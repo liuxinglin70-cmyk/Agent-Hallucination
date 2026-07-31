@@ -76,7 +76,19 @@ _legacy/
 *.log
 logs/
 
+# Large binary archives
+*.tar.gz
+*.tar
+*.zip
+*.7z
+*.rar
+!Paper_translated/*.tar.gz
+
 # Temp
 tmp/
 temp/
 *.tmp
+
+# Legacy experiment scripts (migrated to core/)
+tmp_pull_*/
+tmp_upload_*/
