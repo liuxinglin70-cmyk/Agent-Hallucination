@@ -36,11 +36,14 @@ class ErrorType(str, Enum):
 
     CORRECT = "correct"
     FALSE_POSITIVE = "false_positive"
+    FALSE_NEGATIVE = "false_negative"
     FALSE_NEGATIVE_UNRESOLVED = "false_negative_unresolved"
     FALSE_NEGATIVE_CLEAN = "false_negative_clean"
     UNRESOLVED_SHOULD_ERROR = "unresolved_should_error"
     UNRESOLVED_SHOULD_CLEAN = "unresolved_should_clean"
     UNRESOLVED_UNKNOWN = "unresolved_unknown"  # self-supervised: no gold
+    UNRESOLVED_ERROR = "unresolved_error"
+    INVALID_CERTIFICATE = "invalid_certificate"
     LOCALIZATION_ERROR = "localization_error"
     CANDIDATE_MISS = "candidate_miss"
     CRS_CONTRADICTION = "crs_contradiction"  # self-supervised

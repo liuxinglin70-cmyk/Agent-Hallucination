@@ -277,7 +277,7 @@ def detect_evidence_conflict(
 # to DEFENSE_TYPES. The v3 validate_defense_certificate uses v3's
 # DEFENSE_TYPES which does not include these. We re-implement here.
 
-from .paca_tcl_proof_contract_v3 import _address_space, validate_error_certificate  # noqa: E402
+from .proof_contract_v3 import _address_space, validate_error_certificate  # noqa: E402
 
 
 def validate_defense_certificate(

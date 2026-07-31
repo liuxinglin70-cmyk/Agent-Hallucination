@@ -769,3 +769,80 @@ def create_baseline_genome() -> SkillGenome:
         for i in range(len(mod.rules)):
             mod.set_rule_meta(i, {"is_baseline": True})
     return genome
+
+
+# ============================================================
+# V4-compatible mutation types (used by mutator.py)
+# ============================================================
+
+class MutationOp(str, Enum):
+    REPLACE_TYPED_CLAUSE = "replace_typed_clause"
+    TIGHTEN_PRECONDITION = "tighten_precondition"
+    ADD_NEGATIVE_BOUNDARY = "add_negative_boundary"
+    APPLY_FIX = "apply_fix"
+
+
+@dataclass
+class AtomicMutation:
+    """A single atomic mutation proposed by the LLM."""
+
+    operation: MutationOp
+    target_module: str
+    rule_index: int | None
+    new_content: str | None = None
+    rationale: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "operation": self.operation.value,
+            "target_module": self.target_module,
+            "rule_index": self.rule_index,
+            "new_content": self.new_content,
+            "rationale": self.rationale,
+        }
+
+
+def all_clause_signatures(genome: SkillGenome) -> list[str]:
+    """Get all rule signatures from the genome (for v4 compat)."""
+    signatures: list[str] = []
+    for mid in MODULE_IDS:
+        mod = genome.modules.get(mid)
+        if mod and mod.rules:
+            for i, rule in enumerate(mod.rules):
+                signatures.append(f"{mid}[{i}]: {rule[:80]}")
+    return signatures
+
+
+def validate_mutation(
+    mutation: AtomicMutation, genome: SkillGenome
+) -> tuple[bool, str]:
+    """Validate an atomic mutation against the genome."""
+    if mutation.target_module not in MODULE_IDS:
+        return False, f"invalid_module: {mutation.target_module}"
+
+    module = genome.modules[mutation.target_module]
+    content = (mutation.new_content or "").strip()
+
+    if mutation.operation == MutationOp.APPLY_FIX:
+        if mutation.rule_index is None or mutation.rule_index >= len(module.rules):
+            return False, f"invalid_rule_index: {mutation.rule_index}"
+        if not content:
+            return False, "empty_content"
+
+    elif mutation.operation in (
+        MutationOp.REPLACE_TYPED_CLAUSE,
+        MutationOp.TIGHTEN_PRECONDITION,
+        MutationOp.ADD_NEGATIVE_BOUNDARY,
+    ):
+        if not content:
+            return False, "empty_content"
+        if mutation.rule_index is not None and mutation.rule_index >= len(module.rules):
+            return False, f"invalid_rule_index: {mutation.rule_index}"
+
+    # Check forbidden content
+    content_lower = content.lower()
+    for marker in FORBIDDEN_CONTENT_MARKERS:
+        if marker in content_lower:
+            return False, f"forbidden_content: {marker}"
+
+    return True, "ok"

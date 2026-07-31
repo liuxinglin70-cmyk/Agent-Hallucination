@@ -40,13 +40,13 @@ from .basic_runner import (
     write_json,
     write_jsonl,
 )
-from ..bccse.evolution_runner import EvaluationOutcome
-from ..bccse.reflection_engine import (
-    ErrorType,
+from ..bccse.types import (
+    EvaluationOutcome,
     ExperienceRecord,
     FailureEpisode,
     anonymous_ref,
 )
+from ..bccse.step_attributor import ErrorType
 from ..bccse.genome import SkillGenome, create_baseline_genome
 from ..bccse.mutator import MutationProvider
 from ..bccse.promotion_gates import G1_CHECKS, MetricSnapshot, ReplayEvidence
