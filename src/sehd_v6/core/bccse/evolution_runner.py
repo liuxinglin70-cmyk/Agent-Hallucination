@@ -68,6 +68,13 @@ from .step_attributor import (
     TriggerSource,
     attribute_failure,
 )
+from ..htc_tes import (
+    HallucinationType,
+    HallucinationTypeClassifier,
+    TypeConditionedEvolution,
+    TypeAwareFitness,
+    classify_hallucination_type,
+)
 
 # ============================================================
 # Data structures
@@ -501,9 +508,15 @@ def run_online_evolution(
     provisional_edits: list[ProvisionalEdit] = []
     batch_history: list[dict[str, Any]] = []
 
+    # HTC-TES v3: type-conditioned evolution components
+    type_classifier = HallucinationTypeClassifier()
+    type_evolution = TypeConditionedEvolution()
+    type_fitness = TypeAwareFitness()
+
     print(f"[{run_id}] Starting online evolution: {len(evolution_case_ids)} cases")
     print(f"  Config: use_gold={use_gold}, cooldown={module_cooldown}, "
           f"max_edits={max_total_edits}, convergence_window={convergence_window}")
+    print(f"  HTC-TES v3: type-conditioned evolution enabled")
 
     stable_cases = 0
     # Cached states are provenance only. Batch canaries are always evaluated as
@@ -904,6 +917,21 @@ def run_online_evolution(
                     "case_id": item.case_id,
                     "batch_id": batch_id,
                 })
+                # HTC-TES v3: Record type-conditioned experience
+                type_fitness.assess_edit(
+                    source_case_id=item.case_id,
+                    hallucination_type=type_classifier.classify(
+                        item.source_result, item.source_signal
+                    ).primary_type,
+                    evolution_direction=type_evolution._infer_evolution_direction(
+                        item.source_signal.state, None,
+                    ),
+                    detection_before=item.source_result,
+                    detection_after=source_audits[idx].get("source_after", {}),
+                    type_result=type_classifier.classify(
+                        item.source_result, item.source_signal
+                    ),
+                )
                 step = steps[item.step_index]
                 step.gate_decision = "accept_batch"
                 step.mutation_applied = item.edit.to_dict()
@@ -1093,6 +1121,17 @@ def run_online_evolution(
         print(f"  [{idx}] TRIGGERED {case_id}: {signal.trigger_source.value} "
               f"→ {signal.error_type.value} → {signal.target_module}")
 
+        # --- HTC-TES v3: Classify hallucination type ---
+        type_result = type_classifier.classify(detection_result, signal)
+        type_guidance = type_evolution.generate_type_guidance(
+            type_result.primary_type,
+            type_evolution._infer_evolution_direction(
+                signal.state, signal.get("gold_label"),
+            ),
+        )
+        print(f"    [HTC-TES] type={type_result.primary_type.value} "
+              f"confidence={type_result.confidence:.2f}")
+
         # --- [3] LLM Causal Process Reflection (PRIMARY PATH) ---
         # The LLM is the core engine of evolution — it reasons about WHY
         # the skill failed and GENERATES a novel edit.
@@ -1145,6 +1184,16 @@ def run_online_evolution(
                 capacity_guidance=capacity_guidance,
                 allowed_target_modules=allowed_modules,
             )
+
+            # HTC-TES v3: Append type-conditioned guidance to reflection prompt
+            experience_summary = type_fitness.get_experience_memory().get_type_coverage()
+            user_prompt += f"\n\n{type_guidance}"
+            if experience_summary.get("types_with_success", 0) > 0:
+                user_prompt += (
+                    f"\n[Experience] Types with success: "
+                    f"{experience_summary['types_with_success']}/"
+                    f"{experience_summary['total_types']}"
+                )
 
             # One semantic reflection call per source. Invalid output remains an
             # auditable no-mutation event; it is never "prompted into" an edit.
@@ -1603,6 +1652,9 @@ def run_online_evolution(
     # Save results
     write_json(output_dir / "evolution_result.json", result.to_dict())
     write_json(output_dir / "champion_genome.json", champion_genome.to_dict())
+    # HTC-TES v3: Save type-conditioned experience summary
+    type_coverage = type_fitness.get_experience_memory().get_type_coverage()
+    write_json(output_dir / "htc_tes_coverage.json", type_coverage)
     persist_progress(len(evolution_case_ids), status="complete")
 
     print(f"\n[{run_id}] Complete in {duration:.1f}s:")
@@ -1611,5 +1663,9 @@ def run_online_evolution(
     print(f"  Edits: {edits_accepted} accepted, {edits_rejected} rejected")
     print(f"  Halted: {gate.is_halted} ({gate.halt_reason})")
     print(f"  Champion: {champion_genome.content_hash[:16]}...")
+    # HTC-TES v3: Print type coverage summary
+    print(f"  HTC-TES: {type_coverage['types_with_experience']}/"
+          f"{type_coverage['total_types']} types covered "
+          f"(effective: {type_coverage['effective_coverage']:.1%})")
 
     return result

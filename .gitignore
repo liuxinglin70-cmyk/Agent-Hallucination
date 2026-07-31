@@ -3,10 +3,14 @@ _server_latest/
 验证文件/
 archive/
 Paper/
+Paper_translated/
 .workbuddy/
 过程文档/
 docs/
 tmp_external/
+tmp_pull_*/
+tmp_upload_*/
+架构可视化/
 *.txt
 
 # Python
@@ -82,7 +86,6 @@ logs/
 *.zip
 *.7z
 *.rar
-!Paper_translated/*.tar.gz
 
 # Temp
 tmp/
@@ -90,5 +93,3 @@ temp/
 *.tmp
 
 # Legacy experiment scripts (migrated to core/)
-tmp_pull_*/
-tmp_upload_*/

@@ -2,6 +2,9 @@
 
 Contains dataclasses and type aliases shared between evolution_runner.py
 and proof_evaluator.py. These are kept here to avoid circular imports.
+
+Note: EvolutionStep is defined in evolution_runner.py (not here) because
+it has fields specific to the evolution loop that are not shared.
 """
 
 from __future__ import annotations
@@ -31,38 +34,6 @@ class EvaluationOutcome:
             "per_case_correct": self.per_case_correct,
             "provider_payload_hashes": list(self.provider_payload_hashes),
             "evaluation_id": self.evaluation_id,
-        }
-
-
-@dataclass
-class EvolutionStep:
-    """A single step in the online evolution process."""
-
-    step_index: int
-    case_id: str
-    case_index: int
-    action: str
-    trigger_signal: str = ""
-    gate_decision: str = ""
-    certificate: dict[str, Any] | None = None
-    genome_hash_before: str = ""
-    genome_hash_after: str = ""
-    fitness_assessment: dict[str, Any] | None = None
-    duration_seconds: float = 0.0
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "step_index": self.step_index,
-            "case_id": self.case_id,
-            "case_index": self.case_index,
-            "action": self.action,
-            "trigger_signal": self.trigger_signal,
-            "gate_decision": self.gate_decision,
-            "certificate": self.certificate,
-            "genome_hash_before": self.genome_hash_before,
-            "genome_hash_after": self.genome_hash_after,
-            "fitness_assessment": self.fitness_assessment,
-            "duration_seconds": self.duration_seconds,
         }
 
 

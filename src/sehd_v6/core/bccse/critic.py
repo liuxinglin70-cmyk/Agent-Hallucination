@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
-from .reflection_engine import FailureEpisode
+from .types import FailureEpisode
 from .genome import (
     FORBIDDEN_CONTENT_MARKERS,
     AtomicMutation,
