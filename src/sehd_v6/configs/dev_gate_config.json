@@ -1,0 +1,19 @@
+{
+  "schema_version": "vgse.dev_gate.v1",
+  "evaluation_split": "dev",
+  "allow_test_feedback": false,
+  "minimum_metric_eligible_cases": 50,
+  "objectives": {
+    "evidence_citation_validity": {"minimum_delta": 0.02},
+    "counter_witness_validity": {"minimum_delta": 0.02},
+    "claim_localization_accuracy": {"minimum_delta": 0.0}
+  },
+  "guardrails": {
+    "boundary_false_positive_rate": {"maximum_absolute_increase": 0.01},
+    "forced_decision_under_insufficient_evidence": {"maximum_absolute_increase": 0.0},
+    "abstention_precision": {"minimum_delta": 0.0},
+    "source_shortcut_audit": {"must_pass": true},
+    "test_feedback_used": {"must_equal": false}
+  },
+  "decision_rule": "accept only when all guardrails pass and at least two objectives improve without outcome-as-gold leakage"
+}

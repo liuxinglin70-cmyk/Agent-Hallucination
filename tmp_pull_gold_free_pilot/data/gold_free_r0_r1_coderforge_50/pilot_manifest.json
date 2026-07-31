@@ -1,0 +1,20 @@
+{
+  "created_at": "2026-06-21T22:30:35+08:00",
+  "phase": "gold_free_r0_r1_coderforge_50",
+  "source_id": "coderforge_verified_eval",
+  "agent_system_id": "openhands_coderforge",
+  "input_mode": "preselected_cards",
+  "split_counts": {
+    "train": 30,
+    "dev": 10,
+    "test": 10
+  },
+  "models": {
+    "skill_model": "qwen3.6-plus",
+    "detector_model": "qwen3.6-plus",
+    "feedback_model": "DeepSeek-V4-Pro"
+  },
+  "api_concurrency": 15,
+  "test_split_policy": "test is used only after skill_r1 is frozen",
+  "gold_free_policy": "no judge-created truth labels; hard checks + reverse audit quality feedback only"
+}

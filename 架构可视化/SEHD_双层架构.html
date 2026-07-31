@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEHD 双层架构 — 检测器基座 + 自进化框架</title>
+<style>
+  :root{
+    --bg:#0f1117; --surface:#1a1d28; --surface2:#222636; --border:#2e3347;
+    --text:#e4e7f0; --muted:#8b90a8; --subtle:#62677f;
+    --brand:#7c5cff; --brand-light:#a78bfa;
+    --accent:#10b981; --accent-light:#34d399;
+    --warn:#f59e0b; --warn-light:#fbbf24;
+    --danger:#ef4444; --danger-light:#f87171;
+    --info:#3b82f6; --info-light:#60a5fa;
+    --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    --font-mono:'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-height:1.6;padding:24px;min-height:100vh}
+  h1{font-size:24px;font-weight:700;margin-bottom:6px;background:linear-gradient(135deg,var(--brand-light),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:32px}
+  .framework{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:28px;position:relative;overflow:hidden}
+  .framework::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .framework.detector::before{background:linear-gradient(90deg,var(--info),var(--accent))}
+  .framework.evolution::before{background:linear-gradient(90deg,var(--brand),var(--warn))}
+  .fw-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+  .fw-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px}
+  .fw-badge.frozen{background:rgba(59,130,246,0.15);color:var(--info-light);border:1px solid rgba(59,130,246,0.3)}
+  .fw-badge.active{background:rgba(124,92,255,0.15);color:var(--brand-light);border:1px solid rgba(124,92,255,0.3)}
+  .fw-title{font-size:19px;font-weight:700}
+  .fw-desc{color:var(--muted);font-size:12px;margin-left:auto}
+  .stage-row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+  .stage{flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;transition:border-color 0.2s}
+  .stage:hover{border-color:var(--brand)}
+  .stage-num{position:absolute;top:-8px;left:14px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .stage.det .stage-num{background:var(--info)}
+  .stage-title{font-size:13px;font-weight:600;margin-bottom:6px;margin-top:4px}
+  .stage-body{font-size:11px;color:var(--muted);line-height:1.5}
+  .stage-body strong{color:var(--text)}
+  .stage-body code{font-family:var(--font-mono);font-size:10px;background:rgba(124,92,255,0.1);padding:1px 5px;border-radius:3px;color:var(--brand-light)}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--subtle);font-size:18px;padding:0 2px}
+  .gate-box{background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:14px;margin:10px 0}
+  .gate-title{font-size:12px;font-weight:600;color:var(--warn-light);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .gate-list{display:flex;gap:10px;flex-wrap:wrap}
+  .gate-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;flex:1;min-width:140px}
+  .gate-item strong{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
+  .gate-item span{color:var(--muted);font-size:10px}
+  .crs-row{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+  .crs-dim{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;flex:1;min-width:120px;text-align:center}
+  .crs-name{font-size:11px;font-weight:600;color:var(--text)}
+  .crs-weight{font-size:18px;font-weight:700;color:var(--accent-light);margin:4px 0}
+  .crs-desc{font-size:9px;color:var(--subtle)}
+  .loop-container{display:flex;align-items:flex-start;gap:0;margin:16px 0;flex-wrap:wrap}
+  .loop-step{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:11px;position:relative;flex:1;min-width:130px;text-align:center}
+  .loop-step-num{position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .loop-step strong{display:block;color:var(--text);font-size:11px;margin-bottom:2px}
+  .loop-step span{color:var(--muted);font-size:10px}
+  .loop-arrow{display:flex;align-items:center;color:var(--subtle);font-size:14px;padding:0 4px;align-self:center;margin-top:8px}
+  .fix-badge{display:inline-block;font-size:9px;font-weight:600;padding:1px 6px;border-radius:4px;margin-left:4px;vertical-align:middle}
+  .fix-d1{background:rgba(16,185,129,0.15);color:var(--accent-light);border:1px solid rgba(16,185,129,0.3)}
+  .fix-d2{background:rgba(124,92,255,0.15);color:var(--brand-light);border:1px solid rgba(124,92,255,0.3)}
+  .result-box{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:14px;margin-top:12px}
+  .result-title{font-size:12px;font-weight:600;color:var(--accent-light);margin-bottom:6px}
+  .result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+  .result-item{background:var(--surface2);border-radius:8px;padding:8px;text-align:center}
+  .result-val{font-size:20px;font-weight:700;color:var(--text)}
+  .result-label{font-size:10px;color:var(--muted)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)}
+  .legend-dot{width:10px;height:10px;border-radius:50%}
+  .note{font-size:11px;color:var(--subtle);margin-top:8px;padding:8px 12px;background:rgba(59,130,246,0.05);border-left:3px solid var(--info);border-radius:0 6px 6px 0}
+</style>
+</head>
+<body>
+
+<h1>SEHD 双层架构</h1>
+<div class="subtitle">Evidence-routed Skill Evolution for Agent Hallucination Detection · 检测器基座 (PACA-TCL v3.5.1) + 自进化层 (BCCSE v5.3.5)</div>
+
+<!-- ==================== 检测器框架 ==================== -->
+<div class="framework detector">
+  <div class="fw-header">
+    <span class="fw-badge frozen">FROZEN BASE</span>
+    <span class="fw-title">检测器框架 · PACA-TCL v3.5.1</span>
+    <span class="fw-desc">法庭式因果归因 · 三段管线 · 五维 CRS · 三态输出</span>
+  </div>
+
+  <div class="stage-row">
+    <div class="stage det">
+      <div class="stage-num">H1</div>
+      <div class="stage-title">聚焦起诉 (Focused Prosecution)</div>
+      <div class="stage-body">
+        <strong>输入</strong>: 候选错误事件 (census + construct + process)<br>
+        <strong>动作</strong>: ThreadPoolExecutor 并行起诉每个候选<br>
+        <strong>输出</strong>: 错误证书 (certificates) + <code>impact_kind</code>, <code>benchmark_causal_status</code><br>
+        <strong>coverage</strong>: <code>attempted_candidates</code> <span class="fix-badge fix-d1">D1 修复</span> 区分 LLM-empty (→complete) vs LLM-crash (→incomplete)
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage det">
+      <div class="stage-num">H2</div>
+      <div class="stage-title">共识门 (Consensus Gate)</div>
+      <div class="stage-body">
+        <strong>条件</strong>: 控辩达成共识才定罪<br>
+        <strong>机制</strong>: appeal-sourced positives 必须 initial prosecution 独立支持<br>
+        <strong>权衡</strong>: FP 抑制 ↑ / FN 恢复 ↓ (H2 设计取舍)<br>
+        <strong>注</strong>: 仅作用于 post-appeal 二次裁决
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage det">
+      <div class="stage-num">H3</div>
+      <div class="stage-title">双阶段定位 (Dual-stage Localization)</div>
+      <div class="stage-body">
+        <strong>Stage 1</strong>: 反事实 do-intervention 定位根因<br>
+        <strong>Stage 2</strong>: 时间回溯 tiebreak (CESV counterfactual_rankings)<br>
+        <strong>输出</strong>: <code>verified_error</code> + responsible_event_id<br>
+        <strong>回退</strong>: 反事实失败 → temporal min
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>安全网（D1 修复后）</strong>: Defense 双重覆盖（主要）· Appeal trigger（defense insufficient_evidence → Priority 1）· Base-v2 cross-check（Priority 0）。
+    verified_clean 需 prosecution-empty <strong>且</strong> defense 对所有 required 候选产生 dominating 证据。
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="gate-title">⚖ Verdict 决策树 (冻结, 不可修改)</div>
+    <div class="gate-box">
+      <div class="gate-list">
+        <div class="gate-item">
+          <strong>verified_error</strong>
+          <span>surviving 非空 → H3 选择 winner</span>
+        </div>
+        <div class="gate-item">
+          <strong>verified_clean (路径 B)</strong>
+          <span>surviving 空 + p_cov=complete + d_cov=complete + no invalid + required ⊆ clean_covered</span>
+        </div>
+        <div class="gate-item">
+          <strong>verified_clean (路径 C)</strong>
+          <span>surviving 空 + complete + no required + no valid_errors</span>
+        </div>
+        <div class="gate-item">
+          <strong>unresolved</strong>
+          <span>其他所有情况 (兜底)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="gate-title">📊 五维 CRS 评分 (权重冻结)</div>
+    <div class="crs-row">
+      <div class="crs-dim">
+        <div class="crs-name">Factuality</div>
+        <div class="crs-weight">0.35</div>
+        <div class="crs-desc">breach_type 映射</div>
+      </div>
+      <div class="crs-dim">
+        <div class="crs-name">Counterfactual</div>
+        <div class="crs-weight">0.15</div>
+        <div class="crs-desc">benchmark_causal_status</div>
+      </div>
+      <div class="crs-dim">
+        <div class="crs-name">Recovery</div>
+        <div class="crs-weight">0.20</div>
+        <div class="crs-desc">recovery_state</div>
+      </div>
+      <div class="crs-dim">
+        <div class="crs-name">Process</div>
+        <div class="crs-weight">0.20</div>
+        <div class="crs-desc">evidence-ref 检查</div>
+      </div>
+      <div class="crs-dim">
+        <div class="crs-name">Scope</div>
+        <div class="crs-weight">0.10</div>
+        <div class="crs-desc">impact_kind 映射 (差异化优势维度)</div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:8px">
+      <strong>CRS 非确定性根因</strong>: scope/counterfactual 由 LLM 产出的证书字段决定，<code>validate_error_certificate</code> 只检查枚举不重推导。
+      <span class="fix-badge fix-d2">D2 修复</span>: shared_cache 使同 genome+case 的 LLM 调用只发生一次 → CRS 完全确定。
+    </div>
+  </div>
+
+  <div class="result-box" style="margin-top:16px">
+    <div class="result-title">🏆 基座成绩 (P0=64, macro-F1)</div>
+    <div class="result-grid">
+      <div class="result-item">
+        <div class="result-val">0.764</div>
+        <div class="result-label">PACA-TCL v3.5</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val">0.702</div>
+        <div class="result-label">GPT-5</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val">0.646</div>
+        <div class="result-label">Gemini-2.5-Pro</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val">0.636</div>
+        <div class="result-label">Claude-4.5</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 自进化框架 ==================== -->
+<div class="framework evolution">
+  <div class="fw-header">
+    <span class="fw-badge active">ACTIVE LAYER</span>
+    <span class="fw-title">自进化框架 · BCCSE v5.3.5</span>
+    <span class="fw-desc">在冻结基座之上 · 8 模块自然语言规则 genome · 逐案例在线进化</span>
+  </div>
+
+  <div class="stage-row">
+    <div class="stage">
+      <div class="stage-num">①</div>
+      <div class="stage-title">检测触发</div>
+      <div class="stage-body">
+        运行检测器获取 <code>state</code> + CRS<br>
+        <strong>触发条件</strong>: unresolved / gold_mismatch<br>
+        <strong>跳过</strong>: stable (verified_clean / verified_error 正确)
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="stage-num">②</div>
+      <div class="stage-title">失败归因</div>
+      <div class="stage-body">
+        <code>skill_step_attributor_v5</code><br>
+        <strong>输入</strong>: evidence_summary (pros/def/crs/consensus)<br>
+        <strong>输出</strong>: target_module + secondary_module<br>
+        <strong>路径</strong>: defense.state → 模块映射<br>
+        <span class="fix-badge fix-d1">F3</span> None→clean_defense_boundary
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="stage-num">③</div>
+      <div class="stage-title">LLM 因果反思</div>
+      <div class="stage-body">
+        <code>skill_experience_compiler_v5</code><br>
+        <strong>输入</strong>: 失败 trace + 归因 + genome 容量<br>
+        <strong>输出</strong>: SkillEdit (add_rule/modify_rule/no_edit)<br>
+        <span class="fix-badge fix-d1">F4</span> prefer-add 条件化
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:8px">
+    <div class="gate-title">🔒 三层门控 (安全机制)</div>
+    <div class="gate-box">
+      <div class="gate-list">
+        <div class="gate-item">
+          <strong>结构门 (9 层校验)</strong>
+          <span>契约/容量<span class="fix-badge fix-d1">C</span>/泛化/去重<span class="fix-badge fix-d1">F1: 0.85</span>/bloat<span class="fix-badge fix-d1">B: 2.0</span>/total<span class="fix-badge fix-d1">F2: 60</span>...</span>
+        </div>
+        <div class="gate-item">
+          <strong>Fitness 门 (源回放)</strong>
+          <span>同 genome+case 重检测 · <span class="fix-badge fix-d2">D2: shared_cache</span> 消除非确定性<br>v5.3.3: no_effect add_rule 准入</span>
+        </div>
+        <div class="gate-item">
+          <strong>Canary 门 (漂移对比)</strong>
+          <span>champion vs shadow · canary-size=0 (disabled)<br>batch commit: worse_count==0 <span class="fix-badge fix-d1">F5</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="gate-title">🔄 自进化闭环</div>
+    <div class="loop-container">
+      <div class="loop-step">
+        <div class="loop-step-num">①</div>
+        <strong>检测</strong>
+        <span>运行 v3.5.1</span>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step">
+        <div class="loop-step-num">②</div>
+        <strong>归因</strong>
+        <span>定位失败模块</span>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step">
+        <div class="loop-step-num">③</div>
+        <strong>反思</strong>
+        <span>LLM 生成编辑</span>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step">
+        <div class="loop-step-num">④</div>
+        <strong>门控</strong>
+        <span>结构+fitness+canary</span>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step">
+        <div class="loop-step-num">⑤</div>
+        <strong>应用</strong>
+        <span>shadow genome 更新</span>
+      </div>
+      <div class="loop-arrow">→</div>
+      <div class="loop-step">
+        <div class="loop-step-num">⑥</div>
+        <strong>Batch Commit</strong>
+        <span>≥3 edits → champion</span>
+      </div>
+      <div class="loop-arrow">↻</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="gate-title">🧬 8 模块 Genome (L2 Rule 层)</div>
+    <div class="stage-row" style="margin-bottom:0">
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">candidate_trigger</div>
+        <div class="stage-body">容量 4 · 候选触发</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">evidence_obligation</div>
+        <div class="stage-body">容量 6 · 证据义务</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">candidate_to_verifier_route</div>
+        <div class="stage-body">容量 2 · C→V 路由</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">atomic_verifier_instruction</div>
+        <div class="stage-body">容量 4 · 原子验证</div>
+      </div>
+    </div>
+    <div class="stage-row" style="margin-bottom:0;margin-top:8px">
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">clean_defense_boundary</div>
+        <div class="stage-body">容量 <span class="fix-badge fix-d1">7</span> · clean 辩护</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">causal_link_test</div>
+        <div class="stage-body">容量 4 · 因果链</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">earliest_origin_tiebreak</div>
+        <div class="stage-body">容量 3 · 根因 tiebreak</div>
+      </div>
+      <div class="stage" style="min-width:140px;padding:10px">
+        <div class="stage-title" style="font-size:11px">abstention_rule</div>
+        <div class="stage-body">容量 5 · 弃权规则</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-box" style="margin-top:16px">
+    <div class="result-title">📈 v5.3.5 五例验证结果 (D1-D4 修复后)</div>
+    <div class="result-grid">
+      <div class="result-item">
+        <div class="result-val" style="color:var(--accent-light)">3</div>
+        <div class="result-label">STABLE (verified_clean)</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val" style="color:var(--brand-light)">2</div>
+        <div class="result-label">ACCEPTED (strong_improvement)</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val" style="color:var(--danger-light)">0</div>
+        <div class="result-label">REJECTED</div>
+      </div>
+      <div class="result-item">
+        <div class="result-val">c6986bad</div>
+        <div class="result-label">Champion (2 edits committed)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>修复前: 0/5 accepted, 3 detector-gave-up</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--brand)"></div>修复后: 2/5 accepted, 0 detector-gave-up</div>
+    <div class="legend-item"><span class="fix-badge fix-d1">D1</span>Coverage 语义</div>
+    <div class="legend-item"><span class="fix-badge fix-d2">D2</span>CRS cache 共享</div>
+    <div class="legend-item"><span class="fix-badge fix-d1">F1-F5</span>框架修复</div>
+    <div class="legend-item"><span class="fix-badge fix-d1">B/C</span>bloat+容量</div>
+  </div>
+</div>
+
+<div style="text-align:center;color:var(--subtle);font-size:11px;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+  SEHD Framework · PACA-TCL v3.5.1 (frozen base) + BCCSE v5.3.5 (active evolution) · 2026-07-30
+</div>
+
+</body>
+</html>

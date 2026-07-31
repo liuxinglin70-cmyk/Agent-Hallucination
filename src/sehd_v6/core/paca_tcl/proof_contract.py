@@ -1,0 +1,495 @@
+"""PACA-TCL v3.5 proof-court contract with focused prosecution support.
+
+Compared to v3.4, this contract adds three structural interventions:
+
+H1 - Candidate-Focused Prosecution Support:
+  - Per-candidate prosecution validation (each focused call returns one certificate)
+  - Quarantine feedback metadata for iterative refinement
+  - Causal chain completeness scoring
+
+H2 - Calibrated Appeal with Consensus Gate:
+  - Consensus gate: appeal-sourced positive requires independent initial support
+  - Informed defender integration (defender sees prosecution certificates)
+  - Tightened trigger priority enforcement (only 0-1 pass through)
+
+H3 - Two-Phase Localization:
+  - Phase 1: binary incident confirmation (unchanged from v3.4)
+  - Phase 2: pairwise counterfactual comparison for earliest-origin selection
+  - Replaces simple min(event_order) with causal sufficiency ranking
+
+The fundamental architectural change: prosecution information flow topology
+shifts from broadcast-all to focused-per-candidate, and earliest-origin
+selection shifts from temporal minimum to counterfactual sufficiency.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from typing import Any
+
+from . import contract_v1 as v1
+from .proof_contract_v3 import _address_space, validate_error_certificate
+from .proof_contract_v3_4 import (
+    BREACH_TYPES,
+    CLAIM_KINDS,
+    COVERAGE_STATES,
+    DEFENSE_FIELDS,
+    DEFENSE_TYPES,
+    DOMINATING_DEFENSES,
+    ERROR_FIELDS,
+    IMPACT_KINDS,
+    NORM_SOURCES,
+    RECOVERY_STATES,
+    BENCHMARK_CAUSAL_STATES,
+    check_commitment,
+    check_materiality,
+    detect_evidence_conflict,
+    route_evidence_authority,
+    validate_defense_certificate,
+    _defense_dominates,
+    _validate_top,
+)
+
+
+# ============================================================
+# H1: Focused Prosecution Support
+# ============================================================
+
+# Causal chain scaffolding stages that a complete prosecution must address
+CAUSAL_CHAIN_STAGES = [
+    "norm_identification",       # What norm/obligation was violated?
+    "origin_event",              # What specific agent event is the origin?
+    "agent_control",             # How did the agent control/adopt/generate this?
+    "propagation_path",          # How does the error propagate?
+    "impact_on_result",          # What is the impact on the produced result?
+    "counterfactual_test",       # Would correcting this alone fix the result?
+]
+
+
+def validate_focused_prosecution(
+    row: dict[str, Any], packet: dict[str, Any], candidate_origins: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Validate a single-candidate focused prosecution certificate.
+
+    Same structural validation as v3.4 validate_error_certificate, plus
+    causal chain completeness scoring for the scaffolding feedback loop.
+    """
+    base_audit = validate_error_certificate(row, packet, candidate_origins)
+
+    # Score causal chain completeness (for quarantine feedback)
+    rationale = str(row.get("rationale") or "")
+    chain_scores = {}
+    chain_signals = {
+        "norm_identification": ["norm", "obligation", "requirement", "instruction", "contract", "rule"],
+        "origin_event": ["origin", "event", "step", "action", "assertion", "omission"],
+        "agent_control": ["agent", "controlled", "adopted", "generated", "decided", "chose"],
+        "propagation_path": ["propagat", "downstream", "subsequent", "leads to", "causes", "results in"],
+        "impact_on_result": ["impact", "result", "answer", "output", "incorrect", "wrong"],
+        "counterfactual_test": ["counterfactual", "if corrected", "would fix", "sufficient", "necessary"],
+    }
+    rationale_lower = rationale.lower()
+    for stage, signals in chain_signals.items():
+        chain_scores[stage] = any(signal in rationale_lower for signal in signals)
+
+    completeness = sum(chain_scores.values()) / len(chain_scores)
+    base_audit["causal_chain_completeness"] = completeness
+    base_audit["causal_chain_scores"] = chain_scores
+    base_audit["missing_chain_stages"] = [
+        stage for stage, present in chain_scores.items() if not present
+    ]
+
+    return base_audit
+
+
+def build_quarantine_feedback(audit: dict[str, Any]) -> str:
+    """Build structured feedback for a quarantined certificate to guide retry.
+
+    This is the core of the iterative refinement loop: instead of just
+    discarding a quarantined certificate, we tell the prosecution WHAT
+    failed and WHY, so it can construct a better certificate.
+    """
+    failed_checks = audit.get("failed_checks") or []
+    missing_stages = audit.get("missing_chain_stages") or []
+
+    feedback_parts = []
+    if failed_checks:
+        feedback_parts.append(
+            f"STRUCTURAL_FAILURES: {', '.join(failed_checks)}. "
+            "Fix these field-level issues first."
+        )
+    if missing_stages:
+        stage_guidance = {
+            "norm_identification": "Explicitly state which norm/obligation/rule was violated and cite the evidence for that norm.",
+            "origin_event": "Identify the specific agent event where the error originated.",
+            "agent_control": "Explain how the agent controlled, adopted, or generated this error (not external).",
+            "propagation_path": "Trace how the error propagates from origin to downstream events.",
+            "impact_on_result": "State the specific impact on the produced result (final_answer, persistent state, etc.).",
+            "counterfactual_test": "Argue why correcting THIS origin alone would be causally sufficient to fix the result.",
+        }
+        guidance = "; ".join(
+            f"{stage}: {stage_guidance.get(stage, 'Address this stage.')}"
+            for stage in missing_stages
+        )
+        feedback_parts.append(f"CAUSAL_CHAIN_GAPS: {guidance}")
+
+    if not feedback_parts:
+        feedback_parts.append("Certificate was quarantined for unspecified reasons. Reconstruct with full causal chain.")
+
+    return " | ".join(feedback_parts)
+
+
+# ============================================================
+# H2: Consensus Gate
+# ============================================================
+
+def apply_consensus_gate(
+    *, surviving_errors: list[dict[str, Any]], initial_prosecution: dict[str, Any] | None,
+    appeal_source_marker: str = "appeal_",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Apply the consensus gate to filter appeal-sourced positives.
+
+    Rule: An error certificate whose certificate_id starts with the appeal
+    source marker can only survive if at least one INITIAL prosecution
+    certificate independently supports the same source_candidate_id with
+    benchmark_causal_status in {causes_incorrect_result, propagates_to_incorrect_result}.
+
+    This prevents the appeal layer from creating positives that the initial
+    prosecution did not independently find -- the primary cause of FP in v3.4.
+
+    Returns:
+        (consensus_passed, consensus_blocked) -- errors that pass vs blocked by gate
+    """
+    if initial_prosecution is None:
+        # No initial prosecution available; all pass (backward compat)
+        return surviving_errors, []
+
+    # Build set of candidate_ids that initial prosecution independently supports
+    initial_supported: set[str] = set()
+    for cert in (initial_prosecution.get("candidates") or []):
+        causal_status = str(cert.get("benchmark_causal_status") or "")
+        if causal_status in {"causes_incorrect_result", "propagates_to_incorrect_result"}:
+            initial_supported.add(str(cert.get("source_candidate_id") or ""))
+
+    passed = []
+    blocked = []
+    for error in surviving_errors:
+        cert_id = str(error.get("certificate_id") or "")
+        source_candidate = str(error.get("source_candidate_id") or "")
+        if cert_id.startswith(appeal_source_marker):
+            # Appeal-sourced: requires consensus
+            if source_candidate in initial_supported:
+                passed.append(error)
+            else:
+                blocked.append(error)
+        else:
+            # Initial-sourced: passes without consensus requirement
+            passed.append(error)
+
+    return passed, blocked
+
+
+# ============================================================
+# H3: Two-Phase Localization
+# ============================================================
+
+def select_earliest_origin_temporal(
+    surviving: list[dict[str, Any]], event_order: dict[str, int],
+) -> dict[str, Any] | None:
+    """Phase 1 fallback: simple temporal minimum (same as v3.4)."""
+    if not surviving:
+        return None
+    return min(surviving, key=lambda row: (
+        event_order.get(str(row["origin_event_id"]), 10**9),
+        str(row["certificate_id"]),
+    ))
+
+
+def select_earliest_origin_counterfactual(
+    surviving: list[dict[str, Any]],
+    event_order: dict[str, int],
+    counterfactual_rankings: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """Phase 2: counterfactual-sufficiency-based origin selection.
+
+    If counterfactual_rankings are provided (from a pairwise comparison
+    provider call), use them to rank origins by causal sufficiency.
+    Otherwise, fall back to temporal minimum.
+
+    counterfactual_rankings format:
+    {
+        "event_001": {"causal_sufficiency_score": 0.9, "is_root_cause": True},
+        "event_003": {"causal_sufficiency_score": 0.3, "is_root_cause": False},
+    }
+
+    Selection algorithm:
+    1. If any origin has is_root_cause=True, select the earliest among them
+    2. Otherwise, select the origin with highest causal_sufficiency_score
+    3. Tie-break by temporal order (earlier wins)
+    """
+    if not surviving:
+        return None
+
+    if not counterfactual_rankings:
+        return select_earliest_origin_temporal(surviving, event_order)
+
+    # Check for root cause designations
+    root_causes = [
+        row for row in surviving
+        if counterfactual_rankings.get(str(row["origin_event_id"]), {}).get("is_root_cause", False)
+    ]
+
+    if root_causes:
+        # Among root causes, pick earliest
+        return min(root_causes, key=lambda row: (
+            event_order.get(str(row["origin_event_id"]), 10**9),
+            str(row["certificate_id"]),
+        ))
+
+    # No explicit root cause; use sufficiency score with temporal tiebreak
+    def sort_key(row: dict[str, Any]) -> tuple:
+        origin = str(row["origin_event_id"])
+        score = counterfactual_rankings.get(origin, {}).get("causal_sufficiency_score", 0.0)
+        # Higher score first (negate for ascending sort), then earlier event
+        return (-score, event_order.get(origin, 10**9), str(row["certificate_id"]))
+
+    return min(surviving, key=sort_key)
+
+
+# ============================================================
+# v3.5: Main adjudication with all three interventions
+# ============================================================
+
+def adjudicate_proof_court(
+    *, required_candidates: list[dict[str, Any]], prosecution: dict[str, Any],
+    defense: dict[str, Any], packet: dict[str, Any],
+    # v3.4 options (preserved)
+    apply_materiality_check: bool = True,
+    apply_commitment_check: bool = True,
+    appeal_defense: dict[str, Any] | None = None,
+    # v3.5 new options
+    initial_prosecution: dict[str, Any] | None = None,
+    apply_consensus_gate_flag: bool = True,
+    counterfactual_rankings: dict[str, dict[str, Any]] | None = None,
+    focused_prosecution_audits: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """v3.5 proof court adjudication with consensus gate and counterfactual localization.
+
+    New in v3.5:
+    - initial_prosecution: the pre-appeal prosecution (for consensus gate)
+    - apply_consensus_gate_flag: enable/disable consensus gate (H2)
+    - counterfactual_rankings: pairwise comparison results (H3)
+    - focused_prosecution_audits: per-candidate audit results with chain scores (H1)
+    """
+
+    event_order, _ = _address_space(packet)
+    candidate_origins: dict[str, str] = {}
+    for row in required_candidates:
+        candidate_id = str(row.get("candidate_id") or "")
+        origin = str(row.get("origin_hypothesis_event_id") or "")
+        if not candidate_id or candidate_id in candidate_origins:
+            raise ValueError("required candidate ids must be present and unique")
+        if origin not in event_order:
+            raise ValueError("required candidate origin is not addressable")
+        candidate_origins[candidate_id] = origin
+    required = list(candidate_origins)
+    p_coverage, p_rows = _validate_top(prosecution)
+    d_coverage, d_rows = _validate_top(defense)
+    p_audits = [validate_error_certificate(row, packet, candidate_origins) for row in p_rows]
+    d_audits = [validate_defense_certificate(row, packet, candidate_origins) for row in d_rows]
+    valid_errors = [row for row, audit in zip(p_rows, p_audits) if audit["decision"] == "pass"]
+    valid_defenses = [row for row, audit in zip(d_rows, d_audits) if audit["decision"] == "pass"]
+
+    # v3.4: merge appeal defender into defense pool (preserved)
+    if appeal_defense is not None:
+        try:
+            ad_coverage, ad_rows = _validate_top(appeal_defense)
+            ad_audits = [validate_defense_certificate(row, packet, candidate_origins) for row in ad_rows]
+            ad_valid = [row for row, audit in zip(ad_rows, ad_audits) if audit["decision"] == "pass"]
+            ad_dominating = {
+                str(row["target_candidate_id"]): row
+                for row in ad_valid
+                if str(row.get("defense_type") or "") in DOMINATING_DEFENSES
+            }
+            valid_defenses = [
+                row for row in valid_defenses
+                if not (
+                    str(row.get("defense_type") or "") == "insufficient_evidence"
+                    and str(row.get("target_candidate_id") or "") in ad_dominating
+                )
+            ]
+            seen_defense_keys = {
+                (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
+                for row in valid_defenses
+            }
+            for row in ad_valid:
+                key = (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
+                if key not in seen_defense_keys:
+                    valid_defenses.append(row)
+                    seen_defense_keys.add(key)
+            for audit in ad_audits:
+                d_audits.append(audit)
+        except (ValueError, KeyError):
+            pass
+
+    defenses_by_candidate: dict[str, list[dict[str, Any]]] = {}
+    for row in valid_defenses:
+        defenses_by_candidate.setdefault(str(row["target_candidate_id"]), []).append(row)
+
+    # v3.4: materiality pre-check (preserved)
+    materiality_results: dict[str, dict[str, Any]] = {}
+    if apply_materiality_check:
+        for row in valid_errors:
+            if str(row.get("breach_type") or "") == "contradiction":
+                result = check_materiality(row, packet)
+                materiality_results[str(row["certificate_id"])] = result
+                if result["decision"] == "immaterial_difference" and result.get("defense_type"):
+                    target_id = str(row["source_candidate_id"])
+                    synthetic_defense = {
+                        "certificate_id": f"materiality_defense_{row['certificate_id']}",
+                        "target_candidate_id": target_id,
+                        "target_origin_event_id": str(row.get("origin_event_id") or ""),
+                        "defense_type": result["defense_type"],
+                        "evidence_refs": [str(row.get("origin_event_id") or "")],
+                        "rationale": result["reason"],
+                    }
+                    defenses_by_candidate.setdefault(target_id, []).append(synthetic_defense)
+
+    # v3.4: commitment pre-check (preserved)
+    commitment_results: dict[str, dict[str, Any]] = {}
+    if apply_commitment_check:
+        for row in valid_errors:
+            if str(row.get("breach_type") or "") == "invalid_action":
+                result = check_commitment(row, packet)
+                commitment_results[str(row["certificate_id"])] = result
+                if result["decision"] == "rejected_attempt" and result.get("defense_type"):
+                    target_id = str(row["source_candidate_id"])
+                    synthetic_defense = {
+                        "certificate_id": f"commitment_defense_{row['certificate_id']}",
+                        "target_candidate_id": target_id,
+                        "target_origin_event_id": str(row.get("origin_event_id") or ""),
+                        "defense_type": result["defense_type"],
+                        "evidence_refs": [str(row.get("origin_event_id") or "")],
+                        "rationale": result["reason"],
+                    }
+                    defenses_by_candidate.setdefault(target_id, []).append(synthetic_defense)
+
+    # Defense dominance (preserved from v3.4)
+    surviving = []
+    auxiliary_process = []
+    defeated = []
+    for row in valid_errors:
+        source_candidate = str(row["source_candidate_id"])
+        dominates = any(
+            _defense_dominates(row, item)
+            for item in defenses_by_candidate.get(source_candidate, [])
+        )
+        if not dominates:
+            if (
+                row["benchmark_causal_status"] in {"causes_incorrect_result", "propagates_to_incorrect_result"}
+                and row["impact_kind"] != "process_debt"
+            ):
+                surviving.append(row)
+            elif row["benchmark_causal_status"] == "process_only" or row["impact_kind"] == "process_debt":
+                auxiliary_process.append(row)
+        else:
+            defeated.append(str(row["certificate_id"]))
+
+    # v3.5 H2: CONSENSUS GATE
+    consensus_blocked: list[dict[str, Any]] = []
+    if apply_consensus_gate_flag and initial_prosecution is not None:
+        surviving, consensus_blocked = apply_consensus_gate(
+            surviving_errors=surviving,
+            initial_prosecution=initial_prosecution,
+        )
+
+    invalid_count = sum(audit["decision"] != "pass" for audit in p_audits + d_audits)
+    clean_covered = {
+        candidate_id for candidate_id, rows in defenses_by_candidate.items()
+        if any(row["defense_type"] in DOMINATING_DEFENSES for row in rows)
+    }
+    auxiliary_candidates = {str(row["source_candidate_id"]) for row in auxiliary_process}
+    positive_candidates = {str(row["source_candidate_id"]) for row in surviving}
+
+    if surviving:
+        # v3.5 H3: TWO-PHASE LOCALIZATION
+        winner = select_earliest_origin_counterfactual(
+            surviving, event_order, counterfactual_rankings,
+        )
+        state, responsible = "verified_error", str(winner["origin_event_id"])
+    else:
+        complete = p_coverage == d_coverage == "complete" and not invalid_count
+        if complete and set(required) <= clean_covered | auxiliary_candidates:
+            state, responsible = "verified_clean", None
+        elif complete and not required and not valid_errors:
+            state, responsible = "verified_clean", None
+        else:
+            state, responsible = "unresolved", None
+        winner = None
+
+    impact_status = None
+    if winner is not None:
+        impact_status = {
+            "none": "unrecovered",
+            "pre_impact_repaired": "recovered_before_downstream_impact",
+            "post_impact_residual": "recovered_after_impact",
+            "unresolved": "unresolved",
+        }[str(winner["recovery_state"])]
+
+    all_defense_types = [str(row["defense_type"]) for row in valid_defenses]
+    for results in [materiality_results, commitment_results]:
+        for result in results.values():
+            if result.get("defense_type"):
+                all_defense_types.append(str(result["defense_type"]))
+
+    return {
+        "state": state,
+        "responsible_event_id": responsible,
+        "winning_error_certificate_id": str(winner["certificate_id"]) if winner is not None else None,
+        "winning_impact_kind": str(winner["impact_kind"]) if winner is not None else None,
+        "impact_status": impact_status,
+        "required_candidate_count": len(required),
+        "required_origin_count": len(set(candidate_origins.values())),
+        "resolved_candidate_count": len(clean_covered | auxiliary_candidates | positive_candidates),
+        "valid_error_certificate_count": len(valid_errors),
+        "valid_defense_certificate_count": len(valid_defenses),
+        "surviving_error_certificate_ids": [str(row["certificate_id"]) for row in surviving],
+        "auxiliary_process_certificate_ids": [str(row["certificate_id"]) for row in auxiliary_process],
+        "wide_construct_state": "verified_process_incident" if auxiliary_process else (
+            "verified_hallucination" if surviving else "no_verified_incident"
+        ),
+        "defeated_error_certificate_ids": defeated,
+        "quarantined_error_certificate_ids": [
+            str(row.get("certificate_id") or "")
+            for row, audit in zip(p_rows, p_audits) if audit["decision"] != "pass"
+        ],
+        "quarantined_defense_certificate_ids": [
+            str(row.get("certificate_id") or "")
+            for row, audit in zip(d_rows, d_audits) if audit["decision"] != "pass"
+        ],
+        "prosecution_coverage": p_coverage,
+        "defense_coverage": d_coverage,
+        "error_audits": p_audits,
+        "defense_audits": d_audits,
+        "defense_type_counts": dict(Counter(all_defense_types)),
+        "materiality_results": materiality_results,
+        "commitment_results": commitment_results,
+        "evidence_authority_routes": {
+            str(row["certificate_id"]): route_evidence_authority(row)
+            for row in valid_errors
+        },
+        "synthetic_defense_count": sum(
+            1 for results in [materiality_results, commitment_results]
+            for result in results.values()
+            if result.get("defense_type")
+        ),
+        # v3.5 diagnostics
+        "consensus_gate_blocked_ids": [
+            str(row["certificate_id"]) for row in consensus_blocked
+        ],
+        "consensus_gate_applied": apply_consensus_gate_flag and initial_prosecution is not None,
+        "counterfactual_rankings_used": counterfactual_rankings is not None,
+        "focused_prosecution_chain_completeness": (
+            [a.get("causal_chain_completeness", 0.0) for a in focused_prosecution_audits]
+            if focused_prosecution_audits else None
+        ),
+    }

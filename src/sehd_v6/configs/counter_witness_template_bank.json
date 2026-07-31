@@ -1,0 +1,35 @@
+{
+  "schema_version": "vgse.counter_witness_bank.v1",
+  "templates": [
+    {
+      "template_id": "completion-vs-execution",
+      "category": "completion_claim",
+      "required_evidence": ["execution", "tool_log"],
+      "question": "Which later test output, exit status, or unresolved error contradicts the success/completion claim?"
+    },
+    {
+      "template_id": "tool-summary-vs-raw-output",
+      "category": "tool_output",
+      "required_evidence": ["tool_log"],
+      "question": "Does the agent summary preserve the raw tool result, including failures, warnings, and scope?"
+    },
+    {
+      "template_id": "patch-claim-vs-diff",
+      "category": "patch_effect",
+      "required_evidence": ["patch", "execution"],
+      "question": "Does the diff touch the claimed behavior path, and is behavioral impact supported rather than inferred from file presence?"
+    },
+    {
+      "template_id": "repo-fact-vs-checkout",
+      "category": "repository_fact",
+      "required_evidence": ["repo", "base_commit"],
+      "question": "At the recorded base commit, does the claimed path, symbol, configuration, or behavior exist?"
+    },
+    {
+      "template_id": "dependency-vs-environment",
+      "category": "dependency_environment",
+      "required_evidence": ["repo", "environment", "tool_log"],
+      "question": "Do dependency manifests and observed environment state support the claimed package, version, import, or configuration?"
+    }
+  ]
+}

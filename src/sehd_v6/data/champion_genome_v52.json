@@ -1,0 +1,486 @@
+{
+  "content_hash": "025375a47a9b6f698ef7e098d2ba5e5cb86856fa46f804338b9f7af79fedfa5b",
+  "edits_applied": [
+    {
+      "edit_id": "edit_1e685ce7",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（证据引用列表为空）时，应直接判定为 error，无需进行 CRS 评分",
+      "operation": "add_rule",
+      "rationale": "[LLM] 修复因控方论点缺失导致检测系统无法判定 error 的缺陷，确保候选存在但控方无有效证据时，系统能正确输出 error 而非 unresolved。",
+      "rule_index": null,
+      "source_case_id": "OpenManus/085",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_9fd377a5",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（证据引用列表为空）时，应检查辩方是否提供了有效论点。若辩方未提供有效论点，则直接判定为error；若辩方提供了有效论点，则必须执行CRS评分并综合权衡，不得跳过CRS评分。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 该修改弥补了原规则忽略辩方证据的缺陷，防止在辩方有论点时错误地跳过CRS评分，从而避免CRS分数与判定方向矛盾。同时保持了对控方论点缺失的快速处理能力，但增加了辩方证据的校验，使判定更稳健。",
+      "rule_index": 2,
+      "source_case_id": "BFCL/121",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_b889cf7d",
+      "new_content": "当CRS所有维度评分均为0时，应判定为unresolved，除非存在其他决定性证据（如明确的错误证书或证实）。",
+      "operation": "add_rule",
+      "rationale": "[LLM] CRS全0通常意味着缺乏足够证据支持任何方向，应当视为模糊区间，避免武断判定。此规则填补了现有 abstention_rule 的空白，且不与已接受的 evidence_obligation 规则重复，适用于多种类似场景。",
+      "rule_index": 0,
+      "source_case_id": "Camel/068",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_f0ad1d8f",
+      "new_content": "当CRS所有维度评分均为0时，应判定为unresolved，除非存在其他决定性证据（如明确的错误证书或证实），或当控方未提供任何有效论点且辩方提供了完整有效论点时，应直接判定为clean。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则在CRS全零时强制unresolved，忽略了辩方明显占优时本应判clean的情况。添加例外条件后，能正确处理控方无效、辩方完整的情况，减少unresolved误判，且不与已有规则冲突。",
+      "rule_index": 2,
+      "source_case_id": "OpenDeepSearch/068",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_ba25a678",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（证据引用列表为空或coverage状态为incomplete）且辩方提供了完整有效论点（证据引用列表非空且coverage状态为complete），则直接判定为clean；(3) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 替换原有规则2，消除歧义，明确CRS全0时的判定优先级，确保控方论点不完整且辩方论点完整时正确判为clean，避免本案例中unresolved的误判。",
+      "rule_index": 2,
+      "source_case_id": "SmolAgents/069",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_e4b5bfd4",
+      "new_content": "在最终判定前，必须验证辩方针对每个候选都提供了至少一个独立的辩护（包含证据引用），若存在任何候选未被辩方覆盖，则辩方覆盖状态应视为不完整，不能直接依据辩方覆盖完整而判定为clean。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 防止因辩方选择性辩护导致覆盖状态误判，从而在不满足条件时错误判定为clean。",
+      "rule_index": null,
+      "source_case_id": "OpenManus/050",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_88ca7f2d",
+      "new_content": "当检测到陈述缺乏显式证据引用或证据引用不完整（如只引用部分支持点）时，应生成一个候选，即使该陈述在内容上看似合理。证据不完整本身构成一个独立的候选触发条件，不应依赖四维扫描结果。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 修复candidate_trigger模块对证据不完整信号的遗漏，确保此类幻觉候选能被发现，从而触发后续的验证和判定流程，避免因候选为空而直接判定为clean。",
+      "rule_index": 0,
+      "source_case_id": "Camel/016",
+      "target_module": "candidate_trigger"
+    },
+    {
+      "edit_id": "edit_ebb72d7d",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（证据引用列表为空）时，应检查辩方是否提供了有效论点。若辩方未提供有效论点，则直接判定为error，但若CRS所有维度评分均为0，则不应直接判定为error，而应遵循abstention_rule的优先级规则进行判定。若辩方提供了有效论点，则必须执行CRS评分并综合权衡，不得跳过CRS评分。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复evidence_obligation规则2与abstention_rule规则2之间的冲突，确保CRS全零场景下优先使用abstention_rule的优先级判定，避免因证据不足直接误判为error。",
+      "rule_index": 2,
+      "source_case_id": "OpenDeepSearch/061",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_c60d8941",
+      "new_content": "在判定“明确的错误证书”时，必须验证控方提供的错误证书中包含至少一个具体的证据引用（norm_evidence_refs非空）。若证据引用列表为空，则视为未提供有效论点，应按照全零情况下的优先级规则（2）和（3）处理，不得直接判定为error。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 该规则明确了“明确的错误证书”的定义，避免因无证据引用的证书导致误判为error，同时与已有全零优先级规则兼容，增强判定鲁棒性。",
+      "rule_index": null,
+      "source_case_id": "BFCL/019",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_bb225956",
+      "new_content": "当辩方提供辩护论点时，必须验证每个证据引用是否与候选断言存在直接的因果支持关系（即证据能够证明候选断言为真或合理）。若证据引用与候选断言无因果关联或无法提供实质性支持，则该辩护论点应视为无效，辩方覆盖状态应视为不完整。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 弥补当前规则仅检查证据引用存在性而忽略证据相关性的漏洞，防止因不相关或虚假证据导致错误被误判为clean。此规则适用于所有候选类型，且不依赖具体案例信息。",
+      "rule_index": null,
+      "source_case_id": "Camel/014",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_c81005dc",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（控方所有错误证书的norm_evidence_refs均为空，或coverage状态为incomplete）且辩方提供了完整有效论点（证据引用列表非空且coverage状态为complete），则直接判定为clean；(3) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复控方提交空证据引用证书时无法触发clean判定的漏洞，使规则2的条件与规则3的‘视为未提供有效论点’一致，避免类似情况被错误判定为unresolved。",
+      "rule_index": 2,
+      "source_case_id": "BFCL/055",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_cd0f06d1",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（证据引用列表为空）时，应检查辩方是否提供了有效论点。若辩方未提供有效论点，则直接判定为error，但若CRS所有维度评分均为0，则不应直接判定为error，而应遵循abstention_rule的优先级规则进行判定。若辩方提供了有效论点，则必须执行CRS评分并综合权衡，不得跳过CRS评分；但若CRS所有维度评分均为0，且辩方提供了有效论点且控方无有效论点，则应直接判定为clean，无需执行CRS评分。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复CRS全零时，即使辩方有有效论点，系统仍被强制执行CRS评分导致逻辑路径混乱的问题。明确在CRS全零、辩方有效、控方无效的特殊情况下，直接输出clean，避免评分步骤干扰abstention_rule的正确应用。",
+      "rule_index": 2,
+      "source_case_id": "OpenManus/089",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_ec6b780d",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（控方所有错误证书的norm_evidence_refs均为空，或coverage状态为incomplete）且辩方提供了完整有效论点（证据引用列表非空，coverage状态为complete，且辩方覆盖了所有候选——每个候选至少有一个有效辩护），则直接判定为clean，忽略candidate_path_state的unresolved状态；(3) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复了全零评分时未正确检查辩方覆盖所有候选的漏洞，并明确覆盖candidate_path_state的unresolved状态，避免因候选路径状态导致判定异常。",
+      "rule_index": 2,
+      "source_case_id": "Magentic_One/029",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_fbebf381",
+      "new_content": "在最终判定前，必须依次对每个候选检查是否存在至少一个独立的辩方辩护（包含有效证据引用）。若存在任何一个候选没有任何辩方辩护，则辩方覆盖状态必须强制设为incomplete，且不得因任何其他原因（如CRS评分或控方状态）更改此状态；后续任何判定步骤中均不得将辩方视为覆盖完整。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则虽要求验证每个候选，但未明确强制机制和后续影响，导致系统在本案例中错误接受了辩方partial coverage为complete。新规则通过强制覆盖状态设定和禁止后续覆盖，确保全局覆盖状态正确，从而触发abstention_rule第2条的正确逻辑（全零且控方无有效论点时，若辩方覆盖不完整则判定unresolved，但本案例中辩方覆盖不完整应导致unresolved，而实际却是unreso",
+      "rule_index": 3,
+      "source_case_id": "BFCL/025",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_65e5b4fa",
+      "new_content": "在计算辩方覆盖状态时，系统必须遍历所有候选，对于每个候选，检查是否存在至少一个辩方辩护论点其target_candidate_id与该候选ID匹配。只有当所有候选都有至少一个匹配的辩护论点时，辩方覆盖状态才为complete；否则，必须强制设为incomplete，且不得因任何其他因素（如CRS评分或控方状态）更改此状态。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 该规则确保辩方覆盖状态基于候选级别的辩护覆盖，避免因辩方只覆盖部分候选而错误地将覆盖状态设为complete，从而防止在abstention_rule中错误地应用clean判定条件。",
+      "rule_index": null,
+      "source_case_id": "BFCL/073",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_6442d7a1",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（控方所有错误证书的norm_evidence_refs均为空，或coverage状态为incomplete），且辩方提供了至少一个有效辩护（即存在至少一个辩方证书包含有效证据引用，且该证书的target_candidate_id匹配某个候选），则直接判定为clean，忽略candidate_path_state的unresolved状态；(3) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 放宽全零情况下clean判定的条件，从‘辩方覆盖所有候选’改为‘辩方提供至少一个有效辩护’，以适应控方无证据且辩方部分覆盖的情形，避免因候选数量多且无证据导致的不必要unresolved，同时保持对错误证书的严格处理。",
+      "rule_index": 2,
+      "source_case_id": "SmolAgents/004",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_4eeff05f",
+      "new_content": "在评估每个陈述时，必须独立检查其是否包含至少一个显式的证据引用（如工具调用、数据源引用、外部证据）。若陈述完全缺乏证据引用，或者引用仅覆盖部分断言，则必须立即生成一个evidence_incomplete类型的候选，无需等待四维扫描结果。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 该规则补充了现有规则2的检测方法，使系统在候选发现阶段能主动识别证据不完整情况，避免因缺乏具体操作指令而漏检。",
+      "rule_index": null,
+      "source_case_id": "Camel/078",
+      "target_module": "candidate_trigger"
+    },
+    {
+      "edit_id": "edit_458fba13",
+      "new_content": "当CRS所有维度评分均为0时，若边界路径状态（boundary_path_state）为verified_error，则直接判定为verified_error，不受候选路径状态（candidate_path_state）影响，且此规则优先级高于abstention_rule规则2中的其他条件。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 填补abstention_rule在全零CRS时对边界路径状态的忽略，确保边界路径检测到的错误能被正确判定，避免因CRS全零而错误地转为clean或unresolved，同时不会与现有规则冲突，因为边界路径错误是独立于控辩证据的强信号。",
+      "rule_index": null,
+      "source_case_id": "Camel/022",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_88acd4ff",
+      "new_content": "当CRS所有维度评分均为0时，若边界路径状态为verified_error，但控方未提供任何有效错误证书（即所有错误证书的norm_evidence_refs均为空，或控方覆盖状态为incomplete），且辩方覆盖状态为complete，则不应直接判定为verified_error，而应按照abstention_rule规则2的优先级处理，即判定为clean或unresolved；若控方提供了至少一个有效错误证书，则仍按原规则直接判定为verified_error。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 此修改防止了边界路径状态在缺乏控方有效证据时凌驾于辩方完整覆盖之上，确保在控方无论点、辩方覆盖完整的情况下，优先考虑clean判定，避免过度依赖边界路径的机械判定，同时保留控方有论点时的原始优先级。",
+      "rule_index": 4,
+      "source_case_id": "SmolAgents/081",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_aa48f77a",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（证据引用列表为空）时，应首先检查CRS所有维度评分是否均为0。若CRS全为0，则不得直接判定为error或clean，必须遵循abstention_rule的优先级规则进行判定。若CRS不全为0，则检查辩方是否提供了有效论点：若辩方未提供有效论点，则直接判定为error；若辩方提供了有效论点，则必须执行CRS评分并综合权衡，不得跳过CRS评分。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 通过将CRS全零检查提前，确保覆盖所有全零场景，避免直接判定干扰，使判定逻辑与abstention_rule一致，解决本例中错误判定为verified_error的问题。",
+      "rule_index": 2,
+      "source_case_id": "OpenManus/021",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_4d42ccd5",
+      "new_content": "当CRS所有维度评分均为0时，必须完全忽略边界路径状态（boundary_path_state），直接按照abstention_rule规则2的优先级进行判定，不得以任何理由将边界路径状态作为直接判定依据。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复CRS全0时边界路径状态被错误优先使用导致误判的问题，确保判定逻辑严格遵循规则2的优先级，避免因边界路径状态与控方证书状态不一致而产生错误结论。",
+      "rule_index": 4,
+      "source_case_id": "Magentic_One/090",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_6e6cf214",
+      "new_content": "当候选集合非空且控方未提供任何有效论点（所有错误证书的norm_evidence_refs均为空或coverage状态为incomplete）时，判定器必须首先检查CRS所有维度评分是否均为0。此检查必须在任何其他条件（包括边界路径状态、候选路径状态、辩护有效性评估）之前执行。若CRS全为0，则必须严格遵循abstention_rule的优先级规则进行判定，且此判定结果具有最高优先级，不得被任何后续规则覆盖或更改。若CRS不全为0，则检查辩方是否提供了有效论点：若辩方未提供有效论点，则直接判定为error；若辩方提供了有效论点，则必须执行CRS评分并综合权衡，不得跳过CRS评分。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 通过强制检查顺序和最高优先级，确保CRS全0时严格按照abstention_rule判定，避免被其他模块规则错误覆盖，从而解决当前verified_error误判。",
+      "rule_index": 2,
+      "source_case_id": "BFCL/013",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_f1748a7a",
+      "new_content": "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护（包含有效证据引用）。若存在任何一个候选没有任何辩方辩护，则辩方覆盖状态必须强制设为incomplete，且不得因任何其他原因（如CRS评分或控方状态）更改此状态；后续任何判定步骤中均不得将辩方视为覆盖完整。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则3在最终判定前执行，但规则2要求先检查CRS全零，导致在CRS全零场景下规则3可能被跳过，造成辩方覆盖状态错误。通过将规则3提升为最高优先级检查，确保在CRS全零逻辑之前正确设置辩方覆盖状态，从而让abstention_rule的优先级判定基于正确的覆盖状态，避免误判。",
+      "rule_index": 3,
+      "source_case_id": "OpenManus/049",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_a1f28aae",
+      "new_content": "当CRS所有维度评分均为0时，不视为模糊区间，应按照abstention_rule规则2的优先级进行判定，不得引用本规则判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 消除规则0与规则2之间的潜在冲突，确保CRS全零时严格遵循规则2的优先级，避免因模糊区间误判导致unresolved。",
+      "rule_index": 0,
+      "source_case_id": "BFCL/053",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_371212e2",
+      "new_content": "当CRS所有维度评分均为0时，系统应跳过因果链接测试，不执行任何因果链分析，并直接返回空结果，以避免边界路径状态被错误计算或使用。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 该规则从因果测试入口阻断边界路径计算，确保CRS全零时判定严格遵循abstention_rule优先级，避免边界路径状态干扰，且不依赖其他模块的已有规则，具有通用性。",
+      "rule_index": null,
+      "source_case_id": "Magentic_One/051",
+      "target_module": "causal_link_test"
+    },
+    {
+      "edit_id": "edit_dde89117",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（控方所有错误证书的norm_evidence_refs均为空，或coverage状态为incomplete），且存在至少一个辩方证书包含有效证据引用且其target_candidate_id匹配某个候选，则无论辩方覆盖状态是complete还是incomplete，均直接判定为clean，并忽略candidate_path_state和boundary_path_state的unresolved状态；(3) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 此修改明确排除了辩方覆盖状态对判定条件的干扰，确保当控方无效且存在任何有效辩护时，系统直接判定clean，避免因辩方覆盖不完全而错误地判定unresolved。",
+      "rule_index": 2,
+      "source_case_id": "OpenDeepSearch/040",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_fa6bd75b",
+      "new_content": "当CRS所有维度评分均为0时，在跳过因果链接测试并返回空结果后，必须将边界路径状态（boundary_path_state）强制设置为complete，以确保该状态不会在后续判定中被误用为unresolved而影响判定。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 现有规则仅要求跳过因果测试并返回空结果，但未处理边界路径状态的残留值。强制设为complete可以消除边界路径状态对abstention_rule判定的潜在干扰，使CRS全0时的判定完全由abstention_rule控制，避免因unresolved状态导致错误判定。",
+      "rule_index": null,
+      "source_case_id": "OpenDeepSearch/026",
+      "target_module": "causal_link_test"
+    },
+    {
+      "edit_id": "edit_eaac6524",
+      "new_content": "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护，该辩方辩护必须满足：(1) 其target_candidate_id与该候选ID完全匹配；(2) 包含至少一个有效证据引用。若存在任何一个候选没有任何这样的匹配辩护，则辩方覆盖状态必须强制设为incomplete，且不得因任何其他原因（如CRS评分或控方状态）更改此状态；后续任何判定步骤中均不得将辩方视为覆盖完整。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 通过在规则3中显式添加target_candidate_id匹配条件，消除歧义，确保辩方覆盖状态仅由实际针对每个候选的辩护计算，避免因误判complete导致后续判定逻辑错误，进而消除CRS全零时的矛盾信号。",
+      "rule_index": 3,
+      "source_case_id": "BFCL/080",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_0bc96363",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（控方所有错误证书的norm_evidence_refs均为空，或coverage状态为incomplete），且存在至少一个辩方证书包含有效证据引用且其target_candidate_id匹配某个候选，且辩方覆盖状态为complete，则判定为clean；(3) 否则，若存在至少一个候选且辩方覆盖状态为incomplete，则判定为error；(4) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 该修改确保在CRS全0且控方无有效论点时，系统不会因辩方部分覆盖而轻易判定为clean。只有当辩方覆盖所有候选（complete）时才视作辩方完全有效并判定clean；若辩方仅覆盖部分候选（incomplete），则基于候选存在性判定为error，从而避免因辩方信息不足而漏判错误。此规则比原规则更严谨，与Degradation Protection原则一致，不会导致已有正确判定退化。",
+      "rule_index": 2,
+      "source_case_id": "OpenDeepSearch/020",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_6d1ee32b",
+      "new_content": "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估、abstention_rule优先级判定等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护，该辩方辩护必须满足：(1)其target_candidate_id与该候选ID完全匹配；(2)包含至少一个有效证据引用。若存在任何一个候选没有任何这样的匹配辩护，则辩方覆盖状态必须强制设为incomplete，且此状态为最终状态，后续任何其他规则（包括CRS评分、abstention_rule的优先级判定、边界路径状态等）均不得以任何理由更改此状态。所有后续判定必须基于此强制设置的incomplete状态进行。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则虽要求检查候选与辩方辩护的匹配，但未明确禁止后续规则重新计算覆盖状态，导致本案例中其他逻辑（如abstention_rule）可能误用错误complete状态。修改后明确incomplete状态为最终且不可覆盖，确保所有后续判定基于正确覆盖状态，防止因状态误导导致判定错误。",
+      "rule_index": 3,
+      "source_case_id": "BFCL/159",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_06ea0151",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(0) 首先，必须根据每个候选是否存在至少一个独立的辩方辩护（即target_candidate_id匹配且包含有效证据引用）重新计算辩方覆盖状态：只有当所有候选都有至少一个匹配辩护时，才设为complete；否则，强制设为incomplete。此重计算具有最高优先级，覆盖任何其他来源的辩方覆盖状态。(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（所有错误证书的norm_evidence_refs均为空或coverage状态为incomplete），且辩方覆盖状态为complete，则判定为clean；(3) 否则，若存在至少一个候选且辩方覆盖状态为incomplete，则判定为error；(4) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 通过将辩方覆盖状态的重计算嵌入abstention_rule的优先级判定流程中，确保无论证据义务模块的规则是否被正确执行，abstention_rule都能基于正确的覆盖状态进行判定，从而避免因外部状态错误导致的unresolved结果。",
+      "rule_index": 2,
+      "source_case_id": "Magentic_One/070",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_2750f8fd",
+      "new_content": "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估、abstention_rule优先级判定等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护，该辩方辩护必须满足：(1)其target_candidate_id与该候选ID完全匹配；(2)包含至少一个有效证据引用。若存在任何一个候选没有任何这样的匹配辩护，则辩方覆盖状态必须强制设为incomplete，且此状态为最终状态，后续任何其他规则（包括CRS评分、abstention_rule的优先级判定、边界路径状态等）均不得以任何理由更改此状态，除非后续检测到CRS所有维度评分均为0，此时abstention_rule优先级判定中的辩方覆盖状态重新计算具有更高优先级，可覆盖此前强制设置的状态。所有后续判定必须基于此最终状态进行。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 消除证据义务规则3与abstention_rule规则2之间的覆盖冲突，确保CRS全零时优先级判定中的辩方状态重新计算生效，从而避免边界路径状态被误用，使判定流程正确遵循abstention_rule优先级，防止cr_contradiction。",
+      "rule_index": 3,
+      "source_case_id": "Camel/021",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_e335af43",
+      "new_content": "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估、abstention_rule优先级判定等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护，该辩方辩护必须满足：(1)其target_candidate_id与该候选ID完全匹配；(2)包含至少一个有效证据引用。若存在任何一个候选没有任何这样的匹配辩护，则辩方覆盖状态必须强制设为incomplete，且此状态为最终状态，后续任何其他规则（包括CRS评分、abstention_rule的优先级判定、边界路径状态等）均不得以任何理由更改此状态，即使CRS所有维度评分均为0，abstention_rule的重新计算也不得覆盖此状态。所有后续判定必须基于此最终状态进行。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 删除规则3中允许CRS全零时abstention_rule重新计算覆盖的例外，确保强制incomplete状态在任何情况下均为最终状态，从而避免因重新计算错误导致辩方覆盖被误设为complete，使系统在CRS全零且候选无辩护时能正确判定error。",
+      "rule_index": 3,
+      "source_case_id": "BFCL/078",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_9ec69922",
+      "new_content": "当CRS所有维度评分均为0时，无论候选集合是否为空、控方是否提供有效论点、辩方覆盖状态如何，判定器必须立即停止所有其他判定逻辑，直接按照abstention_rule的优先级规则进行判定，且此判定结果具有最高优先级，不得被任何后续规则覆盖或更改。此规则优先于任何其他关于CRS全零检查的规则。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则2仅当'控方未提供任何有效论点'时才触发CRS全0检查，遗漏了控方提供无效论点（如无证据引用的错误证书）但CRS全0的情况，导致abstention_rule的优先级判定未被正确应用。新规则无条件启用CRS全0检查，确保所有全0场景均直接走abstention_rule流程，避免误判为error。",
+      "rule_index": 2,
+      "source_case_id": "BFCL/112",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_d9419db7",
+      "new_content": "当CRS所有维度评分均为0时，判定器必须立即停止所有其他判定逻辑，并首先执行规则3（即检查每个候选是否存在至少一个匹配的辩方辩护）以确定最终的辩方覆盖状态，然后将此状态作为唯一输入，严格按照abstention_rule的优先级规则进行判定。在此过程中，abstention_rule内部关于辩方覆盖状态的重新计算（即abstention_rule规则2的第(0)步）不得执行，而应直接使用规则3确定的辩方覆盖状态。此规则优先于任何其他关于CRS全零处理的规则。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 消除规则2与规则3之间的执行顺序冲突，确保在CRS全零时辩方覆盖状态由规则3正确计算，并作为唯一依据，避免abstention_rule内部重新计算导致状态被错误覆盖，从而防止因辩方覆盖状态错误导致的判定失误。",
+      "rule_index": 2,
+      "source_case_id": "Camel/036",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_b1623047",
+      "new_content": "在CRS所有维度评分均为0的情况下，系统应优先检查每个候选断言是否为问题定义或上下文隐含的必然结论（如匹配定义、数学公理、逻辑重言式等）。若候选断言属于此类且没有工具调用结果或外部证据表明其错误，则应将此候选视为clean，并从候选集中移除，重新计算辩方覆盖状态。此规则优先于其他基于辩方覆盖的判定规则。",
+      "operation": "add_rule",
+      "rationale": "[LLM] 防止因辩方覆盖不足而将正确的数学/逻辑定义误判为error，提高判定的准确性。",
+      "rule_index": 0,
+      "source_case_id": "OpenDeepSearch/030",
+      "target_module": "clean_defense_boundary"
+    },
+    {
+      "edit_id": "edit_1fb77243",
+      "new_content": "当CRS所有维度评分均为0时，在跳过因果链接测试并返回空结果后，必须将边界路径状态（boundary_path_state）强制设置为complete，同时将候选路径状态（candidate_path_state）也强制设置为complete，以确保两个状态不会在后续判定中被误用为unresolved而引发矛盾。此规则优先于任何其他可能设置候选路径状态的规则。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复CRS全零时边界路径状态与候选路径状态不一致导致的crs_contradiction误触发，使判定过程一致性更高，避免因状态矛盾干扰最终判定。",
+      "rule_index": 3,
+      "source_case_id": "Octotools/021",
+      "target_module": "causal_link_test"
+    },
+    {
+      "edit_id": "edit_277960a2",
+      "new_content": "当CRS所有维度评分均为0时，在应用本规则内任何优先级判定之前，必须首先将边界路径状态（boundary_path_state）强制设置为complete（或null），并从此完全忽略该状态，不得以任何理由将其作为直接判定依据。此后，才能按照abstention_rule规则2的优先级进行判定。此重置操作完成后，禁止任何其他模块（包括causal_link_test、clean_defense_boundary等）对边界路径状态进行任何修改，以确保判定逻辑不受干扰。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 强化对边界路径状态的清零和忽略，确保CRS全零时判定完全基于辩方覆盖状态和控方证书，避免因其他模块意外修改或残留状态导致错误判定。",
+      "rule_index": 4,
+      "source_case_id": "OpenManus/077",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_44932cf0",
+      "new_content": "在计算辩方覆盖状态时，系统必须从候选发现模块获取完整的候选ID列表，以此作为遍历基础，不得仅依赖于辩护论点中的target_candidate_id集合。对于每个候选ID，必须显式查询是否存在至少一个辩方辩护论点其target_candidate_id与该候选ID完全匹配且包含有效证据引用。只有当所有候选都有至少一个匹配的辩护论点时，辩方覆盖状态才为complete；否则，必须强制设为incomplete，且不得因任何其他因素（如CRS评分、控方状态、辩护论点数量等）更改此状态。此规则在CRS全零时仍然必须执行，且优先级高于任何其他规则。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 原规则5虽然要求遍历所有候选，但未明确候选列表的独立来源，实现时可能错误地使用辩护列表中的target_candidate_id集合作为候选列表，导致遗漏未匹配的候选。新规则强制使用候选发现模块的原始列表，确保遍历完整，从而正确计算辩方覆盖状态，防止因覆盖状态错误导致判定路径偏差。",
+      "rule_index": 5,
+      "source_case_id": "BFCL/111",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_36ebdc37",
+      "new_content": "当CRS所有维度评分均为0时，在跳过因果链接测试并返回空结果后，系统必须无条件地将边界路径状态（boundary_path_state）强制设置为complete，同时将候选路径状态（candidate_path_state）也强制设置为complete，且此设置具有最高优先级，任何其他模块（包括evidence_obligation、abstention_rule、clean_defense_boundary等）均不得以任何理由修改这两个状态。设置完成后，必须立即验证这两个状态的值：若仍然为unresolved或其他非complete值，则必须重复设置直到成功，并记录日志。此规则优先于任何其他可能设置候选路径状态或边界路径状态的规则。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 通过增加强制验证和不可撤销性，确保在CRS全0时，候选路径状态和边界路径状态被正确设为complete，从而避免被后续判定误用为unresolved导致矛盾。同时明确禁止其他模块覆盖，解决冲突。",
+      "rule_index": 3,
+      "source_case_id": "OpenDeepSearch/046",
+      "target_module": "causal_link_test"
+    },
+    {
+      "edit_id": "edit_23972bc6",
+      "new_content": "当CRS所有维度评分均为0时，判定器必须立即停止所有其他判定逻辑，并严格遵循规则5（即从候选发现模块获取完整的候选ID列表，检查每个候选是否有至少一个匹配辩方辩护且包含有效证据引用）来确定最终的辩方覆盖状态。此状态具有最高优先级，任何其他模块（包括causal_link_test、abstention_rule、clean_defense_boundary等）均不得以任何理由修改此状态。然后，将此状态作为唯一输入，严格按照abstention_rule的优先级规则进行判定，且abstention_rule内部关于辩方覆盖状态的重新计算（即abstention_rule规则2的第(0)步）不得执行，而应直接使用此状态。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复多候选时辩方覆盖状态计算错误，确保规则5的权威性，避免被其他规则覆盖，从而在CRS全零时正确判定error或clean。",
+      "rule_index": 2,
+      "source_case_id": "Camel/007",
+      "target_module": "evidence_obligation"
+    },
+    {
+      "edit_id": "edit_4bba0340",
+      "new_content": "当辩方证据压倒性地强于控方时，若CRS评分存在非零维度，则判定为unresolved或clean；若CRS所有维度评分均为0，则本规则不适用，必须严格遵循abstention_rule规则2的优先级判定，不得依据本规则修改判定结果。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 消除规则1与规则2在CRS全零时的冲突，确保规则2的优先级判定（控方无有效论点且辩方complete时判定clean）被正确执行，从而避免unresolved误判。",
+      "rule_index": 1,
+      "source_case_id": "OpenDeepSearch/049",
+      "target_module": "abstention_rule"
+    },
+    {
+      "edit_id": "edit_6634632d",
+      "new_content": "在启动任何候选发现流程时，系统必须首先对agent的完整输出执行一次全面证据引用普查：对每个独立断言（包括主句和从句）检查是否包含至少一个显式的证据引用（如工具调用、数据源引用、外部证据）。若发现任何断言完全缺乏证据引用或引用仅覆盖部分断言，则必须立即生成一个evidence_incomplete类型的候选，且此候选具有最高优先级，不得被后续任何候选发现步骤（包括四维扫描、PACA合并等）覆盖或忽略。当CRS所有维度评分均为0时，此普查必须强制执行，并作为唯一候选发现依据，忽略其他所有候选发现方法的结果。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 该修改确保证据不完整检查始终优先执行，且独立于其他候选发现方法，消除了因CRS全零或合并结果为空而跳过候选生成的可能性，从而修复了未能触发evidence_incomplete候选的根因。",
+      "rule_index": 3,
+      "source_case_id": "OpenDeepSearch/092",
+      "target_module": "candidate_trigger"
+    },
+    {
+      "edit_id": "edit_41a22d7b",
+      "new_content": "当CRS所有维度评分均为0时，按以下优先级判定：(0) 首先，必须直接使用证据义务模块规则5已计算并输出的辩方覆盖状态，不得重新计算；此状态具有最高优先级，覆盖任何其他来源的辩方覆盖状态，并且任何其他模块（包括causal_link_test、clean_defense_boundary等）均不得以任何理由修改此状态。(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（所有错误证书的norm_evidence_refs均为空或coverage状态为incomplete），且辩方覆盖状态为complete，则判定为clean；(3) 否则，若存在至少一个候选且辩方覆盖状态为incomplete，则判定为error；(4) 否则，判定为unresolved。",
+      "operation": "modify_rule",
+      "rationale": "[LLM] 修复因重新计算辩方覆盖状态导致的冲突，确保CRS全零时直接使用证据义务模块规则5的正确结果，避免因状态覆盖导致unresolved错误判定。",
+      "rule_index": 2,
+      "source_case_id": "SmolAgents/088",
+      "target_module": "abstention_rule"
+    }
+  ],
+  "generation": 44,
+  "genome_id": "genome_g44_afeb1e6e",
+  "metadata": {
+    "f1_d": 0.747,
+    "source": "PACA-TCL v3.5 fixed"
+  },
+  "modules": {
+    "abstention_rule": {
+      "active": true,
+      "module_id": "abstention_rule",
+      "rules": [
+        "当CRS所有维度评分均为0时，不视为模糊区间，应按照abstention_rule规则2的优先级进行判定，不得引用本规则判定为unresolved。",
+        "当辩方证据压倒性地强于控方时，若CRS评分存在非零维度，则判定为unresolved或clean；若CRS所有维度评分均为0，则本规则不适用，必须严格遵循abstention_rule规则2的优先级判定，不得依据本规则修改判定结果。",
+        "当CRS所有维度评分均为0时，按以下优先级判定：(0) 首先，必须直接使用证据义务模块规则5已计算并输出的辩方覆盖状态，不得重新计算；此状态具有最高优先级，覆盖任何其他来源的辩方覆盖状态，并且任何其他模块（包括causal_link_test、clean_defense_boundary等）均不得以任何理由修改此状态。(1) 若存在明确的错误证书（即控方提供了至少一个包含具体证据引用的错误证书），则判定为error；(2) 否则，若控方未提供任何有效论点（所有错误证书的norm_evidence_refs均为空或coverage状态为incomplete），且辩方覆盖状态为complete，则判定为clean；(3) 否则，若存在至少一个候选且辩方覆盖状态为incomplete，则判定为error；(4) 否则，判定为unresolved。",
+        "在判定“明确的错误证书”时，必须验证控方提供的错误证书中包含至少一个具体的证据引用（norm_evidence_refs非空）。若证据引用列表为空，则视为未提供有效论点，应按照全零情况下的优先级规则（2）和（3）处理，不得直接判定为error。",
+        "当CRS所有维度评分均为0时，在应用本规则内任何优先级判定之前，必须首先将边界路径状态（boundary_path_state）强制设置为complete（或null），并从此完全忽略该状态，不得以任何理由将其作为直接判定依据。此后，才能按照abstention_rule规则2的优先级进行判定。此重置操作完成后，禁止任何其他模块（包括causal_link_test、clean_defense_boundary等）对边界路径状态进行任何修改，以确保判定逻辑不受干扰。"
+      ]
+    },
+    "atomic_verifier_instruction": {
+      "active": true,
+      "module_id": "atomic_verifier_instruction",
+      "rules": [
+        "对每个候选执行因果链脚手架验证（NORM, ORIGIN, CONTROL, PROPAGATION, IMPACT, COUNTERFACTUAL）",
+        "验证失败时最多重试 2 次（隔离反馈重试）"
+      ]
+    },
+    "candidate_to_verifier_route": {
+      "active": true,
+      "module_id": "candidate_to_verifier_route",
+      "rules": [
+        "根据候选类型路由到对应的专项验证器"
+      ]
+    },
+    "candidate_trigger": {
+      "active": true,
+      "module_id": "candidate_trigger",
+      "rules": [
+        "使用四维扫描（F/Fa/P/S）发现幻觉候选",
+        "合并 PACA 候选、构造普查和确定性过程普查的结果",
+        "当检测到陈述缺乏显式证据引用或证据引用不完整（如只引用部分支持点）时，应生成一个候选，即使该陈述在内容上看似合理。证据不完整本身构成一个独立的候选触发条件，不应依赖四维扫描结果。",
+        "在启动任何候选发现流程时，系统必须首先对agent的完整输出执行一次全面证据引用普查：对每个独立断言（包括主句和从句）检查是否包含至少一个显式的证据引用（如工具调用、数据源引用、外部证据）。若发现任何断言完全缺乏证据引用或引用仅覆盖部分断言，则必须立即生成一个evidence_incomplete类型的候选，且此候选具有最高优先级，不得被后续任何候选发现步骤（包括四维扫描、PACA合并等）覆盖或忽略。当CRS所有维度评分均为0时，此普查必须强制执行，并作为唯一候选发现依据，忽略其他所有候选发现方法的结果。"
+      ]
+    },
+    "causal_link_test": {
+      "active": true,
+      "module_id": "causal_link_test",
+      "rules": [
+        "如果修正根源后结果会改变，则因果链成立",
+        "错误必须通过可识别的步骤传播到最终输出",
+        "当CRS所有维度评分均为0时，系统应跳过因果链接测试，不执行任何因果链分析，并直接返回空结果，以避免边界路径状态被错误计算或使用。",
+        "当CRS所有维度评分均为0时，在跳过因果链接测试并返回空结果后，系统必须无条件地将边界路径状态（boundary_path_state）强制设置为complete，同时将候选路径状态（candidate_path_state）也强制设置为complete，且此设置具有最高优先级，任何其他模块（包括evidence_obligation、abstention_rule、clean_defense_boundary等）均不得以任何理由修改这两个状态。设置完成后，必须立即验证这两个状态的值：若仍然为unresolved或其他非complete值，则必须重复设置直到成功，并记录日志。此规则优先于任何其他可能设置候选路径状态或边界路径状态的规则。"
+      ]
+    },
+    "clean_defense_boundary": {
+      "active": true,
+      "module_id": "clean_defense_boundary",
+      "rules": [
+        "如果 agent 的行为有工具输出支持，则不应被标记为幻觉",
+        "工具返回错误且 agent 未忽略该错误，属于正常失败而非幻觉",
+        "agent 尝试了纠正操作（重试/恢复），支持 clean 判定",
+        "错误在最终输出前被修正，不应判定为幻觉",
+        "在CRS所有维度评分均为0的情况下，系统应优先检查每个候选断言是否为问题定义或上下文隐含的必然结论（如匹配定义、数学公理、逻辑重言式等）。若候选断言属于此类且没有工具调用结果或外部证据表明其错误，则应将此候选视为clean，并从候选集中移除，重新计算辩方覆盖状态。此规则优先于其他基于辩方覆盖的判定规则。"
+      ]
+    },
+    "earliest_origin_tiebreak": {
+      "active": true,
+      "module_id": "earliest_origin_tiebreak",
+      "rules": [
+        "在多个因果充分的根源中，选择事件顺序最早的"
+      ]
+    },
+    "evidence_obligation": {
+      "active": true,
+      "module_id": "evidence_obligation",
+      "rules": [
+        "每个 CRS 维度评分必须有明确的证据引用支持",
+        "CRS 权重固定为 factuality=0.35, counterfactual=0.15, recovery=0.20, process=0.20, scope=0.10",
+        "当CRS所有维度评分均为0时，判定器必须立即停止所有其他判定逻辑，并严格遵循规则5（即从候选发现模块获取完整的候选ID列表，检查每个候选是否有至少一个匹配辩方辩护且包含有效证据引用）来确定最终的辩方覆盖状态。此状态具有最高优先级，任何其他模块（包括causal_link_test、abstention_rule、clean_defense_boundary等）均不得以任何理由修改此状态。然后，将此状态作为唯一输入，严格按照abstention_rule的优先级规则进行判定，且abstention_rule内部关于辩方覆盖状态的重新计算（即abstention_rule规则2的第(0)步）不得执行，而应直接使用此状态。",
+        "在进入任何判定逻辑之前（包括CRS全零检查、候选路径状态检查、边界路径状态检查、辩护有效性评估、abstention_rule优先级判定等），系统必须首先依次对每个候选检查是否存在至少一个独立的辩方辩护，该辩方辩护必须满足：(1)其target_candidate_id与该候选ID完全匹配；(2)包含至少一个有效证据引用。若存在任何一个候选没有任何这样的匹配辩护，则辩方覆盖状态必须强制设为incomplete，且此状态为最终状态，后续任何其他规则（包括CRS评分、abstention_rule的优先级判定、边界路径状态等）均不得以任何理由更改此状态，即使CRS所有维度评分均为0，abstention_rule的重新计算也不得覆盖此状态。所有后续判定必须基于此最终状态进行。",
+        "当辩方提供辩护论点时，必须验证每个证据引用是否与候选断言存在直接的因果支持关系（即证据能够证明候选断言为真或合理）。若证据引用与候选断言无因果关联或无法提供实质性支持，则该辩护论点应视为无效，辩方覆盖状态应视为不完整。",
+        "在计算辩方覆盖状态时，系统必须从候选发现模块获取完整的候选ID列表，以此作为遍历基础，不得仅依赖于辩护论点中的target_candidate_id集合。对于每个候选ID，必须显式查询是否存在至少一个辩方辩护论点其target_candidate_id与该候选ID完全匹配且包含有效证据引用。只有当所有候选都有至少一个匹配的辩护论点时，辩方覆盖状态才为complete；否则，必须强制设为incomplete，且不得因任何其他因素（如CRS评分、控方状态、辩护论点数量等）更改此状态。此规则在CRS全零时仍然必须执行，且优先级高于任何其他规则。"
+      ]
+    }
+  },
+  "parent_hash": "072b5f19de4c485ce6622e32190a7ae4fa72441816458a4660c52d1413cdf172"
+}
