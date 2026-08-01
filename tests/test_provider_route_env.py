@@ -120,6 +120,23 @@ def test_deepseek_key_never_replaces_nonofficial_proxy_selector():
     assert route["api_key_environment"] == "AUTODL_API_KEY"
 
 
+def test_proxy_route_without_key_selector_fails_closed():
+    from src.sehd_v6.provider_routes import resolve_provider_credential, resolve_provider_route
+
+    route = resolve_provider_route(
+        {"endpoint": "https://proxy.example/v1"},
+        purpose="detector",
+        environ={"DEEPSEEK_API_KEY": "test-only-placeholder"},
+    )
+    assert route.get("api_key_environment", "") == ""
+    try:
+        resolve_provider_credential(route, purpose="detector")
+    except RuntimeError as exc:
+        assert "api-key environment" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("proxy route unexpectedly inherited DeepSeek key")
+
+
 def test_config_route_purpose_is_not_overwritten_at_transport_boundary(
     tmp_path, monkeypatch,
 ):

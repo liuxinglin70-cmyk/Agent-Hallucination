@@ -123,11 +123,13 @@ def resolve_provider_route(
         and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT
     ):
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    elif not selected_key_env:
+    elif not selected_key_env and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
     elif not explicit_key_selector and selected_key_env == OFFICIAL_API_KEY_ENV:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    if not resolved.get("api_key_environment"):
+    if not resolved.get("api_key_environment") and str(
+        resolved.get("endpoint") or ""
+    ).rstrip("/") == OFFICIAL_ENDPOINT:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
     return resolved
 
