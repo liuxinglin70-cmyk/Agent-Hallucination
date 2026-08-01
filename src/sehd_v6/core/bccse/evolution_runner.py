@@ -408,6 +408,7 @@ def _llm_merge_rules(
     try:
         merged, _ = json_object_provider_call(
             route=mutation_route,
+            purpose="mutation",
             system=system_prompt,
             user=user_prompt,
             cache_dir=cache_dir if cache_dir is not None else Path(".skill_merge_cache"),
@@ -1344,6 +1345,7 @@ def run_online_evolution(
                 attr_system, attr_user = build_attribution_llm_prompt(signal)
                 attr_parsed, _ = json_object_provider_call(
                     route=mutation_route,
+                    purpose="mutation",
                     system=attr_system,
                     user=attr_user,
                     cache_dir=output_dir / "mutation_cache",
@@ -1499,6 +1501,7 @@ def run_online_evolution(
             try:
                 parsed, meta = json_object_provider_call(
                     route=mutation_route,
+                    purpose="mutation",
                     system=system_prompt,
                     user=user_prompt,
                     cache_dir=mutation_cache,

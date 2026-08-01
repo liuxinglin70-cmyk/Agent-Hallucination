@@ -13,6 +13,12 @@ from typing import Any
 from ...utils import ocse_packet as packet
 from . import layered_contract as contract
 from ...utils.preflight import discover_records
+from ...provider_routes import (
+    resolve_config_provider_routes,
+    resolve_provider_credential,
+    resolve_provider_route,
+    route_purpose,
+)
 from .basic_runner import (
     _responsible_step,
     candidate_system_prompt,
@@ -240,12 +246,14 @@ def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, cen
 
 
 def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = read_json(config_path)
+    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
     if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
         raise RuntimeError("layered P0 execution is not authorized")
     for name in ("qualification_route", "propagation_route", "boundary_route"):
-        if not os.environ.get(str(config[name]["api_key_environment"])):
-            raise RuntimeError("provider API key environment variable is absent")
+        route = resolve_provider_route(
+            config[name], purpose=route_purpose(name), route_name=name
+        )
+        resolve_provider_credential(route, purpose=route_purpose(name))
     manifest, records = read_json(manifest_path), discover_records(dataset_root)
     case_ids, by_case = p0_case_ids(manifest), {}
     with ThreadPoolExecutor(max_workers=int(config.get("max_parallel_cases", 4))) as executor:

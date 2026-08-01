@@ -41,6 +41,8 @@ from .basic_runner import (
     write_json,
     write_jsonl,
 )
+from ...provider_routes import resolve_provider_credential, resolve_provider_route
+from ..provider_models import canonical_model_name
 from ..bccse.types import (
     EvaluationOutcome,
     ExperienceRecord,
@@ -93,6 +95,11 @@ def _json_object_provider_call(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Generic cached JSON-object transport without PACA census assumptions."""
 
+    route = resolve_provider_route(route, purpose="mutation", route_name="mutation")
+    try:
+        route["model"] = canonical_model_name(str(route.get("model") or ""))
+    except ValueError:
+        pass
     payload = {
         "model": route["model"],
         "temperature": 0,
@@ -134,7 +141,7 @@ def _json_object_provider_call(
         except Exception:
             pass  # 缓存文件损坏，继续调用大模型
 
-    api_key = os.environ[str(route["api_key_environment"])]
+    api_key = resolve_provider_credential(route, purpose="mutation")
     retries = int(route.get("transport_retries", 2))
     last_error: Exception | None = None
     for attempt in range(retries + 1):

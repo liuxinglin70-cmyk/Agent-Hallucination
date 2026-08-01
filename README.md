@@ -164,12 +164,21 @@ been successfully optimized.
 cd src
 python -m sehd_v6.dry_run_5
 
-# Optional mutation API environment (the key is never stored in the repository)
-# PowerShell example:
-# $env:SEHD_MUTATION_API_KEY = "<secret>"
-# $env:SEHD_MUTATION_ENDPOINT = "https://api.deepseek.com"
-# $env:SEHD_MUTATION_MODEL = "deepseek-v4-flash"
-# $env:SEHD_MUTATION_API_KEY_ENV = "SEHD_MUTATION_API_KEY"
+# Provider routes are loaded from the repository-root `.env` (or the process
+# environment; process values win). No credential value is written to code or
+# artifacts. The default mutation route is official DeepSeek V4-Flash:
+# DEEPSEEK_API_KEY=<secret>
+# Optional purpose-specific overrides:
+# SEHD_MUTATION_ENDPOINT=https://api.deepseek.com
+# SEHD_MUTATION_MODEL=deepseek-v4-flash
+# SEHD_MUTATION_API_KEY_ENV=DEEPSEEK_API_KEY
+# SEHD_DETECTOR_ENDPOINT=...
+# SEHD_DETECTOR_MODEL=...
+# SEHD_DETECTOR_API_KEY_ENV=...
+# SEHD_JUDGE_ENDPOINT=...
+# Route-level selectors such as SEHD_ROUTE_DEFENSE_MODEL take precedence over
+# purpose-level selectors. Legacy config-file route values remain compatible;
+# a non-official proxy route never silently receives DEEPSEEK_API_KEY.
 
 # Partition into a reusable development pool, a small fixed gold probe inside
 # that pool, and a sealed final holdout. Legacy explicit Outer rows are kept.

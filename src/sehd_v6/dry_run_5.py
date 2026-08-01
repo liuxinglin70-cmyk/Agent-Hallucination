@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -39,6 +38,8 @@ from sehd_v6.core.bccse import (
 )
 from sehd_v6.core.bccse.safety_gate import create_structural_gate
 from sehd_v6.core.paca_tcl.basic_runner import json_object_provider_call
+from sehd_v6.env_loader import load_local_env
+from sehd_v6.provider_routes import has_provider_credential, resolve_provider_route
 from sehd_v6.core.htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -170,18 +171,13 @@ TEST_CASES = [
 
 
 def _mutation_route() -> dict[str, str] | None:
-    endpoint = os.environ.get("SEHD_MUTATION_ENDPOINT")
-    model = os.environ.get("SEHD_MUTATION_MODEL")
-    api_env = os.environ.get("SEHD_MUTATION_API_KEY_ENV", "SEHD_MUTATION_API_KEY")
-    if not endpoint or not model or not os.environ.get(api_env):
+    load_local_env()
+    route = resolve_provider_route({}, purpose="mutation", route_name="mutation")
+    if not has_provider_credential(route):
         return None
-    return {
-        "endpoint": endpoint,
-        "model": model,
-        "api_key_environment": api_env,
-        "timeout_seconds": "60",
-        "transport_retries": "0",
-    }
+    route["timeout_seconds"] = 60
+    route["transport_retries"] = 0
+    return route
 
 
 def _llm_edit(route: dict[str, str], case: dict, type_result, signal, cache_dir: Path) -> dict:
@@ -206,6 +202,7 @@ def _llm_edit(route: dict[str, str], case: dict, type_result, signal, cache_dir:
     }, ensure_ascii=False)
     value, _ = json_object_provider_call(
         route=route, system=system, user=user, cache_dir=cache_dir,
+        purpose="mutation",
     )
     if not isinstance(value, dict):
         raise ValueError("mutation response must be an object")
@@ -234,6 +231,7 @@ def _repair_llm_edit(
             },
         }, ensure_ascii=False),
         cache_dir=cache_dir,
+        purpose="mutation",
     )
     return value
 

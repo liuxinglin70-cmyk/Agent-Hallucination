@@ -33,6 +33,7 @@ from .core.provider_models import (
     canonical_model_name,
 )
 from .env_loader import load_local_env
+from .provider_routes import resolve_config_provider_routes, resolve_provider_route
 
 load_local_env()
 
@@ -71,20 +72,11 @@ FINAL_HOLDOUT_SET_ALIASES = {"final_holdout", "outer"}
 
 def _mutation_route_from_env() -> dict[str, Any]:
     """Build the mutation route without ever materializing a credential."""
-
-    return {
-        "endpoint": os.environ.get(
-            "SEHD_MUTATION_ENDPOINT", "https://api.deepseek.com"
-        ),
-        "model": os.environ.get(
-            "SEHD_MUTATION_MODEL", "deepseek-v4-flash"
-        ),
-        "api_key_environment": os.environ.get(
-            "SEHD_MUTATION_API_KEY_ENV", "DEEPSEEK_API_KEY"
-        ),
-        "temperature": float(os.environ.get("SEHD_MUTATION_TEMPERATURE", "0.3")),
-        "max_tokens": int(os.environ.get("SEHD_MUTATION_MAX_TOKENS", "1024")),
-    }
+    return resolve_provider_route(
+        {"temperature": 0.3, "max_tokens": 1024},
+        purpose="mutation",
+        route_name="mutation",
+    )
 
 
 # Official DeepSeek route by default.  SEHD_MUTATION_* variables retain the
@@ -98,6 +90,7 @@ def load_config() -> dict[str, Any]:
         raise FileNotFoundError(f"Frozen v3.5 config missing: {V35_CONFIG_PATH}")
     with open(V35_CONFIG_PATH, "r", encoding="utf-8") as handle:
         config = json.load(handle)
+    config = resolve_config_provider_routes(config, purpose="detector")
     _assert_config_contract(config)
     return config
 

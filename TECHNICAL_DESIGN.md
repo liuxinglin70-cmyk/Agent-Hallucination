@@ -253,9 +253,16 @@ fitness credit and experience records.
   one repair request when needed, then deterministic safe fallback if the API
   proposal remains invalid.
 
-The API key is read only from the environment variable named by
-`SEHD_MUTATION_API_KEY_ENV`. It is never written to source, prompts, result
-files or logs.
+All active provider routes use the dependency-free resolver in
+`src/sehd_v6/provider_routes.py`. It loads the repository `.env` without
+overriding process variables, then applies route-level (`SEHD_ROUTE_*_*`),
+purpose-level (`SEHD_MUTATION_*`, `SEHD_DETECTOR_*`, `SEHD_JUDGE_*`,
+`SEHD_EMBEDDING_*`) and global `SEHD_PROVIDER_*` overrides before falling back
+to a legacy config route or the official DeepSeek V4-Flash route. Only the
+name of the key environment variable is retained; the credential is read at
+the HTTP boundary and is never written to source, prompts, result files or
+logs. Explicit non-official proxy routes fail closed when their selected key
+is absent and never silently substitute `DEEPSEEK_API_KEY`.
 
 One recorded configured DeepSeek exercise used `deepseek-v4-flash` and
 completed 5/5 executions. Four cases created typed experience entries

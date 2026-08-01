@@ -22,6 +22,12 @@ from ...utils import ocse_packet as packet
 from . import proof_contract_v3_4 as contract
 from . import layered_engine as v2
 from ...utils.preflight import discover_records
+from ...provider_routes import (
+    resolve_config_provider_routes,
+    resolve_provider_credential,
+    resolve_provider_route,
+    route_purpose,
+)
 from .basic_runner import (
     _responsible_step, p0_case_ids, provider_call, read_json, validate_provider_census,
     write_json, write_jsonl,
@@ -931,7 +937,7 @@ def evaluate_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> dict[str, An
 
 
 def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config = read_json(config_path)
+    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
     base = v2.preflight(config_path=config_path, dataset_root=dataset_root, manifest_path=manifest_path, census_root=census_root)
     required_routes = {
         "construct_census_route", "prosecution_route", "defense_route",
@@ -959,15 +965,17 @@ def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, cen
 
 
 def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = read_json(config_path)
+    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
     if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
         raise RuntimeError("proof P0 execution is not authorized")
     for name in (
         "qualification_route", "propagation_route", "boundary_route", "construct_census_route",
         "prosecution_route", "defense_route", "appeal_prosecutor_route", "appeal_defender_route",
     ):
-        if not os.environ.get(str(config[name]["api_key_environment"])):
-            raise RuntimeError(f"provider API key environment variable is absent: {name}")
+        route = resolve_provider_route(
+            config[name], purpose=route_purpose(name), route_name=name
+        )
+        resolve_provider_credential(route, purpose=route_purpose(name))
     manifest, records = read_json(manifest_path), discover_records(dataset_root)
     case_ids, by_case = p0_case_ids(manifest), {}
     with ThreadPoolExecutor(max_workers=int(config.get("max_parallel_cases", 4))) as executor:

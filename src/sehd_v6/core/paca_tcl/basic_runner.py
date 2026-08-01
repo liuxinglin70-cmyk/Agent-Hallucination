@@ -24,6 +24,12 @@ from ...utils import ocse_packet as packet
 from . import contract_v1 as contract
 from ...utils.preflight import discover_records
 from ...env_loader import load_local_env
+from ...provider_routes import (
+    resolve_config_provider_routes,
+    resolve_provider_credential,
+    resolve_provider_route,
+)
+from ..provider_models import canonical_model_name
 
 load_local_env()
 
@@ -260,6 +266,7 @@ def provider_call_with_schema(
     cache_dir: Path,
     cache_prefix: str = "v1_census",
     require_candidates: bool = True,
+    purpose: str = "detector",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Provider call with configurable schema validation.
 
@@ -270,6 +277,17 @@ def provider_call_with_schema(
             the H3 counterfactual localization route which returns
             ``{"rankings": {...}}``.
     """
+    route = dict(route)
+    if not route.get("_provider_route_resolved"):
+        route = resolve_provider_route(route, purpose=purpose)
+    else:
+        # Config routes may be shared by worker threads; canonicalize a copy
+        # so transport preparation never mutates the frozen config object.
+        route = dict(route)
+    try:
+        route["model"] = canonical_model_name(str(route.get("model") or ""))
+    except ValueError:
+        pass
     payload = {
         "model": route["model"],
         "temperature": 0,
@@ -296,7 +314,7 @@ def provider_call_with_schema(
         except Exception:
             pass  # 缓存文件损坏，继续调用大模型
 
-    api_key = os.environ[str(route["api_key_environment"])]
+    api_key = resolve_provider_credential(route, purpose=purpose)
     retries = int(route.get("transport_retries", 2))
     last_error: Exception | None = None
     for attempt in range(retries + 1):
@@ -346,7 +364,12 @@ def provider_call_with_schema(
 
 
 def json_object_provider_call(
-    *, route: dict[str, Any], system: str, user: str, cache_dir: Path,
+    *,
+    route: dict[str, Any],
+    system: str,
+    user: str,
+    cache_dir: Path,
+    purpose: str = "detector",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Call a provider for an unconstrained JSON object.
 
@@ -362,6 +385,7 @@ def json_object_provider_call(
         cache_dir=cache_dir,
         cache_prefix="generic_json_object",
         require_candidates=False,
+        purpose=purpose,
     )
 
 
@@ -645,7 +669,7 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config = read_json(config_path)
+    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
     manifest = read_json(manifest_path)
     records = discover_records(dataset_root)
     case_ids = p0_case_ids(manifest)
@@ -679,11 +703,13 @@ def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, cen
 
 
 def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = read_json(config_path)
+    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
     if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
         raise RuntimeError("PACA-TCL P0 execution is not authorized")
-    if not os.environ.get(str(config["model_route"]["api_key_environment"])):
-        raise RuntimeError("provider API key environment variable is absent")
+    model_route = resolve_provider_route(
+        config["model_route"], purpose="detector", route_name="model_route"
+    )
+    resolve_provider_credential(model_route, purpose="detector")
     manifest = read_json(manifest_path)
     records = discover_records(dataset_root)
     case_ids = p0_case_ids(manifest)
