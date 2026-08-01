@@ -432,6 +432,21 @@ def integrated_v35_provider(
     The runner imports provider functions by value, so both bindings must be
     replaced.  A process lock prevents concurrent genomes from sharing global
     provider state.  Original functions are restored even if evaluation fails.
+
+    Thread-safety note:
+        ``_PATCH_LOCK`` serializes all genome evaluations in the process.
+        This is intentional: ``provider_call`` is a module-level binding
+        shared by ``proof_engine`` and ``layered_engine``, so concurrent
+        evaluations with different genomes would cross-contaminate skill
+        context. Parallel evaluation of different genomes must use separate
+        processes (not threads). The baseline ``run()`` function does NOT
+        use this context manager and is unaffected.
+
+        v3.4 provider bindings are intentionally NOT patched here: v3.5
+        only imports pure helper functions from v3.4 (no provider_call
+        invocations). If v3.4 helpers are extended to call provider_call
+        directly, add ``from . import proof_engine_v3_4 as v34`` and patch
+        ``v34.provider_call`` here as well.
     """
 
     from . import layered_engine as v2
@@ -440,14 +455,20 @@ def integrated_v35_provider(
     compiled = compile_genome_for_paca(genome)
     with _PATCH_LOCK:
         original_v35 = v35.provider_call
+        original_v35_json = v35.json_object_provider_call
         original_v2 = v2.provider_call
         wrapped = make_skill_aware_provider(original_v35, compiled=compiled, config=config)
+        wrapped_json = make_skill_aware_provider(
+            original_v35_json, compiled=compiled, config=config,
+        )
         v35.provider_call = wrapped
+        v35.json_object_provider_call = wrapped_json
         v2.provider_call = wrapped
         try:
             yield compiled
         finally:
             v35.provider_call = original_v35
+            v35.json_object_provider_call = original_v35_json
             v2.provider_call = original_v2
 
 

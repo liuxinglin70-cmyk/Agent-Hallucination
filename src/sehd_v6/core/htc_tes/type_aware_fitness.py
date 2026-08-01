@@ -42,6 +42,7 @@ class TypeConditionedExperience:
     source_case_id: str
     timestamp: float = field(default_factory=time.time)
     metadata: dict[str, Any] = field(default_factory=dict)
+    feature_description: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -53,6 +54,7 @@ class TypeConditionedExperience:
             "source_case_id": self.source_case_id,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
+            "feature_description": self.feature_description,
         }
 
 
@@ -79,6 +81,7 @@ class TypeExperienceMemory:
         detection_improved: bool,
         source_case_id: str,
         metadata: dict[str, Any] | None = None,
+        feature_description: str = "",
     ) -> None:
         """Record a detection experience.
 
@@ -99,6 +102,7 @@ class TypeExperienceMemory:
             detection_improved=detection_improved,
             source_case_id=source_case_id,
             metadata=metadata or {},
+            feature_description=feature_description,
         )
         entries = self._experiences[hallucination_type]
         entries.append(experience)
@@ -200,23 +204,25 @@ class TypeExperienceMemory:
     def get_type_coverage(self) -> dict[str, Any]:
         """Get the coverage of hallucination types with experience.
 
-        Returns:
-            Coverage statistics including which types have experience.
+        UNKNOWN is excluded from the denominator because it is a fallback
+        type, not a real type to learn. This fixes the DACR scope issue
+        where max real coverage was capped at 7/8.
         """
-        total_types = len(HallucinationType)
+        real_types = [t for t in HallucinationType if t != HallucinationType.UNKNOWN]
+        total_types = len(real_types)
         types_with_experience = sum(
             1
-            for t in HallucinationType
+            for t in real_types
             if len(self._experiences.get(t, [])) > 0
         )
         types_with_success = sum(
             1
-            for t in HallucinationType
+            for t in real_types
             if self.get_success_rate(t) > 0
         )
 
         per_type: dict[str, Any] = {}
-        for htype in HallucinationType:
+        for htype in real_types:
             entries = self._experiences.get(htype, [])
             successes = sum(1 for e in entries if e.detection_improved)
             per_type[htype.value] = {
@@ -237,6 +243,49 @@ class TypeExperienceMemory:
     def clear(self) -> None:
         """Clear all experiences."""
         self._experiences.clear()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the experience memory to a dict for persistence.
+
+        Each experience is stored under its hallucination type key.
+        """
+        result: dict[str, Any] = {
+            "max_per_type": self._max_per_type,
+            "types": {},
+        }
+        for htype, entries in self._experiences.items():
+            result["types"][htype.value] = [e.to_dict() for e in entries]
+        return result
+
+    def from_dict(self, data: Mapping[str, Any]) -> None:
+        """Load experiences from a serialized dict (replaces current state).
+
+        Args:
+            data: A dict previously produced by ``to_dict()``.
+        """
+        self.clear()
+        self._max_per_type = int(data.get("max_per_type", 50))
+        types = data.get("types") or {}
+        for type_name, entry_list in types.items():
+            try:
+                htype = HallucinationType(type_name)
+            except ValueError:
+                continue
+            for entry_data in entry_list:
+                if not isinstance(entry_data, Mapping):
+                    continue
+                experience = TypeConditionedExperience(
+                    hallucination_type=htype,
+                    evolution_direction=str(entry_data.get("evolution_direction") or ""),
+                    module_targeted=str(entry_data.get("module_targeted") or "unknown"),
+                    strategy_used=str(entry_data.get("strategy_used") or "generic"),
+                    detection_improved=bool(entry_data.get("detection_improved", False)),
+                    source_case_id=str(entry_data.get("source_case_id") or ""),
+                    timestamp=float(entry_data.get("timestamp", 0.0)),
+                    metadata=dict(entry_data.get("metadata") or {}),
+                    feature_description=str(entry_data.get("feature_description") or ""),
+                )
+                self._experiences[htype].append(experience)
 
 
 @dataclass
@@ -264,6 +313,8 @@ class TypeAwareFitnessAssessment:
             "coverage_rate": self.coverage_rate,
             "dacr_score": self.dacr_score,
             "per_type_fitness": self.per_type_fitness,
+            "type_specific_improvements": self.type_specific_improvements,
+            "type_specific_regressions": self.type_specific_regressions,
             "global_fitness": self.global_fitness,
             "recommendation": self.recommendation,
         }
@@ -297,6 +348,8 @@ class TypeAwareFitness:
         detection_before: Mapping[str, Any],
         detection_after: Mapping[str, Any],
         type_result: TypeClassificationResult,
+        target_module: str | None = None,
+        override_success: bool | None = None,
     ) -> TypeAwareFitnessAssessment:
         """Assess a skill edit's fitness for a specific hallucination type.
 
@@ -307,6 +360,15 @@ class TypeAwareFitness:
             detection_before: Detection result before the edit.
             detection_after: Detection result after the edit.
             type_result: The type classification result.
+            target_module: The module that was edited. If None, falls back
+                to ``type_result`` evidence or "unknown". The detection_after
+                dict does NOT contain target_module (it is a PACA-TCL output),
+                so this parameter is the correct source.
+            override_success: When provided, overrides the computed ``improved``
+                flag. This allows the caller (BCCSE) to pass its own fitness
+                decision (based on source-level assessment) as the success
+                signal, ensuring HTC-TES experience memory records consistent
+                success/failure with the BCCSE batch commit decision.
 
         Returns:
             TypeAwareFitnessAssessment with fitness evaluation.
@@ -323,14 +385,55 @@ class TypeAwareFitness:
         is_decisive = after_state in ("verified_error", "verified_clean")
         decisive_correct = self._check_decisive_correctness(after_state, evolution_direction)
 
-        # Record experience
-        improved = direction_correct or decisive_correct
-        strategy = self._infer_strategy(detection_after)
+        # ================================================================
+        # Three-state process evaluation (replaces boolean improved)
+        # ================================================================
+        # Instead of a single boolean "improved", we classify the edit's
+        # effect into three states:
+        #   - "improvement": the edit moved toward a decisive, correct state
+        #   - "regression": the edit moved toward unresolved or wrong state
+        #   - "no_effect": the state didn't change
+        #
+        # This is architecturally superior to boolean improved because:
+        # 1. no_effect is distinguished from regression (allowing the
+        #    evolution loop to allow no_effect add_rules into shadow)
+        # 2. regression requires active worsening, not just "not improvement"
+        # 3. The fitness level integrates the process state holistically
+        if direction_correct and decisive_correct:
+            process_state = "improvement"
+        elif after_state == "unresolved" and before_state != "unresolved":
+            process_state = "regression"  # decisive → indecisive
+        elif after_state != before_state and not decisive_correct:
+            process_state = "regression"  # wrong direction
+        elif after_state == before_state:
+            process_state = "no_effect"
+        else:
+            process_state = "improvement" if decisive_correct else "regression"
+
+        improved = process_state == "improvement"
+
+        # FIX (C1): when the caller (BCCSE) provides its own fitness decision,
+        # use it as the authoritative success flag so HTC-TES experience
+        # memory stays consistent with the batch commit decision.
+        if override_success is not None:
+            improved = override_success
+
+        # Determine the targeted module from the correct source.
+        if target_module:
+            module_targeted = target_module
+        else:
+            module_targeted = str(
+                type_result.evidence.get("module_signal")
+                or type_result.evidence.get("target_module")
+                or "unknown"
+            )
+        strategy = self._infer_strategy(detection_after, module_targeted)
+        feature_description = self._describe_features(type_result)
 
         self._experience_memory.add_experience(
             hallucination_type=hallucination_type,
             evolution_direction=evolution_direction,
-            module_targeted=str(detection_after.get("target_module") or "unknown"),
+            module_targeted=module_targeted,
             strategy_used=strategy,
             detection_improved=improved,
             source_case_id=source_case_id,
@@ -339,7 +442,11 @@ class TypeAwareFitness:
                 "after_state": after_state,
                 "type_confidence": type_result.confidence,
                 "decisive": is_decisive,
+                "decisive_correct": decisive_correct,
+                "direction_correct": direction_correct,
+                "process_state": process_state,
             },
+            feature_description=feature_description,
         )
 
         # Compute metrics
@@ -351,9 +458,9 @@ class TypeAwareFitness:
         # Per-type fitness
         per_type_fitness = self._compute_per_type_fitness(hallucination_type, improved)
 
-        # Determine global fitness level
-        global_fitness = self._determine_global_fitness(
-            improved, decisive_accuracy, coverage_rate
+        # Determine global fitness level using three-state process
+        global_fitness = self._determine_global_fitness_v2(
+            process_state, decisive_accuracy, coverage_rate
         )
 
         # Generate recommendation
@@ -372,6 +479,7 @@ class TypeAwareFitness:
                     f"Direction: {evolution_direction}",
                     f"State: {before_state} → {after_state}",
                     f"Decisive: {is_decisive}",
+                    f"Process: {process_state}",
                 ]
                 if improved
                 else []
@@ -380,38 +488,71 @@ class TypeAwareFitness:
                 hallucination_type.value: [
                     f"Direction: {evolution_direction}",
                     f"State: {before_state} → {after_state}",
+                    f"Process: {process_state}",
                 ]
-                if not improved
+                if process_state == "regression"
                 else []
             },
             global_fitness=global_fitness,
             recommendation=recommendation,
         )
 
+    @staticmethod
+    def _describe_features(type_result: TypeClassificationResult) -> str:
+        features = type_result.trajectory_features
+        if features is None:
+            return "features_unavailable"
+        parts = [
+            f"state={features.state}",
+            f"candidates={features.candidate_count}",
+            f"kinds={','.join(features.candidate_kinds) or 'none'}",
+            f"axes={','.join(features.axes) or 'none'}",
+            f"tool_action={features.has_tool_action}",
+            f"omission={features.has_omission}",
+            f"adoption={features.has_adoption}",
+            f"coverage={features.prosecution_coverage_state}/{features.defense_coverage_state}",
+            f"crs_source={features.crs_source}",
+        ]
+        return " | ".join(parts)
+
     def _check_direction_improvement(
         self, before_state: str, after_state: str, direction: str
     ) -> bool:
-        """Check if the edit moved detection in the intended direction."""
+        """Check if the edit moved detection in the intended direction.
+
+        A direction improvement requires the after-state to be a DECISIVE
+        judgment in the intended direction. Moving to ``unresolved`` is
+        never an improvement — it is a regression from decisive to
+        indecisive (the original bug treated unresolved as improvement).
+        """
         if direction == "error_to_clean":
-            return before_state == "verified_error" and after_state in (
-                "verified_clean",
-                "unresolved",
-            )
+            return before_state == "verified_error" and after_state == "verified_clean"
         elif direction == "clean_to_error":
-            return before_state == "verified_clean" and after_state in (
-                "verified_error",
-                "unresolved",
-            )
+            return before_state == "verified_clean" and after_state == "verified_error"
         elif direction == "unresolved_to_clean":
             return before_state == "unresolved" and after_state == "verified_clean"
         elif direction == "unresolved_to_error":
             return before_state == "unresolved" and after_state == "verified_error"
+        elif direction == "unresolved_to_decisive":
+            return before_state == "unresolved" and after_state in {
+                "verified_error", "verified_clean",
+            }
+        # no_evolution or unknown direction: only count as improvement if
+        # the state became decisive (non-unresolved) and changed.
+        if direction == "no_evolution":
+            return False
         return before_state != after_state and after_state != "unresolved"
 
     def _check_decisive_correctness(
         self, after_state: str, direction: str
     ) -> bool:
-        """Check if the after-state is a correct decisive judgment."""
+        """Check if the after-state is a correct decisive judgment.
+
+        For ``no_evolution`` direction, there is no intended target state,
+        so we cannot call the after-state "correct" — return False to be
+        conservative. The three-state process evaluation will then classify
+        state changes under no_evolution as regression, not improvement.
+        """
         if after_state == "unresolved":
             return False
         if direction == "error_to_clean":
@@ -422,7 +563,10 @@ class TypeAwareFitness:
             return after_state == "verified_clean"
         elif direction == "unresolved_to_error":
             return after_state == "verified_error"
-        return True
+        elif direction == "unresolved_to_decisive":
+            return False
+        # no_evolution or unknown direction: conservative — not correct.
+        return False
 
     def _compute_decisive_accuracy(
         self, hallucination_type: HallucinationType
@@ -431,6 +575,11 @@ class TypeAwareFitness:
 
         Decisive Accuracy = correct_decisive_judgments / total_decisive_judgments
         where a decisive judgment is a verified_error or verified_clean result.
+
+        FIX: "correct" is determined by ``decisive_correct`` in metadata,
+        NOT by ``detection_improved`` (which is the AND of direction_correct
+        and decisive_correct and can be False even when the decisive
+        judgment itself is correct, e.g. for no_evolution cases).
         """
         entries = self._experience_memory.get_type_experiences(hallucination_type)
         decisive_entries = [
@@ -441,7 +590,7 @@ class TypeAwareFitness:
         if not decisive_entries:
             return 0.0
         correct = sum(
-            1 for e in decisive_entries if e.detection_improved
+            1 for e in decisive_entries if e.metadata.get("decisive_correct", False)
         )
         return correct / len(decisive_entries)
 
@@ -472,7 +621,7 @@ class TypeAwareFitness:
         decisive_accuracy: float,
         coverage_rate: float,
     ) -> str:
-        """Determine global fitness level."""
+        """Determine global fitness level (legacy, kept for compatibility)."""
         if not improved and decisive_accuracy < 0.3:
             return "none"
         if improved and decisive_accuracy > 0.6 and coverage_rate > 0.5:
@@ -480,6 +629,39 @@ class TypeAwareFitness:
         if improved or decisive_accuracy > 0.4:
             return "weak"
         return "none"
+
+    def _determine_global_fitness_v2(
+        self,
+        process_state: str,
+        decisive_accuracy: float,
+        coverage_rate: float,
+    ) -> str:
+        """Determine global fitness from three-state process evaluation.
+
+        Architectural principle: fitness is determined by the PROCESS STATE
+        (improvement / regression / no_effect) combined with the type's
+        historical decisive_accuracy and coverage. This replaces the old
+        boolean improved logic.
+
+        - "improvement" + high accuracy + high coverage → "strong"
+        - "improvement" or "no_effect" with decent accuracy → "weak"
+          (no_effect is acceptable for add_rule: the rule didn't hurt
+          existing detection but may help future cases)
+        - "regression" or very low accuracy → "none"
+        """
+        if process_state == "regression":
+            return "none"
+        if process_state == "no_effect":
+            # no_effect is acceptable when the type has some experience
+            # (the rule may help future cases even if this case didn't change)
+            return "weak" if decisive_accuracy >= 0.3 else "none"
+        # process_state == "improvement"
+        if decisive_accuracy > 0.6 and coverage_rate > 0.5:
+            return "strong"
+        # An improving edit should never be "none" — accept it as "weak"
+        # even if the type's history is sparse, so the type can bootstrap
+        # out of the cold-start trap.
+        return "weak"
 
     def _generate_recommendation(
         self,
@@ -504,14 +686,19 @@ class TypeAwareFitness:
                 f"Consider structural changes to rules. Coverage: {coverage['coverage_rate']:.1%}"
             )
 
-    def _infer_strategy(self, detection_result: Mapping[str, Any]) -> str:
-        """Infer the editing strategy from detection result changes."""
+    def _infer_strategy(
+        self, detection_result: Mapping[str, Any], target_module: str = ""
+    ) -> str:
+        """Infer the editing strategy from detection result changes.
+
+        ``target_module`` is passed explicitly because ``detection_result``
+        (a PACA-TCL output) does not contain it.
+        """
         strategy_signals: list[str] = []
 
         # Check for module attribution changes
-        old_module = str(detection_result.get("target_module") or "")
-        if old_module:
-            strategy_signals.append(f"module:{old_module}")
+        if target_module:
+            strategy_signals.append(f"module:{target_module}")
 
         # Check for state transition
         state = str(detection_result.get("state") or "")

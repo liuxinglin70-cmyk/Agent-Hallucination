@@ -1,0 +1,1039 @@
+{
+  "total_cases": 50,
+  "stable_cases": 19,
+  "committed_edits": 3,
+  "rejected_edits": 28,
+  "errors": 0,
+  "trigger_distribution": {
+    "unresolved": 20,
+    "none": 19,
+    "evidence_incomplete": 6,
+    "crs_contradiction": 5
+  },
+  "type_distribution": {
+    "factual": 15,
+    "tool": 3,
+    "contextual": 8,
+    "reasoning": 5
+  },
+  "direction_distribution": {
+    "unresolved_to_clean": 20,
+    "no_evolution": 11
+  },
+  "strategy_distribution": {
+    "strict_verification": 15,
+    "tool_validation": 3,
+    "context_preservation": 8,
+    "causal_chain_strengthening": 5
+  },
+  "module_target_distribution": {
+    "abstention_rule": 20,
+    "evidence_obligation": 11
+  },
+  "edit_outcomes": {
+    "rolled_back": 6,
+    "committed": 3,
+    "rejected_validation": 16,
+    "rejected_gate": 6
+  },
+  "fitness_outcomes": {
+    "none": 6,
+    "weak": 3
+  },
+  "baseline_genome_hash": "27e62ff438ad097445e72e684c7ee41fe71d377e3431cb5f5c79f138d910a9d6",
+  "champion_genome_hash": "4645fa92ed3c587c3bb8c93aa822cd16e3c66d2e669bf303e1b0bb5837870537",
+  "champion_generation": 3,
+  "type_coverage": {
+    "types_with_experience": 4,
+    "total_types": 7,
+    "coverage_rate": 0.5714285714285714,
+    "types_with_success": 3,
+    "effective_coverage": 0.42857142857142855,
+    "per_type": {
+      "factual": {
+        "total_edits": 2,
+        "successes": 1,
+        "success_rate": 0.5
+      },
+      "instructional": {
+        "total_edits": 0,
+        "successes": 0,
+        "success_rate": 0.0
+      },
+      "tool": {
+        "total_edits": 1,
+        "successes": 1,
+        "success_rate": 1.0
+      },
+      "reasoning": {
+        "total_edits": 5,
+        "successes": 0,
+        "success_rate": 0.0
+      },
+      "omission": {
+        "total_edits": 0,
+        "successes": 0,
+        "success_rate": 0.0
+      },
+      "adoption": {
+        "total_edits": 0,
+        "successes": 0,
+        "success_rate": 0.0
+      },
+      "contextual": {
+        "total_edits": 1,
+        "successes": 1,
+        "success_rate": 1.0
+      }
+    }
+  },
+  "per_case_results": [
+    {
+      "index": 0,
+      "case_id": "OpenManus/085",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.495,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "27e62ff4",
+      "genome_after": "ff455fbe",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_error",
+      "outcome": "ROLLED_BACK"
+    },
+    {
+      "index": 1,
+      "case_id": "BFCL/121",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "tool",
+      "type_confidence": 0.44,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "tool_validation",
+      "routed_modules": [
+        "candidate_to_verifier_route"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "27e62ff4",
+      "genome_after": "726eebcc",
+      "fitness": "weak",
+      "dacr_score": 0.143,
+      "overall_improved": true,
+      "after_state": "verified_clean",
+      "outcome": "COMMITTED"
+    },
+    {
+      "index": 2,
+      "case_id": "Camel/068",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "726eebcc",
+      "genome_after": "866f51ed",
+      "fitness": "weak",
+      "dacr_score": 0.143,
+      "overall_improved": true,
+      "after_state": "verified_clean",
+      "outcome": "COMMITTED"
+    },
+    {
+      "index": 3,
+      "case_id": "OpenDeepSearch/068",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.379,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "866f51ed",
+      "genome_after": "4645fa92",
+      "fitness": "weak",
+      "dacr_score": 0.429,
+      "overall_improved": true,
+      "after_state": "verified_clean",
+      "outcome": "COMMITTED"
+    },
+    {
+      "index": 4,
+      "case_id": "SmolAgents/069",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.379,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 5,
+      "case_id": "OpenManus/050",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.495,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 6,
+      "case_id": "Camel/016",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.355,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 7,
+      "case_id": "Camel/023",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 8,
+      "case_id": "BFCL/163",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 9,
+      "case_id": "OpenDeepSearch/061",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "tool",
+      "type_confidence": 0.421,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "tool_validation",
+      "routed_modules": [
+        "candidate_to_verifier_route"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 10,
+      "case_id": "BFCL/019",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 11,
+      "case_id": "OpenDeepSearch/011",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.355,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 12,
+      "case_id": "Camel/014",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.355,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 13,
+      "case_id": "BFCL/055",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 14,
+      "case_id": "OpenManus/089",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.355,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 15,
+      "case_id": "Magentic_One/029",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 16,
+      "case_id": "BFCL/025",
+      "baseline_state": "unresolved",
+      "gold_label": true,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.355,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 17,
+      "case_id": "BFCL/073",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "tool",
+      "type_confidence": 0.44,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "tool_validation",
+      "routed_modules": [
+        "candidate_to_verifier_route"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 18,
+      "case_id": "SmolAgents/004",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.456,
+      "secondary_type": "contextual",
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 19,
+      "case_id": "Camel/078",
+      "baseline_state": "unresolved",
+      "gold_label": false,
+      "error_type": "unresolved_unknown",
+      "trigger_source": "unresolved",
+      "target_module": "abstention_rule",
+      "should_evolve": true,
+      "hallucination_type": "contextual",
+      "type_confidence": 0.379,
+      "secondary_type": null,
+      "evolution_direction": "unresolved_to_clean",
+      "edit_strategy": "context_preservation",
+      "routed_modules": [
+        "abstention_rule"
+      ],
+      "edit_valid": false,
+      "edit_reject_reason": "duplicate_rule: semantic overlap 1.00 >= 0.95 with existing rule",
+      "outcome": "REJECTED_VALIDATION"
+    },
+    {
+      "index": 20,
+      "case_id": "Camel/022",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 21,
+      "case_id": "SmolAgents/081",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 22,
+      "case_id": "OpenManus/021",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 23,
+      "case_id": "Magentic_One/090",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 24,
+      "case_id": "BFCL/013",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.812,
+      "secondary_type": null,
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 25,
+      "case_id": "OpenManus/049",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.602,
+      "secondary_type": "tool",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 26,
+      "case_id": "BFCL/053",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.812,
+      "secondary_type": null,
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 27,
+      "case_id": "SmolAgents/066",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 28,
+      "case_id": "Magentic_One/051",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 29,
+      "case_id": "OpenDeepSearch/040",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.812,
+      "secondary_type": null,
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 30,
+      "case_id": "OpenDeepSearch/026",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 31,
+      "case_id": "BFCL/080",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 32,
+      "case_id": "OpenDeepSearch/020",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 33,
+      "case_id": "BFCL/159",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 34,
+      "case_id": "Magentic_One/070",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.812,
+      "secondary_type": null,
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 35,
+      "case_id": "Camel/021",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 36,
+      "case_id": "BFCL/083",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 37,
+      "case_id": "BFCL/078",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 38,
+      "case_id": "BFCL/112",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 39,
+      "case_id": "Camel/036",
+      "baseline_state": "verified_error",
+      "gold_label": false,
+      "error_type": "evidence_incomplete",
+      "trigger_source": "evidence_incomplete",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "factual",
+      "type_confidence": 0.812,
+      "secondary_type": null,
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "strict_verification",
+      "routed_modules": [
+        "evidence_obligation"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": false,
+      "gate_reasons": [
+        "cross_module_near_duplicate: overlap=1.00 >= 0.95 with rule in [abstention_rule]: \"当检测到factual类型幻觉时，必须验证每个声明是否有工具输出或外部证据支持，禁止仅凭推理判定...\""
+      ],
+      "outcome": "REJECTED_GATE"
+    },
+    {
+      "index": 40,
+      "case_id": "OpenDeepSearch/030",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 41,
+      "case_id": "BFCL/017",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 42,
+      "case_id": "Octotools/021",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 43,
+      "case_id": "OpenManus/077",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 44,
+      "case_id": "BFCL/111",
+      "baseline_state": "verified_error",
+      "gold_label": true,
+      "error_type": "correct",
+      "trigger_source": "none",
+      "target_module": "evidence_obligation",
+      "should_evolve": false,
+      "outcome": "STABLE"
+    },
+    {
+      "index": 45,
+      "case_id": "OpenDeepSearch/046",
+      "baseline_state": "verified_clean",
+      "gold_label": true,
+      "error_type": "crs_contradiction",
+      "trigger_source": "crs_contradiction",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "reasoning",
+      "type_confidence": 0.626,
+      "secondary_type": "factual",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "causal_chain_strengthening",
+      "routed_modules": [
+        "causal_link_test"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "4645fa92",
+      "genome_after": "6b8361aa",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_error",
+      "outcome": "ROLLED_BACK"
+    },
+    {
+      "index": 46,
+      "case_id": "Camel/007",
+      "baseline_state": "verified_clean",
+      "gold_label": false,
+      "error_type": "crs_contradiction",
+      "trigger_source": "crs_contradiction",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "reasoning",
+      "type_confidence": 0.557,
+      "secondary_type": "factual",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "causal_chain_strengthening",
+      "routed_modules": [
+        "causal_link_test"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "4645fa92",
+      "genome_after": "50f79f7c",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_clean",
+      "outcome": "ROLLED_BACK"
+    },
+    {
+      "index": 47,
+      "case_id": "OpenDeepSearch/049",
+      "baseline_state": "verified_clean",
+      "gold_label": false,
+      "error_type": "crs_contradiction",
+      "trigger_source": "crs_contradiction",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "reasoning",
+      "type_confidence": 0.557,
+      "secondary_type": "factual",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "causal_chain_strengthening",
+      "routed_modules": [
+        "causal_link_test"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "4645fa92",
+      "genome_after": "02b291be",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_clean",
+      "outcome": "ROLLED_BACK"
+    },
+    {
+      "index": 48,
+      "case_id": "OpenDeepSearch/092",
+      "baseline_state": "verified_clean",
+      "gold_label": false,
+      "error_type": "crs_contradiction",
+      "trigger_source": "crs_contradiction",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "reasoning",
+      "type_confidence": 0.557,
+      "secondary_type": "factual",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "causal_chain_strengthening",
+      "routed_modules": [
+        "causal_link_test"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "4645fa92",
+      "genome_after": "24402b3c",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_clean",
+      "outcome": "ROLLED_BACK"
+    },
+    {
+      "index": 49,
+      "case_id": "SmolAgents/088",
+      "baseline_state": "verified_clean",
+      "gold_label": false,
+      "error_type": "crs_contradiction",
+      "trigger_source": "crs_contradiction",
+      "target_module": "evidence_obligation",
+      "should_evolve": true,
+      "hallucination_type": "reasoning",
+      "type_confidence": 0.557,
+      "secondary_type": "factual",
+      "evolution_direction": "no_evolution",
+      "edit_strategy": "causal_chain_strengthening",
+      "routed_modules": [
+        "causal_link_test"
+      ],
+      "edit_valid": true,
+      "edit_reject_reason": null,
+      "gate_passed": true,
+      "genome_before": "4645fa92",
+      "genome_after": "fcdfff70",
+      "fitness": "none",
+      "dacr_score": 0.0,
+      "overall_improved": false,
+      "after_state": "verified_clean",
+      "outcome": "ROLLED_BACK"
+    }
+  ]
+}

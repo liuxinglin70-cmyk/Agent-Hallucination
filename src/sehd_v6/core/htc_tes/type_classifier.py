@@ -1,12 +1,28 @@
-"""HTC-TES v3 — Hallucination Type Classifier.
+"""HTC-TES v3 — Hallucination Type Classifier (Hierarchical Architecture).
 
 Classifies agent hallucination cases into distinct types based on trajectory
 features, detection process signals, and failure modes. This classification
 enables type-specific detection experience learning.
 
-The classifier operates in two modes:
-1. Rule-based classification (no LLM): uses trajectory features and detection signals
-2. LLM-enhanced classification: uses LLM for ambiguous cases
+Architectural principle — Hierarchical Classification:
+    The old design used flat weighted fusion of 4 signals, where a
+    no-information signal (UNRESOLVED_UNKNOWN) could dominate typed signals
+    from candidate analysis and CRS patterns. The new design is hierarchical:
+
+    Layer 1 (Structural): Classify from detection_result's intrinsic
+        features — candidate kind, CRS pattern, state×coverage. These
+        signals always carry information about WHAT went wrong.
+
+    Layer 2 (Attribution Enhancement): Use attribution_signal's error_type
+        ONLY when it carries information (i.e., not UNRESOLVED_UNKNOWN /
+        SIGNAL_UNAVAILABLE). No-information error types are excluded
+        entirely from scoring, not just down-weighted.
+
+    Layer 3 (Fallback): If Layer 1 produced no typed signal, fall back
+        to UNKNOWN. UNKNOWN is never chosen when any typed signal exists.
+
+This eliminates the root cause of the "everything is UNKNOWN" problem:
+no-information signals can no longer pollute the scoring space.
 
 Hallucination types:
 - FACTUAL: Agent makes unsupported factual claims
@@ -26,6 +42,27 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
+
+
+def _normalize_signal(signal: Any) -> dict[str, Any]:
+    """Normalize an attribution signal to a dict for uniform access.
+
+    HTC-TES modules accept both ``AttributionSignal`` dataclass instances
+    (the canonical type produced by ``step_attributor.attribute_failure``)
+    and plain ``Mapping[str, Any]`` dicts (used in tests and legacy paths).
+
+    This helper centralizes the conversion so downstream code can use
+    plain ``dict.get`` access without coupling to the dataclass shape.
+    """
+    if signal is None:
+        return {}
+    if isinstance(signal, Mapping):
+        return dict(signal)
+    # AttributionSignal dataclass exposes to_dict() returning the same
+    # field names and value types as the dict contract.
+    if hasattr(signal, "to_dict"):
+        return signal.to_dict()
+    return {}
 
 
 class HallucinationType(str, Enum):
@@ -102,14 +139,23 @@ _CONTEXTUAL_PATTERNS = [
     r"off.*topic",
 ]
 
-# Error type to hallucination type mapping
+# Error type to hallucination type mapping.
+# ErrorType has 16 values; CORRECT is skipped (no hallucination).
+# 语义映射说明：
+# - false_positive: 误报（clean 被判 error），多为边界过严 → CONTEXTUAL/INSTRUCTIONAL
+# - false_negative*: 漏检 error，多为遗漏或证据不足 → OMISSION/FACTUAL
+# - unresolved_should_error: 应判 error 但 abstained → OMISSION
+# - unresolved_should_clean: 应判 clean 但 abstained → CONTEXTUAL
 _ERROR_TYPE_TO_HALLUCINATION: dict[str, HallucinationType] = {
-    "false_positive": HallucinationType.FACTUAL,
-    "false_negative_clean": HallucinationType.INSTRUCTIONAL,
-    "false_negative_unresolved": HallucinationType.REASONING,
-    "unresolved_should_error": HallucinationType.FACTUAL,
+    "false_positive": HallucinationType.CONTEXTUAL,
+    "false_negative": HallucinationType.OMISSION,
+    "false_negative_clean": HallucinationType.OMISSION,
+    "false_negative_unresolved": HallucinationType.OMISSION,
+    "unresolved_should_error": HallucinationType.OMISSION,
     "unresolved_should_clean": HallucinationType.CONTEXTUAL,
     "unresolved_unknown": HallucinationType.UNKNOWN,
+    "unresolved_error": HallucinationType.REASONING,
+    "invalid_certificate": HallucinationType.TOOL,
     "localization_error": HallucinationType.REASONING,
     "candidate_miss": HallucinationType.OMISSION,
     "crs_contradiction": HallucinationType.REASONING,
@@ -117,6 +163,51 @@ _ERROR_TYPE_TO_HALLUCINATION: dict[str, HallucinationType] = {
     "boundary_hesitation": HallucinationType.CONTEXTUAL,
     "signal_unavailable": HallucinationType.UNKNOWN,
 }
+
+# Error types that carry NO information about the hallucination type.
+# These are excluded entirely from Layer 2 scoring (not just down-weighted)
+# because they represent "the classifier doesn't know" — using them would
+# be circular reasoning (classifying based on a label that says "unknown").
+_NO_INFO_ERROR_TYPES: frozenset[str] = frozenset({
+    "unresolved_unknown",
+    "signal_unavailable",
+})
+
+
+@dataclass(frozen=True)
+class TrajectoryFeatures:
+    """Versioned, label-free features extracted from the detector trajectory."""
+
+    schema_version: str
+    candidate_count: int
+    candidate_kinds: tuple[str, ...]
+    axes: tuple[str, ...]
+    module_tags: tuple[str, ...]
+    has_tool_action: bool
+    has_omission: bool
+    has_adoption: bool
+    has_claim: bool
+    state: str
+    prosecution_coverage_state: str | None
+    defense_coverage_state: str | None
+    crs_source: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "candidate_count": self.candidate_count,
+            "candidate_kinds": list(self.candidate_kinds),
+            "axes": list(self.axes),
+            "module_tags": list(self.module_tags),
+            "has_tool_action": self.has_tool_action,
+            "has_omission": self.has_omission,
+            "has_adoption": self.has_adoption,
+            "has_claim": self.has_claim,
+            "state": self.state,
+            "prosecution_coverage_state": self.prosecution_coverage_state,
+            "defense_coverage_state": self.defense_coverage_state,
+            "crs_source": self.crs_source,
+        }
 
 
 @dataclass(frozen=True)
@@ -128,6 +219,7 @@ class TypeClassificationResult:
     confidence: float  # 0.0-1.0
     evidence: dict[str, Any]
     classification_method: str  # "rule_based" or "llm_enhanced"
+    trajectory_features: TrajectoryFeatures | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -136,101 +228,175 @@ class TypeClassificationResult:
             "confidence": self.confidence,
             "evidence": self.evidence,
             "classification_method": self.classification_method,
+            "trajectory_features": self.trajectory_features.to_dict() if self.trajectory_features else None,
         }
 
 
 @dataclass
 class HallucinationTypeClassifier:
-    """Classifies agent hallucinations into distinct types.
+    """Classifies agent hallucinations using a hierarchical architecture.
 
-    The classifier uses a multi-signal approach:
-    1. Detection process signals (error type, module attribution)
-    2. Trajectory content analysis (pattern matching on events)
-    3. CRS score patterns (which dimensions are anomalous)
-    4. Candidate nature (claim type, action type)
+    Layer 1 (Structural): detection_result intrinsic features.
+    Layer 2 (Attribution Enhancement): informative error_type only.
+    Layer 3 (Fallback): UNKNOWN when no typed signal exists.
 
-    When multiple signals conflict, confidence is reduced and
-    secondary types are reported.
+    No-information error types (UNRESOLVED_UNKNOWN, SIGNAL_UNAVAILABLE)
+    are excluded from Layer 2 entirely, preventing circular reasoning.
     """
 
-    _rule_weight: float = 0.6
-    _signal_weight: float = 0.4
+    _layer1_candidate_weight: float = 0.15
+    _layer1_crs_weight: float = 0.15
+    _layer1_state_weight: float = 0.10
+    _layer2_error_type_weight: float = 0.40
+    _layer2_module_weight: float = 0.20
     _min_confidence: float = 0.3
+
+    def extract_features(
+        self, detection_result: Mapping[str, Any], attribution_signal: Any = None,
+    ) -> TrajectoryFeatures:
+        candidates = [row for row in (detection_result.get("census") or []) if isinstance(row, Mapping)]
+        raw_kinds = [str(row.get("candidate_kind") or "").lower() for row in candidates]
+        kinds = tuple(sorted(set(raw_kinds)))
+        axes = tuple(sorted({str(axis).lower() for row in candidates for axis in (row.get("axes") or [])}))
+        tags = tuple(sorted({str(row.get("module_tag") or "").lower() for row in candidates if row.get("module_tag")}))
+        claims = [str(row.get("claim_or_commitment") or "").lower() for row in candidates]
+        signal = _normalize_signal(attribution_signal)
+        return TrajectoryFeatures(
+            schema_version="htc_tes.trajectory_features.v1",
+            candidate_count=len(candidates), candidate_kinds=kinds, axes=axes,
+            module_tags=tags,
+            has_tool_action=any("tool" in kind or "tool" in claim for kind, claim in zip(raw_kinds, claims)),
+            has_omission=any("omission" in kind for kind in kinds),
+            has_adoption=any("adoption" in kind for kind in kinds),
+            has_claim=any("claim" in kind or "assert" in kind for kind in kinds),
+            state=str(detection_result.get("state") or ""),
+            prosecution_coverage_state=signal.get("prosecution_coverage_state"),
+            defense_coverage_state=signal.get("defense_coverage_state"),
+            crs_source=str(signal.get("crs_source") or "unknown"),
+        )
 
     def classify(
         self,
         detection_result: Mapping[str, Any],
-        attribution_signal: Mapping[str, Any] | None = None,
+        attribution_signal: Any = None,
     ) -> TypeClassificationResult:
         """Classify a hallucination case based on detection results.
 
         Args:
             detection_result: The detection pipeline output dict.
-            attribution_signal: Optional attribution signal dict.
+            attribution_signal: Optional attribution signal. Accepts either
+                an ``AttributionSignal`` dataclass (canonical, from
+                ``attribute_failure``) or a ``Mapping[str, Any]`` dict.
 
         Returns:
             TypeClassificationResult with primary and secondary types.
         """
         scores: dict[HallucinationType, float] = {t: 0.0 for t in HallucinationType}
         evidence: dict[str, Any] = {}
+        trajectory_features = self.extract_features(detection_result, attribution_signal)
 
-        # Signal 1: Error type mapping
-        if attribution_signal:
-            error_type = str(attribution_signal.get("error_type") or "")
-            mapped = _ERROR_TYPE_TO_HALLUCINATION.get(error_type)
-            if mapped:
-                scores[mapped] += self._signal_weight
-                evidence["error_type_signal"] = error_type
+        # ================================================================
+        # Layer 1: Structural signals from detection_result
+        # ================================================================
+        # These signals always carry information about WHAT went wrong,
+        # independent of whether the attributor could determine WHY.
 
-            target_module = str(attribution_signal.get("target_module") or "")
-            module_type = self._map_module_to_type(target_module)
-            if module_type:
-                scores[module_type] += 0.2
-                evidence["module_signal"] = target_module
-
-        # Signal 2: Candidate nature analysis
+        # 1a. Candidate nature analysis (claim/action/omission patterns)
         candidates = detection_result.get("census") or []
         if candidates:
             candidate_types = self._analyze_candidates(candidates)
             for htype, count in candidate_types.items():
-                scores[htype] += 0.15 * min(count, 3)
+                scores[htype] += self._layer1_candidate_weight * min(count, 3)
             evidence["candidate_analysis"] = {
                 t.value: c for t, c in candidate_types.items()
             }
 
-        # Signal 3: CRS score pattern analysis
-        crs_scores = detection_result.get("evidential_scores_parsed") or {}
+        # 1b. CRS score pattern analysis (which dimensions are anomalous)
+        signal_dict = _normalize_signal(attribution_signal)
+        crs_scores = signal_dict.get("crs_scores") or detection_result.get("evidential_scores_parsed") or {}
         if crs_scores:
-            crs_type = self._analyze_crs_pattern(crs_scores)
+            crs_type = self._analyze_crs_pattern(
+                crs_scores, risk_semantics=bool(signal_dict.get("crs_scores"))
+            )
             if crs_type:
-                scores[crs_type] += 0.15
+                scores[crs_type] += self._layer1_crs_weight
                 evidence["crs_pattern"] = crs_type.value
 
-        # Signal 4: State transition analysis
+        # 1c. State × coverage structural signal
         state = str(detection_result.get("state") or "")
         if state == "unresolved":
-            crs_agg = self._get_crs_aggregate(detection_result)
+            raw_aggregate = signal_dict.get("crs_aggregate")
+            crs_agg = (
+                float(raw_aggregate)
+                if isinstance(raw_aggregate, (int, float))
+                else self._get_crs_aggregate(detection_result)
+            )
             if crs_agg is not None:
                 if crs_agg > 0.4:
-                    scores[HallucinationType.FACTUAL] += 0.1
+                    scores[HallucinationType.FACTUAL] += self._layer1_state_weight
                 elif crs_agg < 0.2:
-                    scores[HallucinationType.CONTEXTUAL] += 0.1
+                    scores[HallucinationType.CONTEXTUAL] += self._layer1_state_weight
 
-        # Determine primary and secondary types
+        # ================================================================
+        # Layer 2: Attribution enhancement (informative signals only)
+        # ================================================================
+        if signal_dict:
+            error_type = str(signal_dict.get("error_type") or "")
+
+            # Only use error_type if it carries information.
+            # No-information types are excluded entirely — they represent
+            # "the attributor doesn't know" and using them would be
+            # circular (classifying based on "unknown").
+            if error_type and error_type not in _NO_INFO_ERROR_TYPES:
+                mapped = _ERROR_TYPE_TO_HALLUCINATION.get(error_type)
+                if mapped and mapped != HallucinationType.UNKNOWN:
+                    scores[mapped] += self._layer2_error_type_weight
+                    evidence["error_type_signal"] = error_type
+
+            target_module = str(signal_dict.get("target_module") or "")
+            module_type = self._map_module_to_type(target_module)
+            if module_type:
+                scores[module_type] += self._layer2_module_weight
+                evidence["module_signal"] = target_module
+
+        # ================================================================
+        # Layer 3: Determine primary type
+        # ================================================================
+        # UNKNOWN is NEVER chosen when any typed signal has score > 0.
+        # This is the core architectural guarantee: no-information signals
+        # cannot produce an UNKNOWN classification when structural signals
+        # exist.
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        primary_type = sorted_scores[0][0]
+        typed_scores = [
+            (t, s) for t, s in sorted_scores if t != HallucinationType.UNKNOWN
+        ]
+        if typed_scores and typed_scores[0][1] > 0:
+            primary_type = typed_scores[0][0]
+        else:
+            primary_type = HallucinationType.UNKNOWN
         confidence = self._normalize_confidence(scores)
 
         secondary_type = None
-        if len(sorted_scores) > 1 and sorted_scores[1][1] > 0.2:
-            secondary_type = sorted_scores[1][0]
+        for t, s in sorted_scores:
+            if t != primary_type and s >= 0.2:
+                secondary_type = t
+                break
 
-        if confidence < self._min_confidence:
+        # Only fall back to UNKNOWN when confidence is truly below threshold
+        # AND no typed signal exists. If typed signals exist but confidence
+        # is low (e.g., conflicting signals), keep the best typed guess
+        # rather than discarding information.
+        if confidence < self._min_confidence and not typed_scores:
             primary_type = HallucinationType.UNKNOWN
             confidence = 0.0
             secondary_type = None
 
         evidence["raw_scores"] = {t.value: round(s, 3) for t, s in sorted_scores}
+        # Layer 2 is only "active" if it actually contributed a score
+        layer2_active = bool(signal_dict) and bool(evidence.get("error_type_signal") or evidence.get("module_signal"))
+        evidence["classification_layer"] = (
+            "structural+attribution" if layer2_active else "structural_only"
+        )
 
         return TypeClassificationResult(
             primary_type=primary_type,
@@ -238,6 +404,7 @@ class HallucinationTypeClassifier:
             confidence=confidence,
             evidence=evidence,
             classification_method="rule_based",
+            trajectory_features=trajectory_features,
         )
 
     def _map_module_to_type(self, module: str) -> HallucinationType | None:
@@ -264,42 +431,64 @@ class HallucinationTypeClassifier:
             kind = str(candidate.get("candidate_kind") or "").lower()
             claim = str(candidate.get("claim_or_commitment") or "").lower()
 
-            if "assertion" in kind or "claim" in kind:
+            # Candidate kind-based classification
+            axes = {str(value).lower() for value in candidate.get("axes") or []}
+            module_tag = str(candidate.get("module_tag") or "").lower()
+            if "assertion" in kind or "claim" in kind or "factual" in kind or "f" in axes:
                 type_counts[HallucinationType.FACTUAL] += 1
-            if "action" in kind and ("tool" in claim or "api" in claim):
+            if "tool" in kind or "tool" in module_tag or ("action" in kind and ("tool" in claim or "api" in claim)):
                 type_counts[HallucinationType.TOOL] += 1
-            if "action" in kind:
-                type_counts[HallucinationType.FACTUAL] += 1
+            elif "action" in kind:
+                # action 但非 tool 相关，更可能是 REASONING 或 OMISSION
+                type_counts[HallucinationType.REASONING] += 1
             if "omission" in kind:
                 type_counts[HallucinationType.OMISSION] += 1
             if "adoption" in kind:
                 type_counts[HallucinationType.ADOPTION] += 1
-
-            # Check for instruction-related patterns
-            if any(p in claim for p in _INSTRUCTIONAL_PATTERNS):
+            if "faithfulness" in kind or "fa" in axes:
                 type_counts[HallucinationType.INSTRUCTIONAL] += 1
-            if any(p in claim for p in _TOOL_PATTERNS):
+            if "reason" in kind or "reason" in module_tag:
+                type_counts[HallucinationType.REASONING] += 1
+
+            # Pattern-based classification on claim text (use re.search)
+            if any(re.search(p, claim) for p in _INSTRUCTIONAL_PATTERNS):
+                type_counts[HallucinationType.INSTRUCTIONAL] += 1
+            if any(re.search(p, claim) for p in _TOOL_PATTERNS):
                 type_counts[HallucinationType.TOOL] += 1
+            if any(re.search(p, claim) for p in _FACTUAL_PATTERNS):
+                type_counts[HallucinationType.FACTUAL] += 1
+            if any(re.search(p, claim) for p in _REASONING_PATTERNS):
+                type_counts[HallucinationType.REASONING] += 1
+            if any(re.search(p, claim) for p in _OMISSION_PATTERNS):
+                type_counts[HallucinationType.OMISSION] += 1
+            if any(re.search(p, claim) for p in _ADOPTION_PATTERNS):
+                type_counts[HallucinationType.ADOPTION] += 1
+            if any(re.search(p, claim) for p in _CONTEXTUAL_PATTERNS):
+                type_counts[HallucinationType.CONTEXTUAL] += 1
 
         return dict(type_counts)
 
     def _analyze_crs_pattern(
-        self, crs_scores: Mapping[str, Any]
+        self, crs_scores: Mapping[str, Any], *, risk_semantics: bool = False
     ) -> HallucinationType | None:
         """Analyze CRS score patterns to infer hallucination type."""
         type_scores: dict[HallucinationType, float] = {}
 
         for dim, info in crs_scores.items():
-            if not isinstance(info, Mapping):
+            raw_score = info.get("score") if isinstance(info, Mapping) else info
+            try:
+                score = float(raw_score)
+            except (TypeError, ValueError):
                 continue
-            score = float(info.get("score") or 0)
-            evidence = str(info.get("evidence") or "").lower()
+            if not 0.0 <= score <= 1.0:
+                continue
+            anomalous = score > 0.7 if risk_semantics and dim != "recovery" else score < 0.3
 
-            if dim == "factuality" and score < 0.3:
+            if dim == "factuality" and anomalous:
                 type_scores[HallucinationType.FACTUAL] = (
                     type_scores.get(HallucinationType.FACTUAL, 0) + 0.4
                 )
-            if dim == "counterfactual" and score < 0.3:
+            if dim == "counterfactual" and anomalous:
                 type_scores[HallucinationType.REASONING] = (
                     type_scores.get(HallucinationType.REASONING, 0) + 0.4
                 )
@@ -307,11 +496,11 @@ class HallucinationTypeClassifier:
                 type_scores[HallucinationType.INSTRUCTIONAL] = (
                     type_scores.get(HallucinationType.INSTRUCTIONAL, 0) + 0.3
                 )
-            if dim == "process" and score < 0.3:
+            if dim == "process" and anomalous:
                 type_scores[HallucinationType.TOOL] = (
                     type_scores.get(HallucinationType.TOOL, 0) + 0.3
                 )
-            if dim == "scope" and score < 0.3:
+            if dim == "scope" and anomalous:
                 type_scores[HallucinationType.CONTEXTUAL] = (
                     type_scores.get(HallucinationType.CONTEXTUAL, 0) + 0.3
                 )
@@ -338,7 +527,10 @@ class HallucinationTypeClassifier:
             count = 0
             for info in scores.values():
                 if isinstance(info, Mapping):
-                    score = float(info.get("score") or 0)
+                    try:
+                        score = float(info.get("score") or 0)
+                    except (TypeError, ValueError):
+                        continue
                     total += score
                     count += 1
             if count > 0:
@@ -346,11 +538,20 @@ class HallucinationTypeClassifier:
         return None
 
     def _normalize_confidence(self, scores: dict[HallucinationType, float]) -> float:
-        """Normalize scores to confidence value."""
+        """Normalize scores to confidence value.
+
+        UNKNOWN is excluded from the denominator so that a weak but
+        dominant typed signal is not diluted into UNKNOWN by the
+        signal_unavailable fallback (which gives UNKNOWN a 0.4 floor).
+        """
         if not scores:
             return 0.0
-        max_score = max(scores.values())
-        total = sum(scores.values())
+        # Exclude UNKNOWN from the dominance calculation
+        typed_scores = {
+            t: s for t, s in scores.items() if t != HallucinationType.UNKNOWN
+        }
+        max_score = max(typed_scores.values()) if typed_scores else 0.0
+        total = sum(typed_scores.values())
         if total == 0 or max_score == 0:
             return 0.0
         # Confidence = max_score / total (how dominant is the top type)
@@ -362,13 +563,14 @@ class HallucinationTypeClassifier:
 
 def classify_hallucination_type(
     detection_result: Mapping[str, Any],
-    attribution_signal: Mapping[str, Any] | None = None,
+    attribution_signal: Any = None,
 ) -> TypeClassificationResult:
     """Convenience function for single-call classification.
 
     Args:
         detection_result: The detection pipeline output.
-        attribution_signal: Optional attribution signal.
+        attribution_signal: Optional attribution signal. Accepts either
+            an ``AttributionSignal`` dataclass or a ``Mapping[str, Any]`` dict.
 
     Returns:
         TypeClassificationResult with hallucination type classification.

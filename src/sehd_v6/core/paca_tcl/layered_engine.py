@@ -198,8 +198,12 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             confusion["fp"] += 1
         else:
             confusion["tn"] += 1
-        census_steps = {int(str(item["origin_hypothesis_event_id"]).split("_")[-1]) for item in row.get("census") or []}
-        candidate_hits += int(gold and bool(census_steps & set(row.get("gold_steps") or [])))
+        census_steps = {
+            str(item.get("source_step_id"))
+            for item in row.get("census") or []
+            if item.get("source_step_id") is not None
+        }
+        candidate_hits += int(gold and bool(census_steps & {str(step) for step in row.get("gold_steps") or []}))
     tp, fp, fn, tn = (confusion[key] for key in ("tp", "fp", "fn", "tn"))
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
@@ -211,7 +215,7 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "case_count": len(rows), "runtime_valid_rate": runtime_valid / len(rows) if rows else 0.0,
         "confusion": dict(confusion), "macro_f1": (f1_pos + f1_clean) / 2,
         "precision": precision, "recall": recall, "clean_fpr": fp / (fp + tn) if fp + tn else 0.0,
-        "responsible_step_accuracy_all_gold_positive": step_correct / positive_total if positive_total else 0.0,
+        "responsible_step_recall_over_all_gold_positive": step_correct / positive_total if positive_total else 0.0,
         "candidate_origin_coverage_on_gold_positive": candidate_hits / positive_total if positive_total else 0.0,
         "tri_state_counts": dict(states),
         "path_pair_counts": {"|".join(key): value for key, value in path_pairs.items()},

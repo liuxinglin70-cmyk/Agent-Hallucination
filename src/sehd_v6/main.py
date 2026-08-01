@@ -327,7 +327,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     from .core.bccse.evolution_runner import run_online_evolution
     if bool(args.no_fitness_check):
         raise RuntimeError(
-            "Formal evolution requires the source/canary replay gate; "
+            "Formal evolution requires the source replay gate; "
             "--no-fitness-check is not permitted"
         )
 
@@ -374,12 +374,6 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     dataset_root = DATA_ROOT
     records = load_records(dataset_root, allowed_case_ids=evolution_ids)
     config = load_config()
-    # Cached baseline states are not correctness anchors. Canary cases are
-    # drawn from observed stable evolution cases and evaluated as matched
-    # champion-vs-shadow pairs at batch commit time.
-    anchor_canaries: list[tuple[str, str]] = []
-    print("  Fixed cached-state anchor canaries: disabled")
-
     missing_records = [case_id for case_id in evolution_ids if case_id not in records]
     if missing_records:
         raise RuntimeError(
@@ -411,12 +405,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     "gold_enhanced" if args.use_gold else "self_supervised"
                 ),
                 "fitness_check": True,
-                "canary_size": args.canary_size,
                 "fitness_batch_size": args.fitness_batch_size,
                 "fitness_use_gold": args.fitness_use_gold or args.use_gold,
-                "anchor_canaries": [],
-                "anchor_canary_source": "disabled_cached_state_is_not_truth",
-                "canary_protocol": "matched_champion_vs_shadow_batch_audit",
+                "commit_validation": "source_replay_only",
                 "detector_config": str(V35_CONFIG_PATH),
                 "mutation_model": (
                     None if args.no_llm else MUTATION_ROUTE["model"]
@@ -441,8 +432,6 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         max_total_edits=args.max_edits,
         convergence_window=args.convergence,
         fitness_check=not args.no_fitness_check,
-        canary_size=args.canary_size,
-        initial_canaries=anchor_canaries,
         fitness_batch_size=args.fitness_batch_size,
         fitness_use_gold=args.fitness_use_gold or args.use_gold,
         run_id=run_id,
@@ -671,6 +660,7 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
 
     compiled = compile_genome_for_paca(genome)
     original_v35 = v35.provider_call
+    original_v35_json = v35.json_object_provider_call
     original_v2 = v2.provider_call
     if original_v35 is not original_v2:
         raise RuntimeError(
@@ -681,7 +671,13 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         compiled=compiled,
         config=config,
     )
+    wrapped_json = make_skill_aware_provider(
+        original_v35_json,
+        compiled=compiled,
+        config=config,
+    )
     v35.provider_call = wrapped
+    v35.json_object_provider_call = wrapped_json
     v2.provider_call = wrapped
 
     def run_one(case_id: str) -> tuple[str, dict[str, Any], str | None]:
@@ -738,6 +734,7 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
                     )
     finally:
         v35.provider_call = original_v35
+        v35.json_object_provider_call = original_v35_json
         v2.provider_call = original_v2
 
     if errors:
@@ -978,7 +975,6 @@ def main():
         action="store_true",
         help=argparse.SUPPRESS,
     )
-    p_evolve.add_argument("--canary-size", type=int, default=3)
     p_evolve.add_argument(
         "--fitness-batch-size",
         type=int,

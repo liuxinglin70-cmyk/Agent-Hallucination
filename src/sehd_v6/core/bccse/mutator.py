@@ -1,4 +1,13 @@
-"""BCCSE v4 reflective typed-skill mutator.
+"""BCCSE v4 reflective typed-skill mutator (DEPRECATED).
+
+.. deprecated::
+    This module is v4 legacy code and is NOT used by the v5 evolution
+    main loop (``evolution_runner.py`` uses ``reflection_engine.py``
+    instead). The ``MutationProvider`` Protocol below is still imported
+    by ``proof_evaluator.DeepSeekMutationProvider``, so it is retained.
+    All other functions (``propose_mutations``, ``parse_mutation_proposal``,
+    ``_clause_signatures_payload``, etc.) reference v4 genome fields that
+    no longer exist in v5 and will raise on call. Do not call them.
 
 The mutator implements GEPA-style reflection over BCCSE's safer substrate:
 anonymous boundary-contrastive failure episodes.  A DeepSeek-V4 model may

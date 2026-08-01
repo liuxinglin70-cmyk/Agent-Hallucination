@@ -25,6 +25,7 @@ selection shifts from temporal minimum to counterfactual sufficiency.
 from __future__ import annotations
 
 from collections import Counter
+import math
 from typing import Any
 
 from . import contract_v1 as v1
@@ -43,7 +44,6 @@ from .proof_contract_v3_4 import (
     BENCHMARK_CAUSAL_STATES,
     check_commitment,
     check_materiality,
-    detect_evidence_conflict,
     route_evidence_authority,
     validate_defense_certificate,
     _defense_dominates,
@@ -160,8 +160,12 @@ def apply_consensus_gate(
         (consensus_passed, consensus_blocked) -- errors that pass vs blocked by gate
     """
     if initial_prosecution is None:
-        # No initial prosecution available; all pass (backward compat)
-        return surviving_errors, []
+        # Without independent initial support, appeal-created positives cannot
+        # satisfy consensus.
+        return (
+            [row for row in surviving_errors if not str(row.get("certificate_id") or "").startswith(appeal_source_marker)],
+            [row for row in surviving_errors if str(row.get("certificate_id") or "").startswith(appeal_source_marker)],
+        )
 
     # Build set of candidate_ids that initial prosecution independently supports
     initial_supported: set[str] = set()
@@ -229,13 +233,35 @@ def select_earliest_origin_counterfactual(
     if not surviving:
         return None
 
-    if not counterfactual_rankings:
+    allowed_origins = {
+        str(row.get("origin_event_id") or "") for row in surviving
+    }
+    normalized_rankings: dict[str, dict[str, Any]] = {}
+    for origin, ranking in (counterfactual_rankings or {}).items():
+        if str(origin) not in allowed_origins or not isinstance(ranking, dict):
+            continue
+        raw_score = ranking.get("causal_sufficiency_score")
+        try:
+            score = float(raw_score)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(score) or not 0.0 <= score <= 1.0:
+            continue
+        root = ranking.get("is_root_cause")
+        if not isinstance(root, bool):
+            continue
+        normalized_rankings[str(origin)] = {
+            "causal_sufficiency_score": score,
+            "is_root_cause": root,
+        }
+
+    if not normalized_rankings:
         return select_earliest_origin_temporal(surviving, event_order)
 
     # Check for root cause designations
     root_causes = [
         row for row in surviving
-        if counterfactual_rankings.get(str(row["origin_event_id"]), {}).get("is_root_cause", False)
+        if normalized_rankings.get(str(row["origin_event_id"]), {}).get("is_root_cause", False)
     ]
 
     if root_causes:
@@ -248,7 +274,7 @@ def select_earliest_origin_counterfactual(
     # No explicit root cause; use sufficiency score with temporal tiebreak
     def sort_key(row: dict[str, Any]) -> tuple:
         origin = str(row["origin_event_id"])
-        score = counterfactual_rankings.get(origin, {}).get("causal_sufficiency_score", 0.0)
+        score = normalized_rankings.get(origin, {}).get("causal_sufficiency_score", 0.0)
         # Higher score first (negate for ascending sort), then earlier event
         return (-score, event_order.get(origin, 10**9), str(row["certificate_id"]))
 
@@ -394,12 +420,19 @@ def adjudicate_proof_court(
         else:
             defeated.append(str(row["certificate_id"]))
 
-    # v3.5 H2: CONSENSUS GATE
+    # v3.5 H2: CONSENSUS GATE. Only admissible initial certificates count as
+    # independent support; quarantined raw model output has no voting power.
     consensus_blocked: list[dict[str, Any]] = []
     if apply_consensus_gate_flag and initial_prosecution is not None:
+        initial_rows = initial_prosecution.get("candidates") or []
+        admissible_initial = [
+            row for row in initial_rows
+            if isinstance(row, dict)
+            and validate_error_certificate(row, packet, candidate_origins)["decision"] == "pass"
+        ]
         surviving, consensus_blocked = apply_consensus_gate(
             surviving_errors=surviving,
-            initial_prosecution=initial_prosecution,
+            initial_prosecution={"candidates": admissible_initial},
         )
 
     invalid_count = sum(audit["decision"] != "pass" for audit in p_audits + d_audits)

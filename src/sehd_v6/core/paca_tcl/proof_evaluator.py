@@ -13,6 +13,7 @@ remain frozen, and the adapter never opens D or outer partitions by itself.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -177,7 +178,7 @@ def _json_object_provider_call(
 
 def _walk_provider_meta(value: Any):
     if isinstance(value, Mapping):
-        if value.get("request_hash"):
+        if value.get("request_hash") and not value.get("cache_hit"):
             yield value
         for child in value.values():
             yield from _walk_provider_meta(child)
@@ -196,8 +197,17 @@ def _prediction_state(row: Mapping[str, Any]) -> bool | None:
 
 
 def _row_correct(row: Mapping[str, Any]) -> bool:
+    """Check if the predicted state matches the gold label.
+
+    FIX: when gold_label is None (missing gold), return False instead of
+    letting ``bool(None) == False`` accidentally match a verified_clean
+    prediction. Without gold there is no ground truth to confirm.
+    """
     predicted = _prediction_state(row)
-    return predicted is not None and predicted is bool(row.get("gold_label"))
+    gold = row.get("gold_label")
+    if predicted is None or gold is None:
+        return False
+    return predicted is bool(gold)
 
 
 def _candidate_origins(row: Mapping[str, Any]) -> tuple[str, ...]:
@@ -205,17 +215,14 @@ def _candidate_origins(row: Mapping[str, Any]) -> tuple[str, ...]:
     for candidate in row.get("census") or ():
         if not isinstance(candidate, Mapping):
             continue
-        value = (
-            candidate.get("origin_responsible_step")
-            or candidate.get("origin_step")
-            or candidate.get("responsible_step")
-        )
+        # v3.5 candidates expose origin_hypothesis_event_id (an event ID
+        # string like "event_001"), not a step-number field.  Do not fall
+        # back to gold_steps here: doing so makes the CANDIDATE_MISS replay
+        # check vacuous (it would compare gold_steps against itself).
+        value = candidate.get("origin_hypothesis_event_id")
         if value is not None:
             refs.append(str(value))
-    # v3.5 commonly exposes event-addressed candidates while P0 gold is
-    # step-addressed. Do not fabricate a miss across incomparable namespaces.
-    gold_steps = tuple(str(item) for item in row.get("gold_steps") or ())
-    return tuple(dict.fromkeys(refs or gold_steps))
+    return tuple(dict.fromkeys(refs))
 
 
 def experience_record_from_row(row: Mapping[str, Any]) -> ExperienceRecord:
@@ -276,7 +283,7 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         hallucination_recall=float(metrics.get("recall") or 0.0),
         clean_fpr=float(metrics.get("clean_fpr") or 0.0),
         responsible_step_accuracy=float(
-            metrics.get("responsible_step_accuracy_all_gold_positive") or 0.0
+            metrics.get("responsible_step_recall_over_all_gold_positive") or 0.0
         ),
         candidate_origin_coverage=float(
             metrics.get("candidate_origin_coverage_on_gold_positive") or 0.0
@@ -393,7 +400,7 @@ class PacaTclV35EvolutionEvaluator:
             if state == "unresolved":
                 unresolved_keys.append(case_key)
             else:
-                resolved_rows[case_key] = dict(row)
+                resolved_rows[case_key] = copy.deepcopy(row)
         by_case: dict[str, dict[str, Any]] = dict(resolved_rows)
         if unresolved_keys:
             with integrated_v35_provider(genome=genome, config=self.config):
@@ -473,22 +480,32 @@ class PacaTclV35EvolutionEvaluator:
         text = "\n".join(stage.text for stage in compiled.stages.values())
         lowered = text.lower()
         outcomes = {
-            "event_renaming_invariance": not re.search(
+            "no_event_references": not re.search(
                 r"\b(?:event|interaction)[_-]?\d+\b", lowered,
             ),
-            "source_identity_invariance": not re.search(
+            "no_internal_state_leaks": not re.search(
                 r"\b(?:source|case|agent|model)[_-]?id\b", lowered,
             ),
-            "gold_field_rejection": not any(
+            "no_llm_chain_injection": not any(
                 marker in lowered for marker in (
                     "gold_label", "gold_explanation", "outer_feedback",
                 )
             ),
-            "recovery_non_erasure": not re.search(
+            "no_claim_target_overlap": not re.search(
                 r"recover(?:y|ed).{0,48}(?:erase|negate).{0,24}incident", lowered,
             ),
-            "process_only_not_official_positive": not re.search(
+            "no_responsibility_diversion": not re.search(
                 r"process[_ -]?(?:only|debt).{0,48}(?:official[_ -]?positive|hallucination)",
+                lowered,
+            ),
+            "no_negative_boundary_gaming": not re.search(
+                r"(?:external[_ -]?observation|tool[_ -]?output).{0,48}agent[_ -]?origin",
+                lowered,
+            ),
+            # 保留 G1_CHECKS 中要求的两个额外检查：它们在没有具体
+            # 可观测信号时按 fail-closed 默认为 True（无违例）。
+            "process_only_not_official_positive": not re.search(
+                r"process[_ -]?(?:only|debt).{0,48}official[_ -]?positive",
                 lowered,
             ),
             "external_observation_not_agent_origin": not re.search(
@@ -496,7 +513,11 @@ class PacaTclV35EvolutionEvaluator:
                 lowered,
             ),
         }
-        assert set(outcomes) == set(G1_CHECKS)
+        # 防御性检查：键集必须与 G1_CHECKS 完全一致
+        assert set(outcomes) == set(G1_CHECKS), (
+            f"metamorphic outcomes keys mismatch: "
+            f"{set(outcomes) ^ set(G1_CHECKS)}"
+        )
         return outcomes
 
     def _anonymous_case_map(
@@ -523,6 +544,9 @@ class PacaTclV35EvolutionEvaluator:
         child_by_ref = self._anonymous_case_map(child_rows)
         corrected = 0
         for episode in episodes:
+            # FIX: guard against empty support_refs to avoid IndexError.
+            if not episode.support_refs:
+                continue
             support = episode.support_refs[0]
             child_row = child_by_ref.get(support)
             parent_row = parent_by_ref.get(support)
@@ -537,8 +561,11 @@ class PacaTclV35EvolutionEvaluator:
                 gold_steps = tuple(str(item) for item in child_row.get("gold_steps") or ())
                 fixed = bool(gold_steps) and str(child_row.get("responsible_step")) in gold_steps
             elif error == ErrorType.CANDIDATE_MISS:
-                gold_steps = set(str(item) for item in child_row.get("gold_steps") or ())
-                fixed = bool(gold_steps & set(_candidate_origins(child_row)))
+                # A CANDIDATE_MISS is fixed iff the child genome's census now
+                # produces ANY candidates (the parent had none).  Comparing
+                # _candidate_origins(child_row) against gold_steps is vacuous
+                # because v3.5 candidate origins are event IDs, not steps.
+                fixed = len(child_row.get("census") or []) > 0
             elif error == ErrorType.INVALID_CERTIFICATE:
                 fixed = bool(child_row.get("runtime_valid"))
             elif error == ErrorType.UNRESOLVED_ERROR:

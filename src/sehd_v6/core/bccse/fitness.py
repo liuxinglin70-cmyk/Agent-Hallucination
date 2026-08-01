@@ -37,7 +37,7 @@ _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
     "clean_defense_boundary": False,  # defense up = cleaner
     "causal_link_test": True,      # causal chain up = more error-like
     "earliest_origin_tiebreak": None,
-    "abstention_rule": None,  # v5.3.1: neutral - any resolution is progress       # gap up = prosecution stronger
+    "abstention_rule": None,  # v5.3.1: neutral - any resolution is progress
 }
 
 
@@ -109,7 +109,7 @@ def _coverage_rank(signal: AttributionSignal, side: str) -> float:
     if value is not None:
         return value
     state = getattr(signal, f"{side}_coverage_state")
-    return {"complete": 1.0, "incomplete": 0.5, "unresolved": 0.0}.get(
+    return {"complete": 1.0, "incomplete": 0.3, "unresolved": 0.0}.get(
         str(state or ""),
         0.0,
     )
@@ -187,9 +187,9 @@ def module_local_score(
         valid = len(_certificate_rows(row, "prosecution"))
         return float(valid - _quarantine_count(row)) + prosecution
     if module == "evidence_obligation":
-        # For an unresolved case, separation between the two proof paths is
-        # local progress even if final adjudication has not yet closed.
-        return _coverage_gap(signal)
+        # A one-sided proof is not progress. Reward the weaker side so that
+        # evolution cannot improve this module by starving its challenger.
+        return min(prosecution, defense)
     if module == "clean_defense_boundary":
         return defense + float(len(_certificate_rows(row, "defense")))
     if module == "causal_link_test":
@@ -197,12 +197,22 @@ def module_local_score(
     if module == "earliest_origin_tiebreak":
         return _responsible_step_present(row) + _causal_field_score(row)
     if module == "abstention_rule":
-        # v5.3.1: graduated score reflecting partial progress toward verdict.
+        # v5.3.2: graduated score reflecting partial progress toward verdict.
         # Full resolution is best, but CRS/consensus progress is measurable.
+        #
+        # FIX (B2): 旧版 clean=2.0, error=1.5 偏好 clean 方向，导致进化
+        # 系统性地将 unresolved→clean，即使 gold=positive（应判 error）。
+        # 修复策略：
+        # 1. 当 gold_label 可用时，正确方向得高分，错误方向得 0 分
+        # 2. 当 gold_label 不可用时（自监督），clean 和 error 对称（均 2.0）
         if signal.state == "verified_clean":
+            if signal.has_gold:
+                return 2.0 if not signal.gold_label else 0.0
             return 2.0
         if signal.state == "verified_error":
-            return 1.5
+            if signal.has_gold:
+                return 2.0 if signal.gold_label else 0.0
+            return 2.0
         # unresolved: measure partial progress toward resolution
         score = 0.0
         # CRS completeness indicates diagnostic signal is available
@@ -239,13 +249,6 @@ def assess_source_fitness(
     if after.state not in VALID_STATES:
         return FitnessAssessment("worse", ("invalid_after_state",))
     if before.crs_complete and not after.crs_complete:
-        # v5.3.3: add_rule cannot logically cause signal loss (it only adds info).
-        # Signal loss after add_rule is LLM non-determinism, not edit regression.
-        if operation == "add_rule":
-            return FitnessAssessment(
-                "no_effect",
-                ("signal_loss_likely_nondeterminism:add_rule_cannot_remove_signals",),
-            )
         return FitnessAssessment("worse", ("required_diagnostic_signal_lost",))
 
     task_before: int | None = None
@@ -281,6 +284,20 @@ def assess_source_fitness(
             task_after,
         )
 
+    # v5.4 symmetric regression check: an edit that turns a previously
+    # stable (non-triggered) detection into a triggered one is a regression,
+    # even when coverage states are unchanged. The old asymmetric logic only
+    # rewarded closing triggers and never penalized introducing them, which
+    # let "decisive -> unresolved" regressions pass as no_effect in
+    # self-supervised mode.
+    if not before.should_evolve and after.should_evolve:
+        return FitnessAssessment(
+            "worse",
+            ("new_failure_trigger_introduced",),
+            task_before,
+            task_after,
+        )
+
     local_before = module_local_score(target_module, before, before_result)
     local_after = module_local_score(target_module, after, after_result)
     delta = local_after - local_before
@@ -305,20 +322,6 @@ def assess_source_fitness(
             local_after,
         )
     if delta < -epsilon:
-        # v5.3.3: For add_rule, small regressions are likely LLM noise.
-        # add_rule cannot remove existing diagnostic pathways.
-        noise_tolerance = -0.5 if operation == "add_rule" else 0.0
-        if delta >= noise_tolerance and operation == "add_rule":
-            reasons.append(f"module_local_score_noise:{local_before:.3f}->{local_after:.3f}")
-            return FitnessAssessment(
-                "no_effect",
-                tuple(reasons),
-                task_before,
-                task_after,
-                local_before,
-                local_after,
-            )
-        # Regression is always worse regardless of gold direction
         reasons.append(f"module_local_score_regressed:{local_before:.3f}->{local_after:.3f}")
         return FitnessAssessment(
             "worse",

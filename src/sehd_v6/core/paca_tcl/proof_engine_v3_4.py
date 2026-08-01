@@ -679,7 +679,7 @@ def evaluate_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> dict[str, An
         "hallucination_precision_min": ("precision", ">="),
         "hallucination_recall_min": ("recall", ">="),
         "clean_fpr_max": ("clean_fpr", "<="),
-        "responsible_step_accuracy_min": ("responsible_step_accuracy_all_gold_positive", ">="),
+        "responsible_step_accuracy_min": ("responsible_step_recall_over_all_gold_positive", ">="),
         "runtime_valid_rate_min": ("runtime_valid_rate", ">="),
         "candidate_origin_coverage_min": ("candidate_origin_coverage_on_gold_positive", ">="),
         "causal_chain_validity_min": ("causal_chain_validity", ">="),

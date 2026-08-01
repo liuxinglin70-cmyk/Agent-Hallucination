@@ -206,11 +206,16 @@ def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
     if re.search(r"\b[a-z][a-z_]+/\d+\b|https?://", lowered):
         return False, "case_specific_pattern"
     # --- Verdict permission (layered, v5.3 optimization) ---
-    # Detect final verdict emission (clean/error/unresolved)
+    # Detect final verdict emission (clean/error/unresolved).
+    # v5.4 fix: the baseline's own "treat ... as clean" phrasing bypassed
+    # this check, letting verdict semantics leak into modules without
+    # verdict permission. Verdict-equivalent phrasings are now covered.
     final_verdict_re = (
         r"判定为\s*(clean|error|unresolved)|"
         r"直接输出\s*(clean|error|unresolved)|"
         r"(?:return|classify as|label as)\s+(clean|error|unresolved)\b|"
+        r"(?:treat|regard|consider|deem)\s+[^,，。；;]{0,40}\s+as\s+(clean|error|unresolved)\b|"
+        r"(?:视为|视作|当作|认定为|判别为)\s*(clean|error|unresolved)|"
         r"应判(?:定为|为)?\s*(clean|error|unresolved)|"
         r"结论(?:为|是)\s*(clean|error|unresolved)"
     )
@@ -313,6 +318,7 @@ class SkillEdit:
     rationale: str = ""  # LLM's reasoning
     source_case_id: str = ""
     is_merge: bool = False  # v5.3.5: marks merge-generated edits to bypass similarity check
+    feature_description: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -324,6 +330,7 @@ class SkillEdit:
             "rationale": self.rationale,
             "source_case_id": self.source_case_id,
             "is_merge": self.is_merge,
+            "feature_description": self.feature_description,
         }
 
     @classmethod
@@ -336,6 +343,8 @@ class SkillEdit:
             new_content=data.get("new_content", ""),
             rationale=data.get("rationale", ""),
             source_case_id=data.get("source_case_id", ""),
+            is_merge=bool(data.get("is_merge", False)),
+            feature_description=str(data.get("feature_description") or ""),
         )
 
 
@@ -356,7 +365,25 @@ class SkillGenome:
 
     @property
     def content_hash(self) -> str:
-        state = {"modules": {mid: self.modules[mid].to_dict() for mid in MODULE_IDS}}
+        """Content identity of the genome.
+
+        v5.4 fix: the hash covers only module activation state and rule
+        TEXT. ``rule_meta`` (fitness_status, direction, provenance) is
+        bookkeeping written AFTER batch commit; including it made the same
+        logical genome change identity after every commit (snapshot name
+        drift, cache-key churn, and lineage-replay mismatch in
+        ``main._load_genome_strict``). Rule meta remains serialized in
+        ``to_dict``; it is simply excluded from identity.
+        """
+        state = {
+            "modules": {
+                mid: {
+                    "active": self.modules[mid].active,
+                    "rules": list(self.modules[mid].rules),
+                }
+                for mid in MODULE_IDS
+            }
+        }
         text = json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -515,17 +542,6 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     return True, ""
 
 
-def _legacy_semantic_overlap(text_a: str, text_b: str) -> float:
-    """Legacy whitespace-token Jaccard retained for audit comparison."""
-    tokens_a = set(text_a.lower().replace("，", " ").replace("。", " ").split())
-    tokens_b = set(text_b.lower().replace("，", " ").replace("。", " ").split())
-    if not tokens_a or not tokens_b:
-        return 0.0
-    intersection = tokens_a & tokens_b
-    union = tokens_a | tokens_b
-    return len(intersection) / len(union)
-
-
 def semantic_overlap(text_a: str, text_b: str) -> float:
     """Compute language-agnostic character-bigram Jaccard similarity."""
     def tokens(text: str) -> set[str]:
@@ -545,13 +561,23 @@ def semantic_overlap(text_a: str, text_b: str) -> float:
 
 
 def _detect_rule_direction(rule_text: str) -> str:
-    """Detect the action direction of a rule for direction-consistency checks."""
+    """Detect the action direction of a rule for direction-consistency checks.
+
+    v5.4: also recognizes verdict-equivalent phrasings (treat/regard as ...)
+    so rule direction metadata stays consistent with the gate's verdict
+    permission layer.
+    """
     lowered = rule_text.lower()
-    if re.search(r"判(?:定为|为)?\s*clean|直接输出\s*clean|应判.*clean|结论.*clean", lowered):
+    verdict_re = (
+        r"判(?:定为|为)?\s*{v}|直接输出\s*{v}|应判.*{v}|结论.*{v}|"
+        r"(?:treat|regard|consider|deem)\s+[^,，。；;]{{0,40}}\s+as\s+{v}\b|"
+        r"(?:视为|视作|当作|认定为|判别为)\s*{v}"
+    )
+    if re.search(verdict_re.format(v="clean"), lowered):
         return "clean"
-    if re.search(r"判(?:定为|为)?\s*error|直接输出\s*error|应判.*error|结论.*error", lowered):
+    if re.search(verdict_re.format(v="error"), lowered):
         return "error"
-    if re.search(r"判(?:定为|为)?\s*unresolved|直接输出\s*unresolved|应判.*unresolved|结论.*unresolved", lowered):
+    if re.search(verdict_re.format(v="unresolved"), lowered):
         return "unresolved"
     if re.search(r"不成立|不应视为|不足以构成|非因果", rule_text):
         return "deny_causal"
@@ -571,6 +597,7 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "source_case_id": edit.source_case_id,
         "fitness_status": FITNESS_STATUS_NONE,
         "direction": _detect_rule_direction(edit.new_content),
+        "feature_description": edit.feature_description[:500],
         "created_at_generation": new_generation,
     }
 
@@ -582,12 +609,16 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         old_rule = module.rules[edit.rule_index]
         # v5.3.5: skip similarity check for merge-generated edits, since
         # merged content naturally overlaps with the original rule.
+        # FIX: only reject near-identical content (>= 0.95), not merely
+        # similar content (old threshold 0.7 defeated the purpose of
+        # modify_rule — legitimate small improvements were rejected).
         if not getattr(edit, "is_merge", False):
             similarity = semantic_overlap(old_rule, edit.new_content)
-            if similarity > 0.7:
+            if similarity >= DEDUP_HIGH_THRESHOLD:
                 raise ValueError(
-                    f"semantically_equivalent: overlap={similarity:.2f} > 0.70 "
-                    f"(new rule is too similar to existing)"
+                    f"semantically_equivalent: overlap={similarity:.2f} "
+                    f">= {DEDUP_HIGH_THRESHOLD} (new rule is near-identical "
+                    f"to existing — use a meaningful modification)"
                 )
         module.rules[edit.rule_index] = edit.new_content
         module.set_rule_meta(edit.rule_index, new_meta)
@@ -609,85 +640,6 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
 # ============================================================
 # Baseline Genome Factory
 # ============================================================
-
-def _create_legacy_baseline_genome() -> SkillGenome:
-    """Create the baseline genome (PACA-TCL v3.5 default behavior).
-
-    The baseline has minimal rules that describe the existing v3.5 behavior.
-    Evolution adds/modifies rules on top of this.
-    """
-    modules: dict[str, SkillModule] = {}
-
-    modules["candidate_trigger"] = SkillModule(
-        module_id="candidate_trigger",
-        rules=[
-            "使用四维扫描（F/Fa/P/S）发现幻觉候选",
-            "合并 PACA 候选、构造普查和确定性过程普查的结果",
-        ],
-    )
-
-    modules["evidence_obligation"] = SkillModule(
-        module_id="evidence_obligation",
-        rules=[
-            "每个 CRS 维度评分必须有明确的证据引用支持",
-            "CRS 权重固定为 factuality=0.35, counterfactual=0.15, recovery=0.20, process=0.20, scope=0.10",
-        ],
-    )
-
-    modules["candidate_to_verifier_route"] = SkillModule(
-        module_id="candidate_to_verifier_route",
-        rules=[
-            "根据候选类型路由到对应的专项验证器",
-        ],
-    )
-
-    modules["atomic_verifier_instruction"] = SkillModule(
-        module_id="atomic_verifier_instruction",
-        rules=[
-            "对每个候选执行因果链脚手架验证（NORM, ORIGIN, CONTROL, PROPAGATION, IMPACT, COUNTERFACTUAL）",
-            "验证失败时最多重试 2 次（隔离反馈重试）",
-        ],
-    )
-
-    modules["clean_defense_boundary"] = SkillModule(
-        module_id="clean_defense_boundary",
-        rules=[
-            "如果 agent 的行为有工具输出支持，则不应被标记为幻觉",
-            "工具返回错误且 agent 未忽略该错误，属于正常失败而非幻觉",
-            "agent 尝试了纠正操作（重试/恢复），支持 clean 判定",
-            "错误在最终输出前被修正，不应判定为幻觉",
-        ],
-    )
-
-    modules["causal_link_test"] = SkillModule(
-        module_id="causal_link_test",
-        rules=[
-            "如果修正根源后结果会改变，则因果链成立",
-            "错误必须通过可识别的步骤传播到最终输出",
-        ],
-    )
-
-    modules["earliest_origin_tiebreak"] = SkillModule(
-        module_id="earliest_origin_tiebreak",
-        rules=[
-            "在多个因果充分的根源中，选择事件顺序最早的",
-        ],
-    )
-
-    modules["abstention_rule"] = SkillModule(
-        module_id="abstention_rule",
-        rules=[
-            "当 CRS 分数处于模糊区间时，应判定 unresolved",
-            "当辩方证据压倒性地强于控方时，应判定 unresolved 或 clean",
-        ],
-    )
-
-    return SkillGenome(
-        genome_id="baseline_paca_tcl_v3_5",
-        modules=modules,
-        metadata={"source": "PACA-TCL v3.5 fixed", "f1_d": 0.747},
-    )
-
 
 def create_baseline_genome() -> SkillGenome:
     """Create a proof-court-native, immutable baseline Skill genome.
@@ -769,80 +721,3 @@ def create_baseline_genome() -> SkillGenome:
         for i in range(len(mod.rules)):
             mod.set_rule_meta(i, {"is_baseline": True})
     return genome
-
-
-# ============================================================
-# V4-compatible mutation types (used by mutator.py)
-# ============================================================
-
-class MutationOp(str, Enum):
-    REPLACE_TYPED_CLAUSE = "replace_typed_clause"
-    TIGHTEN_PRECONDITION = "tighten_precondition"
-    ADD_NEGATIVE_BOUNDARY = "add_negative_boundary"
-    APPLY_FIX = "apply_fix"
-
-
-@dataclass
-class AtomicMutation:
-    """A single atomic mutation proposed by the LLM."""
-
-    operation: MutationOp
-    target_module: str
-    rule_index: int | None
-    new_content: str | None = None
-    rationale: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "operation": self.operation.value,
-            "target_module": self.target_module,
-            "rule_index": self.rule_index,
-            "new_content": self.new_content,
-            "rationale": self.rationale,
-        }
-
-
-def all_clause_signatures(genome: SkillGenome) -> list[str]:
-    """Get all rule signatures from the genome (for v4 compat)."""
-    signatures: list[str] = []
-    for mid in MODULE_IDS:
-        mod = genome.modules.get(mid)
-        if mod and mod.rules:
-            for i, rule in enumerate(mod.rules):
-                signatures.append(f"{mid}[{i}]: {rule[:80]}")
-    return signatures
-
-
-def validate_mutation(
-    mutation: AtomicMutation, genome: SkillGenome
-) -> tuple[bool, str]:
-    """Validate an atomic mutation against the genome."""
-    if mutation.target_module not in MODULE_IDS:
-        return False, f"invalid_module: {mutation.target_module}"
-
-    module = genome.modules[mutation.target_module]
-    content = (mutation.new_content or "").strip()
-
-    if mutation.operation == MutationOp.APPLY_FIX:
-        if mutation.rule_index is None or mutation.rule_index >= len(module.rules):
-            return False, f"invalid_rule_index: {mutation.rule_index}"
-        if not content:
-            return False, "empty_content"
-
-    elif mutation.operation in (
-        MutationOp.REPLACE_TYPED_CLAUSE,
-        MutationOp.TIGHTEN_PRECONDITION,
-        MutationOp.ADD_NEGATIVE_BOUNDARY,
-    ):
-        if not content:
-            return False, "empty_content"
-        if mutation.rule_index is not None and mutation.rule_index >= len(module.rules):
-            return False, f"invalid_rule_index: {mutation.rule_index}"
-
-    # Check forbidden content
-    content_lower = content.lower()
-    for marker in FORBIDDEN_CONTENT_MARKERS:
-        if marker in content_lower:
-            return False, f"forbidden_content: {marker}"
-
-    return True, "ok"

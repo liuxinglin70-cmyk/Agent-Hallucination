@@ -1,4 +1,12 @@
-"""BCCSE v4 independent semantic, leakage, and construct critics.
+"""BCCSE v4 independent semantic, leakage, and construct critics (DEPRECATED).
+
+.. deprecated::
+    This module is v4 legacy code and is NOT used by the v5 evolution
+    main loop. It references v4 genome fields (``module.clauses``,
+    ``module.negative_boundaries``, ``module.retired``) and v4
+    ``MutationOp`` values (``ACTIVATE``/``DEACTIVATE``/``RETIRE``) that
+    do not exist in v5. Any call will raise ``AttributeError``. The v5
+    structural validation is handled by ``safety_gate.py`` instead.
 
 Mutation proposal and mutation approval are intentionally separated.  These
 critics are deterministic and fail-closed: the semantic critic rejects no-op

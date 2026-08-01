@@ -7,7 +7,11 @@ Self-supervised trigger signals (NO gold label required):
 - Unresolved: system admits "current skill insufficient to judge"
 - CRS internal contradiction: dimension scores conflict with final decision
 - Evidence chain incomplete: prosecution/defense coverage abnormally low
-- Boundary hesitation: prosecution and defense strengths are close
+  (including one-sided adjudication where the losing side never completed)
+
+Note (v5.4): the former "boundary hesitation" trigger was retired — it
+required quantitative coverage readings, which the v3.5 proof court never
+emits (coverage is categorical), so it could never fire in production.
 
 Gold label is used as OPTIONAL enhancement when available:
 - Forces trigger when prediction disagrees with gold
@@ -24,6 +28,7 @@ from typing import Any, Mapping
 from .genome import MODULE_IDS
 
 from .signal_adapter import (
+    CRS_WEIGHTS,
     CRSSignal,
     CoverageReading,
     extract_coverage,
@@ -48,7 +53,9 @@ class ErrorType(str, Enum):
     CANDIDATE_MISS = "candidate_miss"
     CRS_CONTRADICTION = "crs_contradiction"  # self-supervised
     EVIDENCE_INCOMPLETE = "evidence_incomplete"  # self-supervised
-    BOUNDARY_HESITATION = "boundary_hesitation"  # self-supervised
+    # Retired in v5.4 (unreachable: v3.5 coverage is categorical, never
+    # quantitative). Retained so historical attribution records stay readable.
+    BOUNDARY_HESITATION = "boundary_hesitation"
     SIGNAL_UNAVAILABLE = "signal_unavailable"  # malformed/incomplete trace
 
 
@@ -68,7 +75,7 @@ class TriggerSource(str, Enum):
     UNRESOLVED = "unresolved"
     CRS_CONTRADICTION = "crs_contradiction"
     EVIDENCE_INCOMPLETE = "evidence_incomplete"
-    BOUNDARY_HESITATION = "boundary_hesitation"
+    BOUNDARY_HESITATION = "boundary_hesitation"  # retired in v5.4 (unreachable)
     SIGNAL_UNAVAILABLE = "signal_unavailable"
     GOLD_MISMATCH = "gold_mismatch"  # optional enhancement
     NONE = "none"  # no trigger (stable success)
@@ -77,6 +84,7 @@ class TriggerSource(str, Enum):
 # Mapping from error type to primary target module
 ERROR_MODULE_MAP: dict[ErrorType, str] = {
     ErrorType.FALSE_POSITIVE: "clean_defense_boundary",
+    ErrorType.FALSE_NEGATIVE: "evidence_obligation",
     ErrorType.FALSE_NEGATIVE_UNRESOLVED: "evidence_obligation",
     ErrorType.FALSE_NEGATIVE_CLEAN: "evidence_obligation",
     ErrorType.UNRESOLVED_SHOULD_ERROR: "evidence_obligation",
@@ -84,6 +92,8 @@ ERROR_MODULE_MAP: dict[ErrorType, str] = {
     # Root cause is abstention_rule, not evidence_obligation.
     ErrorType.UNRESOLVED_SHOULD_CLEAN: "abstention_rule",
     ErrorType.UNRESOLVED_UNKNOWN: "evidence_obligation",  # default for self-supervised
+    ErrorType.UNRESOLVED_ERROR: "abstention_rule",
+    ErrorType.INVALID_CERTIFICATE: "atomic_verifier_instruction",
     ErrorType.LOCALIZATION_ERROR: "causal_link_test",
     ErrorType.CANDIDATE_MISS: "candidate_trigger",
     ErrorType.CRS_CONTRADICTION: "evidence_obligation",
@@ -95,6 +105,7 @@ ERROR_MODULE_MAP: dict[ErrorType, str] = {
 # Secondary module (alternative attribution)
 ERROR_MODULE_SECONDARY: dict[ErrorType, str] = {
     ErrorType.FALSE_POSITIVE: "evidence_obligation",
+    ErrorType.FALSE_NEGATIVE: "abstention_rule",
     ErrorType.FALSE_NEGATIVE_UNRESOLVED: "abstention_rule",
     ErrorType.FALSE_NEGATIVE_CLEAN: "clean_defense_boundary",
     ErrorType.UNRESOLVED_SHOULD_ERROR: "abstention_rule",
@@ -102,6 +113,8 @@ ERROR_MODULE_SECONDARY: dict[ErrorType, str] = {
     # (defense is already complete, verify it's correctly formed)
     ErrorType.UNRESOLVED_SHOULD_CLEAN: "clean_defense_boundary",
     ErrorType.UNRESOLVED_UNKNOWN: "abstention_rule",
+    ErrorType.UNRESOLVED_ERROR: "evidence_obligation",
+    ErrorType.INVALID_CERTIFICATE: "evidence_obligation",
     ErrorType.LOCALIZATION_ERROR: "earliest_origin_tiebreak",
     ErrorType.CANDIDATE_MISS: "candidate_to_verifier_route",
     ErrorType.CRS_CONTRADICTION: "atomic_verifier_instruction",
@@ -116,11 +129,79 @@ ERROR_MODULE_SECONDARY: dict[ErrorType, str] = {
 
 # Coverage below this is considered "abnormally low"
 COVERAGE_LOW_THRESHOLD = 0.3
-# Prosecution-defense gap below this is "hesitation"
-BOUNDARY_HESITATION_GAP = 0.15
 # Frozen PACA CRS decision thresholds used only for diagnostic consistency.
 CRS_THRESHOLD_BORDERLINE = 0.28
 CRS_THRESHOLD_ERROR = 0.45
+# Adversarial equilibrium: min(p, d) / max(p, d). Below this ratio the
+# adjudication is considered one-sided (insufficient adversarial testing).
+# Only meaningful for QUANTITATIVE coverage readings; see
+# `_adversarially_tested` for the categorical (production v3.5) rule.
+ADVERSARIAL_EQUILIBRIUM_THRESHOLD = 0.4
+
+
+def _compute_adversarial_equilibrium(
+    prosecution: CoverageReading, defense: CoverageReading
+) -> float:
+    """Compute the adversarial equilibrium score of a proof adjudication.
+
+    The adversarial equilibrium measures how balanced the prosecution and
+    defense coverage are. A high score (close to 1.0) means both sides
+    were thoroughly tested; a low score (close to 0.0) means the
+    adjudication was one-sided — one party dominated without meaningful
+    challenge from the other.
+
+    This is the core architectural fix for the FP blind spot: the old
+    design treated "high CRS + surviving error certificate" as
+    high-confidence, but CRS is a prosecution-side score. A one-sided
+    adjudication (high prosecution, low defense) can produce high CRS
+    while being a false positive. The equilibrium score captures this.
+
+    Returns:
+        Equilibrium score in [0.0, 1.0]. Returns 0.0 when either side's
+        coverage is unavailable (fail-closed: no evidence of balance).
+    """
+    p = prosecution.score
+    d = defense.score
+    if p is None or d is None:
+        return 0.0
+    if p <= 0 and d <= 0:
+        return 0.0
+    # FIX (B8): 分级阈值——当获胜方分数很高时，不平衡更可能是
+    # 合法主导（证据确实一边倒）而非对抗不充分，适当放宽均衡
+    # 要求，避免 EVIDENCE_INCOMPLETE 过度触发。上限仍限制在 1.0。
+    max_score = max(p, d)
+    if max_score > 0.8:
+        return min(1.0, min(p, d) / max_score * 1.5)
+    return min(p, d) / max_score
+
+
+def _adversarially_tested(
+    prosecution: CoverageReading, defense: CoverageReading
+) -> bool:
+    """Whether BOTH sides of the proof court were genuinely exercised.
+
+    v5.4 fix: for CATEGORICAL coverage readings (the production v3.5
+    contract), a side that is "incomplete"/"unresolved" means that side
+    never finished its run — this is NOT legitimate dominance and must
+    never count as adversarially tested. The old code fed the categorical
+    state scores (complete=1.0, incomplete=0.3) through the equilibrium
+    ratio, and the B8 boost (x1.5) lifted one-sided verdicts
+    (1.0 vs 0.3 → 0.45) over the 0.4 threshold, rubber-stamping exactly
+    the one-sided adjudications this gate was built to catch.
+
+    Rules:
+    - Either side categorical: both states must be "complete".
+    - Both quantitative: equilibrium ratio must clear the threshold.
+    - Unavailable: not tested (fail-closed).
+    """
+    if prosecution.state is not None or defense.state is not None:
+        return prosecution.state == "complete" and defense.state == "complete"
+    if prosecution.quantitative and defense.quantitative:
+        return (
+            _compute_adversarial_equilibrium(prosecution, defense)
+            >= ADVERSARIAL_EQUILIBRIUM_THRESHOLD
+        )
+    return False
 
 
 @dataclass(frozen=True)
@@ -292,9 +373,30 @@ def _detect_crs_contradiction(state: str, crs_signal: CRSSignal) -> bool:
     """
     if not crs_signal.complete:
         return False
+    # FIX (C7): recovery 是倒置维度（风险贡献为 1-recovery）。高 recovery
+    # （错误在影响前已修复）既拉低 aggregate，也正向支持 clean 判定，
+    # 矛盾检测必须区分这两种效应。
+    recovery = crs_signal.scores.get("recovery")
     if state == "verified_error":
+        if (
+            crs_signal.aggregate < CRS_THRESHOLD_ERROR
+            and recovery is not None
+            and recovery >= 0.75
+        ):
+            # aggregate 偏低可能主要由高 recovery 造成；剔除 recovery
+            # 维度后重新归一再比较，避免将“已修复但确有影响的错误”
+            # 误判为矛盾。
+            recovery_free = (
+                crs_signal.aggregate
+                - CRS_WEIGHTS["recovery"] * (1.0 - recovery)
+            ) / (1.0 - CRS_WEIGHTS["recovery"])
+            return recovery_free < CRS_THRESHOLD_ERROR
         return crs_signal.aggregate < CRS_THRESHOLD_ERROR
     if state == "verified_clean":
+        # 高 recovery 本身支持 clean：其他维度将 aggregate 推高到阈值
+        # 之上并不与 clean 判定矛盾。
+        if recovery is not None and recovery >= 0.75:
+            return False
         return crs_signal.aggregate >= CRS_THRESHOLD_BORDERLINE
     return False
 
@@ -302,45 +404,72 @@ def _detect_crs_contradiction(state: str, crs_signal: CRSSignal) -> bool:
 def _detect_evidence_incomplete(
     prosecution: CoverageReading, defense: CoverageReading, state: str
 ) -> bool:
-    """Detect if evidence chain is abnormally incomplete.
+    """Detect if the adjudication was one-sided or evidence-starved.
 
-    Triggers when relevant coverage is below threshold:
-    - For unresolved/verified_error: prosecution coverage too low
-    - For verified_clean: defense coverage too low
+    Architectural principle: a court-style adjudication requires BOTH
+    prosecution and defense to have adequate coverage. When either side
+    is starved, the verdict is unreliable regardless of which side won.
+
+    This replaces the old asymmetric logic (which only checked the
+    "relevant" side per state) with a symmetric equilibrium check:
+    - For verified_error: prosecution must be complete AND defense must
+      have adequate coverage (otherwise it's a one-sided FP risk).
+    - For verified_clean: defense must be complete AND prosecution must
+      have adequate coverage (otherwise it's a one-sided FN risk).
+    - For unresolved: either side incomplete explains the abstention.
     """
-    relevant = prosecution if state in ("unresolved", "verified_error") else defense
-    if relevant.state is not None:
-        return relevant.state != "complete"
-    if not relevant.quantitative or relevant.score is None:
+    # Check the "winning" side first — it must be complete.
+    if state in ("unresolved", "verified_error"):
+        winner = prosecution
+    else:
+        winner = defense
+    if winner.state is not None:
+        if winner.state != "complete":
+            return True
+    elif not winner.quantitative or winner.score is None:
         return True
-    # Both sides very low → system has almost no evidence
-    return bool(
-        relevant.quantitative
-        and relevant.score is not None
-        and relevant.score < COVERAGE_LOW_THRESHOLD
-    )
+    elif winner.score < COVERAGE_LOW_THRESHOLD:
+        return True
+
+    # Check the "losing" side — it must have had adequate opportunity
+    # to rebut. A one-sided verdict is not reliable.
+    if state == "verified_error":
+        challenger = defense
+    elif state == "verified_clean":
+        challenger = prosecution
+    else:
+        # unresolved: both sides matter, check the weaker one
+        challenger = defense if (prosecution.score or 0) >= (defense.score or 0) else prosecution
+
+    # Challenger check: symmetric with winner check — any non-complete
+    # state is insufficient. The old logic required BOTH state != "complete"
+    # AND score < threshold, which let categorical "incomplete" (score 0.5)
+    # slip through. Now: state must be "complete" (or score >= threshold
+    # if quantitative).
+    if challenger.state is not None:
+        if challenger.state != "complete":
+            return True
+    elif not challenger.quantitative or challenger.score is None:
+        return True
+    elif challenger.score < COVERAGE_LOW_THRESHOLD:
+        return True
+
+    return False
 
 
 def _detect_boundary_hesitation(
     prosecution: CoverageReading, defense: CoverageReading, state: str
 ) -> bool:
-    """Detect if prosecution and defense are too close (boundary unclear).
+    """RETIRED (v5.4): always False.
 
-    Only relevant when a decision WAS made (not unresolved).
-    If both sides have reasonable coverage but the gap is tiny,
-    the decision boundary is not well-defined.
+    The v3.5 proof court emits only categorical coverage states
+    (complete/incomplete/unresolved), never quantitative scores, so a
+    score-gap "hesitation" check could never fire in production. The
+    function is kept as a non-operational stub so that historical
+    attribution records mentioning the trigger remain interpretable;
+    it is no longer wired into the trigger cascade.
     """
-    if state == "unresolved":
-        return False  # unresolved is already handled separately
-    if not (prosecution.quantitative and defense.quantitative):
-        return False
-    if prosecution.score is None or defense.score is None:
-        return False
-    # Both sides must have some substance for this to be meaningful
-    if prosecution.score < 0.1 or defense.score < 0.1:
-        return False
-    gap = abs(prosecution.score - defense.score)
-    return gap < BOUNDARY_HESITATION_GAP
+    return False
 
 
 def attribute_failure(
@@ -397,21 +526,41 @@ def attribute_failure(
     trigger_source = TriggerSource.NONE
     error_type = ErrorType.CORRECT
 
-    # --- Check high-confidence pass (NOT triggered) ---
+    # --- Adversarial Equilibrium Confidence Gate ---
+    #
+    # Architectural principle: a court-style adjudication is only
+    # "high confidence" when BOTH prosecution and defense were
+    # thoroughly tested. The old design checked only prosecution-side
+    # signals (CRS, surviving error certificate), which made it blind
+    # to false positives where the defense had no chance to rebut.
+    #
+    # The new gate requires:
+    #   1. Strong prosecution evidence (CRS ≥ threshold + surviving cert)
+    #   2. Adversarial equilibrium ≥ threshold (both sides tested)
+    #
+    # When equilibrium is low, the case is NOT high-confidence and
+    # falls through to the trigger cascade, where it will be caught
+    # by evidence_incomplete (one-sided adjudication).
+    both_sides_tested = _adversarially_tested(prosecution, defense)
+
     is_high_confidence = False
     if state == "verified_error":
-        if (
+        prosecution_strong = (
             crs_signal.complete
+            and crs_signal.projection_confidence >= 0.75
             and crs_signal.aggregate >= CRS_THRESHOLD_ERROR
             and _has_surviving_error_certificate(row)
-        ):
+        )
+        if prosecution_strong and both_sides_tested:
             is_high_confidence = True
     elif state == "verified_clean":
-        if (
+        defense_strong = (
             crs_signal.complete
+            and crs_signal.projection_confidence >= 0.75
             and crs_signal.aggregate < CRS_THRESHOLD_BORDERLINE
             and defense.state == "complete"
-        ):
+        )
+        if defense_strong and both_sides_tested:
             is_high_confidence = True
 
     if is_high_confidence:
@@ -465,10 +614,9 @@ def attribute_failure(
             trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
             error_type = ErrorType.EVIDENCE_INCOMPLETE
 
-        # Trigger 5: Boundary hesitation
-        elif _detect_boundary_hesitation(prosecution, defense, state):
-            trigger_source = TriggerSource.BOUNDARY_HESITATION
-            error_type = ErrorType.BOUNDARY_HESITATION
+        # Trigger 5 (boundary hesitation) retired in v5.4: it required
+        # quantitative coverage readings that the v3.5 proof court never
+        # emits, so the trigger was unreachable in production.
 
         # Trigger 6: Gold mismatch (optional, lowest priority)
         elif use_gold and has_gold and predicted is not None and predicted != gold:
@@ -604,10 +752,6 @@ def attribute_failure(
         )
     if error_type == ErrorType.CRS_CONTRADICTION:
         evidence_parts.append("crs_dimensions_contradict_final_decision")
-    if error_type == ErrorType.BOUNDARY_HESITATION:
-        evidence_parts.append(
-            f"prosecution_defense_gap={abs(prosecution_cov - defense_cov):.3f}"
-        )
 
     # Attribution confidence (v5.3): high for definite error types,
     # medium for CRS/boundary signals, low for unresolved/unavailable.

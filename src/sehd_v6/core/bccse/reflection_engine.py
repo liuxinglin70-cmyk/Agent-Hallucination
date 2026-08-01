@@ -720,7 +720,8 @@ def build_mutator_prompt(
         f"{rejected_info}\n\n"
         f"Respond with JSON: "
         f'{{"target_module": "...", "operation": "...", "target_clause_id": "...", '
-        f'"new_content": "...", "new_preconditions": ["..."], "rationale": "..."}}'
+        f'"new_content": "...", "feature_description": "reusable trajectory feature", '
+        f'"new_preconditions": ["..."], "rationale": "..."}}'
     )
 
     return system, user

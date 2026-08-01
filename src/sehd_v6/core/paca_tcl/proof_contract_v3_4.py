@@ -167,15 +167,15 @@ def check_materiality(
     # immaterial_difference defense that the appellate join can use.
 
     # Check for explicit tolerance or equivalence language in the rationale
-    tolerance_signals = ["approximately", "≈", "approximately equal", "rounding",
-                         "rounded to", "decimal", ".33", ".333", ".666", ".667"]
-    rounding_signals = ["26.33", "26.333", "0.33", "0.333", "0.66", "0.666",
-                        "0.67", "0.667", "round"]
+    tolerance_signals = (
+        "approximately", "approximately equal", "within tolerance",
+        "rounding tolerance", "rounded to", "equivalent within", "≈",
+    )
+    has_tolerance_language = any(
+        signal in rationale.lower() for signal in tolerance_signals
+    )
 
-    has_rounding_context = any(s in rationale for s in rounding_signals)
-    has_tolerance_language = any(s in rationale for s in tolerance_signals)
-
-    if has_rounding_context or has_tolerance_language:
+    if has_tolerance_language:
         # These are prime candidates for immaterial difference
         # Generate a defense that the appellate join can use
         return {
@@ -259,16 +259,6 @@ def check_commitment(
 # Module 4: Cross-examination / Contradiction Matrix
 # ============================================================
 
-def detect_evidence_conflict(
-    error_cert: dict[str, Any], defense_cert: dict[str, Any],
-) -> bool:
-    """Detect if the same evidence refs are interpreted oppositely."""
-    error_refs = set(str(ref) for ref in (error_cert.get("violation_evidence_refs") or []))
-    defense_refs = set(str(ref) for ref in (defense_cert.get("evidence_refs") or []))
-    overlap = error_refs & defense_refs
-    return len(overlap) >= 1 and error_cert.get("breach_type") == defense_cert.get("defense_type")
-
-
 # ============================================================
 # v3.4: Re-implement validation with extended defense types
 # ============================================================
@@ -328,7 +318,23 @@ def _defense_dominates(error: dict[str, Any], defense: dict[str, Any]) -> bool:
 
     # v3.3 legacy: mechanism-matched dominance
     if defense_type == "supported_or_correct":
-        return True
+        if breach_type not in {
+            "contradiction", "fabrication", "unsupported_commitment",
+        }:
+            return False
+        error_refs = {
+            str(ref)
+            for field in (
+                "norm_evidence_refs", "violation_evidence_refs",
+                "agent_control_evidence_refs", "impact_evidence_refs",
+                "benchmark_causal_evidence_refs",
+            )
+            for ref in (error.get(field) or [])
+        }
+        defense_refs = {
+            str(ref) for ref in (defense.get("evidence_refs") or [])
+        }
+        return bool(error_refs & defense_refs)
     if defense_type == "external_unadopted":
         return claim_kind == "agent_adoption"
     if defense_type == "explicitly_authorized":

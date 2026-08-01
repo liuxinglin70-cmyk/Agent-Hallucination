@@ -41,10 +41,14 @@ from .genome import (
 
 @dataclass
 class GateConfig:
-    """Configuration for the structural constraint gate."""
+    """Configuration for the structural constraint gate.
+
+    v5.4: these defaults are the single source of truth. ``run_online_evolution``
+    and the CLI both default to these values (0/200/20).
+    """
 
     # Frequency control (minimal — rely on structural constraints, not artificial limits)
-    module_cooldown: int = 0  # REMOVED: no cooldown, rely on duplicate detection
+    module_cooldown: int = 0  # no cooldown; rely on duplicate detection
     max_total_edits: int = 200  # effectively unlimited (capacity constraint prevents bloat)
     convergence_window: int = 20  # generous window before declaring convergence
 
@@ -53,15 +57,6 @@ class GateConfig:
     # Rule quality constraints (v5.2 R2)
     max_modify_ratio: float = 1.5  # modify_rule: new length <= 1.5x original
     max_same_prefix_rules: int = 3  # max rules sharing same condition prefix
-
-    # Module capacity (anti-bloat — the PRIMARY size control)
-    max_clauses_per_module: int = 8  # hard limit per module
-    max_boundaries_per_module: int = 3  # hard limit on negative boundaries
-    max_preconditions_per_clause: int = 5
-
-    # Signal decay monitoring
-    signal_decay_window: int = 10  # cases to monitor after edit
-    ineffective_threshold: int = 3  # same signal repeats → mark ineffective
 
 
 # ============================================================
@@ -116,9 +111,6 @@ class StructuralGate:
     certificates: list[GateCertificate] = field(default_factory=list)
     _module_last_edit_idx: dict[str, int] = field(default_factory=dict)
     _total_edits: int = field(default=0)
-    # Signal decay monitoring: track (module, error_type) trigger counts
-    _trigger_history: list[dict[str, Any]] = field(default_factory=list)
-    _edit_effectiveness: dict[str, list[int]] = field(default_factory=dict)  # edit_key -> [trigger_indices_after]
     _consecutive_no_edit: int = field(default=0)
     _converged: bool = field(default=False)
     _halted: bool = field(default=False)
@@ -159,27 +151,6 @@ class StructuralGate:
         else:
             self._module_last_edit_idx.pop(module, None)
 
-    # ============================================================
-    # Signal Decay Monitoring (direction guarantee, zero-cost)
-    # ============================================================
-
-    def record_trigger(self, case_index: int, module: str, error_type: str) -> None:
-        """Record a trigger event for signal decay monitoring."""
-        self._trigger_history.append({
-            "case_index": case_index,
-            "module": module,
-            "error_type": error_type,
-        })
-        # Track post-edit triggers for effectiveness
-        edit_key = f"{module}:{error_type}"
-        if edit_key in self._edit_effectiveness:
-            self._edit_effectiveness[edit_key].append(case_index)
-
-    def record_edit_accepted(self, case_index: int, module: str, error_type: str) -> None:
-        """Record that an edit was accepted — start monitoring its effectiveness."""
-        edit_key = f"{module}:{error_type}"
-        self._edit_effectiveness[edit_key] = []  # reset: track future triggers
-
     def revoke_structural_accept(
         self,
         certificate: GateCertificate,
@@ -194,42 +165,15 @@ class StructuralGate:
         self._restore_last_edit_index(certificate.target_module)
         self.record_no_edit()
 
-    def get_signal_decay(self, module: str, error_type: str) -> dict[str, Any]:
-        """Check if an edit to (module, error_type) was effective.
-
-        Returns decay info: how many times the same signal triggered after edit.
-        """
-        edit_key = f"{module}:{error_type}"
-        post_triggers = self._edit_effectiveness.get(edit_key, [])
-        n_post = len(post_triggers)
-        is_ineffective = n_post >= self.config.ineffective_threshold
-        return {
-            "module": module,
-            "error_type": error_type,
-            "post_edit_triggers": n_post,
-            "is_ineffective": is_ineffective,
-            "threshold": self.config.ineffective_threshold,
-        }
-
-    def get_module_trigger_frequency(self, module: str, window: int = 10) -> float:
-        """Get recent trigger frequency for a module (triggers per case in window)."""
-        if not self._trigger_history:
-            return 0.0
-        recent = [t for t in self._trigger_history if t["module"] == module]
-        if not recent:
-            return 0.0
-        # Count in last `window` cases
-        latest_idx = self._trigger_history[-1]["case_index"]
-        in_window = [t for t in recent if latest_idx - t["case_index"] < window]
-        return len(in_window) / max(1, window)
-
     def get_allowed_operations(self, module: str) -> list[str]:
         """All operations are always allowed — trust the LLM's judgment.
 
         The LLM causal reflection decides what operation is appropriate.
         Structural constraints (capacity, duplicates) prevent abuse.
+
+        Returns v5 SkillOp values (add_rule / modify_rule / remove_rule).
         """
-        return ["tighten_precondition", "replace_typed_clause", "add_negative_boundary"]
+        return ["add_rule", "modify_rule", "remove_rule"]
 
     def evaluate(
         self,
@@ -407,9 +351,16 @@ class StructuralGate:
                 mod = current_genome.modules.get(mid)
                 if not mod or not mod.active:
                     continue
-                # Skip self for modify_rule (the rule being modified)
-                for existing_rule in mod.rules:
-                    if operation == "modify_rule" and existing_rule == content:
+                # Skip self for modify_rule (the rule being modified).
+                # FIX: skip by rule_index, not by content match — the new
+                # content differs from the old rule (otherwise why modify?),
+                # so the old content-based skip never triggered.
+                for rule_idx, existing_rule in enumerate(mod.rules):
+                    if (
+                        operation == "modify_rule"
+                        and mid == target_module
+                        and rule_idx == rule_index
+                    ):
                         continue
                     overlap = semantic_overlap(existing_rule, content)
                     if overlap >= DEDUP_HIGH_THRESHOLD:
@@ -565,12 +516,11 @@ class StructuralGate:
     def summary(self) -> dict[str, Any]:
         """Generate a summary of all gate evaluations."""
         return {
-            "schema_version": "agenthallu.bccse_v5_structural_gate.v1",
+            "schema_version": "agenthallu.bccse_v5_structural_gate.v2",
             "config": {
                 "module_cooldown": self.config.module_cooldown,
                 "max_total_edits": self.config.max_total_edits,
                 "convergence_window": self.config.convergence_window,
-                "max_clauses_per_module": self.config.max_clauses_per_module,
             },
             "halted": self._halted,
             "halt_reason": self._halt_reason,
@@ -586,11 +536,11 @@ class StructuralGate:
 
 def create_structural_gate(
     *,
-    module_cooldown: int = 3,
-    max_total_edits: int = 30,
-    convergence_window: int = 10,
+    module_cooldown: int = 0,
+    max_total_edits: int = 200,
+    convergence_window: int = 20,
 ) -> StructuralGate:
-    """Create a structural constraint gate with default configuration."""
+    """Create a structural constraint gate with the registered defaults."""
     config = GateConfig(
         module_cooldown=module_cooldown,
         max_total_edits=max_total_edits,

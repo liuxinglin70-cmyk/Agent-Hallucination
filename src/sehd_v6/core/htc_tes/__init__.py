@@ -15,6 +15,8 @@ This module implements the HTC-TES v3 methodology that addresses:
 from .type_classifier import (
     HallucinationType,
     HallucinationTypeClassifier,
+    TrajectoryFeatures,
+    TypeClassificationResult,
     classify_hallucination_type,
 )
 
@@ -22,6 +24,7 @@ from .type_conditioned_evolution import (
     TypeConditionedEvolution,
     TypeConditionedEdit,
     TypeConditionedEditProposal,
+    build_type_conditioned_reflection_prompt,
 )
 
 from .type_aware_fitness import (
@@ -34,10 +37,13 @@ from .type_aware_fitness import (
 __all__ = [
     "HallucinationType",
     "HallucinationTypeClassifier",
+    "TrajectoryFeatures",
+    "TypeClassificationResult",
     "classify_hallucination_type",
     "TypeConditionedEvolution",
     "TypeConditionedEdit",
     "TypeConditionedEditProposal",
+    "build_type_conditioned_reflection_prompt",
     "TypeAwareFitness",
     "TypeAwareFitnessAssessment",
     "TypeConditionedExperience",

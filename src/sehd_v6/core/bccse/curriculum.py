@@ -5,7 +5,8 @@ Orders evolution cases by "learning edge" priority:
 2. Boundary resolved cases second (CRS near threshold)
 3. High-confidence correct cases last (provide stable_success signal)
 
-Canary cases are interleaved in the first batch for early safety monitoring.
+Case ordering is a prioritization hint only; commit safety is enforced by
+structural validation and source replay.
 
 Inspired by HIVE (ICML 2026): "strongest learning signals are concentrated
 at the learning edge defined by the intersection of medium difficulty and
@@ -20,7 +21,7 @@ from typing import Any, Mapping, Sequence
 def order_evolution_cases(
     case_ids: Sequence[str],
     baseline_predictions: Mapping[str, Mapping[str, Any]],
-    canary_ids: Sequence[str],
+    canary_ids: Sequence[str] | None = None,
     *,
     use_gold: bool = False,
 ) -> list[str]:
@@ -31,27 +32,24 @@ def order_evolution_cases(
     2. Resolved but boundary cases (moderate signal)
     3. High-confidence correct cases (low signal, stable_success)
 
-    Canary cases are placed at evenly-spaced positions within the first batch
-    to ensure early safety monitoring.
 
     Args:
-        case_ids: All evolution case IDs (includes canary).
+        case_ids: All evolution case IDs.
         baseline_predictions: Baseline predictions keyed by case_ref.
-        canary_ids: Canary case IDs (subset of case_ids).
 
     Returns:
         Ordered list of case_ids for sequential processing.
     """
-    canary_set = set(canary_ids)
-    non_canary = [cid for cid in case_ids if cid not in canary_set]
-    canary_list = [cid for cid in case_ids if cid in canary_set]
-
-    # Classify non-canary cases by priority
+    # ``canary_ids`` remains accepted for callers of the retired curriculum
+    # API, but is intentionally ignored. Canary execution is no longer part
+    # of BCCSE promotion or ordering.
+    _ = canary_ids
+    # Classify cases by priority.
     unresolved = []
     boundary = []
     confident = []
 
-    for cid in non_canary:
+    for cid in case_ids:
         pred = baseline_predictions.get(cid)
         if pred is None:
             unresolved.append(cid)  # Unknown → treat as high priority
@@ -81,25 +79,7 @@ def order_evolution_cases(
         else:
             unresolved.append(cid)
 
-    # Interleave canary cases into the first portion
-    # Place canaries at positions 0, 5, 10, 15, 20, 25 (every 5th position)
-    ordered_non_canary = unresolved + boundary + confident
-    result: list[str] = []
-    canary_idx = 0
-    canary_interval = max(1, len(ordered_non_canary) // (len(canary_list) + 1))
-
-    for i, cid in enumerate(ordered_non_canary):
-        if canary_idx < len(canary_list) and i > 0 and i % canary_interval == 0:
-            result.append(canary_list[canary_idx])
-            canary_idx += 1
-        result.append(cid)
-
-    # Append remaining canaries at the end
-    while canary_idx < len(canary_list):
-        result.append(canary_list[canary_idx])
-        canary_idx += 1
-
-    return result
+    return unresolved + boundary + confident
 
 
 def get_case_priority_label(

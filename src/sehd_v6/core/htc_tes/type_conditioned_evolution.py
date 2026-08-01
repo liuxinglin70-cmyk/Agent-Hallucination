@@ -32,7 +32,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .type_classifier import HallucinationType, TypeClassificationResult
+from .type_classifier import (
+    HallucinationType,
+    TypeClassificationResult,
+    _normalize_signal,
+)
 
 
 # Type to module routing table: which modules are primary targets per type
@@ -93,6 +97,14 @@ _TYPE_EDIT_STRATEGY: dict[HallucinationType, str] = {
 
 # Evolution direction to type-specific guidance
 _DIRECTION_TYPE_GUIDANCE: dict[str, dict[HallucinationType, str]] = {
+    "unresolved_to_decisive": {
+        htype: "Strengthen observable evidence construction without presuming clean or error; let the proof court decide."
+        for htype in HallucinationType
+    },
+    "process_repair": {
+        htype: "Repair the attributed evidence process without prescribing a final verdict."
+        for htype in HallucinationType
+    },
     "error_to_clean": {
         HallucinationType.FACTUAL: "Add boundary: when claim has verified tool output, it is supported",
         HallucinationType.INSTRUCTIONAL: "When agent followed explicit instruction, do not flag as error",
@@ -242,6 +254,21 @@ class TypeConditionedEvolution:
             return modules[:1]
         return modules[1:]
 
+    def intersect_allowed_modules(
+        self,
+        hallucination_type: HallucinationType,
+        attribution_modules: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Return the hard-safe intersection of type and attribution routes."""
+        allowed = set(attribution_modules)
+        return tuple(
+            module for module in self.get_target_modules(hallucination_type, primary=False)
+            if module in allowed
+        ) or tuple(
+            module for module in self.get_target_modules(hallucination_type, primary=True)
+            if module in allowed
+        )
+
     def get_edit_strategy(self, hallucination_type: HallucinationType) -> str:
         """Get the editing strategy for a given hallucination type."""
         return _TYPE_EDIT_STRATEGY.get(
@@ -280,7 +307,7 @@ class TypeConditionedEvolution:
 
     def create_edit_proposal(
         self,
-        signal: Mapping[str, Any],
+        signal: Any,
         type_result: TypeClassificationResult,
         allowed_modules: Sequence[str],
         source_case_id: str,
@@ -289,7 +316,8 @@ class TypeConditionedEvolution:
         """Create a type-conditioned edit proposal.
 
         Args:
-            signal: The attribution signal dict.
+            signal: The attribution signal. Accepts either an
+                ``AttributionSignal`` dataclass or a ``Mapping[str, Any]`` dict.
             type_result: The hallucination type classification.
             allowed_modules: Modules that can be edited.
             source_case_id: The source case ID.
@@ -302,9 +330,11 @@ class TypeConditionedEvolution:
         if operation == "no_edit":
             return None
 
+        signal_dict = _normalize_signal(signal)
+
         target_module = str(reflection_output.get("target_module") or "")
         if not target_module or target_module not in allowed_modules:
-            target_module = str(signal.get("target_module") or "")
+            target_module = str(signal_dict.get("target_module") or "")
 
         new_content = str(reflection_output.get("new_content") or "")
         if not new_content:
@@ -317,8 +347,8 @@ class TypeConditionedEvolution:
         )
 
         # Determine evolution direction
-        state = str(signal.get("state") or "")
-        gold = signal.get("gold_label")
+        state = str(signal_dict.get("state") or "")
+        gold = signal_dict.get("gold_label")
         direction = self._infer_evolution_direction(state, gold)
 
         strategy = self.get_edit_strategy(type_result.primary_type)
@@ -342,25 +372,40 @@ class TypeConditionedEvolution:
     def _infer_evolution_direction(
         self, state: str, gold: Any
     ) -> str:
-        """Infer the evolution direction from state and gold."""
+        """Infer the evolution direction from state and gold.
+
+        Semantics:
+        - Gold-supervised (gold is bool): the gold label tells us the
+          *correct* target state. If current state disagrees with gold,
+          evolution should move toward the gold-implied state.
+        - Self-supervised (gold is None): only ``unresolved`` cases need
+          evolution (move toward a decisive judgment). Already-decided
+          states (verified_error / verified_clean) should NOT be
+          auto-flipped — that was the original bug which guided every
+          correct detection toward the opposite label.
+        """
         if isinstance(gold, bool):
             if gold:
+                # Gold says "error". Current state should move to error.
                 if state == "unresolved":
                     return "unresolved_to_error"
                 if state == "verified_clean":
                     return "clean_to_error"
+                # verified_error already correct → no evolution needed
+                return "no_evolution"
             else:
+                # Gold says "clean". Current state should move to clean.
                 if state == "unresolved":
                     return "unresolved_to_clean"
                 if state == "verified_error":
                     return "error_to_clean"
+                # verified_clean already correct → no evolution needed
+                return "no_evolution"
 
-        # Self-supervised mode: infer from state
+        # Self-supervised mode has no authority to prescribe verdict polarity.
         if state == "unresolved":
-            return "unresolved_to_clean"
-        if state == "verified_error":
-            return "error_to_clean"
-        return "clean_to_error"
+            return "unresolved_to_decisive"
+        return "process_repair"
 
     def accumulate_experience(
         self,
@@ -384,30 +429,38 @@ class TypeConditionedEvolution:
             "strategy": edit.edit_strategy,
             "target_module": edit.target_module,
         }
-        self._experience_cache[type_key].append(edit)
+        # FIX: previously appended `edit` instead of `entry`, discarding
+        # the success flag and making get_experience_summary unable to
+        # compute success rates.
+        self._experience_cache[type_key].append(entry)
 
     def get_experience_summary(
         self, hallucination_type: HallucinationType
     ) -> dict[str, Any]:
         """Get accumulated experience summary for a hallucination type."""
         type_key = hallucination_type.value
-        edits = self._experience_cache.get(type_key, [])
+        entries = self._experience_cache.get(type_key, [])
 
-        total = len(edits)
+        total = len(entries)
         if total == 0:
             return {"type": type_key, "total_edits": 0}
 
         by_direction: dict[str, int] = {}
         by_module: dict[str, int] = {}
-        for edit in edits:
-            direction = edit.evolution_direction
+        successes = 0
+        for entry in entries:
+            direction = entry["direction"]
             by_direction[direction] = by_direction.get(direction, 0) + 1
-            module = edit.target_module
+            module = entry["target_module"]
             by_module[module] = by_module.get(module, 0) + 1
+            if entry["success"]:
+                successes += 1
 
         return {
             "type": type_key,
             "total_edits": total,
+            "successes": successes,
+            "success_rate": successes / total if total else 0.0,
             "by_direction": by_direction,
             "by_module": by_module,
             "top_modules": sorted(
@@ -418,7 +471,7 @@ class TypeConditionedEvolution:
 
 def build_type_conditioned_reflection_prompt(
     type_result: TypeClassificationResult,
-    signal: Mapping[str, Any],
+    signal: Any,
     allowed_modules: Sequence[str],
     experience_summary: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
@@ -429,7 +482,8 @@ def build_type_conditioned_reflection_prompt(
 
     Args:
         type_result: The hallucination type classification result.
-        signal: The attribution signal.
+        signal: The attribution signal. Accepts either an ``AttributionSignal``
+            dataclass or a ``Mapping[str, Any]`` dict.
         allowed_modules: Modules that can be edited.
         experience_summary: Optional accumulated experience for this type.
 
@@ -464,18 +518,34 @@ Type-specific guidance:
             system_prompt += f"- [{direction}]: {guidance_map[htype]}\n"
 
     if experience_summary and experience_summary.get("total_edits", 0) > 0:
+        # Adapt to both get_experience_summary() (which returns top_modules
+        # as list[tuple]) and get_type_coverage() (which returns per_type
+        # dict without top_modules). This fixes the interface mismatch
+        # where the prompt always showed empty top modules.
+        top_modules = experience_summary.get("top_modules")
+        if top_modules:
+            # Format from get_experience_summary: list[tuple[str, int]]
+            modules_str = ", ".join(m for m, _ in top_modules)
+        else:
+            # Format from get_type_coverage: per_type dict
+            per_type = experience_summary.get("per_type", {})
+            type_stats = per_type.get(htype.value, {})
+            modules_str = f"({type_stats.get('total_edits', 0)} edits, {type_stats.get('success_rate', 0):.0%} success)"
+        success_rate = experience_summary.get("success_rate")
+        success_line = f"- Success rate: {success_rate:.0%}\n" if isinstance(success_rate, (int, float)) else ""
         system_prompt += f"""
 Accumulated experience for type '{htype.value}':
 - Total edits applied: {experience_summary['total_edits']}
-- Top modules: {', '.join(m for m, _ in experience_summary.get('top_modules', []))}
+{success_line}- Top modules: {modules_str}
 
 Use this experience to avoid repeating ineffective patterns and focus on
 strategies that have worked for this hallucination type.
 """
 
-    error_type = str(signal.get("error_type") or "unknown")
-    target_module = str(signal.get("target_module") or "")
-    state = str(signal.get("state") or "")
+    signal_dict = _normalize_signal(signal)
+    error_type = str(signal_dict.get("error_type") or "unknown")
+    target_module = str(signal_dict.get("target_module") or "")
+    state = str(signal_dict.get("state") or "")
 
     user_prompt = f"""Case analysis:
 - Error type: {error_type}
@@ -494,7 +564,8 @@ The rule should:
 
 Return exactly one JSON object:
 {{"target_module": "<module>", "operation": "add_rule|modify_rule", "rule_index": null,
- "new_content": "<rule>", "rationale": "<reasoning for this type>"}}
+  "new_content": "<rule>", "feature_description": "<reusable trajectory feature>",
+  "rationale": "<reasoning for this type>"}}
 """
 
     return system_prompt, user_prompt

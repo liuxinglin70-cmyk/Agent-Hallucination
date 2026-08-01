@@ -4,7 +4,7 @@ Main orchestration loop for causal-process-reflection-driven online skill evolut
 Processes cases sequentially with CONDITION-TRIGGERED evolution:
 - Not every case triggers evolution (only "informative" cases do)
 - Self-supervised signals drive reflection (no gold label required)
-- Structural constraints replace expensive canary re-evaluation
+- Structural constraints replace expensive cross-case re-evaluation
 - Convergence detection naturally terminates evolution
 
 Architecture:
@@ -29,18 +29,17 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..paca_tcl import proof_engine as v35
-from ..paca_tcl.proof_evaluator import (
-    DeepSeekMutationProvider,
-    _json_object_provider_call,
-)
 from ..paca_tcl.skill_integration import integrated_v35_provider
-from ..paca_tcl.basic_runner import write_json, write_jsonl
+from ..paca_tcl.basic_runner import (
+    json_object_provider_call,
+    write_json,
+    write_jsonl,
+)
 from .reflection_engine import (
     RejectedEditEntry,
     build_causal_reflection_prompt,
     build_capacity_guidance,
     build_accepted_edits_summary,
-    compile_edit_proposal,
     format_detection_context_for_llm,
     format_skill_context_for_llm,
 )
@@ -59,7 +58,6 @@ from .genome import (
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
-    task_state_score,
 )
 from .safety_gate import StructuralGate, create_structural_gate
 from .step_attributor import (
@@ -225,7 +223,13 @@ def _run_detection_with_genome(
             target = shared_hash_root / name
             target.mkdir(parents=True, exist_ok=True)
             if not link_path.exists() and not link_path.is_symlink():
-                link_path.symlink_to(target, target_is_directory=True)
+                try:
+                    link_path.symlink_to(target, target_is_directory=True)
+                except (FileExistsError, OSError):
+                    # FIX (C8): Windows 上无管理员权限/未开发者模式时
+                    # symlink_to 抛 OSError；降级为直接使用本地目录（不共享
+                    # 缓存，但功能正确）。FileExistsError 为并发创建，安全忽略。
+                    pass
     else:
         # Fallback: original behavior (no sharing) for backward compatibility
         marker = genome_dir / ".baseline_cache_seeded"
@@ -286,30 +290,8 @@ def _atomic_write_json(path: Path, value: Any) -> None:
 
 
 # ============================================================
-# ============================================================
 # Main evolution loop
 # ============================================================
-
-
-_SIGNAL_SEVERITY = {
-    ErrorType.CORRECT: 0,
-    ErrorType.BOUNDARY_HESITATION: 1,
-    ErrorType.CRS_CONTRADICTION: 2,
-    ErrorType.EVIDENCE_INCOMPLETE: 2,
-    ErrorType.UNRESOLVED_UNKNOWN: 3,
-    ErrorType.UNRESOLVED_SHOULD_ERROR: 4,
-    ErrorType.UNRESOLVED_SHOULD_CLEAN: 4,
-    ErrorType.CANDIDATE_MISS: 4,
-    ErrorType.FALSE_POSITIVE: 4,
-    ErrorType.FALSE_NEGATIVE_CLEAN: 4,
-    ErrorType.FALSE_NEGATIVE_UNRESOLVED: 4,
-    ErrorType.LOCALIZATION_ERROR: 3,
-    ErrorType.SIGNAL_UNAVAILABLE: 4,
-}
-
-
-def _signal_severity(signal: AttributionSignal) -> int:
-    return _SIGNAL_SEVERITY.get(signal.error_type, 4)
 
 
 def _llm_merge_rules(
@@ -317,6 +299,7 @@ def _llm_merge_rules(
     new_rule: str,
     *,
     mutation_route: dict[str, Any] | None,
+    cache_dir: Path | None = None,
 ) -> str | None:
     """Merge two semantically-overlapping rules into a single rule.
 
@@ -327,6 +310,9 @@ def _llm_merge_rules(
         existing_rule: The existing rule text to merge into.
         new_rule: The new rule text carrying additional conditions.
         mutation_route: LLM route for reflection calls (None = structural only).
+        cache_dir: Cache directory for LLM merge calls. Defaults to a
+            relative ``.skill_merge_cache`` only as a last resort; callers
+            should pass ``output_dir / "skill_merge_cache"``.
 
     Returns:
         Merged rule text, or None if merge failed.
@@ -371,11 +357,11 @@ def _llm_merge_rules(
         "请以 JSON 格式返回：{\"merged_rule\": \"合并后的规则文本\"}"
     )
     try:
-        merged, _ = _json_object_provider_call(
+        merged, _ = json_object_provider_call(
             route=mutation_route,
             system=system_prompt,
             user=user_prompt,
-            cache_dir=Path(".skill_merge_cache"),
+            cache_dir=cache_dir if cache_dir is not None else Path(".skill_merge_cache"),
         )
         if merged and isinstance(merged, dict):
             rule = merged.get("merged_rule", "").strip()
@@ -387,23 +373,6 @@ def _llm_merge_rules(
     return _llm_merge_rules(existing_rule, new_rule, mutation_route=None)
 
 
-def _source_fitness_passed(
-    before: AttributionSignal,
-    after: AttributionSignal,
-) -> bool:
-    """Return whether a source achieved strong (fully closed) improvement.
-
-    Kept as a compatibility helper for audits/tests. Online selection now uses
-    assess_source_fitness(), which also admits measurable module-local progress
-    to a reversible shadow batch.
-    """
-    return (
-        before.should_evolve
-        and not after.should_evolve
-        and after.state in {"verified_error", "verified_clean"}
-    )
-
-
 def run_online_evolution(
     *,
     evolution_case_ids: Sequence[str],
@@ -411,20 +380,22 @@ def run_online_evolution(
     config: dict[str, Any],
     output_dir: Path,
     census_root: Path,
-    use_gold: bool = True,
+    use_gold: bool = False,
     mutation_route: dict[str, Any] | None = None,
     baseline_cache_root: Path | None = None,
-    module_cooldown: int = 3,
-    max_total_edits: int = 30,
-    convergence_window: int = 10,
+    module_cooldown: int = 0,
+    max_total_edits: int = 200,
+    convergence_window: int = 20,
     fitness_check: bool = True,
-    canary_size: int = 3,
-    initial_canaries: Sequence[tuple[str, str]] = (),
     fitness_batch_size: int = 1,
-    fitness_use_gold: bool = True,
+    fitness_use_gold: bool = False,
     run_id: str | None = None,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
+
+    Batch commit is gated solely on per-case source replay. Cross-case
+    regression is intentionally not re-verified at commit time; the registered
+    validation-set evaluation is the authoritative check.
 
     Args:
         evolution_case_ids: Cases for evolution (natural order or shuffled).
@@ -441,9 +412,6 @@ def run_online_evolution(
         convergence_window: Consecutive no-edit cases before convergence.
         fitness_check: Require local source improvement and reversible batch
             selection before champion commit.
-        canary_size: Number of matched champion-vs-shadow audit cases per batch.
-        initial_canaries: Optional audit case IDs. Their cached states are never
-            treated as truth.
         fitness_batch_size: Provisional edits accumulated before batch commit.
             Default 1 (incremental commit) — each edit is validated and committed
             independently, avoiding same-module edit interference in batch audit.
@@ -465,20 +433,8 @@ def run_online_evolution(
         raise ValueError(
             "Evolution records missing: " + ", ".join(missing_records)
         )
-    if canary_size < 0 or canary_size > 10:
-        raise ValueError("canary_size must be between 0 and 10")
     if fitness_batch_size < 1 or fitness_batch_size > 10:
         raise ValueError("fitness_batch_size must be between 1 and 10")
-    if len(initial_canaries) > canary_size:
-        raise ValueError("initial_canaries cannot exceed canary_size")
-    initial_ids = [str(case_id) for case_id, _ in initial_canaries]
-    if len(initial_ids) != len(set(initial_ids)):
-        raise ValueError("initial_canaries contains duplicate case IDs")
-    for case_id, state in initial_canaries:
-        if case_id not in records:
-            raise ValueError(f"Initial canary record missing: {case_id}")
-        if state not in {"verified_error", "verified_clean"}:
-            raise ValueError(f"Initial canary is not a stable state: {state}")
     if mutation_route is not None:
         model = str(mutation_route.get("model") or "")
         if model not in {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}:
@@ -519,10 +475,6 @@ def run_online_evolution(
     print(f"  HTC-TES v3: type-conditioned evolution enabled")
 
     stable_cases = 0
-    # Cached states are provenance only. Batch canaries are always evaluated as
-    # matched champion-vs-shadow pairs.
-    anchor_canaries = [(str(case_id), str(state)) for case_id, state in initial_canaries]
-    stable_canaries: list[tuple[str, str]] = []
     triggered_cases = 0
     edits_accepted = 0
     edits_rejected = 0
@@ -539,7 +491,7 @@ def run_online_evolution(
         _atomic_write_json(
             output_dir / "evolution_checkpoint.json",
             {
-                "schema_version": "agenthallu.bccse_v5_checkpoint.v1",
+                "schema_version": "agenthallu.bccse_v5_checkpoint.v2",
                 "run_id": run_id,
                 "status": status,
                 "next_case_index": next_case_index,
@@ -551,14 +503,6 @@ def run_online_evolution(
                 "provisional_edit_count": len(provisional_edits),
                 "steps": [step.to_dict() for step in steps],
                 "gate_summary": gate.summary(),
-                "stable_canaries": [
-                    {"case_id": value[0], "state": value[1]}
-                    for value in stable_canaries
-                ],
-                "anchor_canaries": [
-                    {"case_id": value[0], "state": value[1]}
-                    for value in anchor_canaries
-                ],
                 "accepted_edits_history": accepted_edits_history,
                 "batch_history": batch_history,
                 "counters": {
@@ -574,20 +518,6 @@ def run_online_evolution(
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         steps.append(step)
         persist_progress(next_case_index)
-
-    def fitness_canaries() -> list[tuple[str, str]]:
-        if canary_size == 0:
-            return []
-        selected = list(anchor_canaries[:canary_size])
-        if len(selected) >= canary_size:
-            return selected
-        for item in reversed(stable_canaries):
-            if item[0] in {case_id for case_id, _ in selected}:
-                continue
-            selected.append(item)
-            if len(selected) >= canary_size:
-                break
-        return selected[:canary_size]
 
     def fitness_gold(case_id: str) -> bool | None:
         if not fitness_use_gold:
@@ -617,19 +547,15 @@ def run_online_evolution(
         batch_id = f"batch_{len(batch_history):03d}"
         batch_root = output_dir / "fitness_batches" / batch_id
         source_audits: list[dict[str, Any]] = []
-        canary_audits: list[dict[str, Any]] = []
         runtime_errors: list[str] = []
 
-        # v3.5.1: 并行执行所有检测，分两阶段避免 provider patch 冲突
-        # 阶段1: 并行执行所有 shadow 检测（current_genome，在 integrated_v35_provider 上下文内）
-        # 阶段2: 并行执行所有 champion canary 检测（baseline genome，不需要 patch）
-        # 保障：每阶段内检测输入完全独立，并行不改变任何单次检测的输入和输出
-        canary_list = list(fitness_canaries())
-
+        # Replay every edited source against the complete shadow genome. This
+        # is the only commit-time runtime validation; cross-case evaluation is
+        # deliberately left to the separately registered validation set.
         shadow_raw: dict[str, Any] = {}  # case_id -> result_dict 或 Exception
 
-        # 阶段1: 并行执行所有 shadow 检测（source 重检 + canary shadow）
-        shadow_case_count = len(provisional_edits) + len(canary_list)
+        # 并行执行所有 shadow source 重检（current_genome 上下文内）
+        shadow_case_count = len(provisional_edits)
         if shadow_case_count:
             with integrated_v35_provider(genome=current_genome, config=config):
                 with ThreadPoolExecutor(max_workers=min(4, shadow_case_count)) as pool:
@@ -649,52 +575,12 @@ def run_online_evolution(
                             provider_already_patched=True,
                         )
                         future_to_case[future] = item.case_id
-                    # canary shadow
-                    for canary_id, _ in canary_list:
-                        future = pool.submit(
-                            _run_detection_with_genome,
-                            genome=current_genome,
-                            case_id=canary_id,
-                            record=records[canary_id],
-                            config=config,
-                            output_dir=batch_root / "canaries" / "shadow" / canary_id.replace("/", "_"),
-                            shared_cache_root=shared_cache_root,
-                            census_root=census_root,
-                            baseline_cache_root=baseline_cache_root,
-                            provider_already_patched=True,
-                        )
-                        future_to_case[future] = canary_id
                     for future in as_completed(future_to_case):
                         case_id = future_to_case[future]
                         try:
                             shadow_raw[case_id] = future.result()
                         except Exception as exc:
                             shadow_raw[case_id] = exc
-
-        # 阶段2: 并行执行 champion canary 检测（baseline genome，不需要 patch）
-        champion_raw: dict[str, Any] = {}
-        if canary_list:
-            with ThreadPoolExecutor(max_workers=min(4, len(canary_list))) as pool:
-                future_to_canary: dict[Any, str] = {}
-                for canary_id, _ in canary_list:
-                    future = pool.submit(
-                        _run_detection_with_genome,
-                        genome=champion_genome,
-                        case_id=canary_id,
-                        record=records[canary_id],
-                        config=config,
-                        output_dir=batch_root / "canaries" / "champion" / canary_id.replace("/", "_"),
-                        shared_cache_root=shared_cache_root,
-                        census_root=census_root,
-                        baseline_cache_root=baseline_cache_root,
-                    )
-                    future_to_canary[future] = canary_id
-                for future in as_completed(future_to_canary):
-                    case_id = future_to_canary[future]
-                    try:
-                        champion_raw[case_id] = future.result()
-                    except Exception as exc:
-                        champion_raw[case_id] = exc
 
         # 处理 source 重检结果（保持原顺序，audit 数据与串行完全一致）
         for item in provisional_edits:
@@ -723,54 +609,13 @@ def run_online_evolution(
                     "edit_id": item.edit.edit_id,
                     "assessment": assessment.to_dict(),
                     "source_after": shadow_signal.to_dict(),
+                    # FIX (C1): 保存真正的检测结果dict（而非AttributionSignal），
+                    # 供HTC-TES适应度评估使用
+                    "shadow_result": shadow_result,
                 })
             except Exception as exc:
                 runtime_errors.append(
                     f"source:{item.case_id}:{type(exc).__name__}:{exc}"
-                )
-
-        # 处理 canary 结果（保持原顺序）
-        for canary_id, cached_state in canary_list:
-            champion_result = champion_raw.get(canary_id)
-            shadow_result = shadow_raw.get(canary_id)
-            if isinstance(champion_result, Exception):
-                runtime_errors.append(
-                    f"canary:{canary_id}:champion:{type(champion_result).__name__}:{champion_result}"
-                )
-                continue
-            if isinstance(shadow_result, Exception):
-                runtime_errors.append(
-                    f"canary:{canary_id}:shadow:{type(shadow_result).__name__}:{shadow_result}"
-                )
-                continue
-            try:
-                champion_signal = attribute_failure(
-                    champion_result,
-                    use_gold=False,
-                )
-                shadow_signal = attribute_failure(
-                    shadow_result,
-                    use_gold=False,
-                )
-                gold = fitness_gold(canary_id)
-                task_delta: int | None = None
-                if gold is not None:
-                    task_delta = (
-                        task_state_score(shadow_signal.state, gold)
-                        - task_state_score(champion_signal.state, gold)
-                    )
-                canary_audits.append({
-                    "case_id": canary_id,
-                    "cached_state_provenance_only": cached_state,
-                    "champion_state": champion_signal.state,
-                    "shadow_state": shadow_signal.state,
-                    "champion_should_evolve": champion_signal.should_evolve,
-                    "shadow_should_evolve": shadow_signal.should_evolve,
-                    "task_score_delta": task_delta,
-                })
-            except Exception as exc:
-                runtime_errors.append(
-                    f"canary:{canary_id}:{type(exc).__name__}:{exc}"
                 )
 
         decisions = [
@@ -781,22 +626,6 @@ def run_online_evolution(
             for value in decisions
         )
         worse_count = sum(value == "worse" for value in decisions)
-        canary_deltas = [
-            value["task_score_delta"]
-            for value in canary_audits
-            if value["task_score_delta"] is not None
-        ]
-        canary_gold_passed = (
-            not canary_deltas
-            or (
-                sum(canary_deltas) >= 0
-                and all(value > -2 for value in canary_deltas)
-            )
-        )
-        # Canary is audit-only (v5.3): no hard veto.
-        # Canary audits are recorded for manual review but do not block
-        # batch commit. Gold-assisted source fitness already provides
-        # directional correctness checking.
         # v5.3.5 incremental commit: each edit is validated independently.
         # Edits that are worse are isolated and rejected; non-worse edits
         # (improved or no_effect) are committed. This avoids the old behavior
@@ -805,16 +634,15 @@ def run_online_evolution(
         # v5.3.5 modify_rule relaxation: modify_rule is no longer held to the
         # strict required_improvements threshold. As long as worse_count == 0
         # across the batch, all non-worse edits (add or modify) are committed.
-        # Rationale: the per-case fitness gate already verified each edit is
-        # locally useful or no_effect; batch audit only needs to confirm no
-        # regression appears under joint evaluation.
+        # Rationale: only an explicit source improvement is promotable. A
+        # no-effect edit is retained as telemetry, not silently committed.
         accepted_indices: list[int] = []
         rejected_indices: list[int] = []
         for i, dec in enumerate(decisions):
-            if dec == "worse":
-                rejected_indices.append(i)
-            else:
+            if dec in {"strong_improvement", "local_improvement"}:
                 accepted_indices.append(i)
+            else:
+                rejected_indices.append(i)
         # Commit policy:
         # - If any runtime_error: reject entire batch (cannot trust audits)
         # - If any source_audit missing: reject entire batch
@@ -835,14 +663,13 @@ def run_online_evolution(
             "champion_hash_before": champion_genome.content_hash,
             "shadow_hash": current_genome.content_hash,
             "source_audits": source_audits,
-            "canary_audits": canary_audits,
             "runtime_errors": runtime_errors,
             "improved_count": improved_count,
             "worse_count": worse_count,
             "accepted_indices": accepted_indices,
             "rejected_indices": rejected_indices,
             "fitness_use_gold": fitness_use_gold,
-            "canary_gold_passed": canary_gold_passed,
+            "commit_validation": "source_replay_only",
             "passed": passed,
         }
 
@@ -887,11 +714,6 @@ def run_online_evolution(
             edits_accepted += len(accepted_indices)
             for idx in accepted_indices:
                 item = provisional_edits[idx]
-                gate.record_edit_accepted(
-                    item.case_index,
-                    item.edit.target_module,
-                    item.source_signal.error_type.value,
-                )
                 # Set fitness_status on accepted rules (v5.3 protected modify)
                 assessment_decision = (
                     source_audits[idx]["assessment"]["decision"]
@@ -918,19 +740,30 @@ def run_online_evolution(
                     "batch_id": batch_id,
                 })
                 # HTC-TES v3: Record type-conditioned experience
+                # FIX: pass gold_label (was None) and target_module (was missing)
+                # to ensure experience memory records correct direction and module.
+                _type_result = type_classifier.classify(
+                    item.source_result, item.source_signal
+                )
+                _direction = type_evolution._infer_evolution_direction(
+                    item.source_signal.state, item.source_signal.gold_label,
+                )
+                # FIX (C1): 使用BCCSE的assessment决策作为成功标志，并传入
+                # 真正的检测结果dict（shadow_result），而非AttributionSignal
+                # 的序列化结果，避免HTC-TES内部误判before/after状态。
+                _htc_success = assessment_decision in {
+                    "strong_improvement", "local_improvement",
+                }
+                _shadow_result = source_audits[idx].get("shadow_result", {})
                 type_fitness.assess_edit(
                     source_case_id=item.case_id,
-                    hallucination_type=type_classifier.classify(
-                        item.source_result, item.source_signal
-                    ).primary_type,
-                    evolution_direction=type_evolution._infer_evolution_direction(
-                        item.source_signal.state, None,
-                    ),
+                    hallucination_type=_type_result.primary_type,
+                    evolution_direction=_direction,
                     detection_before=item.source_result,
-                    detection_after=source_audits[idx].get("source_after", {}),
-                    type_result=type_classifier.classify(
-                        item.source_result, item.source_signal
-                    ),
+                    detection_after=_shadow_result,
+                    type_result=_type_result,
+                    target_module=item.edit.target_module,
+                    override_success=_htc_success,
                 )
                 step = steps[item.step_index]
                 step.gate_decision = "accept_batch"
@@ -952,8 +785,6 @@ def run_online_evolution(
             reasons = ["shadow_edit_worse"]
             if runtime_errors:
                 reasons.append("shadow_batch_runtime_error")
-            if not canary_gold_passed:
-                reasons.append("gold_assisted_canary_regression")
             for idx in rejected_indices:
                 item = provisional_edits[idx]
                 gate.revoke_structural_accept(item.certificate, reasons)
@@ -967,15 +798,8 @@ def run_online_evolution(
                             "content": item.edit.new_content[:80],
                         },
                     )(),
-                    regressed_cases=[
-                        value["case_id"]
-                        for value in canary_audits
-                        if (
-                            value["task_score_delta"] is not None
-                            and value["task_score_delta"] < 0
-                        )
-                    ],
-                    budget_consumed=len(source_audits) + 2 * len(canary_audits),
+                    regressed_cases=[],
+                    budget_consumed=len(source_audits),
                 ))
                 step = steps[item.step_index]
                 step.gate_decision = "rollback_batch"
@@ -1012,8 +836,8 @@ def run_online_evolution(
     persist_progress(0)
 
     for idx, case_id in enumerate(evolution_case_ids):
-        # --- Check halt ---
-        if gate.is_halted:
+        # --- Check halt (including convergence) ---
+        if gate.is_halted or getattr(gate, "_converged", False):
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -1044,9 +868,8 @@ def run_online_evolution(
                 shared_cache_root=shared_cache_root,
             )
         except Exception as exc:
-            persist_progress(idx, status="failed")
             _atomic_write_json(
-                output_dir / "evolution_failure.json",
+                output_dir / "runtime_failures" / f"{idx:04d}.json",
                 {
                     "schema_version": "agenthallu.bccse_v5_failure.v1",
                     "run_id": run_id,
@@ -1054,10 +877,29 @@ def run_online_evolution(
                     "case_index": idx,
                     "genome_hash": current_genome.content_hash,
                     "error": f"{type(exc).__name__}: {exc}",
-                    "checkpoint": str(output_dir / "evolution_checkpoint.json"),
+                    "action": "case_skipped",
                 },
             )
-            raise
+            gate.record_no_edit()
+            record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source="runtime_invalid",
+                attribution=None,
+                edit_proposal=None,
+                mutation_applied=None,
+                gate_decision="skip_runtime_invalid",
+                genome_hash_before=genome_before,
+                genome_hash_after=current_genome.content_hash,
+                detection_state="runtime_invalid",
+                timestamp=time.time(),
+                fitness_check={
+                    "runtime_error": f"{type(exc).__name__}: {exc}",
+                    "passed": False,
+                },
+            ), next_case_index=idx + 1)
+            print(f"  [{idx}] RUNTIME_INVALID {case_id}: {type(exc).__name__}: {exc}")
+            continue
         detection_state = str(detection_result.get("state") or "")
 
         # --- [2] Causal process reflection (self-supervised trigger) ---
@@ -1070,7 +912,7 @@ def run_online_evolution(
             from .step_attributor import build_attribution_llm_prompt
             try:
                 attr_system, attr_user = build_attribution_llm_prompt(signal)
-                attr_parsed, _ = _json_object_provider_call(
+                attr_parsed, _ = json_object_provider_call(
                     route=mutation_route,
                     system=attr_system,
                     user=attr_user,
@@ -1097,7 +939,6 @@ def run_online_evolution(
         if not signal.should_evolve:
             # Stable success — no trigger
             stable_cases += 1
-            stable_canaries.append((case_id, detection_state))
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -1117,16 +958,34 @@ def run_online_evolution(
 
         # --- Triggered! ---
         triggered_cases += 1
-        gate.record_trigger(idx, signal.target_module, signal.error_type.value)
         print(f"  [{idx}] TRIGGERED {case_id}: {signal.trigger_source.value} "
               f"→ {signal.error_type.value} → {signal.target_module}")
 
         # --- HTC-TES v3: Classify hallucination type ---
         type_result = type_classifier.classify(detection_result, signal)
+        type_allowed_modules = type_evolution.intersect_allowed_modules(
+            type_result.primary_type,
+            (signal.target_module, signal.secondary_module),
+        )
+        if not type_allowed_modules:
+            gate.record_no_edit()
+            record_step(EvolutionStep(
+                case_id=case_id, case_index=idx,
+                trigger_source=signal.trigger_source.value,
+                attribution=signal.to_dict(), edit_proposal={
+                    "operation": "no_edit",
+                    "reason": "type_attribution_route_intersection_empty",
+                    "hallucination_type": type_result.primary_type.value,
+                }, mutation_applied=None, gate_decision="skip_route_conflict",
+                genome_hash_before=genome_before,
+                genome_hash_after=current_genome.content_hash,
+                detection_state=detection_state, timestamp=time.time(),
+            ), next_case_index=idx + 1)
+            continue
         type_guidance = type_evolution.generate_type_guidance(
             type_result.primary_type,
             type_evolution._infer_evolution_direction(
-                signal.state, signal.get("gold_label"),
+                signal.state, signal.gold_label,
             ),
         )
         print(f"    [HTC-TES] type={type_result.primary_type.value} "
@@ -1144,9 +1003,7 @@ def run_online_evolution(
             mutation_cache.mkdir(parents=True, exist_ok=True)
 
             # Prepare rich context for LLM
-            allowed_modules = tuple(dict.fromkeys(
-                (signal.target_module, signal.secondary_module)
-            ))
+            allowed_modules = type_allowed_modules
             skill_context = "\n\n".join(
                 format_skill_context_for_llm(
                     current_genome.modules,
@@ -1198,7 +1055,7 @@ def run_online_evolution(
             # One semantic reflection call per source. Invalid output remains an
             # auditable no-mutation event; it is never "prompted into" an edit.
             try:
-                parsed, meta = _json_object_provider_call(
+                parsed, meta = json_object_provider_call(
                     route=mutation_route,
                     system=system_prompt,
                     user=user_prompt,
@@ -1213,6 +1070,7 @@ def run_online_evolution(
                 rationale = str(
                     parsed.get("rationale") or parsed.get("reasoning") or ""
                 )
+                feature_description = str(parsed.get("feature_description") or "")[:500]
 
                 if operation == "no_edit":
                     no_edit_reason = (
@@ -1228,6 +1086,7 @@ def run_online_evolution(
                         new_content="",
                         rationale=f"[LLM] {rationale[:200]}",
                         source_case_id=case_id,
+                        feature_description=feature_description,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation} "
@@ -1248,6 +1107,7 @@ def run_online_evolution(
                         new_content=new_content,
                         rationale=f"[LLM] {rationale[:200]}",
                         source_case_id=case_id,
+                        feature_description=feature_description,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
@@ -1353,6 +1213,9 @@ def run_online_evolution(
                         existing_text,
                         edit.new_content,
                         mutation_route=mutation_route,
+                        # FIX (B3): 缓存目录放入 output_dir，避免相对路径
+                        # 依赖当前工作目录。
+                        cache_dir=output_dir / "skill_merge_cache",
                     )
                     if merged_content is not None:
                         # Convert to modify_rule on the existing rule
@@ -1462,8 +1325,7 @@ def run_online_evolution(
                     "source_after": None,
                     "source_improved": False,
                     "source_stable_after": False,
-                    "canaries_checked": 0,
-                    "canary_regressions": [],
+                    "commit_validation": "source_replay_only",
                     "runtime_error": reason,
                     "passed": False,
                 }
@@ -1503,24 +1365,11 @@ def run_online_evolution(
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),
                 "source_stable_after": not candidate_signal.should_evolve,
-                "canaries_checked": 0,
-                "canary_regressions": [],
+                "commit_validation": "source_replay_only",
                 "passed": assessment.passed,
             }
             if not assessment.passed:
-                # v5.3.3: no_effect add_rule is harmless - allow into shadow.
-                # The rule adds information without removing anything; batch
-                # validation will confirm or deny at commit time.
-                if (
-                    assessment.decision == "no_effect"
-                    and edit.operation == "add_rule"
-                ):
-                    print(
-                        f"    [v5.3.3] no_effect add_rule admitted to shadow: "
-                        f"{assessment.reasons[0] if assessment.reasons else ''}"
-                    )
-                    # Fall through to provisional path (do NOT continue)
-                else:
+                if assessment.decision != "no_effect":
                     reasons = [
                         f"source_{assessment.decision}:"
                         + ",".join(assessment.reasons)
@@ -1556,6 +1405,21 @@ def run_online_evolution(
                     ), next_case_index=idx + 1)
                     print(f"  [{idx}] REJECT_LOCAL_FITNESS {case_id}: {reasons}")
                     continue
+                reasons = ["source_no_effect:" + ",".join(assessment.reasons)]
+                gate.revoke_structural_accept(cert, reasons)
+                edits_rejected += 1
+                record_step(EvolutionStep(
+                    case_id=case_id, case_index=idx,
+                    trigger_source=signal.trigger_source.value,
+                    attribution=signal.to_dict(), edit_proposal=edit.to_dict(),
+                    mutation_applied=None, gate_decision="reject_fitness_no_effect",
+                    genome_hash_before=genome_before,
+                    genome_hash_after=current_genome.content_hash,
+                    detection_state=detection_state, timestamp=time.time(),
+                    fitness_check=fitness_audit,
+                ), next_case_index=idx + 1)
+                print(f"  [{idx}] REJECT_LOCAL_FITNESS {case_id}: {reasons}")
+                continue
 
         if not fitness_check:
             # Non-formal diagnostic compatibility path. Formal CLI runs require
@@ -1563,11 +1427,6 @@ def run_online_evolution(
             champion_genome = candidate_genome
             current_genome = candidate_genome
             edits_accepted += 1
-            gate.record_edit_accepted(
-                idx,
-                edit.target_module,
-                signal.error_type.value,
-            )
             accepted_edits_history.append({
                 "target_module": edit.target_module,
                 "operation": edit.operation,
@@ -1655,6 +1514,10 @@ def run_online_evolution(
     # HTC-TES v3: Save type-conditioned experience summary
     type_coverage = type_fitness.get_experience_memory().get_type_coverage()
     write_json(output_dir / "htc_tes_coverage.json", type_coverage)
+    write_json(
+        output_dir / "htc_tes_experience_memory.json",
+        type_fitness.get_experience_memory().to_dict(),
+    )
     persist_progress(len(evolution_case_ids), status="complete")
 
     print(f"\n[{run_id}] Complete in {duration:.1f}s:")

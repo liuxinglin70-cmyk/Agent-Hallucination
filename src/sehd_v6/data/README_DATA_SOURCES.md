@@ -17,6 +17,17 @@
 - `eval_metrics_v52_full.json` (1.2 KB) - v52 评估指标
 - `eval_results_v51.json` (12.18 KB) - v51 评估结果
 
+这些冠军和评估文件是历史参考产物。它们使用旧版 genome hash 和规则
+契约，当前严格加载器会拒绝无法从现行 baseline 合法重放的 lineage；不得将
+它们作为修复后框架的可执行 champion。正式评估应使用当前框架重新生成并
+通过严格重放校验的 `champion_genome.json`。
+
+当前 evolution run 还会输出：
+
+- `htc_tes_coverage.json`：类型经验覆盖摘要
+- `htc_tes_experience_memory.json`：包含轨迹特征描述、类型、模块、方向和
+  source replay 成功状态的完整经验记忆
+
 ### 预测数据 (JSONL)
 - `skill_predictions_analysis.jsonl` (2.7 MB) - 技能预测（分析数据）
 - `skill_predictions_r2_validation.jsonl` (2.1 MB) - 技能预测（R2验证）

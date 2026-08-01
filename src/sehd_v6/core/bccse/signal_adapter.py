@@ -51,11 +51,15 @@ class CRSSignal:
     source: str
     certificate_id: str | None
     complete: bool
+    # FIX (B1): 投影置信度——native CRS 为 1.0；证书投影按“枚举字段
+    # 命中比例”计算（未识别字段回退 0.5 会降低置信度）；不确定
+    # 回退为 0.0。下游可据此区分高/低可信的 CRS 诊断信号。
+    projection_confidence: float = 1.0
 
 
 _COVERAGE_STATE_SCORE = {
     "complete": 1.0,
-    "incomplete": 0.5,
+    "incomplete": 0.3,  # was 0.5 — lowered to align with COVERAGE_LOW_THRESHOLD
     "unresolved": 0.0,
 }
 
@@ -222,8 +226,16 @@ _SCOPE_BY_IMPACT = {
 }
 
 
-def _certificate_projection(certificate: Mapping[str, Any]) -> dict[str, float]:
-    """Project one validated proof certificate into CRS-compatible dimensions."""
+def _certificate_projection(
+    certificate: Mapping[str, Any],
+) -> tuple[dict[str, float], float]:
+    """Project one validated proof certificate into CRS-compatible dimensions.
+
+    Returns:
+        (scores, projection_confidence) — confidence is the fraction of
+        enum-mapped dimensions whose source field matched a known value
+        (unknown values fall back to 0.5 and reduce confidence).
+    """
     process_checks = (
         bool(certificate.get("norm_evidence_refs")),
         bool(certificate.get("violation_evidence_refs")),
@@ -231,6 +243,13 @@ def _certificate_projection(certificate: Mapping[str, Any]) -> dict[str, float]:
         bool(certificate.get("impact_evidence_refs")),
     )
     process_score = sum(process_checks) / len(process_checks)
+    known_hits = (
+        str(certificate.get("breach_type") or "") in _FACTUALITY_BY_BREACH,
+        str(certificate.get("benchmark_causal_status") or "") in _COUNTERFACTUAL_BY_STATUS,
+        str(certificate.get("recovery_state") or "") in _RECOVERY_BY_STATE,
+        str(certificate.get("impact_kind") or "") in _SCOPE_BY_IMPACT,
+    )
+    confidence = sum(known_hits) / len(known_hits)
     return {
         "factuality": _FACTUALITY_BY_BREACH.get(
             str(certificate.get("breach_type") or ""), 0.5
@@ -245,7 +264,7 @@ def _certificate_projection(certificate: Mapping[str, Any]) -> dict[str, float]:
         "scope": _SCOPE_BY_IMPACT.get(
             str(certificate.get("impact_kind") or ""), 0.5
         ),
-    }
+    }, confidence
 
 
 def _prosecution_certificates(row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -300,26 +319,32 @@ def _proof_projection(row: Mapping[str, Any]) -> CRSSignal:
                 source="proof_projection_clean",
                 certificate_id=None,
                 complete=True,
+                # 完整控辩覆盖的确定性投影：置信度 1.0
+                projection_confidence=1.0,
             )
 
-    projected: list[tuple[float, dict[str, float], str | None]] = []
+    projected: list[tuple[float, dict[str, float], str | None, float]] = []
     for certificate in certificates:
-        scores = _certificate_projection(certificate)
+        scores, confidence = _certificate_projection(certificate)
         projected.append(
             (
                 compute_crs(scores),
                 scores,
                 str(certificate.get("certificate_id") or "") or None,
+                confidence,
             )
         )
     if projected:
-        aggregate, scores, certificate_id = max(projected, key=lambda item: item[0])
+        aggregate, scores, certificate_id, confidence = max(
+            projected, key=lambda item: item[0]
+        )
         return CRSSignal(
             scores=scores,
             aggregate=aggregate,
             source="proof_projection_certificate",
             certificate_id=certificate_id,
             complete=True,
+            projection_confidence=confidence,
         )
 
     # Unresolved proof with no usable certificate: 0.5 explicitly denotes
@@ -331,6 +356,7 @@ def _proof_projection(row: Mapping[str, Any]) -> CRSSignal:
         source="proof_projection_uncertain",
         certificate_id=None,
         complete=False,
+        projection_confidence=0.0,
     )
 
 

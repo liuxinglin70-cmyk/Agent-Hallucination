@@ -174,6 +174,14 @@ def load_paca_census(*, case_id: str, built: dict[str, Any], cache_root: Path) -
             "module_tag": str(row.get("module_tag") or "Unknown"),
             "observation": str(row.get("observation") or ""),
             "is_decision_point": bool(row.get("is_decision_point")),
+            "source_step_id": next(
+                (
+                    event.get("source_step_id")
+                    for event in built["events"]
+                    if str(event.get("event_id")) == origin
+                ),
+                None,
+            ),
         })
     return converted, {
         "status": "complete" if len(converted) == len(raw_candidates) else "partial",
@@ -214,6 +222,30 @@ Coverage is complete only after scanning the whole supplied trajectory. Never us
 
 
 def provider_call(*, route: dict[str, Any], system: str, user: str, cache_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    return provider_call_with_schema(
+        route=route, system=system, user=user, cache_dir=cache_dir,
+        cache_prefix="v1_census", require_candidates=True,
+    )
+
+
+def provider_call_with_schema(
+    *,
+    route: dict[str, Any],
+    system: str,
+    user: str,
+    cache_dir: Path,
+    cache_prefix: str = "v1_census",
+    require_candidates: bool = True,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Provider call with configurable schema validation.
+
+    Args:
+        require_candidates: If True (default), validate that the response
+            contains a ``candidates`` list (the census/ledger schema). Set
+            to False for routes that return other top-level keys, e.g.
+            the H3 counterfactual localization route which returns
+            ``{"rankings": {...}}``.
+    """
     payload = {
         "model": route["model"],
         "temperature": 0,
@@ -221,9 +253,9 @@ def provider_call(*, route: dict[str, Any], system: str, user: str, cache_dir: P
         "response_format": {"type": "json_object"},
     }
     body = packet.canonical_json(payload).encode("utf-8")
-    # v3.5.1: 缓存键含 "v1_census" 前缀，与 evaluator 的 _json_object_provider_call 区分
+    # v3.5.1: 缓存键含 cache_prefix 前缀，与 evaluator 的 _json_object_provider_call 区分
     # （两者 payload 可能相同但 schema 验证不同，必须隔离缓存）
-    request_hash = hashlib.sha256(b"v1_census|" + (route["endpoint"] + "|" + route["model"] + "|").encode("utf-8") + body).hexdigest()
+    request_hash = hashlib.sha256(cache_prefix.encode("utf-8") + b"|" + (route["endpoint"] + "|" + route["model"] + "|").encode("utf-8") + body).hexdigest()
 
     # v3.5.1: 全局缓存查找（不依赖 cache_dir，所有 output_dir 共享）
     global_target = _global_cache_path(request_hash)
@@ -257,8 +289,10 @@ def provider_call(*, route: dict[str, Any], system: str, user: str, cache_dir: P
             value = json.loads(raw.decode("utf-8"))
             content = value["choices"][0]["message"]["content"]
             parsed = json.loads(content)
-            if not isinstance(parsed, dict) or not isinstance(parsed.get("candidates"), list):
-                raise ValueError("provider ledger schema invalid")
+            if not isinstance(parsed, dict):
+                raise ValueError("provider response is not a JSON object")
+            if require_candidates and not isinstance(parsed.get("candidates"), list):
+                raise ValueError("provider ledger schema invalid: missing candidates")
             cached = {
                 "request_hash": request_hash,
                 "response_hash": hashlib.sha256(raw).hexdigest(),
@@ -285,6 +319,26 @@ def provider_call(*, route: dict[str, Any], system: str, user: str, cache_dir: P
                 time.sleep(2**attempt)
     assert last_error is not None
     raise last_error
+
+
+def json_object_provider_call(
+    *, route: dict[str, Any], system: str, user: str, cache_dir: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Call a provider for an unconstrained JSON object.
+
+    Mutation and attribution routes do not use the PACA ``candidates``
+    envelope. Keeping this wrapper beside the cached provider implementation
+    gives those callers the same deterministic transport without pretending
+    they implement a ledger schema.
+    """
+    return provider_call_with_schema(
+        route=route,
+        system=system,
+        user=user,
+        cache_dir=cache_dir,
+        cache_prefix="generic_json_object",
+        require_candidates=False,
+    )
 
 
 def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -321,7 +375,17 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
             "decision_point": isinstance(row.get("is_decision_point"), bool),
         }
         if all(checks.values()):
-            valid.append(row)
+            normalized_row = dict(row)
+            origin = str(row.get("origin_hypothesis_event_id") or "")
+            normalized_row["source_step_id"] = next(
+                (
+                    event.get("source_step_id")
+                    for event in built["events"]
+                    if str(event.get("event_id")) == origin
+                ),
+                None,
+            )
+            valid.append(normalized_row)
             seen.add(candidate_id)
         else:
             failures.append({"index": index, "failed_checks": sorted(key for key, passed in checks.items() if not passed)})
@@ -478,7 +542,14 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         state = str(row.get("state") or "unresolved")
         tri_state[state] += 1
         runtime_valid += int(bool(row.get("runtime_valid")))
-        predicted = state == "verified_error"
+        if state == "unresolved":
+            # Fail closed for official binary metrics: abstention on a gold
+            # error is FN, while abstention on a clean case is TN. The
+            # separate unresolved counter preserves selective-prediction data.
+            confusion["unresolved"] += 1
+            predicted = False
+        else:
+            predicted = state == "verified_error"
         if gold and predicted:
             confusion["tp"] += 1
             step_correct += int(row.get("responsible_step") in set(row.get("gold_steps") or []))
@@ -490,10 +561,11 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             confusion["tn"] += 1
 
         census_steps = {
-            int(str(item["origin_hypothesis_event_id"]).split("_")[-1])
+            str(item.get("source_step_id"))
             for item in row.get("census") or []
+            if item.get("source_step_id") is not None
         }
-        hit = bool(census_steps & set(row.get("gold_steps") or [])) if gold else False
+        hit = bool(census_steps & {str(step) for step in row.get("gold_steps") or []}) if gold else False
         discovery_hits += int(hit)
         adjudication = row.get("adjudication") or {}
         quarantined_candidates += len(adjudication.get("quarantined_candidate_ids") or [])
@@ -537,7 +609,7 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "precision": precision,
         "recall": recall,
         "clean_fpr": fp / (fp + tn) if fp + tn else 0.0,
-        "responsible_step_accuracy_all_gold_positive": step_correct / positive_total if positive_total else 0.0,
+        "responsible_step_recall_over_all_gold_positive": step_correct / positive_total if positive_total else 0.0,
         "responsible_step_accuracy_on_detected_positive": step_correct / tp if tp else 0.0,
         "candidate_origin_coverage_on_gold_positive": discovery_hits / positive_total if positive_total else 0.0,
         "tri_state_counts": dict(tri_state),

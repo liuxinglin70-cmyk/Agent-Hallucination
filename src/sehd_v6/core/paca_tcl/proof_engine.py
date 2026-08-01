@@ -26,7 +26,7 @@ from . import layered_engine as v2
 from ...utils.preflight import discover_records
 from .basic_runner import (
     _responsible_step, p0_case_ids, provider_call, read_json, validate_provider_census,
-    append_jsonl, write_json, write_jsonl,
+    append_jsonl, json_object_provider_call, write_json, write_jsonl,
 )
 from .proof_engine_v3_4 import (
     CONSTRUCT_CENSUS_SYSTEM, CONSTRUCT_AXIS_ALIASES,
@@ -347,7 +347,10 @@ def _run_focused_prosecution(
     if errored_candidates:
         # At least one provider call crashed → fail-closed (do not claim complete coverage)
         coverage = "incomplete"
-    elif successful_candidates >= all_candidate_ids:
+    # FIX (D5): 集合比较应为相等（==）而非超集（>=）；此处语义是
+    # “所有候选均成功”，successful 是 attempted 的子集，>= 仅在相等时
+    # 成立但表达意图错误且易误导维护。
+    elif successful_candidates == all_candidate_ids:
         # All candidates were submitted and the LLM returned a result (empty = no error)
         coverage = "complete"
     elif successful_candidates:
@@ -529,7 +532,9 @@ def _run_counterfactual_localization(
 
     user = _counterfactual_localization_user(built=built, surviving_errors=surviving_errors)
     try:
-        value, _meta = provider_call(
+        # H3 counterfactual localization returns {"rankings": {...}} (no
+        # "candidates" field), so use the schema-relaxed provider call.
+        value, _meta = json_object_provider_call(
             route=config.get("counterfactual_route", config["focused_prosecution_route"]),
             system=COUNTERFACTUAL_LOCALIZATION_SYSTEM,
             user=user, cache_dir=output_dir / "counterfactual_cache",
@@ -593,6 +598,7 @@ def adjudicate_case(
     initial_proof = None
     focused_audits: list[dict[str, Any]] = []
     counterfactual_rankings = None
+    prosecution, defense = None, None
 
     try:
         # Run focused prosecution and defense concurrently
@@ -705,13 +711,24 @@ def adjudicate_case(
 
         runtime_valid = _proof_runtime_valid(base_runtime_valid, proof)
     except Exception as exc:
-        prosecution, defense = None, None
         proof = {
             "state": "unresolved", "responsible_event_id": None, "impact_status": None,
             "winning_impact_kind": None, "error_type": type(exc).__name__, "error": str(exc)[:500],
             "quarantined_error_certificate_ids": [], "quarantined_defense_certificate_ids": [],
             "consensus_gate_blocked_ids": [], "consensus_gate_applied": False,
             "counterfactual_rankings_used": False,
+            "required_candidate_count": 0,
+            "resolved_candidate_count": 0,
+            "wide_construct_state": "unresolved",
+            "surviving_error_certificate_ids": [],
+            "defense_type_counts": {},
+            "error_audits": [],
+            "defense_audits": [],
+            "synthetic_defense_count": 0,
+            "evidence_authority_routes": {},
+            "prosecution_coverage": "unresolved",
+            "defense_coverage": "unresolved",
+            "winning_error_certificate_id": None,
         }
         providers["proof_court_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
         runtime_valid = False
@@ -885,7 +902,7 @@ def evaluate_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> dict[str, An
         "hallucination_precision_min": ("precision", ">="),
         "hallucination_recall_min": ("recall", ">="),
         "clean_fpr_max": ("clean_fpr", "<="),
-        "responsible_step_accuracy_min": ("responsible_step_accuracy_all_gold_positive", ">="),
+        "responsible_step_accuracy_min": ("responsible_step_recall_over_all_gold_positive", ">="),
         "runtime_valid_rate_min": ("runtime_valid_rate", ">="),
         "candidate_origin_coverage_min": ("candidate_origin_coverage_on_gold_positive", ">="),
         "causal_chain_validity_min": ("causal_chain_validity", ">="),

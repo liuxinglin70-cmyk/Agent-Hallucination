@@ -222,12 +222,24 @@ def adjudicate_candidate_path(
             states[candidate_id] = "unresolved"
             audits[candidate_id] = {"qualification": q_audit, "propagation": "missing"}
             continue
-        p_audit = validate_propagation(propagation, str(source.get("origin_event_id") or ""), packet)
+        origin_event_id = str(
+            source.get("origin_event_id")
+            or source.get("origin_hypothesis_event_id")
+            or ""
+        )
+        p_audit = validate_propagation(propagation, origin_event_id, packet)
         states[candidate_id] = propagation_state(propagation) if p_audit["decision"] == "pass" else "unresolved"
         audits[candidate_id] = {"qualification": q_audit, "propagation": p_audit}
 
     event_order, _ = _address_space(packet)
-    positives = [census_by_id[cid] for cid, state in states.items() if state == "verified_error"]
+    positives = [
+        {**census_by_id[cid], "origin_event_id": str(
+            census_by_id[cid].get("origin_event_id")
+            or census_by_id[cid].get("origin_hypothesis_event_id")
+            or ""
+        )}
+        for cid, state in states.items() if state == "verified_error"
+    ]
     coverage_complete = (
         census_coverage == qualification_coverage == "complete"
         and set(q_by_id) == set(census_by_id)
