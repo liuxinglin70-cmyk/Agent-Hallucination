@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+import os
+
+
+def test_dotenv_loader_does_not_override_process_environment(tmp_path, monkeypatch):
+    from src.sehd_v6.env_loader import load_local_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "# comment\nFROM_FILE=loaded\nexport QUOTED=\"value\"\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("FROM_FILE", "process_wins")
+    monkeypatch.delenv("QUOTED", raising=False)
+
+    loaded = load_local_env(env_file)
+
+    assert loaded == env_file
+    assert os.environ["FROM_FILE"] == "process_wins"
+    assert os.environ["QUOTED"] == "value"
+
+
+def test_main_mutation_route_defaults_to_official_and_supports_overrides(monkeypatch):
+    from src.sehd_v6 import main
+
+    for key in (
+        "SEHD_MUTATION_ENDPOINT",
+        "SEHD_MUTATION_MODEL",
+        "SEHD_MUTATION_API_KEY_ENV",
+        "SEHD_MUTATION_TEMPERATURE",
+        "SEHD_MUTATION_MAX_TOKENS",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    default = main._mutation_route_from_env()
+    assert default["endpoint"] == "https://api.deepseek.com"
+    assert default["model"] == "deepseek-v4-flash"
+    assert default["api_key_environment"] == "DEEPSEEK_API_KEY"
+
+    monkeypatch.setenv("SEHD_MUTATION_ENDPOINT", "https://proxy.example/v1")
+    monkeypatch.setenv("SEHD_MUTATION_MODEL", "DeepSeek-V4-Pro")
+    monkeypatch.setenv("SEHD_MUTATION_API_KEY_ENV", "CUSTOM_KEY")
+    monkeypatch.setenv("SEHD_MUTATION_TEMPERATURE", "0.1")
+    monkeypatch.setenv("SEHD_MUTATION_MAX_TOKENS", "321")
+    override = main._mutation_route_from_env()
+    assert override == {
+        "endpoint": "https://proxy.example/v1",
+        "model": "DeepSeek-V4-Pro",
+        "api_key_environment": "CUSTOM_KEY",
+        "temperature": 0.1,
+        "max_tokens": 321,
+    }
+
+
+def test_model_aliases_canonicalize_to_official_wire_names():
+    from src.sehd_v6.core.provider_models import canonical_model_name
+
+    assert canonical_model_name("DeepSeek-V4-Flash") == "deepseek-v4-flash"
+    assert canonical_model_name("deepseek-v4-flash") == "deepseek-v4-flash"
+    assert canonical_model_name("DeepSeek-V4-Pro") == "deepseek-v4-pro"
+    assert canonical_model_name("deepseek-v4-pro") == "deepseek-v4-pro"
+
+
+def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, monkeypatch):
+    import json
+
+    from src.sehd_v6.core.paca_tcl import proof_evaluator
+
+    captured: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(proof_evaluator.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        proof_evaluator,
+        "_global_cache_path",
+        lambda request_hash: tmp_path / f"{request_hash}.json",
+    )
+
+    value, _meta = proof_evaluator._json_object_provider_call(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "transport_retries": 0,
+            "timeout_seconds": 5,
+        },
+        system="return json",
+        user="{}",
+        cache_dir=tmp_path,
+    )
+
+    assert value == {}
+    assert "response_format" not in captured["payload"]
+
+
+def test_evolution_accepts_case_insensitive_route_alias_without_provider_call(
+    tmp_path, monkeypatch,
+):
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda **kwargs: {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "valid",
+            "census": [],
+        },
+    )
+    # Keep this validator test offline; the route must be accepted without
+    # allowing a real mutation request to escape the test process.
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: ({"operation": "no_edit", "reason": "test"}, {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("stable",),
+        records={"stable": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "DeepSeek-V4-Flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+        },
+        run_id="route_alias",
+    )
+
+    assert result.edits_accepted == 0
+    assert result.steps[0].gate_decision in {"skip_stable", "skip_no_edit"}

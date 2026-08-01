@@ -23,6 +23,9 @@ from urllib import request as urlrequest
 from ...utils import ocse_packet as packet
 from . import contract_v1 as contract
 from ...utils.preflight import discover_records
+from ...env_loader import load_local_env
+
+load_local_env()
 
 
 # ============================================================

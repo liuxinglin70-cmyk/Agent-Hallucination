@@ -79,6 +79,7 @@ from ..htc_tes import (
     TypeAwareFitness,
     classify_hallucination_type,
 )
+from ..provider_models import canonical_model_name
 
 # ============================================================
 # Data structures
@@ -543,9 +544,9 @@ def run_online_evolution(
             + ", ".join(missing_probe_gold)
         )
     if mutation_route is not None:
+        mutation_route = dict(mutation_route)
         model = str(mutation_route.get("model") or "")
-        if model not in {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}:
-            raise ValueError(f"Disallowed mutation model: {model!r}")
+        mutation_route["model"] = canonical_model_name(model)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

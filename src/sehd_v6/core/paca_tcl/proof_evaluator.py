@@ -105,7 +105,9 @@ def _json_object_provider_call(
     # returns HTTP 400 when response_format is sent). Only add it for
     # models that support it (Flash supports it; Pro does not).
     model_name = str(route.get("model", ""))
-    if "Pro" not in model_name:
+    # Canonical routes use lowercase wire names; retain the Pro transport
+    # restriction for both legacy title-case and official lowercase aliases.
+    if "pro" not in model_name.lower():
         payload["response_format"] = {"type": "json_object"}
     body = packet.canonical_json(payload).encode("utf-8")
     # v3.5.1: 缓存键含 "eval_jsonobj" 前缀，与 v1 的 provider_call 区分

@@ -28,6 +28,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from .core.provider_models import (
+    ALLOWED_PROVIDER_MODELS,
+    canonical_model_name,
+)
+from .env_loader import load_local_env
+
+load_local_env()
+
 # ============================================================
 # Paths (configurable via environment variables or --project-root)
 # ============================================================
@@ -56,19 +64,32 @@ def _apply_project_root(project_root: str | None) -> None:
     g["DATA_ROOT"] = Path(os.environ.get("AGENT_HALLUCINATION_DATA_ROOT", str(base / "data" / "agenthallu" / "raw" / "AgentHallu")))
     g["BCCSE_V5_ROOT"] = Path(os.environ.get("AGENT_HALLUCINATION_BCCSE_ROOT", str(base / "bccse_v5")))
     g["V35_CONFIG_PATH"] = Path(os.environ.get("AGENT_HALLUCINATION_V35_CONFIG", str(g["PROJECT_ROOT"] / "configs" / "paca_tcl_proof_p0_v3_5.json")))
-ALLOWED_MODELS = {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}
+ALLOWED_MODELS = set(ALLOWED_PROVIDER_MODELS)
 VALID_STATES = {"verified_error", "verified_clean", "unresolved"}
 PROBE_SET_ALIASES = {"probe", "validation", "test"}
 FINAL_HOLDOUT_SET_ALIASES = {"final_holdout", "outer"}
 
-# LLM route config for DeepSeek-V4 (via AutoDL proxy)
-MUTATION_ROUTE = {
-    "endpoint": "https://www.autodl.art/api/v1",
-    "model": "DeepSeek-V4-Pro",
-    "api_key_environment": "AUTODL_API_KEY",
-    "temperature": 0.3,
-    "max_tokens": 1024,
-}
+def _mutation_route_from_env() -> dict[str, Any]:
+    """Build the mutation route without ever materializing a credential."""
+
+    return {
+        "endpoint": os.environ.get(
+            "SEHD_MUTATION_ENDPOINT", "https://api.deepseek.com"
+        ),
+        "model": os.environ.get(
+            "SEHD_MUTATION_MODEL", "deepseek-v4-flash"
+        ),
+        "api_key_environment": os.environ.get(
+            "SEHD_MUTATION_API_KEY_ENV", "DEEPSEEK_API_KEY"
+        ),
+        "temperature": float(os.environ.get("SEHD_MUTATION_TEMPERATURE", "0.3")),
+        "max_tokens": int(os.environ.get("SEHD_MUTATION_MAX_TOKENS", "1024")),
+    }
+
+
+# Official DeepSeek route by default.  SEHD_MUTATION_* variables retain the
+# previous deployment override surface (including proxy endpoints).
+MUTATION_ROUTE = _mutation_route_from_env()
 
 
 def load_config() -> dict[str, Any]:
@@ -99,7 +120,9 @@ def _assert_config_contract(config: dict[str, Any]) -> None:
             continue
         route_count += 1
         model = str(value.get("model") or "")
-        if model not in ALLOWED_MODELS:
+        try:
+            canonical_model_name(model)
+        except ValueError:
             raise RuntimeError(f"Disallowed model in {key}: {model!r}")
     if route_count == 0:
         raise RuntimeError("Frozen v3.5 config contains no provider routes")
