@@ -24,6 +24,11 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from .type_classifier import HallucinationType, TypeClassificationResult
+from ..bccse.genome import (
+    normalize_type_confidence,
+    sanitize_feature_description,
+)
+from ..bccse.signal_adapter import resolve_authoritative_state
 
 
 @dataclass
@@ -43,6 +48,7 @@ class TypeConditionedExperience:
     timestamp: float = field(default_factory=time.time)
     metadata: dict[str, Any] = field(default_factory=dict)
     feature_description: str = ""
+    type_confidence: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -54,7 +60,10 @@ class TypeConditionedExperience:
             "source_case_id": self.source_case_id,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
-            "feature_description": self.feature_description,
+            "feature_description": sanitize_feature_description(
+                self.feature_description
+            ),
+            "type_confidence": normalize_type_confidence(self.type_confidence),
         }
 
 
@@ -82,6 +91,7 @@ class TypeExperienceMemory:
         source_case_id: str,
         metadata: dict[str, Any] | None = None,
         feature_description: str = "",
+        type_confidence: float = 0.0,
     ) -> None:
         """Record a detection experience.
 
@@ -94,6 +104,30 @@ class TypeExperienceMemory:
             source_case_id: The case ID.
             metadata: Additional context.
         """
+        feature_description = sanitize_feature_description(feature_description)
+        normalized_feature = " ".join(feature_description.lower().split())
+        entries = self._experiences[hallucination_type]
+        duplicate = next(
+            (
+                entry for entry in reversed(entries)
+                if entry.evolution_direction == evolution_direction
+                and entry.module_targeted == module_targeted
+                and " ".join(entry.feature_description.lower().split()) == normalized_feature
+                and entry.detection_improved == detection_improved
+            ),
+            None,
+        )
+        if duplicate is not None:
+            duplicate.metadata["observation_count"] = int(
+                duplicate.metadata.get("observation_count", 1)
+            ) + 1
+            duplicate.timestamp = time.time()
+            duplicate.type_confidence = max(
+                duplicate.type_confidence,
+                normalize_type_confidence(type_confidence),
+            )
+            return
+
         experience = TypeConditionedExperience(
             hallucination_type=hallucination_type,
             evolution_direction=evolution_direction,
@@ -101,10 +135,10 @@ class TypeExperienceMemory:
             strategy_used=strategy_used,
             detection_improved=detection_improved,
             source_case_id=source_case_id,
-            metadata=metadata or {},
+            metadata={**(metadata or {}), "observation_count": 1},
             feature_description=feature_description,
+            type_confidence=normalize_type_confidence(type_confidence),
         )
-        entries = self._experiences[hallucination_type]
         entries.append(experience)
 
         # Trim to max per type
@@ -169,6 +203,39 @@ class TypeExperienceMemory:
             if entry.detection_improved:
                 stats["success"] += 1
         return dict(strategy_stats)
+
+    def get_reflection_summary(
+        self,
+        hallucination_type: HallucinationType,
+        direction: str | None = None,
+        limit: int = 5,
+    ) -> dict[str, Any]:
+        """Return compact, concrete evidence for the next reflection.
+
+        This is deliberately an audit summary rather than a verdict source:
+        only previously observed edits and their replay metadata are exposed.
+        """
+        entries = self.get_type_experiences(hallucination_type, direction)
+        entries = entries[-max(0, int(limit)):]
+        return {
+            "type": hallucination_type.value,
+            "direction": direction,
+            "total": len(self.get_type_experiences(hallucination_type, direction)),
+            "successes": sum(bool(e.detection_improved) for e in entries),
+            "experiences": [
+                {
+                    "module": e.module_targeted,
+                    "strategy": e.strategy_used,
+                    "success": e.detection_improved,
+                    "feature": e.feature_description,
+                    "before": e.metadata.get("before_state"),
+                    "after": e.metadata.get("after_state"),
+                    "process_state": e.metadata.get("process_state"),
+                    "type_confidence": e.type_confidence,
+                }
+                for e in entries
+            ],
+        }
 
     def get_top_modules(
         self,
@@ -283,7 +350,12 @@ class TypeExperienceMemory:
                     source_case_id=str(entry_data.get("source_case_id") or ""),
                     timestamp=float(entry_data.get("timestamp", 0.0)),
                     metadata=dict(entry_data.get("metadata") or {}),
-                    feature_description=str(entry_data.get("feature_description") or ""),
+                    feature_description=sanitize_feature_description(
+                        str(entry_data.get("feature_description") or "")
+                    ),
+                    type_confidence=normalize_type_confidence(
+                        entry_data.get("type_confidence")
+                    ),
                 )
                 self._experiences[htype].append(experience)
 
@@ -350,6 +422,7 @@ class TypeAwareFitness:
         type_result: TypeClassificationResult,
         target_module: str | None = None,
         override_success: bool | None = None,
+        feature_description: str | None = None,
     ) -> TypeAwareFitnessAssessment:
         """Assess a skill edit's fitness for a specific hallucination type.
 
@@ -374,8 +447,8 @@ class TypeAwareFitness:
             TypeAwareFitnessAssessment with fitness evaluation.
         """
         # Compute per-type improvement
-        before_state = str(detection_before.get("state") or "unresolved")
-        after_state = str(detection_after.get("state") or "unresolved")
+        before_state = resolve_authoritative_state(detection_before)
+        after_state = resolve_authoritative_state(detection_after)
 
         direction_correct = self._check_direction_improvement(
             before_state, after_state, evolution_direction
@@ -399,8 +472,12 @@ class TypeAwareFitness:
         #    evolution loop to allow no_effect add_rules into shadow)
         # 2. regression requires active worsening, not just "not improvement"
         # 3. The fitness level integrates the process state holistically
-        if direction_correct and decisive_correct:
+        if direction_correct and decisive_correct is True:
             process_state = "improvement"
+        elif direction_correct and decisive_correct is None:
+            # Self-supervised resolution is useful directional evidence, but
+            # it is not correctness evidence and must not inflate accuracy.
+            process_state = "directional_improvement"
         elif after_state == "unresolved" and before_state != "unresolved":
             process_state = "regression"  # decisive → indecisive
         elif after_state != before_state and not decisive_correct:
@@ -416,7 +493,10 @@ class TypeAwareFitness:
         # use it as the authoritative success flag so HTC-TES experience
         # memory stays consistent with the batch commit decision.
         if override_success is not None:
-            improved = override_success
+            # A caller may confirm a directional/no-effect source improvement,
+            # but it cannot turn an independently observed regression into a
+            # successful typed experience.
+            improved = bool(override_success) and process_state != "regression"
 
         # Determine the targeted module from the correct source.
         if target_module:
@@ -428,7 +508,11 @@ class TypeAwareFitness:
                 or "unknown"
             )
         strategy = self._infer_strategy(detection_after, module_targeted)
-        feature_description = self._describe_features(type_result)
+        feature_description = (
+            feature_description.strip()
+            if feature_description and feature_description.strip()
+            else self._describe_features(type_result)
+        )
 
         self._experience_memory.add_experience(
             hallucination_type=hallucination_type,
@@ -440,13 +524,16 @@ class TypeAwareFitness:
             metadata={
                 "before_state": before_state,
                 "after_state": after_state,
-                "type_confidence": type_result.confidence,
+                "type_confidence": normalize_type_confidence(
+                    type_result.confidence
+                ),
                 "decisive": is_decisive,
                 "decisive_correct": decisive_correct,
                 "direction_correct": direction_correct,
                 "process_state": process_state,
             },
             feature_description=feature_description,
+            type_confidence=type_result.confidence,
         )
 
         # Compute metrics
@@ -517,7 +604,7 @@ class TypeAwareFitness:
 
     def _check_direction_improvement(
         self, before_state: str, after_state: str, direction: str
-    ) -> bool:
+    ) -> bool | None:
         """Check if the edit moved detection in the intended direction.
 
         A direction improvement requires the after-state to be a DECISIVE
@@ -545,7 +632,7 @@ class TypeAwareFitness:
 
     def _check_decisive_correctness(
         self, after_state: str, direction: str
-    ) -> bool:
+    ) -> bool | None:
         """Check if the after-state is a correct decisive judgment.
 
         For ``no_evolution`` direction, there is no intended target state,
@@ -564,7 +651,7 @@ class TypeAwareFitness:
         elif direction == "unresolved_to_error":
             return after_state == "verified_error"
         elif direction == "unresolved_to_decisive":
-            return False
+            return None
         # no_evolution or unknown direction: conservative — not correct.
         return False
 
@@ -589,10 +676,16 @@ class TypeAwareFitness:
         ]
         if not decisive_entries:
             return 0.0
+        scored = [
+            e for e in decisive_entries
+            if e.metadata.get("decisive_correct") is not None
+        ]
+        if not scored:
+            return 0.0
         correct = sum(
-            1 for e in decisive_entries if e.metadata.get("decisive_correct", False)
+            bool(e.metadata.get("decisive_correct")) for e in scored
         )
-        return correct / len(decisive_entries)
+        return correct / len(scored)
 
     def _compute_per_type_fitness(
         self,
@@ -651,6 +744,11 @@ class TypeAwareFitness:
         """
         if process_state == "regression":
             return "none"
+        if process_state == "directional_improvement":
+            # Label-free decisiveness is process evidence only. It may be
+            # retained in typed memory but cannot bootstrap strong/weak
+            # correctness fitness by itself.
+            return "none"
         if process_state == "no_effect":
             # no_effect is acceptable when the type has some experience
             # (the rule may help future cases even if this case didn't change)
@@ -701,7 +799,7 @@ class TypeAwareFitness:
             strategy_signals.append(f"module:{target_module}")
 
         # Check for state transition
-        state = str(detection_result.get("state") or "")
+        state = resolve_authoritative_state(detection_result)
         if state == "verified_error":
             strategy_signals.append("error_detection")
         elif state == "verified_clean":

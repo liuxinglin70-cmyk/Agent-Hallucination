@@ -507,6 +507,12 @@ def adjudicate_proof_court(
         else:
             defeated.append(str(row["certificate_id"]))
 
+    # Append to the occurrence ledger only after truth adjudication: schema
+    # validation, mechanism-matched defense dominance, and the deterministic
+    # materiality/commitment checks above.  Recovery is evaluated after this
+    # append point and can change residual impact, never occurrence truth.
+    occurrence_errors = list(surviving)
+
     invalid_count = sum(audit["decision"] != "pass" for audit in p_audits + d_audits)
     clean_covered = {
         candidate_id for candidate_id, rows in defenses_by_candidate.items()
@@ -514,14 +520,14 @@ def adjudicate_proof_court(
     }
     auxiliary_candidates = {str(row["source_candidate_id"]) for row in auxiliary_process}
     positive_candidates = {str(row["source_candidate_id"]) for row in surviving}
+    coverage_complete = p_coverage == d_coverage == "complete" and not invalid_count
     if surviving:
         winner = min(surviving, key=lambda row: (event_order[str(row["origin_event_id"])], str(row["certificate_id"])))
         state, responsible = "verified_error", str(winner["origin_event_id"])
     else:
-        complete = p_coverage == d_coverage == "complete" and not invalid_count
-        if complete and set(required) <= clean_covered | auxiliary_candidates:
+        if coverage_complete and set(required) <= clean_covered | auxiliary_candidates:
             state, responsible = "verified_clean", None
-        elif complete and not required and not valid_errors:
+        elif coverage_complete and not required and not valid_errors:
             state, responsible = "verified_clean", None
         else:
             state, responsible = "unresolved", None
@@ -534,6 +540,30 @@ def adjudicate_proof_court(
             "post_impact_residual": "recovered_after_impact",
             "unresolved": "unresolved",
         }[str(winner["recovery_state"])]
+
+    occurrence_winner = (
+        min(
+            occurrence_errors,
+            key=lambda row: (
+                event_order[str(row["origin_event_id"])],
+                str(row["certificate_id"]),
+            ),
+        )
+        if occurrence_errors else None
+    )
+    occurrence_state = (
+        "verified_error" if occurrence_winner is not None
+        else "verified_clean" if coverage_complete
+        else "unresolved"
+    )
+    occurrence_impact_status = None
+    if occurrence_winner is not None:
+        occurrence_impact_status = {
+            "none": "unrecovered",
+            "pre_impact_repaired": "recovered_before_downstream_impact",
+            "post_impact_residual": "recovered_after_impact",
+            "unresolved": "unresolved",
+        }[str(occurrence_winner["recovery_state"])]
     # v3.4: Count defense types including synthetic defenses injected by
     # materiality/commitment checks
     all_defense_types = [
@@ -547,6 +577,53 @@ def adjudicate_proof_court(
     return {
         "state": state,
         "responsible_event_id": responsible,
+        "occurrence_state": occurrence_state,
+        "incident_occurred": (
+            True if occurrence_state == "verified_error"
+            else False if occurrence_state == "verified_clean"
+            else None
+        ),
+        "occurrence_responsible_event_id": (
+            str(occurrence_winner["origin_event_id"])
+            if occurrence_winner is not None else None
+        ),
+        "occurrence_error_certificate_ids": [
+            str(row["certificate_id"]) for row in occurrence_errors
+        ],
+        "occurrence_error_certificate_count": len(occurrence_errors),
+        "occurrence_impact_kind": (
+            str(occurrence_winner["impact_kind"])
+            if occurrence_winner is not None else None
+        ),
+        "occurrence_recovery_state": (
+            str(occurrence_winner["recovery_state"])
+            if occurrence_winner is not None else None
+        ),
+        "occurrence_impact_status": occurrence_impact_status,
+        "occurrence_ledger": {
+            "state": occurrence_state,
+            "incident_occurred": (
+                True if occurrence_state == "verified_error"
+                else False if occurrence_state == "verified_clean"
+                else None
+            ),
+            "certificate_ids": [
+                str(row["certificate_id"]) for row in occurrence_errors
+            ],
+            "responsible_event_id": (
+                str(occurrence_winner["origin_event_id"])
+                if occurrence_winner is not None else None
+            ),
+            "impact_kind": (
+                str(occurrence_winner["impact_kind"])
+                if occurrence_winner is not None else None
+            ),
+            "recovery_state": (
+                str(occurrence_winner["recovery_state"])
+                if occurrence_winner is not None else None
+            ),
+            "impact_status": occurrence_impact_status,
+        },
         "winning_error_certificate_id": str(winner["certificate_id"]) if winner is not None else None,
         "winning_impact_kind": str(winner["impact_kind"]) if winner is not None else None,
         "impact_status": impact_status,

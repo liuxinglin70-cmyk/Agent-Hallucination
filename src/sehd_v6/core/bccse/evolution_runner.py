@@ -4,7 +4,7 @@ Main orchestration loop for causal-process-reflection-driven online skill evolut
 Processes cases sequentially with CONDITION-TRIGGERED evolution:
 - Not every case triggers evolution (only "informative" cases do)
 - Self-supervised signals drive reflection (no gold label required)
-- Structural constraints replace expensive cross-case re-evaluation
+- Structural constraints plus bounded stable-case canaries gate promotion
 - Convergence detection naturally terminates evolution
 
 Architecture:
@@ -65,6 +65,10 @@ from .step_attributor import (
     ErrorType,
     TriggerSource,
     attribute_failure,
+)
+from .signal_adapter import (
+    decision_authority_invalid,
+    resolve_authoritative_state,
 )
 from ..htc_tes import (
     HallucinationType,
@@ -270,11 +274,12 @@ def _run_detection_with_genome(
     result = invoke()
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
-    state = str(result.get("state") or "")
-    if state not in {"verified_error", "verified_clean", "unresolved"}:
-        raise RuntimeError(f"detector returned invalid state: {state!r}")
-    if result.get("runtime_valid") is False:
-        raise RuntimeError("detector returned runtime_valid=false")
+    if decision_authority_invalid(result):
+        raise RuntimeError("detector returned invalid decision authority")
+    try:
+        resolve_authoritative_state(result)
+    except ValueError as exc:
+        raise RuntimeError(f"detector returned invalid state: {exc}") from exc
     return result
 
 
@@ -389,13 +394,19 @@ def run_online_evolution(
     fitness_check: bool = True,
     fitness_batch_size: int = 1,
     fitness_use_gold: bool = False,
+    experience_memory_path: Path | None = None,
+    canary_limit: int = 4,
+    initial_genome: SkillGenome | None = None,
     run_id: str | None = None,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
-    Batch commit is gated solely on per-case source replay. Cross-case
-    regression is intentionally not re-verified at commit time; the registered
-    validation-set evaluation is the authoritative check.
+    Batch commit requires per-case source replay and preservation of a rolling
+    set of previously stable evolution cases. The registered validation set
+    remains unopened during evolution and is the authoritative cross-set check.
+    Self-supervised signals generate candidates and telemetry only; champion
+    promotion requires explicit gold-assisted fitness or a future independent
+    promotion authority.
 
     Args:
         evolution_case_ids: Cases for evolution (natural order or shuffled).
@@ -419,6 +430,12 @@ def run_online_evolution(
         fitness_use_gold: Use labels only inside fitness selection. Labels never
             enter attribution or the reflection prompt unless use_gold is also
             explicitly enabled.
+        experience_memory_path: Optional prior HTC-TES memory artifact. Loaded
+            before evolution so confirmed observations can guide reflection.
+        canary_limit: Maximum previously stable evolution cases replayed for
+            regression protection on each provisional edit.
+        initial_genome: Optional audited champion to continue evolving. When
+            omitted, evolution starts from the frozen baseline genome.
         run_id: Optional run identifier.
 
     Returns:
@@ -433,8 +450,13 @@ def run_online_evolution(
         raise ValueError(
             "Evolution records missing: " + ", ".join(missing_records)
         )
-    if fitness_batch_size < 1 or fitness_batch_size > 10:
-        raise ValueError("fitness_batch_size must be between 1 and 10")
+    if fitness_batch_size != 1:
+        raise ValueError(
+            "fitness_batch_size must be 1: multi-edit shadow batches cannot "
+            "attribute a combined replay outcome to individual edits safely"
+        )
+    if canary_limit < 0 or canary_limit > 20:
+        raise ValueError("canary_limit must be between 0 and 20")
     if mutation_route is not None:
         model = str(mutation_route.get("model") or "")
         if model not in {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}:
@@ -451,7 +473,10 @@ def run_online_evolution(
         run_id = f"bccse_v5_{uuid.uuid4().hex[:8]}"
 
     # Initialize
-    champion_genome = create_baseline_genome()
+    champion_genome = (
+        initial_genome.clone() if initial_genome is not None
+        else create_baseline_genome()
+    )
     current_genome = champion_genome  # reversible working/shadow genome
     gate = create_structural_gate(
         module_cooldown=module_cooldown,
@@ -468,6 +493,60 @@ def run_online_evolution(
     type_classifier = HallucinationTypeClassifier()
     type_evolution = TypeConditionedEvolution()
     type_fitness = TypeAwareFitness()
+    if experience_memory_path is not None:
+        memory_path = Path(experience_memory_path)
+        if not memory_path.is_file():
+            raise FileNotFoundError(f"Experience memory not found: {memory_path}")
+        with memory_path.open(encoding="utf-8") as handle:
+            memory_payload = json.load(handle)
+        type_fitness.get_experience_memory().from_dict(memory_payload)
+
+    # A rolling set of label-free, previously stable cases protects decisive
+    # behavior from catastrophic forgetting. These are evolution cases only;
+    # validation and outer partitions remain unopened.
+    stable_canaries: dict[str, dict[str, Any]] = {}
+
+    def canary_preserved(
+        parent_result: Mapping[str, Any],
+        child_result: Mapping[str, Any],
+    ) -> tuple[bool, dict[str, Any]]:
+        """Require both verdict and process stability on a replay anchor."""
+        try:
+            parent_state = resolve_authoritative_state(parent_result)
+            child_state = resolve_authoritative_state(child_result)
+        except ValueError as exc:
+            return False, {
+                "before_state": None,
+                "after_state": None,
+                "preserved": False,
+                "error": f"canary_state:{exc}",
+            }
+        try:
+            parent_signal = attribute_failure(parent_result, use_gold=use_gold)
+            child_signal = attribute_failure(child_result, use_gold=use_gold)
+            parent_triggered = parent_signal.should_evolve
+            child_triggered = child_signal.should_evolve
+        except Exception as exc:
+            return False, {
+                "before_state": parent_state,
+                "after_state": child_state,
+                "preserved": False,
+                "error": f"canary_attribution:{type(exc).__name__}:{exc}",
+            }
+        preserved = (
+            parent_state == child_state
+            and bool(child_result.get("runtime_valid"))
+            and not parent_triggered
+            and not child_triggered
+        )
+        return preserved, {
+            "before_state": parent_state,
+            "after_state": child_state,
+            "before_should_evolve": parent_triggered,
+            "after_should_evolve": child_triggered,
+            "runtime_valid": bool(child_result.get("runtime_valid")),
+            "preserved": preserved,
+        }
 
     print(f"[{run_id}] Starting online evolution: {len(evolution_case_ids)} cases")
     print(f"  Config: use_gold={use_gold}, cooldown={module_cooldown}, "
@@ -514,6 +593,10 @@ def run_online_evolution(
                 "updated_at": time.time(),
             },
         )
+        _atomic_write_json(
+            output_dir / "htc_tes_experience_memory.json",
+            type_fitness.get_experience_memory().to_dict(),
+        )
 
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         steps.append(step)
@@ -547,11 +630,12 @@ def run_online_evolution(
         batch_id = f"batch_{len(batch_history):03d}"
         batch_root = output_dir / "fitness_batches" / batch_id
         source_audits: list[dict[str, Any]] = []
+        batch_canary_audits: list[dict[str, Any]] = []
         runtime_errors: list[str] = []
 
-        # Replay every edited source against the complete shadow genome. This
-        # is the only commit-time runtime validation; cross-case evaluation is
-        # deliberately left to the separately registered validation set.
+        # Replay every edited source against the complete shadow genome, then
+        # replay the bounded stable-case canaries below. The registered
+        # validation set remains unopened during evolution.
         shadow_raw: dict[str, Any] = {}  # case_id -> result_dict 或 Exception
 
         # 并行执行所有 shadow source 重检（current_genome 上下文内）
@@ -618,6 +702,34 @@ def run_online_evolution(
                     f"source:{item.case_id}:{type(exc).__name__}:{exc}"
                 )
 
+        # Recheck stable anchors at commit time against the exact shadow genome
+        # that will become champion.
+        for canary_id, parent_canary in stable_canaries.items():
+            try:
+                child_canary = _run_detection_with_genome(
+                    genome=current_genome,
+                    case_id=canary_id,
+                    record=records[canary_id],
+                    config=config,
+                    output_dir=batch_root / "canaries" / canary_id.replace("/", "_"),
+                    shared_cache_root=shared_cache_root,
+                    census_root=census_root,
+                    baseline_cache_root=baseline_cache_root,
+                    # The source replay provider context has already exited.
+                    # Enter a fresh child-genome context here; claiming an
+                    # already-patched provider would silently run the parent
+                    # provider for this commit canary.
+                    provider_already_patched=False,
+                )
+                preserved, audit = canary_preserved(parent_canary, child_canary)
+                batch_canary_audits.append({"case_id": canary_id, **audit})
+                if not preserved:
+                    runtime_errors.append(f"canary:{canary_id}:state_regression")
+            except Exception as exc:
+                runtime_errors.append(
+                    f"canary:{canary_id}:{type(exc).__name__}:{exc}"
+                )
+
         decisions = [
             value["assessment"]["decision"] for value in source_audits
         ]
@@ -639,6 +751,10 @@ def run_online_evolution(
         accepted_indices: list[int] = []
         rejected_indices: list[int] = []
         for i, dec in enumerate(decisions):
+            # A label-free stable canary proves only non-regression on that
+            # anchor. It cannot establish that a newly decisive source verdict
+            # is correct, so directional evidence is telemetry-only and never
+            # enters the promotable set.
             if dec in {"strong_improvement", "local_improvement"}:
                 accepted_indices.append(i)
             else:
@@ -663,13 +779,14 @@ def run_online_evolution(
             "champion_hash_before": champion_genome.content_hash,
             "shadow_hash": current_genome.content_hash,
             "source_audits": source_audits,
+            "stable_canary_audits": batch_canary_audits,
             "runtime_errors": runtime_errors,
             "improved_count": improved_count,
             "worse_count": worse_count,
             "accepted_indices": accepted_indices,
             "rejected_indices": rejected_indices,
             "fitness_use_gold": fitness_use_gold,
-            "commit_validation": "source_replay_only",
+            "commit_validation": "source_replay_plus_stable_canaries",
             "passed": passed,
         }
 
@@ -703,14 +820,6 @@ def run_online_evolution(
                 rejected_indices.append(idx)
             champion_genome = new_champion
             current_genome = new_champion
-            # v5.3.5: snapshot champion after each commit for auditability.
-            # Snapshots are saved to <output_dir>/champion_snapshots/<hash>.json
-            # and allow tracing which edit produced which genome version.
-            snapshot_dir = output_dir / "champion_snapshots"
-            snapshot_dir.mkdir(parents=True, exist_ok=True)
-            snapshot_path = snapshot_dir / f"{champion_genome.content_hash[:16]}.json"
-            if not snapshot_path.exists():
-                write_json(snapshot_path, champion_genome.to_dict())
             edits_accepted += len(accepted_indices)
             for idx in accepted_indices:
                 item = provisional_edits[idx]
@@ -764,7 +873,18 @@ def run_online_evolution(
                     type_result=_type_result,
                     target_module=item.edit.target_module,
                     override_success=_htc_success,
+                    feature_description=item.edit.feature_description,
                 )
+                # A successfully repaired source becomes a future regression
+                # anchor, so later edits cannot silently forget the fix.
+                if (
+                    resolve_authoritative_state(_shadow_result)
+                    in {"verified_error", "verified_clean"}
+                    and not bool(source_audits[idx]["source_after"].get("should_evolve"))
+                ):
+                    stable_canaries[item.case_id] = _shadow_result
+                    while len(stable_canaries) > canary_limit:
+                        stable_canaries.pop(next(iter(stable_canaries)))
                 step = steps[item.step_index]
                 step.gate_decision = "accept_batch"
                 step.mutation_applied = item.edit.to_dict()
@@ -773,6 +893,18 @@ def run_online_evolution(
                     **(step.fitness_check or {}),
                     "batch": batch_audit,
                 }
+
+            # Snapshot only after fitness metadata and experience have been
+            # attached, so artifacts with the same hash have identical audit
+            # semantics.
+            snapshot_dir = output_dir / "champion_snapshots"
+            snapshot_dir.mkdir(parents=True, exist_ok=True)
+            snapshot_path = snapshot_dir / f"{champion_genome.content_hash[:16]}.json"
+            write_json(snapshot_path, champion_genome.to_dict())
+
+        if not accepted_indices:
+            passed = False
+            batch_audit["passed"] = False
 
         if rejected_indices:
             # Roll back rejected edits individually.
@@ -787,7 +919,39 @@ def run_online_evolution(
                 reasons.append("shadow_batch_runtime_error")
             for idx in rejected_indices:
                 item = provisional_edits[idx]
+                # Preserve negative learning signal as well. A batch-level
+                # canary failure or a shadow replay rejection is valuable
+                # evidence for avoiding the same strategy later.
+                if idx < len(source_audits):
+                    rejected_result = source_audits[idx].get("shadow_result")
+                    if isinstance(rejected_result, Mapping):
+                        try:
+                            rejected_type = type_classifier.classify(
+                                item.source_result, item.source_signal,
+                            )
+                            type_fitness.assess_edit(
+                                source_case_id=item.case_id,
+                                hallucination_type=rejected_type.primary_type,
+                                evolution_direction=type_evolution._infer_evolution_direction(
+                                    item.source_signal.state,
+                                    item.source_signal.gold_label,
+                                ),
+                                detection_before=item.source_result,
+                                detection_after=rejected_result,
+                                type_result=rejected_type,
+                                target_module=item.edit.target_module,
+                                override_success=False,
+                                feature_description=item.edit.feature_description,
+                            )
+                        except Exception as exc:
+                            runtime_errors.append(
+                                f"experience:{item.case_id}:{type(exc).__name__}:{exc}"
+                            )
                 gate.revoke_structural_accept(item.certificate, reasons)
+                # One processed case produced no effective committed edit.
+                # Structural acceptance had reset convergence, so restore the
+                # case-level no-edit signal exactly once after replay rejects.
+                gate.record_no_edit()
                 rejected_buffer.append(RejectedEditEntry(
                     proposal=type(
                         "P",
@@ -900,7 +1064,7 @@ def run_online_evolution(
             ), next_case_index=idx + 1)
             print(f"  [{idx}] RUNTIME_INVALID {case_id}: {type(exc).__name__}: {exc}")
             continue
-        detection_state = str(detection_result.get("state") or "")
+        detection_state = resolve_authoritative_state(detection_result)
 
         # --- [2] Causal process reflection (self-supervised trigger) ---
         signal = attribute_failure(detection_result, use_gold=use_gold)
@@ -939,6 +1103,9 @@ def run_online_evolution(
         if not signal.should_evolve:
             # Stable success — no trigger
             stable_cases += 1
+            stable_canaries[case_id] = detection_result
+            while len(stable_canaries) > canary_limit:
+                stable_canaries.pop(next(iter(stable_canaries)))
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -963,9 +1130,13 @@ def run_online_evolution(
 
         # --- HTC-TES v3: Classify hallucination type ---
         type_result = type_classifier.classify(detection_result, signal)
+        evolution_direction = type_evolution._infer_evolution_direction(
+            signal.state, signal.gold_label,
+        )
         type_allowed_modules = type_evolution.intersect_allowed_modules(
             type_result.primary_type,
             (signal.target_module, signal.secondary_module),
+            secondary_type=type_result.secondary_type,
         )
         if not type_allowed_modules:
             gate.record_no_edit()
@@ -984,9 +1155,7 @@ def run_online_evolution(
             continue
         type_guidance = type_evolution.generate_type_guidance(
             type_result.primary_type,
-            type_evolution._infer_evolution_direction(
-                signal.state, signal.gold_label,
-            ),
+            evolution_direction,
         )
         print(f"    [HTC-TES] type={type_result.primary_type.value} "
               f"confidence={type_result.confidence:.2f}")
@@ -1043,13 +1212,18 @@ def run_online_evolution(
             )
 
             # HTC-TES v3: Append type-conditioned guidance to reflection prompt
-            experience_summary = type_fitness.get_experience_memory().get_type_coverage()
+            experience_memory = type_fitness.get_experience_memory()
+            experience_summary = experience_memory.get_reflection_summary(
+                type_result.primary_type,
+                evolution_direction,
+            )
             user_prompt += f"\n\n{type_guidance}"
-            if experience_summary.get("types_with_success", 0) > 0:
+            if experience_summary.get("total", 0) > 0:
                 user_prompt += (
-                    f"\n[Experience] Types with success: "
-                    f"{experience_summary['types_with_success']}/"
-                    f"{experience_summary['total_types']}"
+                    "\n[Prior type-conditioned replay evidence]\n"
+                    + json.dumps(experience_summary, ensure_ascii=False, sort_keys=True)
+                    + "\nUse successful patterns as hypotheses, avoid repeated failed "
+                    "strategies, and do not treat this memory as verdict authority."
                 )
 
             # One semantic reflection call per source. Invalid output remains an
@@ -1063,7 +1237,7 @@ def run_online_evolution(
                 )
                 target_module = str(parsed.get("target_module") or "")
                 if target_module not in allowed_modules:
-                    target_module = signal.target_module
+                    target_module = allowed_modules[0]
                 operation = str(parsed.get("operation") or "")
                 rule_index = parsed.get("rule_index")
                 new_content = str(parsed.get("new_content") or "")
@@ -1087,6 +1261,14 @@ def run_online_evolution(
                         rationale=f"[LLM] {rationale[:200]}",
                         source_case_id=case_id,
                         feature_description=feature_description,
+                        hallucination_type=type_result.primary_type.value,
+                        secondary_hallucination_type=(
+                            type_result.secondary_type.value
+                            if type_result.secondary_type is not None else ""
+                        ),
+                        evolution_direction=evolution_direction,
+                        type_confidence=type_result.confidence,
+                        routing_allowed_modules=tuple(allowed_modules),
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation} "
@@ -1108,6 +1290,14 @@ def run_online_evolution(
                         rationale=f"[LLM] {rationale[:200]}",
                         source_case_id=case_id,
                         feature_description=feature_description,
+                        hallucination_type=type_result.primary_type.value,
+                        secondary_hallucination_type=(
+                            type_result.secondary_type.value
+                            if type_result.secondary_type is not None else ""
+                        ),
+                        evolution_direction=evolution_direction,
+                        type_confidence=type_result.confidence,
+                        routing_allowed_modules=tuple(allowed_modules),
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
@@ -1206,7 +1396,11 @@ def run_online_evolution(
                             break
                     if merge_target_module is not None:
                         break
-                if merge_target_module is not None and merge_rule_index is not None:
+                if (
+                    merge_target_module is not None
+                    and merge_rule_index is not None
+                    and merge_target_module in allowed_modules
+                ):
                     # Build merged content via LLM (or structural fallback)
                     existing_text = current_genome.modules[merge_target_module].rules[merge_rule_index]
                     merged_content = _llm_merge_rules(
@@ -1228,6 +1422,14 @@ def run_online_evolution(
                             rationale=f"merged: {edit.rationale[:60]}",
                             source_case_id=case_id,
                             is_merge=True,
+                            feature_description=edit.feature_description,
+                            hallucination_type=edit.hallucination_type,
+                            secondary_hallucination_type=(
+                                edit.secondary_hallucination_type
+                            ),
+                            evolution_direction=edit.evolution_direction,
+                            type_confidence=edit.type_confidence,
+                            routing_allowed_modules=edit.routing_allowed_modules,
                         )
                         # Re-run structural gate on the merged edit
                         accepted, cert, reject_reasons = gate.evaluate(
@@ -1288,6 +1490,7 @@ def run_online_evolution(
         except ValueError as e:
             print(f"  [{idx}] EDIT_ERROR {case_id}: {e}")
             gate.revoke_structural_accept(cert, [f"apply_edit_failed:{e}"])
+            gate.record_no_edit()
             edits_rejected += 1
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -1325,11 +1528,12 @@ def run_online_evolution(
                     "source_after": None,
                     "source_improved": False,
                     "source_stable_after": False,
-                    "commit_validation": "source_replay_only",
+                    "commit_validation": "source_replay_plus_stable_canaries",
                     "runtime_error": reason,
                     "passed": False,
                 }
                 gate.revoke_structural_accept(cert, [reason])
+                gate.record_no_edit()
                 edits_rejected += 1
                 record_step(EvolutionStep(
                     case_id=case_id,
@@ -1360,21 +1564,88 @@ def run_online_evolution(
                 after_result=candidate_result,
                 gold_label=fitness_gold(case_id),
             )
+
+            canary_audit: list[dict[str, Any]] = []
+            canary_regressions: list[str] = []
+            if (assessment.passed or assessment.evidence_only) and stable_canaries:
+                canary_root = replay_root / "canaries"
+                for canary_id, parent_canary in stable_canaries.items():
+                    try:
+                        child_canary = _run_detection_with_genome(
+                            genome=candidate_genome,
+                            case_id=canary_id,
+                            record=records[canary_id],
+                            config=config,
+                            output_dir=canary_root / canary_id.replace("/", "_"),
+                            census_root=census_root,
+                            baseline_cache_root=baseline_cache_root,
+                            shared_cache_root=shared_cache_root,
+                        )
+                        preserved, audit = canary_preserved(
+                            parent_canary, child_canary,
+                        )
+                        canary_audit.append({"case_id": canary_id, **audit})
+                        if not preserved:
+                            canary_regressions.append(canary_id)
+                    except Exception as exc:
+                        canary_regressions.append(canary_id)
+                        canary_audit.append({
+                            "case_id": canary_id,
+                            "preserved": False,
+                            "error": f"{type(exc).__name__}:{exc}",
+                        })
             fitness_audit = {
                 "source_before": signal.to_dict(),
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),
                 "source_stable_after": not candidate_signal.should_evolve,
-                "commit_validation": "source_replay_only",
+                "commit_validation": "source_replay_plus_stable_canaries",
                 "passed": assessment.passed,
+                "canary_audit": canary_audit,
+                "canary_regressions": canary_regressions,
             }
-            if not assessment.passed:
+            if canary_regressions:
+                assessment = FitnessAssessment(
+                    "worse",
+                    ("stable_canary_regression:" + ",".join(canary_regressions),),
+                    assessment.task_score_before,
+                    assessment.task_score_after,
+                    assessment.local_score_before,
+                    assessment.local_score_after,
+                )
+                fitness_audit["assessment"] = assessment.to_dict()
+                fitness_audit["passed"] = False
+            directional_canary_support = (
+                assessment.evidence_only
+                and bool(canary_audit)
+                and not canary_regressions
+                and all(bool(audit.get("preserved")) for audit in canary_audit)
+            )
+            if directional_canary_support:
+                fitness_audit["directional_evidence_canary_preserved"] = True
+                fitness_audit["shadow_admissible"] = True
+            if not assessment.passed and not directional_canary_support:
+                type_fitness.assess_edit(
+                    source_case_id=case_id,
+                    hallucination_type=type_result.primary_type,
+                    evolution_direction=type_evolution._infer_evolution_direction(
+                        signal.state, signal.gold_label,
+                    ),
+                    detection_before=detection_result,
+                    detection_after=candidate_result,
+                    type_result=type_result,
+                    target_module=edit.target_module,
+                    override_success=False,
+                    feature_description=edit.feature_description,
+                )
+                persist_progress(idx + 1)
                 if assessment.decision != "no_effect":
                     reasons = [
                         f"source_{assessment.decision}:"
                         + ",".join(assessment.reasons)
                     ]
                     gate.revoke_structural_accept(cert, reasons)
+                    gate.record_no_edit()
                     edits_rejected += 1
                     rejected_buffer.append(RejectedEditEntry(
                         proposal=type(
@@ -1407,6 +1678,7 @@ def run_online_evolution(
                     continue
                 reasons = ["source_no_effect:" + ",".join(assessment.reasons)]
                 gate.revoke_structural_accept(cert, reasons)
+                gate.record_no_edit()
                 edits_rejected += 1
                 record_step(EvolutionStep(
                     case_id=case_id, case_index=idx,

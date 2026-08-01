@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -134,6 +135,64 @@ FORBIDDEN_CONTENT_MARKERS = frozenset({
     "gold_explanation_text", "outer_metric", "outer_error",
     "example_specific_fact", "continuous_threshold_search",
 })
+
+_FEATURE_POISON_PATTERNS = (
+    r"https?://",
+    r"\b(?:case|source|agent|model)[-_ ]?id\b",
+    r"\b(?:case|source)[_-]\d+\b",
+    r"\bag_\w{8,}\b",
+    r"\b0x[0-9a-f]{6,}\b",
+    r"\b(?:gold|ground[ -]?truth|golden label)\b",
+    r"(?:\u91d1\u6807|\u7b54\u6848|\u6b63\u786e\u6807\u7b7e|"
+    r"\u771f\u5b9e\u6807\u7b7e|\u672c\u6848\u4f8b|\u8fd9\u4e2a\u6848\u4f8b)",
+    r"\b(?:ignore|disregard|override)\s+(?:all\s+)?"
+    r"(?:previous|prior|above|system|developer)\b.{0,40}"
+    r"\b(?:instruction|prompt|rule|message)s?\b",
+    r"\b(?:system|developer|assistant)\s+(?:prompt|message)\b",
+    r"\b(?:you are|follow these instructions|output only|return json)\b",
+    r"\b(?:instruction|prompt)\s*:",
+    r"^(?:ignore|follow|output|return|write|add|remove|modify|delete|always|never|must)\b",
+    r"\b[a-z][a-z_]+/\d+\b",
+)
+
+
+def validate_feature_description(content: str) -> tuple[bool, str]:
+    """Validate label-free feature provenance before it can reach prompts.
+
+    Feature descriptions are persisted and later included in reflection
+    context, so they need the same case/gold/URL boundary as runtime rules plus
+    an explicit prompt-instruction boundary. Empty descriptions are allowed;
+    the typed trajectory extractor can supply a safe fallback.
+    """
+    normalized = " ".join(str(content or "").split())
+    if len(normalized) > 500:
+        return False, "feature_description_too_long"
+    lowered = normalized.lower()
+    for marker in FORBIDDEN_CONTENT_MARKERS:
+        if marker in lowered:
+            return False, f"feature_forbidden_content:{marker}"
+    for pattern in _FEATURE_POISON_PATTERNS:
+        if re.search(pattern, lowered, flags=re.IGNORECASE | re.DOTALL):
+            return False, f"feature_prompt_or_case_pollution:{pattern}"
+    return True, ""
+
+
+def sanitize_feature_description(content: str) -> str:
+    """Return a persistence-safe feature description or an empty sentinel."""
+    normalized = " ".join(str(content or "").split())[:500]
+    valid, _ = validate_feature_description(normalized)
+    return normalized if valid else ""
+
+
+def normalize_type_confidence(value: Any) -> float:
+    """Bound untrusted serialized confidence without failing restoration."""
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(confidence):
+        return 0.0
+    return max(0.0, min(1.0, confidence))
 
 
 def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
@@ -258,6 +317,15 @@ class SkillModule:
         while len(self.rule_meta) < len(self.rules):
             self.rule_meta.append({})
         self.rule_meta = self.rule_meta[: len(self.rules)]
+        for meta in self.rule_meta:
+            if "feature_description" in meta:
+                meta["feature_description"] = sanitize_feature_description(
+                    str(meta.get("feature_description") or "")
+                )
+            if "type_confidence" in meta:
+                meta["type_confidence"] = normalize_type_confidence(
+                    meta.get("type_confidence")
+                )
 
     @property
     def capacity(self) -> int:
@@ -275,7 +343,16 @@ class SkillModule:
     def set_rule_meta(self, index: int, meta: dict[str, Any]) -> None:
         while len(self.rule_meta) <= index:
             self.rule_meta.append({})
-        self.rule_meta[index] = dict(meta)
+        normalized = dict(meta)
+        if "feature_description" in normalized:
+            normalized["feature_description"] = sanitize_feature_description(
+                str(normalized.get("feature_description") or "")
+            )
+        if "type_confidence" in normalized:
+            normalized["type_confidence"] = normalize_type_confidence(
+                normalized.get("type_confidence")
+            )
+        self.rule_meta[index] = normalized
 
     def is_rule_protected(self, index: int) -> bool:
         """Protected if baseline or passed fitness (weak/strong)."""
@@ -285,11 +362,23 @@ class SkillModule:
         return meta.get("fitness_status") in (FITNESS_STATUS_WEAK, FITNESS_STATUS_STRONG)
 
     def to_dict(self) -> dict[str, Any]:
+        safe_meta: list[dict[str, Any]] = []
+        for value in self.rule_meta:
+            meta = dict(value)
+            if "feature_description" in meta:
+                meta["feature_description"] = sanitize_feature_description(
+                    str(meta.get("feature_description") or "")
+                )
+            if "type_confidence" in meta:
+                meta["type_confidence"] = normalize_type_confidence(
+                    meta.get("type_confidence")
+                )
+            safe_meta.append(meta)
         return {
             "module_id": self.module_id,
             "active": self.active,
             "rules": list(self.rules),
-            "rule_meta": [dict(m) for m in self.rule_meta],
+            "rule_meta": safe_meta,
         }
 
     @classmethod
@@ -319,18 +408,38 @@ class SkillEdit:
     source_case_id: str = ""
     is_merge: bool = False  # v5.3.5: marks merge-generated edits to bypass similarity check
     feature_description: str = ""
+    hallucination_type: str = "unknown"
+    secondary_hallucination_type: str = ""
+    evolution_direction: str = "process_repair"
+    type_confidence: float = 0.0
+    routing_allowed_modules: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "edit_id": self.edit_id,
             "target_module": self.target_module,
-            "operation": self.operation,
+            "operation": (
+                self.operation.value
+                if isinstance(self.operation, SkillOp)
+                else str(self.operation)
+            ),
             "rule_index": self.rule_index,
             "new_content": self.new_content,
             "rationale": self.rationale,
             "source_case_id": self.source_case_id,
             "is_merge": self.is_merge,
-            "feature_description": self.feature_description,
+            "feature_description": sanitize_feature_description(
+                self.feature_description
+            ),
+            "hallucination_type": self.hallucination_type,
+            "secondary_hallucination_type": self.secondary_hallucination_type,
+            "evolution_direction": self.evolution_direction,
+            "type_confidence": normalize_type_confidence(self.type_confidence),
+            "routing_allowed_modules": [
+                value
+                for value in self.routing_allowed_modules
+                if value in MODULE_IDS
+            ],
         }
 
     @classmethod
@@ -344,7 +453,24 @@ class SkillEdit:
             rationale=data.get("rationale", ""),
             source_case_id=data.get("source_case_id", ""),
             is_merge=bool(data.get("is_merge", False)),
-            feature_description=str(data.get("feature_description") or ""),
+            feature_description=sanitize_feature_description(
+                str(data.get("feature_description") or "")
+            ),
+            hallucination_type=str(data.get("hallucination_type") or "unknown"),
+            secondary_hallucination_type=str(
+                data.get("secondary_hallucination_type") or ""
+            ),
+            evolution_direction=str(
+                data.get("evolution_direction") or "process_repair"
+            ),
+            type_confidence=normalize_type_confidence(
+                data.get("type_confidence")
+            ),
+            routing_allowed_modules=tuple(
+                str(value)
+                for value in (data.get("routing_allowed_modules") or ())
+                if str(value) in MODULE_IDS
+            ),
         )
 
 
@@ -461,6 +587,25 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
 
     module = genome.modules[edit.target_module]
 
+    feature_valid, feature_reason = validate_feature_description(
+        edit.feature_description
+    )
+    if not feature_valid:
+        return False, feature_reason
+    try:
+        confidence = float(edit.type_confidence)
+    except (TypeError, ValueError):
+        return False, "invalid_type_confidence"
+    if not 0.0 <= confidence <= 1.0:
+        return False, "invalid_type_confidence"
+    if any(module_id not in MODULE_IDS for module_id in edit.routing_allowed_modules):
+        return False, "invalid_routing_provenance"
+    if (
+        edit.routing_allowed_modules
+        and edit.target_module not in edit.routing_allowed_modules
+    ):
+        return False, "target_outside_routing_provenance"
+
     # Check forbidden content
     content_lower = edit.new_content.lower()
     for marker in FORBIDDEN_CONTENT_MARKERS:
@@ -538,6 +683,10 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         baseline_rules = create_baseline_genome().modules[edit.target_module].rules
         if module.rules[edit.rule_index] in baseline_rules:
             return False, "immutable_baseline_rule"
+        if module.is_rule_protected(edit.rule_index):
+            meta = module.get_rule_meta(edit.rule_index)
+            status = meta.get("fitness_status", "unknown")
+            return False, f"protected_rule: fitness_status={status}"
 
     return True, ""
 
@@ -597,7 +746,14 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "source_case_id": edit.source_case_id,
         "fitness_status": FITNESS_STATUS_NONE,
         "direction": _detect_rule_direction(edit.new_content),
-        "feature_description": edit.feature_description[:500],
+        "feature_description": sanitize_feature_description(
+            edit.feature_description
+        ),
+        "hallucination_type": edit.hallucination_type,
+        "secondary_hallucination_type": edit.secondary_hallucination_type,
+        "evolution_direction": edit.evolution_direction,
+        "type_confidence": normalize_type_confidence(edit.type_confidence),
+        "routing_allowed_modules": list(edit.routing_allowed_modules),
         "created_at_generation": new_generation,
     }
 

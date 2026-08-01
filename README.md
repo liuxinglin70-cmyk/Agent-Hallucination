@@ -1,4 +1,12 @@
-# SEHD v6 — Evidence-routed Skill Evolution for Agent Hallucination Detection
+# SEHD v6 — Research Prototype for Evidence-routed Skill Evolution
+
+SEHD v6 is a research prototype. It implements a registered execution
+protocol, a mutable strategy/genome layer, and typed telemetry with provenance;
+it is not a production detector or a demonstrated detector improvement.
+
+For a reader-oriented, end-to-end explanation of the data roles, PACA-TCL
+court stages, BCCSE case evolution, evaluation boundaries and current evidence
+limits, see [EXPERIMENT_FRAMEWORK_GUIDE.md](EXPERIMENT_FRAMEWORK_GUIDE.md).
 
 ## Architecture
 
@@ -40,22 +48,26 @@ SEHD v6
 │   ├── configs/          # JSON schemas and config templates
 │   ├── utils/            # OCSE packet utilities, preflight checks
 │   ├── main.py           # CLI entry: partition / evolve / evaluate
-│   ├── dry_run_5.py      # 5-case dry-run validation (mock or configured LLM)
+│   ├── dry_run_5.py      # 5-case dry-run wiring exercise (mock or configured LLM)
 │   └── bccse_v5_data_partition.py  # Stratified data partitioning
 └── .gitignore
 ```
 
 ## Core Methodology
 
-### 1. PACA-TCL v3.5 — Court-Style Causal Attribution Detector (Frozen Base)
+### 1. PACA-TCL v3.5 — Registered Execution Protocol
 
-The frozen detection base operates as a three-stage court-style pipeline:
+The baseline protocol registers a court-style pipeline. Config,
+case roles and provider routes are frozen for an individual audited run. BCCSE
+can deliberately mutate injected strategy rules, so the resulting detector
+behavior must not be described as globally frozen.
 
+- **H0 Base pass and construct census**: Builds the OCSE packet, runs the layered base analysis and enumerates candidate constructs. These are hypotheses for later adjudication, not verdicts.
 - **H1 Prosecution**: Constructs a causal prosecution case identifying hallucination candidates from the agent trajectory. Produces error certificates with evidence chains.
 - **H2 Consensus Gate**: Adversarial defense vs prosecution. Defense attempts to exonerate candidates via counter-evidence. Gate adjudicates based on certificate validity.
 - **H3 Dual-Phase Localization**: When error is confirmed, localizes the responsible step via causal backtracking and earliest-origin tiebreak.
 
-**Five-dimensional CRS Scoring** (frozen weights):
+**Five-dimensional CRS diagnostic projection** (configured weights):
 - Factuality (0.35): Does the claim have verified tool/output support?
 - Counterfactual (0.15): Would the error exist under intervention?
 - Recovery (0.20): Did the agent self-correct downstream?
@@ -90,8 +102,8 @@ proof-court verdict directly.
 2. **Attribute**: Self-supervised trigger check (no gold required)
 3. **Reflect**: LLM causal process reflection generates edit proposal
 4. **Gate**: Structural constraint gate validates edit safety
-5. **Fitness**: Source replay only; cross-case effectiveness is measured on the registered validation set
-6. **Commit/Rollback**: Incremental shadow batch commit
+5. **Fitness**: Source replay plus rolling stable-case canaries; an authorized validation/test protocol is required for any cross-set effectiveness claim
+6. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
 
 ### 3. HTC-TES v3 — Hallucination-Typed Conditioning
 
@@ -135,7 +147,10 @@ proof-court verdict directly.
 - ADOPTION → adoption_scrutiny
 - CONTEXTUAL → context_preservation
 
-**Bidirectional evolution**: Each type maintains both error-detection and clean-detection strands, resolving direction conflicts via type-specific guidance.
+**Typed direction telemetry**: The implementation can record declared
+error-oriented, clean-oriented, process-repair and abstention transitions.
+This routing vocabulary is not evidence that both detector directions have
+been successfully optimized.
 
 **Typed telemetry**: Directional decisiveness × type-experience coverage
 - Without gold, decisive outcomes are not called correct; the metric records whether a typed process edit reached its declared direction
@@ -145,7 +160,7 @@ proof-court verdict directly.
 ## Usage
 
 ```bash
-# 5-case dry-run validation (mock detections; optionally uses configured mutation LLM)
+# 5-case dry-run wiring exercise (mock detections; optionally uses configured mutation LLM)
 cd src
 python -m sehd_v6.dry_run_5
 
@@ -156,15 +171,36 @@ python -m sehd_v6.dry_run_5
 # $env:SEHD_MUTATION_MODEL = "deepseek-v4-flash"
 # $env:SEHD_MUTATION_API_KEY_ENV = "SEHD_MUTATION_API_KEY"
 
-# Partition data
+# Partition data (every row requires an explicit Inner/Outer role; Outer rows
+# also require real case_id values so a hash-bound manifest can be emitted)
 python -m src.sehd_v6.main partition
 
-# Run evolution (with HTC-TES v3 type conditioning)
+# Run diagnostic evolution on a stage-authorized manifest. A manifest containing
+# D cases requires D_execution_authorized=true even though this is not a formal
+# effectiveness evaluation.
 python -m src.sehd_v6.main evolve --size 50 --use-gold
 
-# Evaluate champion genome
+# Continue from an audited champion and prior experience memory
+python -m src.sehd_v6.main evolve --size 50 \
+  --initial-genome <champion_genome.json> \
+  --experience-memory <htc_tes_experience_memory.json>
+
+# Inner validation/test evaluation: never sufficient for champion promotion.
 python -m src.sehd_v6.main evaluate --set validation --genome <path>
+
+# Role-isolated final Outer evaluation. Requires exactly one explicit, hash-bound
+# outer_set_ids.json plus execution_authorized=true,
+# D_execution_authorized=true and outer_execution_authorized=true.
+python -m src.sehd_v6.main evaluate --set outer --genome <path>
 ```
+
+Outer IDs are never recovered from `case_ref` values or dataset scans. The
+Outer path reads the supplied genome without mutation and never writes back
+experience or champion state. Code guarantees role isolation and hash binding,
+not secrecy, operator blindness or one-shot custody. Champion eligibility
+therefore also requires `outer_custody_verified=true`, an external governance
+attestation that the role stayed outside development and was opened under the
+final-evaluation policy. The CLI has no durable global use registry.
 
 ## Public API
 
@@ -188,7 +224,7 @@ from sehd_v6.core import (
 
 Each sub-package also exposes its own `__init__.py` for granular imports:
 - `sehd_v6.core.bccse` — self-evolution framework
-- `sehd_v6.core.paca_tcl` — frozen detector base
+- `sehd_v6.core.paca_tcl` — registered detector protocol implementation
 - `sehd_v6.core.htc_tes` — type conditioning layer
 
 ## Key Design Decisions
@@ -197,9 +233,9 @@ Each sub-package also exposes its own `__init__.py` for granular imports:
 2. **Self-supervised triggers**: Evolution can proceed without gold labels from unresolved, CRS contradiction, evidence-incomplete, and unavailable-signal conditions. It does not prescribe clean/error polarity without gold.
 3. **Incremental batch commit**: Each edit validated independently; failed edits don't discard successful ones.
 4. **Shared LLM cache**: Same genome+case replay reuses cache, eliminating CRS nondeterminism.
-5. **Structural prevention > post-hoc verification**: Gate prevents unsafe edits structurally, not by expensive canary re-evaluation.
+5. **Layered edit checks**: Structural validation and stable-case canary replay cover different failure modes; neither establishes generalization.
 6. **Interface normalization**: HTC-TES modules accept both `AttributionSignal` dataclass and `Mapping[str, Any]` dict via a `_normalize_signal` helper, decoupling the type-conditioning layer from BCCSE's dataclass internals while maintaining a uniform access pattern.
-7. **Bidirectional type-conditioned evolution**: Each hallucination type maintains both error-detection and clean-detection strands, preventing evolution direction conflicts.
+7. **Typed transition bookkeeping**: Direction and type are recorded separately from gold correctness and claim eligibility.
 
 ## Module Dependencies
 
@@ -236,20 +272,34 @@ HTC-TES modules accept attribution signals via a normalized interface:
 | `TypeConditionedEvolution.create_edit_proposal()` | `AttributionSignal \| Mapping` | `_normalize_signal()` → dict |
 | `build_type_conditioned_reflection_prompt()` | `AttributionSignal \| Mapping` | `_normalize_signal()` → dict |
 
-This decouples HTC-TES from BCCSE's dataclass shape while allowing the production
-code path (which passes `AttributionSignal` objects) to work without manual
+This decouples HTC-TES from BCCSE's dataclass shape while allowing the runner
+path (which passes `AttributionSignal` objects) to work without manual
 `.to_dict()` conversion at every call site.
 
-## Status
+## Current Evidence Boundaries
 
-- **PACA-TCL v3.5**: Frozen production base
-- **BCCSE v5**: Production — 50-case evolution experiments completed
-- **HTC-TES v3**: Integrated into evolution loop; 5-case dry-run validation passed (5/5)
-  - Type classification: FACTUAL, OMISSION, REASONING correctly identified
+- **PACA-TCL v3.5**: research detector implementation with a frozen per-run
+  execution protocol; its strategy can be modified by genome injection.
+- **BCCSE v5**: research evolution machinery. Historical 50-case artifacts do
+  not by themselves establish out-of-sample or Outer-set improvement.
+- **HTC-TES v3**: integrated typed telemetry; a 5-case dry-run exercised the
+  configured path but was not a validation study.
+  - Type telemetry emitted FACTUAL, OMISSION and REASONING labels in the recorded exercise
   - Type→module routing: evidence_obligation, candidate_trigger, causal_link_test
-  - A configured DeepSeek dry-run completed 5/5 cases; 4 typed cases produced experience records
+  - A configured DeepSeek dry-run completed 5/5 executions; 4 typed cases produced experience records
   - The dry-run correctly reported 0% effective coverage because no authoritative detector improvement was established
   - Interface normalization: `_normalize_signal` resolves AttributionSignal/dict mismatch
+
+Formal artifacts report occurrence-first three-state confusion, selective
+accuracy/risk, paired transitions and exact McNemar statistics. A detector
+improvement or champion label is ineligible when changes are abstention-only,
+paired correctness gain is not significant, the deterministic paired
+net-correctness-gain interval is unavailable/non-positive, the result is not
+from the explicit Outer role, or critical provenance is incomplete. Validation
+and Inner test results remain research observations. The currently
+registered `P0_diagnostic_only` configuration has
+`D_execution_authorized=false`, so it cannot authorize validation/test
+or Outer effectiveness execution.
 
 ## License
 

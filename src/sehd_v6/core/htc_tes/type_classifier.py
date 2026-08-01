@@ -18,11 +18,12 @@ Architectural principle — Hierarchical Classification:
         SIGNAL_UNAVAILABLE). No-information error types are excluded
         entirely from scoring, not just down-weighted.
 
-    Layer 3 (Fallback): If Layer 1 produced no typed signal, fall back
-        to UNKNOWN. UNKNOWN is never chosen when any typed signal exists.
+    Layer 3 (Evidence threshold): Emit a typed result only when weighted and
+        independent evidence clears a conservative threshold; otherwise use
+        UNKNOWN. A lone weak structural cue is not sufficient.
 
-This eliminates the root cause of the "everything is UNKNOWN" problem:
-no-information signals can no longer pollute the scoring space.
+No-information signals cannot pollute the scoring space, while UNKNOWN remains
+reachable when the remaining evidence is too weak to support typed routing.
 
 Hallucination types:
 - FACTUAL: Agent makes unsupported factual claims
@@ -38,10 +39,12 @@ Hallucination types:
 from __future__ import annotations
 
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
+
+from ..bccse.signal_adapter import resolve_authoritative_state
 
 
 def _normalize_signal(signal: Any) -> dict[str, Any]:
@@ -238,7 +241,8 @@ class HallucinationTypeClassifier:
 
     Layer 1 (Structural): detection_result intrinsic features.
     Layer 2 (Attribution Enhancement): informative error_type only.
-    Layer 3 (Fallback): UNKNOWN when no typed signal exists.
+    Layer 3 (Evidence threshold): UNKNOWN when typed evidence is absent or
+        insufficiently corroborated.
 
     No-information error types (UNRESOLVED_UNKNOWN, SIGNAL_UNAVAILABLE)
     are excluded from Layer 2 entirely, preventing circular reasoning.
@@ -250,6 +254,7 @@ class HallucinationTypeClassifier:
     _layer2_error_type_weight: float = 0.40
     _layer2_module_weight: float = 0.20
     _min_confidence: float = 0.3
+    _min_typed_score: float = 0.30
 
     def extract_features(
         self, detection_result: Mapping[str, Any], attribution_signal: Any = None,
@@ -269,7 +274,7 @@ class HallucinationTypeClassifier:
             has_omission=any("omission" in kind for kind in kinds),
             has_adoption=any("adoption" in kind for kind in kinds),
             has_claim=any("claim" in kind or "assert" in kind for kind in kinds),
-            state=str(detection_result.get("state") or ""),
+            state=resolve_authoritative_state(detection_result),
             prosecution_coverage_state=signal.get("prosecution_coverage_state"),
             defense_coverage_state=signal.get("defense_coverage_state"),
             crs_source=str(signal.get("crs_source") or "unknown"),
@@ -292,6 +297,16 @@ class HallucinationTypeClassifier:
             TypeClassificationResult with primary and secondary types.
         """
         scores: dict[HallucinationType, float] = {t: 0.0 for t in HallucinationType}
+        support_families: dict[HallucinationType, set[str]] = defaultdict(set)
+
+        def add_score(
+            hallucination_type: HallucinationType,
+            score: float,
+            family: str,
+        ) -> None:
+            scores[hallucination_type] += score
+            support_families[hallucination_type].add(family)
+
         evidence: dict[str, Any] = {}
         trajectory_features = self.extract_features(detection_result, attribution_signal)
 
@@ -306,7 +321,11 @@ class HallucinationTypeClassifier:
         if candidates:
             candidate_types = self._analyze_candidates(candidates)
             for htype, count in candidate_types.items():
-                scores[htype] += self._layer1_candidate_weight * min(count, 3)
+                add_score(
+                    htype,
+                    self._layer1_candidate_weight * min(count, 3),
+                    "candidate",
+                )
             evidence["candidate_analysis"] = {
                 t.value: c for t, c in candidate_types.items()
             }
@@ -319,11 +338,11 @@ class HallucinationTypeClassifier:
                 crs_scores, risk_semantics=bool(signal_dict.get("crs_scores"))
             )
             if crs_type:
-                scores[crs_type] += self._layer1_crs_weight
+                add_score(crs_type, self._layer1_crs_weight, "crs")
                 evidence["crs_pattern"] = crs_type.value
 
         # 1c. State × coverage structural signal
-        state = str(detection_result.get("state") or "")
+        state = resolve_authoritative_state(detection_result)
         if state == "unresolved":
             raw_aggregate = signal_dict.get("crs_aggregate")
             crs_agg = (
@@ -333,9 +352,17 @@ class HallucinationTypeClassifier:
             )
             if crs_agg is not None:
                 if crs_agg > 0.4:
-                    scores[HallucinationType.FACTUAL] += self._layer1_state_weight
+                    add_score(
+                        HallucinationType.FACTUAL,
+                        self._layer1_state_weight,
+                        "state_coverage",
+                    )
                 elif crs_agg < 0.2:
-                    scores[HallucinationType.CONTEXTUAL] += self._layer1_state_weight
+                    add_score(
+                        HallucinationType.CONTEXTUAL,
+                        self._layer1_state_weight,
+                        "state_coverage",
+                    )
 
         # ================================================================
         # Layer 2: Attribution enhancement (informative signals only)
@@ -350,48 +377,74 @@ class HallucinationTypeClassifier:
             if error_type and error_type not in _NO_INFO_ERROR_TYPES:
                 mapped = _ERROR_TYPE_TO_HALLUCINATION.get(error_type)
                 if mapped and mapped != HallucinationType.UNKNOWN:
-                    scores[mapped] += self._layer2_error_type_weight
+                    add_score(
+                        mapped,
+                        self._layer2_error_type_weight,
+                        "error_type",
+                    )
                     evidence["error_type_signal"] = error_type
 
             target_module = str(signal_dict.get("target_module") or "")
             module_type = self._map_module_to_type(target_module)
             if module_type:
-                scores[module_type] += self._layer2_module_weight
+                add_score(module_type, self._layer2_module_weight, "module")
                 evidence["module_signal"] = target_module
 
         # ================================================================
         # Layer 3: Determine primary type
         # ================================================================
-        # UNKNOWN is NEVER chosen when any typed signal has score > 0.
-        # This is the core architectural guarantee: no-information signals
-        # cannot produce an UNKNOWN classification when structural signals
-        # exist.
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         typed_scores = [
             (t, s) for t, s in sorted_scores if t != HallucinationType.UNKNOWN
         ]
-        if typed_scores and typed_scores[0][1] > 0:
-            primary_type = typed_scores[0][0]
-        else:
-            primary_type = HallucinationType.UNKNOWN
-        confidence = self._normalize_confidence(scores)
+        top_type, top_score = (
+            typed_scores[0]
+            if typed_scores
+            else (HallucinationType.UNKNOWN, 0.0)
+        )
+        top_families = support_families.get(top_type, set())
+        single_candidate_cue = top_families == {"candidate"}
+        has_sufficient_evidence = (
+            top_score >= self._min_typed_score
+            and not single_candidate_cue
+        )
+        primary_type = top_type if has_sufficient_evidence else HallucinationType.UNKNOWN
+        confidence = (
+            self._normalize_confidence(scores, len(top_families))
+            if has_sufficient_evidence
+            else 0.0
+        )
 
-        secondary_type = None
-        for t, s in sorted_scores:
-            if t != primary_type and s >= 0.2:
+        secondary_type: HallucinationType | None = None
+        secondary_threshold = max(0.12, top_score * 0.35)
+        for t, s in typed_scores:
+            if (
+                primary_type != HallucinationType.UNKNOWN
+                and t != primary_type
+                and s >= secondary_threshold
+                and support_families.get(t)
+            ):
                 secondary_type = t
                 break
 
-        # Only fall back to UNKNOWN when confidence is truly below threshold
-        # AND no typed signal exists. If typed signals exist but confidence
-        # is low (e.g., conflicting signals), keep the best typed guess
-        # rather than discarding information.
-        if confidence < self._min_confidence and not typed_scores:
+        # Conflicting or low-confidence evidence remains UNKNOWN even if one
+        # weak typed cue exists; routing should not manufacture certainty.
+        if confidence < self._min_confidence:
             primary_type = HallucinationType.UNKNOWN
             confidence = 0.0
             secondary_type = None
 
         evidence["raw_scores"] = {t.value: round(s, 3) for t, s in sorted_scores}
+        evidence["support_families"] = {
+            htype.value: sorted(families)
+            for htype, families in support_families.items()
+            if families
+        }
+        evidence["evidence_threshold"] = {
+            "minimum_typed_score": self._min_typed_score,
+            "top_score": round(top_score, 3),
+            "single_candidate_cue_rejected": single_candidate_cue,
+        }
         # Layer 2 is only "active" if it actually contributed a score
         layer2_active = bool(signal_dict) and bool(evidence.get("error_type_signal") or evidence.get("module_signal"))
         evidence["classification_layer"] = (
@@ -537,7 +590,11 @@ class HallucinationTypeClassifier:
                 return total / count
         return None
 
-    def _normalize_confidence(self, scores: dict[HallucinationType, float]) -> float:
+    def _normalize_confidence(
+        self,
+        scores: dict[HallucinationType, float],
+        support_count: int = 0,
+    ) -> float:
         """Normalize scores to confidence value.
 
         UNKNOWN is excluded from the denominator so that a weak but
@@ -550,15 +607,25 @@ class HallucinationTypeClassifier:
         typed_scores = {
             t: s for t, s in scores.items() if t != HallucinationType.UNKNOWN
         }
-        max_score = max(typed_scores.values()) if typed_scores else 0.0
+        ordered = sorted(typed_scores.values(), reverse=True)
+        max_score = ordered[0] if ordered else 0.0
+        second_score = ordered[1] if len(ordered) > 1 else 0.0
         total = sum(typed_scores.values())
         if total == 0 or max_score == 0:
             return 0.0
-        # Confidence = max_score / total (how dominant is the top type)
-        raw_confidence = max_score / total if total > 0 else 0.0
-        # Scale by absolute signal strength
-        signal_strength = min(total / 2.0, 1.0)
-        return min(raw_confidence * 0.7 + signal_strength * 0.3, 1.0)
+        dominance = max_score / total
+        absolute_strength = min(max_score / 0.8, 1.0)
+        margin = (max_score - second_score) / max_score
+        confidence = (
+            0.45 * absolute_strength
+            + 0.30 * dominance
+            + 0.25 * margin
+        )
+        if support_count <= 1:
+            confidence = min(confidence, 0.55)
+        elif support_count == 2:
+            confidence = min(confidence, 0.78)
+        return min(max(confidence, 0.0), 1.0)
 
 
 def classify_hallucination_type(

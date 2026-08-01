@@ -34,6 +34,8 @@ from .proof_engine_v3_4 import (
     _normalize_construct_value, _deterministic_process_census, _union_census,
     _required_origins, _required_candidates, _proof_runtime_valid, _proof_user,
     _merge_prosecutions,
+    _construct_authority, _apply_construct_authority,
+    _occurrence_first_rows, _causal_certificate_counts,
 )
 
 
@@ -578,6 +580,10 @@ def adjudicate_case(
             construct_audit = {"status": "provider_error", "error_type": type(exc).__name__, "error": str(exc)[:500]}
             construct_provider = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
 
+    construct_authoritative, construct_authority_reasons = _construct_authority(
+        construct_audit
+    )
+
     base_runtime_valid = bool(base.get("runtime_valid"))
     paca_census = list(base.get("census") or [])
     deterministic_census = _deterministic_process_census(built)
@@ -680,6 +686,26 @@ def adjudicate_case(
                 )
             except Exception as exc:
                 providers["appeal_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
+                # Appeal was required by the calibrated trigger. Reusing the
+                # initial verdict would turn an incomplete court process into a
+                # valid decisive output, so fail closed instead.
+                proof = {
+                    **initial_proof,
+                    "state": "unresolved",
+                    "responsible_event_id": None,
+                    "impact_status": None,
+                    "winning_impact_kind": None,
+                    "winning_error_certificate_id": None,
+                    "surviving_error_certificate_ids": [],
+                    "decision_authority": "invalid",
+                    "authority_failure_reasons": [{
+                        "component": "appeal",
+                        "code": "required_appeal_incomplete",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc)[:500],
+                    }],
+                    "appeal_incomplete": True,
+                }
 
         # H3: Two-Phase Localization (only if multiple surviving origins)
         surviving_ids = proof.get("surviving_error_certificate_ids") or []
@@ -709,7 +735,14 @@ def adjudicate_case(
                         focused_prosecution_audits=focused_audits,
                     )
 
-        runtime_valid = _proof_runtime_valid(base_runtime_valid, proof)
+        proof, construct_authoritative, construct_authority_reasons = (
+            _apply_construct_authority(proof, construct_audit)
+        )
+        runtime_valid = (
+            _proof_runtime_valid(base_runtime_valid, proof)
+            and construct_authoritative
+            and "appeal_error" not in providers
+        )
     except Exception as exc:
         proof = {
             "state": "unresolved", "responsible_event_id": None, "impact_status": None,
@@ -729,6 +762,14 @@ def adjudicate_case(
             "prosecution_coverage": "unresolved",
             "defense_coverage": "unresolved",
             "winning_error_certificate_id": None,
+            "decision_authority": "invalid",
+            "authority_failure_reasons": [{
+                "component": "proof_court",
+                "code": "proof_court_exception",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
+            }],
+            "occurrence_state": "unresolved", "incident_occurred": None,
         }
         providers["proof_court_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
         runtime_valid = False
@@ -738,6 +779,8 @@ def adjudicate_case(
     output.update({
         "runtime_valid": runtime_valid,
         "state": proof["state"],
+        "decision_authority": proof.get("decision_authority", "invalid"),
+        "authority_failure_reasons": proof.get("authority_failure_reasons") or [],
         "incident_state": {
             "verified_error": "verified_hallucination",
             "verified_clean": "verified_non_hallucination",
@@ -745,6 +788,16 @@ def adjudicate_case(
         }[proof["state"]],
         "responsible_event_id": proof["responsible_event_id"],
         "responsible_step": _responsible_step(proof["responsible_event_id"], built),
+        "occurrence_state": proof.get("occurrence_state", "unresolved"),
+        "incident_occurred": proof.get("incident_occurred"),
+        "occurrence_responsible_event_id": proof.get("occurrence_responsible_event_id"),
+        "occurrence_responsible_step": _responsible_step(
+            proof.get("occurrence_responsible_event_id"), built,
+        ),
+        "occurrence_impact_status": proof.get("occurrence_impact_status"),
+        "occurrence_impact_kind": proof.get("occurrence_impact_kind"),
+        "occurrence_recovery_state": proof.get("occurrence_recovery_state"),
+        "occurrence_ledger": proof.get("occurrence_ledger"),
         "impact_status": proof.get("impact_status"),
         "impact_kind": proof.get("winning_impact_kind"),
         "wide_construct_state": proof.get("wide_construct_state"),
@@ -764,6 +817,8 @@ def adjudicate_case(
             "construct_raw_candidate_count": int(construct_audit.get("raw_candidate_count") or 0),
             "construct_accepted_candidate_count": int(construct_audit.get("converted_candidate_count") or 0),
             "construct_axis_normalized_count": int(construct_audit.get("axis_normalized_count") or 0),
+            "construct_authoritative": construct_authoritative,
+            "construct_authority_failure_reasons": construct_authority_reasons,
             "quarantined_error_certificate_count": len(proof.get("quarantined_error_certificate_ids") or []),
             "quarantined_defense_certificate_count": len(proof.get("quarantined_defense_certificate_ids") or []),
             "required_candidate_count": int(proof.get("required_candidate_count") or 0),
@@ -810,8 +865,9 @@ def adjudicate_case(
 # ============================================================
 
 def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    metrics = v2.evaluate(rows)
-    proof_states, wide_states, impact_kinds, defenses = Counter(), Counter(), Counter(), Counter()
+    metrics = v2.evaluate(_occurrence_first_rows(rows))
+    proof_states, occurrence_states = Counter(), Counter()
+    wide_states, impact_kinds, defenses = Counter(), Counter(), Counter()
     construct_states = Counter()
     q_error = q_defense = total_error = total_defense = 0
     construct_raw = construct_accepted = construct_normalized = 0
@@ -819,7 +875,7 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     appeal_candidates_total = appeal_pros_certs_total = appeal_def_certs_total = 0
     appeal_states = Counter()
     materiality_hits_total = 0
-    causal_valid = 0
+    causal_predicted = causal_valid = 0
     # v3.5 counters
     focused_certs_total = focused_audits_total = 0
     consensus_blocked_total = 0
@@ -830,6 +886,7 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         proof = row.get("proof_adjudication") or {}
         health = row.get("evidence_health") or {}
         proof_states[str(proof.get("state") or "unresolved")] += 1
+        occurrence_states[str(proof.get("occurrence_state") or "unresolved")] += 1
         wide_states[str(proof.get("wide_construct_state") or "unresolved")] += 1
         if row.get("impact_kind"):
             impact_kinds[str(row["impact_kind"])] += 1
@@ -848,13 +905,9 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         appeal_def_certs_total += int(health.get("appeal_defender_certificate_count") or 0)
         appeal_states[str(health.get("appeal_status") or "unknown")] += 1
         materiality_hits_total += int(health.get("materiality_hits") or 0)
-        causal_valid += int(
-            proof.get("state") != "verified_error"
-            or (
-                bool(proof.get("winning_error_certificate_id"))
-                and proof.get("winning_impact_kind") != "process_debt"
-            )
-        )
+        predicted_count, valid_count = _causal_certificate_counts(row)
+        causal_predicted += predicted_count
+        causal_valid += valid_count
         for key, value in (proof.get("defense_type_counts") or {}).items():
             defenses[str(key)] += int(value)
         # v3.5
@@ -867,9 +920,25 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             chain_completeness_scores.extend(completeness)
 
     metrics.update({
-        "proof_state_counts": dict(proof_states), "wide_construct_state_counts": dict(wide_states),
+        "proof_state_counts": dict(proof_states),
+        "occurrence_state_counts": dict(occurrence_states),
+        "official_prediction_basis": "occurrence_state",
+        "wide_construct_state_counts": dict(wide_states),
         "impact_kind_counts": dict(impact_kinds),
-        "causal_chain_validity": causal_valid / len(rows) if rows else 0.0,
+        "causal_chain_validity": (
+            causal_valid / causal_predicted if causal_predicted else None
+        ),
+        "causal_error_certificate_validity": (
+            causal_valid / causal_predicted if causal_predicted else None
+        ),
+        "causal_chain_validity_defined": bool(causal_predicted),
+        "causal_chain_validity_denominator": causal_predicted,
+        "predicted_causal_error_certificate_count": causal_predicted,
+        "valid_causal_error_certificate_count": causal_valid,
+        "causal_chain_validity_semantics": (
+            "fully valid, addressable causal error certificates divided by "
+            "all certificates predicting a causal error; undefined when none are predicted"
+        ),
         "defense_type_counts": dict(defenses), "quarantined_error_certificate_count": q_error,
         "quarantined_defense_certificate_count": q_defense,
         "construct_view_status_counts": dict(construct_states),

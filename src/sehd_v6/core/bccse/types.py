@@ -47,7 +47,7 @@ class ExperienceRecord:
 
     record_key: str
     partition: str
-    gold_positive: bool
+    gold_positive: bool | None
     predicted_positive: bool | None
     gold_responsible_ref: str | None
     predicted_responsible_ref: str | None

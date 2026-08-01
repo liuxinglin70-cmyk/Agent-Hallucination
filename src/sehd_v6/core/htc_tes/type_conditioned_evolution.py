@@ -7,8 +7,8 @@ and how to resolve evolution direction conflicts.
 Core concepts:
 1. Type-conditioned routing: Different hallucination types activate different
    evolution modules and editing strategies
-2. Bidirectional evolution: Simultaneously learn error-detection and
-   clean-detection rules for the same hallucination type
+2. Bidirectional provenance: Record error/clean evolution direction on each
+   edit and enforce an auditable bounded-module routing intersection
 3. Experience-conditioned generation: Past editing experiences for each type
    inform the reflection engine's prompt
 
@@ -37,6 +37,7 @@ from .type_classifier import (
     TypeClassificationResult,
     _normalize_signal,
 )
+from ..bccse.genome import normalize_type_confidence
 
 
 # Type to module routing table: which modules are primary targets per type
@@ -159,7 +160,9 @@ class TypeConditionedEdit:
             "hallucination_type": self.hallucination_type.value,
             "evolution_direction": self.evolution_direction,
             "edit_strategy": self.edit_strategy,
-            "type_confidence": self.type_confidence,
+            "type_confidence": normalize_type_confidence(
+                self.type_confidence
+            ),
             "rule_index": self.rule_index,
         }
 
@@ -181,6 +184,7 @@ class TypeConditionedEditProposal:
     edit_strategy: str
     type_guidance: str
     source_case_id: str
+    type_confidence: float
     rule_index: int | None = None
 
     def to_edit(self) -> TypeConditionedEdit:
@@ -195,7 +199,7 @@ class TypeConditionedEditProposal:
             hallucination_type=self.hallucination_type,
             evolution_direction=self.evolution_direction,
             edit_strategy=self.edit_strategy,
-            type_confidence=1.0,
+            type_confidence=normalize_type_confidence(self.type_confidence),
             rule_index=self.rule_index,
         )
 
@@ -210,6 +214,9 @@ class TypeConditionedEditProposal:
             "edit_strategy": self.edit_strategy,
             "type_guidance": self.type_guidance,
             "source_case_id": self.source_case_id,
+            "type_confidence": normalize_type_confidence(
+                self.type_confidence
+            ),
             "rule_index": self.rule_index,
         }
 
@@ -224,7 +231,7 @@ class TypeConditionedEvolution:
 
     Key features:
     1. Type-conditioned module routing
-    2. Bidirectional learning (error + clean simultaneously)
+    2. Bidirectional typed provenance (not runtime strand isolation)
     3. Type-specific editing strategies
     4. Experience accumulation per hallucination type
     """
@@ -258,16 +265,34 @@ class TypeConditionedEvolution:
         self,
         hallucination_type: HallucinationType,
         attribution_modules: Sequence[str],
+        secondary_type: HallucinationType | None = None,
     ) -> tuple[str, ...]:
-        """Return the hard-safe intersection of type and attribution routes."""
+        """Return an auditable primary/secondary typed routing intersection.
+
+        This is provenance-aware routing, not isolated runtime strands: every
+        candidate must still fall inside the attributor's bounded modules.
+        """
         allowed = set(attribution_modules)
-        return tuple(
-            module for module in self.get_target_modules(hallucination_type, primary=False)
-            if module in allowed
-        ) or tuple(
+        # Preserve the routing table's priority: the primary module is the
+        # first candidate, while secondary modules are fallback options.
+        primary = tuple(
             module for module in self.get_target_modules(hallucination_type, primary=True)
             if module in allowed
+        ) + tuple(
+            module for module in self.get_target_modules(hallucination_type, primary=False)
+            if module in allowed
         )
+        secondary = (
+            tuple(
+                module
+                for module in self.get_target_modules(secondary_type, primary=True)
+                + self.get_target_modules(secondary_type, primary=False)
+                if module in allowed and module not in primary
+            )
+            if secondary_type is not None
+            else ()
+        )
+        return primary + secondary
 
     def get_edit_strategy(self, hallucination_type: HallucinationType) -> str:
         """Get the editing strategy for a given hallucination type."""
@@ -366,6 +391,7 @@ class TypeConditionedEvolution:
             edit_strategy=strategy,
             type_guidance=guidance,
             source_case_id=source_case_id,
+            type_confidence=type_result.confidence,
             rule_index=reflection_output.get("rule_index"),
         )
 
@@ -555,9 +581,11 @@ strategies that have worked for this hallucination type.
 - Allowed modules: {', '.join(allowed_modules)}
 - Edit strategy: {strategy}
 
-Generate a type-specific rule that addresses this hallucination type.
+Generate a rule with typed provenance that addresses this hallucination type.
+The runtime rule cannot observe the classifier type itself, so its condition
+must use only concrete trajectory evidence.
 The rule should:
-1. Be conditioned on the detected hallucination type '{htype.value}'
+1. Describe observable evidence associated with '{htype.value}'
 2. Use the appropriate editing strategy '{strategy}'
 3. Target the most relevant module for this type
 4. Be generalizable to similar cases of this hallucination type
@@ -566,6 +594,9 @@ Return exactly one JSON object:
 {{"target_module": "<module>", "operation": "add_rule|modify_rule", "rule_index": null,
   "new_content": "<rule>", "feature_description": "<reusable trajectory feature>",
   "rationale": "<reasoning for this type>"}}
+
+feature_description must be descriptive, not an instruction, and contain no
+case/source identifier, gold/answer information, URL, or prompt text.
 """
 
     return system_prompt, user_prompt

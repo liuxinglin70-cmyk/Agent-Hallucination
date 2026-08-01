@@ -163,7 +163,9 @@ class StructuralGate:
         certificate.reject_reasons.extend(str(reason) for reason in reasons)
         self._total_edits = max(0, self._total_edits - 1)
         self._restore_last_edit_index(certificate.target_module)
-        self.record_no_edit()
+        # This is a post-replay outcome for an already processed case. It must
+        # not count once per rejected edit toward the case-level convergence
+        # window; the runner records the case outcome separately.
 
     def get_allowed_operations(self, module: str) -> list[str]:
         """All operations are always allowed — trust the LLM's judgment.
@@ -336,6 +338,13 @@ class StructuralGate:
                     ].rules
                     if module.rules[rule_index] in baseline_rules:
                         reject_reasons.append("immutable_baseline_rule")
+                    elif module.is_rule_protected(rule_index):
+                        status = module.get_rule_meta(rule_index).get(
+                            "fitness_status", "unknown"
+                        )
+                        reject_reasons.append(
+                            f"protected_rule: fitness_status={status}"
+                        )
 
         # --- Layer 5: Cross-module tiered semantic deduplication ---
         # v5.3.5: tiered thresholds avoid wasting evolution experience.

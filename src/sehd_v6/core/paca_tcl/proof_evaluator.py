@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -49,7 +49,6 @@ from ..bccse.types import (
 )
 from ..bccse.step_attributor import ErrorType
 from ..bccse.genome import SkillGenome, create_baseline_genome
-from ..bccse.mutator import MutationProvider
 from ..bccse.promotion_gates import G1_CHECKS, MetricSnapshot, ReplayEvidence
 
 
@@ -62,6 +61,21 @@ _CACHE_DIRS = (
     "appeal_defender_cache",
     "counterfactual_cache",
 )
+
+
+class MutationProvider(Protocol):
+    """Minimal provider contract used by the production evaluator."""
+
+    def complete(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+        response_format: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]: ...
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     with Path(path).open(encoding="utf-8") as handle:
         rows = [json.loads(line) for line in handle if line.strip()]
@@ -187,12 +201,130 @@ def _walk_provider_meta(value: Any):
             yield from _walk_provider_meta(child)
 
 
+_PREDICTION_STATE_ALIASES = {
+    "verified_error": "verified_error",
+    "verified_hallucination": "verified_error",
+    "verified_clean": "verified_clean",
+    "verified_non_hallucination": "verified_clean",
+    "unresolved": "unresolved",
+}
+
+
+def _canonical_prediction_state(value: Any) -> str | None:
+    if isinstance(value, str):
+        return _PREDICTION_STATE_ALIASES.get(value.strip())
+    return None
+
+
+def _occurrence_fact_state_detail(row: Mapping[str, Any]) -> tuple[str, bool]:
+    """Resolve the append-only occurrence fact before authority gating.
+
+    Authority order is intentionally explicit and shared by metrics,
+    experience generation, replay, and execution selection:
+
+    1. top-level ``occurrence_state``;
+    2. proof adjudication and occurrence ledgers;
+    3. structured ``incident_state.occurrence_state``;
+    4. legacy string ``incident_state`` and top-level ``state``.
+    """
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    proof_ledger = proof.get("occurrence_ledger")
+    proof_ledger = proof_ledger if isinstance(proof_ledger, Mapping) else {}
+    row_ledger = row.get("occurrence_ledger")
+    row_ledger = row_ledger if isinstance(row_ledger, Mapping) else {}
+    incident = row.get("incident_state")
+    structured_incident = incident if isinstance(incident, Mapping) else {}
+
+    occurrence_candidates = (
+        row.get("occurrence_state"),
+        proof.get("occurrence_state"),
+        proof_ledger.get("occurrence_state"),
+        proof_ledger.get("state"),
+        row_ledger.get("occurrence_state"),
+        row_ledger.get("state"),
+        structured_incident.get("occurrence_state"),
+    )
+    for candidate in occurrence_candidates:
+        state = _canonical_prediction_state(candidate)
+        if state is not None:
+            return state, True
+
+    legacy_candidates = (
+        incident if isinstance(incident, str) else None,
+        row.get("state"),
+    )
+    for candidate in legacy_candidates:
+        state = _canonical_prediction_state(candidate)
+        if state is not None:
+            return state, False
+    return "unresolved", False
+
+
+def _decision_is_invalid(row: Mapping[str, Any]) -> bool:
+    """A structurally invalid run cannot emit a decisive scored prediction."""
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    return (
+        row.get("runtime_valid") is False
+        or str(row.get("decision_authority") or "") == "invalid"
+        or str(proof.get("decision_authority") or "") == "invalid"
+    )
+
+
+def _prediction_state_detail(row: Mapping[str, Any]) -> tuple[str, bool]:
+    """Resolve the scoreable state without mutating the occurrence fact."""
+    occurrence_state, occurrence_sourced = _occurrence_fact_state_detail(row)
+    if _decision_is_invalid(row):
+        return "unresolved", occurrence_sourced
+    return occurrence_state, occurrence_sourced
+
+
+def _prediction_state_name(row: Mapping[str, Any]) -> str:
+    return _prediction_state_detail(row)[0]
+
+
 def _prediction_state(row: Mapping[str, Any]) -> bool | None:
-    state = str(row.get("state") or "")
+    state = _prediction_state_name(row)
     if state == "verified_error":
         return True
     if state == "verified_clean":
         return False
+    return None
+
+
+def _prediction_responsible_ref(row: Mapping[str, Any]) -> str | None:
+    """Resolve occurrence localization without falling back across a conflict."""
+    if _prediction_state(row) is None:
+        return None
+    _, occurrence_authoritative = _prediction_state_detail(row)
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    proof_ledger = proof.get("occurrence_ledger")
+    proof_ledger = proof_ledger if isinstance(proof_ledger, Mapping) else {}
+    row_ledger = row.get("occurrence_ledger")
+    row_ledger = row_ledger if isinstance(row_ledger, Mapping) else {}
+    incident = row.get("incident_state")
+    structured_incident = incident if isinstance(incident, Mapping) else {}
+
+    if occurrence_authoritative:
+        candidates = (
+            row.get("occurrence_responsible_step"),
+            row.get("occurrence_responsible_event_id"),
+            proof.get("occurrence_responsible_step"),
+            proof.get("occurrence_responsible_event_id"),
+            proof_ledger.get("responsible_step"),
+            proof_ledger.get("responsible_event_id"),
+            row_ledger.get("responsible_step"),
+            row_ledger.get("responsible_event_id"),
+            structured_incident.get("occurrence_responsible_step"),
+            structured_incident.get("occurrence_responsible_event_id"),
+        )
+    else:
+        candidates = (row.get("responsible_step"), row.get("responsible_event_id"))
+    for candidate in candidates:
+        if candidate is not None and str(candidate).strip():
+            return str(candidate)
     return None
 
 
@@ -225,10 +357,40 @@ def _candidate_origins(row: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(refs))
 
 
-def experience_record_from_row(row: Mapping[str, Any]) -> ExperienceRecord:
+def _occurrence_metric_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Normalize evaluator rows before delegating aggregate math to v3.5.
+
+    v3.5 accepts historical artifacts whose nested proof fields may conflict
+    with newer top-level occurrence fields.  Materializing the evaluator's
+    authority decision into both locations prevents the delegated evaluator
+    from accidentally restoring a lower-priority legacy value.  The copied
+    occurrence ledger is intentionally left unchanged as the factual record.
+    """
+    normalized_rows: list[dict[str, Any]] = []
+    for original in rows:
+        row = dict(original)
+        state = _prediction_state_name(original)
+        row["occurrence_state"] = state
+        proof_value = original.get("proof_adjudication")
+        proof = dict(proof_value) if isinstance(proof_value, Mapping) else {}
+        proof["occurrence_state"] = state
+        row["proof_adjudication"] = proof
+        responsible = _prediction_responsible_ref(original)
+        if responsible is not None:
+            row["occurrence_responsible_step"] = responsible
+        normalized_rows.append(row)
+    return normalized_rows
+
+
+def experience_record_from_row(
+    row: Mapping[str, Any], *, include_gold: bool = False,
+) -> ExperienceRecord:
     """Convert one v3.5 row into the compiler-only, raw-text-free view."""
 
-    state = str(row.get("state") or "")
+    state = _prediction_state_name(row)
+    occurrence_state = _occurrence_fact_state_detail(row)[0]
     gold_steps = tuple(str(item) for item in row.get("gold_steps") or ())
     health = row.get("evidence_health") or {}
     proof = row.get("proof_adjudication") or {}
@@ -240,24 +402,30 @@ def experience_record_from_row(row: Mapping[str, Any]) -> ExperienceRecord:
     return ExperienceRecord(
         record_key=str(row.get("case_ref") or ""),
         partition="evolution",
-        gold_positive=bool(row.get("gold_label")),
+        gold_positive=(bool(row.get("gold_label")) if include_gold else None),
         predicted_positive=_prediction_state(row),
-        gold_responsible_ref=gold_steps[0] if gold_steps else None,
-        predicted_responsible_ref=(
-            None if row.get("responsible_step") is None
-            else str(row.get("responsible_step"))
-        ),
+        gold_responsible_ref=(gold_steps[0] if include_gold and gold_steps else None),
+        predicted_responsible_ref=_prediction_responsible_ref(row),
         candidate_origin_refs=_candidate_origins(row),
         analysis_dimension="trajectory_causal_validity",
         origin_relation="earliest_agent_controlled_origin",
         evidence_obligation="complete_admissible_causal_chain",
         clean_boundary="supported_or_correct_or_ordinary_failure",
-        certificate_valid=bool(row.get("runtime_valid")),
+        certificate_valid=(
+            bool(row.get("runtime_valid")) and not _decision_is_invalid(row)
+        ),
         unresolved=state == "unresolved",
         model_calls=len(provider_metas),
         latency_seconds=sum(float(meta.get("latency_seconds") or 0.0) for meta in provider_metas),
         metadata={
             "proof_state": state,
+            "occurrence_state": occurrence_state,
+            "legacy_proof_state": row.get("state"),
+            "prediction_state_authority": (
+                "invalid" if _decision_is_invalid(row)
+                else "occurrence" if _prediction_state_detail(row)[1]
+                else "legacy"
+            ),
             "wide_construct_state": row.get("wide_construct_state"),
             "construct_view_status": health.get("construct_view_status"),
             "candidate_count": len(row.get("census") or ()),
@@ -269,29 +437,70 @@ def experience_record_from_row(row: Mapping[str, Any]) -> ExperienceRecord:
 
 
 def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
-    metrics = v35.evaluate([dict(row) for row in rows])
+    metrics = v35.evaluate(_occurrence_metric_rows(rows))
     metas = tuple(
         meta
         for row in rows
         for meta in _walk_provider_meta(row.get("providers") or {})
     )
     case_count = len(rows)
-    unresolved = sum(str(row.get("state") or "") == "unresolved" for row in rows)
+    unresolved = sum(_prediction_state(row) is None for row in rows)
+    valid_outputs = sum(
+        bool(row.get("runtime_valid")) and not _decision_is_invalid(row)
+        for row in rows
+    )
+    gold_positive = gold_negative = 0
+    tp = fp = fn = tn = step_correct = 0
+    for row in rows:
+        gold = row.get("gold_label")
+        if gold is None:
+            continue
+        gold_is_positive = bool(gold)
+        predicted = _prediction_state(row)
+        gold_positive += int(gold_is_positive)
+        gold_negative += int(not gold_is_positive)
+        if predicted is True and gold_is_positive:
+            tp += 1
+            gold_steps = {str(item) for item in row.get("gold_steps") or ()}
+            step_correct += int(
+                bool(gold_steps) and _prediction_responsible_ref(row) in gold_steps
+            )
+        elif predicted is True:
+            fp += 1
+        elif predicted is False and gold_is_positive:
+            fn += 1
+        elif predicted is False:
+            tn += 1
+
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / gold_positive if gold_positive else 0.0
+    hallucination_f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision + recall else 0.0
+    )
+    clean_precision = tn / (tn + fn) if tn + fn else 0.0
+    clean_recall = tn / gold_negative if gold_negative else 0.0
+    clean_f1 = (
+        2 * clean_precision * clean_recall / (clean_precision + clean_recall)
+        if clean_precision + clean_recall else 0.0
+    )
     return MetricSnapshot(
-        macro_f1=float(metrics.get("macro_f1") or 0.0),
-        precision=float(metrics.get("precision") or 0.0),
-        hallucination_recall=float(metrics.get("recall") or 0.0),
-        clean_fpr=float(metrics.get("clean_fpr") or 0.0),
-        responsible_step_accuracy=float(
-            metrics.get("responsible_step_recall_over_all_gold_positive") or 0.0
+        macro_f1=(hallucination_f1 + clean_f1) / 2,
+        precision=precision,
+        hallucination_recall=recall,
+        clean_fpr=fp / gold_negative if gold_negative else 0.0,
+        responsible_step_accuracy=(
+            step_correct / gold_positive if gold_positive else 0.0
         ),
         candidate_origin_coverage=float(
             metrics.get("candidate_origin_coverage_on_gold_positive") or 0.0
         ),
-        valid_output_rate=float(metrics.get("runtime_valid_rate") or 0.0),
+        valid_output_rate=valid_outputs / case_count if case_count else 0.0,
         causal_chain_validity=float(metrics.get("causal_chain_validity") or 0.0),
         unresolved_rate=unresolved / case_count if case_count else 0.0,
-        invalid_rate=1.0 - float(metrics.get("runtime_valid_rate") or 0.0),
+        invalid_rate=(
+            1.0 - valid_outputs / case_count if case_count else 0.0
+        ),
         model_calls=len(metas),
         latency_seconds=sum(float(meta.get("latency_seconds") or 0.0) for meta in metas),
         cost=0.0,
@@ -396,8 +605,7 @@ class PacaTclV35EvolutionEvaluator:
         unresolved_keys: list[str] = []
         resolved_rows: dict[str, dict[str, Any]] = {}
         for case_key, row in zip(case_keys, baseline_rows):
-            state = str(row.get("state") or "")
-            if state == "unresolved":
+            if _prediction_state(row) is None:
                 unresolved_keys.append(case_key)
             else:
                 resolved_rows[case_key] = copy.deepcopy(row)
@@ -543,6 +751,7 @@ class PacaTclV35EvolutionEvaluator:
         parent_by_ref = self._anonymous_case_map(parent_rows)
         child_by_ref = self._anonymous_case_map(child_rows)
         corrected = 0
+        targeted_total = 0
         for episode in episodes:
             # FIX: guard against empty support_refs to avoid IndexError.
             if not episode.support_refs:
@@ -552,14 +761,20 @@ class PacaTclV35EvolutionEvaluator:
             parent_row = parent_by_ref.get(support)
             if child_row is None or parent_row is None:
                 continue
+            targeted_total += 1
             error = episode.error_type
-            if error == ErrorType.FALSE_POSITIVE:
+            if _decision_is_invalid(child_row):
+                fixed = False
+            elif error == ErrorType.FALSE_POSITIVE:
                 fixed = _prediction_state(child_row) is not True
             elif error == ErrorType.FALSE_NEGATIVE:
                 fixed = _prediction_state(child_row) is True
             elif error == ErrorType.LOCALIZATION_ERROR:
                 gold_steps = tuple(str(item) for item in child_row.get("gold_steps") or ())
-                fixed = bool(gold_steps) and str(child_row.get("responsible_step")) in gold_steps
+                fixed = (
+                    bool(gold_steps)
+                    and _prediction_responsible_ref(child_row) in gold_steps
+                )
             elif error == ErrorType.CANDIDATE_MISS:
                 # A CANDIDATE_MISS is fixed iff the child genome's census now
                 # produces ANY candidates (the parent had none).  Comparing
@@ -580,7 +795,8 @@ class PacaTclV35EvolutionEvaluator:
         boundary_refs = {
             ref
             for episode in episodes
-            for ref in (episode.paired_positive_ref, episode.paired_negative_ref)
+            for ref in episode.boundary_refs
+            if ref
         }
         boundary_total = regressions = 0
         for ref in boundary_refs:
@@ -593,12 +809,15 @@ class PacaTclV35EvolutionEvaluator:
         parent_metrics = metric_snapshot(parent_rows)
         child_metrics = metric_snapshot(child_rows)
         return ReplayEvidence(
-            targeted_error_total=len(episodes),
+            targeted_error_total=targeted_total,
             targeted_error_corrected=corrected,
             paired_boundary_total=boundary_total,
             paired_boundary_regressions=regressions,
             parent_candidate_origin_coverage=parent_metrics.candidate_origin_coverage,
             child_candidate_origin_coverage=child_metrics.candidate_origin_coverage,
             total_outputs=len(child_rows),
-            valid_outputs=sum(bool(row.get("runtime_valid")) for row in child_rows),
+            valid_outputs=sum(
+                bool(row.get("runtime_valid")) and not _decision_is_invalid(row)
+                for row in child_rows
+            ),
         )

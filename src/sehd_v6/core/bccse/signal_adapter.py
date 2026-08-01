@@ -36,6 +36,91 @@ CRS_WEIGHTS = {
     "scope": 0.10,
 }
 
+VALID_DETECTION_STATES = frozenset({
+    "verified_error", "verified_clean", "unresolved",
+})
+_LEGACY_INCIDENT_STATE_MAP = {
+    "verified_error": "verified_error",
+    "verified_hallucination": "verified_error",
+    "verified_incident": "verified_error",
+    "verified_clean": "verified_clean",
+    "verified_non_hallucination": "verified_clean",
+    "no_verified_incident": "verified_clean",
+    "unresolved": "unresolved",
+}
+
+
+def decision_authority_invalid(row: Mapping[str, Any]) -> bool:
+    """Whether a detector result is barred from authoritative decisions."""
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    return (
+        row.get("runtime_valid") is False
+        or str(row.get("decision_authority") or "").strip().lower() == "invalid"
+        or str(proof.get("decision_authority") or "").strip().lower() == "invalid"
+    )
+
+
+def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
+    """Resolve the decision state without rewriting factual occurrence data.
+
+    Invalid decision authority exposes ``unresolved`` to attribution and
+    promotion consumers even if the factual occurrence ledger records an
+    error. The original row/ledger remains untouched for incident audit.
+    """
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    if decision_authority_invalid(row):
+        return "unresolved"
+    top_ledger = row.get("occurrence_ledger")
+    top_ledger = top_ledger if isinstance(top_ledger, Mapping) else {}
+    proof_ledger = proof.get("occurrence_ledger")
+    proof_ledger = proof_ledger if isinstance(proof_ledger, Mapping) else {}
+    occurrence_candidates = (
+        ("occurrence_state", row.get("occurrence_state")),
+        ("proof_adjudication.occurrence_state", proof.get("occurrence_state")),
+        ("occurrence_ledger.occurrence_state", top_ledger.get("occurrence_state")),
+        ("occurrence_ledger.state", top_ledger.get("state")),
+        (
+            "proof_adjudication.occurrence_ledger.occurrence_state",
+            proof_ledger.get("occurrence_state"),
+        ),
+        (
+            "proof_adjudication.occurrence_ledger.state",
+            proof_ledger.get("state"),
+        ),
+    )
+    for source, value in occurrence_candidates:
+        if value in (None, ""):
+            continue
+        normalized = str(value)
+        if normalized not in VALID_DETECTION_STATES:
+            raise ValueError(f"Invalid {source}: {value!r}")
+        return normalized
+
+    incident = row.get("incident_state")
+    if isinstance(incident, Mapping):
+        occurrence = incident.get("occurrence_state")
+        if occurrence not in (None, ""):
+            normalized = str(occurrence)
+            if normalized not in VALID_DETECTION_STATES:
+                raise ValueError(
+                    "Invalid incident_state.occurrence_state: "
+                    f"{occurrence!r}"
+                )
+            return normalized
+        incident = incident.get("state") or incident.get("verdict")
+    if incident not in (None, ""):
+        normalized = _LEGACY_INCIDENT_STATE_MAP.get(str(incident))
+        if normalized is None:
+            raise ValueError(f"Invalid incident_state: {incident!r}")
+        return normalized
+
+    legacy_state = str(row.get("state") or "")
+    if legacy_state not in VALID_DETECTION_STATES:
+        raise ValueError(f"Invalid detector state: {legacy_state!r}")
+    return legacy_state
+
 
 @dataclass(frozen=True)
 class CoverageReading:
@@ -279,7 +364,7 @@ def _proof_projection(row: Mapping[str, Any]) -> CRSSignal:
     proof = row.get("proof_adjudication") or {}
     if not isinstance(proof, Mapping):
         proof = {}
-    state = str(row.get("state") or proof.get("state") or "")
+    state = resolve_authoritative_state(row)
     certificates = _prosecution_certificates(row)
     quarantined = {
         str(value)

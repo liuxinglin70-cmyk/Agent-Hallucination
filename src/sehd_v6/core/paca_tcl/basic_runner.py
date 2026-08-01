@@ -134,12 +134,33 @@ def p0_case_ids(manifest: dict[str, Any]) -> list[str]:
 
 
 def _event_for_source_step(built: dict[str, Any], step: Any) -> str | None:
+    normalized_step = str(step).strip() if step is not None else None
     for event in built["events"]:
-        if event.get("source_step_id") == step:
+        event_step = event.get("source_step_id")
+        if event_step == step or (
+            normalized_step is not None
+            and str(event_step).strip() == normalized_step
+        ):
             return str(event["event_id"])
-    if isinstance(step, int) and 1 <= step <= len(built["events"]):
-        return str(built["events"][step - 1]["event_id"])
+    if normalized_step and normalized_step.isdigit():
+        position = int(normalized_step)
+        if 1 <= position <= len(built["events"]):
+            return str(built["events"][position - 1]["event_id"])
     return None
+
+
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no", ""}:
+            return False
+    raise ValueError(f"invalid boolean value: {value!r}")
 
 
 def load_paca_census(*, case_id: str, built: dict[str, Any], cache_root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -173,7 +194,7 @@ def load_paca_census(*, case_id: str, built: dict[str, Any], cache_root: Path) -
             "dependency_event_ids": dependencies,
             "module_tag": str(row.get("module_tag") or "Unknown"),
             "observation": str(row.get("observation") or ""),
-            "is_decision_point": bool(row.get("is_decision_point")),
+            "is_decision_point": _parse_bool(row.get("is_decision_point", False)),
             "source_step_id": next(
                 (
                     event.get("source_step_id")

@@ -3,7 +3,7 @@
 Core algorithmic module implementing the three CESV innovations:
 1. Typed Provenance Graph with deterministic edge classification (7 edge types)
 2. Dirichlet evidential uncertainty decomposition (aleatoric/epistemic separation)
-3. E-value sequential hypothesis testing (anytime-valid FPR guarantee via Ville's inequality)
+3. Heuristic sequential evidence aggregation for auxiliary ranking
 
 This module is purely deterministic except for the evidential scoring interface
 which consumes LLM-produced Dirichlet parameters. All causal reasoning is done
@@ -351,37 +351,39 @@ class CausalInterventionEngine:
                 "severed_edges": [],
             }
 
-        # Simulate intervention: build graph without target's outgoing edges
-        # A downstream node is "affected" if it becomes unreachable from target
-        # when target's outgoing edges are removed
-        # Since we remove ALL outgoing edges from target, no node is reachable from target
-        # So the question becomes: which downstream nodes have NO other path from
-        # any ancestor of target?
+        severed_edges = list(self.graph.outgoing(target_node))
 
-        # Simpler interpretation per design doc:
-        # interventional_effect = |affected_downstream| / |total_downstream|
-        # where affected = nodes whose SUPPORT edges from target are severed
-        severed_edges = [
-            e for e in self.graph.outgoing(target_node)
-            if e.edge_type in (EdgeType.SUPPORT, EdgeType.TRIGGER, EdgeType.PROPAGATE)
-        ]
-        affected_nodes: set[str] = set()
-        for edge in severed_edges:
-            # Check if this node has alternative support paths (not through target)
-            has_alternative = False
-            for in_edge in self.graph.incoming(edge.target):
-                if (in_edge.source != target_node
-                        and in_edge.edge_type in (EdgeType.SUPPORT, EdgeType.TRIGGER)):
-                    has_alternative = True
-                    break
-            if not has_alternative:
-                affected_nodes.add(edge.target)
-                # Also mark transitive downstream of affected nodes
-                affected_nodes.update(self.graph.downstream_nodes(edge.target))
+        # Compare reachability from all non-target ancestors before and after
+        # removing the target's outgoing edges. This implements the documented
+        # graph intervention instead of extrapolating from direct edges only.
+        ancestors: set[str] = set()
+        queue = deque([target_node])
+        while queue:
+            current = queue.popleft()
+            for edge in self.graph.incoming(current):
+                if edge.source not in ancestors:
+                    ancestors.add(edge.source)
+                    queue.append(edge.source)
 
-        # Remove nodes that are still reachable via other paths from non-target ancestors
-        # (conservative: keep only nodes that truly lose support)
-        affected_nodes &= total_downstream
+        blocked = {(edge.source, edge.target, edge.edge_type) for edge in severed_edges}
+
+        def reachable_from(starts: set[str], *, remove_target_edges: bool) -> set[str]:
+            reached: set[str] = set(starts)
+            pending = deque(starts)
+            while pending:
+                current = pending.popleft()
+                for edge in self.graph.outgoing(current):
+                    if remove_target_edges and (edge.source, edge.target, edge.edge_type) in blocked:
+                        continue
+                    if edge.target not in reached:
+                        reached.add(edge.target)
+                        pending.append(edge.target)
+            return reached
+
+        starts = ancestors or {target_node}
+        before_reachable = reachable_from(starts, remove_target_edges=False)
+        after_reachable = reachable_from(starts, remove_target_edges=True)
+        affected_nodes = total_downstream & (before_reachable - after_reachable)
 
         effect = len(affected_nodes) / len(total_downstream) if total_downstream else 0.0
 
@@ -552,7 +554,7 @@ def parse_dirichlet_response(response: dict[str, Any]) -> list[EvidentialScore]:
 # ============================================================
 
 class SequentialHypothesisArbiter:
-    """E-value based sequential hypothesis testing for trajectory verification.
+    """Heuristic sequential evidence aggregation for trajectory verification.
 
     H0: trajectory is clean (no hallucination)
     H1: trajectory has hallucination (error)
@@ -564,20 +566,20 @@ class SequentialHypothesisArbiter:
 
     Cumulative: E_n = ∏ e_t
 
-    Decision (anytime-valid by Ville's inequality):
-        E_n ≥ 1/α → reject H0 → verified_error (FPR ≤ α guaranteed)
+    Decision:
+        E_n ≥ 1/α → heuristic error threshold
         E_n ≤ α   → accept H0 → verified_clean
         otherwise  → unresolved
 
-    Key property: P(∃n: E_n ≥ 1/α | H0 true) ≤ α
+    The LLM-produced concentrations are not calibrated e-values. This class
+    therefore makes no frequentist FPR or optional-stopping guarantee.
     """
 
     def __init__(self, alpha: float = 0.10):
-        """Initialize with significance level α (FPR upper bound).
+        """Initialize with a symmetric evidence threshold parameter.
 
         Args:
-            alpha: significance level. FPR ≤ α is guaranteed by Ville's inequality.
-                   Default 0.10 means FPR ≤ 10% with mathematical certainty.
+            alpha: threshold parameter in (0, 1).
         """
         if not (0 < alpha < 1):
             raise ValueError("alpha must be in (0, 1)")
@@ -644,14 +646,7 @@ class SequentialHypothesisArbiter:
         return step_result
 
     def _current_decision(self) -> str:
-        """Current decision based on cumulative e-value.
-
-        Ville's inequality guarantees:
-        P(∃n: E_n ≥ 1/α | H0) ≤ α
-
-        So rejecting H0 when E_n ≥ 1/α gives anytime-valid FPR ≤ α.
-        Uses relative tolerance for floating-point boundary comparisons.
-        """
+        """Current heuristic decision using symmetric evidence thresholds."""
         e_n = self.cumulative_e_value
         # Use relative tolerance (1e-9) for boundary comparisons
         if e_n >= self.rejection_threshold * (1.0 - 1e-9):
@@ -671,7 +666,8 @@ class SequentialHypothesisArbiter:
             "alpha": self.alpha,
             "rejection_threshold": self.rejection_threshold,
             "acceptance_threshold": self.acceptance_threshold,
-            "fpr_guarantee": f"FPR ≤ {self.alpha} (Ville's inequality)",
+            "fpr_guarantee": None,
+            "calibration_status": "uncalibrated_heuristic",
             "history": self._history,
         }
 
@@ -725,7 +721,10 @@ def run_cesv_pipeline(
         intervention = engine.do_intervention(origin)
         intervention_results[origin] = intervention
         # Root cause backtracking
-        root_causes[origin] = engine.identify_root_cause(origin)
+        root = engine.identify_root_cause(origin)
+        root_causes[origin] = root
+        if root not in intervention_results:
+            intervention_results[root] = engine.do_intervention(root)
 
     # Phase 3: Uncertainty-error separation
     separation_results: list[dict[str, Any]] = []
@@ -744,10 +743,10 @@ def run_cesv_pipeline(
         if result["separation_decision"] != "unresolved"
     ]
 
-    # Special case: no evidential scores at all → verified_clean (nothing to prosecute)
+    # Absence of evidential scores is absence of evidence, not clean evidence.
     if not evidential_scores:
         return {
-            "state": "verified_clean",
+            "state": "unresolved",
             "responsible_event_id": None,
             "cesv_diagnostics": {
                 "provenance_graph": graph.to_dict(),

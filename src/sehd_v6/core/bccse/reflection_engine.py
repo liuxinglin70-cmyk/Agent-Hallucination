@@ -33,6 +33,7 @@ from .step_attributor import (
     ReflectionType,
     TriggerSource,
 )
+from .signal_adapter import resolve_authoritative_state
 
 
 def _format_optional_score(value: float | None) -> str:
@@ -268,12 +269,11 @@ def build_causal_reflection_prompt(
 
     system = """You are the BCCSE v5 causal-process reflection engine.
 
-The experiment uses gold-assisted selection (B+ mode). You may receive a
-gold diagnostic reference indicating the true label for this case. Use it
-as a diagnostic direction to understand WHY the detector's proof process
-failed, not as an instruction to copy the label into a rule. A trigger
-means the detector's proof process is internally incomplete or inconsistent;
-the gold reference helps you identify which detection stage failed.
+The experiment may be self-supervised or explicitly gold-enhanced. If a gold
+diagnostic reference is present, use it only to understand WHY the detector's
+proof process failed, never as rule content. If it is absent, do not infer a
+label or prescribe clean/error polarity. A trigger means the detector's proof
+process is internally incomplete or inconsistent.
 
 CRS projections, coverage values/states, trigger names, module names, and rule
 indices are diagnostic-only. They may support your rationale, but the runtime
@@ -320,7 +320,13 @@ the trace does not support a safe, runtime-observable, generalizable rule, retur
 Otherwise return exactly one JSON object:
 {"target_module":"<allowed module>","operation":"add_rule|modify_rule|remove_rule",
  "rule_index":<index or null>,"new_content":"<rule>",
+ "feature_description":"<short descriptive trajectory pattern>",
  "rationale":"<brief causal justification>"}
+
+feature_description is persisted and may be shown in a later reflection. It
+must be descriptive rather than imperative and must not contain a case/source
+identifier, gold/answer information, URL, quoted instruction, prompt text, or
+request to change model behavior.
 """
 
     # Build rejected edits section
@@ -552,7 +558,7 @@ def format_detection_context_for_llm(detection_result: Mapping[str, Any]) -> str
     adjudication = detection_result.get("adjudication") or {}
     pa = detection_result.get("proof_adjudication") or {}
     parts.append("  <adjudication>")
-    parts.append(f"  最终状态: {detection_result.get('state', 'unknown')}")
+    parts.append(f"  最终状态: {resolve_authoritative_state(detection_result)}")
     if pa.get("prosecution_coverage") is not None:
         parts.append(f"  控方覆盖率: {pa['prosecution_coverage']}")
     if pa.get("defense_coverage") is not None:

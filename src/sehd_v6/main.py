@@ -7,7 +7,7 @@ Usage:
     # Run a registered evolution set.
     python -m scripts.agenthallu.run_bccse_v5 evolve --size 50
 
-    # Evaluate an explicit champion. Evaluation defaults to 20 workers.
+    # Evaluate an explicit genome under a formally authorized config.
     python -m scripts.agenthallu.run_bccse_v5 evaluate \
         --set validation --genome /absolute/path/champion_genome.json
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import time
 from collections import Counter
@@ -100,6 +101,85 @@ def _assert_config_contract(config: dict[str, Any]) -> None:
             raise RuntimeError(f"Disallowed model in {key}: {model!r}")
     if route_count == 0:
         raise RuntimeError("Frozen v3.5 config contains no provider routes")
+
+
+def _assert_stage_authorized(
+    config: dict[str, Any],
+    *,
+    stage: str,
+    contains_d_cases: bool = False,
+) -> None:
+    """Enforce the frozen config's phase authorization before any provider call.
+
+    Evolution is a diagnostic strategy-development path.  Validation and test
+    are formal effectiveness paths and therefore cannot inherit a P0-only
+    authorization.  D cases require the explicit D authorization in either
+    path; an absent flag is fail-closed.
+    """
+    if config.get("execution_authorized") is not True:
+        raise RuntimeError(f"{stage} execution is not authorized by frozen config")
+    phase = str(config.get("authorized_phase") or "")
+    if not phase:
+        raise RuntimeError("Frozen config has no authorized_phase")
+
+    formal = stage in {
+        "evaluation",
+        "validation",
+        "test",
+        "outer",
+        "effectiveness",
+    }
+    if formal:
+        if phase == "P0_diagnostic_only" or "diagnostic" in phase.lower():
+            raise RuntimeError(
+                f"Formal {stage} effectiveness cannot run under diagnostic "
+                f"phase {phase!r}"
+            )
+        if config.get("D_execution_authorized") is not True:
+            raise RuntimeError(
+                f"Formal {stage} effectiveness requires "
+                "D_execution_authorized=true"
+            )
+        if not any(
+            marker in phase.lower()
+            for marker in (
+                "effectiveness",
+                "validation",
+                "test",
+                "oof",
+                "outer",
+                "final",
+            )
+        ):
+            raise RuntimeError(
+                f"Frozen phase {phase!r} does not explicitly authorize a "
+                f"formal {stage} effectiveness stage"
+            )
+        if stage == "outer" and config.get("outer_execution_authorized") is not True:
+            raise RuntimeError(
+                "Formal Outer evaluation requires outer_execution_authorized=true"
+            )
+    elif stage != "evolve":
+        raise ValueError(f"Unknown execution stage: {stage!r}")
+
+    if contains_d_cases and config.get("D_execution_authorized") is not True:
+        raise RuntimeError(
+            f"{stage} includes D cases but D_execution_authorized is not true"
+        )
+
+
+def _prediction_state(row: dict[str, Any]) -> str:
+    """Compatibility wrapper around the single occurrence-first resolver."""
+    from .core.bccse.signal_adapter import resolve_authoritative_state
+
+    return resolve_authoritative_state(row)
+
+
+def _decision_authority_invalid(row: dict[str, Any]) -> bool:
+    """Thin wrapper for formal-scope exclusion of invalid detector rows."""
+    from .core.bccse.signal_adapter import decision_authority_invalid
+
+    return decision_authority_invalid(row)
 
 
 def load_records(
@@ -205,6 +285,9 @@ def _load_inner_case_refs() -> set[str]:
                 if not line.strip():
                     continue
                 row = json.loads(line)
+                role = str(row.get("split") or row.get("partition") or "").lower()
+                if role in {"outer", "outer_sealed", "test_sealed"}:
+                    continue
                 case_ref = str(row.get("case_ref") or "")
                 if not case_ref:
                     raise RuntimeError(f"Cached inner row has no case_ref: {path}")
@@ -226,6 +309,22 @@ def _assert_inner_membership(case_ids: list[str], *, set_name: str) -> None:
             f"{set_name} contains cases outside the sealed inner universe: "
             + ", ".join(outside)
         )
+
+
+def _contains_d_cases(case_ids: list[str]) -> bool:
+    if not D_PREDICTIONS.exists():
+        raise FileNotFoundError(
+            f"Cannot determine D-stage authorization; cache missing: {D_PREDICTIONS}"
+        )
+    d_refs: set[str] = set()
+    with open(D_PREDICTIONS, "r", encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                row = json.loads(line)
+                ref = str(row.get("case_ref") or "")
+                if ref:
+                    d_refs.add(ref)
+    return any(_case_ref(case_id) in d_refs for case_id in case_ids)
 
 
 def _load_registered_evolution_ids() -> list[str]:
@@ -264,7 +363,7 @@ def _select_self_supervised_anchor_canaries(
         if row is None:
             continue
         signal = attribute_failure(row, use_gold=use_gold)
-        state = str(row.get("state") or "")
+        state = _prediction_state(row)
         if not signal.should_evolve and state in stable_by_state:
             stable_by_state[state].append((case_id, state))
 
@@ -322,12 +421,12 @@ def cmd_partition(args: argparse.Namespace) -> None:
 
 
 def cmd_evolve(args: argparse.Namespace) -> None:
-    """Run online evolution."""
+    """Run diagnostic strategy evolution; this is not an effectiveness claim."""
     _apply_project_root(getattr(args, "project_root", None))
     from .core.bccse.evolution_runner import run_online_evolution
     if bool(args.no_fitness_check):
         raise RuntimeError(
-            "Formal evolution requires the source replay gate; "
+            "Registered evolution requires the source replay gate; "
             "--no-fitness-check is not permitted"
         )
 
@@ -344,6 +443,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             f"--size must be between 1 and {len(registered_evolution_ids)}"
         )
     evolution_ids = registered_evolution_ids[:size]
+    config = load_config()
+    _assert_stage_authorized(
+        config,
+        stage="evolve",
+        contains_d_cases=_contains_d_cases(evolution_ids),
+    )
 
     validation_path = BCCSE_V5_ROOT / "validation_set_ids.json"
     if not validation_path.exists():
@@ -373,7 +478,6 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     # Load records using discover_records
     dataset_root = DATA_ROOT
     records = load_records(dataset_root, allowed_case_ids=evolution_ids)
-    config = load_config()
     missing_records = [case_id for case_id in evolution_ids if case_id not in records]
     if missing_records:
         raise RuntimeError(
@@ -386,6 +490,16 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     run_id = f"evolve_{size}_{int(time.time())}"
     output_dir = BCCSE_V5_ROOT / "runs" / run_id
     output_dir.mkdir(parents=True, exist_ok=False)
+    evolution_manifest_path = BCCSE_V5_ROOT / "stratified_evolution_set.json"
+    run_provenance = _build_run_provenance(
+        stage="evolve",
+        case_ids=evolution_ids,
+        config=config,
+        partition_path=partition_path,
+        case_manifest_path=evolution_manifest_path,
+        genome_path=(Path(args.initial_genome) if args.initial_genome else None),
+        mutation_route=(None if args.no_llm else MUTATION_ROUTE),
+    )
     with open(output_dir / "run_contract.json", "w", encoding="utf-8") as handle:
         json.dump(
             {
@@ -401,17 +515,25 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 "evolution_validation_overlap": 0,
                 "inner_universe_only": True,
                 "outer_exposure": False,
+                "execution_scope": "diagnostic_strategy_evolution",
+                "formal_effectiveness_claim": False,
+                "authorized_phase": str(config.get("authorized_phase") or ""),
+                "D_execution_authorized": config.get("D_execution_authorized") is True,
                 "supervision_mode": (
                     "gold_enhanced" if args.use_gold else "self_supervised"
                 ),
                 "fitness_check": True,
                 "fitness_batch_size": args.fitness_batch_size,
                 "fitness_use_gold": args.fitness_use_gold or args.use_gold,
-                "commit_validation": "source_replay_only",
+                "commit_validation": "source_replay_plus_stable_canaries",
+                "stable_canary_limit": args.canary_limit,
+                "experience_memory_path": args.experience_memory,
+                "initial_genome_path": args.initial_genome,
                 "detector_config": str(V35_CONFIG_PATH),
                 "mutation_model": (
                     None if args.no_llm else MUTATION_ROUTE["model"]
                 ),
+                "provenance": run_provenance,
             },
             handle,
             ensure_ascii=False,
@@ -434,6 +556,14 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         fitness_check=not args.no_fitness_check,
         fitness_batch_size=args.fitness_batch_size,
         fitness_use_gold=args.fitness_use_gold or args.use_gold,
+        experience_memory_path=(
+            Path(args.experience_memory) if args.experience_memory else None
+        ),
+        canary_limit=args.canary_limit,
+        initial_genome=(
+            _load_genome_strict(Path(args.initial_genome))
+            if args.initial_genome else None
+        ),
         run_id=run_id,
     )
 
@@ -458,6 +588,238 @@ def _case_set_hash(case_ids: list[str]) -> str:
 def _case_sequence_hash(case_ids: list[str]) -> str:
     payload = "\n".join(case_ids).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _canonical_sha256(value: Any) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _path_provenance(
+    path: Path,
+    *,
+    include_suffixes: set[str] | None = None,
+) -> dict[str, Any]:
+    """Hash a file or deterministic directory manifest without inventing data."""
+    resolved = path.resolve()
+    entry: dict[str, Any] = {"path": str(resolved), "present": path.exists()}
+    if not path.exists():
+        entry.update({"status": "missing", "sha256": None})
+        return entry
+    try:
+        if path.is_file():
+            entry.update(
+                {
+                    "kind": "file",
+                    "status": "complete",
+                    "sha256": _file_sha256(path),
+                    "size_bytes": path.stat().st_size,
+                }
+            )
+            return entry
+
+        files = [candidate for candidate in path.rglob("*") if candidate.is_file()]
+        if include_suffixes is not None:
+            files = [candidate for candidate in files if candidate.suffix in include_suffixes]
+        manifest = [
+            {
+                "path": candidate.relative_to(path).as_posix(),
+                "sha256": _file_sha256(candidate),
+                "size_bytes": candidate.stat().st_size,
+            }
+            for candidate in sorted(files, key=lambda candidate: candidate.as_posix())
+        ]
+        entry.update(
+            {
+                "kind": "directory_manifest",
+                "status": "complete" if manifest else "empty",
+                "sha256": _canonical_sha256(manifest) if manifest else None,
+                "file_count": len(manifest),
+                "size_bytes": sum(item["size_bytes"] for item in manifest),
+            }
+        )
+    except OSError as exc:
+        entry.update(
+            {
+                "status": "unavailable",
+                "sha256": None,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+    return entry
+
+
+def _case_records_provenance(data_root: Path, case_ids: list[str]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for case_id in case_ids:
+        parts = case_id.split("/")
+        if len(parts) != 2:
+            missing.append(case_id)
+            continue
+        path = data_root / parts[0] / f"{parts[1]}.json"
+        if not path.is_file():
+            missing.append(case_id)
+            continue
+        rows.append(
+            {
+                "case_id": case_id,
+                "sha256": _file_sha256(path),
+                "size_bytes": path.stat().st_size,
+            }
+        )
+    return {
+        "root": str(data_root.resolve()),
+        "status": "complete" if not missing and len(rows) == len(case_ids) else "incomplete",
+        "case_count": len(rows),
+        "case_sequence_sha256": _case_sequence_hash(case_ids),
+        "content_manifest_sha256": _canonical_sha256(rows),
+        "missing_case_ids": missing,
+    }
+
+
+def _provider_provenance(
+    config: dict[str, Any],
+    mutation_route: dict[str, Any] | None,
+) -> dict[str, Any]:
+    raw_routes = {
+        key: value
+        for key, value in config.items()
+        if key.endswith("_route") and isinstance(value, dict)
+    }
+    sensitive_markers = ("api_key", "token", "secret", "password", "credential")
+
+    def _redact(route: dict[str, Any] | None) -> dict[str, Any] | None:
+        if route is None:
+            return None
+        return {
+            key: (
+                "<redacted-present>"
+                if any(marker in key.lower() for marker in sensitive_markers)
+                and value not in (None, "")
+                else value
+            )
+            for key, value in route.items()
+        }
+
+    routes = {key: _redact(value) for key, value in raw_routes.items()}
+    sanitized_mutation_route = _redact(mutation_route)
+    payload = {
+        "detector_routes": routes,
+        "mutation_route": sanitized_mutation_route,
+    }
+    return {
+        "status": "complete" if routes else "incomplete",
+        "configuration_sha256": _canonical_sha256(payload),
+        "detector_models": sorted(
+            {str(value.get("model") or "") for value in raw_routes.values()}
+        ),
+        "mutation_model": (
+            str(mutation_route.get("model") or "") if mutation_route else None
+        ),
+        "credential_values_recorded": False,
+        "sensitive_fields_redacted_before_hashing": True,
+    }
+
+
+def _build_run_provenance(
+    *,
+    stage: str,
+    case_ids: list[str],
+    config: dict[str, Any],
+    partition_path: Path,
+    case_manifest_path: Path,
+    genome_path: Path | None = None,
+    genome_content_hash: str | None = None,
+    mutation_route: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    sources: dict[str, Any] = {
+        "code": _path_provenance(Path(__file__).resolve().parent, include_suffixes={".py"}),
+        "detector_config": _path_provenance(V35_CONFIG_PATH),
+        "partition": _path_provenance(partition_path),
+        "case_manifest": _path_provenance(case_manifest_path),
+        "case_records": _case_records_provenance(DATA_ROOT, case_ids),
+        "case_sequence": {
+            "status": "complete",
+            "count": len(case_ids),
+            "set_sha256": _case_set_hash(case_ids),
+            "sequence_sha256": _case_sequence_hash(case_ids),
+        },
+        "provider": _provider_provenance(config, mutation_route),
+        "baseline_caches": {
+            "status": "complete",
+            "entries": [
+                {"role": role, **_path_provenance(path)}
+                for role, path in (
+                    (
+                        "optional_consolidated",
+                        BCCSE_V5_ROOT / "baseline_predictions_by_id.json",
+                    ),
+                    ("D", D_PREDICTIONS),
+                    ("P0", P0_PREDICTIONS),
+                )
+            ],
+        },
+        "construct_census_cache": _path_provenance(CENSUS_ROOT),
+    }
+    required_cache_entries = sources["baseline_caches"]["entries"][1:]
+    if not all(entry.get("status") == "complete" for entry in required_cache_entries):
+        sources["baseline_caches"]["status"] = "incomplete"
+        sources["baseline_caches"]["required_entries"] = ["D", "P0"]
+    if genome_path is not None:
+        sources["genome"] = {
+            **_path_provenance(genome_path),
+            "content_hash": genome_content_hash,
+        }
+    elif stage == "evaluation":
+        sources["genome"] = {
+            "status": "missing",
+            "path": None,
+            "sha256": None,
+            "content_hash": genome_content_hash,
+        }
+
+    critical_names = [
+        "code",
+        "detector_config",
+        "partition",
+        "case_manifest",
+        "case_records",
+        "case_sequence",
+        "provider",
+        "baseline_caches",
+        "construct_census_cache",
+    ]
+    if stage == "evaluation":
+        critical_names.append("genome")
+    missing = [
+        name
+        for name in critical_names
+        if sources[name].get("status") != "complete"
+    ]
+    return {
+        "schema_version": "agenthallu.run_provenance.v1",
+        "stage": stage,
+        "sources": sources,
+        "reproducibility": {
+            "status": "reproducible" if not missing else "not_reproducible",
+            "critical_provenance_complete": not missing,
+            "missing_or_incomplete": missing,
+        },
+    }
 
 
 def _atomic_dump_json(path: Path, value: Any) -> None:
@@ -512,9 +874,12 @@ def _normalize_cached_baseline(
     prediction: dict[str, Any],
 ) -> dict[str, Any]:
     """Validate one cached baseline row without making provider calls."""
-    state = str(prediction.get("state") or "")
-    if state not in VALID_STATES:
-        raise RuntimeError(f"Invalid cached baseline state for {case_id}: {state!r}")
+    if _decision_authority_invalid(prediction):
+        raise RuntimeError(f"Cached baseline decision authority invalid for {case_id}")
+    try:
+        state = _prediction_state(prediction)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid cached baseline state for {case_id}: {exc}") from exc
     if "gold_label" not in prediction or prediction["gold_label"] is None:
         raise RuntimeError(f"Cached baseline gold_label missing for {case_id}")
     if not isinstance(prediction["gold_label"], bool):
@@ -528,7 +893,88 @@ def _normalize_cached_baseline(
     normalized["case_id"] = case_id
     normalized["case_ref"] = _case_ref(case_id)
     normalized["gold_label"] = bool(prediction["gold_label"])
+    normalized["state"] = state
     return normalized
+
+
+def _read_case_id_manifest(
+    path: Path,
+    *,
+    key: str,
+    role: str,
+) -> tuple[list[str], dict[str, Any]]:
+    if not path.exists():
+        raise FileNotFoundError(f"Required independent {role} manifest missing: {path}")
+    with open(path, "r", encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    case_ids = [str(value) for value in manifest.get(key) or []]
+    if not case_ids:
+        raise RuntimeError(f"{role} manifest is empty")
+    if len(case_ids) != len(set(case_ids)):
+        raise RuntimeError(f"{role} manifest contains duplicate case IDs")
+    for case_id in case_ids:
+        parts = case_id.split("/")
+        if (
+            len(parts) != 2
+            or not parts[0]
+            or not parts[1]
+            or any(value in {".", ".."} for value in parts)
+        ):
+            raise RuntimeError(f"{role} manifest has invalid case ID: {case_id!r}")
+    return case_ids, manifest
+
+
+def _resolve_outer_manifest_path() -> Path:
+    candidates = [
+        BCCSE_V5_ROOT / "outer_set_ids.json",
+        BCCSE_V5_ROOT / "partition" / "outer_set_ids.json",
+    ]
+    existing = [path for path in candidates if path.exists()]
+    if not existing:
+        raise FileNotFoundError(
+            "Formal Outer evaluation requires an explicit outer_set_ids.json; "
+            "case_ref reverse discovery and dataset scanning are forbidden"
+        )
+    if len(existing) != 1:
+        raise RuntimeError(
+            "Outer manifest is ambiguous; exactly one registered "
+            "outer_set_ids.json must exist"
+        )
+    return existing[0]
+
+
+def _assert_outer_membership(
+    case_ids: list[str],
+    *,
+    manifest: dict[str, Any],
+    partition: dict[str, Any],
+) -> None:
+    if str(manifest.get("role") or "").lower() != "outer":
+        raise RuntimeError("Outer manifest lacks explicit role='outer' evidence")
+    expected_refs = [_case_ref(case_id) for case_id in case_ids]
+    declared_refs = [str(value) for value in manifest.get("outer_case_refs") or []]
+    if declared_refs != expected_refs:
+        raise RuntimeError("Outer manifest case_ref evidence does not match its case IDs")
+    assignments = [
+        {"case_id": case_id, "case_ref": case_ref, "role": "outer"}
+        for case_id, case_ref in zip(case_ids, expected_refs)
+    ]
+    if manifest.get("role_assignments") != assignments:
+        raise RuntimeError("Outer manifest lacks per-case Outer role assignments")
+    if str(manifest.get("role_assignment_sha256") or "") != _canonical_sha256(
+        assignments
+    ):
+        raise RuntimeError("Outer manifest role-assignment hash mismatch")
+    if str(manifest.get("partition_payload_sha256") or "") != _canonical_sha256(
+        partition
+    ):
+        raise RuntimeError("Outer manifest is not hash-bound to the loaded partition")
+    inner_overlap = sorted(set(expected_refs).intersection(_load_inner_case_refs()))
+    if inner_overlap:
+        raise RuntimeError(
+            "Outer manifest contains cases registered in the sealed Inner universe: "
+            + ", ".join(inner_overlap)
+        )
 
 
 def _load_evaluation_ids(
@@ -538,60 +984,78 @@ def _load_evaluation_ids(
 ) -> tuple[list[str], str]:
     if set_name == "validation":
         validation_path = BCCSE_V5_ROOT / "validation_set_ids.json"
-        if not validation_path.exists():
-            raise FileNotFoundError(
-                f"Required independent validation manifest missing: {validation_path}"
-            )
-        with open(validation_path, "r", encoding="utf-8") as handle:
-            manifest = json.load(handle)
-        case_ids = [str(value) for value in manifest["validation_case_ids"]]
+        case_ids, _ = _read_case_id_manifest(
+            validation_path,
+            key="validation_case_ids",
+            role="validation",
+        )
         source = str(validation_path)
-
-    else:
+    elif set_name == "test":
         test_path = BCCSE_V5_ROOT / "test_set_ids.json"
-        if not test_path.exists():
-            raise FileNotFoundError(
-                "Formal test evaluation requires an explicit test_set_ids.json "
-                "manifest; case_ref reverse discovery is forbidden"
-            )
-        with open(test_path, "r", encoding="utf-8") as handle:
-            test_manifest = json.load(handle)
-        case_ids = [
-            str(value)
-            for value in test_manifest.get("test_case_ids") or []
-        ]
+        case_ids, _ = _read_case_id_manifest(
+            test_path,
+            key="test_case_ids",
+            role="test",
+        )
         source = str(test_path)
+    elif set_name == "outer":
+        outer_path = _resolve_outer_manifest_path()
+        case_ids, outer_manifest = _read_case_id_manifest(
+            outer_path,
+            key="outer_case_ids",
+            role="outer",
+        )
+        source = str(outer_path)
+    else:
+        raise ValueError(f"Unknown evaluation set: {set_name!r}")
 
-    if len(case_ids) != len(set(case_ids)):
-        raise RuntimeError(f"{set_name} manifest contains duplicate case IDs")
-    if not case_ids:
-        raise RuntimeError(f"{set_name} manifest is empty")
     _assert_disjoint_from_evolution(case_ids, set_name=set_name)
-    if set_name != "validation":
-        validation_path = BCCSE_V5_ROOT / "validation_set_ids.json"
-        if not validation_path.exists():
-            raise FileNotFoundError(
-                f"Cannot prove test/validation isolation: {validation_path}"
-            )
-        with open(validation_path, "r", encoding="utf-8") as handle:
-            validation_manifest = json.load(handle)
-        validation_ids = {
-            str(value)
-            for value in validation_manifest.get("validation_case_ids") or []
-        }
-        overlap = sorted(validation_ids.intersection(case_ids))
+    if set_name in {"test", "outer"}:
+        validation_ids, _ = _read_case_id_manifest(
+            BCCSE_V5_ROOT / "validation_set_ids.json",
+            key="validation_case_ids",
+            role="validation",
+        )
+        overlap = sorted(set(validation_ids).intersection(case_ids))
         if overlap:
             raise RuntimeError(
-                "Validation/test overlap detected; execution aborted: "
+                f"Validation/{set_name} overlap detected; execution aborted: "
                 + ", ".join(overlap)
             )
-    _assert_inner_membership(case_ids, set_name=set_name)
+    if set_name == "outer":
+        test_ids, _ = _read_case_id_manifest(
+            BCCSE_V5_ROOT / "test_set_ids.json",
+            key="test_case_ids",
+            role="test",
+        )
+        validation_test_overlap = sorted(set(validation_ids).intersection(test_ids))
+        if validation_test_overlap:
+            raise RuntimeError(
+                "Validation/test role overlap prevents Outer isolation audit: "
+                + ", ".join(validation_test_overlap)
+            )
+        test_overlap = sorted(set(test_ids).intersection(case_ids))
+        if test_overlap:
+            raise RuntimeError(
+                "Test/outer overlap detected; execution aborted: "
+                + ", ".join(test_overlap)
+            )
+        _assert_outer_membership(
+            case_ids,
+            manifest=outer_manifest,
+            partition=partition,
+        )
+    else:
+        _assert_inner_membership(case_ids, set_name=set_name)
     return case_ids, source
 
 
 def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
-    """Evaluate one genome with a single provider patch and true concurrency."""
+    """Formally evaluate one genome after a fail-closed phase check."""
     _apply_project_root(getattr(args, "project_root", None))
+    config = load_config()
+    _assert_stage_authorized(config, stage=str(args.set))
+
     from .core.paca_tcl import layered_engine as v2
     from .core.paca_tcl import proof_engine as v35
     from .core.paca_tcl.skill_integration import (
@@ -602,6 +1066,8 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
     from .core.bccse.step_attributor import attribute_failure
 
     partition_path = BCCSE_V5_ROOT / "partition" / "data_partition_v5.json"
+    if not partition_path.exists():
+        raise FileNotFoundError(f"Frozen partition artifact missing: {partition_path}")
     with open(partition_path, "r", encoding="utf-8") as handle:
         partition = json.load(handle)
 
@@ -619,8 +1085,12 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         set_name=args.set,
         partition=partition,
     )
+    _assert_stage_authorized(
+        config,
+        stage=str(args.set),
+        contains_d_cases=_contains_d_cases(eval_ids),
+    )
     records = load_records(DATA_ROOT, allowed_case_ids=eval_ids)
-    config = load_config()
     baselines = load_baseline_predictions()
     baseline_by_id: dict[str, dict[str, Any]] = {}
     missing_baseline: list[str] = []
@@ -648,6 +1118,51 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         / f"{args.set}_concurrent_{time.time_ns()}"
     )
     output_dir.mkdir(parents=True, exist_ok=False)
+    run_provenance = _build_run_provenance(
+        stage="evaluation",
+        case_ids=eval_ids,
+        config=config,
+        partition_path=partition_path,
+        case_manifest_path=Path(set_source),
+        genome_path=genome_path,
+        genome_content_hash=genome.content_hash,
+    )
+    is_outer_evaluation = str(args.set) == "outer"
+    final_evaluation_protocol = {
+        "is_outer_final_evaluation": is_outer_evaluation,
+        "outer_execution_authorized": (
+            config.get("outer_execution_authorized") is True
+        ),
+        "outer_custody_verified": config.get("outer_custody_verified") is True,
+        "D_execution_authorized": config.get("D_execution_authorized") is True,
+        "authorized_phase": str(config.get("authorized_phase") or ""),
+        "genome_access": "read_only",
+        "mutation_calls_allowed": False,
+        "experience_writeback_allowed": False,
+        "champion_writeback_allowed": False,
+        "semantics": (
+            "role_isolated_final_evaluation"
+            if is_outer_evaluation
+            else "inner_cross_set_evaluation_not_champion_eligible"
+        ),
+        "one_shot_enforcement": (
+            "external_custody_audit_no_durable_cross-process_use_registry"
+            if is_outer_evaluation
+            else "not_applicable"
+        ),
+        "audit_limitation": (
+            "Code enforces role isolation and hashes, not secrecy or one-shot "
+            "custody. outer_custody_verified records an external governance "
+            "attestation that must be audited independently."
+            if is_outer_evaluation
+            else None
+        ),
+        "outer_manifest_sha256": (
+            run_provenance["sources"]["case_manifest"].get("sha256")
+            if is_outer_evaluation
+            else None
+        ),
+    }
 
     print(f"Evaluating genome: {genome.content_hash}")
     print(f"  Eval set: {args.set} ({len(eval_ids)} cases)")
@@ -657,6 +1172,10 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
     print("  Evolution overlap: 0 (asserted before provider calls)")
     print(f"  Baseline: cached only ({len(baseline_by_id)} rows)")
     print(f"  Provider patch: single global patch; workers={workers}")
+    if is_outer_evaluation:
+        print("  Outer semantics: role-isolated final evaluation")
+        print("  Custody/one-shot enforcement: external audit")
+        print("  Genome/experience/champion writeback: disabled")
 
     compiled = compile_genome_for_paca(genome)
     original_v35 = v35.provider_call
@@ -691,11 +1210,15 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
             )
             if not isinstance(result, dict):
                 raise RuntimeError("detector returned a non-object result")
-            state = str(result.get("state") or "")
-            if state not in VALID_STATES:
-                raise RuntimeError(f"detector returned invalid state: {state!r}")
             if result.get("runtime_valid") is False:
                 raise RuntimeError("detector returned runtime_valid=false")
+            if _decision_authority_invalid(result):
+                raise RuntimeError("detector returned decision_authority=invalid")
+            state = _prediction_state(result)
+            compatibility_state = result.get("state")
+            if compatibility_state not in (None, "", state):
+                result["compatibility_state"] = compatibility_state
+            result["state"] = state
             return case_id, result, None
         except Exception as exc:
             return (
@@ -749,6 +1272,8 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
                 "failed_case_count": len(errors),
                 "errors": errors,
                 "metrics_computed": False,
+                "provenance": run_provenance,
+                "final_evaluation_protocol": final_evaluation_protocol,
             },
         )
         raise RuntimeError(
@@ -764,7 +1289,18 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
             "Metric scope mismatch: predictions are not exactly the declared "
             f"{args.set} manifest"
         )
-    metrics = compute_metrics(skill_results, baseline_results)
+    metrics = compute_metrics(
+        skill_results,
+        baseline_results,
+        claim_context={
+            "outer_evaluated": is_outer_evaluation,
+            "evaluation_set": str(args.set),
+            "outer_custody_verified": config.get("outer_custody_verified") is True,
+            "critical_provenance_complete": run_provenance["reproducibility"][
+                "critical_provenance_complete"
+            ],
+        },
+    )
 
     details: list[dict[str, Any]] = []
     trigger_counts: Counter[str] = Counter()
@@ -785,15 +1321,15 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
                 "case_id": case_id,
                 "case_ref": _case_ref(case_id),
                 "gold": bool(baseline["gold_label"]),
-                "baseline_state": str(baseline.get("state") or ""),
-                "skill_state": str(skill.get("state") or ""),
+                "baseline_state": _prediction_state(baseline),
+                "skill_state": _prediction_state(skill),
                 "error": errors.get(case_id),
                 "self_supervised_attribution": signal.to_dict(),
             }
         )
 
     eval_output = {
-        "schema_version": "agenthallu.bccse_v5_evaluation.v3",
+        "schema_version": "agenthallu.bccse_v5_evaluation.v5",
         "eval_set": args.set,
         "eval_set_source": set_source,
         "eval_set_hash": _case_set_hash(eval_ids),
@@ -815,6 +1351,9 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         "elapsed_seconds": time.time() - started,
         "errors": errors,
         "metrics": metrics,
+        "claim_eligibility": metrics["claim_eligibility"],
+        "provenance": run_provenance,
+        "final_evaluation_protocol": final_evaluation_protocol,
         "self_supervision_audit": {
             "mode": "self_supervised",
             "trigger_counts": dict(trigger_counts),
@@ -833,14 +1372,169 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
     print(f"Saved to: {output_dir / 'eval_metrics.json'}")
 
 
+def _exact_mcnemar(baseline_only_correct: int, skill_only_correct: int) -> dict[str, Any]:
+    """Dependency-free, two-sided exact McNemar test on discordant pairs."""
+    b = int(baseline_only_correct)
+    c = int(skill_only_correct)
+    if b < 0 or c < 0:
+        raise ValueError("McNemar discordant counts must be non-negative")
+    discordant = b + c
+    if discordant == 0:
+        p_value = 1.0
+    else:
+        tail = sum(math.comb(discordant, k) for k in range(min(b, c) + 1))
+        p_value = min(1.0, 2.0 * tail / (2 ** discordant))
+    return {
+        "method": "exact_two_sided_binomial_no_scipy",
+        "baseline_only_correct": b,
+        "skill_only_correct": c,
+        "discordant_pairs": discordant,
+        "p_value": p_value,
+        "alpha": 0.05,
+        "significant": p_value < 0.05,
+        "direction": "skill_gain" if c > b else ("skill_loss" if b > c else "tie"),
+    }
+
+
+def _paired_net_gain_confidence_interval(
+    *,
+    baseline_only_correct: int,
+    skill_only_correct: int,
+    total_pairs: int,
+) -> dict[str, Any]:
+    """95% paired net-gain CI via Wilson discordant-pair transformation."""
+    minimum_pairs = 20
+    b = int(baseline_only_correct)
+    c = int(skill_only_correct)
+    total = int(total_pairs)
+    result: dict[str, Any] = {
+        "method": (
+            "wilson_95_on_discordant_skill_win_probability_transformed_to_"
+            "paired_net_correctness_gain_rate"
+        ),
+        "confidence_level": 0.95,
+        "total_pair_denominator": total,
+        "discordant_pair_denominator": b + c,
+        "baseline_only_correct": b,
+        "skill_only_correct": c,
+        "minimum_total_pairs_for_claim": minimum_pairs,
+        "assumption": (
+            "conditions on the observed discordant-pair count; the interval "
+            "is for (skill_only_correct-baseline_only_correct)/total_pairs"
+        ),
+    }
+    if total < minimum_pairs:
+        return {
+            **result,
+            "status": "insufficient_sample",
+            "lower": None,
+            "upper": None,
+        }
+    discordant = b + c
+    if discordant == 0:
+        return {**result, "status": "complete", "lower": 0.0, "upper": 0.0}
+
+    z = 1.959963984540054
+    win_rate = c / discordant
+    denominator = 1.0 + (z * z / discordant)
+    center = (win_rate + z * z / (2.0 * discordant)) / denominator
+    half_width = (
+        z
+        * math.sqrt(
+            win_rate * (1.0 - win_rate) / discordant
+            + z * z / (4.0 * discordant * discordant)
+        )
+        / denominator
+    )
+    discordant_fraction = discordant / total
+    lower = discordant_fraction * (2.0 * max(0.0, center - half_width) - 1.0)
+    upper = discordant_fraction * (2.0 * min(1.0, center + half_width) - 1.0)
+    return {
+        **result,
+        "status": "complete",
+        "lower": max(-1.0, lower),
+        "upper": min(1.0, upper),
+    }
+
+
+def _claim_eligibility(
+    *,
+    paired_test: dict[str, Any],
+    paired_confidence_interval: dict[str, Any],
+    only_abstention_migration: bool,
+    claim_context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    context = dict(claim_context or {})
+    outer_evaluated = context.get("outer_evaluated") is True
+    outer_final_evaluation = (
+        outer_evaluated and str(context.get("evaluation_set") or "") == "outer"
+    )
+    outer_custody_verified = context.get("outer_custody_verified") is True
+    confidence_interval = (
+        paired_confidence_interval if outer_final_evaluation else None
+    )
+    if outer_final_evaluation:
+        context["confidence_interval"] = confidence_interval
+    has_ci = (
+        isinstance(confidence_interval, dict)
+        and confidence_interval.get("status") == "complete"
+        and confidence_interval.get("lower") is not None
+        and confidence_interval.get("upper") is not None
+    )
+    ci_supports_gain = has_ci and float(confidence_interval["lower"]) > 0.0
+    provenance_complete = context.get("critical_provenance_complete") is True
+    paired_gain = (
+        paired_test["significant"]
+        and paired_test["direction"] == "skill_gain"
+    )
+    reasons: list[str] = []
+    if only_abstention_migration:
+        reasons.append("state_changes_are_abstention_migrations_only")
+    if not paired_gain:
+        reasons.append("no_significant_paired_correctness_gain")
+    if not has_ci:
+        reasons.append("confidence_interval_missing")
+        if (
+            outer_final_evaluation
+            and confidence_interval.get("status") == "insufficient_sample"
+        ):
+            reasons.append("paired_ci_insufficient_sample")
+    elif not ci_supports_gain:
+        reasons.append("confidence_interval_does_not_support_positive_gain")
+    if not outer_final_evaluation:
+        reasons.append("outer_evaluation_missing")
+    elif not outer_custody_verified:
+        reasons.append("outer_custody_unverified")
+    if not provenance_complete:
+        reasons.append("critical_provenance_incomplete")
+    eligible = not reasons
+    return {
+        "eligible_for_detector_improvement_claim": eligible,
+        "eligible_for_champion_label": eligible,
+        "claim_status": "eligible" if eligible else "ineligible_research_observation",
+        "blocking_reasons": reasons,
+        "paired_significant_correctness_gain": paired_gain,
+        "only_abstention_migration": only_abstention_migration,
+        "confidence_interval_present": has_ci,
+        "confidence_interval_supports_positive_gain": ci_supports_gain,
+        "outer_evaluated": outer_evaluated,
+        "outer_final_evaluation": outer_final_evaluation,
+        "outer_custody_verified": outer_custody_verified,
+        "critical_provenance_complete": provenance_complete,
+        "context": context,
+    }
+
+
 def compute_metrics(
     skill_results: list[dict[str, Any]],
     baseline_results: list[dict[str, Any]],
+    *,
+    claim_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute evaluation metrics comparing skill vs baseline."""
+    """Compute occurrence-first three-state and transparent compatibility metrics."""
     if len(skill_results) != len(baseline_results):
         raise ValueError(
-            "Metric inputs must have identical validation-set cardinality: "
+            "Metric inputs must have identical evaluation-set cardinality: "
             f"{len(skill_results)} != {len(baseline_results)}"
         )
     skill_ids = [str(row.get("case_id") or "") for row in skill_results]
@@ -849,74 +1543,180 @@ def compute_metrics(
         if skill_ids != baseline_ids or any(not value for value in skill_ids):
             raise ValueError("Metric inputs are not aligned to the same case-ID order")
 
-    def _metrics_from_results(results: list[dict[str, Any]]) -> dict[str, float]:
-        tp = fp = tn = fn = 0
-        unresolved = 0
+    def _gold(row: dict[str, Any]) -> bool:
+        gold = row.get("gold_label")
+        if not isinstance(gold, bool):
+            raise ValueError("Metric gold_label must be bool before metric computation")
+        return gold
+
+    def _metrics_from_results(results: list[dict[str, Any]]) -> dict[str, Any]:
+        three_state = {
+            "gold_positive": {state: 0 for state in sorted(VALID_STATES)},
+            "gold_negative": {state: 0 for state in sorted(VALID_STATES)},
+        }
         for row in results:
-            state = str(row.get("state") or "")
-            if state not in VALID_STATES:
-                raise ValueError(f"Invalid prediction state in metric input: {state!r}")
-            gold = row.get("gold_label")
-            if gold is None:
-                raise ValueError("Metric input contains a row without gold_label")
-            if not isinstance(gold, bool):
-                raise ValueError(
-                    "Metric gold_label must be bool before metric computation"
-                )
-            gold = bool(gold)
-            if state == "verified_error":
-                if gold:
-                    tp += 1
-                else:
-                    fp += 1
-            elif state == "verified_clean":
-                if gold:
-                    fn += 1
-                else:
-                    tn += 1
-            else:  # unresolved
-                unresolved += 1
-                # Count unresolved as negative for F1 calculation
-                if gold:
-                    fn += 1
-                else:
-                    tn += 1
+            state = _prediction_state(row)
+            gold_key = "gold_positive" if _gold(row) else "gold_negative"
+            three_state[gold_key][state] += 1
 
-        total = tp + fp + tn + fn
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-        unresolved_rate = unresolved / total if total > 0 else 0.0
+        positive = three_state["gold_positive"]
+        negative = three_state["gold_negative"]
+        tp = positive["verified_error"]
+        fp = negative["verified_error"]
+        decisive_fn = positive["verified_clean"]
+        decisive_tn = negative["verified_clean"]
+        positive_unresolved = positive["unresolved"]
+        negative_unresolved = negative["unresolved"]
+        unresolved = positive_unresolved + negative_unresolved
+        total = sum(sum(row.values()) for row in three_state.values())
+        decisive = total - unresolved
+        decisive_correct = tp + decisive_tn
 
-        return {
+        # This explicitly named compatibility view preserves historical binary
+        # outputs.  Its TN includes negative unresolved by policy; the canonical
+        # three-state and selective metrics above never call those cases clean.
+        legacy_fn = decisive_fn + positive_unresolved
+        legacy_tn = decisive_tn + negative_unresolved
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + legacy_fn) if tp + legacy_fn else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        fpr = fp / (fp + legacy_tn) if fp + legacy_tn else 0.0
+        selective_accuracy = decisive_correct / decisive if decisive else 0.0
+        compatibility = {
+            "policy": "legacy_unresolved_collapsed_to_binary_negative",
+            "tp": tp,
+            "fp": fp,
+            "tn": legacy_tn,
+            "fn": legacy_fn,
             "f1": f1,
             "precision": precision,
             "recall": recall,
             "fpr": fpr,
-            "unresolved_rate": unresolved_rate,
-            "tp": tp, "fp": fp, "tn": tn, "fn": fn,
-            "unresolved": unresolved,
-            "total": total,
+            "warning": (
+                "tn includes negative unresolved for compatibility only; use "
+                "three_state_confusion for clean decisions"
+            ),
         }
+        return {
+            "total": total,
+            "three_state_confusion": three_state,
+            "decisive_confusion": {
+                "tp": tp,
+                "fp": fp,
+                "tn": decisive_tn,
+                "fn": decisive_fn,
+                "total_decisive": decisive,
+            },
+            "binary_compatibility": compatibility,
+            "unresolved": unresolved,
+            "unresolved_rate": unresolved / total if total else 0.0,
+            "positive_unresolved": positive_unresolved,
+            "negative_unresolved": negative_unresolved,
+            "positive_unresolved_rate": (
+                positive_unresolved / sum(positive.values()) if sum(positive.values()) else 0.0
+            ),
+            "negative_unresolved_rate": (
+                negative_unresolved / sum(negative.values()) if sum(negative.values()) else 0.0
+            ),
+            "decision_coverage": decisive / total if total else 0.0,
+            "selective_accuracy": selective_accuracy,
+            "selective_risk": 1.0 - selective_accuracy if decisive else 0.0,
+        }
+
+    for skill, baseline in zip(skill_results, baseline_results):
+        if _gold(skill) != _gold(baseline):
+            raise ValueError("Paired metric rows disagree on gold_label")
 
     skill_m = _metrics_from_results(skill_results)
     base_m = _metrics_from_results(baseline_results)
+    states = ("verified_error", "verified_clean", "unresolved")
+    transition_table = {
+        baseline_state: {skill_state: 0 for skill_state in states}
+        for baseline_state in states
+    }
+    baseline_only_correct = skill_only_correct = 0
+    changed_pairs: list[tuple[str, str]] = []
+    for skill, baseline in zip(skill_results, baseline_results):
+        skill_state = _prediction_state(skill)
+        baseline_state = _prediction_state(baseline)
+        transition_table[baseline_state][skill_state] += 1
+        gold = _gold(skill)
+        skill_correct = (
+            skill_state == ("verified_error" if gold else "verified_clean")
+        )
+        baseline_correct = (
+            baseline_state == ("verified_error" if gold else "verified_clean")
+        )
+        baseline_only_correct += int(baseline_correct and not skill_correct)
+        skill_only_correct += int(skill_correct and not baseline_correct)
+        if baseline_state != skill_state:
+            changed_pairs.append((baseline_state, skill_state))
+
+    paired_test = _exact_mcnemar(baseline_only_correct, skill_only_correct)
+    only_abstention_migration = bool(changed_pairs) and all(
+        "unresolved" in pair for pair in changed_pairs
+    )
+    total = len(skill_results)
+    paired_ci = _paired_net_gain_confidence_interval(
+        baseline_only_correct=baseline_only_correct,
+        skill_only_correct=skill_only_correct,
+        total_pairs=total,
+    )
+    claim_gate = _claim_eligibility(
+        paired_test=paired_test,
+        paired_confidence_interval=paired_ci,
+        only_abstention_migration=only_abstention_migration,
+        claim_context=claim_context,
+    )
+    skill_binary = skill_m["binary_compatibility"]
+    base_binary = base_m["binary_compatibility"]
 
     return {
-        "skill_f1": skill_m["f1"],
-        "baseline_f1": base_m["f1"],
-        "delta_f1": skill_m["f1"] - base_m["f1"],
-        "skill_precision": skill_m["precision"],
-        "baseline_precision": base_m["precision"],
-        "skill_recall": skill_m["recall"],
-        "baseline_recall": base_m["recall"],
-        "skill_fpr": skill_m["fpr"],
-        "baseline_fpr": base_m["fpr"],
+        "state_authority": (
+            "occurrence_state_then_proof_or_ledger_occurrence_then_"
+            "structured_incident_then_legacy_state"
+        ),
+        "skill_f1": skill_binary["f1"],
+        "baseline_f1": base_binary["f1"],
+        "delta_f1": skill_binary["f1"] - base_binary["f1"],
+        "skill_precision": skill_binary["precision"],
+        "baseline_precision": base_binary["precision"],
+        "skill_recall": skill_binary["recall"],
+        "baseline_recall": base_binary["recall"],
+        "skill_fpr": skill_binary["fpr"],
+        "baseline_fpr": base_binary["fpr"],
         "skill_unresolved_rate": skill_m["unresolved_rate"],
         "baseline_unresolved_rate": base_m["unresolved_rate"],
-        "skill_confusion": skill_m,
-        "baseline_confusion": base_m,
+        "skill_decision_coverage": skill_m["decision_coverage"],
+        "baseline_decision_coverage": base_m["decision_coverage"],
+        "skill_selective_accuracy": skill_m["selective_accuracy"],
+        "baseline_selective_accuracy": base_m["selective_accuracy"],
+        "skill_selective_risk": skill_m["selective_risk"],
+        "baseline_selective_risk": base_m["selective_risk"],
+        "skill_positive_unresolved_rate": skill_m["positive_unresolved_rate"],
+        "baseline_positive_unresolved_rate": base_m["positive_unresolved_rate"],
+        "skill_negative_unresolved_rate": skill_m["negative_unresolved_rate"],
+        "baseline_negative_unresolved_rate": base_m["negative_unresolved_rate"],
+        "skill_three_state_confusion": skill_m["three_state_confusion"],
+        "baseline_three_state_confusion": base_m["three_state_confusion"],
+        "skill_decisive_confusion": skill_m["decisive_confusion"],
+        "baseline_decisive_confusion": base_m["decisive_confusion"],
+        "skill_binary_compatibility": skill_binary,
+        "baseline_binary_compatibility": base_binary,
+        # Stable aliases for older readers; the policy field prevents these
+        # compatibility counts from being mistaken for three-state decisions.
+        "skill_confusion": skill_binary,
+        "baseline_confusion": base_binary,
+        "paired_transition_table": transition_table,
+        "paired_correctness": {
+            "net_gain_count": skill_only_correct - baseline_only_correct,
+            "net_gain_rate": (
+                (skill_only_correct - baseline_only_correct) / total if total else 0.0
+            ),
+            "mcnemar": paired_test,
+            "net_gain_confidence_interval": paired_ci,
+        },
+        "claim_eligibility": claim_gate,
     }
 
 
@@ -924,7 +1724,7 @@ def cmd_full(args: argparse.Namespace) -> None:
     """Prevent a convenience command from mutating frozen scientific state."""
     raise RuntimeError(
         "The 'full' command is disabled for the frozen protocol. Run 'evolve' "
-        "and then 'evaluate --genome <explicit champion>' as separate audited steps."
+        "and then 'evaluate --genome <explicit genome>' as separate audited steps."
     )
 
 
@@ -980,10 +1780,27 @@ def main():
         type=int,
         default=1,
         help=(
-            "Locally useful shadow edits per commit/rollback batch (1-10). "
-            "Default 1 (incremental commit): each edit validated and committed "
-            "independently, avoiding same-module edit interference."
+            "Must be 1: each edit is replayed and committed independently so "
+            "fitness credit remains attributable."
         ),
+    )
+    p_evolve.add_argument(
+        "--experience-memory",
+        type=str,
+        default=None,
+        help="Prior htc_tes_experience_memory.json to load before evolution",
+    )
+    p_evolve.add_argument(
+        "--initial-genome",
+        type=str,
+        default=None,
+        help="Audited champion_genome.json to continue evolving",
+    )
+    p_evolve.add_argument(
+        "--canary-limit",
+        type=int,
+        default=4,
+        help="Previously stable evolution cases used for per-edit regression replay",
     )
     p_evolve.add_argument(
         "--fitness-use-gold",
@@ -995,14 +1812,28 @@ def main():
     )
 
     # evaluate
-    p_eval = subparsers.add_parser("evaluate", help="Evaluate evolved skill")
+    p_eval = subparsers.add_parser(
+        "evaluate",
+        help="Formally evaluate a genome (requires D/effectiveness authorization)",
+    )
     p_eval.add_argument("--project-root", type=str, default=None, help="Override AGENT_HALLUCINATION_ROOT")
-    p_eval.add_argument("--set", choices=["validation", "test"], default="validation")
+    p_eval.add_argument(
+        "--set",
+        choices=["validation", "test", "outer"],
+        default="validation",
+        help=(
+            "Evaluation role; outer additionally requires a hash-bound explicit "
+            "manifest and outer_execution_authorized=true"
+        ),
+    )
     p_eval.add_argument(
         "--genome",
         type=str,
         required=True,
-        help="Explicit path to the champion genome JSON",
+        help=(
+            "Explicit genome JSON path; claim eligibility is determined from "
+            "paired evidence, CI, Outer evidence and provenance"
+        ),
     )
     p_eval.add_argument(
         "--workers",

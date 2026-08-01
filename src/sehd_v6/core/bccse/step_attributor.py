@@ -33,6 +33,7 @@ from .signal_adapter import (
     CoverageReading,
     extract_coverage,
     extract_crs_signal,
+    resolve_authoritative_state,
 )
 
 
@@ -137,8 +138,6 @@ CRS_THRESHOLD_ERROR = 0.45
 # Only meaningful for QUANTITATIVE coverage readings; see
 # `_adversarially_tested` for the categorical (production v3.5) rule.
 ADVERSARIAL_EQUILIBRIUM_THRESHOLD = 0.4
-
-
 def _compute_adversarial_equilibrium(
     prosecution: CoverageReading, defense: CoverageReading
 ) -> float:
@@ -272,7 +271,7 @@ class AttributionSignal:
 
 def _prediction_state(row: Mapping[str, Any]) -> bool | None:
     """Extract predicted polarity from state string."""
-    state = str(row.get("state") or "")
+    state = resolve_authoritative_state(row)
     if state == "verified_error":
         return True
     if state == "verified_clean":
@@ -498,9 +497,7 @@ def attribute_failure(
     - High-confidence verified_error (all CRS dimensions consistently high)
     - High-confidence verified_clean (defense overwhelming)
     """
-    state = str(row.get("state") or "")
-    if state not in {"verified_error", "verified_clean", "unresolved"}:
-        raise ValueError(f"Unsupported detection state for attribution: {state!r}")
+    state = resolve_authoritative_state(row)
     predicted = _prediction_state(row)
     prosecution, defense = _extract_coverage(row)
     prosecution_cov, defense_cov = prosecution.score, defense.score

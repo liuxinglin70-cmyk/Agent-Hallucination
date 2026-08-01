@@ -5,8 +5,8 @@ Orders evolution cases by "learning edge" priority:
 2. Boundary resolved cases second (CRS near threshold)
 3. High-confidence correct cases last (provide stable_success signal)
 
-Case ordering is a prioritization hint only; commit safety is enforced by
-structural validation and source replay.
+Case ordering is a prioritization hint only; champion promotion requires
+structural validation plus explicit independent correctness evidence.
 
 Inspired by HIVE (ICML 2026): "strongest learning signals are concentrated
 at the learning edge defined by the intersection of medium difficulty and
@@ -16,6 +16,8 @@ high response entropy."
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+
+from .signal_adapter import resolve_authoritative_state
 
 
 def order_evolution_cases(
@@ -55,7 +57,7 @@ def order_evolution_cases(
             unresolved.append(cid)  # Unknown → treat as high priority
             continue
 
-        state = str(pred.get("state") or "")
+        state = resolve_authoritative_state(pred)
         if state == "unresolved":
             unresolved.append(cid)
         elif state in ("verified_error", "verified_clean"):
@@ -92,7 +94,7 @@ def get_case_priority_label(
     pred = baseline_predictions.get(case_id)
     if pred is None:
         return "unknown"
-    state = str(pred.get("state") or "")
+    state = resolve_authoritative_state(pred)
     if state == "unresolved":
         return "unresolved"
     if use_gold:
