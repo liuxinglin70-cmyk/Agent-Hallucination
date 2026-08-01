@@ -288,12 +288,19 @@ def provider_call_with_schema(
         route["model"] = canonical_model_name(str(route.get("model") or ""))
     except ValueError:
         pass
+    # Keep the wire payload aligned with the resolved route.  Previously the
+    # route parser accepted temperature/max_tokens but this transport silently
+    # hard-coded temperature=0 and dropped max_tokens.  That made mutation
+    # routes unexpectedly deterministic and allowed long reasoning tails to
+    # ignore the configured output budget.
     payload = {
         "model": route["model"],
-        "temperature": 0,
+        "temperature": float(route.get("temperature", 0)),
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "response_format": {"type": "json_object"},
     }
+    if route.get("max_tokens") is not None:
+        payload["max_tokens"] = int(route["max_tokens"])
     body = packet.canonical_json(payload).encode("utf-8")
     # v3.5.1: 缓存键含 cache_prefix 前缀，与 evaluator 的 _json_object_provider_call 区分
     # （两者 payload 可能相同但 schema 验证不同，必须隔离缓存）
@@ -316,8 +323,28 @@ def provider_call_with_schema(
 
     api_key = resolve_provider_credential(route, purpose=purpose)
     retries = int(route.get("transport_retries", 2))
+    per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
+    # A retry budget without a total deadline can turn one provider call into
+    # several full timeout windows.  Use the per-attempt timeout as the safe
+    # default total budget when no explicit route override is supplied.
+    total_timeout = route.get("total_timeout_seconds", per_attempt_timeout)
+    deadline = (
+        time.monotonic() + max(1, int(total_timeout))
+        if total_timeout is not None
+        else None
+    )
     last_error: Exception | None = None
     for attempt in range(retries + 1):
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                last_error = TimeoutError(
+                    "provider total timeout exceeded before attempt"
+                )
+                break
+            request_timeout = max(1, min(per_attempt_timeout, int(remaining)))
+        else:
+            request_timeout = per_attempt_timeout
         try:
             req = urlrequest.Request(
                 route["endpoint"].rstrip("/") + "/chat/completions",
@@ -326,7 +353,7 @@ def provider_call_with_schema(
                 method="POST",
             )
             started = time.time()
-            with urlrequest.urlopen(req, timeout=int(route.get("timeout_seconds", 300))) as response:
+            with urlrequest.urlopen(req, timeout=request_timeout) as response:
                 raw = response.read()
             value = json.loads(raw.decode("utf-8"))
             content = value["choices"][0]["message"]["content"]
@@ -358,7 +385,14 @@ def provider_call_with_schema(
         except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
             if attempt < retries:
-                time.sleep(2**attempt)
+                backoff = float(2**attempt)
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    backoff = min(backoff, remaining)
+                if backoff > 0:
+                    time.sleep(backoff)
     assert last_error is not None
     raise last_error
 

@@ -203,6 +203,60 @@ def test_config_route_purpose_is_not_overwritten_at_transport_boundary(
     assert captured["payload"]["model"] == "deepseek-v4-pro"
 
 
+def test_provider_transport_honors_route_generation_budget_and_total_timeout(
+    tmp_path, monkeypatch,
+):
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    captured: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        basic_runner,
+        "_global_cache_path",
+        lambda request_hash: tmp_path / f"{request_hash}.json",
+    )
+    basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "temperature": 0.3,
+            "max_tokens": 77,
+            "timeout_seconds": 20,
+            "total_timeout_seconds": 4,
+            "transport_retries": 0,
+        },
+        system="return json",
+        user="{}",
+        cache_dir=tmp_path,
+        require_candidates=False,
+    )
+    assert captured["payload"]["temperature"] == 0.3
+    assert captured["payload"]["max_tokens"] == 77
+    assert captured["timeout"] == 4
+
+
 def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, monkeypatch):
     import json
 

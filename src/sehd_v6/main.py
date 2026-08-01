@@ -593,6 +593,34 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         f"(probe-source overlap=0, final-holdout exposure=0)"
     )
 
+    # Label-free source replay can show direction but cannot certify itself.
+    # Reserve stable development cases outside the mutation-source prefix so
+    # every provisional edit has an independent non-regression anchor.
+    fitness_uses_gold = bool(args.fitness_use_gold or args.use_gold)
+    canary_candidates = [
+        case_id
+        for case_id in registered_evolution_ids
+        if case_id not in set(evolution_ids) and case_id not in set(probe_ids)
+    ]
+    selected_canaries: list[tuple[str, str]] = []
+    if args.canary_limit > 0 and canary_candidates:
+        try:
+            selected_canaries = _select_self_supervised_anchor_canaries(
+                canary_candidates,
+                limit=args.canary_limit,
+                use_gold=fitness_uses_gold,
+            )
+        except RuntimeError:
+            if not fitness_uses_gold:
+                raise
+    canary_case_ids = [case_id for case_id, _ in selected_canaries]
+    if not fitness_uses_gold and args.canary_limit > 0 and not canary_case_ids:
+        raise RuntimeError(
+            "Label-free evolution requires at least one stable canary outside "
+            "the mutation source set; reduce --size or register a larger "
+            "development pool"
+        )
+
     # Load evolution sources plus only the budgeted prefix of the registered
     # probe.  Probe IDs are passed separately and never become mutation sources.
     dataset_root = DATA_ROOT
@@ -603,7 +631,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             stage="evolve",
             contains_d_cases=_contains_d_cases(active_probe_ids),
         )
-    execution_record_ids = list(dict.fromkeys([*evolution_ids, *active_probe_ids]))
+    execution_record_ids = list(dict.fromkeys([
+        *evolution_ids,
+        *canary_case_ids,
+        *active_probe_ids,
+    ]))
     records = load_records(dataset_root, allowed_case_ids=execution_record_ids)
     missing_records = [
         case_id for case_id in execution_record_ids if case_id not in records
@@ -698,6 +730,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 "fitness_use_gold": args.fitness_use_gold or args.use_gold,
                 "commit_validation": "source_replay_plus_stable_canaries",
                 "stable_canary_limit": args.canary_limit,
+                "stable_canary_case_ids": canary_case_ids,
+                "stable_canary_selection": [
+                    {"case_id": case_id, "baseline_state": state}
+                    for case_id, state in selected_canaries
+                ],
                 "experience_memory_path": args.experience_memory,
                 "initial_genome_path": args.initial_genome,
                 "detector_config": str(V35_CONFIG_PATH),
@@ -731,6 +768,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             Path(args.experience_memory) if args.experience_memory else None
         ),
         canary_limit=args.canary_limit,
+        canary_case_ids=canary_case_ids,
         initial_genome=(
             _load_genome_strict(Path(args.initial_genome))
             if args.initial_genome else None

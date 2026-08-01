@@ -73,18 +73,36 @@ class RejectedEditEntry:
     proposal: EditProposal
     regressed_cases: list[str]
     budget_consumed: int
-    reject_reasons: list[str] = None
-
-    def __post_init__(self):
-        if self.reject_reasons is None:
-            self.reject_reasons = []
+    reject_reasons: list[str] = field(default_factory=list)
+    rejection_stage: str = "structural_gate"
+    observed_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "proposal": self.proposal.to_dict(),
             "regressed_cases": self.regressed_cases,
             "budget_consumed": self.budget_consumed,
+            "reject_reasons": list(self.reject_reasons),
+            "rejection_stage": self.rejection_stage,
+            "observed_effect": self.observed_effect,
         }
+
+    def feedback_summary(self) -> str:
+        """Return bounded, actionable feedback for the next reflection."""
+        # Only expose stable reason categories. Detail suffixes can contain
+        # case IDs or echoed rule text and must not re-enter an LLM prompt.
+        reasons = "; ".join(
+            str(value).split(":", 1)[0]
+            for value in self.reject_reasons[:3]
+        )
+        observed = (
+            f"; observed={self.observed_effect[:160]}"
+            if self.observed_effect else ""
+        )
+        return (
+            f"stage={self.rejection_stage}; "
+            f"reasons={reasons or 'unspecified'}{observed}"
+        )
 
 
 # Mapping from reflection type to preferred operation
@@ -321,12 +339,20 @@ Otherwise return exactly one JSON object:
 {"target_module":"<allowed module>","operation":"add_rule|modify_rule|remove_rule",
  "rule_index":<index or null>,"new_content":"<rule>",
  "feature_description":"<short descriptive trajectory pattern>",
+ "expected_effect":"<one concrete runtime-observable change>",
  "rationale":"<brief causal justification>"}
 
 feature_description is persisted and may be shown in a later reflection. It
 must be descriptive rather than imperative and must not contain a case/source
 identifier, gold/answer information, URL, quoted instruction, prompt text, or
 request to change model behavior.
+
+expected_effect is a counterfactual prediction for source replay, not a final
+verdict. State exactly one observable change, such as "prosecution coverage
+gains a complete causal field", "defense coverage gains a cited support
+reference", "candidate_count increases", or "the same unresolved process
+state becomes authoritative". If no single observable change can be predicted
+from the trace, return no_edit instead.
 """
 
     # Build rejected edits section
@@ -334,7 +360,8 @@ request to change model behavior.
     if rejected_buffer:
         rejected_lines = [
             f"  - {r.proposal.target_module}/{r.proposal.operation}: "
-            f"\"{r.proposal.content[:100]}\" → REJECTED (constraint violation)"
+            f"\"{r.proposal.content[:100]}\" -> REJECTED "
+            f"({r.feedback_summary()})"
             for r in rejected_buffer[-5:]
         ]
         rejected_info = (
@@ -459,7 +486,8 @@ request to change model behavior.
         "or\n"
         f'{{"target_module":"<{allowed_modules_text}>",'
         '"operation":"add_rule|modify_rule|remove_rule","rule_index":null,'
-        '"new_content":"...","rationale":"..."}}\n'
+        '"new_content":"...","feature_description":"...",'
+        '"expected_effect":"...","rationale":"..."}}\n'
         "</task>"
     )
     return system, user
@@ -699,7 +727,7 @@ def build_mutator_prompt(
     if rejected_buffer:
         rejected_lines = [
             f"- REJECTED: {r.proposal.target_module}/{r.proposal.operation}: "
-            f"{r.proposal.content[:80]} (reason: structural constraint violation)"
+            f"{r.proposal.content[:80]} ({r.feedback_summary()})"
             for r in rejected_buffer[-5:]
         ]
         rejected_info = f"\n\nPREVIOUSLY REJECTED EDITS (do not repeat):\n" + "\n".join(rejected_lines)

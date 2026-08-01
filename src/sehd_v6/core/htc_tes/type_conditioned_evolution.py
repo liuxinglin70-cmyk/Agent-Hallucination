@@ -292,7 +292,17 @@ class TypeConditionedEvolution:
             if secondary_type is not None
             else ()
         )
-        return primary + secondary
+        routed = primary + secondary
+        if routed:
+            return routed
+
+        # The type classifier is advisory; the causal attributor is the
+        # stronger runtime provenance boundary.  A hard empty intersection
+        # made a low-confidence type mismatch silently discard an otherwise
+        # auditable edit candidate (one of the five-case run's five triggers
+        # was lost here).  Fall back to the already bounded attributor route,
+        # preserving safety while avoiding classifier-induced dead ends.
+        return tuple(dict.fromkeys(str(module) for module in attribution_modules if module))
 
     def get_edit_strategy(self, hallucination_type: HallucinationType) -> str:
         """Get the editing strategy for a given hallucination type."""

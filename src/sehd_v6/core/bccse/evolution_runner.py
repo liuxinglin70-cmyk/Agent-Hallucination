@@ -159,6 +159,65 @@ class OnlineEvolutionResult:
         }
 
 
+def _expected_effect_audit(
+    edit: SkillEdit,
+    assessment: FitnessAssessment,
+) -> dict[str, Any]:
+    """Compare the mutator's counterfactual prediction with source replay."""
+    expected = " ".join(str(edit.expected_effect or "").split())[:240]
+    if not expected:
+        status = "unspecified"
+    elif assessment.worsened:
+        status = "contradicted"
+    elif assessment.decision == "no_effect":
+        status = "not_observed"
+    else:
+        status = "observed"
+    return {
+        "expected": expected,
+        "status": status,
+        "observed_decision": assessment.decision,
+        "observed_reasons": list(assessment.reasons),
+        "local_score_before": assessment.local_score_before,
+        "local_score_after": assessment.local_score_after,
+    }
+
+
+def _build_rejection_summary(
+    gate_summary: Mapping[str, Any],
+    steps: Sequence[EvolutionStep],
+) -> dict[str, Any]:
+    """Separate legality, evidence, regression and runtime rejection causes."""
+    reason_counts: dict[str, int] = {}
+    stage_counts: dict[str, int] = {}
+    for certificate in gate_summary.get("certificates") or ():
+        if certificate.get("decision") != "reject":
+            continue
+        reasons = [str(value) for value in certificate.get("reject_reasons") or ()]
+        if any("runtime" in value or "apply_edit_failed" in value for value in reasons):
+            stage = "runtime"
+        elif any("no_effect" in value for value in reasons):
+            stage = "evidence_no_effect"
+        elif any("directional_evidence" in value for value in reasons):
+            stage = "evidence_unverified"
+        elif any("worse" in value or "regression" in value for value in reasons):
+            stage = "regression"
+        else:
+            stage = "structural"
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        for reason in reasons:
+            key = reason.split(":", 1)[0]
+            reason_counts[key] = reason_counts.get(key, 0) + 1
+    decision_counts: dict[str, int] = {}
+    for step in steps:
+        decision_counts[step.gate_decision] = decision_counts.get(step.gate_decision, 0) + 1
+    return {
+        "by_stage": stage_counts,
+        "by_reason": reason_counts,
+        "by_decision": decision_counts,
+    }
+
+
 @dataclass
 class ProvisionalEdit:
     """One reversible edit admitted to the current shadow genome."""
@@ -282,6 +341,11 @@ def _run_detection_with_genome(
     result = invoke()
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
+    # Formal evolution must never consume legacy rows that omit the explicit
+    # authority field.  Compatibility evaluators may still inspect such rows,
+    # but they cannot enter source fitness or champion promotion.
+    if not str(result.get("decision_authority") or "").strip():
+        raise RuntimeError("detector returned missing decision authority")
     if decision_authority_invalid(result):
         raise RuntimeError("detector returned invalid decision authority")
     try:
@@ -349,6 +413,7 @@ def _llm_merge_rules(
     *,
     mutation_route: dict[str, Any] | None,
     cache_dir: Path | None = None,
+    budget_usage: dict[str, int] | None = None,
 ) -> str | None:
     """Merge two semantically-overlapping rules into a single rule.
 
@@ -406,6 +471,8 @@ def _llm_merge_rules(
         "请以 JSON 格式返回：{\"merged_rule\": \"合并后的规则文本\"}"
     )
     try:
+        if budget_usage is not None:
+            budget_usage["mutation_calls"] += 1
         merged, _ = json_object_provider_call(
             route=mutation_route,
             purpose="mutation",
@@ -418,6 +485,8 @@ def _llm_merge_rules(
             if rule and len(rule) <= 120:
                 return rule
     except Exception:
+        if budget_usage is not None:
+            budget_usage["mutation_errors"] += 1
         pass
     # Fallback to structural merge
     return _llm_merge_rules(existing_rule, new_rule, mutation_route=None)
@@ -441,6 +510,7 @@ def run_online_evolution(
     fitness_use_gold: bool = False,
     experience_memory_path: Path | None = None,
     canary_limit: int = 2,
+    canary_case_ids: Sequence[str] = (),
     validation_probe_every: int = 0,
     probe_ids: Sequence[str] = (),
     probe_limit: int = 2,
@@ -484,6 +554,10 @@ def run_online_evolution(
             before evolution so confirmed observations can guide reflection.
         canary_limit: Maximum sampled stable evolution cases replayed for
             local non-regression on each edit. Default 2.
+        canary_case_ids: Optional pre-registered label-free baseline canaries.
+            These are evaluated once before evolution so an all-triggered
+            evolution sample can still have independent non-regression anchors.
+            They must be disjoint from evolution and probe cases.
         validation_probe_every: Run the independent gold development probe
             after each N accepted edits. Zero disables this trigger.
         probe_ids: Pre-registered development-probe case IDs. These are never
@@ -524,6 +598,24 @@ def run_online_evolution(
         raise ValueError("probe_limit must be between 0 and 20")
     if len(probe_ids) != len(set(probe_ids)):
         raise ValueError("probe_ids contains duplicates")
+    if len(canary_case_ids) != len(set(canary_case_ids)):
+        raise ValueError("canary_case_ids contains duplicates")
+    overlapping_canary_ids = sorted(
+        set(canary_case_ids).intersection(evolution_case_ids)
+    )
+    if overlapping_canary_ids:
+        raise ValueError(
+            "canary_case_ids must be disjoint from evolution_case_ids: "
+            + ", ".join(overlapping_canary_ids)
+        )
+    overlapping_canary_probe_ids = sorted(
+        set(canary_case_ids).intersection(probe_ids)
+    )
+    if overlapping_canary_probe_ids:
+        raise ValueError(
+            "canary_case_ids must be disjoint from probe_ids: "
+            + ", ".join(overlapping_canary_probe_ids)
+        )
     overlapping_probe_ids = sorted(set(probe_ids).intersection(evolution_case_ids))
     if overlapping_probe_ids:
         raise ValueError(
@@ -533,6 +625,13 @@ def run_online_evolution(
     missing_probe_records = [case_id for case_id in probe_ids if case_id not in records]
     if missing_probe_records:
         raise ValueError("Probe records missing: " + ", ".join(missing_probe_records))
+    missing_canary_records = [
+        case_id for case_id in canary_case_ids if case_id not in records
+    ]
+    if missing_canary_records:
+        raise ValueError(
+            "Canary records missing: " + ", ".join(missing_canary_records)
+        )
     registered_probe_ids = tuple(probe_ids[:probe_limit])
     missing_probe_gold = [
         case_id
@@ -580,7 +679,14 @@ def run_online_evolution(
         "source_replays": 0,
         "canary_cases": 0,
         "probe_cases": 0,
+        # ``provider_calls`` is retained as the historical detector-call
+        # counter. Explicit fields avoid conflating detector replays with
+        # reflection/mutation calls in audit output.
         "provider_calls": 0,
+        "detector_calls": 0,
+        "mutation_calls": 0,
+        "mutation_errors": 0,
+        "mutation_cache_hits": 0,
     }
     rollback_reason = ""
     stable_genome = champion_genome.clone()
@@ -608,6 +714,7 @@ def run_online_evolution(
     # validation and outer partitions remain unopened.
     stable_canaries: dict[str, dict[str, Any]] = {}
     stable_canaries_checkpoint: dict[str, dict[str, Any]] = {}
+    baseline_canary_audit: list[dict[str, Any]] = []
 
     def canary_preserved(
         parent_result: Mapping[str, Any],
@@ -670,6 +777,7 @@ def run_online_evolution(
     ) -> dict[str, Any]:
         """Run one detector call in a counted, label-free envelope."""
         budget_usage["provider_calls"] += 1
+        budget_usage["detector_calls"] += 1
         budget_field = {
             "source": "source_replays",
             "canary": "canary_cases",
@@ -689,6 +797,18 @@ def run_online_evolution(
             shared_cache_root=shared_cache_root,
         )
 
+    def run_mutation_call(**kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Count attribution/reflection calls separately from detector calls."""
+        budget_usage["mutation_calls"] += 1
+        try:
+            parsed, meta = json_object_provider_call(**kwargs)
+        except Exception:
+            budget_usage["mutation_errors"] += 1
+            raise
+        if isinstance(meta, Mapping) and meta.get("cache_hit"):
+            budget_usage["mutation_cache_hits"] += 1
+        return parsed, meta
+
     def attribution_for(
         result: Mapping[str, Any],
         case_id: str,
@@ -700,6 +820,44 @@ def run_online_evolution(
             if gold is not None:
                 payload["gold_label"] = gold
         return attribute_failure(payload, use_gold=use_gold)
+
+    # Seed independent label-free anchors before processing the evolution
+    # sample. Without this explicit pool, an all-triggered sample has no
+    # stable case available for the non-regression gate.
+    registered_canary_ids = tuple(canary_case_ids[:canary_limit])
+    for canary_id in registered_canary_ids:
+        audit: dict[str, Any] = {"case_id": canary_id, "admitted": False}
+        try:
+            canary_result = run_detection(
+                budget_kind="canary",
+                genome=champion_genome,
+                case_id=canary_id,
+                output_path=(
+                    output_dir / "baseline_canaries" / canary_id.replace("/", "_")
+                ),
+            )
+            canary_signal = attribution_for(canary_result, canary_id)
+            audit.update({
+                "state": resolve_authoritative_state(canary_result),
+                "should_evolve": canary_signal.should_evolve,
+                "attribution": canary_signal.to_dict(),
+            })
+            if not canary_signal.should_evolve:
+                stable_canaries[canary_id] = canary_result
+                audit["admitted"] = True
+        except Exception as exc:
+            audit.update({
+                "state": "runtime_invalid",
+                "error": f"{type(exc).__name__}:{exc}",
+            })
+        baseline_canary_audit.append(audit)
+    stable_canaries_checkpoint = dict(stable_canaries)
+    if registered_canary_ids and not stable_canaries and not fitness_use_gold:
+        raise RuntimeError(
+            "No registered canary remained stable under the initial genome; "
+            "label-free evolution cannot distinguish directional evidence "
+            "from self-confirmation"
+        )
 
     def selected_canaries(edit: SkillEdit) -> list[tuple[str, dict[str, Any]]]:
         """Deterministically sample a small risk-adaptive canary set."""
@@ -745,6 +903,8 @@ def run_online_evolution(
                 "accepted_edits_history": accepted_edits_history,
                 "batch_history": batch_history,
                 "probe_history": probe_history,
+                "baseline_canary_audit": baseline_canary_audit,
+                "canary_case_ids": list(registered_canary_ids),
                 "budget_usage": dict(budget_usage),
                 "rollback_reason": rollback_reason,
                 "stable_genome_hash": stable_genome.content_hash,
@@ -1152,11 +1312,15 @@ def run_online_evolution(
             if not accepted_indices:
                 current_genome = champion_genome
             edits_rejected += len(rejected_indices)
-            reasons = ["shadow_edit_worse"]
-            if runtime_errors:
-                reasons.append("shadow_batch_runtime_error")
             for idx in rejected_indices:
                 item = provisional_edits[idx]
+                item_assessment = item.individual_assessment
+                reasons = [
+                    f"source_{item_assessment.decision}:"
+                    + ",".join(item_assessment.reasons)
+                ]
+                if runtime_errors:
+                    reasons.append("shadow_batch_runtime_error")
                 # Preserve negative learning signal as well. A batch-level
                 # canary failure or a shadow replay rejection is valuable
                 # evidence for avoiding the same strategy later.
@@ -1202,6 +1366,13 @@ def run_online_evolution(
                     )(),
                     regressed_cases=[],
                     budget_consumed=len(source_audits),
+                    reject_reasons=reasons,
+                    rejection_stage=(
+                        "batch_runtime" if runtime_errors else "source_fitness"
+                    ),
+                    observed_effect=_expected_effect_audit(
+                        item.edit, item_assessment,
+                    )["status"],
                 ))
                 step = steps[item.step_index]
                 step.gate_decision = "rollback_batch"
@@ -1343,7 +1514,7 @@ def run_online_evolution(
             from .step_attributor import build_attribution_llm_prompt
             try:
                 attr_system, attr_user = build_attribution_llm_prompt(signal)
-                attr_parsed, _ = json_object_provider_call(
+                attr_parsed, _ = run_mutation_call(
                     route=mutation_route,
                     purpose="mutation",
                     system=attr_system,
@@ -1499,7 +1670,7 @@ def run_online_evolution(
             # One semantic reflection call per source. Invalid output remains an
             # auditable no-mutation event; it is never "prompted into" an edit.
             try:
-                parsed, meta = json_object_provider_call(
+                parsed, meta = run_mutation_call(
                     route=mutation_route,
                     purpose="mutation",
                     system=system_prompt,
@@ -1516,6 +1687,7 @@ def run_online_evolution(
                     parsed.get("rationale") or parsed.get("reasoning") or ""
                 )
                 feature_description = str(parsed.get("feature_description") or "")[:500]
+                expected_effect = str(parsed.get("expected_effect") or "")[:240]
 
                 if operation == "no_edit":
                     no_edit_reason = (
@@ -1540,6 +1712,7 @@ def run_online_evolution(
                         evolution_direction=evolution_direction,
                         type_confidence=type_result.confidence,
                         routing_allowed_modules=tuple(allowed_modules),
+                        expected_effect=expected_effect,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation} "
@@ -1569,6 +1742,7 @@ def run_online_evolution(
                         evolution_direction=evolution_direction,
                         type_confidence=type_result.confidence,
                         routing_allowed_modules=tuple(allowed_modules),
+                        expected_effect=expected_effect,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
@@ -1681,6 +1855,7 @@ def run_online_evolution(
                         # FIX (B3): 缓存目录放入 output_dir，避免相对路径
                         # 依赖当前工作目录。
                         cache_dir=output_dir / "skill_merge_cache",
+                        budget_usage=budget_usage,
                     )
                     if merged_content is not None:
                         # Convert to modify_rule on the existing rule
@@ -1701,6 +1876,7 @@ def run_online_evolution(
                             evolution_direction=edit.evolution_direction,
                             type_confidence=edit.type_confidence,
                             routing_allowed_modules=edit.routing_allowed_modules,
+                            expected_effect=edit.expected_effect,
                         )
                         # Re-run structural gate on the merged edit
                         accepted, cert, reject_reasons = gate.evaluate(
@@ -1883,6 +2059,8 @@ def run_online_evolution(
                 )
                 fitness_audit["assessment"] = assessment.to_dict()
                 fitness_audit["passed"] = False
+            effect_audit = _expected_effect_audit(edit, assessment)
+            fitness_audit["expected_effect_contract"] = effect_audit
             directional_canary_support = (
                 assessment.evidence_only
                 and bool(canary_audit)
@@ -1927,6 +2105,12 @@ def run_online_evolution(
                         )(),
                         regressed_cases=[],
                         budget_consumed=1,
+                        reject_reasons=reasons,
+                        rejection_stage=(
+                            "canary_regression"
+                            if canary_regressions else "source_fitness"
+                        ),
+                        observed_effect=effect_audit["status"],
                     ))
                     record_step(EvolutionStep(
                         case_id=case_id,
@@ -1948,6 +2132,22 @@ def run_online_evolution(
                 gate.revoke_structural_accept(cert, reasons)
                 gate.record_no_edit()
                 edits_rejected += 1
+                rejected_buffer.append(RejectedEditEntry(
+                    proposal=type(
+                        "P",
+                        (),
+                        {
+                            "target_module": edit.target_module,
+                            "operation": edit.operation,
+                            "content": edit.new_content[:80],
+                        },
+                    )(),
+                    regressed_cases=[],
+                    budget_consumed=1,
+                    reject_reasons=reasons,
+                    rejection_stage="source_fitness",
+                    observed_effect=effect_audit["status"],
+                ))
                 record_step(EvolutionStep(
                     case_id=case_id, case_index=idx,
                     trigger_source=signal.trigger_source.value,
@@ -2066,11 +2266,12 @@ def run_online_evolution(
         run_development_probe(reason="final_pending_candidate")
         persist_progress(len(evolution_case_ids))
     duration = time.time() - start_time
+    final_gate_summary = gate.summary()
     result = OnlineEvolutionResult(
         run_id=run_id,
         champion_genome=champion_genome,
         steps=steps,
-        gate_summary=gate.summary(),
+        gate_summary=final_gate_summary,
         total_cases=len(evolution_case_ids),
         triggered_cases=triggered_cases,
         edits_accepted=edits_accepted,
@@ -2082,6 +2283,9 @@ def run_online_evolution(
         duration_seconds=duration,
         evolution_audit={
             **budget_usage,
+            "total_provider_calls": (
+                budget_usage["detector_calls"] + budget_usage["mutation_calls"]
+            ),
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,
             "validation_probe_every": validation_probe_every,
@@ -2091,6 +2295,11 @@ def run_online_evolution(
             "probe_ids": list(registered_probe_ids),
             "probe_limit": probe_limit,
             "canary_limit": canary_limit,
+            "canary_case_ids": list(registered_canary_ids),
+            "baseline_canary_audit": baseline_canary_audit,
+            "rejection_summary": _build_rejection_summary(
+                final_gate_summary, steps,
+            ),
             "final_champion_claim": False,
             "result_scope": "development_candidate_not_final_holdout_champion",
             "label_free_accuracy_claim": False,
@@ -2114,6 +2323,12 @@ def run_online_evolution(
     print(f"  Cases: {len(evolution_case_ids)} total, {triggered_cases} triggered, "
           f"{stable_cases} stable")
     print(f"  Edits: {edits_accepted} accepted, {edits_rejected} rejected")
+    if registered_canary_ids:
+        print(
+            f"  Baseline canaries: "
+            f"{sum(bool(item.get('admitted')) for item in baseline_canary_audit)}/"
+            f"{len(registered_canary_ids)} admitted"
+        )
     print(f"  Halted: {gate.is_halted} ({gate.halt_reason})")
     print(f"  Champion: {champion_genome.content_hash[:16]}...")
     # HTC-TES v3: Print type coverage summary

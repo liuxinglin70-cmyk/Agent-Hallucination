@@ -39,6 +39,7 @@ _NUMERIC_FIELDS: dict[str, type[int] | type[float]] = {
     "max_tokens": int,
     "transport_retries": int,
     "timeout_seconds": int,
+    "total_timeout_seconds": int,
 }
 
 
@@ -96,6 +97,7 @@ def resolve_provider_route(
         ("max_tokens", "MAX_TOKENS"),
         ("transport_retries", "TRANSPORT_RETRIES"),
         ("timeout_seconds", "TIMEOUT_SECONDS"),
+        ("total_timeout_seconds", "TOTAL_TIMEOUT_SECONDS"),
     ):
         value = _env_value(env, ordered, suffix)
         if value is None:

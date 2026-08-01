@@ -102,12 +102,14 @@ def _json_object_provider_call(
         pass
     payload = {
         "model": route["model"],
-        "temperature": 0,
+        "temperature": float(route.get("temperature", 0)),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
+    if route.get("max_tokens") is not None:
+        payload["max_tokens"] = int(route["max_tokens"])
     # response_format not supported by all models (e.g. DeepSeek-V4-Pro
     # returns HTTP 400 when response_format is sent). Only add it for
     # models that support it (Flash supports it; Pro does not).
@@ -143,8 +145,25 @@ def _json_object_provider_call(
 
     api_key = resolve_provider_credential(route, purpose="mutation")
     retries = int(route.get("transport_retries", 2))
+    per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
+    total_timeout = route.get("total_timeout_seconds", per_attempt_timeout)
+    deadline = (
+        time.monotonic() + max(1, int(total_timeout))
+        if total_timeout is not None
+        else None
+    )
     last_error: Exception | None = None
     for attempt in range(retries + 1):
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                last_error = TimeoutError(
+                    "provider total timeout exceeded before attempt"
+                )
+                break
+            request_timeout = max(1, min(per_attempt_timeout, int(remaining)))
+        else:
+            request_timeout = per_attempt_timeout
         try:
             request = urlrequest.Request(
                 route["endpoint"].rstrip("/") + "/chat/completions",
@@ -158,7 +177,7 @@ def _json_object_provider_call(
             started = time.time()
             with urlrequest.urlopen(
                 request,
-                timeout=int(route.get("timeout_seconds", 300)),
+                timeout=request_timeout,
             ) as response:
                 raw = response.read()
             value = json.loads(raw.decode("utf-8"))
@@ -194,7 +213,14 @@ def _json_object_provider_call(
         ) as exc:
             last_error = exc
             if attempt < retries:
-                time.sleep(2**attempt)
+                backoff = float(2**attempt)
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    backoff = min(backoff, remaining)
+                if backoff > 0:
+                    time.sleep(backoff)
     assert last_error is not None
     raise last_error
 

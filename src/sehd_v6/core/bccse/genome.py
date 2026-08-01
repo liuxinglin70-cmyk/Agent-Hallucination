@@ -184,6 +184,23 @@ def sanitize_feature_description(content: str) -> str:
     return normalized if valid else ""
 
 
+def validate_expected_effect(content: str) -> tuple[bool, str]:
+    """Validate persisted counterfactual telemetry against prompt pollution."""
+    normalized = " ".join(str(content or "").split())
+    if len(normalized) > 240:
+        return False, "expected_effect_too_long"
+    valid, reason = validate_feature_description(normalized)
+    if not valid:
+        return False, reason.replace("feature_", "expected_effect_", 1)
+    return True, ""
+
+
+def sanitize_expected_effect(content: str) -> str:
+    normalized = " ".join(str(content or "").split())[:240]
+    valid, _ = validate_expected_effect(normalized)
+    return normalized if valid else ""
+
+
 def normalize_type_confidence(value: Any) -> float:
     """Bound untrusted serialized confidence without failing restoration."""
     try:
@@ -413,6 +430,9 @@ class SkillEdit:
     evolution_direction: str = "process_repair"
     type_confidence: float = 0.0
     routing_allowed_modules: tuple[str, ...] = ()
+    # A short counterfactual contract supplied by the reflection engine. It is
+    # telemetry, not a verdict: source replay remains authoritative.
+    expected_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -440,6 +460,7 @@ class SkillEdit:
                 for value in self.routing_allowed_modules
                 if value in MODULE_IDS
             ],
+            "expected_effect": sanitize_expected_effect(self.expected_effect),
         }
 
     @classmethod
@@ -470,6 +491,9 @@ class SkillEdit:
                 str(value)
                 for value in (data.get("routing_allowed_modules") or ())
                 if str(value) in MODULE_IDS
+            ),
+            expected_effect=sanitize_expected_effect(
+                str(data.get("expected_effect") or "")
             ),
         )
 
@@ -592,6 +616,9 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     )
     if not feature_valid:
         return False, feature_reason
+    effect_valid, effect_reason = validate_expected_effect(edit.expected_effect)
+    if not effect_valid:
+        return False, effect_reason
     try:
         confidence = float(edit.type_confidence)
     except (TypeError, ValueError):
