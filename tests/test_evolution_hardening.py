@@ -492,7 +492,7 @@ def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch)
     )
 
 
-def test_directional_evidence_is_not_promoted_even_with_stable_canary(
+def test_directional_evidence_is_provisional_with_stable_canary(
     tmp_path, monkeypatch,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
@@ -530,15 +530,22 @@ def test_directional_evidence_is_not_promoted_even_with_stable_canary(
         run_id="directional_not_promotable",
     )
 
-    assert result.edits_accepted == 0
-    assert result.edits_rejected == 1
-    assert result.steps[1].gate_decision == "rollback_batch"
+    assert result.edits_accepted == 1
+    assert result.edits_rejected == 0
+    assert result.steps[1].gate_decision == "accept_batch"
     batch = result.steps[1].fitness_check["batch"]
     assert batch["source_audits"][0]["assessment"]["evidence_only"]
     assert batch["stable_canary_audits"][0]["preserved"]
+    assert batch["promotion_eligible"] is False
+    edit = result.champion_genome.edits_applied[-1]
+    rule_meta = result.champion_genome.modules[edit.target_module].get_rule_meta(
+        len(result.champion_genome.modules[edit.target_module].rules) - 1
+    )
+    assert rule_meta["fitness_status"] == "none"
+    assert rule_meta["promotion_status"] == "provisional_label_free"
 
 
-def test_no_gold_local_process_gain_never_reaches_champion(
+def test_no_gold_local_process_gain_stays_unprotected_provisional(
     tmp_path, monkeypatch,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
@@ -591,14 +598,15 @@ def test_no_gold_local_process_gain_never_reaches_champion(
         run_id="local_score_not_promotable",
     )
 
-    assert result.edits_accepted == 0
-    assert result.edits_rejected == 1
-    assert result.champion_genome.generation == 0
+    assert result.edits_accepted == 1
+    assert result.edits_rejected == 0
+    assert result.champion_genome.generation == 1
     batch = result.steps[1].fitness_check["batch"]
     assert batch["source_audits"][0]["assessment"]["decision"] == (
         "directional_evidence"
     )
-    assert batch["accepted_indices"] == []
+    assert batch["accepted_indices"] == [0]
+    assert batch["claim_scope"] == "label_free_provisional_telemetry"
 
 
 def test_runner_rejects_source_self_proof_and_counts_convergence(
@@ -643,3 +651,182 @@ def test_runner_rejects_source_self_proof_and_counts_convergence(
     assert result.steps[0].fitness_check["assessment"]["evidence_only"]
     assert result.gate_summary["consecutive_no_edit"] == 1
     assert result.gate_summary["convergence_signal"] is True
+
+
+@pytest.mark.parametrize("probe_fails", [False, True])
+def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
+    tmp_path, monkeypatch, probe_fails,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    detector_records: list[tuple[str, dict[str, object]]] = []
+
+    def detector(*, genome, case_id, record, **kwargs):
+        detector_records.append((case_id, dict(record)))
+        if case_id.startswith("stable"):
+            state = "verified_clean"
+        elif case_id == "source":
+            state = "verified_clean" if genome.generation else "unresolved"
+        elif case_id == "dev_probe":
+            if probe_fails:
+                raise RuntimeError("invalid probe authority")
+            state = "verified_clean"
+        else:  # pragma: no cover - closed fixture universe
+            raise AssertionError(case_id)
+        return {"state": state, "runtime_valid": True, "census": []}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+    )
+
+    records = {
+        "stable_1": {},
+        "stable_2": {},
+        "stable_3": {},
+        "source": {"gold_label": False},
+        "dev_probe": {"gold_label": False},
+    }
+    result = runner.run_online_evolution(
+        evolution_case_ids=("stable_1", "stable_2", "stable_3", "source"),
+        records=records,
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        validation_probe_every=1,
+        probe_ids=("dev_probe",),
+        run_id=f"probe_{probe_fails}",
+    )
+
+    audit = result.evolution_audit
+    assert audit["source_replays"] == 1
+    assert audit["canary_cases"] <= 2
+    assert audit["probe_cases"] == 1
+    assert audit["provider_calls"] == len(detector_records)
+    assert all("gold_label" not in record for _, record in detector_records)
+    assert audit["final_champion_claim"] is False
+    assert audit["probe_history"][0]["promotion_effect"] == (
+        "continue_only_not_final_champion"
+    )
+
+    if probe_fails:
+        assert result.edits_accepted == 0
+        assert result.champion_genome.generation == 0
+        assert result.steps[-1].gate_decision == "rollback_probe"
+        assert audit["rollback_reason"].startswith("development_probe_failed:")
+    else:
+        assert result.edits_accepted == 1
+        assert result.champion_genome.generation == 1
+        assert audit["rollback_reason"] == ""
+        assert audit["probe_history"][0]["passed"] is True
+
+
+def test_no_gold_run_has_provisional_telemetry_but_no_accuracy_claim(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda *, genome, case_id, **kwargs: {
+            "state": (
+                "verified_clean"
+                if case_id == "stable" or genome.generation
+                else "unresolved"
+            ),
+            "runtime_valid": True,
+            "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("stable", "source"),
+        records={"stable": {}, "source": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        run_id="no_gold_claim_scope",
+    )
+
+    assert result.edits_accepted == 1
+    assert result.champion_genome.generation == 1
+    assert result.evolution_audit["label_free_accuracy_claim"] is False
+    assert result.evolution_audit["final_champion_claim"] is False
+    assert result.steps[-1].gate_decision == "accept_batch"
+    assert result.steps[-1].fitness_check["batch"]["claim_scope"] == (
+        "label_free_provisional_telemetry"
+    )
+
+
+def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda *, genome, case_id, **kwargs: {
+            "state": (
+                "verified_clean"
+                if case_id in {"stable", "probe"} or genome.generation
+                else "unresolved"
+            ),
+            "runtime_valid": True,
+            "decision_authority": "valid",
+            "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("stable", "source"),
+        records={"stable": {}, "source": {}, "probe": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        validation_probe_every=1,
+        probe_ids=("probe",),
+        probe_limit=1,
+        run_id="unlabelled_probe_process_veto",
+    )
+
+    assert result.edits_accepted == 1
+    probe_audit = result.evolution_audit["probe_history"][0]
+    assert probe_audit["passed"] is True
+    assert probe_audit["case_audits"][0]["probe_mode"] == (
+        "label_free_process_veto"
+    )
+    assert probe_audit["case_audits"][0]["gold_correct"] is None
+    assert result.evolution_audit["label_free_accuracy_claim"] is False

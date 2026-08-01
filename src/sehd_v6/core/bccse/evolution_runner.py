@@ -20,10 +20,10 @@ Architecture:
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -52,12 +52,14 @@ from .genome import (
     validate_edit,
     semantic_overlap,
     MODULE_IDS,
+    FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
     FITNESS_STATUS_STRONG,
 )
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
+    task_state_score,
 )
 from .safety_gate import StructuralGate, create_structural_gate
 from .step_attributor import (
@@ -133,6 +135,7 @@ class OnlineEvolutionResult:
     halted: bool
     halt_reason: str
     duration_seconds: float
+    evolution_audit: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -151,6 +154,7 @@ class OnlineEvolutionResult:
             "halted": self.halted,
             "halt_reason": self.halt_reason,
             "duration_seconds": self.duration_seconds,
+            "evolution_audit": self.evolution_audit,
         }
 
 
@@ -164,9 +168,12 @@ class ProvisionalEdit:
     certificate: Any
     source_signal: AttributionSignal
     source_result: dict[str, Any]
+    source_after_signal: AttributionSignal
+    source_after_result: dict[str, Any]
     individual_assessment: FitnessAssessment
     step_index: int
     applied_rule_idx: int | None = None  # v5.3.4: rule index at apply time
+    canary_audits: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ============================================================
@@ -294,6 +301,42 @@ def _atomic_write_json(path: Path, value: Any) -> None:
     os.replace(temporary, path)
 
 
+_EVALUATOR_ONLY_FIELDS = frozenset({
+    "gold_label",
+    "gold_explanation",
+    "is_hallucination",
+    "hallucination_step",
+    "hallucination_reason",
+    "outer_feedback",
+})
+
+
+def _detector_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the detector envelope with evaluator-only labels removed."""
+    return {
+        key: value
+        for key, value in record.items()
+        if key not in _EVALUATOR_ONLY_FIELDS
+    }
+
+
+def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
+    """Join a label only inside an evaluator; never pass it to detection."""
+    value = record.get("gold_label")
+    if isinstance(value, bool):
+        return value
+    value = record.get("is_hallucination")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.lower().strip()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    return None
+
+
 # ============================================================
 # Main evolution loop
 # ============================================================
@@ -395,18 +438,23 @@ def run_online_evolution(
     fitness_batch_size: int = 1,
     fitness_use_gold: bool = False,
     experience_memory_path: Path | None = None,
-    canary_limit: int = 4,
+    canary_limit: int = 2,
+    validation_probe_every: int = 0,
+    probe_ids: Sequence[str] = (),
+    probe_limit: int = 2,
+    validation_probe_trigger_threshold: int = 0,
     initial_genome: SkillGenome | None = None,
     run_id: str | None = None,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
     Batch commit requires per-case source replay and preservation of a rolling
-    set of previously stable evolution cases. The registered validation set
-    remains unopened during evolution and is the authoritative cross-set check.
-    Self-supervised signals generate candidates and telemetry only; champion
-    promotion requires explicit gold-assisted fitness or a future independent
-    promotion authority.
+    set of previously stable development cases. The separately registered
+    gold probe is opened only by its budgeted gate; the final holdout remains
+    unopened during evolution and is the authoritative cross-set check.
+    Self-supervised signals may advance only an unprotected provisional working
+    candidate after independent canary non-regression. Protected promotion and
+    accuracy claims require explicit evaluation authority outside this run.
 
     Args:
         evolution_case_ids: Cases for evolution (natural order or shuffled).
@@ -432,8 +480,15 @@ def run_online_evolution(
             explicitly enabled.
         experience_memory_path: Optional prior HTC-TES memory artifact. Loaded
             before evolution so confirmed observations can guide reflection.
-        canary_limit: Maximum previously stable evolution cases replayed for
-            regression protection on each provisional edit.
+        canary_limit: Maximum sampled stable evolution cases replayed for
+            local non-regression on each edit. Default 2.
+        validation_probe_every: Run the independent gold development probe
+            after each N accepted edits. Zero disables this trigger.
+        probe_ids: Pre-registered development-probe case IDs. These are never
+            inferred from validation, test, or outer partitions.
+        probe_limit: Maximum pre-registered probe cases evaluated per probe.
+        validation_probe_trigger_threshold: Also run the development probe
+            after this many newly triggered source cases. Zero disables it.
         initial_genome: Optional audited champion to continue evolving. When
             omitted, evolution starts from the frozen baseline genome.
         run_id: Optional run identifier.
@@ -457,6 +512,36 @@ def run_online_evolution(
         )
     if canary_limit < 0 or canary_limit > 20:
         raise ValueError("canary_limit must be between 0 and 20")
+    if validation_probe_every < 0:
+        raise ValueError("validation_probe_every must be non-negative")
+    if validation_probe_trigger_threshold < 0:
+        raise ValueError(
+            "validation_probe_trigger_threshold must be non-negative"
+        )
+    if probe_limit < 0 or probe_limit > 20:
+        raise ValueError("probe_limit must be between 0 and 20")
+    if len(probe_ids) != len(set(probe_ids)):
+        raise ValueError("probe_ids contains duplicates")
+    overlapping_probe_ids = sorted(set(probe_ids).intersection(evolution_case_ids))
+    if overlapping_probe_ids:
+        raise ValueError(
+            "probe_ids must be disjoint from evolution_case_ids: "
+            + ", ".join(overlapping_probe_ids)
+        )
+    missing_probe_records = [case_id for case_id in probe_ids if case_id not in records]
+    if missing_probe_records:
+        raise ValueError("Probe records missing: " + ", ".join(missing_probe_records))
+    registered_probe_ids = tuple(probe_ids[:probe_limit])
+    missing_probe_gold = [
+        case_id
+        for case_id in registered_probe_ids
+        if _evaluator_gold(records[case_id]) is None
+    ]
+    if missing_probe_gold and (use_gold or fitness_use_gold):
+        raise ValueError(
+            "Development probes require evaluator gold labels: "
+            + ", ".join(missing_probe_gold)
+        )
     if mutation_route is not None:
         model = str(mutation_route.get("model") or "")
         if model not in {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}:
@@ -488,6 +573,20 @@ def run_online_evolution(
     steps: list[EvolutionStep] = []
     provisional_edits: list[ProvisionalEdit] = []
     batch_history: list[dict[str, Any]] = []
+    probe_history: list[dict[str, Any]] = []
+    budget_usage = {
+        "source_replays": 0,
+        "canary_cases": 0,
+        "probe_cases": 0,
+        "provider_calls": 0,
+    }
+    rollback_reason = ""
+    stable_genome = champion_genome.clone()
+    pending_probe_step_indexes: list[int] = []
+    pending_probe_commits: list[ProvisionalEdit] = []
+    stable_history_length = 0
+    last_probe_accepted_count = 0
+    last_probe_triggered_count = 0
 
     # HTC-TES v3: type-conditioned evolution components
     type_classifier = HallucinationTypeClassifier()
@@ -500,11 +599,13 @@ def run_online_evolution(
         with memory_path.open(encoding="utf-8") as handle:
             memory_payload = json.load(handle)
         type_fitness.get_experience_memory().from_dict(memory_payload)
+    stable_memory_payload = type_fitness.get_experience_memory().to_dict()
 
     # A rolling set of label-free, previously stable cases protects decisive
     # behavior from catastrophic forgetting. These are evolution cases only;
     # validation and outer partitions remain unopened.
     stable_canaries: dict[str, dict[str, Any]] = {}
+    stable_canaries_checkpoint: dict[str, dict[str, Any]] = {}
 
     def canary_preserved(
         parent_result: Mapping[str, Any],
@@ -522,8 +623,8 @@ def run_online_evolution(
                 "error": f"canary_state:{exc}",
             }
         try:
-            parent_signal = attribute_failure(parent_result, use_gold=use_gold)
-            child_signal = attribute_failure(child_result, use_gold=use_gold)
+            parent_signal = attribute_failure(parent_result, use_gold=False)
+            child_signal = attribute_failure(child_result, use_gold=False)
             parent_triggered = parent_signal.should_evolve
             child_triggered = child_signal.should_evolve
         except Exception as exc:
@@ -558,6 +659,63 @@ def run_online_evolution(
     edits_accepted = 0
     edits_rejected = 0
 
+    def run_detection(
+        *,
+        budget_kind: str,
+        genome: SkillGenome,
+        case_id: str,
+        output_path: Path,
+    ) -> dict[str, Any]:
+        """Run one detector call in a counted, label-free envelope."""
+        budget_usage["provider_calls"] += 1
+        budget_field = {
+            "source": "source_replays",
+            "canary": "canary_cases",
+            "probe": "probe_cases",
+        }.get(budget_kind)
+        if budget_field is not None:
+            # Debit before dispatch so runtime-invalid attempts are auditable.
+            budget_usage[budget_field] += 1
+        return _run_detection_with_genome(
+            genome=genome,
+            case_id=case_id,
+            record=_detector_record(records[case_id]),
+            config=config,
+            output_dir=output_path,
+            census_root=census_root,
+            baseline_cache_root=baseline_cache_root,
+            shared_cache_root=shared_cache_root,
+        )
+
+    def attribution_for(
+        result: Mapping[str, Any],
+        case_id: str,
+    ) -> AttributionSignal:
+        """Join gold to attribution only under the explicit use_gold opt-in."""
+        payload = dict(result)
+        if use_gold:
+            gold = _evaluator_gold(records[case_id])
+            if gold is not None:
+                payload["gold_label"] = gold
+        return attribute_failure(payload, use_gold=use_gold)
+
+    def selected_canaries(edit: SkillEdit) -> list[tuple[str, dict[str, Any]]]:
+        """Deterministically sample a small risk-adaptive canary set."""
+        if not stable_canaries or canary_limit == 0:
+            return []
+        requested = canary_limit
+        if edit.operation == SkillOp.ADD_RULE:
+            requested = min(requested, 1)
+        ranked = sorted(
+            stable_canaries.items(),
+            key=lambda item: hashlib.sha256(
+                f"{current_genome.content_hash}:{edit.edit_id}:{item[0]}".encode(
+                    "utf-8"
+                )
+            ).hexdigest(),
+        )
+        return ranked[:requested]
+
     def persist_progress(next_case_index: int, status: str = "in_progress") -> None:
         _atomic_write_json(
             output_dir / "champion_checkpoint.json",
@@ -584,6 +742,11 @@ def run_online_evolution(
                 "gate_summary": gate.summary(),
                 "accepted_edits_history": accepted_edits_history,
                 "batch_history": batch_history,
+                "probe_history": probe_history,
+                "budget_usage": dict(budget_usage),
+                "rollback_reason": rollback_reason,
+                "stable_genome_hash": stable_genome.content_hash,
+                "pending_probe_step_indexes": list(pending_probe_step_indexes),
                 "counters": {
                     "stable_cases": stable_cases,
                     "triggered_cases": triggered_cases,
@@ -605,17 +768,139 @@ def run_online_evolution(
     def fitness_gold(case_id: str) -> bool | None:
         if not fitness_use_gold:
             return None
-        record = records[case_id]
-        # Try gold_label (bool) first, then is_hallucination (str)
-        value = record.get("gold_label")
-        if isinstance(value, bool):
-            return value
-        value = record.get("is_hallucination")
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            return value.lower().strip() == "true"
-        return None  # gold unavailable, degrade to self-supervised
+        return _evaluator_gold(records[case_id])
+
+    def run_development_probe(*, reason: str) -> tuple[bool, dict[str, Any]]:
+        """Apply the independent development envelope as a veto-only gate."""
+        nonlocal champion_genome, current_genome, stable_genome
+        nonlocal edits_accepted, edits_rejected, rollback_reason
+        nonlocal last_probe_accepted_count, last_probe_triggered_count
+        nonlocal stable_history_length
+        nonlocal stable_memory_payload, stable_canaries_checkpoint
+
+        before_budget = dict(budget_usage)
+        audit: dict[str, Any] = {
+            "probe_index": len(probe_history),
+            "reason": reason,
+            "genome_hash": champion_genome.content_hash,
+            "case_audits": [],
+            "passed": True,
+            "rollback_reason": "",
+            "promotion_effect": "continue_only_not_final_champion",
+        }
+        failures: list[str] = []
+        for probe_id in registered_probe_ids:
+            gold = _evaluator_gold(records[probe_id])
+            try:
+                result = run_detection(
+                    budget_kind="probe",
+                    genome=champion_genome,
+                    case_id=probe_id,
+                    output_path=(
+                        output_dir
+                        / "development_probes"
+                        / f"probe_{len(probe_history):03d}"
+                        / probe_id.replace("/", "_")
+                    ),
+                )
+                state = resolve_authoritative_state(result)
+                runtime_valid = result.get("runtime_valid") is True
+                authority_invalid = decision_authority_invalid(result)
+                if gold is None:
+                    # Unlabelled probe mode is deliberately process-only: it
+                    # can veto runtime/authority loss, but it cannot score a
+                    # clean/error polarity or provide correctness evidence.
+                    score = None
+                    passed = runtime_valid and not authority_invalid
+                else:
+                    score = task_state_score(state, gold)
+                    passed = runtime_valid and not authority_invalid and score == 2
+                audit["case_audits"].append({
+                    "case_id": probe_id,
+                    "state": state,
+                    "gold_correct": (passed if gold is not None else None),
+                    "task_score": score,
+                    "runtime_valid": runtime_valid,
+                    "probe_mode": (
+                        "gold_correctness_veto"
+                        if gold is not None
+                        else "label_free_process_veto"
+                    ),
+                })
+                if not passed:
+                    failures.append(
+                        f"{probe_id}:"
+                        + ("gold_mismatch" if gold is not None else "runtime_or_authority_invalid")
+                    )
+            except Exception as exc:
+                # The attempt and provider call were debited before dispatch.
+                error = f"{probe_id}:{type(exc).__name__}:{exc}"
+                failures.append(error)
+                audit["case_audits"].append({
+                    "case_id": probe_id,
+                    "state": "runtime_invalid",
+                    "gold_correct": False,
+                    "runtime_valid": False,
+                    "error": error,
+                })
+
+        audit["source_replays"] = 0
+        audit["canary_cases"] = 0
+        audit["probe_cases"] = (
+            budget_usage["probe_cases"] - before_budget["probe_cases"]
+        )
+        audit["provider_calls"] = (
+            budget_usage["provider_calls"] - before_budget["provider_calls"]
+        )
+        last_probe_triggered_count = triggered_cases
+
+        if failures:
+            rollback_reason = "development_probe_failed:" + "|".join(failures)
+            audit["passed"] = False
+            audit["rollback_reason"] = rollback_reason
+            rolled_back = len(pending_probe_commits)
+            audit["rolled_back_edits"] = rolled_back
+            champion_genome = stable_genome.clone()
+            current_genome = stable_genome.clone()
+            type_fitness.get_experience_memory().from_dict(stable_memory_payload)
+            stable_canaries.clear()
+            stable_canaries.update(stable_canaries_checkpoint)
+            for item in pending_probe_commits:
+                gate.revoke_structural_accept(item.certificate, [rollback_reason])
+                gate.record_no_edit()
+                step = steps[item.step_index]
+                step.gate_decision = "rollback_probe"
+                step.mutation_applied = None
+                step.genome_hash_after = stable_genome.content_hash
+                step.fitness_check = {
+                    **(step.fitness_check or {}),
+                    "development_probe": audit,
+                }
+            edits_accepted -= rolled_back
+            edits_rejected += rolled_back
+            del accepted_edits_history[stable_history_length:]
+            pending_probe_commits.clear()
+            pending_probe_step_indexes.clear()
+            last_probe_accepted_count = edits_accepted
+        else:
+            rollback_reason = ""
+            audit["rolled_back_edits"] = 0
+            stable_genome = champion_genome.clone()
+            stable_history_length = len(accepted_edits_history)
+            stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+            stable_canaries_checkpoint = dict(stable_canaries)
+            for item in pending_probe_commits:
+                step = steps[item.step_index]
+                step.fitness_check = {
+                    **(step.fitness_check or {}),
+                    "development_probe": audit,
+                }
+            pending_probe_commits.clear()
+            pending_probe_step_indexes.clear()
+            last_probe_accepted_count = edits_accepted
+
+        probe_history.append(audit)
+        return not failures, audit
 
     def flush_shadow_batch(*, next_case_index: int, force: bool = False) -> bool:
         """Commit or roll back the current reversible shadow batch."""
@@ -628,107 +913,22 @@ def run_online_evolution(
             return True
 
         batch_id = f"batch_{len(batch_history):03d}"
-        batch_root = output_dir / "fitness_batches" / batch_id
-        source_audits: list[dict[str, Any]] = []
-        batch_canary_audits: list[dict[str, Any]] = []
+        source_audits = [
+            {
+                "case_id": item.case_id,
+                "edit_id": item.edit.edit_id,
+                "assessment": item.individual_assessment.to_dict(),
+                "source_after": item.source_after_signal.to_dict(),
+                "shadow_result": item.source_after_result,
+            }
+            for item in provisional_edits
+        ]
+        batch_canary_audits = [
+            audit
+            for item in provisional_edits
+            for audit in item.canary_audits
+        ]
         runtime_errors: list[str] = []
-
-        # Replay every edited source against the complete shadow genome, then
-        # replay the bounded stable-case canaries below. The registered
-        # validation set remains unopened during evolution.
-        shadow_raw: dict[str, Any] = {}  # case_id -> result_dict 或 Exception
-
-        # 并行执行所有 shadow source 重检（current_genome 上下文内）
-        shadow_case_count = len(provisional_edits)
-        if shadow_case_count:
-            with integrated_v35_provider(genome=current_genome, config=config):
-                with ThreadPoolExecutor(max_workers=min(4, shadow_case_count)) as pool:
-                    future_to_case: dict[Any, str] = {}
-                    # source 重检
-                    for item in provisional_edits:
-                        future = pool.submit(
-                            _run_detection_with_genome,
-                            genome=current_genome,
-                            case_id=item.case_id,
-                            record=records[item.case_id],
-                            config=config,
-                            output_dir=batch_root / "sources" / item.case_id.replace("/", "_"),
-                            shared_cache_root=shared_cache_root,
-                            census_root=census_root,
-                            baseline_cache_root=baseline_cache_root,
-                            provider_already_patched=True,
-                        )
-                        future_to_case[future] = item.case_id
-                    for future in as_completed(future_to_case):
-                        case_id = future_to_case[future]
-                        try:
-                            shadow_raw[case_id] = future.result()
-                        except Exception as exc:
-                            shadow_raw[case_id] = exc
-
-        # 处理 source 重检结果（保持原顺序，audit 数据与串行完全一致）
-        for item in provisional_edits:
-            shadow_result = shadow_raw.get(item.case_id)
-            if isinstance(shadow_result, Exception):
-                runtime_errors.append(
-                    f"source:{item.case_id}:{type(shadow_result).__name__}:{shadow_result}"
-                )
-                continue
-            try:
-                shadow_signal = attribute_failure(
-                    shadow_result,
-                    use_gold=use_gold,
-                )
-                assessment = assess_source_fitness(
-                    item.source_signal,
-                    shadow_signal,
-                    target_module=item.edit.target_module,
-                    operation=item.edit.operation,
-                    before_result=item.source_result,
-                    after_result=shadow_result,
-                    gold_label=fitness_gold(item.case_id),
-                )
-                source_audits.append({
-                    "case_id": item.case_id,
-                    "edit_id": item.edit.edit_id,
-                    "assessment": assessment.to_dict(),
-                    "source_after": shadow_signal.to_dict(),
-                    # FIX (C1): 保存真正的检测结果dict（而非AttributionSignal），
-                    # 供HTC-TES适应度评估使用
-                    "shadow_result": shadow_result,
-                })
-            except Exception as exc:
-                runtime_errors.append(
-                    f"source:{item.case_id}:{type(exc).__name__}:{exc}"
-                )
-
-        # Recheck stable anchors at commit time against the exact shadow genome
-        # that will become champion.
-        for canary_id, parent_canary in stable_canaries.items():
-            try:
-                child_canary = _run_detection_with_genome(
-                    genome=current_genome,
-                    case_id=canary_id,
-                    record=records[canary_id],
-                    config=config,
-                    output_dir=batch_root / "canaries" / canary_id.replace("/", "_"),
-                    shared_cache_root=shared_cache_root,
-                    census_root=census_root,
-                    baseline_cache_root=baseline_cache_root,
-                    # The source replay provider context has already exited.
-                    # Enter a fresh child-genome context here; claiming an
-                    # already-patched provider would silently run the parent
-                    # provider for this commit canary.
-                    provider_already_patched=False,
-                )
-                preserved, audit = canary_preserved(parent_canary, child_canary)
-                batch_canary_audits.append({"case_id": canary_id, **audit})
-                if not preserved:
-                    runtime_errors.append(f"canary:{canary_id}:state_regression")
-            except Exception as exc:
-                runtime_errors.append(
-                    f"canary:{canary_id}:{type(exc).__name__}:{exc}"
-                )
 
         decisions = [
             value["assessment"]["decision"] for value in source_audits
@@ -751,11 +951,20 @@ def run_online_evolution(
         accepted_indices: list[int] = []
         rejected_indices: list[int] = []
         for i, dec in enumerate(decisions):
-            # A label-free stable canary proves only non-regression on that
-            # anchor. It cannot establish that a newly decisive source verdict
-            # is correct, so directional evidence is telemetry-only and never
-            # enters the promotable set.
-            if dec in {"strong_improvement", "local_improvement"}:
+            # Label-free directional evidence may advance the reversible
+            # working genome only when an independent sampled canary proves
+            # process non-regression. It remains explicitly provisional and
+            # cannot acquire protected fitness status or an accuracy claim.
+            label_free_provisional = (
+                not fitness_use_gold
+                and dec == "directional_evidence"
+                and bool(provisional_edits[i].canary_audits)
+                and all(
+                    bool(audit.get("preserved"))
+                    for audit in provisional_edits[i].canary_audits
+                )
+            )
+            if dec in {"strong_improvement", "local_improvement"} or label_free_provisional:
                 accepted_indices.append(i)
             else:
                 rejected_indices.append(i)
@@ -786,7 +995,18 @@ def run_online_evolution(
             "accepted_indices": accepted_indices,
             "rejected_indices": rejected_indices,
             "fitness_use_gold": fitness_use_gold,
-            "commit_validation": "source_replay_plus_stable_canaries",
+            "commit_validation": "single_source_replay_plus_sampled_canaries",
+            "source_replays": len(source_audits),
+            "canary_cases": len(batch_canary_audits),
+            "probe_cases": 0,
+            "provider_calls": len(source_audits) + len(batch_canary_audits),
+            "rollback_reason": "",
+            "promotion_eligible": bool(fitness_use_gold),
+            "claim_scope": (
+                "gold_development_candidate"
+                if fitness_use_gold
+                else "label_free_provisional_telemetry"
+            ),
             "passed": passed,
         }
 
@@ -828,11 +1048,14 @@ def run_online_evolution(
                     source_audits[idx]["assessment"]["decision"]
                     if idx < len(source_audits) else ""
                 )
-                fitness_status = (
-                    FITNESS_STATUS_STRONG
-                    if assessment_decision == "strong_improvement"
-                    else FITNESS_STATUS_WEAK
-                )
+                if not fitness_use_gold:
+                    fitness_status = FITNESS_STATUS_NONE
+                else:
+                    fitness_status = (
+                        FITNESS_STATUS_STRONG
+                        if assessment_decision == "strong_improvement"
+                        else FITNESS_STATUS_WEAK
+                    )
                 mod = champion_genome.modules[item.edit.target_module]
                 rule_idx = item.applied_rule_idx
                 if rule_idx is None and item.edit.rule_index is not None:
@@ -840,14 +1063,27 @@ def run_online_evolution(
                 if rule_idx is not None and rule_idx < len(mod.rules):
                     meta = mod.get_rule_meta(rule_idx)
                     meta["fitness_status"] = fitness_status
+                    meta["promotion_status"] = (
+                        "provisional_label_free"
+                        if not fitness_use_gold
+                        else "gold_development_candidate"
+                    )
                     mod.set_rule_meta(rule_idx, meta)
                 accepted_edits_history.append({
+                    "edit_id": item.edit.edit_id,
                     "target_module": item.edit.target_module,
                     "operation": item.edit.operation,
                     "new_content": item.edit.new_content,
                     "case_id": item.case_id,
                     "batch_id": batch_id,
+                    "promotion_status": (
+                        "provisional_label_free"
+                        if not fitness_use_gold
+                        else "gold_development_candidate"
+                    ),
                 })
+                pending_probe_commits.append(item)
+                pending_probe_step_indexes.append(item.step_index)
                 # HTC-TES v3: Record type-conditioned experience
                 # FIX: pass gold_label (was None) and target_module (was missing)
                 # to ensure experience memory records correct direction and module.
@@ -883,7 +1119,7 @@ def run_online_evolution(
                     and not bool(source_audits[idx]["source_after"].get("should_evolve"))
                 ):
                     stable_canaries[item.case_id] = _shadow_result
-                    while len(stable_canaries) > canary_limit:
+                    while len(stable_canaries) > max(8, canary_limit * 4):
                         stable_canaries.pop(next(iter(stable_canaries)))
                 step = steps[item.step_index]
                 step.gate_decision = "accept_batch"
@@ -973,6 +1209,34 @@ def run_online_evolution(
                     **(step.fitness_check or {}),
                     "batch": batch_audit,
                 }
+
+        probe_due_reason = ""
+        if accepted_indices and registered_probe_ids:
+            if (
+                validation_probe_every > 0
+                and edits_accepted - last_probe_accepted_count
+                >= validation_probe_every
+            ):
+                probe_due_reason = "accepted_edit_cadence"
+            elif (
+                validation_probe_trigger_threshold > 0
+                and triggered_cases - last_probe_triggered_count
+                >= validation_probe_trigger_threshold
+            ):
+                probe_due_reason = "triggered_case_threshold"
+        if probe_due_reason:
+            probe_passed, probe_audit = run_development_probe(
+                reason=probe_due_reason,
+            )
+            batch_audit["probe_cases"] = probe_audit["probe_cases"]
+            batch_audit["provider_calls"] += probe_audit["provider_calls"]
+            batch_audit["development_probe"] = probe_audit
+            if not probe_passed:
+                passed = False
+                batch_audit["passed"] = False
+                batch_audit["rollback_reason"] = probe_audit["rollback_reason"]
+                batch_audit["probe_vetoed_indices"] = list(accepted_indices)
+                accepted_indices = []
         batch_audit["champion_hash_after"] = champion_genome.content_hash
         if accepted_indices and not rejected_indices:
             print(
@@ -986,8 +1250,13 @@ def run_online_evolution(
                 f"→ {champion_genome.content_hash[:12]}"
             )
         else:
+            rollback_count = int(
+                (batch_audit.get("development_probe") or {}).get(
+                    "rolled_back_edits", len(rejected_indices),
+                )
+            )
             print(
-                f"  [{batch_id}] ROLLBACK {len(rejected_indices)} edits: "
+                f"  [{batch_id}] ROLLBACK {rollback_count} edits: "
                 f"improved={improved_count}, worse={worse_count}, "
                 f"runtime_errors={len(runtime_errors)}"
             )
@@ -1021,15 +1290,11 @@ def run_online_evolution(
 
         # --- [1] Run detection with current skill (global injection) ---
         try:
-            detection_result = _run_detection_with_genome(
+            detection_result = run_detection(
+                budget_kind="case",
                 genome=current_genome,
                 case_id=case_id,
-                record=records[case_id],
-                config=config,
-                output_dir=output_dir,
-                census_root=census_root,
-                baseline_cache_root=baseline_cache_root,
-                shared_cache_root=shared_cache_root,
+                output_path=output_dir,
             )
         except Exception as exc:
             _atomic_write_json(
@@ -1067,7 +1332,7 @@ def run_online_evolution(
         detection_state = resolve_authoritative_state(detection_result)
 
         # --- [2] Causal process reflection (self-supervised trigger) ---
-        signal = attribute_failure(detection_result, use_gold=use_gold)
+        signal = attribution_for(detection_result, case_id)
 
         # LLM-enhanced attribution (v5.3): when confidence is low,
         # use LLM to refine root-cause module identification.
@@ -1104,8 +1369,10 @@ def run_online_evolution(
             # Stable success — no trigger
             stable_cases += 1
             stable_canaries[case_id] = detection_result
-            while len(stable_canaries) > canary_limit:
+            while len(stable_canaries) > max(8, canary_limit * 4):
                 stable_canaries.pop(next(iter(stable_canaries)))
+            if not pending_probe_commits:
+                stable_canaries_checkpoint = dict(stable_canaries)
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -1508,18 +1775,17 @@ def run_online_evolution(
             continue
 
         fitness_audit: dict[str, Any] | None = None
-        if fitness_check:
+        # Source replay is mandatory for every edit. ``fitness_check`` remains
+        # an interface-compatible flag controlling formal promotion semantics,
+        # not permission to skip the replay envelope.
+        if True:
             replay_root = output_dir / "fitness_replay" / f"{idx:03d}_{case_id.replace('/', '_')}"
             try:
-                candidate_result = _run_detection_with_genome(
+                candidate_result = run_detection(
+                    budget_kind="source",
                     genome=candidate_genome,
                     case_id=case_id,
-                    record=records[case_id],
-                    config=config,
-                    output_dir=replay_root / "source",
-                    census_root=census_root,
-                    baseline_cache_root=baseline_cache_root,
-                    shared_cache_root=shared_cache_root,
+                    output_path=replay_root / "source",
                 )
             except Exception as exc:
                 reason = f"source_replay_runtime_error:{type(exc).__name__}:{exc}"
@@ -1528,7 +1794,7 @@ def run_online_evolution(
                     "source_after": None,
                     "source_improved": False,
                     "source_stable_after": False,
-                    "commit_validation": "source_replay_plus_stable_canaries",
+                    "commit_validation": "single_source_replay_plus_sampled_canaries",
                     "runtime_error": reason,
                     "passed": False,
                 }
@@ -1551,10 +1817,7 @@ def run_online_evolution(
                 ), next_case_index=idx + 1)
                 print(f"  [{idx}] REJECT_FITNESS_RUNTIME {case_id}: {reason}")
                 continue
-            candidate_signal = attribute_failure(
-                candidate_result,
-                use_gold=use_gold,
-            )
+            candidate_signal = attribution_for(candidate_result, case_id)
             assessment = assess_source_fitness(
                 signal,
                 candidate_signal,
@@ -1569,17 +1832,13 @@ def run_online_evolution(
             canary_regressions: list[str] = []
             if (assessment.passed or assessment.evidence_only) and stable_canaries:
                 canary_root = replay_root / "canaries"
-                for canary_id, parent_canary in stable_canaries.items():
+                for canary_id, parent_canary in selected_canaries(edit):
                     try:
-                        child_canary = _run_detection_with_genome(
+                        child_canary = run_detection(
+                            budget_kind="canary",
                             genome=candidate_genome,
                             case_id=canary_id,
-                            record=records[canary_id],
-                            config=config,
-                            output_dir=canary_root / canary_id.replace("/", "_"),
-                            census_root=census_root,
-                            baseline_cache_root=baseline_cache_root,
-                            shared_cache_root=shared_cache_root,
+                            output_path=canary_root / canary_id.replace("/", "_"),
                         )
                         preserved, audit = canary_preserved(
                             parent_canary, child_canary,
@@ -1599,7 +1858,12 @@ def run_online_evolution(
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),
                 "source_stable_after": not candidate_signal.should_evolve,
-                "commit_validation": "source_replay_plus_stable_canaries",
+                "commit_validation": "single_source_replay_plus_sampled_canaries",
+                "source_replays": 1,
+                "canary_cases": len(canary_audit),
+                "probe_cases": 0,
+                "provider_calls": 1 + len(canary_audit),
+                "rollback_reason": "",
                 "passed": assessment.passed,
                 "canary_audit": canary_audit,
                 "canary_regressions": canary_regressions,
@@ -1696,6 +1960,34 @@ def run_online_evolution(
         if not fitness_check:
             # Non-formal diagnostic compatibility path. Formal CLI runs require
             # fitness_check=True.
+            if not fitness_use_gold:
+                gate.revoke_structural_accept(
+                    cert,
+                    ["label_free_candidate_is_telemetry_only"],
+                )
+                gate.record_no_edit()
+                edits_rejected += 1
+                current_genome = champion_genome
+                record_step(EvolutionStep(
+                    case_id=case_id,
+                    case_index=idx,
+                    trigger_source=signal.trigger_source.value,
+                    attribution=signal.to_dict(),
+                    edit_proposal=edit.to_dict(),
+                    mutation_applied=None,
+                    gate_decision="provisional_no_gold_telemetry",
+                    genome_hash_before=genome_before,
+                    genome_hash_after=champion_genome.content_hash,
+                    detection_state=detection_state,
+                    timestamp=time.time(),
+                    fitness_check={
+                        "passed": False,
+                        "promotion_eligible": False,
+                        "claim_scope": "label_free_provisional_telemetry",
+                        "rollback_reason": "no_independent_correctness_authority",
+                    },
+                ), next_case_index=idx + 1)
+                continue
             champion_genome = candidate_genome
             current_genome = candidate_genome
             edits_accepted += 1
@@ -1734,8 +2026,11 @@ def run_online_evolution(
             applied_rule_idx=_applied_rule_idx,
             source_signal=signal,
             source_result=detection_result,
+            source_after_signal=candidate_signal,
+            source_after_result=candidate_result,
             individual_assessment=assessment,
             step_index=step_index,
+            canary_audits=canary_audit,
         ))
         record_step(EvolutionStep(
             case_id=case_id,
@@ -1763,6 +2058,9 @@ def run_online_evolution(
         next_case_index=len(evolution_case_ids),
         force=True,
     )
+    if pending_probe_commits and registered_probe_ids:
+        run_development_probe(reason="final_pending_candidate")
+        persist_progress(len(evolution_case_ids))
     duration = time.time() - start_time
     result = OnlineEvolutionResult(
         run_id=run_id,
@@ -1778,6 +2076,22 @@ def run_online_evolution(
         halted=gate.is_halted,
         halt_reason=gate.halt_reason,
         duration_seconds=duration,
+        evolution_audit={
+            **budget_usage,
+            "rollback_reason": rollback_reason,
+            "probe_history": probe_history,
+            "validation_probe_every": validation_probe_every,
+            "validation_probe_trigger_threshold": (
+                validation_probe_trigger_threshold
+            ),
+            "probe_ids": list(registered_probe_ids),
+            "probe_limit": probe_limit,
+            "canary_limit": canary_limit,
+            "final_champion_claim": False,
+            "result_scope": "development_candidate_not_final_holdout_champion",
+            "label_free_accuracy_claim": False,
+            "no_gold_promotion_allowed": False,
+        },
     )
 
     # Save results

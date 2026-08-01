@@ -6,7 +6,7 @@
 
 ```mermaid
 flowchart TD
-    A["显式角色数据<br/>evolution / validation / test / outer"] --> B["冻结本次执行合同<br/>config + manifests + hashes"]
+    A["显式角色数据<br/>development / probe / final_holdout"] --> B["冻结本次执行合同<br/>config + manifests + hashes"]
     B --> C["PACA-TCL 检测当前 genome"]
     C --> C0["H0 基础层与候选 census"]
     C0 --> C1["H1 focused prosecution + defense"]
@@ -19,8 +19,8 @@ flowchart TD
     G -->|通过| H["commit 本地 genome"]
     G -->|失败/无效| I["reject / rollback + 审计记录"]
     H --> C
-    E -->|validation / test| J["Inner 评估<br/>研究观察，不可晋升 champion"]
-    E -->|outer| K["角色隔离的最终评估<br/>只读 genome，无进化写回"]
+    E -->|periodic probe| J["方向/回滚门<br/>受 interval 与预算限制"]
+    E -->|final_holdout / outer| K["角色隔离的最终评估<br/>只读 genome，无进化写回"]
     J --> L["三态、selective、paired 指标"]
     K --> L
     L --> M{"champion claim gate"}
@@ -36,26 +36,25 @@ flowchart TD
 
 ## 2. 数据角色与分区
 
-### 2.1 四种角色不是同义词
+### 2.1 三种语义角色
 
-| 角色 | 用途 | 进化时可见 | 能否单独支持 champion 声明 |
-|---|---|---:|---:|
-| `evolution` | 逐案产生、筛选策略编辑 | 是 | 否 |
-| `validation` | Inner 跨案例检查 | 否 | 否 |
-| `test` | 独立于 evolution/validation 的 Inner 测试 | 否 | 否 |
-| `outer` | 角色隔离的最终评估 | 否 | 只有通过全部 claim gate 才可能 |
+| 角色 | 用途 | 开发期如何使用 | 能否单独支持 champion 声明 |
+|---|---|---|---:|
+| `development_pool` | 自进化材料总池 | evolution、source replay、canary、经验记忆可持续复用 | 否 |
+| `gold_probe` | 开发池内固定小探针 | 按 `probe_interval` / `probe_budget` 周期打开，只作方向或回滚门 | 否 |
+| `final_holdout`（别名 `outer`） | 实验结束的只读验证 | 开发期封存；结束时一次性或由外部治理开放 | 只有通过全部 claim gate 才可能 |
 
-`partition` 命令要求每一行都显式带有 Inner/Outer 角色。一条 Outer 标记不会让其他未标记行自动变成 Inner。新分区会记录输入 SHA-256、D/P0 角色计数、各角色序列哈希和两两互斥审计。
+为什么大部分数据可以进入进化？因为本系统研究的是持续自进化；source replay 和经验记忆本来就是开发过程。把旧 validation/test 的大块数据永久冻结会让可学习材料快速枯竭，却不会自动带来更可信的最终结论。真正需要隔离的是一个足够、预注册且开发期未反复查看的 final holdout。
 
-Outer 还有更严格的要求：
+`gold_probe` 是 `development_pool` 的子集，但不进入 mutation-source 列表；它与 `final_holdout` 互斥。探针被重复查看后会产生适应风险，所以只能回答“当前方向是否值得继续/回滚”，不能回答“是否泛化”。分区由 `probe_size`、`holdout_size` 和 `seed` 固定，并记录 `development_case_count`、`probe_case_count`、`final_holdout_count` 和 `holdout_sealed`。
 
-- 每个 Outer 行必须保存真实、可加载的 `source/id` 形式 `case_id`；
-- `case_ref` 只能由 `case_id` 正向计算，禁止由 `case_ref` 反查 ID；
-- `outer_set_ids.json` 保存逐案 `role=outer` 赋值；
-- manifest 的角色赋值哈希必须匹配，并绑定当前 `data_partition_v5.json` 的 canonical payload 哈希；
-- Outer IDs 必须与 evolution、validation、Inner test 和整个 Inner universe 严格不相交。
+有 Gold 时，probe evaluator 用冻结标签做正确性 veto；无 Gold 时，同一
+probe 退化为只检查 `runtime_valid` 和 `decision_authority` 的 process veto，
+不会计算 clean/error 得分，也不会解除 provisional/claim 限制。
 
-如果历史 artifact 只有 `case_ref`、`outer=0` 或没有哈希绑定的真实-ID manifest，代码不会把它“升级”为合法 Outer 证据。
+新 manifest 是 `development_pool_ids.json`、`probe_set_ids.json`、`final_holdout_ids.json`。旧 `stratified_evolution_set.json`、`validation_set_ids.json`、`test_set_ids.json`、`outer_set_ids.json` 仍可读取；validation/test 不必同时存在，也不再自动阻止开发池复用。
+
+Final holdout 仍要求真实、可加载的 `source/id` 形式 `case_id`，`case_ref` 只能正向计算，manifest 必须与 partition 哈希绑定。历史 artifact 若没有真实 ID、哈希绑定或 sealing/custody 证据，不会被“升级”为合法最终证据。
 
 ### 2.2 阶段授权
 
@@ -63,11 +62,11 @@ Outer 还有更严格的要求：
 
 - 所有执行要求 `execution_authorized=true`；
 - 包含 D cases 的 evolve 要求 `D_execution_authorized=true`；
-- validation/test 要求 D/effectiveness 正式阶段授权；
-- Outer 额外要求 `outer_execution_authorized=true`；
-- `P0_diagnostic_only` 不能被当作 D、validation、test 或 Outer 授权。
+- probe 与 final evaluation 要求 D/effectiveness 正式阶段授权；
+- final holdout/Outer 额外要求 `outer_execution_authorized=true`；
+- `P0_diagnostic_only` 不能被当作 D、probe 或 final-holdout 授权。
 
-当前仓库所指向的 PACA-TCL v3.5 配置是 `P0_diagnostic_only`，并且 `D_execution_authorized=false`。因此默认配置会主动拒绝正式 validation/test/Outer，也会拒绝包含 D cases 的 evolve。这是前置条件未满足，不是实验已经运行并失败。
+当前仓库所指向的 PACA-TCL v3.5 配置是 `P0_diagnostic_only`，并且 `D_execution_authorized=false`。因此默认配置会主动拒绝正式 probe/final-holdout，也会拒绝包含 D cases 的 evolve。这是前置条件未满足，不是实验已经运行并失败。
 
 ## 3. PACA-TCL：从轨迹到判决
 
@@ -181,8 +180,8 @@ flowchart LR
 5. `StructuralGate` 检查可观察的 if/when 条件、单一动作、模块权限、重复/泄漏/直接 verdict 等约束。
 6. 编辑只先进入 candidate/shadow genome。
 7. Source replay 在同一触发案例上比较 before/after。
-8. 若 source assessment 可进入下一层，则在滚动的 stable evolution cases 上跑 canary；这些 canary 不来自 validation/test/Outer。
-9. 只有具备独立正确性证据且 canary 无回归时才 commit；否则 reject/rollback，并保存原因和 before/after hash。具体地，无独立 gold/外部正确性证据时，`directional_evidence` 和 detector-local score 只记为 telemetry，不能进入 `accepted_indices`；只有 gold-assisted 的 `strong_improvement` / `local_improvement`，或后续独立晋升证据，才可提交。
+8. 若 source assessment 可进入下一层，则在滚动的 stable development cases 上跑 canary；按注册 interval/accepted-edit 阈值还可打开预算内 gold probe，final holdout 始终不在此路径。
+9. 只有 source replay 与 canary 通过，且没有 runtime/authority 回归时才进入下一层；否则 reject/rollback，并保存原因和 before/after hash。Gold 模式下，`strong_improvement` / `local_improvement` 可作为 development candidate 的选择证据，但仍不能替代 final holdout。无 Gold 模式下，`directional_evidence` 和 detector-local score 只能在 canary 非回归时进入 `provisional_label_free` working candidate；它保持 `fitness_status=none`、不可受 strong/weak 保护，也不能产生准确率或 champion 声明。周期 probe 只能继续或回滚，不能把 provisional 变成正式结论。
 
 正式 CLI 强制 `fitness_batch_size=1`，因为多个编辑一起 replay 后无法把效果可靠归因给单条规则。`--no-fitness-check` 在正式 evolve 入口被拒绝。
 
@@ -194,10 +193,10 @@ flowchart LR
 |---|---|---|
 | 默认 `evolve` | 不进入归因或 reflection；依靠 unresolved、coverage、CRS provenance 等自监督信号 | decisive 不等于 correct；不能自行选 error/clean 极性 |
 | `--use-gold` | 显式启用 gold-enhanced attribution；运行合同记录该模式 | 仍不是独立 effectiveness 证据 |
-| `--fitness-use-gold` | 只在 source fitness 选择中使用标签；除非同时 `--use-gold`，标签不进入归因/reflection prompt | 仍不能替代 validation/test/Outer |
+| `--fitness-use-gold` | 只在 source fitness 选择中使用标签；除非同时 `--use-gold`，标签不进入归因/reflection prompt | 仍不能替代 final holdout |
 | `evaluate` | 从冻结 baseline cache 读取 bool `gold_label`，仅用于指标 | 标签不会授权执行，也不会补足缺失 provenance |
 
-无 gold 时，unresolved 的合法方向是 `unresolved_to_decisive`，不是默认 `unresolved_to_error`。Source replay 的 evidence-only 或方向性信号只能说明局部过程变化；不能称为 accuracy gain。
+无 gold 时，unresolved 的合法方向是 `unresolved_to_decisive`，不是默认 `unresolved_to_error`。Source replay 的 evidence-only 或方向性信号只能说明局部过程变化；在 stable canary 非回归时可形成 `provisional_label_free` working candidate，但不能称为 accuracy gain，也不能晋升正式 champion。
 
 ## 7. HTC-TES 的真实作用与非作用
 
@@ -213,22 +212,21 @@ HTC-TES 当前实际做三件事：
 - 不把分类 confidence 当 detector accuracy；
 - 不证明 error-oriented/clean-oriented 两个方向都已优化；
 - 不因为产生 experience record 就认定编辑成功；
-- 不授权 validation/test/Outer，也不授予 champion 身份。
+- 不授权 probe/final holdout，也不授予 champion 身份。
 
-## 8. Validation、Test 与 Outer
+## 8. Probe、Final Holdout 与旧别名
 
-| 属性 | validation | test | outer |
-|---|---|---|---|
-| 数据宇宙 | Inner | Inner | 必须不属于 Inner |
-| 与 evolution 不相交 | 必须 | 必须 | 必须 |
-| 与 validation 不相交 | 自身 | 必须 | 必须 |
-| 与 Inner test 不相交 | 不要求 | 自身 | 必须 |
-| 额外执行授权 | D/effectiveness | D/effectiveness | D/effectiveness + `outer_execution_authorized` |
-| Genome 是否只读 | 是 | 是 | 是 |
-| 写回 mutation/experience/champion | 否 | 否 | 否 |
-| Champion eligible | 永不 | 永不 | 仅可能 |
+| 属性 | `probe` | `final_holdout` / `outer` |
+|---|---|---|
+| 数据关系 | development pool 内的固定子集；不作 mutation source | 与整个 development pool 互斥 |
+| 开放频率 | 按 interval/预算，或累计 accepted edit 阈值 | 实验末一次，或外部治理控制 |
+| 用途 | 在线方向检查、回滚门 | 最终泛化与 claim gate |
+| Genome/经验/champion 写回 | 否 | 否 |
+| Champion eligible | 永不 | 仅可能 |
 
-Outer artifact 使用 `role_isolated_final_evaluation` 语义。代码能保证角色检查、ID/ref/partition 哈希绑定和只读评估路径，但不能保证数据对操作者保密，也没有跨进程的一次性开启注册表。
+`validation` 默认兼容映射到 probe；`test` 在旧 manifest 存在时仍可读，否则可回落到 probe；`outer` 映射到 final holdout。旧名字不会制造额外的数据禁区。
+
+Final artifact 使用 `role_isolated_final_holdout_read_only` 语义。代码能保证角色检查、ID/ref/partition 哈希绑定和只读评估路径，但不能保证数据对操作者保密，也没有跨进程的一次性开启注册表。
 
 因此 champion eligibility 还要求 `outer_custody_verified=true`。它是外部治理证明：Outer 没有参与开发，并按最终评估策略开放。代码记录这个 assertion，但无法独立证明其历史真实性。
 
@@ -264,9 +262,9 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 1. 变化不只是 abstention/unresolved migration；
 2. exact McNemar 显示显著的 paired correctness 正增益；
 3. paired net-gain CI 完整且 lower bound > 0；
-4. evaluation role 精确为 `outer`；
+4. evaluation role 为 sealed `final_holdout`（或 `outer` 别名）；
 5. critical provenance 完整；
-6. `outer_custody_verified=true`。
+6. `holdout_sealed=true` 且 `outer_custody_verified=true`。
 
 任一条件不足都会产生具体 `blocking_reasons`，如：
 
@@ -275,6 +273,8 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 - `paired_ci_insufficient_sample`
 - `confidence_interval_does_not_support_positive_gain`
 - `outer_evaluation_missing`
+- `final_holdout_evaluation_missing`
+- `final_holdout_not_sealed`
 - `critical_provenance_incomplete`
 - `outer_custody_unverified`
 
@@ -313,8 +313,9 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 [ ] genome lineage/hash 可严格 replay
 [ ] baseline/census/provider/config/case provenance 完整
 [ ] evolve 使用 source replay，fitness_batch_size=1
-[ ] validation/test 未在 evolve 中打开
-[ ] Outer 使用真实 ID、哈希绑定 manifest 和 outer_execution_authorized=true
+[ ] probe 与 final_holdout 互斥，development pool 除 probe 外可作 evolution source
+[ ] run contract 记录 probe_interval/probe_budget，probe 只作方向/回滚门
+[ ] final holdout 使用真实 ID、哈希绑定 manifest、holdout_sealed=true 和 outer_execution_authorized=true
 [ ] champion claim 另有 outer_custody_verified=true 的外部治理依据
 [ ] 结论同时报告三态、selective、paired、CI 和 blocking reasons
 ```
@@ -322,11 +323,10 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 常用入口：
 
 ```bash
-python -m src.sehd_v6.main partition
-python -m src.sehd_v6.main evolve --size 50
-python -m src.sehd_v6.main evaluate --set validation --genome <path>
-python -m src.sehd_v6.main evaluate --set test --genome <path>
-python -m src.sehd_v6.main evaluate --set outer --genome <path>
+python -m src.sehd_v6.main partition --probe-size 10 --holdout-size 20 --seed 42
+python -m src.sehd_v6.main evolve --size 50 --probe-interval 10 --probe-budget 5
+python -m src.sehd_v6.main evaluate --set probe --genome <path>
+python -m src.sehd_v6.main evaluate --set final_holdout --genome <path>
 ```
 
 这些命令不会绕过授权检查。以当前默认 P0 配置直接运行包含 D cases 的 `evolve` 或任一正式 evaluation 时，预期行为是 fail closed；需要先注册与目标阶段相符的冻结配置和角色 manifests。

@@ -1,16 +1,10 @@
-"""BCCSE v5 — Data partition for evolution experiments.
+"""BCCSE v5 data protocol: development pool, gold probe, final holdout.
 
-Partitions the 587 cases (P0=64 + D=523) into:
-- Evolution pool: 200 cases (main experiment uses first 50)
-- Quick validation set: 50 cases (for iterative evaluation)
-- Full test set: remaining ~337 cases (final evaluation)
-- Outer 106: sealed (never used)
-
-Design principles:
-- Stratified by detection state (verified_error / verified_clean / unresolved)
-- Stratified by gold label (positive / negative)
-- Quick validation set enriched with "informative" cases (unresolved + FP)
-- Reproducible via fixed random seed
+Most non-holdout cases remain reusable development material.  A fixed, small
+gold probe is sampled *inside* that development pool for budgeted directional
+checks.  The final holdout is disjoint, sealed, and read-only.  Legacy
+validation/test/outer fields are emitted or accepted as compatibility aliases;
+they no longer imply that three separate forbidden development sets must exist.
 """
 
 from __future__ import annotations
@@ -62,24 +56,31 @@ def partition_data(
     p0_predictions_path: Path | None = None,
     output_dir: Path,
     seed: int = 42,
-    evolution_pool_size: int = 200,
+    evolution_pool_size: int | None = None,
     validation_size: int = 50,
     main_evolution_size: int = 50,
+    probe_size: int | None = None,
+    holdout_size: int | None = None,
+    holdout_sealed: bool = True,
 ) -> dict[str, Any]:
-    """Partition cases into evolution pool, validation set, and test set.
+    """Partition cases into development, periodic probe, and final holdout.
 
-    Strategy:
-    1. Load all predictions (D=523 + P0=64 = 587)
-    2. Require an explicit Inner/Outer role on every row
-    3. Stratify by (state, gold_label)
-    4. Sample validation set first (enriched with unresolved + FP)
-    5. Sample evolution pool from remaining
-    6. Rest becomes test set
+    ``validation_size`` and ``evolution_pool_size`` remain supported for old
+    callers.  ``probe_size`` supersedes ``validation_size``.  When
+    ``holdout_size`` is omitted, at least one explicitly marked Outer/final
+    row is required (the legacy fail-closed behavior).  When it is supplied,
+    explicit holdout rows are preserved and any shortfall is deterministically
+    sampled before the probe.
 
     Returns:
         Dictionary with partition info and case ID lists.
     """
     rng = random.Random(seed)
+    effective_probe_size = validation_size if probe_size is None else probe_size
+    if effective_probe_size < 0:
+        raise ValueError("probe_size must be non-negative")
+    if holdout_size is not None and holdout_size < 1:
+        raise ValueError("holdout_size must be at least 1 when supplied")
 
     # Load predictions
     d_rows = [
@@ -109,9 +110,11 @@ def partition_data(
         row["case_ref"] = ref
         by_ref[ref] = row
 
-    # Filter out Outer cases (if marked)
+    # Interpret explicit roles.  "probe" is still a development role; it only
+    # requests membership in the fixed periodic probe.
     inner_cases: list[dict[str, Any]] = []
     outer_cases: list[dict[str, Any]] = []
+    explicit_probe_refs: list[str] = []
     unmarked_cases: list[str] = []
     for ref, row in by_ref.items():
         raw_split = row.get("split") or row.get("partition")
@@ -119,24 +122,76 @@ def partition_data(
             unmarked_cases.append(ref)
             continue
         split = str(raw_split).lower()
-        if split in ("outer", "test_sealed", "outer_sealed"):
+        if split in (
+            "outer",
+            "test_sealed",
+            "outer_sealed",
+            "final",
+            "final_set",
+            "final_holdout",
+            "holdout",
+        ):
             outer_cases.append(row)
-        elif split in ("inner", "development", "d", "p0", "train"):
+        elif split in (
+            "inner",
+            "development",
+            "development_pool",
+            "d",
+            "p0",
+            "train",
+            "probe",
+            "gold_probe",
+            "validation",
+            "test",
+        ):
             inner_cases.append(row)
+            if split in ("probe", "gold_probe", "validation"):
+                explicit_probe_refs.append(ref)
         else:
             raise RuntimeError(f"Unknown partition role {raw_split!r} for {ref}")
 
     if unmarked_cases:
         raise RuntimeError(
-            "Every partition row requires an explicit Inner/Outer role; "
-            "unmarked rows cannot be silently treated as Inner: "
+            "Every partition row requires an explicit development/final role; "
+            "unmarked rows cannot be silently treated as development: "
             + ", ".join(unmarked_cases[:20])
         )
-    if not outer_cases:
+    explicit_outer_count = len(outer_cases)
+    if holdout_size is None and not outer_cases:
         raise RuntimeError(
-            "No explicit Outer marker is present in the partition inputs; "
-            "refusing to silently classify the entire cache as Inner"
+            "No explicit Outer marker or final-holdout marker is present and no "
+            "holdout_size was supplied; refusing an unsealed all-development split"
         )
+
+    if holdout_size is not None:
+        if len(outer_cases) > holdout_size:
+            raise RuntimeError(
+                "Explicit final-holdout rows exceed holdout_size; explicitly "
+                "sealed rows cannot be demoted into development"
+            )
+        shortfall = holdout_size - len(outer_cases)
+        if shortfall:
+            eligible = [
+                row
+                for row in inner_cases
+                if str(row.get("case_id") or "").count("/") == 1
+                and str(row.get("case_ref") or "")
+                == _case_ref(str(row.get("case_id")))
+            ]
+            rng.shuffle(eligible)
+            if len(eligible) < shortfall:
+                raise RuntimeError(
+                    "Not enough loadable development rows to satisfy holdout_size"
+                )
+            promoted = eligible[:shortfall]
+            promoted_refs = {str(row["case_ref"]) for row in promoted}
+            outer_cases.extend(promoted)
+            inner_cases = [
+                row for row in inner_cases if str(row["case_ref"]) not in promoted_refs
+            ]
+            explicit_probe_refs = [
+                ref for ref in explicit_probe_refs if ref not in promoted_refs
+            ]
 
     outer_assignments: list[dict[str, str]] = []
     for row in outer_cases:
@@ -160,7 +215,7 @@ def partition_data(
 
     print(f"Inner: {len(inner_cases)}, Outer: {len(outer_cases)}")
 
-    # Stratify inner cases
+    # Stratify the development pool for a reproducible, informative probe.
     strata: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in inner_cases:
         state = str(row.get("state") or "unknown")
@@ -175,9 +230,14 @@ def partition_data(
     for key, cases in sorted(strata.items()):
         print(f"  {key}: {len(cases)}")
 
-    # --- Sample validation set (enriched with informative cases) ---
-    validation_refs: list[str] = []
-    validation_target = {
+    # --- Sample the small periodic gold probe ---
+    probe_refs: list[str] = list(dict.fromkeys(explicit_probe_refs))
+    if len(probe_refs) > effective_probe_size:
+        raise RuntimeError(
+            "Explicit probe rows exceed probe_size; explicitly assigned probe "
+            "rows cannot be silently changed"
+        )
+    probe_target = {
         "unresolved_negative": 15,  # unresolved cases (gold=neg)
         "unresolved_positive": 10,  # unresolved cases (gold=pos)
         "verified_error_negative": 10,  # FP cases
@@ -186,9 +246,9 @@ def partition_data(
         "verified_clean_positive": 2,  # FN cases
     }
 
-    used_refs: set[str] = set()
-    for stratum_key, target_count in validation_target.items():
-        remaining_slots = validation_size - len(validation_refs)
+    used_refs: set[str] = set(probe_refs)
+    for stratum_key, target_count in probe_target.items():
+        remaining_slots = effective_probe_size - len(probe_refs)
         if remaining_slots <= 0:
             break
         available = [
@@ -199,55 +259,62 @@ def partition_data(
         selected = available[:min(target_count, remaining_slots)]
         for row in selected:
             ref = str(row.get("case_ref") or row.get("case_id"))
-            validation_refs.append(ref)
+            probe_refs.append(ref)
             used_refs.add(ref)
 
-    # Fill remaining validation slots if needed
-    if len(validation_refs) < validation_size:
+    # Fill the remaining probe budget without opening the final holdout.
+    if len(probe_refs) < effective_probe_size:
         remaining = [
             r for r in inner_cases
             if str(r.get("case_ref") or r.get("case_id")) not in used_refs
         ]
         rng.shuffle(remaining)
         for row in remaining:
-            if len(validation_refs) >= validation_size:
+            if len(probe_refs) >= effective_probe_size:
                 break
             ref = str(row.get("case_ref") or row.get("case_id"))
-            validation_refs.append(ref)
+            probe_refs.append(ref)
             used_refs.add(ref)
 
-    # --- Sample evolution pool ---
+    # All remaining development cases are evolution/source-replay material by
+    # default.  The legacy cap is still honored when explicitly supplied.
     evolution_candidates = [
         str(r.get("case_ref") or r.get("case_id"))
         for r in inner_cases
         if str(r.get("case_ref") or r.get("case_id")) not in used_refs
     ]
     rng.shuffle(evolution_candidates)
-    evolution_pool_refs = evolution_candidates[:evolution_pool_size]
-    used_refs.update(evolution_pool_refs)
+    if evolution_pool_size is None:
+        evolution_pool_refs = list(evolution_candidates)
+    else:
+        if evolution_pool_size < 0:
+            raise ValueError("evolution_pool_size must be non-negative")
+        evolution_pool_refs = evolution_candidates[:evolution_pool_size]
 
-    # --- Remaining = test set ---
+    # A legacy test remainder may exist for old consumers, but it is still
+    # development material under v3 and is not a second final holdout.
+    evolution_set = set(evolution_pool_refs)
     test_refs = [
-        str(r.get("case_ref") or r.get("case_id"))
-        for r in inner_cases
-        if str(r.get("case_ref") or r.get("case_id")) not in used_refs
+        ref for ref in evolution_candidates if ref not in evolution_set
     ]
 
     # Main evolution set = first N from pool
     main_evolution_refs = evolution_pool_refs[:main_evolution_size]
 
     # --- Summary ---
-    validation_set = set(validation_refs)
-    evolution_set = set(evolution_pool_refs)
+    development_set = {
+        str(row.get("case_ref") or row.get("case_id")) for row in inner_cases
+    }
+    probe_set = set(probe_refs)
     test_set = set(test_refs)
     outer_set = {
         str(row.get("case_ref") or row.get("case_id")) for row in outer_cases
     }
     role_sets = {
-        "validation": validation_set,
+        "gold_probe": probe_set,
         "evolution_pool": evolution_set,
-        "test": test_set,
-        "outer": outer_set,
+        "legacy_test_remainder": test_set,
+        "final_holdout": outer_set,
     }
     overlaps: dict[str, list[str]] = {}
     role_names = list(role_sets)
@@ -259,7 +326,7 @@ def partition_data(
     inner_refs = {
         str(row.get("case_ref") or row.get("case_id")) for row in inner_cases
     }
-    assigned_inner = validation_set | evolution_set | test_set
+    assigned_inner = probe_set | evolution_set | test_set
     missing_inner = sorted(inner_refs - assigned_inner)
     unexpected_inner = sorted(assigned_inner - inner_refs)
     if overlaps or missing_inner or unexpected_inner:
@@ -300,22 +367,59 @@ def partition_data(
             else {"path": None, "sha256": None, "row_count": 0, "status": "not_supplied"}
         ),
     }
+    final_holdout_refs = [item["case_ref"] for item in outer_assignments]
+    development_case_ids = [
+        str(row.get("case_id") or "") for row in inner_cases
+    ]
+    development_ids_complete = all(
+        case_id and _case_ref(case_id) == str(row.get("case_ref") or "")
+        for case_id, row in zip(development_case_ids, inner_cases)
+    )
+    ids_by_ref = {
+        str(row.get("case_ref") or ""): str(row.get("case_id") or "")
+        for row in inner_cases
+    }
+    probe_case_ids = [ids_by_ref.get(ref, "") for ref in probe_refs]
+    probe_ids_complete = bool(probe_refs) and all(probe_case_ids)
+
     partition = {
-        "schema_version": "agenthallu.bccse_v5_data_partition.v2",
+        "schema_version": "agenthallu.bccse_v5_data_partition.v3",
+        "protocol": "development_pool_periodic_gold_probe_final_holdout",
         "seed": seed,
         "total_inner": len(inner_cases),
         "total_outer": len(outer_cases),
+        "development_case_count": len(development_set),
+        "probe_case_count": len(probe_set),
+        "final_holdout_count": len(outer_set),
+        "holdout_sealed": bool(holdout_sealed),
         "input_provenance": input_provenance,
         "input_role_counts": input_role_counts,
         "outer_role_evidence": {
-            "explicit_outer_marker_present": True,
+            "explicit_outer_marker_present": explicit_outer_count > 0,
+            "explicit_outer_marker_count": explicit_outer_count,
+            "holdout_size_configured": holdout_size,
             "all_rows_have_explicit_roles": True,
             "unmarked_row_count": 0,
             "outer_role_assignment_sha256": _canonical_sha256(outer_assignments),
         },
+        "development_pool": {
+            "size": len(development_set),
+            "case_refs": sorted(development_set),
+            "includes_gold_probe": True,
+            "reusable_for_evolution": True,
+        },
+        "gold_probe": {
+            "size": len(probe_refs),
+            "case_refs": probe_refs,
+            "subset_of": "development_pool",
+            "purpose": "budgeted_online_direction_and_rollback_only",
+            "final_generalization_evidence": False,
+        },
+        # Legacy alias: validation means the development gold probe in v3.
         "validation_set": {
-            "size": len(validation_refs),
-            "case_refs": validation_refs,
+            "size": len(probe_refs),
+            "case_refs": probe_refs,
+            "alias_of": "gold_probe",
         },
         "evolution_pool": {
             "size": len(evolution_pool_refs),
@@ -327,21 +431,34 @@ def partition_data(
         "test_set": {
             "size": len(test_refs),
             "case_refs": test_refs,
+            "optional_legacy_development_remainder": True,
+            "final_generalization_evidence": False,
+        },
+        "final_holdout": {
+            "size": len(final_holdout_refs),
+            "case_refs": final_holdout_refs,
+            "sealed": bool(holdout_sealed),
+            "read_only": True,
         },
         "outer_sealed": {
             "size": len(outer_cases),
-            "case_refs": [
-                str(r.get("case_ref") or r.get("case_id")) for r in outer_cases
-            ],
+            "case_refs": final_holdout_refs,
+            "alias_of": "final_holdout",
         },
         "role_counts": {
-            "validation": len(validation_set),
+            "development_pool": len(development_set),
+            "gold_probe": len(probe_set),
+            "final_holdout": len(outer_set),
+            "validation": len(probe_set),
             "evolution_pool": len(evolution_set),
             "test": len(test_set),
             "outer": len(outer_set),
         },
         "role_sequence_hashes": {
-            "validation": hashlib.sha256("\n".join(validation_refs).encode("utf-8")).hexdigest(),
+            "development_pool": hashlib.sha256("\n".join(sorted(development_set)).encode("utf-8")).hexdigest(),
+            "gold_probe": hashlib.sha256("\n".join(probe_refs).encode("utf-8")).hexdigest(),
+            "final_holdout": hashlib.sha256("\n".join(final_holdout_refs).encode("utf-8")).hexdigest(),
+            "validation": hashlib.sha256("\n".join(probe_refs).encode("utf-8")).hexdigest(),
             "evolution_pool": hashlib.sha256("\n".join(evolution_pool_refs).encode("utf-8")).hexdigest(),
             "test": hashlib.sha256("\n".join(test_refs).encode("utf-8")).hexdigest(),
             "outer": hashlib.sha256("\n".join(sorted(outer_set)).encode("utf-8")).hexdigest(),
@@ -355,6 +472,11 @@ def partition_data(
             },
             "inner_coverage_complete": True,
             "inner_assigned_count": len(assigned_inner),
+            "probe_final_holdout_overlap_count": len(probe_set & outer_set),
+        },
+        "manifest_capability": {
+            "development_case_ids_complete": development_ids_complete,
+            "probe_case_ids_complete": probe_ids_complete,
         },
     }
 
@@ -378,6 +500,8 @@ def partition_data(
             role: value.get("sha256") for role, value in input_provenance.items()
         },
         "evaluation_semantics": "role_isolated_final_read_only",
+        "canonical_role": "final_holdout",
+        "holdout_sealed": bool(holdout_sealed),
         "custody_and_one_shot_enforcement": "external_governance_required",
         "reverse_discovery_used": False,
     }
@@ -385,12 +509,56 @@ def partition_data(
     with open(outer_manifest_path, "w", encoding="utf-8") as handle:
         json.dump(outer_manifest, handle, ensure_ascii=False, indent=2)
 
+    final_assignments = [
+        {"case_id": item["case_id"], "case_ref": item["case_ref"], "role": "final_holdout"}
+        for item in outer_assignments
+    ]
+    final_manifest = {
+        **outer_manifest,
+        "schema_version": "agenthallu.final_holdout_manifest.v1",
+        "role": "final_holdout",
+        "final_holdout_case_ids": outer_case_ids,
+        "final_holdout_case_refs": final_holdout_refs,
+        "role_assignments": final_assignments,
+        "role_assignment_sha256": _canonical_sha256(final_assignments),
+    }
+    final_manifest_path = output_dir / "final_holdout_ids.json"
+    with open(final_manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(final_manifest, handle, ensure_ascii=False, indent=2)
+
+    if development_ids_complete:
+        development_manifest = {
+            "schema_version": "agenthallu.development_pool_manifest.v1",
+            "role": "development_pool",
+            "development_case_ids": development_case_ids,
+            "probe_case_ids": probe_case_ids,
+            "evolution_case_ids": [
+                case_id
+                for case_id in development_case_ids
+                if case_id not in set(probe_case_ids)
+            ],
+            "partition_payload_sha256": _canonical_sha256(partition),
+        }
+        with open(output_dir / "development_pool_ids.json", "w", encoding="utf-8") as handle:
+            json.dump(development_manifest, handle, ensure_ascii=False, indent=2)
+    if probe_ids_complete:
+        probe_manifest = {
+            "schema_version": "agenthallu.gold_probe_manifest.v1",
+            "role": "gold_probe",
+            "probe_case_ids": probe_case_ids,
+            "validation_case_ids": probe_case_ids,
+            "partition_payload_sha256": _canonical_sha256(partition),
+            "final_generalization_evidence": False,
+        }
+        with open(output_dir / "probe_set_ids.json", "w", encoding="utf-8") as handle:
+            json.dump(probe_manifest, handle, ensure_ascii=False, indent=2)
+
     print(f"\nPartition saved to: {out_path}")
-    print(f"  Validation: {len(validation_refs)} cases")
+    print(f"  Development pool: {len(development_set)} cases")
+    print(f"  Periodic gold probe: {len(probe_refs)} cases")
     print(f"  Evolution pool: {len(evolution_pool_refs)} cases (main: {main_evolution_size})")
-    print(f"  Test set: {len(test_refs)} cases")
-    print(f"  Outer sealed: {len(outer_cases)} cases")
-    print(f"  Outer ID manifest: {outer_manifest_path}")
+    print(f"  Final holdout: {len(outer_cases)} cases (sealed={bool(holdout_sealed)})")
+    print(f"  Final-holdout manifest: {final_manifest_path}")
 
     return partition
 
@@ -415,6 +583,18 @@ if __name__ == "__main__":
         default=Path("/root/autodl-tmp/agent_hallucination/bccse_v5/partition"),
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--probe-size",
+        type=int,
+        default=10,
+        help="Fixed development-pool gold probe size",
+    )
+    parser.add_argument(
+        "--holdout-size",
+        type=int,
+        default=None,
+        help="Final holdout size; omitted means use all explicitly marked Outer rows",
+    )
     args = parser.parse_args()
 
     partition_data(
@@ -422,4 +602,6 @@ if __name__ == "__main__":
         p0_predictions_path=args.p0_predictions,
         output_dir=args.output_dir,
         seed=args.seed,
+        probe_size=args.probe_size,
+        holdout_size=args.holdout_size,
     )

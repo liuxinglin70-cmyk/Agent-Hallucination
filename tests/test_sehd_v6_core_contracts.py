@@ -317,7 +317,7 @@ def test_replay_rejection_does_not_fake_multiple_convergence_cases() -> None:
     assert gate.summary()["consecutive_no_edit"] == 0
 
 
-def test_online_evolution_does_not_commit_label_free_directional_evidence(
+def test_online_evolution_keeps_label_free_directional_edit_provisional(
     tmp_path, monkeypatch,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
@@ -406,11 +406,13 @@ def test_online_evolution_does_not_commit_label_free_directional_evidence(
         run_id="mock_e2e",
     )
 
-    assert result.edits_accepted == 0
-    assert result.edits_rejected == 1
-    assert result.champion_genome.generation == 0
+    assert result.edits_accepted == 1
+    assert result.edits_rejected == 0
+    assert result.champion_genome.generation == 1
     assert result.steps[0].gate_decision == "skip_stable"
-    assert result.steps[1].gate_decision == "rollback_batch"
+    assert result.steps[1].gate_decision == "accept_batch"
+    assert result.evolution_audit["final_champion_claim"] is False
+    assert result.steps[1].fitness_check["batch"]["promotion_eligible"] is False
     memory = (tmp_path / "htc_tes_experience_memory.json").read_text("utf-8")
     assert '"detection_improved": false' in memory
     assert '"source_case_id": "source"' in memory

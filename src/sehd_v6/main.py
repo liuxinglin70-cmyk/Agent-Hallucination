@@ -58,6 +58,8 @@ def _apply_project_root(project_root: str | None) -> None:
     g["V35_CONFIG_PATH"] = Path(os.environ.get("AGENT_HALLUCINATION_V35_CONFIG", str(g["PROJECT_ROOT"] / "configs" / "paca_tcl_proof_p0_v3_5.json")))
 ALLOWED_MODELS = {"DeepSeek-V4-Flash", "DeepSeek-V4-Pro"}
 VALID_STATES = {"verified_error", "verified_clean", "unresolved"}
+PROBE_SET_ALIASES = {"probe", "validation", "test"}
+FINAL_HOLDOUT_SET_ALIASES = {"final_holdout", "outer"}
 
 # LLM route config for DeepSeek-V4 (via AutoDL proxy)
 MUTATION_ROUTE = {
@@ -124,8 +126,10 @@ def _assert_stage_authorized(
 
     formal = stage in {
         "evaluation",
+        "probe",
         "validation",
         "test",
+        "final_holdout",
         "outer",
         "effectiveness",
     }
@@ -155,9 +159,10 @@ def _assert_stage_authorized(
                 f"Frozen phase {phase!r} does not explicitly authorize a "
                 f"formal {stage} effectiveness stage"
             )
-        if stage == "outer" and config.get("outer_execution_authorized") is not True:
+        if stage in FINAL_HOLDOUT_SET_ALIASES and config.get("outer_execution_authorized") is not True:
             raise RuntimeError(
-                "Formal Outer evaluation requires outer_execution_authorized=true"
+                "Formal final-holdout/Outer evaluation requires "
+                "outer_execution_authorized=true"
             )
     elif stage != "evolve":
         raise ValueError(f"Unknown execution stage: {stage!r}")
@@ -327,19 +332,74 @@ def _contains_d_cases(case_ids: list[str]) -> bool:
     return any(_case_ref(case_id) in d_refs for case_id in case_ids)
 
 
+def _first_existing_manifest(*relative_paths: str) -> Path | None:
+    for relative_path in relative_paths:
+        path = BCCSE_V5_ROOT / relative_path
+        if path.exists():
+            return path
+    return None
+
+
 def _load_registered_evolution_ids() -> list[str]:
-    path = BCCSE_V5_ROOT / "stratified_evolution_set.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Registered evolution manifest missing: {path}")
+    """Load reusable development cases, excluding the fixed gold probe.
+
+    The v3 development manifest is preferred.  The old stratified evolution
+    manifest remains a read-compatible fallback.
+    """
+    path = _first_existing_manifest(
+        "development_pool_ids.json",
+        "partition/development_pool_ids.json",
+        "stratified_evolution_set.json",
+    )
+    if path is None:
+        raise FileNotFoundError(
+            "Registered development/evolution manifest missing under "
+            f"{BCCSE_V5_ROOT}"
+        )
     with open(path, "r", encoding="utf-8") as handle:
         manifest = json.load(handle)
-    case_ids = [str(value) for value in manifest.get("evolution_case_ids") or []]
+    case_ids = [
+        str(value)
+        for value in (
+            manifest.get("evolution_case_ids")
+            or manifest.get("development_case_ids")
+            or []
+        )
+    ]
+    probe_ids = {str(value) for value in manifest.get("probe_case_ids") or []}
+    case_ids = [case_id for case_id in case_ids if case_id not in probe_ids]
     if not case_ids:
-        raise RuntimeError("Registered evolution manifest is empty")
+        raise RuntimeError("Registered development/evolution manifest is empty")
     if len(case_ids) != len(set(case_ids)):
-        raise RuntimeError("Registered evolution manifest contains duplicate case IDs")
+        raise RuntimeError("Registered development manifest contains duplicate case IDs")
     _assert_inner_membership(case_ids, set_name="evolution")
     return case_ids
+
+
+def _load_probe_ids_optional() -> tuple[list[str], Path | None]:
+    """Load the v3 probe or a legacy validation manifest, if registered."""
+    path = _first_existing_manifest(
+        "probe_set_ids.json",
+        "partition/probe_set_ids.json",
+        "validation_set_ids.json",
+        "partition/validation_set_ids.json",
+    )
+    if path is None:
+        return [], None
+    with open(path, "r", encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    case_ids = [
+        str(value)
+        for value in (
+            manifest.get("probe_case_ids")
+            or manifest.get("validation_case_ids")
+            or []
+        )
+    ]
+    if not case_ids or len(case_ids) != len(set(case_ids)):
+        raise RuntimeError("Probe/validation manifest is empty or contains duplicates")
+    _assert_inner_membership(case_ids, set_name="gold_probe")
+    return case_ids, path
 
 
 def _select_self_supervised_anchor_canaries(
@@ -417,6 +477,9 @@ def cmd_partition(args: argparse.Namespace) -> None:
         p0_predictions_path=Path(args.p0_predictions),
         output_dir=BCCSE_V5_ROOT / "partition",
         seed=args.seed,
+        probe_size=getattr(args, "probe_size", None),
+        holdout_size=getattr(args, "holdout_size", None),
+        holdout_sealed=not bool(getattr(args, "unsealed_holdout", False)),
     )
 
 
@@ -435,6 +498,8 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     partition_path = BCCSE_V5_ROOT / "partition" / "data_partition_v5.json"
     if not partition_path.exists():
         raise FileNotFoundError(f"Frozen partition artifact missing: {partition_path}")
+    with open(partition_path, "r", encoding="utf-8") as handle:
+        partition = json.load(handle)
 
     registered_evolution_ids = _load_registered_evolution_ids()
     size = int(args.size)
@@ -450,47 +515,118 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         contains_d_cases=_contains_d_cases(evolution_ids),
     )
 
-    validation_path = BCCSE_V5_ROOT / "validation_set_ids.json"
-    if not validation_path.exists():
-        raise FileNotFoundError(
-            f"Cannot prove evolution/validation isolation: {validation_path}"
-        )
-    with open(validation_path, "r", encoding="utf-8") as handle:
-        validation_manifest = json.load(handle)
-    validation_ids = [
-        str(value)
-        for value in validation_manifest.get("validation_case_ids") or []
-    ]
-    if not validation_ids or len(validation_ids) != len(set(validation_ids)):
-        raise RuntimeError("Validation manifest is empty or contains duplicate IDs")
-    overlap = sorted(set(evolution_ids).intersection(validation_ids))
+    probe_ids, probe_path = _load_probe_ids_optional()
+    overlap = sorted(set(evolution_ids).intersection(probe_ids))
     if overlap:
         raise RuntimeError(
-            "Evolution/validation overlap detected before provider calls: "
+            "Evolution-source/gold-probe overlap detected before provider calls: "
             + ", ".join(overlap)
         )
-    _assert_inner_membership(validation_ids, set_name="validation")
+    final_refs = set(
+        str(value)
+        for value in (
+            (partition.get("final_holdout") or {}).get("case_refs")
+            or (partition.get("outer_sealed") or {}).get("case_refs")
+            or []
+        )
+    )
+    final_overlap = sorted(
+        case_id for case_id in evolution_ids if _case_ref(case_id) in final_refs
+    )
+    if final_overlap:
+        raise RuntimeError(
+            "Development/final-holdout overlap detected before provider calls: "
+            + ", ".join(final_overlap)
+        )
+    development_count = int(
+        partition.get("development_case_count")
+        or (partition.get("development_pool") or {}).get("size")
+        or len(registered_evolution_ids) + len(probe_ids)
+    )
+    probe_count = int(
+        partition.get("probe_case_count")
+        or (partition.get("gold_probe") or {}).get("size")
+        or len(probe_ids)
+    )
+    final_holdout_count = int(
+        partition.get("final_holdout_count")
+        or (partition.get("final_holdout") or {}).get("size")
+        or (partition.get("outer_sealed") or {}).get("size")
+        or 0
+    )
+    holdout_sealed = bool(
+        partition.get("holdout_sealed")
+        if "holdout_sealed" in partition
+        else (partition.get("final_holdout") or {}).get("sealed", True)
+    )
+    probe_interval = int(getattr(args, "probe_interval", 10))
+    if probe_interval < 1:
+        raise ValueError("--probe-interval must be at least 1")
+    requested_probe_budget = getattr(args, "probe_budget", None)
+    probe_budget = (
+        min(5, probe_count)
+        if requested_probe_budget is None
+        else int(requested_probe_budget)
+    )
+    if probe_budget < 0 or probe_budget > probe_count:
+        raise ValueError(
+            f"--probe-budget must be between 0 and probe_case_count={probe_count}"
+        )
     print(
-        f"Evolution set: {len(evolution_ids)} registered inner cases "
-        f"(validation overlap=0, Outer exposure=0)"
+        f"Evolution set: {len(evolution_ids)} reusable development cases "
+        f"(probe-source overlap=0, final-holdout exposure=0)"
     )
 
-    # Load records using discover_records
+    # Load evolution sources plus only the budgeted prefix of the registered
+    # probe.  Probe IDs are passed separately and never become mutation sources.
     dataset_root = DATA_ROOT
-    records = load_records(dataset_root, allowed_case_ids=evolution_ids)
-    missing_records = [case_id for case_id in evolution_ids if case_id not in records]
+    active_probe_ids = probe_ids[:probe_budget]
+    if active_probe_ids:
+        _assert_stage_authorized(
+            config,
+            stage="evolve",
+            contains_d_cases=_contains_d_cases(active_probe_ids),
+        )
+    execution_record_ids = list(dict.fromkeys([*evolution_ids, *active_probe_ids]))
+    records = load_records(dataset_root, allowed_case_ids=execution_record_ids)
+    missing_records = [
+        case_id for case_id in execution_record_ids if case_id not in records
+    ]
     if missing_records:
         raise RuntimeError(
             "Evolution records missing; partial evolution is forbidden: "
             + ", ".join(missing_records)
         )
+    # Gold is evaluator-side metadata, not detector input. Raw trajectory
+    # records do not have to carry labels, so join boolean labels from the
+    # registered baseline cache before handing records to the runner. The
+    # runner strips these fields at every detector call and only joins them
+    # inside the explicit Gold fitness/probe evaluator.
+    cached_predictions = load_baseline_predictions()
+    for case_id, record in records.items():
+        if isinstance(record.get("gold_label"), bool):
+            continue
+        prediction = (
+            cached_predictions.get(case_id)
+            or cached_predictions.get(_case_ref(case_id))
+        )
+        if isinstance(prediction, dict) and isinstance(
+            prediction.get("gold_label"), bool
+        ):
+            record["gold_label"] = bool(prediction["gold_label"])
     print(f"  Available for evolution: {len(evolution_ids)}/{len(evolution_ids)}")
 
     # Output directory
     run_id = f"evolve_{size}_{int(time.time())}"
     output_dir = BCCSE_V5_ROOT / "runs" / run_id
     output_dir.mkdir(parents=True, exist_ok=False)
-    evolution_manifest_path = BCCSE_V5_ROOT / "stratified_evolution_set.json"
+    evolution_manifest_path = _first_existing_manifest(
+        "development_pool_ids.json",
+        "partition/development_pool_ids.json",
+        "stratified_evolution_set.json",
+    )
+    if evolution_manifest_path is None:
+        raise FileNotFoundError("Registered development/evolution manifest disappeared")
     run_provenance = _build_run_provenance(
         stage="evolve",
         case_ids=evolution_ids,
@@ -509,9 +645,28 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 "evolution_case_count": len(evolution_ids),
                 "evolution_case_hash": _case_set_hash(evolution_ids),
                 "evolution_case_sequence_hash": _case_sequence_hash(evolution_ids),
-                "validation_case_count": len(validation_ids),
-                "validation_case_hash": _case_set_hash(validation_ids),
-                "validation_case_sequence_hash": _case_sequence_hash(validation_ids),
+                "development_case_count": development_count,
+                "probe_case_count": probe_count,
+                "final_holdout_count": final_holdout_count,
+                "probe_interval": probe_interval,
+                "probe_budget": probe_budget,
+                "probe_trigger_threshold": int(
+                    getattr(args, "probe_trigger_threshold", 0)
+                ),
+                "probe_manifest_path": str(probe_path) if probe_path else None,
+                "probe_manifest_provenance": (
+                    _path_provenance(probe_path) if probe_path else None
+                ),
+                "active_probe_case_hash": (
+                    _case_set_hash(active_probe_ids) if active_probe_ids else None
+                ),
+                "probe_execution": "budgeted_direction_or_rollback_gate",
+                "probe_eligible_for_opening_by_this_command": bool(active_probe_ids),
+                "holdout_sealed": holdout_sealed,
+                "evolution_probe_source_overlap": 0,
+                "evolution_final_holdout_overlap": 0,
+                # Legacy field retained for old run readers.
+                "validation_case_count": probe_count,
                 "evolution_validation_overlap": 0,
                 "inner_universe_only": True,
                 "outer_exposure": False,
@@ -565,6 +720,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             if args.initial_genome else None
         ),
         run_id=run_id,
+        validation_probe_every=probe_interval,
+        probe_ids=active_probe_ids,
+        probe_limit=probe_budget,
+        validation_probe_trigger_threshold=int(
+            getattr(args, "probe_trigger_threshold", 0)
+        ),
     )
 
     print(f"\nResults saved to: {output_dir}")
@@ -949,14 +1110,24 @@ def _assert_outer_membership(
     manifest: dict[str, Any],
     partition: dict[str, Any],
 ) -> None:
-    if str(manifest.get("role") or "").lower() != "outer":
-        raise RuntimeError("Outer manifest lacks explicit role='outer' evidence")
+    manifest_role = str(manifest.get("role") or "").lower()
+    if manifest_role not in {"outer", "final_holdout"}:
+        raise RuntimeError(
+            "Final manifest lacks explicit role='final_holdout'/'outer' evidence"
+        )
     expected_refs = [_case_ref(case_id) for case_id in case_ids]
-    declared_refs = [str(value) for value in manifest.get("outer_case_refs") or []]
+    declared_refs = [
+        str(value)
+        for value in (
+            manifest.get("final_holdout_case_refs")
+            or manifest.get("outer_case_refs")
+            or []
+        )
+    ]
     if declared_refs != expected_refs:
         raise RuntimeError("Outer manifest case_ref evidence does not match its case IDs")
     assignments = [
-        {"case_id": case_id, "case_ref": case_ref, "role": "outer"}
+        {"case_id": case_id, "case_ref": case_ref, "role": manifest_role}
         for case_id, case_ref in zip(case_ids, expected_refs)
     ]
     if manifest.get("role_assignments") != assignments:
@@ -969,12 +1140,36 @@ def _assert_outer_membership(
         partition
     ):
         raise RuntimeError("Outer manifest is not hash-bound to the loaded partition")
-    inner_overlap = sorted(set(expected_refs).intersection(_load_inner_case_refs()))
-    if inner_overlap:
-        raise RuntimeError(
-            "Outer manifest contains cases registered in the sealed Inner universe: "
-            + ", ".join(inner_overlap)
+    partition_final_refs = [
+        str(value)
+        for value in (
+            (partition.get("final_holdout") or {}).get("case_refs")
+            or (partition.get("outer_sealed") or {}).get("case_refs")
+            or []
         )
+    ]
+    if partition_final_refs:
+        if partition_final_refs != expected_refs:
+            raise RuntimeError(
+                "Final manifest does not match the partition final_holdout"
+            )
+        development_refs = set(
+            str(value)
+            for value in (partition.get("development_pool") or {}).get("case_refs") or []
+        )
+        overlap = sorted(set(expected_refs).intersection(development_refs))
+        if overlap:
+            raise RuntimeError(
+                "Development/final-holdout overlap detected: " + ", ".join(overlap)
+            )
+    else:
+        # Legacy partitions registered Outer outside the Inner cache universe.
+        inner_overlap = sorted(set(expected_refs).intersection(_load_inner_case_refs()))
+        if inner_overlap:
+            raise RuntimeError(
+                "Outer manifest contains cases registered in the sealed Inner universe: "
+                + ", ".join(inner_overlap)
+            )
 
 
 def _load_evaluation_ids(
@@ -982,59 +1177,62 @@ def _load_evaluation_ids(
     set_name: str,
     partition: dict[str, Any],
 ) -> tuple[list[str], str]:
-    if set_name == "validation":
-        validation_path = BCCSE_V5_ROOT / "validation_set_ids.json"
-        case_ids, _ = _read_case_id_manifest(
-            validation_path,
-            key="validation_case_ids",
-            role="validation",
-        )
-        source = str(validation_path)
-    elif set_name == "test":
-        test_path = BCCSE_V5_ROOT / "test_set_ids.json"
-        case_ids, _ = _read_case_id_manifest(
-            test_path,
-            key="test_case_ids",
-            role="test",
-        )
-        source = str(test_path)
-    elif set_name == "outer":
-        outer_path = _resolve_outer_manifest_path()
-        case_ids, outer_manifest = _read_case_id_manifest(
-            outer_path,
-            key="outer_case_ids",
-            role="outer",
-        )
-        source = str(outer_path)
-    else:
+    if set_name not in PROBE_SET_ALIASES | FINAL_HOLDOUT_SET_ALIASES:
         raise ValueError(f"Unknown evaluation set: {set_name!r}")
 
+    final_role = set_name in FINAL_HOLDOUT_SET_ALIASES
+    final_manifest: dict[str, Any] | None = None
+    if final_role:
+        if set_name == "outer":
+            path = _resolve_outer_manifest_path()
+        else:
+            path = _first_existing_manifest(
+                "final_holdout_ids.json",
+                "partition/final_holdout_ids.json",
+                "outer_set_ids.json",
+                "partition/outer_set_ids.json",
+            )
+            if path is None:
+                raise FileNotFoundError(
+                    "Formal final-holdout evaluation requires an explicit manifest"
+                )
+        with open(path, "r", encoding="utf-8") as handle:
+            final_manifest = json.load(handle)
+        raw_ids = (
+            final_manifest.get("final_holdout_case_ids")
+            or final_manifest.get("outer_case_ids")
+            or []
+        )
+        case_ids = [str(value) for value in raw_ids]
+        if not case_ids or len(case_ids) != len(set(case_ids)):
+            raise RuntimeError("Final-holdout manifest is empty or contains duplicates")
+        source = str(path)
+    elif set_name == "test":
+        path = _first_existing_manifest("test_set_ids.json", "partition/test_set_ids.json")
+        if path is not None:
+            case_ids, _ = _read_case_id_manifest(path, key="test_case_ids", role="test")
+            source = str(path)
+        else:
+            case_ids, path = _load_probe_ids_optional()
+            if path is None:
+                raise FileNotFoundError("No test or probe compatibility manifest exists")
+            source = str(path)
+    else:
+        case_ids, path = _load_probe_ids_optional()
+        if path is None:
+            raise FileNotFoundError("Required periodic gold-probe manifest is missing")
+        source = str(path)
+
     _assert_disjoint_from_evolution(case_ids, set_name=set_name)
-    if set_name in {"test", "outer"}:
-        validation_ids, _ = _read_case_id_manifest(
-            BCCSE_V5_ROOT / "validation_set_ids.json",
-            key="validation_case_ids",
-            role="validation",
-        )
-        overlap = sorted(set(validation_ids).intersection(case_ids))
-        if overlap:
-            raise RuntimeError(
-                f"Validation/{set_name} overlap detected; execution aborted: "
-                + ", ".join(overlap)
+    if final_role:
+        legacy_test_path = _first_existing_manifest("test_set_ids.json")
+        if legacy_test_path is not None:
+            test_ids, _ = _read_case_id_manifest(
+                legacy_test_path, key="test_case_ids", role="test"
             )
-    if set_name == "outer":
-        test_ids, _ = _read_case_id_manifest(
-            BCCSE_V5_ROOT / "test_set_ids.json",
-            key="test_case_ids",
-            role="test",
-        )
-        validation_test_overlap = sorted(set(validation_ids).intersection(test_ids))
-        if validation_test_overlap:
-            raise RuntimeError(
-                "Validation/test role overlap prevents Outer isolation audit: "
-                + ", ".join(validation_test_overlap)
-            )
-        test_overlap = sorted(set(test_ids).intersection(case_ids))
+            test_overlap = sorted(set(test_ids).intersection(case_ids))
+        else:
+            test_overlap = []
         if test_overlap:
             raise RuntimeError(
                 "Test/outer overlap detected; execution aborted: "
@@ -1042,7 +1240,7 @@ def _load_evaluation_ids(
             )
         _assert_outer_membership(
             case_ids,
-            manifest=outer_manifest,
+            manifest=final_manifest or {},
             partition=partition,
         )
     else:
@@ -1127,9 +1325,42 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         genome_path=genome_path,
         genome_content_hash=genome.content_hash,
     )
-    is_outer_evaluation = str(args.set) == "outer"
+    canonical_eval_set = (
+        "final_holdout"
+        if str(args.set) in FINAL_HOLDOUT_SET_ALIASES
+        else "gold_probe"
+    )
+    is_outer_evaluation = canonical_eval_set == "final_holdout"
+    holdout_sealed = bool(
+        partition.get("holdout_sealed")
+        if "holdout_sealed" in partition
+        else (partition.get("final_holdout") or {}).get("sealed", True)
+    )
+    development_case_count = int(
+        partition.get("development_case_count")
+        or (partition.get("development_pool") or {}).get("size")
+        or 0
+    )
+    probe_case_count = int(
+        partition.get("probe_case_count")
+        or (partition.get("gold_probe") or {}).get("size")
+        or 0
+    )
+    final_holdout_count = int(
+        partition.get("final_holdout_count")
+        or (partition.get("final_holdout") or {}).get("size")
+        or (partition.get("outer_sealed") or {}).get("size")
+        or 0
+    )
     final_evaluation_protocol = {
         "is_outer_final_evaluation": is_outer_evaluation,
+        "canonical_evaluation_set": canonical_eval_set,
+        "requested_set_alias": str(args.set),
+        "development_case_count": development_case_count,
+        "probe_case_count": probe_case_count,
+        "final_holdout_count": final_holdout_count,
+        "holdout_sealed": holdout_sealed,
+        "probe_role": "online_direction_and_rollback_only",
         "outer_execution_authorized": (
             config.get("outer_execution_authorized") is True
         ),
@@ -1141,9 +1372,9 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         "experience_writeback_allowed": False,
         "champion_writeback_allowed": False,
         "semantics": (
-            "role_isolated_final_evaluation"
+            "role_isolated_final_holdout_read_only"
             if is_outer_evaluation
-            else "inner_cross_set_evaluation_not_champion_eligible"
+            else "development_gold_probe_not_generalization_evidence"
         ),
         "one_shot_enforcement": (
             "external_custody_audit_no_durable_cross-process_use_registry"
@@ -1294,7 +1525,10 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         baseline_results,
         claim_context={
             "outer_evaluated": is_outer_evaluation,
-            "evaluation_set": str(args.set),
+            "final_holdout_evaluated": is_outer_evaluation,
+            "evaluation_set": canonical_eval_set,
+            "evaluation_set_alias": str(args.set),
+            "holdout_sealed": holdout_sealed,
             "outer_custody_verified": config.get("outer_custody_verified") is True,
             "critical_provenance_complete": run_provenance["reproducibility"][
                 "critical_provenance_complete"
@@ -1331,6 +1565,7 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
     eval_output = {
         "schema_version": "agenthallu.bccse_v5_evaluation.v5",
         "eval_set": args.set,
+        "canonical_eval_set": canonical_eval_set,
         "eval_set_source": set_source,
         "eval_set_hash": _case_set_hash(eval_ids),
         "eval_set_sequence_hash": _case_sequence_hash(eval_ids),
@@ -1339,6 +1574,10 @@ def cmd_evaluate_concurrent(args: argparse.Namespace) -> None:
         "metric_scope_case_count": len(eval_ids),
         "metric_scope_hash": _case_set_hash(eval_ids),
         "metric_scope_sequence_hash": _case_sequence_hash(eval_ids),
+        "development_case_count": development_case_count,
+        "probe_case_count": probe_case_count,
+        "final_holdout_count": final_holdout_count,
+        "holdout_sealed": holdout_sealed,
         "evolution_overlap_count": 0,
         "concurrency": workers,
         "provider_patch": "single_global_patch",
@@ -1466,10 +1705,19 @@ def _claim_eligibility(
 ) -> dict[str, Any]:
     context = dict(claim_context or {})
     outer_evaluated = context.get("outer_evaluated") is True
+    evaluation_set = str(context.get("evaluation_set") or "")
+    final_holdout_evaluated = (
+        context.get("final_holdout_evaluated") is True or outer_evaluated
+    )
     outer_final_evaluation = (
-        outer_evaluated and str(context.get("evaluation_set") or "") == "outer"
+        final_holdout_evaluated
+        and evaluation_set in FINAL_HOLDOUT_SET_ALIASES
     )
     outer_custody_verified = context.get("outer_custody_verified") is True
+    holdout_sealed = (
+        context.get("holdout_sealed") is True
+        or ("holdout_sealed" not in context and evaluation_set == "outer")
+    )
     confidence_interval = (
         paired_confidence_interval if outer_final_evaluation else None
     )
@@ -1502,7 +1750,11 @@ def _claim_eligibility(
     elif not ci_supports_gain:
         reasons.append("confidence_interval_does_not_support_positive_gain")
     if not outer_final_evaluation:
+        reasons.append("final_holdout_evaluation_missing")
+        # Stable legacy reason for existing dashboards and tests.
         reasons.append("outer_evaluation_missing")
+    elif not holdout_sealed:
+        reasons.append("final_holdout_not_sealed")
     elif not outer_custody_verified:
         reasons.append("outer_custody_unverified")
     if not provenance_complete:
@@ -1518,7 +1770,9 @@ def _claim_eligibility(
         "confidence_interval_present": has_ci,
         "confidence_interval_supports_positive_gain": ci_supports_gain,
         "outer_evaluated": outer_evaluated,
+        "final_holdout_evaluated": final_holdout_evaluated,
         "outer_final_evaluation": outer_final_evaluation,
+        "holdout_sealed": holdout_sealed,
         "outer_custody_verified": outer_custody_verified,
         "critical_provenance_complete": provenance_complete,
         "context": context,
@@ -1744,6 +1998,19 @@ def main():
     p_part.add_argument("--d-predictions", default=str(D_PREDICTIONS))
     p_part.add_argument("--p0-predictions", default=str(P0_PREDICTIONS))
     p_part.add_argument("--seed", type=int, default=42)
+    p_part.add_argument(
+        "--probe-size",
+        type=int,
+        default=10,
+        help="Fixed periodic gold probe sampled inside the development pool",
+    )
+    p_part.add_argument(
+        "--holdout-size",
+        type=int,
+        default=None,
+        help="Final holdout size; omitted preserves explicitly marked Outer rows",
+    )
+    p_part.add_argument("--unsealed-holdout", action="store_true", help=argparse.SUPPRESS)
     p_part.add_argument("--force-repartition", action="store_true")
 
     # evolve
@@ -1799,8 +2066,8 @@ def main():
     p_evolve.add_argument(
         "--canary-limit",
         type=int,
-        default=4,
-        help="Previously stable evolution cases used for per-edit regression replay",
+        default=2,
+        help="Small set of stable development cases used for per-edit regression replay",
     )
     p_evolve.add_argument(
         "--fitness-use-gold",
@@ -1809,6 +2076,24 @@ def main():
             "Use evolution-set labels only inside fitness selection; labels "
             "remain hidden from self-supervised attribution and reflection"
         ),
+    )
+    p_evolve.add_argument(
+        "--probe-interval",
+        type=int,
+        default=10,
+        help="Accepted-edit interval between budgeted gold-probe gates",
+    )
+    p_evolve.add_argument(
+        "--probe-budget",
+        type=int,
+        default=None,
+        help="Maximum probe cases per gate (default: min(5, probe size))",
+    )
+    p_evolve.add_argument(
+        "--probe-trigger-threshold",
+        type=int,
+        default=0,
+        help="Also open a probe gate after this many pending accepted edits (0 disables)",
     )
 
     # evaluate
@@ -1819,11 +2104,11 @@ def main():
     p_eval.add_argument("--project-root", type=str, default=None, help="Override AGENT_HALLUCINATION_ROOT")
     p_eval.add_argument(
         "--set",
-        choices=["validation", "test", "outer"],
-        default="validation",
+        choices=["probe", "final_holdout", "validation", "test", "outer"],
+        default="probe",
         help=(
-            "Evaluation role; outer additionally requires a hash-bound explicit "
-            "manifest and outer_execution_authorized=true"
+            "probe/final_holdout roles; validation/test/outer remain compatibility "
+            "aliases. Final holdout requires a hash-bound manifest and authorization"
         ),
     )
     p_eval.add_argument(

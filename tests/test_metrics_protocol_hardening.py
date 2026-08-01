@@ -453,3 +453,99 @@ def test_partition_requires_outer_evidence_and_records_provenance(tmp_path: Path
     assert outer_manifest["partition_payload_sha256"] == main._canonical_sha256(
         result
     )
+
+
+def test_v3_partition_probe_and_final_holdout_are_disjoint_and_development_reusable(
+    tmp_path: Path,
+) -> None:
+    d_path = tmp_path / "d.jsonl"
+    output = tmp_path / "partition"
+    rows = [
+        {
+            "case_id": f"Development/{index:03d}",
+            "case_ref": main._case_ref(f"Development/{index:03d}"),
+            "split": "development",
+            "state": "unresolved" if index % 2 else "verified_clean",
+            "gold_label": bool(index % 3),
+        }
+        for index in range(8)
+    ]
+    _write_jsonl(d_path, rows)
+
+    result = partition_data(
+        d_predictions_path=d_path,
+        output_dir=output,
+        seed=7,
+        probe_size=2,
+        holdout_size=2,
+        main_evolution_size=4,
+    )
+
+    development = set(result["development_pool"]["case_refs"])
+    probe = set(result["gold_probe"]["case_refs"])
+    final_holdout = set(result["final_holdout"]["case_refs"])
+    evolution = set(result["evolution_pool"]["case_refs"])
+    assert len(development) == 6
+    assert len(probe) == 2
+    assert len(final_holdout) == 2
+    assert probe <= development
+    assert probe.isdisjoint(final_holdout)
+    assert development.isdisjoint(final_holdout)
+    assert evolution == development - probe
+    assert result["validation_set"]["alias_of"] == "gold_probe"
+    assert result["outer_sealed"]["alias_of"] == "final_holdout"
+    assert result["holdout_sealed"] is True
+    assert result["final_holdout"]["read_only"] is True
+
+    development_manifest = json.loads(
+        (output / "development_pool_ids.json").read_text(encoding="utf-8")
+    )
+    assert set(development_manifest["evolution_case_ids"]).isdisjoint(
+        development_manifest["probe_case_ids"]
+    )
+    assert len(development_manifest["evolution_case_ids"]) == 4
+
+
+def test_new_development_manifest_is_preferred_but_old_evolution_manifest_works(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "bccse"
+    partition_dir = root / "partition"
+    partition_dir.mkdir(parents=True)
+    (root / "stratified_evolution_set.json").write_text(
+        json.dumps({"evolution_case_ids": ["Legacy/001"]}),
+        encoding="utf-8",
+    )
+    (partition_dir / "development_pool_ids.json").write_text(
+        json.dumps(
+            {
+                "development_case_ids": ["Dev/001", "Dev/probe"],
+                "probe_case_ids": ["Dev/probe"],
+                "evolution_case_ids": ["Dev/001"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(main, "BCCSE_V5_ROOT", root)
+    monkeypatch.setattr(main, "_assert_inner_membership", lambda *args, **kwargs: None)
+    assert main._load_registered_evolution_ids() == ["Dev/001"]
+
+    (partition_dir / "development_pool_ids.json").unlink()
+    assert main._load_registered_evolution_ids() == ["Legacy/001"]
+
+
+def test_probe_metrics_never_open_the_final_claim_gate() -> None:
+    baseline = [_row(f"c{index}", True, state="verified_clean") for index in range(20)]
+    skill = [_row(f"c{index}", True, state="verified_error") for index in range(20)]
+    metrics = main.compute_metrics(
+        skill,
+        baseline,
+        claim_context={
+            "evaluation_set": "probe",
+            "critical_provenance_complete": True,
+        },
+    )
+    gate = metrics["claim_eligibility"]
+    assert gate["eligible_for_champion_label"] is False
+    assert "final_holdout_evaluation_missing" in gate["blocking_reasons"]

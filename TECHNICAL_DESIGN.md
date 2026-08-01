@@ -21,6 +21,29 @@ The classification layer is not allowed to overwrite the proof court's final
 state. It controls experience organization, mutation routing and fitness
 interpretation.
 
+## Development, Probe and Final-Holdout Protocol
+
+The v3 partition has three semantic roles:
+
+1. `development_pool`: every non-final case. These cases may be reused for
+   evolution, source replay and experience memory across iterations.
+2. `gold_probe`: a fixed small subset of `development_pool`, disjoint from the
+   mutation-source list. It is opened only on the registered
+   `probe_interval`/`probe_budget` schedule as a direction or rollback gate.
+   Repeated access makes it development evidence, not generalization evidence.
+3. `final_holdout` (legacy alias: `outer`): disjoint, sealed and read-only. It
+   is opened at experiment end, or under equivalent external custody, and is
+   the only role that can enter the detector-improvement claim gate.
+
+`probe_size`, `holdout_size` and `seed` make the split reproducible. New
+manifests are `development_pool_ids.json`, `probe_set_ids.json` and
+`final_holdout_ids.json`; old `stratified_evolution_set.json`,
+`validation_set_ids.json`, `test_set_ids.json` and `outer_set_ids.json` remain
+read-compatible. Validation/test are optional compatibility views, not
+mandatory permanently isolated data silos. The run contract records
+`development_case_count`, `probe_case_count`, `final_holdout_count`,
+`probe_interval`, `probe_budget` and `holdout_sealed`.
+
 ## Detection Authority
 
 The final detection path is:
@@ -177,11 +200,14 @@ The promotion hierarchy is:
 3. A rolling set of previously stable evolution cases must preserve its
    decisive state, runtime validity and non-triggered process status before an
    edit can be committed.
-4. Only explicit `strong_improvement` or `local_improvement` is promotable,
-   and those labels require independent correctness evidence. In no-gold mode,
-   detector-local score gains and `directional_evidence` remain telemetry and
-   never enter `accepted_indices`; gold-assisted fitness is an explicit
-   selection mode, not a generalization claim.
+4. Gold mode may commit explicit `strong_improvement` or `local_improvement`
+   as a development candidate after source/canary checks; those labels are
+   still not generalization evidence. In no-gold mode, detector-local score
+   gains and `directional_evidence` may enter a reversible
+   `provisional_label_free` working candidate only after canary
+   non-regression. Such rules keep `fitness_status=none`, are not protected as
+   strong/weak, and cannot create an accuracy or champion claim. A periodic
+   gold probe can veto/rollback but cannot promote a provisional candidate.
 5. `no_effect` is not silently committed.
 6. Cross-set effectiveness is evaluated only when the frozen config explicitly
    authorizes the D/effectiveness phase and the registered set.
@@ -190,18 +216,21 @@ Evidence-obligation local fitness rewards the weaker side of the prosecution
 and defense coverage, rather than rewarding a large coverage gap. This avoids
 turning one-sided adjudication into a false improvement signal.
 
-Canary re-evaluation uses only previously stable evolution cases and is a veto
-against catastrophic forgetting. It never opens validation or outer data.
-An authorized validation/test evaluation is the cross-set check; stable
-canaries establish local non-regression, not generalization. The current
+Canary re-evaluation uses previously stable development cases and is a veto
+against catastrophic forgetting. A separately scheduled gold probe may steer
+or roll back development, but does not establish generalization. Only the
+sealed final holdout is the final cross-set check; stable canaries establish
+local non-regression. The current
 `P0_diagnostic_only` config has `D_execution_authorized=false` and therefore
 cannot enter that effectiveness path.
 
-Champion eligibility is narrower than cross-set checking. Validation and Inner
-test runs are never champion-eligible. The only eligible role is `--set outer`,
+Champion eligibility is narrower than development checking. Probe and legacy
+validation/test runs are never champion-eligible. The only eligible role is
+`--set final_holdout` (or legacy `--set outer`),
 which additionally requires `outer_execution_authorized=true` and one explicit
-`outer_set_ids.json` bound to the loaded partition and per-case Outer role
-assignments. Outer IDs must be real loadable `source/id` values; reverse lookup
+`final_holdout_ids.json` (or legacy `outer_set_ids.json`) bound to the loaded
+partition and per-case final role assignments. IDs must be real loadable
+`source/id` values; reverse lookup
 from case references and dataset scanning are forbidden.
 
 Role isolation and hash binding do not provide secrecy or one-shot custody.
@@ -255,11 +284,12 @@ only then legacy `incident_state`/`state`. Artifacts contain:
 Missing critical provenance is recorded as `not_reproducible`; no placeholder
 hash is generated. Detector-improvement and champion labels are ineligible for
 abstention-only migration, absence of significant paired correctness gain,
-missing/non-positive confidence intervals, or missing Outer evaluation.
+missing/non-positive confidence intervals, or missing sealed final-holdout
+evaluation. Probe metrics can be used only for online direction/rollback.
 
-Outer evaluation is read-only with respect to the genome, mutation system,
+Final-holdout/Outer evaluation is read-only with respect to the genome, mutation system,
 experience memory and champion state. Its artifact records
-`role_isolated_final_evaluation`. The implementation has no durable
+`role_isolated_final_holdout_read_only`. The implementation has no durable
 cross-process use registry and cannot prove secrecy, operator blindness or
 single prior use; custody and one-shot enforcement require external
 artifact/authorization audit.

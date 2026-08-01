@@ -102,7 +102,7 @@ proof-court verdict directly.
 2. **Attribute**: Self-supervised trigger check (no gold required)
 3. **Reflect**: LLM causal process reflection generates edit proposal
 4. **Gate**: Structural constraint gate validates edit safety
-5. **Fitness**: Source replay plus rolling stable-case canaries; an authorized validation/test protocol is required for any cross-set effectiveness claim
+5. **Fitness**: Source replay plus rolling stable-case canaries; a budgeted probe can steer/rollback development, while only an authorized sealed final holdout can support a generalization claim
 6. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
 
 ### 3. HTC-TES v3 — Hallucination-Typed Conditioning
@@ -171,31 +171,40 @@ python -m sehd_v6.dry_run_5
 # $env:SEHD_MUTATION_MODEL = "deepseek-v4-flash"
 # $env:SEHD_MUTATION_API_KEY_ENV = "SEHD_MUTATION_API_KEY"
 
-# Partition data (every row requires an explicit Inner/Outer role; Outer rows
-# also require real case_id values so a hash-bound manifest can be emitted)
-python -m src.sehd_v6.main partition
+# Partition into a reusable development pool, a small fixed gold probe inside
+# that pool, and a sealed final holdout. Legacy explicit Outer rows are kept.
+python -m src.sehd_v6.main partition --probe-size 10 --holdout-size 20 --seed 42
 
 # Run diagnostic evolution on a stage-authorized manifest. A manifest containing
 # D cases requires D_execution_authorized=true even though this is not a formal
 # effectiveness evaluation.
-python -m src.sehd_v6.main evolve --size 50 --use-gold
+python -m src.sehd_v6.main evolve --size 50 --use-gold \
+  --probe-interval 10 --probe-budget 5
 
 # Continue from an audited champion and prior experience memory
 python -m src.sehd_v6.main evolve --size 50 \
   --initial-genome <champion_genome.json> \
   --experience-memory <htc_tes_experience_memory.json>
 
-# Inner validation/test evaluation: never sufficient for champion promotion.
-python -m src.sehd_v6.main evaluate --set validation --genome <path>
+# Budgeted probe check: directional/rollback evidence, never a generalization claim.
+python -m src.sehd_v6.main evaluate --set probe --genome <path>
 
-# Role-isolated final Outer evaluation. Requires exactly one explicit, hash-bound
-# outer_set_ids.json plus execution_authorized=true,
+# Read-only final-holdout evaluation. `outer` is a compatibility alias. Requires
+# a hash-bound final_holdout_ids.json/outer_set_ids.json plus execution_authorized=true,
 # D_execution_authorized=true and outer_execution_authorized=true.
-python -m src.sehd_v6.main evaluate --set outer --genome <path>
+python -m src.sehd_v6.main evaluate --set final_holdout --genome <path>
 ```
 
-Outer IDs are never recovered from `case_ref` values or dataset scans. The
-Outer path reads the supplied genome without mutation and never writes back
+Most data can remain in the development pool because source replay, experience
+memory and repeated evolution are development activities; making each old
+validation/test slice permanently forbidden would unnecessarily starve that
+loop. The fixed gold probe is a small, budgeted subset of the development pool:
+it can steer or veto a change, but repeated access means it is not final
+generalization evidence. The disjoint final holdout answers that separate
+question only after development ends.
+
+Final-holdout IDs are never recovered from `case_ref` values or dataset scans. The
+final path reads the supplied genome without mutation and never writes back
 experience or champion state. Code guarantees role isolation and hash binding,
 not secrecy, operator blindness or one-shot custody. Champion eligibility
 therefore also requires `outer_custody_verified=true`, an external governance
@@ -295,11 +304,12 @@ accuracy/risk, paired transitions and exact McNemar statistics. A detector
 improvement or champion label is ineligible when changes are abstention-only,
 paired correctness gain is not significant, the deterministic paired
 net-correctness-gain interval is unavailable/non-positive, the result is not
-from the explicit Outer role, or critical provenance is incomplete. Validation
-and Inner test results remain research observations. The currently
+from the sealed final-holdout/Outer role, or critical provenance is incomplete.
+Probe, validation and test results remain development observations; validation
+and test are optional legacy aliases and need not both exist. The currently
 registered `P0_diagnostic_only` configuration has
-`D_execution_authorized=false`, so it cannot authorize validation/test
-or Outer effectiveness execution.
+`D_execution_authorized=false`, so it cannot authorize probe or final-holdout
+effectiveness execution.
 
 ## License
 
