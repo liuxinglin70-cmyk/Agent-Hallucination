@@ -163,6 +163,37 @@ def has_provider_credential(route: Mapping[str, Any]) -> bool:
     return bool(_ENV_NAME.fullmatch(name) and os.environ.get(name))
 
 
+def provider_thinking_control(
+    route: Mapping[str, Any], *, purpose: str
+) -> dict[str, str] | None:
+    """Resolve a bounded thinking toggle for strict JSON provider calls.
+
+    DeepSeek V4 defaults to thinking mode. Small mutation requests can spend
+    their entire output budget in ``reasoning_content`` and return an empty
+    final ``content``, which the JSON transport previously misclassified as a
+    malformed skill. Mutation/reflection calls therefore default to the
+    official non-thinking mode; an explicit route setting still wins.
+    """
+    configured = route.get("thinking")
+    if isinstance(configured, Mapping):
+        value = str(configured.get("type") or "").strip().lower()
+    else:
+        value = str(configured or "").strip().lower()
+    if value:
+        if value not in {"enabled", "disabled"}:
+            raise ValueError("provider thinking mode must be enabled or disabled")
+        return {"type": value}
+    endpoint = str(route.get("endpoint") or "").rstrip("/")
+    model = str(route.get("model") or "").lower()
+    if (
+        purpose == "mutation"
+        and endpoint == OFFICIAL_ENDPOINT
+        and model.startswith("deepseek-v4-")
+    ):
+        return {"type": "disabled"}
+    return None
+
+
 def resolve_config_provider_routes(
     config: Mapping[str, Any],
     *,

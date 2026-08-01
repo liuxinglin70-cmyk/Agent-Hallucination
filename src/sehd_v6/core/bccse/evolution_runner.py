@@ -24,6 +24,7 @@ import hashlib
 import os
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -59,6 +60,7 @@ from .genome import (
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
+    observable_process_delta,
     task_state_score,
 )
 from .safety_gate import StructuralGate, create_structural_gate
@@ -101,6 +103,7 @@ class EvolutionStep:
     detection_state: str
     timestamp: float
     fitness_check: dict[str, Any] | None = None
+    attempt_index: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -116,6 +119,7 @@ class EvolutionStep:
             "detection_state": self.detection_state,
             "timestamp": self.timestamp,
             "fitness_check": self.fitness_check,
+            "attempt_index": self.attempt_index,
         }
 
 
@@ -162,22 +166,74 @@ class OnlineEvolutionResult:
 def _expected_effect_audit(
     edit: SkillEdit,
     assessment: FitnessAssessment,
+    *,
+    before: AttributionSignal | None = None,
+    after: AttributionSignal | None = None,
+    before_result: Mapping[str, Any] | None = None,
+    after_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compare the mutator's counterfactual prediction with source replay."""
     expected = " ".join(str(edit.expected_effect or "").split())[:240]
+    lowered_expected = expected.lower()
+    effect_markers: dict[str, tuple[str, ...]] = {
+        "candidate_trigger": ("candidate", "候选"),
+        "evidence_obligation": (
+            "prosecution", "evidence", "certificate", "causal field",
+            "控方", "证据", "证书", "因果字段",
+        ),
+        "candidate_to_verifier_route": (
+            "prosecution", "certificate", "route", "控方", "证书", "路由",
+        ),
+        "atomic_verifier_instruction": (
+            "certificate", "quarantine", "violation", "actor", "boundary",
+            "证书", "隔离", "违规", "责任", "边界",
+        ),
+        "clean_defense_boundary": ("defense", "boundary", "辩护", "边界"),
+        "causal_link_test": (
+            "causal", "propagation", "impact", "recovery", "因果", "传播", "影响", "恢复",
+        ),
+        "earliest_origin_tiebreak": (
+            "responsible", "origin", "earliest", "责任", "根源", "最早",
+        ),
+        "abstention_rule": (
+            "state", "unresolved", "authoritative", "verdict", "状态", "弃权", "判定",
+        ),
+    }
+    markers = effect_markers.get(edit.target_module, ())
+    target_aligned = (
+        None
+        if not expected
+        else any(marker in lowered_expected for marker in markers)
+    )
     if not expected:
         status = "unspecified"
+    elif target_aligned is False:
+        status = "misaligned"
     elif assessment.worsened:
         status = "contradicted"
     elif assessment.decision == "no_effect":
         status = "not_observed"
     else:
         status = "observed"
+    observable_deltas = (
+        observable_process_delta(
+            before,
+            after,
+            target_module=edit.target_module,
+            before_result=before_result,
+            after_result=after_result,
+        )
+        if before is not None and after is not None
+        else ()
+    )
     return {
         "expected": expected,
         "status": status,
+        "target_aligned": target_aligned,
         "observed_decision": assessment.decision,
         "observed_reasons": list(assessment.reasons),
+        "observable_deltas": list(observable_deltas),
+        "target_output_changed": bool(observable_deltas),
         "local_score_before": assessment.local_score_before,
         "local_score_after": assessment.local_score_after,
     }
@@ -216,6 +272,44 @@ def _build_rejection_summary(
         "by_reason": reason_counts,
         "by_decision": decision_counts,
     }
+
+
+_REPAIRABLE_STRUCTURAL_REASONS = frozenset({
+    "runtime_rule_contract",
+    "content_too_short",
+    "not_if_then_instruction",
+    "multi_step_pseudocode",
+    "condition_overload",
+    "multiple_actions",
+    "cross_module_near_duplicate",
+    "cross_module_merge_required",
+    "merge_required",
+    "diagnostic_only_condition",
+    "cross_module_reference",
+    "modify_bloat",
+    "duplicate_content",
+})
+
+
+def _structural_rejection_retryable(reasons: Sequence[str]) -> bool:
+    """Whether a fresh proposal can safely repair this structural failure."""
+    categories = {str(reason).split(":", 1)[0] for reason in reasons}
+    return bool(categories) and categories <= _REPAIRABLE_STRUCTURAL_REASONS
+
+
+def _no_edit_reason_categories(reason: str) -> list[str]:
+    """Reduce free-form mutator abstention text to safe learning categories."""
+    lowered = str(reason or "").lower()
+    categories = ["model_no_edit"]
+    if "baseline" in lowered and any(
+        token in lowered for token in ("cover", "already", "sufficient")
+    ):
+        categories.append("baseline_coverage_claimed")
+    if any(token in lowered for token in ("no observable", "lacks observable", "no concrete")):
+        categories.append("insufficient_observable_evidence")
+    if any(token in lowered for token in ("unsafe", "speculative", "false positive")):
+        categories.append("unsafe_generalization_risk")
+    return categories
 
 
 @dataclass
@@ -515,6 +609,7 @@ def run_online_evolution(
     probe_ids: Sequence[str] = (),
     probe_limit: int = 2,
     validation_probe_trigger_threshold: int = 0,
+    max_mutation_attempts_per_case: int = 2,
     initial_genome: SkillGenome | None = None,
     run_id: str | None = None,
 ) -> OnlineEvolutionResult:
@@ -565,6 +660,10 @@ def run_online_evolution(
         probe_limit: Maximum pre-registered probe cases evaluated per probe.
         validation_probe_trigger_threshold: Also run the development probe
             after this many newly triggered source cases. Zero disables it.
+        max_mutation_attempts_per_case: Bounded same-source search budget.
+            A structurally repairable or source-no-effect first proposal may
+            be regenerated once using its actual rejection feedback. Each
+            candidate is still replayed independently from the same parent.
         initial_genome: Optional audited champion to continue evolving. When
             omitted, evolution starts from the frozen baseline genome.
         run_id: Optional run identifier.
@@ -594,6 +693,8 @@ def run_online_evolution(
         raise ValueError(
             "validation_probe_trigger_threshold must be non-negative"
         )
+    if max_mutation_attempts_per_case < 1 or max_mutation_attempts_per_case > 3:
+        raise ValueError("max_mutation_attempts_per_case must be between 1 and 3")
     if probe_limit < 0 or probe_limit > 20:
         raise ValueError("probe_limit must be between 0 and 20")
     if len(probe_ids) != len(set(probe_ids)):
@@ -687,6 +788,7 @@ def run_online_evolution(
         "mutation_calls": 0,
         "mutation_errors": 0,
         "mutation_cache_hits": 0,
+        "mutation_retry_attempts": 0,
     }
     rollback_reason = ""
     stable_genome = champion_genome.clone()
@@ -923,7 +1025,10 @@ def run_online_evolution(
             type_fitness.get_experience_memory().to_dict(),
         )
 
+    active_attempt_index = 0
+
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
+        step.attempt_index = active_attempt_index
         steps.append(step)
         persist_progress(next_case_index)
 
@@ -1262,6 +1367,14 @@ def run_online_evolution(
                     "strong_improvement", "local_improvement",
                 }
                 _shadow_result = source_audits[idx].get("shadow_result", {})
+                _effect_audit = _expected_effect_audit(
+                    item.edit,
+                    item.individual_assessment,
+                    before=item.source_signal,
+                    after=item.source_after_signal,
+                    before_result=item.source_result,
+                    after_result=_shadow_result,
+                )
                 type_fitness.assess_edit(
                     source_case_id=item.case_id,
                     hallucination_type=_type_result.primary_type,
@@ -1272,6 +1385,22 @@ def run_online_evolution(
                     target_module=item.edit.target_module,
                     override_success=_htc_success,
                     feature_description=item.edit.feature_description,
+                    attempt_metadata={
+                        "operation": (
+                            item.edit.operation.value
+                            if isinstance(item.edit.operation, SkillOp)
+                            else str(item.edit.operation)
+                        ),
+                        "outcome": item.individual_assessment.decision,
+                        "reason_categories": [
+                            str(value).split(":", 1)[0]
+                            for value in item.individual_assessment.reasons
+                        ],
+                        "observable_deltas": _effect_audit[
+                            "observable_deltas"
+                        ],
+                        "expected_effect_status": _effect_audit["status"],
+                    },
                 )
                 # A successfully repaired source becomes a future regression
                 # anchor, so later edits cannot silently forget the fix.
@@ -1328,6 +1457,14 @@ def run_online_evolution(
                     rejected_result = source_audits[idx].get("shadow_result")
                     if isinstance(rejected_result, Mapping):
                         try:
+                            rejected_effect = _expected_effect_audit(
+                                item.edit,
+                                item_assessment,
+                                before=item.source_signal,
+                                after=item.source_after_signal,
+                                before_result=item.source_result,
+                                after_result=rejected_result,
+                            )
                             rejected_type = type_classifier.classify(
                                 item.source_result, item.source_signal,
                             )
@@ -1344,6 +1481,24 @@ def run_online_evolution(
                                 target_module=item.edit.target_module,
                                 override_success=False,
                                 feature_description=item.edit.feature_description,
+                                attempt_metadata={
+                                    "operation": (
+                                        item.edit.operation.value
+                                        if isinstance(item.edit.operation, SkillOp)
+                                        else str(item.edit.operation)
+                                    ),
+                                    "outcome": item_assessment.decision,
+                                    "reason_categories": [
+                                        str(value).split(":", 1)[0]
+                                        for value in item_assessment.reasons
+                                    ],
+                                    "observable_deltas": rejected_effect[
+                                        "observable_deltas"
+                                    ],
+                                    "expected_effect_status": rejected_effect[
+                                        "status"
+                                    ],
+                                },
                             )
                         except Exception as exc:
                             runtime_errors.append(
@@ -1354,6 +1509,14 @@ def run_online_evolution(
                 # Structural acceptance had reset convergence, so restore the
                 # case-level no-edit signal exactly once after replay rejects.
                 gate.record_no_edit()
+                batch_effect = _expected_effect_audit(
+                    item.edit,
+                    item_assessment,
+                    before=item.source_signal,
+                    after=item.source_after_signal,
+                    before_result=item.source_result,
+                    after_result=item.source_after_result,
+                )
                 rejected_buffer.append(RejectedEditEntry(
                     proposal=type(
                         "P",
@@ -1370,9 +1533,10 @@ def run_online_evolution(
                     rejection_stage=(
                         "batch_runtime" if runtime_errors else "source_fitness"
                     ),
-                    observed_effect=_expected_effect_audit(
-                        item.edit, item_assessment,
-                    )["status"],
+                    observed_effect=batch_effect["status"],
+                    observable_deltas=tuple(
+                        batch_effect["observable_deltas"]
+                    ),
                 ))
                 step = steps[item.step_index]
                 step.gate_decision = "rollback_batch"
@@ -1441,7 +1605,14 @@ def run_online_evolution(
 
     persist_progress(0)
 
-    for idx, case_id in enumerate(evolution_case_ids):
+    source_work_queue = deque(
+        (index, case_id, 0)
+        for index, case_id in enumerate(evolution_case_ids)
+    )
+    while source_work_queue:
+        idx, case_id, active_attempt_index = source_work_queue.popleft()
+        if active_attempt_index > 0:
+            budget_usage["mutation_retry_attempts"] += 1
         # --- Check halt (including convergence) ---
         if gate.is_halted or getattr(gate, "_converged", False):
             record_step(EvolutionStep(
@@ -1541,7 +1712,8 @@ def run_online_evolution(
 
         if not signal.should_evolve:
             # Stable success — no trigger
-            stable_cases += 1
+            if active_attempt_index == 0:
+                stable_cases += 1
             stable_canaries[case_id] = detection_result
             while len(stable_canaries) > max(8, canary_limit * 4):
                 stable_canaries.pop(next(iter(stable_canaries)))
@@ -1565,9 +1737,12 @@ def run_online_evolution(
             continue
 
         # --- Triggered! ---
-        triggered_cases += 1
+        if active_attempt_index == 0:
+            triggered_cases += 1
         print(f"  [{idx}] TRIGGERED {case_id}: {signal.trigger_source.value} "
-              f"→ {signal.error_type.value} → {signal.target_module}")
+              f"→ {signal.error_type.value} → {signal.target_module} "
+              f"(attempt {active_attempt_index + 1}/"
+              f"{max_mutation_attempts_per_case})")
 
         # --- HTC-TES v3: Classify hallucination type ---
         type_result = type_classifier.classify(detection_result, signal)
@@ -1621,7 +1796,10 @@ def run_online_evolution(
                 )
                 for module in allowed_modules
             )
-            detection_context = format_detection_context_for_llm(detection_result)
+            detection_context = format_detection_context_for_llm(
+                detection_result,
+                trajectory_record=_detector_record(records[case_id]),
+            )
 
             # Do not seed the LLM with legacy CRS/coverage templates. The
             # reflection must derive a runtime-observable rule from the trace.
@@ -1760,6 +1938,25 @@ def run_online_evolution(
                 )
 
         if edit is None and no_edit_reason:
+            type_fitness.get_experience_memory().add_experience(
+                hallucination_type=type_result.primary_type,
+                evolution_direction=evolution_direction,
+                module_targeted=allowed_modules[0],
+                strategy_used="model_no_edit",
+                detection_improved=False,
+                source_case_id=case_id,
+                metadata={
+                    "operation": "no_edit",
+                    "outcome": "no_edit",
+                    "reason_categories": _no_edit_reason_categories(
+                        no_edit_reason
+                    ),
+                    "observable_deltas": [],
+                    "expected_effect_status": "not_proposed",
+                },
+                feature_description="",
+                type_confidence=type_result.confidence,
+            )
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -1783,7 +1980,16 @@ def run_online_evolution(
         # --- [3b] No mutation provider or invalid single response ---
         if edit is None:
             print(f"  [{idx}] SKIP_INVALID_MUTATION {case_id}")
-            gate.record_no_edit()
+            retry_scheduled = (
+                mutation_route is not None
+                and active_attempt_index + 1 < max_mutation_attempts_per_case
+            )
+            if retry_scheduled:
+                source_work_queue.appendleft(
+                    (idx, case_id, active_attempt_index + 1)
+                )
+            else:
+                gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -1795,12 +2001,20 @@ def run_online_evolution(
                     or "mutation provider unavailable",
                 },
                 mutation_applied=None,
-                gate_decision="skip_invalid_mutation",
+                gate_decision=(
+                    "retry_invalid_mutation"
+                    if retry_scheduled else "skip_invalid_mutation"
+                ),
                 genome_hash_before=genome_before,
                 genome_hash_after=current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
-            ), next_case_index=idx + 1)
+                fitness_check={
+                    "retry_scheduled": retry_scheduled,
+                    "mutation_error": invalid_mutation_reason
+                    or "mutation provider unavailable",
+                },
+            ), next_case_index=(idx if retry_scheduled else idx + 1))
             continue
 
         # --- [4] Structural constraint gate ---
@@ -1817,6 +2031,7 @@ def run_online_evolution(
         )
 
         if not accepted:
+            repairable_certificate = cert
             # v5.3.5: Handle merge_required signal from tiered dedup.
             # When overlap is in [0.70, 0.95), instead of dropping the edit,
             # route to LLM-assisted merge: convert add_rule → modify_rule on
@@ -1879,6 +2094,11 @@ def run_online_evolution(
                             expected_effect=edit.expected_effect,
                         )
                         # Re-run structural gate on the merged edit
+                        gate.defer_structural_reject(repairable_certificate)
+                        gate.mark_repaired(
+                            repairable_certificate,
+                            "semantic_merge_attempt",
+                        )
                         accepted, cert, reject_reasons = gate.evaluate(
                             case_id=case_id,
                             case_index=idx,
@@ -1902,12 +2122,54 @@ def run_online_evolution(
                             )
             if not accepted:
                 edits_rejected += 1
-                rejected_buffer.append(RejectedEditEntry(
+                rejected_entry = RejectedEditEntry(
                     proposal=type('P', (), {'target_module': edit.target_module, 'operation': edit.operation, 'content': edit.new_content[:80]})(),
                     regressed_cases=[],
                     budget_consumed=0,
                     reject_reasons=reject_reasons,
-                ))
+                )
+                rejected_buffer.append(rejected_entry)
+                type_fitness.get_experience_memory().add_experience(
+                    hallucination_type=type_result.primary_type,
+                    evolution_direction=evolution_direction,
+                    module_targeted=edit.target_module,
+                    strategy_used=(
+                        "operation:"
+                        + (
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        )
+                    ),
+                    detection_improved=False,
+                    source_case_id=case_id,
+                    metadata={
+                        "operation": (
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        ),
+                        "outcome": "structural_reject",
+                        "reason_categories": [
+                            str(value).split(":", 1)[0]
+                            for value in reject_reasons
+                        ],
+                        "observable_deltas": [],
+                        "expected_effect_status": "not_replayed",
+                    },
+                    feature_description=edit.feature_description,
+                    type_confidence=type_result.confidence,
+                )
+                retry_scheduled = (
+                    mutation_route is not None
+                    and active_attempt_index + 1 < max_mutation_attempts_per_case
+                    and _structural_rejection_retryable(reject_reasons)
+                )
+                if retry_scheduled:
+                    gate.defer_structural_reject(cert)
+                    source_work_queue.appendleft(
+                        (idx, case_id, active_attempt_index + 1)
+                    )
                 record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -1915,12 +2177,18 @@ def run_online_evolution(
                     attribution=signal.to_dict(),
                     edit_proposal=edit.to_dict(),
                     mutation_applied=None,
-                    gate_decision="reject",
+                    gate_decision=(
+                        "retry_structural" if retry_scheduled else "reject"
+                    ),
                     genome_hash_before=genome_before,
                     genome_hash_after=current_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
-                ), next_case_index=idx + 1)
+                    fitness_check={
+                        "retry_scheduled": retry_scheduled,
+                        "retry_reason": rejected_entry.feedback_summary(),
+                    },
+                ), next_case_index=(idx if retry_scheduled else idx + 1))
                 print(f"  [{idx}] REJECT {case_id}: {reject_reasons}")
                 continue
 
@@ -2059,7 +2327,14 @@ def run_online_evolution(
                 )
                 fitness_audit["assessment"] = assessment.to_dict()
                 fitness_audit["passed"] = False
-            effect_audit = _expected_effect_audit(edit, assessment)
+            effect_audit = _expected_effect_audit(
+                edit,
+                assessment,
+                before=signal,
+                after=candidate_signal,
+                before_result=detection_result,
+                after_result=candidate_result,
+            )
             fitness_audit["expected_effect_contract"] = effect_audit
             directional_canary_support = (
                 assessment.evidence_only
@@ -2083,8 +2358,23 @@ def run_online_evolution(
                     target_module=edit.target_module,
                     override_success=False,
                     feature_description=edit.feature_description,
+                    attempt_metadata={
+                        "operation": (
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        ),
+                        "outcome": assessment.decision,
+                        "reason_categories": [
+                            str(value).split(":", 1)[0]
+                            for value in assessment.reasons
+                        ],
+                        "observable_deltas": effect_audit[
+                            "observable_deltas"
+                        ],
+                        "expected_effect_status": effect_audit["status"],
+                    },
                 )
-                persist_progress(idx + 1)
                 if assessment.decision != "no_effect":
                     reasons = [
                         f"source_{assessment.decision}:"
@@ -2111,6 +2401,9 @@ def run_online_evolution(
                             if canary_regressions else "source_fitness"
                         ),
                         observed_effect=effect_audit["status"],
+                        observable_deltas=tuple(
+                            effect_audit["observable_deltas"]
+                        ),
                     ))
                     record_step(EvolutionStep(
                         case_id=case_id,
@@ -2130,9 +2423,8 @@ def run_online_evolution(
                     continue
                 reasons = ["source_no_effect:" + ",".join(assessment.reasons)]
                 gate.revoke_structural_accept(cert, reasons)
-                gate.record_no_edit()
                 edits_rejected += 1
-                rejected_buffer.append(RejectedEditEntry(
+                rejected_entry = RejectedEditEntry(
                     proposal=type(
                         "P",
                         (),
@@ -2147,17 +2439,37 @@ def run_online_evolution(
                     reject_reasons=reasons,
                     rejection_stage="source_fitness",
                     observed_effect=effect_audit["status"],
-                ))
+                    observable_deltas=tuple(
+                        effect_audit["observable_deltas"]
+                    ),
+                )
+                rejected_buffer.append(rejected_entry)
+                retry_scheduled = (
+                    mutation_route is not None
+                    and active_attempt_index + 1 < max_mutation_attempts_per_case
+                )
+                if retry_scheduled:
+                    source_work_queue.appendleft(
+                        (idx, case_id, active_attempt_index + 1)
+                    )
+                else:
+                    gate.record_no_edit()
+                fitness_audit["retry_scheduled"] = retry_scheduled
+                fitness_audit["retry_reason"] = rejected_entry.feedback_summary()
                 record_step(EvolutionStep(
                     case_id=case_id, case_index=idx,
                     trigger_source=signal.trigger_source.value,
                     attribution=signal.to_dict(), edit_proposal=edit.to_dict(),
-                    mutation_applied=None, gate_decision="reject_fitness_no_effect",
+                    mutation_applied=None,
+                    gate_decision=(
+                        "retry_fitness_no_effect"
+                        if retry_scheduled else "reject_fitness_no_effect"
+                    ),
                     genome_hash_before=genome_before,
                     genome_hash_after=current_genome.content_hash,
                     detection_state=detection_state, timestamp=time.time(),
                     fitness_check=fitness_audit,
-                ), next_case_index=idx + 1)
+                ), next_case_index=(idx if retry_scheduled else idx + 1))
                 print(f"  [{idx}] REJECT_LOCAL_FITNESS {case_id}: {reasons}")
                 continue
 
@@ -2295,6 +2607,7 @@ def run_online_evolution(
             "probe_ids": list(registered_probe_ids),
             "probe_limit": probe_limit,
             "canary_limit": canary_limit,
+            "max_mutation_attempts_per_case": max_mutation_attempts_per_case,
             "canary_case_ids": list(registered_canary_ids),
             "baseline_canary_audit": baseline_canary_audit,
             "rejection_summary": _build_rejection_summary(

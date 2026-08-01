@@ -31,6 +31,16 @@ from ..bccse.genome import (
 from ..bccse.signal_adapter import resolve_authoritative_state
 
 
+def _safe_category(value: Any, *, limit: int = 80) -> str:
+    """Keep persisted feedback categorical before it re-enters a prompt."""
+    text = str(value or "")[:limit]
+    return "".join(
+        character
+        for character in text
+        if character.isalnum() or character in "_:-.>"
+    )
+
+
 @dataclass
 class TypeConditionedExperience:
     """A single type-conditioned detection experience entry.
@@ -231,6 +241,25 @@ class TypeExperienceMemory:
                     "before": e.metadata.get("before_state"),
                     "after": e.metadata.get("after_state"),
                     "process_state": e.metadata.get("process_state"),
+                    "operation": _safe_category(e.metadata.get("operation")),
+                    "outcome": _safe_category(e.metadata.get("outcome")),
+                    "reason_categories": [
+                        _safe_category(value)
+                        for value in list(
+                            e.metadata.get("reason_categories") or []
+                        )[:5]
+                        if _safe_category(value)
+                    ],
+                    "observable_deltas": [
+                        _safe_category(value)
+                        for value in list(
+                            e.metadata.get("observable_deltas") or []
+                        )[:8]
+                        if _safe_category(value)
+                    ],
+                    "expected_effect_status": _safe_category(
+                        e.metadata.get("expected_effect_status")
+                    ),
                     "type_confidence": e.type_confidence,
                 }
                 for e in entries
@@ -423,6 +452,7 @@ class TypeAwareFitness:
         target_module: str | None = None,
         override_success: bool | None = None,
         feature_description: str | None = None,
+        attempt_metadata: Mapping[str, Any] | None = None,
     ) -> TypeAwareFitnessAssessment:
         """Assess a skill edit's fitness for a specific hallucination type.
 
@@ -531,6 +561,7 @@ class TypeAwareFitness:
                 "decisive_correct": decisive_correct,
                 "direction_correct": direction_correct,
                 "process_state": process_state,
+                **dict(attempt_metadata or {}),
             },
             feature_description=feature_description,
             type_confidence=type_result.confidence,

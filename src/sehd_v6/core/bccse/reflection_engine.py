@@ -76,6 +76,7 @@ class RejectedEditEntry:
     reject_reasons: list[str] = field(default_factory=list)
     rejection_stage: str = "structural_gate"
     observed_effect: str = ""
+    observable_deltas: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -85,6 +86,7 @@ class RejectedEditEntry:
             "reject_reasons": list(self.reject_reasons),
             "rejection_stage": self.rejection_stage,
             "observed_effect": self.observed_effect,
+            "observable_deltas": list(self.observable_deltas),
         }
 
     def feedback_summary(self) -> str:
@@ -99,10 +101,66 @@ class RejectedEditEntry:
             f"; observed={self.observed_effect[:160]}"
             if self.observed_effect else ""
         )
+        deltas = ",".join(str(value)[:80] for value in self.observable_deltas[:6])
         return (
             f"stage={self.rejection_stage}; "
-            f"reasons={reasons or 'unspecified'}{observed}"
+            f"reasons={reasons or 'unspecified'}{observed}; "
+            f"observable_changes={deltas or 'none'}"
         )
+
+
+# Each module is injected only into providers whose output schema can execute
+# these actions. Reflection must therefore propose a change to one of these
+# concrete outputs, rather than an abstract policy that no provider can enact.
+MODULE_RUNTIME_CONTRACTS: dict[str, str] = {
+    "candidate_trigger": (
+        "emit or suppress a census candidate and set its observable origin, "
+        "kind, axes, or dependency event IDs"
+    ),
+    "evidence_obligation": (
+        "require or populate cited evidence fields, or keep proof coverage "
+        "incomplete when a required causal field is absent"
+    ),
+    "candidate_to_verifier_route": (
+        "route every supplied candidate to a matching qualification or "
+        "verification record without dropping its candidate ID"
+    ),
+    "atomic_verifier_instruction": (
+        "set certificate violation, actor, boundary, propagation, or evidence "
+        "fields from cited trajectory events"
+    ),
+    "clean_defense_boundary": (
+        "emit a cited defense/boundary record for support, authorization, "
+        "ordinary failure, or repair"
+    ),
+    "causal_link_test": (
+        "populate the origin-consumption-impact/recovery chain or reject a "
+        "non-causal origin locally"
+    ),
+    "earliest_origin_tiebreak": (
+        "select an addressable earlier responsible event among supported "
+        "causal origins"
+    ),
+    "abstention_rule": (
+        "choose clean, error, or unresolved only from complete admissible "
+        "prosecution and defense outputs"
+    ),
+}
+
+MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
+    "candidate_trigger": "candidate_count or emitted candidate origin/kind changes",
+    "evidence_obligation": (
+        "prosecution coverage or cited causal evidence-field coverage changes"
+    ),
+    "candidate_to_verifier_route": "prosecution certificate count/coverage changes",
+    "atomic_verifier_instruction": (
+        "valid or quarantined certificate count and certificate fields change"
+    ),
+    "clean_defense_boundary": "defense certificate count/coverage changes",
+    "causal_link_test": "causal-field coverage or propagation state changes",
+    "earliest_origin_tiebreak": "responsible-step/origin selection changes",
+    "abstention_rule": "authoritative state or unresolved trigger changes",
+}
 
 
 # Mapping from reflection type to preferred operation
@@ -284,6 +342,11 @@ def build_causal_reflection_prompt(
         )
     )
     allowed_modules_text = ", ".join(allowed_modules)
+    runtime_contract_text = "\n".join(
+        f"- {module}: action={MODULE_RUNTIME_CONTRACTS.get(module, 'module-local output')}; "
+        f"expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}"
+        for module in allowed_modules
+    )
 
     system = """You are the BCCSE v5 causal-process reflection engine.
 
@@ -311,6 +374,19 @@ module. A legal rule:
 - uses no case identity, concrete case fact, internal state manipulation,
   priority declaration, pseudocode, or cross-module reference;
 - does not directly force clean/error/unresolved outside abstention_rule.
+
+Most importantly, the action must change an output field that the target
+module's provider can actually emit. Abstract actions such as "improve the
+analysis", "treat the obligation as satisfied", or "consider the evidence"
+are inert unless they say which candidate/certificate/evidence/boundary/causal
+or verdict output must be emitted, suppressed, populated, or kept incomplete.
+
+An applicable broad baseline rule does not by itself justify no_edit when the
+runtime trace proves the receiving provider failed to execute it. In that
+case, you may add one operational specialization: name a distinct observable
+sub-pattern and the exact module-local output it must change. The specialization
+must add an executable trigger that the baseline lacks; never merely restate
+the baseline conclusion.
 
 Operation preference (v5.3.2):
 - STRONGLY prefer add_rule over modify_rule. Adding a new rule is safe;
@@ -348,11 +424,12 @@ identifier, gold/answer information, URL, quoted instruction, prompt text, or
 request to change model behavior.
 
 expected_effect is a counterfactual prediction for source replay, not a final
-verdict. State exactly one observable change, such as "prosecution coverage
-gains a complete causal field", "defense coverage gains a cited support
-reference", "candidate_count increases", or "the same unresolved process
-state becomes authoritative". If no single observable change can be predicted
-from the trace, return no_edit instead.
+verdict. State exactly one observable change allowed by the selected target
+module's runtime output contract. For example, evidence_obligation may predict
+prosecution evidence-field coverage, but it must not predict defense coverage
+because that module is not injected into a defense provider. If no single
+target-aligned observable change can be predicted from the trace, return
+no_edit instead.
 """
 
     # Build rejected edits section
@@ -463,6 +540,7 @@ from the trace, return no_edit instead.
         f" ({signal.defense_coverage_state or 'numeric/unavailable'})\n"
         f"candidate_count={signal.candidate_count}\n"
         f"crs_source={signal.crs_source}; aggregate={signal.crs_aggregate:.3f}\n"
+        f"attribution_evidence={html.escape(signal.evidence_summary[:1200], quote=True)}\n"
         f"{crs_section}\n"
         "</diagnostic_signal>\n\n"
         f"{gold_section}"
@@ -472,6 +550,9 @@ from the trace, return no_edit instead.
         f"<current_skill allowed_modules=\"{allowed_modules_text}\">\n"
         f"{current_skill_text}\n"
         "</current_skill>\n"
+        "<runtime_output_contracts>\n"
+        f"{runtime_contract_text}\n"
+        "</runtime_output_contracts>\n"
         f"{rejected_info}{accepted_section}{capacity_section}{hint_section}\n"
         "<task>\n"
         "Decide whether one safe general rule is justified by observable "
@@ -521,7 +602,10 @@ def format_skill_context_for_llm(genome_modules: dict, target_module: str) -> st
     return "\n".join(lines)
 
 
-def format_detection_context_for_llm(detection_result: Mapping[str, Any]) -> str:
+def format_detection_context_for_llm(
+    detection_result: Mapping[str, Any],
+    trajectory_record: Mapping[str, Any] | None = None,
+) -> str:
     """Format full detection trace as XML-structured context.
 
     Provides the reflection LLM with the complete detection process
@@ -538,6 +622,57 @@ def format_detection_context_for_llm(detection_result: Mapping[str, Any]) -> str
         text = "".join(character for character in text if character >= " " or character in "\n\t")
         return html.escape(text[:limit], quote=True)
 
+    def certificate_rows(kind: str) -> list[Mapping[str, Any]]:
+        keys = (
+            ("combined_prosecution", "prosecution")
+            if kind == "prosecution"
+            else ("combined_defense", "defense")
+        )
+        for key in keys:
+            payload = detection_result.get(key) or {}
+            if not isinstance(payload, Mapping):
+                continue
+            rows = payload.get("candidates") or payload.get("certificates") or []
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, Mapping)]
+        return []
+
+    def selected_fields(row: Mapping[str, Any], names: Sequence[str]) -> str:
+        values = []
+        for name in names:
+            value = row.get(name)
+            if value not in (None, "", [], {}):
+                values.append(f"{name}={safe_text(value, 140)}")
+        return "; ".join(values)
+
+    if trajectory_record:
+        # The caller removes evaluator-only fields before this boundary. Keep
+        # the raw evidence bounded and visibly untrusted: the model needs event
+        # contents to learn a causal rule, but must never execute instructions
+        # quoted from the trajectory.
+        preferred_keys = (
+            "events", "trajectory", "messages", "interactions", "task",
+            "request", "prompt", "response",
+        )
+        selected = {
+            key: trajectory_record[key]
+            for key in preferred_keys
+            if key in trajectory_record
+        }
+        if not selected:
+            selected = {
+                key: value
+                for key, value in trajectory_record.items()
+                if key not in {
+                    "case_id", "source_id", "gold_label", "gold_explanation",
+                    "is_hallucination", "hallucination_step",
+                    "hallucination_reason", "outer_feedback",
+                }
+            }
+        parts.append("  <trajectory_evidence untrusted=\"true\">")
+        parts.append(f"  {safe_text(selected, 6000)}")
+        parts.append("  </trajectory_evidence>")
+
     # 1. Candidates
     census = detection_result.get("census") or []
     parts.append("  <candidates>")
@@ -551,34 +686,45 @@ def format_detection_context_for_llm(detection_result: Mapping[str, Any]) -> str
     parts.append("  </candidates>")
 
     # 2. Prosecution arguments
-    prosecution = detection_result.get("combined_prosecution") or detection_result.get("appeal_prosecution") or {}
+    prosecution = detection_result.get("combined_prosecution") or detection_result.get("prosecution") or {}
+    prosecution_rows = certificate_rows("prosecution")
     parts.append("  <prosecution>")
-    if isinstance(prosecution, dict):
-        for key, val in list(prosecution.items())[:3]:
-            summary = safe_text(val, 200) if val else "无"
-            parts.append(f"  - {key}: {summary}")
-    elif isinstance(prosecution, list):
-        for item in prosecution[:3]:
-            parts.append(f"  - {safe_text(item, 200)}")
-    else:
-        parts.append(f"  {safe_text(prosecution, 300)}")
-    if not prosecution:
+    if isinstance(prosecution, Mapping):
+        parts.append(
+            "  coverage_state="
+            + safe_text(prosecution.get("coverage_state", "unavailable"), 40)
+        )
+    for row in prosecution_rows[:5]:
+        summary = selected_fields(row, (
+            "source_candidate_id", "candidate_id", "violation_state",
+            "actor_state", "boundary_state", "propagation_state",
+            "benchmark_causal_status", "norm_evidence_refs",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "impact_evidence_refs", "recovery_evidence_refs",
+        ))
+        parts.append(f"  - {summary or 'certificate has no executable fields'}")
+    if not prosecution_rows:
         parts.append("  控方未提出有效论点")
     parts.append("  </prosecution>")
 
     # 3. Defense arguments
-    defense = detection_result.get("defense") or detection_result.get("appeal_defense") or {}
+    defense = detection_result.get("combined_defense") or detection_result.get("defense") or {}
+    defense_rows = certificate_rows("defense")
     parts.append("  <defense>")
-    if isinstance(defense, dict):
-        for key, val in list(defense.items())[:3]:
-            summary = safe_text(val, 200) if val else "无"
-            parts.append(f"  - {key}: {summary}")
-    elif isinstance(defense, list):
-        for item in defense[:3]:
-            parts.append(f"  - {safe_text(item, 200)}")
-    else:
-        parts.append(f"  {safe_text(defense, 300)}")
-    if not defense:
+    if isinstance(defense, Mapping):
+        parts.append(
+            "  coverage_state="
+            + safe_text(defense.get("coverage_state", "unavailable"), 40)
+        )
+    for row in defense_rows[:5]:
+        summary = selected_fields(row, (
+            "target_candidate_id", "candidate_id", "defense_type",
+            "boundary_state", "support_state", "evidence_refs",
+            "positive_evidence_refs", "boundary_evidence_refs",
+            "recovery_evidence_refs", "rationale",
+        ))
+        parts.append(f"  - {summary or 'defense has no executable fields'}")
+    if not defense_rows:
         parts.append("  辩方未提出有效论点")
     parts.append("  </defense>")
 
@@ -593,6 +739,13 @@ def format_detection_context_for_llm(detection_result: Mapping[str, Any]) -> str
         parts.append(f"  辩方覆盖率: {pa['defense_coverage']}")
     if pa.get("responsible_event_id"):
         parts.append(f"  责任事件: {pa['responsible_event_id']}")
+    for key in (
+        "quarantined_error_certificate_ids", "consensus_gate_blocked_ids",
+        "unresolved_candidate_ids", "clean_covered_candidate_ids",
+        "positive_candidate_ids",
+    ):
+        if pa.get(key):
+            parts.append(f"  {key}: {safe_text(pa[key], 240)}")
     if adjudication:
         adj_str = safe_text(adjudication, 300)
         parts.append(f"  判定推理: {adj_str}")

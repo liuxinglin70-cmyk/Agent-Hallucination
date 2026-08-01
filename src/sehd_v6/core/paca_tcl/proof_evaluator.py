@@ -41,7 +41,11 @@ from .basic_runner import (
     write_json,
     write_jsonl,
 )
-from ...provider_routes import resolve_provider_credential, resolve_provider_route
+from ...provider_routes import (
+    provider_thinking_control,
+    resolve_provider_credential,
+    resolve_provider_route,
+)
 from ..provider_models import canonical_model_name
 from ..bccse.types import (
     EvaluationOutcome,
@@ -110,6 +114,9 @@ def _json_object_provider_call(
     }
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
+    thinking = provider_thinking_control(route, purpose="mutation")
+    if thinking is not None:
+        payload["thinking"] = thinking
     # response_format not supported by all models (e.g. DeepSeek-V4-Pro
     # returns HTTP 400 when response_format is sent). Only add it for
     # models that support it (Flash supports it; Pro does not).
@@ -181,7 +188,17 @@ def _json_object_provider_call(
             ) as response:
                 raw = response.read()
             value = json.loads(raw.decode("utf-8"))
-            parsed = json.loads(value["choices"][0]["message"]["content"])
+            choice = value["choices"][0]
+            message = choice["message"]
+            content = message.get("content")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(
+                    "provider_empty_content:"
+                    f"finish_reason={choice.get('finish_reason') or 'unknown'},"
+                    "reasoning_content_present="
+                    f"{bool(message.get('reasoning_content'))}"
+                )
+            parsed = json.loads(content)
             if not isinstance(parsed, dict):
                 raise ValueError("mutation provider response root is not an object")
             cached = {

@@ -240,6 +240,92 @@ def module_local_score(
     return 0.0
 
 
+def observable_process_delta(
+    before: AttributionSignal,
+    after: AttributionSignal,
+    *,
+    target_module: str,
+    before_result: Mapping[str, Any] | None = None,
+    after_result: Mapping[str, Any] | None = None,
+    epsilon: float = 0.05,
+) -> tuple[str, ...]:
+    """Describe bounded detector-observable changes caused by one edit.
+
+    The returned tokens contain no case identifiers or free-form trajectory
+    text, so they are safe to persist and feed into a later reflection. This
+    is the missing bridge between replay and learning: a rejected rule should
+    teach the mutator *which executable output failed to move*, not merely
+    that a scalar fitness gate rejected it.
+    """
+    changes: list[str] = []
+    if before.state != after.state:
+        changes.append(f"state:{before.state}->{after.state}")
+    if before.should_evolve != after.should_evolve:
+        changes.append(
+            "trigger:closed" if not after.should_evolve else "trigger:opened"
+        )
+    if before.candidate_count != after.candidate_count:
+        direction = "increased" if after.candidate_count > before.candidate_count else "decreased"
+        changes.append(f"candidate_count:{direction}")
+
+    for side in ("prosecution", "defense"):
+        before_rank = _coverage_rank(before, side)
+        after_rank = _coverage_rank(after, side)
+        if after_rank - before_rank > epsilon:
+            changes.append(f"{side}_coverage:increased")
+        elif before_rank - after_rank > epsilon:
+            changes.append(f"{side}_coverage:decreased")
+
+    before_local = module_local_score(target_module, before, before_result)
+    after_local = module_local_score(target_module, after, after_result)
+    if after_local - before_local > epsilon:
+        changes.append("target_local_score:increased")
+    elif before_local - after_local > epsilon:
+        changes.append("target_local_score:decreased")
+
+    before_result = before_result or {}
+    after_result = after_result or {}
+    counters = (
+        (
+            "prosecution_certificates",
+            len(_certificate_rows(before_result, "prosecution")),
+            len(_certificate_rows(after_result, "prosecution")),
+        ),
+        (
+            "defense_certificates",
+            len(_certificate_rows(before_result, "defense")),
+            len(_certificate_rows(after_result, "defense")),
+        ),
+        (
+            "quarantined_certificates",
+            _quarantine_count(before_result),
+            _quarantine_count(after_result),
+        ),
+    )
+    for name, old, new in counters:
+        if old != new:
+            changes.append(f"{name}:{'increased' if new > old else 'decreased'}")
+
+    before_causal = _causal_field_score(before_result)
+    after_causal = _causal_field_score(after_result)
+    if after_causal - before_causal > epsilon:
+        changes.append("causal_field_coverage:increased")
+    elif before_causal - after_causal > epsilon:
+        changes.append("causal_field_coverage:decreased")
+
+    before_responsible = bool(_responsible_step_present(before_result))
+    after_responsible = bool(_responsible_step_present(after_result))
+    if before_responsible != after_responsible:
+        changes.append(
+            "responsible_step:added" if after_responsible else "responsible_step:removed"
+        )
+    if before.crs_complete != after.crs_complete:
+        changes.append(
+            "diagnostic_signal:gained" if after.crs_complete else "diagnostic_signal:lost"
+        )
+    return tuple(dict.fromkeys(changes))
+
+
 def assess_source_fitness(
     before: AttributionSignal,
     after: AttributionSignal,

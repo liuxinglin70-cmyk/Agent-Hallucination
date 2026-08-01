@@ -61,6 +61,22 @@ def test_model_aliases_canonicalize_to_official_wire_names():
     assert canonical_model_name("deepseek-v4-pro") == "deepseek-v4-pro"
 
 
+def test_official_v4_mutation_defaults_to_non_thinking_json_mode():
+    from src.sehd_v6.provider_routes import provider_thinking_control
+
+    route = {
+        "endpoint": "https://api.deepseek.com",
+        "model": "deepseek-v4-flash",
+    }
+    assert provider_thinking_control(route, purpose="mutation") == {
+        "type": "disabled"
+    }
+    assert provider_thinking_control(route, purpose="detector") is None
+    assert provider_thinking_control(
+        {**route, "thinking": "enabled"}, purpose="mutation"
+    ) == {"type": "enabled"}
+
+
 def test_unified_route_resolution_precedence_and_official_defaults(monkeypatch):
     from src.sehd_v6.provider_routes import resolve_provider_route
 
@@ -251,9 +267,11 @@ def test_provider_transport_honors_route_generation_budget_and_total_timeout(
         user="{}",
         cache_dir=tmp_path,
         require_candidates=False,
+        purpose="mutation",
     )
     assert captured["payload"]["temperature"] == 0.3
     assert captured["payload"]["max_tokens"] == 77
+    assert captured["payload"]["thinking"] == {"type": "disabled"}
     assert captured["timeout"] == 4
 
 

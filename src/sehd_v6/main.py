@@ -727,6 +727,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 ),
                 "fitness_check": True,
                 "fitness_batch_size": args.fitness_batch_size,
+                "max_mutation_attempts_per_case": (
+                    args.max_mutation_attempts_per_case
+                ),
                 "fitness_use_gold": args.fitness_use_gold or args.use_gold,
                 "commit_validation": "source_replay_plus_stable_canaries",
                 "stable_canary_limit": args.canary_limit,
@@ -780,6 +783,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         validation_probe_trigger_threshold=int(
             getattr(args, "probe_trigger_threshold", 0)
         ),
+        max_mutation_attempts_per_case=args.max_mutation_attempts_per_case,
     )
 
     print(f"\nResults saved to: {output_dir}")
@@ -2103,6 +2107,16 @@ def main():
         help=(
             "Must be 1: each edit is replayed and committed independently so "
             "fitness credit remains attributable."
+        ),
+    )
+    p_evolve.add_argument(
+        "--max-mutation-attempts-per-case",
+        type=int,
+        default=2,
+        choices=(1, 2, 3),
+        help=(
+            "Bounded same-source proposal budget; no-effect or repairable "
+            "structural failures feed their replay feedback into the next attempt"
         ),
     )
     p_evolve.add_argument(

@@ -25,6 +25,7 @@ from . import contract_v1 as contract
 from ...utils.preflight import discover_records
 from ...env_loader import load_local_env
 from ...provider_routes import (
+    provider_thinking_control,
     resolve_config_provider_routes,
     resolve_provider_credential,
     resolve_provider_route,
@@ -301,6 +302,9 @@ def provider_call_with_schema(
     }
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
+    thinking = provider_thinking_control(route, purpose=purpose)
+    if thinking is not None:
+        payload["thinking"] = thinking
     body = packet.canonical_json(payload).encode("utf-8")
     # v3.5.1: 缓存键含 cache_prefix 前缀，与 evaluator 的 _json_object_provider_call 区分
     # （两者 payload 可能相同但 schema 验证不同，必须隔离缓存）
@@ -356,7 +360,16 @@ def provider_call_with_schema(
             with urlrequest.urlopen(req, timeout=request_timeout) as response:
                 raw = response.read()
             value = json.loads(raw.decode("utf-8"))
-            content = value["choices"][0]["message"]["content"]
+            choice = value["choices"][0]
+            message = choice["message"]
+            content = message.get("content")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(
+                    "provider_empty_content:"
+                    f"finish_reason={choice.get('finish_reason') or 'unknown'},"
+                    "reasoning_content_present="
+                    f"{bool(message.get('reasoning_content'))}"
+                )
             parsed = json.loads(content)
             if not isinstance(parsed, dict):
                 raise ValueError("provider response is not a JSON object")

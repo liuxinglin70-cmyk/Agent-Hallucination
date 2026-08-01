@@ -212,6 +212,14 @@ The promotion hierarchy is:
 6. Cross-set effectiveness is evaluated only when the frozen config explicitly
    authorizes the D/effectiveness phase and the registered set.
 
+Candidate search is bounded separately from promotion. The default source
+budget is two mutation attempts (maximum three). A repairable structural
+failure or source-level no-effect result restores the source's pre-attempt
+convergence checkpoint and may retry from the unchanged parent genome. Replay
+emits categorical observable deltas (state/trigger, coverage, candidate and
+certificate counts, quarantine, causal fields and responsible-step presence)
+into negative experience. Attempts never share fitness credit.
+
 Evidence-obligation local fitness rewards the weaker side of the prosecution
 and defense coverage, rather than rewarding a large coverage gap. This avoids
 turning one-sided adjudication into a false improvement signal.

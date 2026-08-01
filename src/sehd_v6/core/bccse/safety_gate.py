@@ -76,6 +76,8 @@ class GateCertificate:
     reject_reasons: list[str]
     edit_index: int  # which edit number this is
     case_index: int
+    prior_consecutive_no_edit: int = 0
+    prior_converged: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +90,8 @@ class GateCertificate:
             "reject_reasons": self.reject_reasons,
             "edit_index": self.edit_index,
             "case_index": self.case_index,
+            "prior_consecutive_no_edit": self.prior_consecutive_no_edit,
+            "prior_converged": self.prior_converged,
         }
 
 
@@ -163,9 +167,32 @@ class StructuralGate:
         certificate.reject_reasons.extend(str(reason) for reason in reasons)
         self._total_edits = max(0, self._total_edits - 1)
         self._restore_last_edit_index(certificate.target_module)
-        # This is a post-replay outcome for an already processed case. It must
-        # not count once per rejected edit toward the case-level convergence
-        # window; the runner records the case outcome separately.
+        # Structural acceptance is provisional until source replay succeeds.
+        # Restore the case-level convergence checkpoint so a failed proposal
+        # does not erase the preceding no-edit streak. The runner records one
+        # final no-edit outcome only after all attempts for this case fail.
+        self._consecutive_no_edit = certificate.prior_consecutive_no_edit
+        self._converged = certificate.prior_converged
+
+    def defer_structural_reject(self, certificate: GateCertificate) -> None:
+        """Undo attempt-level convergence accounting before a bounded retry.
+
+        The certificate remains a real rejected proposal in the audit trail,
+        but convergence is defined over source cases rather than mutation
+        attempts. A later retry will either reset the streak on acceptance or
+        record exactly one no-edit outcome when the source is exhausted.
+        """
+        if certificate.decision != "reject":
+            return
+        self._consecutive_no_edit = certificate.prior_consecutive_no_edit
+        self._converged = certificate.prior_converged
+
+    def mark_repaired(self, certificate: GateCertificate, repair: str) -> None:
+        """Mark a repairable structural proposal as superseded, not rejected."""
+        if certificate.decision != "reject":
+            return
+        certificate.decision = "superseded"
+        certificate.reject_reasons.append(f"repaired_by:{repair}")
 
     def get_allowed_operations(self, module: str) -> list[str]:
         """All operations are always allowed — trust the LLM's judgment.
@@ -196,6 +223,8 @@ class StructuralGate:
             (accepted, certificate, reject_reasons)
         """
         reject_reasons: list[str] = []
+        prior_consecutive_no_edit = self._consecutive_no_edit
+        prior_converged = self._converged
 
         # --- Check halt ---
         if self._halted:
@@ -216,42 +245,6 @@ class StructuralGate:
                     f"content_too_short: {len(content.strip())} < "
                     f"{self.config.min_content_length}"
                 )
-            normalized = content.strip()
-            has_if_then = (
-                (
-                    normalized.startswith(("当", "如果"))
-                    and (
-                        "时" in normalized
-                        or "，" in normalized
-                        or "," in normalized
-                    )
-                )
-                or (
-                    normalized.lower().startswith(("when ", "if "))
-                    and ("," in normalized or "，" in normalized)
-                )
-            )
-            if not has_if_then:
-                reject_reasons.append("not_if_then_instruction")
-            if re.search(r"(?:^|[\s（(])(?:0|1|2|3)[.)、]|首先|其次|然后|最后", normalized):
-                reject_reasons.append("multi_step_pseudocode")
-            condition = normalized.split("时", 1)[0]
-            if (
-                normalized.lower().startswith(("when ", "if "))
-                or normalized.startswith("如果")
-            ):
-                condition = re.split(r"[,，]", normalized, maxsplit=1)[0]
-            conjunctions = re.findall(
-                r"且|并且|以及|或|\band\b|\bor\b",
-                condition.lower(),
-            )
-            if len(conjunctions) > 1:
-                reject_reasons.append(
-                    f"condition_overload: {len(conjunctions) + 1} conditions > 2"
-                )
-            action = normalized[len(condition):]
-            if any(token in action for token in ("；", ";", "然后", "同时还", "并随后")):
-                reject_reasons.append("multiple_actions")
 
         # --- Layer 2: Module targeting ---
         if target_module not in MODULE_IDS:
@@ -517,6 +510,8 @@ class StructuralGate:
             reject_reasons=reject_reasons,
             edit_index=self._total_edits,
             case_index=case_index,
+            prior_consecutive_no_edit=prior_consecutive_no_edit,
+            prior_converged=prior_converged,
         )
         self.certificates.append(cert)
 

@@ -100,10 +100,14 @@ proof-court verdict directly.
 **Evolution loop** (per case):
 1. **Detect**: Run PACA-TCL v3.5 with current genome injected
 2. **Attribute**: Self-supervised trigger check (no gold required)
-3. **Reflect**: LLM causal process reflection generates edit proposal
+3. **Reflect**: LLM reflection receives evaluator-field-stripped trajectory
+   evidence, attribution, executable module-output contracts, and bounded
+   negative experience
 4. **Gate**: Structural constraint gate validates edit safety
 5. **Fitness**: Source replay plus rolling stable-case canaries; a budgeted probe can steer/rollback development, while only an authorized sealed final holdout can support a generalization claim
-6. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
+6. **Repair**: A repairable structural or source-no-effect candidate may use
+   one bounded same-source retry with its actual observable replay deltas
+7. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
 
 ### 3. HTC-TES v3 — Hallucination-Typed Conditioning
 

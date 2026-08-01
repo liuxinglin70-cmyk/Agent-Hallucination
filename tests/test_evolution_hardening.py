@@ -6,7 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.sehd_v6.core.bccse.fitness import assess_source_fitness
+from src.sehd_v6.core.bccse.fitness import (
+    assess_source_fitness,
+    observable_process_delta,
+)
 from src.sehd_v6.core.bccse.genome import (
     FITNESS_STATUS_STRONG,
     SkillEdit,
@@ -125,7 +128,7 @@ def test_expected_effect_is_sanitized_and_audited() -> None:
     assert "expected_effect" in reason
     assert SkillEdit.from_dict(poisoned.to_dict()).expected_effect == ""
 
-    edit = _typed_edit(expected_effect="candidate count increases")
+    edit = _typed_edit(expected_effect="prosecution evidence coverage increases")
     no_effect = assess_source_fitness(
         _signal("unresolved"),
         _signal("unresolved"),
@@ -133,6 +136,129 @@ def test_expected_effect_is_sanitized_and_audited() -> None:
     )
     audit = runner._expected_effect_audit(edit, no_effect)
     assert audit["status"] == "not_observed"
+    assert audit["target_aligned"] is True
+
+    misaligned = runner._expected_effect_audit(
+        _typed_edit(expected_effect="defense coverage increases"), no_effect
+    )
+    assert misaligned["status"] == "misaligned"
+
+
+def test_observable_process_delta_is_bounded_and_actionable() -> None:
+    before = replace(
+        _signal("unresolved"),
+        candidate_count=0,
+        prosecution_coverage_state="incomplete",
+        prosecution_coverage=0.3,
+    )
+    after = replace(
+        _signal("verified_clean"),
+        candidate_count=1,
+        prosecution_coverage_state="complete",
+        prosecution_coverage=1.0,
+    )
+    changes = observable_process_delta(
+        before,
+        after,
+        target_module="candidate_trigger",
+    )
+    assert "state:unresolved->verified_clean" in changes
+    assert "trigger:closed" in changes
+    assert "candidate_count:increased" in changes
+    assert "prosecution_coverage:increased" in changes
+
+
+def test_reflection_context_includes_untrusted_trajectory_but_not_evaluator_data() -> None:
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        format_detection_context_for_llm,
+    )
+
+    context = format_detection_context_for_llm(
+        {"state": "unresolved", "census": []},
+        trajectory_record={
+            "task": {"required_actions": ["verify_file_exists"]},
+            "events": [{"event_id": "event_001", "content": "run export"}],
+            "gold_label": True,
+            "gold_explanation": "must never enter reflection trace",
+        },
+    )
+    assert '<trajectory_evidence untrusted="true">' in context
+    assert "verify_file_exists" in context
+    assert "event_001" in context
+    assert "gold_label" not in context
+    assert "must never enter" not in context
+
+
+def test_same_source_no_effect_retry_can_produce_effective_skill(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    mutation_calls = 0
+
+    def detector(*, genome, case_id, **kwargs):
+        if case_id == "anchor":
+            state = "verified_clean"
+        else:
+            rules = genome.modules["evidence_obligation"].rules
+            effective = any("populate the missing evidence reference" in rule for rule in rules)
+            state = "verified_clean" if effective else "unresolved"
+        return {"state": state, "runtime_valid": True, "census": []}
+
+    def mutation(**kwargs):
+        nonlocal mutation_calls
+        mutation_calls += 1
+        if mutation_calls == 1:
+            content = (
+                "When a certificate lacks support, consider the evidence "
+                "obligation again."
+            )
+        else:
+            assert "observable_changes=none" in kwargs["user"]
+            content = (
+                "When a certificate omits a cited support event, populate the "
+                "missing evidence reference."
+            )
+        return ({
+            "target_module": "evidence_obligation",
+            "operation": "add_rule",
+            "new_content": content,
+            "feature_description": "certificate missing a cited support event",
+            "expected_effect": "prosecution coverage gains a cited support reference",
+            "rationale": "Change an executable certificate field.",
+        }, {})
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        canary_case_ids=("anchor",),
+        records={"source": {}, "anchor": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        max_mutation_attempts_per_case=2,
+        run_id="same_source_retry",
+    )
+
+    assert mutation_calls == 2
+    assert result.triggered_cases == 1
+    assert result.edits_rejected == 1
+    assert result.edits_accepted == 1
+    assert [step.gate_decision for step in result.steps] == [
+        "retry_fitness_no_effect",
+        "accept_batch",
+    ]
+    assert [step.attempt_index for step in result.steps] == [0, 1]
+    assert result.champion_genome.generation == 1
+    assert result.evolution_audit["mutation_retry_attempts"] == 1
 
 
 def test_self_replay_closure_is_directional_not_promotable() -> None:
@@ -639,10 +765,10 @@ def test_independent_registered_canary_unblocks_all_triggered_source_pool(
         runner,
         "json_object_provider_call",
         lambda **kwargs: (
-            _typed_edit(
-                operation="add_rule",
-                expected_effect="the source process becomes authoritative",
-            ).to_dict(),
+                _typed_edit(
+                    operation="add_rule",
+                    expected_effect="prosecution evidence coverage becomes complete",
+                ).to_dict(),
             {},
         ),
     )
