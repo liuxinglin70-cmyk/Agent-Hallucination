@@ -93,8 +93,15 @@ follow these rules:
    framework capability, add it as a generic API in the framework and
    implement the experiment-specific policy in `experiments/protocols/`.
 
-Large local workspaces that stay in place and are git-ignored: `tmp*`
-directories and `_server_latest/`.
+Large local workspaces that stay in place and are git-ignored: none —
+obsolete `tmp*` directories, `_server_latest/` and the legacy validation data
+were removed.  Ten empty `tmp/pytest-*` shell directories created by a past
+pytest run have broken ACLs and cannot be removed from a non-admin shell;
+delete them from an elevated terminal or after a reboot:
+
+```powershell
+Remove-Item -Recurse -Force "$PWD\tmp"
+```
 
 ## Core Methodology
 
