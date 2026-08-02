@@ -991,6 +991,17 @@ def attribute_failure(
         error_type in _GOLD_POLARITY_ERROR_TYPES or gold_verified_correct
     )
 
+    # 自监督过程诊断重分类（不变式 #1 边界）：
+    #   - gold 锁定时（has_gold=True 且 error_type ∈ _GOLD_POLARITY_ERROR_TYPES），
+    #     `not gold_polarity_locked` 守门阻止此分支，process diagnostics 不得
+    #     改写极性 —— 严格满足不变式 #1。
+    #   - 无 gold 时（自监督模式），detector 自评 CORRECT 但过程诊断报告
+    #     FOCUSED_CERTIFICATE_QUARANTINE / APPEAL_FAILURE 等内部不一致，
+    #     此分支将 CORRECT 重分类为具体过程缺陷以触发反思。这是自监督触发
+    #     反思的核心机制：没有 gold 极性可优先，过程信号是唯一的归因来源。
+    #     _REFINABLE_ERROR_TYPES 限定可被重分类的弱极性类型（CORRECT /
+    #     UNRESOLVED_UNKNOWN / CRS_CONTRADICTION / EVIDENCE_INCOMPLETE /
+    #     SIGNAL_UNAVAILABLE），已锁定的 gold 极性类型不在其中。
     if (
         diagnostic_finding is not None
         and not gold_polarity_locked

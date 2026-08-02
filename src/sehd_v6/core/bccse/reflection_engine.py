@@ -35,6 +35,33 @@ from .step_attributor import (
 )
 from .signal_adapter import resolve_authoritative_state
 
+# Evaluator-only keys that must never enter a reflection prompt (不变式 #3).
+# preferred_keys 路径直接序列化整个子树，若 events/messages 等键的值内部
+# 嵌套了这些字段，它们会随 JSON 进入 prompt。fallback 路径已显式排除顶层
+# 字段；此常量为 preferred_keys 路径的递归剥离提供单一来源。
+_EVALUATOR_TRAJECTORY_KEYS = frozenset({
+    "case_id", "source_id", "gold_label", "gold_explanation",
+    "is_hallucination", "hallucination_step", "hallucination_reason",
+    "outer_feedback", "gold_steps",
+})
+
+
+def _strip_evaluator_fields(value: Any) -> Any:
+    """递归剥离 trajectory 子树中嵌套的 evaluator-only 字段。
+
+    返回一个新的结构，其中所有 dict 键命中 ``_EVALUATOR_TRAJECTORY_KEYS``
+    的条目（含任意嵌套层级）被移除。list/tuple 递归处理，其它类型原样返回。
+    """
+    if isinstance(value, Mapping):
+        return {
+            k: _strip_evaluator_fields(v)
+            for k, v in value.items()
+            if k not in _EVALUATOR_TRAJECTORY_KEYS
+        }
+    if isinstance(value, (list, tuple)):
+        return [_strip_evaluator_fields(item) for item in value]
+    return value
+
 
 def _format_optional_score(value: float | None) -> str:
     return "unavailable" if value is None else f"{value:.3f}"
@@ -663,12 +690,12 @@ def format_detection_context_for_llm(
             selected = {
                 key: value
                 for key, value in trajectory_record.items()
-                if key not in {
-                    "case_id", "source_id", "gold_label", "gold_explanation",
-                    "is_hallucination", "hallucination_step",
-                    "hallucination_reason", "outer_feedback",
-                }
+                if key not in _EVALUATOR_TRAJECTORY_KEYS
             }
+        # preferred_keys 路径直接序列化整个子树：若 events/messages 等键的
+        # 值内部嵌套了 gold_label/case_id 等字段，它们会随 JSON 进入 prompt。
+        # 递归剥离确保嵌套层级也被清理（与 fallback 顶层排除对齐，不变式 #3）。
+        selected = _strip_evaluator_fields(selected)
         parts.append("  <trajectory_evidence untrusted=\"true\">")
         parts.append(f"  {safe_text(selected, 6000)}")
         parts.append("  </trajectory_evidence>")

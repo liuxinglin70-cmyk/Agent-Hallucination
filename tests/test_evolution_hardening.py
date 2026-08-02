@@ -189,6 +189,48 @@ def test_reflection_context_includes_untrusted_trajectory_but_not_evaluator_data
     assert "must never enter" not in context
 
 
+def test_reflection_context_strips_nested_gold_in_preferred_keys() -> None:
+    """Nested evaluator-only fields inside preferred_keys must be stripped.
+
+    preferred_keys (events/messages/task/...) are serialized as a whole
+    subtree. If their values nest gold_label/case_id/gold_steps etc., those
+    would leak into the reflection prompt via JSON serialization (invariant
+    #3). The fallback path already excludes top-level gold keys; this test
+    pins the recursive stripping for the preferred_keys path.
+    """
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        format_detection_context_for_llm,
+    )
+
+    context = format_detection_context_for_llm(
+        {"state": "unresolved", "census": []},
+        trajectory_record={
+            "events": [
+                {
+                    "event_id": "event_001",
+                    "content": "run export",
+                    "gold_label": True,
+                    "gold_steps": [3, 7],
+                    "case_id": "secret_case_xyz",
+                }
+            ],
+            "messages": [
+                {"role": "user", "content": "summarize", "gold_explanation": "leak"},
+            ],
+        },
+    )
+    # Preferred-key content is present.
+    assert "event_001" in context
+    assert "run export" in context
+    assert "summarize" in context
+    # Nested evaluator-only fields and their values are stripped.
+    assert "gold_label" not in context
+    assert "gold_steps" not in context
+    assert "gold_explanation" not in context
+    assert "secret_case_xyz" not in context
+    assert "leak" not in context
+
+
 def test_same_source_no_effect_retry_can_produce_effective_skill(
     tmp_path, monkeypatch,
 ) -> None:
@@ -280,6 +322,38 @@ def test_self_replay_closure_is_directional_not_promotable() -> None:
     )
     assert gold_assessment.decision == "strong_improvement"
     assert gold_assessment.passed
+
+
+def test_diagnostic_only_signal_is_rejected_by_fitness() -> None:
+    """diagnostic_only signals must never yield a promotable fitness (invariant #4).
+
+    Currently protected by three upstream layers (should_evolve=False, runner
+    continue, VALID_STATES). This test pins the explicit fitness-layer guard
+    so a future signal that is diagnostic_only=True but state-legal cannot
+    slip through the local-score delta path.
+    """
+    from dataclasses import replace as _replace
+
+    diagnostic_before = _replace(_signal("unresolved"), diagnostic_only=True)
+    clean_after = _signal("verified_clean")
+
+    assessment = assess_source_fitness(
+        diagnostic_before,
+        clean_after,
+        target_module="evidence_obligation",
+        gold_label=False,  # even with gold, diagnostic_only must block
+    )
+    assert assessment.decision == "worse"
+    assert "diagnostic_only_signal_not_promotable" in assessment.reasons
+
+    assessment_after = assess_source_fitness(
+        _signal("unresolved"),
+        _replace(clean_after, diagnostic_only=True),
+        target_module="evidence_obligation",
+        gold_label=False,
+    )
+    assert assessment_after.decision == "worse"
+    assert "diagnostic_only_signal_not_promotable" in assessment_after.reasons
 
 
 def test_no_gold_detector_local_score_gain_is_directional_only() -> None:

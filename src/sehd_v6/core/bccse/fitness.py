@@ -420,6 +420,12 @@ def assess_source_fitness(
             state=resolve_authoritative_state(after_result),
         )
     reasons: list[str] = []
+    # 不变式 #4 防御性硬化：diagnostic_only 信号（如 runtime_invalid）永不可
+    # 作进化依据。当前由 step_attributor.should_evolve=False + runner continue
+    # + VALID_STATES 三层防御保护，此处显式断言把不变式在 fitness 层也钉死，
+    # 防止未来引入 state 合法但 diagnostic_only=True 的信号绕过上游守门。
+    if before.diagnostic_only or after.diagnostic_only:
+        return FitnessAssessment("worse", ("diagnostic_only_signal_not_promotable",))
     if after.state not in VALID_STATES:
         return FitnessAssessment("worse", ("invalid_after_state",))
     if before.crs_complete and not after.crs_complete:
