@@ -1,6 +1,5 @@
 # Project directories (not part of SEHD v6 core)
 _server_latest/
-验证文件/
 .workbuddy/
 .trae/
 tmp_external/

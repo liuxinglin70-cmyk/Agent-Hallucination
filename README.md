@@ -44,8 +44,57 @@ development probes, evaluation gates) are deliberately not part of the
 framework code.  They belong under `experiments/protocols/` and may be
 re-added as a layer on top of the standalone detector and evolution modules.
 
+## Documentation Map
+
+```text
+docs/
+├── design/                    # framework design
+│   └── TECHNICAL_DESIGN.md    # detector + evolution architecture
+├── technical/                 # technical documentation
+│   ├── DETECTION_EVOLUTION_FLOW.md   # detection-to-evolution data flow
+│   └── EXPERIMENT_FRAMEWORK_GUIDE.md # framework guide (historical)
+├── papers/                    # reference paper index (README tracked)
+│   └── raw/                   # paper files (local-only, git-ignored)
+├── notes/                     # personal notes (local-only)
+├── visualization/             # diagrams and visualizations (local-only)
+└── superpowers/               # historical planning records
+```
+
+Module-level documentation lives beside the code:
+
+- `src/sehd_v6/detector/README.md` — standalone detector API
+- `src/sehd_v6/evolution/README.md` — standalone self-evolution API
+- `datasets/README.md` — raw dataset layout and record format
+- `experiments/README.md` — experiment workspace guide
+- `experiments/protocols/README.md` — protocol/benchmark workspace guide
+
+## Development Guidelines
+
+The detector (`src/sehd_v6/detector`) and the self-evolution framework
+(`src/sehd_v6/evolution`) are the two stable framework modules.  Subsequent
+experiments may iterate and optimize the detector and evolution code, but must
+follow these rules:
+
+1. **No experiment protocols or boundary splitting inside the framework.**
+   Partitions, manifests, execution authorization, development probes,
+   evaluation gates and dataset splits must not be added to
+   `src/sehd_v6/detector`, `src/sehd_v6/evolution` or `src/sehd_v6/core`.
+2. **Experiments live in `experiments/`.**  Protocol definitions, benchmark
+   scripts and run orchestration are written under
+   `experiments/protocols/` (see its README) and consume the framework
+   modules through their public APIs:
+   - `detect_record()` / `load_detector_config()` from `src/sehd_v6.detector`
+   - `run_evolution()` / `load_records()` from `src/sehd_v6.evolution`
+3. **Keep the framework callable standalone.**  The framework must remain
+   runnable with a raw trajectory as the only input; any experiment layer must
+   be an optional consumer, never a required dependency.
+4. **Shared improvements belong in the framework; experiment-specific
+   behavior belongs in the experiment.**  If an experiment needs a new
+   framework capability, add it as a generic API in the framework and
+   implement the experiment-specific policy in `experiments/protocols/`.
+
 Large local workspaces that stay in place and are git-ignored: `tmp*`
-directories, `_server_latest/` and `验证文件/`.
+directories and `_server_latest/`.
 
 ## Core Methodology
 
