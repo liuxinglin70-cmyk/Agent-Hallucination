@@ -1,16 +1,11 @@
 # Project directories (not part of SEHD v6 core)
 _server_latest/
 验证文件/
-archive/
-Paper/
-Paper_translated/
 .workbuddy/
-过程文档/
 .trae/
 tmp_external/
 tmp_pull_*/
 tmp_upload_*/
-架构可视化/
 *.txt
 
 # Experiment workspace (local-only)
@@ -18,6 +13,13 @@ experiments/progress/
 experiments/results/
 experiments/logs/
 experiments/*.py
+experiments/protocols/*
+!experiments/protocols/README.md
+
+# Documentation workspace (local-only)
+docs/papers/raw/
+docs/notes/
+docs/visualization/
 
 # Raw datasets (large, local-only)
 datasets/raw/

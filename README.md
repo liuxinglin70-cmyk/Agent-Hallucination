@@ -27,20 +27,25 @@ SEHD v6
 ├── docs/                 # ② documentation: design, technical, papers
 │   ├── design/
 │   ├── technical/
-│   └── papers/
+│   ├── papers/           #   paper index (raw paper files local-only)
+│   ├── notes/            #   local-only notes
+│   └── visualization/    #   local-only diagrams
 ├── datasets/             # ③ raw datasets (local-only, git-ignored)
-├── experiments/          # ④ experiment plans / progress / results / logs
-│   ├── plans/
-│   ├── progress/         #   local-only
-│   ├── results/          #   local-only
-│   └── logs/             #   local-only
-└── tests/
+└── experiments/          # ④ experiment workspace
+    ├── plans/            #   experiment plans (tracked)
+    ├── protocols/        #   experiment protocol + benchmark workspace
+    ├── progress/         #   local-only
+    ├── results/          #   local-only
+    └── logs/             #   local-only
 ```
 
 Experiment protocols (partitioning, manifests, execution authorization,
 development probes, evaluation gates) are deliberately not part of the
-framework code.  They belong under `experiments/` and may be re-added as a
-layer on top of the standalone detector and evolution modules.
+framework code.  They belong under `experiments/protocols/` and may be
+re-added as a layer on top of the standalone detector and evolution modules.
+
+Large local workspaces that stay in place and are git-ignored: `tmp*`
+directories, `_server_latest/` and `验证文件/`.
 
 ## Core Methodology
 
