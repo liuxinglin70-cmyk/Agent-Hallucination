@@ -6,12 +6,23 @@ Paper/
 Paper_translated/
 .workbuddy/
 过程文档/
-docs/
+.trae/
 tmp_external/
 tmp_pull_*/
 tmp_upload_*/
 架构可视化/
 *.txt
+
+# Experiment workspace (local-only)
+experiments/progress/
+experiments/results/
+experiments/logs/
+experiments/*.py
+
+# Raw datasets (large, local-only)
+datasets/raw/
+datasets/**/*.json
+datasets/**/*.jsonl
 
 # Python
 __pycache__/
@@ -91,5 +102,3 @@ logs/
 tmp/
 temp/
 *.tmp
-
-# Legacy experiment scripts (migrated to core/)

@@ -1,20 +1,18 @@
-"""Run PACA-TCL v1 on opened P0 using frozen PACA candidate-census caches.
+"""PACA-TCL provider transport, census helpers and label-free v1 runner.
 
-This experiment isolates the new responsibility/boundary/propagation layers.
-PACA candidate caches contain no labels and are converted back to addressable
-events from the complete raw trajectory.  P0 remains diagnostic only.
+This module is part of the standalone detector framework.  Batch experiment
+entry points (preflight / P0 manifest runs) have been removed; experiment
+protocols live outside this package.
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import os
 import threading
 import time
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 from urllib import error as urlerror
@@ -22,11 +20,9 @@ from urllib import request as urlrequest
 
 from ...utils import ocse_packet as packet
 from . import contract_v1 as contract
-from ...utils.preflight import discover_records
 from ...env_loader import load_local_env
 from ...provider_routes import (
     provider_thinking_control,
-    resolve_config_provider_routes,
     resolve_provider_credential,
     resolve_provider_route,
 )
@@ -137,13 +133,6 @@ def parse_gold_steps(value: Any) -> set[int]:
     if isinstance(value, int):
         return {value}
     return {int(token) for token in __import__("re").findall(r"\d+", str(value))}
-
-
-def p0_case_ids(manifest: dict[str, Any]) -> list[str]:
-    rows = (manifest.get("roles") or {}).get("P0_opened_diagnostic")
-    if not isinstance(rows, list) or len(rows) != 64:
-        raise ValueError("P0 role must contain exactly 64 rows")
-    return sorted(str(row["case_id"]) for row in rows)
 
 
 def _event_for_source_step(built: dict[str, Any], step: Any) -> str | None:
@@ -718,123 +707,3 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "layer_state_counts": {key: dict(value) for key, value in layer_states.items()},
         "candidate_provider_fallback_count": sum(int((row.get("candidate_provider") or {}).get("source") == "provider_fallback") for row in rows),
     }
-
-
-def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    manifest = read_json(manifest_path)
-    records = discover_records(dataset_root)
-    case_ids = p0_case_ids(manifest)
-    counts = Counter()
-    candidate_counts = Counter()
-    failures = []
-    for case_id in case_ids:
-        try:
-            built = packet.build_packet(records[case_id])
-            census, audit = load_paca_census(case_id=case_id, built=built, cache_root=census_root)
-            counts["packet_valid"] += 1
-            counts["cached_census_complete"] += int(bool(census) and audit.get("status") == "complete")
-            counts["fallback_required"] += int(not census or audit.get("status") != "complete")
-            candidate_counts[len(census)] += 1
-            if census:
-                provider_user_prompt(built, census)
-            candidate_provider_user_prompt(built)
-        except Exception as exc:
-            failures.append({"case_ref": private_ref(case_id, "case_"), "error_type": type(exc).__name__, "error": str(exc)[:300]})
-    decision = "pass" if counts["packet_valid"] == 64 and not failures and "candidate_fallback_route" in config else "fail"
-    return {
-        "schema_version": "agenthallu.paca_tcl_preflight.v1",
-        "decision": decision,
-        "case_count": len(case_ids),
-        "counts": dict(counts),
-        "cached_candidate_count_distribution": {str(key): value for key, value in sorted(candidate_counts.items())},
-        "failures": failures,
-        "provider_calls_made": 0,
-        "outer_opened": False,
-    }
-
-
-def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
-        raise RuntimeError("PACA-TCL P0 execution is not authorized")
-    model_route = resolve_provider_route(
-        config["model_route"], purpose="detector", route_name="model_route"
-    )
-    resolve_provider_credential(model_route, purpose="detector")
-    manifest = read_json(manifest_path)
-    records = discover_records(dataset_root)
-    case_ids = p0_case_ids(manifest)
-    workers = int(config.get("max_parallel_cases", 4))
-    by_case: dict[str, dict[str, Any]] = {}
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = {
-            executor.submit(
-                adjudicate_case,
-                case_id=case_id,
-                record=records[case_id],
-                config=config,
-                output_dir=output_dir,
-                census_root=census_root,
-            ): case_id
-            for case_id in case_ids
-        }
-        for future in as_completed(futures):
-            case_id = futures[future]
-            by_case[case_id] = future.result()
-            write_jsonl(output_dir / "predictions.jsonl", [by_case[item] for item in case_ids if item in by_case])
-    rows = [by_case[item] for item in case_ids]
-    report = {
-        "schema_version": "agenthallu.paca_tcl_p0.v1",
-        "experiment_id": config["experiment_id"],
-        "effectiveness_scope": "opened_P0_diagnostic_only_not_OOF_or_outer",
-        "outer_opened": False,
-        "model_route": {"endpoint": config["model_route"]["endpoint"], "model": config["model_route"]["model"], "temperature": 0},
-        "candidate_source": "frozen_PACA_stage1_provider_outputs_without_labels",
-        "metrics": evaluate(rows),
-    }
-    write_json(output_dir / "metrics.json", report)
-    return report
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--dataset-root", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--paca-census-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--preflight-only", action="store_true")
-    args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.preflight_only:
-        report = preflight(
-            config_path=args.config,
-            dataset_root=args.dataset_root,
-            manifest_path=args.manifest,
-            census_root=args.paca_census_root,
-        )
-        write_json(args.output_dir / "preflight.json", report)
-        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-        return
-    lock = args.output_dir / ".paca_tcl.lock"
-    try:
-        with lock.open("x", encoding="utf-8") as handle:
-            handle.write(str(os.getpid()) + "\n")
-    except FileExistsError as exc:
-        raise RuntimeError("output directory is locked") from exc
-    try:
-        report = run(
-            config_path=args.config,
-            dataset_root=args.dataset_root,
-            manifest_path=args.manifest,
-            census_root=args.paca_census_root,
-            output_dir=args.output_dir,
-        )
-    finally:
-        lock.unlink(missing_ok=True)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()

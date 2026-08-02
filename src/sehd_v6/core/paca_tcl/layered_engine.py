@@ -1,36 +1,25 @@
-"""Run the genuinely layered PACA-TCL v2 experiment on opened P0 only."""
+"""Layered PACA-TCL v2 base layer of the standalone detector.
+
+Batch experiment entry points (preflight / P0 manifest runs) have been removed;
+experiment protocols live outside this package.
+"""
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 from ...utils import ocse_packet as packet
 from . import layered_contract as contract
-from ...utils.preflight import discover_records
-from ...provider_routes import (
-    resolve_config_provider_routes,
-    resolve_provider_credential,
-    resolve_provider_route,
-    route_purpose,
-)
 from .basic_runner import (
     _responsible_step,
-    candidate_system_prompt,
     candidate_provider_user_prompt,
+    candidate_system_prompt,
     load_paca_census,
-    p0_case_ids,
     private_ref,
     provider_call,
-    read_json,
     validate_provider_census,
-    write_json,
-    write_jsonl,
 )
 
 
@@ -222,73 +211,3 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "tri_state_counts": dict(states),
         "path_pair_counts": {"|".join(key): value for key, value in path_pairs.items()},
     }
-
-
-def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config, manifest, records = read_json(config_path), read_json(manifest_path), discover_records(dataset_root)
-    case_ids, failures, counts = p0_case_ids(manifest), [], Counter()
-    for case_id in case_ids:
-        try:
-            built = packet.build_packet(records[case_id])
-            census, audit = load_paca_census(case_id=case_id, built=built, cache_root=census_root)
-            _provider_user(built, census=census)
-            counts["packet_valid"] += 1
-            counts["fallback_required"] += int(not census or audit.get("status") != "complete")
-        except Exception as exc:
-            failures.append({"case_ref": private_ref(case_id, "case_"), "error_type": type(exc).__name__, "error": str(exc)[:300]})
-    routes = {"qualification_route", "propagation_route", "boundary_route", "candidate_fallback_route"}
-    decision = "pass" if len(case_ids) == 64 and not failures and routes <= set(config) else "fail"
-    return {"schema_version": "agenthallu.paca_tcl_layered_preflight.v2", "decision": decision, "case_count": len(case_ids), "counts": dict(counts), "failures": failures, "provider_calls_made": 0, "outer_opened": False}
-
-
-def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
-        raise RuntimeError("layered P0 execution is not authorized")
-    for name in ("qualification_route", "propagation_route", "boundary_route"):
-        route = resolve_provider_route(
-            config[name], purpose=route_purpose(name), route_name=name
-        )
-        resolve_provider_credential(route, purpose=route_purpose(name))
-    manifest, records = read_json(manifest_path), discover_records(dataset_root)
-    case_ids, by_case = p0_case_ids(manifest), {}
-    with ThreadPoolExecutor(max_workers=int(config.get("max_parallel_cases", 4))) as executor:
-        futures = {executor.submit(adjudicate_case, case_id=case_id, record=records[case_id], config=config, output_dir=output_dir, census_root=census_root): case_id for case_id in case_ids}
-        for future in as_completed(futures):
-            by_case[futures[future]] = future.result()
-            write_jsonl(output_dir / "predictions.jsonl", [by_case[key] for key in case_ids if key in by_case])
-    rows = [by_case[key] for key in case_ids]
-    report = {"schema_version": "agenthallu.paca_tcl_layered_p0.v2", "experiment_id": config["experiment_id"], "effectiveness_scope": "opened_P0_diagnostic_only", "outer_opened": False, "metrics": evaluate(rows)}
-    write_json(output_dir / "metrics.json", report)
-    return report
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--dataset-root", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--paca-census-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--preflight-only", action="store_true")
-    args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.preflight_only:
-        report = preflight(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root)
-        write_json(args.output_dir / "preflight.json", report)
-    else:
-        lock = args.output_dir / ".paca_tcl_layered.lock"
-        try:
-            with lock.open("x", encoding="utf-8") as handle:
-                handle.write(str(os.getpid()) + "\n")
-        except FileExistsError as exc:
-            raise RuntimeError("output directory is locked") from exc
-        try:
-            report = run(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root, output_dir=args.output_dir)
-        finally:
-            lock.unlink(missing_ok=True)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()

@@ -21,8 +21,8 @@ def test_dotenv_loader_does_not_override_process_environment(tmp_path, monkeypat
     assert os.environ["QUOTED"] == "value"
 
 
-def test_main_mutation_route_defaults_to_official_and_supports_overrides(monkeypatch):
-    from src.sehd_v6 import main
+def test_evolution_mutation_route_defaults_to_official_and_supports_overrides(monkeypatch):
+    from src.sehd_v6.evolution.runner import default_mutation_route
 
     for key in (
         "SEHD_MUTATION_ENDPOINT",
@@ -32,7 +32,7 @@ def test_main_mutation_route_defaults_to_official_and_supports_overrides(monkeyp
         "SEHD_MUTATION_MAX_TOKENS",
     ):
         monkeypatch.delenv(key, raising=False)
-    default = main._mutation_route_from_env()
+    default = default_mutation_route()
     assert default["endpoint"] == "https://api.deepseek.com"
     assert default["model"] == "deepseek-v4-flash"
     assert default["api_key_environment"] == "DEEPSEEK_API_KEY"
@@ -42,7 +42,7 @@ def test_main_mutation_route_defaults_to_official_and_supports_overrides(monkeyp
     monkeypatch.setenv("SEHD_MUTATION_API_KEY_ENV", "CUSTOM_KEY")
     monkeypatch.setenv("SEHD_MUTATION_TEMPERATURE", "0.1")
     monkeypatch.setenv("SEHD_MUTATION_MAX_TOKENS", "321")
-    override = main._mutation_route_from_env()
+    override = default_mutation_route()
     assert override == {
         "endpoint": "https://proxy.example/v1",
         "model": "DeepSeek-V4-Pro",

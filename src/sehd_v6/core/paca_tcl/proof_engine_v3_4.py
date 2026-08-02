@@ -1,36 +1,20 @@
-"""Run PACA-TCL v3.4 proof court with symmetric appellate subsystem.
+"""PACA-TCL v3.4 proof court with symmetric appellate subsystem (legacy compat).
 
-v3.4 refactors the asymmetric candidate appeal (v3.3) into:
-1. Candidate-local trigger calibrator (replaces broad "appeal all" trigger)
-2. Symmetric appellate advocate (concurrent prosecutor + defender)
-3. Evidence-authority routing (deterministic)
-4. Materiality + commitment guardrails (deterministic)
-5. Deterministic appellate join with typed hard obligations
+Batch experiment entry points (preflight / P0 manifest runs) have been removed;
+experiment protocols live outside this package.
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 from ...utils import ocse_packet as packet
 from . import proof_contract_v3_4 as contract
 from . import layered_engine as v2
-from ...utils.preflight import discover_records
-from ...provider_routes import (
-    resolve_config_provider_routes,
-    resolve_provider_credential,
-    resolve_provider_route,
-    route_purpose,
-)
 from .basic_runner import (
-    _responsible_step, p0_case_ids, provider_call, read_json, validate_provider_census,
-    write_json, write_jsonl,
+    _responsible_step, provider_call, validate_provider_census,
 )
 
 
@@ -909,121 +893,3 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "materiality_defense_hits": materiality_hits_total,
     })
     return metrics
-
-
-def evaluate_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> dict[str, Any]:
-    mappings = {
-        "macro_f1_min": ("macro_f1", ">="),
-        "hallucination_precision_min": ("precision", ">="),
-        "hallucination_recall_min": ("recall", ">="),
-        "clean_fpr_max": ("clean_fpr", "<="),
-        "responsible_step_accuracy_min": ("responsible_step_recall_over_all_gold_positive", ">="),
-        "runtime_valid_rate_min": ("runtime_valid_rate", ">="),
-        "candidate_origin_coverage_min": ("candidate_origin_coverage_on_gold_positive", ">="),
-        "causal_chain_validity_min": ("causal_chain_validity", ">="),
-    }
-    checks = {}
-    for gate_key, (metric_key, operator) in mappings.items():
-        if gate_key not in gate:
-            continue
-        observed, required = float(metrics.get(metric_key) or 0.0), float(gate[gate_key])
-        passed = observed >= required if operator == ">=" else observed <= required
-        checks[gate_key] = {
-            "metric": metric_key, "observed": observed, "operator": operator,
-            "required": required, "passed": passed,
-        }
-    failed = sorted(key for key, value in checks.items() if not value["passed"])
-    return {"decision": "pass" if not failed else "fail", "checks": checks, "failed_checks": failed}
-
-
-def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    base = v2.preflight(config_path=config_path, dataset_root=dataset_root, manifest_path=manifest_path, census_root=census_root)
-    required_routes = {
-        "construct_census_route", "prosecution_route", "defense_route",
-        "appeal_prosecutor_route", "appeal_defender_route",
-    }
-    failures = list(base.get("failures") or [])
-    if not required_routes <= set(config):
-        failures.append({"error": "missing proof routes"})
-    construct_path = Path(str(config.get("hallucination_construct") or ""))
-    if not construct_path.is_absolute():
-        construct_path = config_path.resolve().parents[1] / construct_path
-    try:
-        construct_value = read_json(construct_path)
-        if construct_value.get("status") not in {"canonical_for_PACA_TCL_v3", "canonical_for_PACA_TCL_v3_1"}:
-            failures.append({"error": "hallucination construct is not canonical"})
-    except Exception as exc:
-        failures.append({"error": "hallucination construct unreadable", "error_type": type(exc).__name__})
-    decision = "pass" if base.get("decision") == "pass" and not failures else "fail"
-    return {
-        "schema_version": "agenthallu.paca_tcl_proof_preflight.v3_4", "decision": decision,
-        "case_count": base.get("case_count"), "counts": base.get("counts"), "failures": failures,
-        "provider_calls_made": 0, "outer_opened": False,
-        "construct": config.get("hallucination_construct"),
-    }
-
-
-def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
-        raise RuntimeError("proof P0 execution is not authorized")
-    for name in (
-        "qualification_route", "propagation_route", "boundary_route", "construct_census_route",
-        "prosecution_route", "defense_route", "appeal_prosecutor_route", "appeal_defender_route",
-    ):
-        route = resolve_provider_route(
-            config[name], purpose=route_purpose(name), route_name=name
-        )
-        resolve_provider_credential(route, purpose=route_purpose(name))
-    manifest, records = read_json(manifest_path), discover_records(dataset_root)
-    case_ids, by_case = p0_case_ids(manifest), {}
-    with ThreadPoolExecutor(max_workers=int(config.get("max_parallel_cases", 4))) as executor:
-        futures = {executor.submit(
-            adjudicate_case, case_id=case_id, record=records[case_id],
-            config=config, output_dir=output_dir, census_root=census_root,
-        ): case_id for case_id in case_ids}
-        for future in as_completed(futures):
-            by_case[futures[future]] = future.result()
-            write_jsonl(output_dir / "predictions.jsonl", [by_case[key] for key in case_ids if key in by_case])
-    rows = [by_case[key] for key in case_ids]
-    metrics = evaluate(rows)
-    report = {
-        "schema_version": "agenthallu.paca_tcl_proof_p0.v3_4", "experiment_id": config["experiment_id"],
-        "effectiveness_scope": "opened_P0_diagnostic_only", "outer_opened": False,
-        "hallucination_construct": config["hallucination_construct"], "metrics": metrics,
-        "primary_gate": evaluate_gate(metrics, config.get("primary_p0_gate") or {}),
-    }
-    write_json(output_dir / "metrics.json", report)
-    return report
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--dataset-root", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--paca-census-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--preflight-only", action="store_true")
-    args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.preflight_only:
-        report = preflight(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root)
-        write_json(args.output_dir / "preflight.json", report)
-    else:
-        lock = args.output_dir / ".paca_tcl_proof.lock"
-        try:
-            with lock.open("x", encoding="utf-8") as handle:
-                handle.write(str(os.getpid()) + "\n")
-        except FileExistsError as exc:
-            raise RuntimeError("output directory is locked") from exc
-        try:
-            report = run(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root, output_dir=args.output_dir)
-        finally:
-            lock.unlink(missing_ok=True)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()

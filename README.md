@@ -1,66 +1,46 @@
-# SEHD v6 — Research Prototype for Evidence-routed Skill Evolution
+# SEHD v6 — Hallucination Detector and Self-Evolution Framework
 
-SEHD v6 is a research prototype. It implements a registered execution
-protocol, a mutable strategy/genome layer, and typed telemetry with provenance;
-it is not a production detector or a demonstrated detector improvement.
+SEHD v6 implements a court-style hallucination detector (PACA-TCL v3.5) and a
+self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning).  The
+detector and the evolution loop are standalone modules; experiment protocols,
+data partitioning and evaluation gates live outside the framework code.
 
-For a reader-oriented, end-to-end explanation of the data roles, PACA-TCL
-court stages, BCCSE case evolution, evaluation boundaries and current evidence
-limits, see [EXPERIMENT_FRAMEWORK_GUIDE.md](EXPERIMENT_FRAMEWORK_GUIDE.md).
+For framework design and flow documentation see
+[docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md) and
+[docs/technical/DETECTION_EVOLUTION_FLOW.md](docs/technical/DETECTION_EVOLUTION_FLOW.md).
 
-## Architecture
+## Layout
 
-```
+```text
 SEHD v6
-├── src/sehd_v6/
-│   ├── detector/             # Independent single-trajectory detector API
-│   │   ├── __init__.py
-│   │   ├── __main__.py
-│   │   └── README.md
-│   ├── evolution/            # Independent self-evolution framework API
-│   │   ├── __init__.py
-│   │   ├── runner.py         # run_evolution public API
-│   │   ├── __main__.py
-│   │   └── README.md
-│   ├── core/
-│   │   ├── paca_tcl/      # PACA-TCL v3.5: Court-style causal attribution detector
-│   │   │   ├── contract_v1.py          # Typed causal-ledger contract
-│   │   │   ├── proof_contract_v3.py    # Proof-court contract v3
-│   │   │   ├── proof_contract_v3_4.py  # Proof-court contract v3.4 (extended defenses)
-│   │   │   ├── layered_contract.py     # Genuinely layered contract v2
-│   │   │   ├── proof_contract.py       # Unified proof contract facade
-│   │   │   ├── proof_engine.py         # v3.5 adjudication engine
-│   │   │   ├── proof_engine_v3_4.py    # v3.4 engine (legacy compat)
-│   │   │   ├── layered_engine.py       # Layered adjudication engine
-│   │   │   ├── proof_evaluator.py      # BCCSE evaluator adapter + LLM provider
-│   │   │   ├── skill_integration.py    # Genome→v3.5 provider injection
-│   │   │   └── basic_runner.py         # I/O helpers
-│   │   ├── bccse/        # BCCSE v5: Self-evolution framework
-│   │   │   ├── genome.py              # 8-module NL rule genome + v4 mutation types
-│   │   │   ├── evolution_runner.py    # Per-case online evolution main loop
-│   │   │   ├── reflection_engine.py   # LLM causal process reflection
-│   │   │   ├── fitness.py             # Hierarchical fitness assessment
-│   │   │   ├── safety_gate.py         # Structural constraint gate
-│   │   │   ├── step_attributor.py     # Self-supervised + gold-enhanced attribution
-│   │   │   ├── signal_adapter.py      # CRS/coverage signal extraction
-│   │   │   ├── types.py               # Shared types (EvaluationOutcome, ExperienceRecord, ...)
-│   │   │   ├── mutator.py             # Reflective typed-skill mutator
-│   │   │   ├── promotion_gates.py     # G1 checks, MetricSnapshot, ReplayEvidence
-│   │   │   ├── critic.py              # Independent semantic/leakage/construct critics
-│   │   │   ├── cesv_contract.py       # CESV auxiliary graph contract
-│   │   │   └── curriculum.py          # Evolution curriculum (case ordering)
-│   │   └── htc_tes/      # HTC-TES v3: Hallucination-Typed Conditioning
-│   │       ├── type_classifier.py             # 8-type hallucination classifier
-│   │       ├── type_conditioned_evolution.py  # Type→module routing + editing strategy
-│   │       └── type_aware_fitness.py          # DACR metric + typed experience memory
-│   ├── data/             # Experiment data (partitions, champions, results)
-│   ├── configs/          # JSON schemas and config templates
-│   ├── utils/            # OCSE packet utilities, preflight checks
-│   ├── main.py           # CLI entry: partition / evolve / evaluate
-│   ├── dry_run_5.py      # 5-case dry-run wiring exercise (mock or configured LLM)
-│   └── bccse_v5_data_partition.py  # Stratified data partitioning
-└── .gitignore
+├── src/sehd_v6/          # ① framework code: detector + self-evolution
+│   ├── detector/         #   standalone single-trajectory detector API
+│   ├── evolution/        #   standalone self-evolution framework API
+│   ├── core/             #   engine implementations
+│   │   ├── paca_tcl/     #   PACA-TCL v3.5 court-style detector engine
+│   │   ├── bccse/        #   BCCSE v5 self-evolution core
+│   │   └── htc_tes/      #   HTC-TES v3 type conditioning
+│   ├── configs/          #   detector config template
+│   ├── provider_routes.py
+│   ├── env_loader.py
+│   └── utils/            #   OCSE packet utilities
+├── docs/                 # ② documentation: design, technical, papers
+│   ├── design/
+│   ├── technical/
+│   └── papers/
+├── datasets/             # ③ raw datasets (local-only, git-ignored)
+├── experiments/          # ④ experiment plans / progress / results / logs
+│   ├── plans/
+│   ├── progress/         #   local-only
+│   ├── results/          #   local-only
+│   └── logs/             #   local-only
+└── tests/
 ```
+
+Experiment protocols (partitioning, manifests, execution authorization,
+development probes, evaluation gates) are deliberately not part of the
+framework code.  They belong under `experiments/` and may be re-added as a
+layer on top of the standalone detector and evolution modules.
 
 ## Core Methodology
 
@@ -274,73 +254,42 @@ python -m src.sehd_v6.evolution \
 
 The standalone evolution module does not require partitions, manifests,
 development probes, pre-registered canaries, execution authorization, or a
-census cache. Those are experiment protocols and belong to experiment
-orchestration (`src/sehd_v6/main.py`), not to the framework loop.
+census cache. Those are experiment protocols and live under `experiments/`,
+not in the framework loop.
 
-```bash
-# 5-case dry-run wiring exercise (mock detections; optionally uses configured mutation LLM)
-cd src
-python -m sehd_v6.dry_run_5
+Provider routes are loaded from the repository-root `.env` (or the process
+environment; process values win). No credential value is written to code or
+artifacts. The default mutation route is official DeepSeek V4-Flash:
 
-# Provider routes are loaded from the repository-root `.env` (or the process
-# environment; process values win). No credential value is written to code or
-# artifacts. The default mutation route is official DeepSeek V4-Flash:
-# DEEPSEEK_API_KEY=<secret>
+```text
+DEEPSEEK_API_KEY=<secret>
 # Optional purpose-specific overrides:
-# SEHD_MUTATION_ENDPOINT=https://api.deepseek.com
-# SEHD_MUTATION_MODEL=deepseek-v4-flash
-# SEHD_MUTATION_API_KEY_ENV=DEEPSEEK_API_KEY
-# SEHD_DETECTOR_ENDPOINT=...
-# SEHD_DETECTOR_MODEL=...
-# SEHD_DETECTOR_API_KEY_ENV=...
-# SEHD_JUDGE_ENDPOINT=...
+SEHD_MUTATION_ENDPOINT=https://api.deepseek.com
+SEHD_MUTATION_MODEL=deepseek-v4-flash
+SEHD_MUTATION_API_KEY_ENV=DEEPSEEK_API_KEY
+SEHD_DETECTOR_ENDPOINT=...
+SEHD_DETECTOR_MODEL=...
+SEHD_DETECTOR_API_KEY_ENV=...
+SEHD_JUDGE_ENDPOINT=...
 # Route-level selectors such as SEHD_ROUTE_DEFENSE_MODEL take precedence over
-# purpose-level selectors. Legacy config-file route values remain compatible;
-# a non-official proxy route never silently receives DEEPSEEK_API_KEY.
-
-# Partition into a reusable development pool, a small fixed gold probe inside
-# that pool, and a sealed final holdout. Legacy explicit Outer rows are kept.
-python -m src.sehd_v6.main partition --probe-size 10 --holdout-size 20 --seed 42
-
-# Run diagnostic evolution on a stage-authorized manifest. A manifest containing
-# D cases requires D_execution_authorized=true even though this is not a formal
-# effectiveness evaluation.
-python -m src.sehd_v6.main evolve --size 50 --use-gold \
-  --probe-interval 10 --probe-budget 5
-
-# Continue from an audited champion and prior experience memory
-python -m src.sehd_v6.main evolve --size 50 \
-  --initial-genome <champion_genome.json> \
-  --experience-memory <htc_tes_experience_memory.json>
-
-# Budgeted probe check: directional/rollback evidence, never a generalization claim.
-python -m src.sehd_v6.main evaluate --set probe --genome <path>
-
-# Read-only final-holdout evaluation. `outer` is a compatibility alias. Requires
-# a hash-bound final_holdout_ids.json/outer_set_ids.json plus execution_authorized=true,
-# D_execution_authorized=true and outer_execution_authorized=true.
-python -m src.sehd_v6.main evaluate --set final_holdout --genome <path>
+# purpose-level selectors. A non-official proxy route never silently receives
+# DEEPSEEK_API_KEY.
 ```
 
-Most data can remain in the development pool because source replay, experience
-memory and repeated evolution are development activities; making each old
-validation/test slice permanently forbidden would unnecessarily starve that
-loop. The fixed gold probe is a small, budgeted subset of the development pool:
-it can steer or veto a change, but repeated access means it is not final
-generalization evidence. The disjoint final holdout answers that separate
-question only after development ends.
-
-Final-holdout IDs are never recovered from `case_ref` values or dataset scans. The
-final path reads the supplied genome without mutation and never writes back
-experience or champion state. Code guarantees role isolation and hash binding,
-not secrecy, operator blindness or one-shot custody. Champion eligibility
-therefore also requires `outer_custody_verified=true`, an external governance
-attestation that the role stayed outside development and was opened under the
-final-evaluation policy. The CLI has no durable global use registry.
+Raw datasets belong in `datasets/` (see `datasets/README.md`). Experiment
+plans, progress, results and logs belong in `experiments/`.
 
 ## Public API
 
-Import from `sehd_v6.core` for a unified entry point:
+The stable application-facing imports are `sehd_v6.detector` and
+`sehd_v6.evolution`:
+
+```python
+from sehd_v6.detector import detect_record, project_for_evolution
+from sehd_v6.evolution import run_evolution, SkillGenome, create_baseline_genome
+```
+
+Lower-level imports remain available through `sehd_v6.core`:
 
 ```python
 from sehd_v6.core import (
@@ -359,8 +308,10 @@ from sehd_v6.core import (
 ```
 
 Each sub-package also exposes its own `__init__.py` for granular imports:
-- `sehd_v6.core.bccse` — self-evolution framework
-- `sehd_v6.core.paca_tcl` — registered detector protocol implementation
+- `sehd_v6.detector` — standalone detector API
+- `sehd_v6.evolution` — standalone self-evolution API
+- `sehd_v6.core.bccse` — self-evolution framework core
+- `sehd_v6.core.paca_tcl` — detector engine
 - `sehd_v6.core.htc_tes` — type conditioning layer
 
 ## Key Design Decisions
@@ -376,8 +327,8 @@ Each sub-package also exposes its own `__init__.py` for granular imports:
 ## Module Dependencies
 
 ```
-main.py
-  └── evolution_runner.py
+evolution/runner.py (run_evolution)
+  └── evolution_runner.py (run_online_evolution)
         ├── genome.py (SkillGenome, SkillEdit, apply_edit)
         ├── step_attributor.py (attribute_failure, ErrorType, AttributionSignal)
         ├── reflection_engine.py (build_causal_reflection_prompt)
@@ -388,6 +339,12 @@ main.py
         ├── mutator.py (MutationProvider, AtomicMutation)
         └── htc_tes/ (HallucinationTypeClassifier, TypeConditionedEvolution, TypeAwareFitness)
                 └── type_classifier.py::_normalize_signal() ← accepts AttributionSignal | Mapping
+
+detector/__init__.py (detect_record)
+  └── proof_engine.py (adjudicate_case)
+        ├── layered_engine.py (base layer)
+        ├── proof_contract.py (proof-court contract)
+        └── basic_runner.py (provider transport)
 
 proof_evaluator.py
   ├── proof_engine.py (adjudicate_case, evaluate)
@@ -414,29 +371,18 @@ path (which passes `AttributionSignal` objects) to work without manual
 
 ## Current Evidence Boundaries
 
-- **PACA-TCL v3.5**: research detector implementation with a frozen per-run
-  execution protocol; its strategy can be modified by genome injection.
-- **BCCSE v5**: research evolution machinery. Historical 50-case artifacts do
-  not by themselves establish out-of-sample or Outer-set improvement.
-- **HTC-TES v3**: integrated typed telemetry; a 5-case dry-run exercised the
-  configured path but was not a validation study.
-  - Type telemetry emitted FACTUAL, OMISSION and REASONING labels in the recorded exercise
-  - Type→module routing: evidence_obligation, candidate_trigger, causal_link_test
-  - A configured DeepSeek dry-run completed 5/5 executions; 4 typed cases produced experience records
-  - The dry-run correctly reported 0% effective coverage because no authoritative detector improvement was established
+- **PACA-TCL v3.5**: standalone research detector implementation; its
+  strategy can be modified by genome injection.
+- **BCCSE v5**: standalone research evolution machinery. Historical artifacts
+  do not by themselves establish out-of-sample improvement.
+- **HTC-TES v3**: integrated typed telemetry.
+  - Type telemetry and type→module routing are recorded in evolution results
   - Interface normalization: `_normalize_signal` resolves AttributionSignal/dict mismatch
 
-Formal artifacts report occurrence-first three-state confusion, selective
-accuracy/risk, paired transitions and exact McNemar statistics. A detector
-improvement or champion label is ineligible when changes are abstention-only,
-paired correctness gain is not significant, the deterministic paired
-net-correctness-gain interval is unavailable/non-positive, the result is not
-from the sealed final-holdout/Outer role, or critical provenance is incomplete.
-Probe, validation and test results remain development observations; validation
-and test are optional legacy aliases and need not both exist. The currently
-registered `P0_diagnostic_only` configuration has
-`D_execution_authorized=false`, so it cannot authorize probe or final-holdout
-effectiveness execution.
+Experiment protocols (partitions, probes, final-holdout roles, authorization
+flags) are intentionally removed from the framework code. They can be re-added
+as a layer under `experiments/` on top of the standalone detector and
+evolution modules.
 
 ## License
 
