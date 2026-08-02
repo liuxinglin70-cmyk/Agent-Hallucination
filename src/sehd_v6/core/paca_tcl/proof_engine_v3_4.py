@@ -371,7 +371,6 @@ def _proof_user(built: dict[str, Any], base: dict[str, Any]) -> str:
     neutral = {
         "required_origin_event_ids": _required_origins(base),
         "required_candidates": _required_candidates(base),
-        "broad_construct_candidates": base.get("census") or [],
         "semantic_findings": base.get("qualifications") or [],
         "causal_findings": base.get("propagations") or [],
         "case_boundary_finding": {

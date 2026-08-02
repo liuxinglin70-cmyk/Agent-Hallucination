@@ -43,20 +43,28 @@ load_local_env()
 #
 # 全局缓存不依赖 output_dir，所有 output_dir 共享同一份缓存。
 # 原子写入防止并发线程写冲突。
+#
+# v3.5.2: 缓存是 opt-in。只有设置 PACA_GLOBAL_CACHE_ROOT（例如
+# experiments/cache/provider）才启用；未设置时不做任何缓存调用，
+# 也不再依赖任何固定系统路径（此前默认写死的远端训练机路径在
+# 本机解析为无法写入的盘根目录，缓存被静默禁用）。
 # ============================================================
 
-_GLOBAL_CACHE_ROOT = Path(
-    os.environ.get(
-        "PACA_GLOBAL_CACHE_ROOT",
-        "/root/autodl-tmp/agent_hallucination/global_provider_cache",
-    )
-)
 _global_cache_write_lock = threading.Lock()
 
 
-def _global_cache_path(request_hash: str) -> Path:
+def _global_cache_root() -> Path | None:
+    """Global provider cache root, or None when the cache is disabled."""
+    raw = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
+    return Path(raw.strip()) if raw and raw.strip() else None
+
+
+def _global_cache_path(request_hash: str) -> Path | None:
     """全局缓存文件路径（两级目录分散，避免单目录文件过多）"""
-    return _GLOBAL_CACHE_ROOT / request_hash[:2] / f"{request_hash}.json"
+    root = _global_cache_root()
+    if root is None:
+        return None
+    return root / request_hash[:2] / f"{request_hash}.json"
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -294,8 +302,11 @@ def provider_call_with_schema(
         "model": route["model"],
         "temperature": float(route.get("temperature", 0)),
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "response_format": {"type": "json_object"},
     }
+    # DeepSeek V4 Pro rejects response_format even though it still returns JSON
+    # when the system prompt requests it.
+    if str(route["model"]).lower() != "deepseek-v4-pro":
+        payload["response_format"] = {"type": "json_object"}
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
     thinking = provider_thinking_control(route, purpose=purpose)
@@ -308,11 +319,16 @@ def provider_call_with_schema(
 
     # v3.5.1: 全局缓存查找（不依赖 cache_dir，所有 output_dir 共享）
     global_target = _global_cache_path(request_hash)
-    if global_target.is_file():
+    if global_target is not None and global_target.is_file():
         try:
             cached = read_json(global_target)
             if cached.get("request_hash") == request_hash:
-                return cached["parsed"], {
+                parsed = cached.get("parsed")
+                if not isinstance(parsed, dict):
+                    raise ValueError("cached provider response is not an object")
+                if require_candidates and not isinstance(parsed.get("candidates"), list):
+                    raise ValueError("cached provider ledger schema invalid")
+                return parsed, {
                     "cache_hit": True,
                     "request_hash": request_hash,
                     "usage": cached.get("usage") or {},
@@ -380,10 +396,11 @@ def provider_call_with_schema(
                 "contains_credentials": False,
             }
             # v3.5.1: 写入全局缓存（原子写，防止并发冲突）
-            try:
-                _atomic_write_json(global_target, cached)
-            except Exception:
-                pass  # 写缓存失败不影响主流程
+            if global_target is not None:
+                try:
+                    _atomic_write_json(global_target, cached)
+                except Exception:
+                    pass  # 写缓存失败不影响主流程
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,

@@ -12,6 +12,7 @@ from ..core.paca_tcl.detector import (
     validate_record,
 )
 from ..core.paca_tcl.evolution_contract import EvolutionDetection, project_for_evolution
+from .batch import label_free_record, load_batch_records, run_batch
 
 __all__ = [
     "detect_record",
@@ -20,4 +21,7 @@ __all__ = [
     "validate_record",
     "EvolutionDetection",
     "project_for_evolution",
+    "label_free_record",
+    "load_batch_records",
+    "run_batch",
 ]

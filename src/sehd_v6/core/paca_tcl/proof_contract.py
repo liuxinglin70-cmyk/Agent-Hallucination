@@ -76,20 +76,46 @@ def validate_focused_prosecution(
     """
     base_audit = validate_error_certificate(row, packet, candidate_origins)
 
-    # Score causal chain completeness (for quarantine feedback)
+    # Score causal chain completeness (for quarantine feedback).  The focused
+    # prosecution prompt mandates the scaffold markers NORM:/ORIGIN:/CONTROL:/
+    # PROPAGATION:/IMPACT:/COUNTERFACTUAL: in the rationale; marker presence is
+    # the primary signal.  When a provider ignores the scaffold entirely,
+    # fall back to the keyword signals so the score stays non-degenerate.
     rationale = str(row.get("rationale") or "")
+    rationale_upper = rationale.upper()
     chain_scores = {}
-    chain_signals = {
-        "norm_identification": ["norm", "obligation", "requirement", "instruction", "contract", "rule"],
-        "origin_event": ["origin", "event", "step", "action", "assertion", "omission"],
-        "agent_control": ["agent", "controlled", "adopted", "generated", "decided", "chose"],
-        "propagation_path": ["propagat", "downstream", "subsequent", "leads to", "causes", "results in"],
-        "impact_on_result": ["impact", "result", "answer", "output", "incorrect", "wrong"],
-        "counterfactual_test": ["counterfactual", "if corrected", "would fix", "sufficient", "necessary"],
+    markers = {
+        "norm_identification": "NORM:",
+        "origin_event": "ORIGIN:",
+        "agent_control": "CONTROL:",
+        "propagation_path": "PROPAGATION:",
+        "impact_on_result": "IMPACT:",
+        "counterfactual_test": "COUNTERFACTUAL:",
     }
-    rationale_lower = rationale.lower()
-    for stage, signals in chain_signals.items():
-        chain_scores[stage] = any(signal in rationale_lower for signal in signals)
+    if all(marker in rationale_upper for marker in markers.values()):
+        # Every mandated scaffold marker is present; a stage counts only when
+        # its section carries substantive content (not just an empty header).
+        marker_order = [(stage, marker) for stage, marker in markers.items()]
+        for index, (stage, marker) in enumerate(marker_order):
+            start = rationale_upper.find(marker) + len(marker)
+            end = (
+                rationale_upper.find(marker_order[index + 1][1])
+                if index + 1 < len(marker_order) else len(rationale_upper)
+            )
+            section = rationale[start:end].strip("| :\n\t")
+            chain_scores[stage] = len(section) >= 20
+    else:
+        chain_signals = {
+            "norm_identification": ["norm", "obligation", "requirement", "instruction", "contract", "rule"],
+            "origin_event": ["origin", "event", "step", "action", "assertion", "omission"],
+            "agent_control": ["agent", "controlled", "adopted", "generated", "decided", "chose"],
+            "propagation_path": ["propagat", "downstream", "subsequent", "leads to", "causes", "results in"],
+            "impact_on_result": ["impact", "result", "answer", "output", "incorrect", "wrong"],
+            "counterfactual_test": ["counterfactual", "if corrected", "would fix", "sufficient", "necessary"],
+        }
+        rationale_lower = rationale.lower()
+        for stage, signals in chain_signals.items():
+            chain_scores[stage] = any(signal in rationale_lower for signal in signals)
 
     completeness = sum(chain_scores.values()) / len(chain_scores)
     base_audit["causal_chain_completeness"] = completeness
@@ -145,6 +171,7 @@ def build_quarantine_feedback(audit: dict[str, Any]) -> str:
 def apply_consensus_gate(
     *, surviving_errors: list[dict[str, Any]], initial_prosecution: dict[str, Any] | None,
     appeal_source_marker: str = "appeal_",
+    initial_supported_candidate_ids: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Apply the consensus gate to filter appeal-sourced positives.
 
@@ -168,11 +195,12 @@ def apply_consensus_gate(
         )
 
     # Build set of candidate_ids that initial prosecution independently supports
-    initial_supported: set[str] = set()
-    for cert in (initial_prosecution.get("candidates") or []):
-        causal_status = str(cert.get("benchmark_causal_status") or "")
-        if causal_status in {"causes_incorrect_result", "propagates_to_incorrect_result"}:
-            initial_supported.add(str(cert.get("source_candidate_id") or ""))
+    initial_supported = set(initial_supported_candidate_ids or ())
+    if initial_supported_candidate_ids is None:
+        for cert in (initial_prosecution.get("candidates") or []):
+            causal_status = str(cert.get("benchmark_causal_status") or "")
+            if causal_status in {"causes_incorrect_result", "propagates_to_incorrect_result"}:
+                initial_supported.add(str(cert.get("source_candidate_id") or ""))
 
     passed = []
     blocked = []
@@ -439,6 +467,11 @@ def adjudicate_proof_court(
         surviving, consensus_blocked = apply_consensus_gate(
             surviving_errors=surviving,
             initial_prosecution={"candidates": admissible_initial},
+            initial_supported_candidate_ids={
+                str(row.get("source_candidate_id") or "")
+                for row in surviving
+                if str(row.get("certificate_id") or "").startswith("initial_")
+            },
         )
 
     # Truth adjudication precedes ledger append: only causal certificates that
@@ -456,6 +489,7 @@ def adjudicate_proof_court(
     positive_candidates = {str(row["source_candidate_id"]) for row in surviving}
 
     coverage_complete = p_coverage == d_coverage == "complete" and not invalid_count
+    candidate_terminal = set(required) <= clean_covered | auxiliary_candidates | positive_candidates
     if surviving:
         # v3.5 H3: TWO-PHASE LOCALIZATION
         winner = select_earliest_origin_counterfactual(
@@ -463,7 +497,7 @@ def adjudicate_proof_court(
         )
         state, responsible = "verified_error", str(winner["origin_event_id"])
     else:
-        if coverage_complete and set(required) <= clean_covered | auxiliary_candidates:
+        if coverage_complete and candidate_terminal:
             state, responsible = "verified_clean", None
         elif coverage_complete and not required and not valid_errors:
             state, responsible = "verified_clean", None

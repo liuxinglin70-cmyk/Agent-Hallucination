@@ -34,22 +34,34 @@ REQUIRED_ROUTES = (
     "appeal_prosecutor_route",
     "appeal_defender_route",
 )
-FORBIDDEN_INPUT_FIELDS = frozenset({
-    "gold_label",
-    "gold_steps",
-    "is_hallucination",
-    "hallucination_step",
-    "hallucination_reason",
-    "outer_feedback",
-})
+DETECTOR_SCHEMA_VERSION = "agenthallu.paca_tcl_detector_config.v3_5"
+FORBIDDEN_INPUT_FIELDS = ocse_packet.EVALUATOR_ONLY_FIELDS
 FORBIDDEN_OUTPUT_FIELDS = FORBIDDEN_INPUT_FIELDS
+
+
+def _forbidden_field_hits(value: Any) -> set[str]:
+    """Find evaluator-only keys at any detector boundary depth."""
+    if isinstance(value, Mapping):
+        hits = {
+            str(key) for key in value
+            if str(key) in FORBIDDEN_INPUT_FIELDS
+        }
+        for nested in value.values():
+            hits.update(_forbidden_field_hits(nested))
+        return hits
+    if isinstance(value, (list, tuple)):
+        hits: set[str] = set()
+        for nested in value:
+            hits.update(_forbidden_field_hits(nested))
+        return hits
+    return set()
 
 
 def validate_record(record: dict[str, Any]) -> None:
     """Validate one label-free raw trajectory before any provider call."""
     if not isinstance(record, dict):
         raise TypeError("record must be an object")
-    leaked = sorted(FORBIDDEN_INPUT_FIELDS.intersection(record))
+    leaked = sorted(_forbidden_field_hits(record))
     if leaked:
         raise ValueError("detector input must be label-free: " + ", ".join(leaked))
     ocse_packet.build_packet(record)
@@ -63,14 +75,41 @@ def resolve_detector_config(
     Credential validation is intentionally separate from config loading so
     offline tests and provider adapters can construct the detector first.
     """
+    schema_version = str(config.get("schema_version") or "")
+    if schema_version and schema_version != DETECTOR_SCHEMA_VERSION:
+        raise ValueError(f"unsupported detector config schema: {schema_version}")
     resolved = resolve_config_provider_routes(dict(config), purpose="detector")
     missing = [name for name in REQUIRED_ROUTES if not isinstance(resolved.get(name), dict)]
     if missing:
         raise ValueError("detector config missing routes: " + ", ".join(missing))
+    try:
+        max_parallel = int(resolved.get("max_focused_parallel", 4))
+        focused_retries = int(resolved.get("focused_prosecution_retries", 2))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("detector concurrency and retry settings must be integers") from exc
+    if max_parallel < 1:
+        raise ValueError("max_focused_parallel must be at least 1")
+    if focused_retries < 0:
+        raise ValueError("focused_prosecution_retries must be non-negative")
+    resolved["max_focused_parallel"] = max_parallel
+    resolved["focused_prosecution_retries"] = focused_retries
+    route_names = list(REQUIRED_ROUTES)
+    if isinstance(resolved.get("counterfactual_route"), dict):
+        route_names.append("counterfactual_route")
+    for name in route_names:
+        route = resolved[name]
+        for field in ("endpoint", "model", "api_key_environment"):
+            if not str(route.get(field) or "").strip():
+                raise ValueError(f"detector route {name} missing {field}")
+        for field in ("max_tokens", "timeout_seconds", "total_timeout_seconds"):
+            if route.get(field) is not None and int(route[field]) <= 0:
+                raise ValueError(f"detector route {name} requires positive {field}")
+        if route.get("transport_retries") is not None and int(route["transport_retries"]) < 0:
+            raise ValueError(f"detector route {name} requires non-negative transport_retries")
     resolved["detector_mode"] = "standalone"
     if require_credentials:
         from ...provider_routes import resolve_provider_credential, route_purpose
-        for name in REQUIRED_ROUTES:
+        for name in route_names:
             resolve_provider_credential(resolved[name], purpose=route_purpose(name))
     return resolved
 
@@ -105,27 +144,68 @@ def detect_record(
             )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
-    leaked = sorted(FORBIDDEN_OUTPUT_FIELDS.intersection(result))
+    leaked = sorted(_forbidden_field_hits(result))
     if leaked:
         raise RuntimeError("detector output contains evaluation fields: " + ", ".join(leaked))
-    if result.get("runtime_valid") is not True:
+    if (
+        result.get("runtime_valid") is not True
+        or result.get("decision_authority") != "authoritative"
+    ):
+        # Fail closed: an invalid run must not carry a decisive prediction.
+        # The occurrence ledger is append-only evidence and is preserved, but
+        # every top-level decisive field is reset so standalone consumers of
+        # prediction.json cannot read a stale verdict off an invalid run.
         result["state"] = "unresolved"
         result["decision_authority"] = "invalid"
+        result["incident_state"] = "unresolved"
+        result["responsible_event_id"] = None
+        result["responsible_step"] = None
+        result["impact_status"] = None
+        result["impact_kind"] = None
+        result["wide_construct_state"] = "unresolved"
+        result["occurrence_state"] = "unresolved"
+        result["incident_occurred"] = None
+        result["occurrence_responsible_event_id"] = None
+        result["occurrence_responsible_step"] = None
+        result["occurrence_impact_status"] = None
+        result["occurrence_impact_kind"] = None
+        result["occurrence_recovery_state"] = None
     return result
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--record", type=Path, required=True, help="JSON trajectory record")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--record", type=Path, help="one JSON trajectory record")
+    source.add_argument(
+        "--records", type=Path,
+        help="JSON/JSONL records or directory of trajectory JSON files",
+    )
     parser.add_argument("--case-id", default="case")
     parser.add_argument("--output-dir", type=Path, default=Path("detector_output"))
+    parser.add_argument("--max-parallel", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--no-resume", action="store_true")
     parser.add_argument(
         "--census-root", type=Path, default=None,
         help="optional precomputed census cache; provider census is used when omitted",
     )
     args = parser.parse_args()
     config = load_detector_config(args.config)
+    if args.records is not None:
+        from ...detector.batch import load_batch_records, run_batch
+        records = load_batch_records(args.records)
+        if args.limit is not None:
+            if args.limit < 1:
+                parser.error("--limit must be at least 1")
+            records = dict(list(records.items())[:args.limit])
+        summary = run_batch(
+            records=records, config=config, output_dir=args.output_dir,
+            max_parallel=args.max_parallel, resume=not args.no_resume,
+        )
+        print(args.output_dir / "summary.json")
+        return 0 if summary["failed_case_count"] == 0 else 2
     record = read_json(args.record)
     result = detect_record(
         record=record, config=config, case_id=args.case_id,

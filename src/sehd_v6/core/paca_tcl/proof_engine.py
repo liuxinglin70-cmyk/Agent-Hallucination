@@ -197,7 +197,7 @@ def _focused_prosecution_retry_user(
 
 def _run_focused_prosecution_for_candidate(
     *, candidate: dict[str, Any], built: dict[str, Any], base: dict[str, Any],
-    config: dict[str, Any], output_dir: Path, max_retries: int = 2,
+    config: dict[str, Any], output_dir: Path, max_retries: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Run focused prosecution for a single candidate with iterative refinement.
 
@@ -208,6 +208,8 @@ def _run_focused_prosecution_for_candidate(
     cache_dir = output_dir / "focused_prosecution_cache" / candidate_id
     all_audits: list[dict[str, Any]] = []
     provider_meta: dict[str, Any] = {}
+    if max_retries is None:
+        max_retries = max(0, int(config.get("focused_prosecution_retries", 2)))
 
     # Round 1: initial focused prosecution
     user = _focused_prosecution_user(built=built, candidate=candidate, base=base)
@@ -246,15 +248,19 @@ def _run_focused_prosecution_for_candidate(
     candidate_origins = {candidate_id: str(candidate.get("origin_hypothesis_event_id") or "")}
     for cert in certificates:
         audit = contract.validate_focused_prosecution(cert, built, candidate_origins)
+        audit["source_candidate_id"] = candidate_id
         all_audits.append(audit)
 
-    # Check if any certificate passed
+    # A mixed valid/quarantined response leaves part of the provider's claimed
+    # proof unresolved. Retry the whole candidate instead of silently dropping
+    # the invalid claim and declaring complete coverage.
     passed_certs = [
         cert for cert, audit in zip(certificates, all_audits)
         if audit["decision"] == "pass"
     ]
-    if passed_certs:
+    if passed_certs and len(passed_certs) == len(certificates):
         return passed_certs, all_audits, provider_meta
+    provider_meta["all_quarantined"] = True  # round 1 produced certs, none valid
 
     # All quarantined — iterative refinement loop
     for retry_round in range(1, max_retries + 1):
@@ -295,25 +301,28 @@ def _run_focused_prosecution_for_candidate(
             }
             break
         if not certificates:
+            # The provider retracted after quarantine feedback; this is an
+            # explicit no-error decision, not a quarantined certificate.
+            provider_meta.pop("all_quarantined", None)
             break
 
         for cert in certificates:
             audit = contract.validate_focused_prosecution(cert, built, candidate_origins)
+            audit["source_candidate_id"] = candidate_id
             all_audits.append(audit)
 
         passed_certs = [
             cert for cert, audit in zip(certificates, all_audits[-len(certificates):])
             if audit["decision"] == "pass"
         ]
-        if passed_certs:
+        if passed_certs and len(passed_certs) == len(certificates):
+            provider_meta.pop("all_quarantined", None)
             return passed_certs, all_audits, provider_meta
+        provider_meta["all_quarantined"] = True
 
-    # All retries exhausted — return whatever we have (likely empty)
-    final_passed = [
-        cert for cert, audit in zip(certificates, all_audits[-len(certificates):] if certificates else [])
-        if audit["decision"] == "pass"
-    ]
-    return final_passed, all_audits, provider_meta
+    # All retries exhausted: only a quarantine-only round can reach this point
+    # with the flag set; any explicit no-error retraction cleared it above.
+    return [], all_audits, provider_meta
 
 
 def _run_focused_prosecution(
@@ -354,7 +363,15 @@ def _run_focused_prosecution(
             except Exception as exc:
                 provider_metas[candidate_id] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
 
-    # Renumber certificate IDs for consistency
+    all_certificates.sort(key=lambda cert: (
+        str(cert.get("source_candidate_id") or ""),
+        str(cert.get("origin_event_id") or ""),
+        str(cert.get("breach_type") or ""),
+        str(cert.get("impact_kind") or ""),
+        str(cert.get("certificate_id") or ""),
+    ))
+    certificate_overflow = len(all_certificates) > 32
+    # Renumber certificate IDs only after deterministic ordering.
     for idx, cert in enumerate(all_certificates, 1):
         cert["certificate_id"] = f"focused_error_{idx:03d}"
 
@@ -366,19 +383,32 @@ def _run_focused_prosecution(
     # FIX: track attempted candidates (all submitted to provider) AND errored candidates
     # (provider crashed). LLM-empty counts as attempted-success → can contribute to
     # "complete". LLM-crash counts as attempted-error → forces "incomplete" (fail-closed).
+    #
+    # v3.5.2 fix: a candidate whose certificates were all QUARANTINED (produced but
+    # structurally invalid after retries) is neither an explicit no-error nor a crash:
+    # it leaves an open structural concern. It must force "incomplete" coverage
+    # (fail-closed) and remain appealable via the calibrated trigger.
     all_candidate_ids = {str(c.get("candidate_id") or "") for c in candidates}
-    attempted_candidates = set(all_candidate_ids)  # all candidates submitted to provider
     errored_candidates = {
         str(cid) for cid, meta in (provider_metas or {}).items()
         if meta and (any(k.endswith("_error") for k in meta) or "error_type" in (meta or {}))
     }
-    successful_candidates = attempted_candidates - errored_candidates
+    quarantined_candidates = {
+        str(cid) for cid, meta in (provider_metas or {}).items()
+        if meta and meta.get("all_quarantined")
+    }
+    successful_candidates = all_candidate_ids - errored_candidates - quarantined_candidates
     if errored_candidates:
         # At least one provider call crashed → fail-closed (do not claim complete coverage)
+        coverage = "incomplete"
+    elif quarantined_candidates:
+        # Quarantined-only candidates leave an open structural concern → fail-closed
         coverage = "incomplete"
     # FIX (D5): 集合比较应为相等（==）而非超集（>=）；此处语义是
     # “所有候选均成功”，successful 是 attempted 的子集，>= 仅在相等时
     # 成立但表达意图错误且易误导维护。
+    elif certificate_overflow:
+        coverage = "incomplete"
     elif successful_candidates == all_candidate_ids:
         # All candidates were submitted and the LLM returned a result (empty = no error)
         coverage = "complete"
@@ -398,11 +428,14 @@ def _run_focused_prosecution(
 def _appeal_trigger_calibrator_v35(
     *, base: dict[str, Any], proof: dict[str, Any], prosecution: dict[str, Any],
     defense: dict[str, Any], built: dict[str, Any],
+    focused_prosecution_metas: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """v3.5 trigger calibrator: ONLY priority 0-1 triggers pass.
 
     Priority 0 (strongest):
-    - quarantined error certificate
+    - quarantined error certificate (focused prosecution returned certificates
+      but every round was structurally invalid, v3.5.2: reported through
+      ``focused_prosecution_metas``)
     - quarantined defense certificate
     - base-v2 verified_error origin
 
@@ -427,6 +460,13 @@ def _appeal_trigger_calibrator_v35(
         if key in by_id and priority <= 1:  # v3.5: ONLY priority 0-1
             priorities[key] = min(priority, priorities.get(key, priority))
 
+    # Priority 0: quarantined focused-prosecution certificates.  The merged
+    # prosecution only contains validated certificates, so the quarantine
+    # signal must come from the per-candidate provider metadata.
+    for candidate_id, meta in (focused_prosecution_metas or {}).items():
+        if meta and meta.get("all_quarantined"):
+            mark(candidate_id, 0)
+
     # Priority 0: quarantined error certificates
     errors = (prosecution or {}).get("candidates") or []
     for error, audit in zip(errors, proof.get("error_audits") or []):
@@ -442,16 +482,9 @@ def _appeal_trigger_calibrator_v35(
         elif item.get("defense_type") == "insufficient_evidence":
             mark(item.get("target_candidate_id"), 1)
 
-    # Priority 0: base-v2 responsible event is a candidate origin
-    base_origin = str((base.get("adjudication") or {}).get("responsible_event_id") or "")
-    if base_origin:
-        for candidate_id, row in by_id.items():
-            if str(row.get("origin_hypothesis_event_id") or "") == base_origin:
-                mark(candidate_id, 0)
-
-    # v3.5: DELETED priority 2 (earliest-origin conflict, coverage hole)
-    # v3.5: DELETED priority 3 (evidence-authority mismatch)
-    # These were the primary drivers of over-prosecution in v3.4.
+    # A base-layer responsible event is diagnostic context, not by itself an
+    # appeal trigger. Appeal is reserved for an open proof obligation; this
+    # avoids paying for a second full court on already terminal candidates.
 
     if not priorities:
         return []
@@ -476,14 +509,33 @@ def _appeal_prosecutor_user_v35(
     prosecution: dict[str, Any], defense: dict[str, Any], proof: dict[str, Any],
 ) -> str:
     """Build appellate prosecutor input (v3.5: same structure, updated prompt)."""
+    candidate_ids = {str(row.get("candidate_id") or "") for row in candidates}
+    initial_errors = [
+        row for row in (prosecution.get("candidates") or [])
+        if str(row.get("source_candidate_id") or "") in candidate_ids
+    ]
+    initial_defenses = [
+        row for row in (defense.get("candidates") or [])
+        if str(row.get("target_candidate_id") or "") in candidate_ids
+    ]
+    proof_summary = {
+        key: proof.get(key)
+        for key in (
+            "state", "responsible_event_id", "prosecution_coverage",
+            "defense_coverage", "quarantined_error_certificate_ids",
+            "quarantined_defense_certificate_ids",
+            "surviving_error_certificate_ids", "defeated_error_certificate_ids",
+            "consensus_gate_blocked_ids", "decision_authority",
+        )
+    }
     neutral = {
         "appeal_candidates": candidates,
         "semantic_findings": base.get("qualifications") or [],
         "causal_findings": base.get("propagations") or [],
         "case_boundary_finding": base.get("boundary_path") or {},
-        "first_prosecution": prosecution,
-        "first_defense": defense,
-        "first_adjudication": proof,
+        "first_prosecution": {"candidates": initial_errors},
+        "first_defense": {"candidates": initial_defenses},
+        "first_adjudication": proof_summary,
     }
     value = "TRAJECTORY_PACKET=\n" + packet.canonical_json(built) + "\nAPPEAL_EVIDENCE=\n" + packet.canonical_json(neutral)
     for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"'):
@@ -498,14 +550,33 @@ def _appeal_defender_user_v35(
     appeal_prosecution: dict[str, Any] | None = None,
 ) -> str:
     """Build appellate defender input (v3.5: includes prosecution certificates)."""
+    candidate_ids = {str(row.get("candidate_id") or "") for row in candidates}
+    initial_errors = [
+        row for row in (prosecution.get("candidates") or [])
+        if str(row.get("source_candidate_id") or "") in candidate_ids
+    ]
+    initial_defenses = [
+        row for row in (defense.get("candidates") or [])
+        if str(row.get("target_candidate_id") or "") in candidate_ids
+    ]
+    proof_summary = {
+        key: proof.get(key)
+        for key in (
+            "state", "responsible_event_id", "prosecution_coverage",
+            "defense_coverage", "quarantined_error_certificate_ids",
+            "quarantined_defense_certificate_ids",
+            "surviving_error_certificate_ids", "defeated_error_certificate_ids",
+            "consensus_gate_blocked_ids", "decision_authority",
+        )
+    }
     neutral = {
         "appeal_candidates": candidates,
         "semantic_findings": base.get("qualifications") or [],
         "causal_findings": base.get("propagations") or [],
         "case_boundary_finding": base.get("boundary_path") or {},
-        "first_prosecution": prosecution,
-        "first_defense": defense,
-        "first_adjudication": proof,
+        "first_prosecution": {"candidates": initial_errors},
+        "first_defense": {"candidates": initial_defenses},
+        "first_adjudication": proof_summary,
         # v3.5 H2: Informed defender sees the appeal prosecution certificates
         "prosecution_certificates": appeal_prosecution,
     }
@@ -569,11 +640,67 @@ def _run_counterfactual_localization(
             user=user, cache_dir=output_dir / "counterfactual_cache",
         )
         rankings = value.get("rankings")
-        if isinstance(rankings, dict):
+        if (
+            isinstance(rankings, dict)
+            and set(map(str, rankings)) == set(distinct_origins)
+        ):
             return rankings
     except Exception:
         pass
     return None
+
+
+def _initial_error_has_local_authority(proof: dict[str, Any]) -> bool:
+    """Return whether an initial positive is complete without appeal evidence."""
+    surviving = proof.get("surviving_error_certificate_ids") or []
+    winner = str(proof.get("winning_error_certificate_id") or "")
+    return bool(
+        proof.get("state") == "verified_error"
+        and proof.get("decision_authority") == "authoritative"
+        and proof.get("prosecution_coverage") == "complete"
+        and proof.get("defense_coverage") == "complete"
+        and not (proof.get("quarantined_error_certificate_ids") or [])
+        and not (proof.get("quarantined_defense_certificate_ids") or [])
+        and int(proof.get("resolved_candidate_count") or 0)
+        == int(proof.get("required_candidate_count") or 0)
+        and winner
+        and winner in surviving
+    )
+
+
+def _resolve_incomplete_appeal(
+    initial_proof: dict[str, Any], exc: Exception,
+) -> dict[str, Any]:
+    """Preserve only a complete initial positive when appeal infrastructure fails."""
+    failure = {
+        "component": "appeal",
+        "code": "required_appeal_incomplete",
+        "error_type": type(exc).__name__,
+        "error": str(exc)[:500],
+    }
+    if _initial_error_has_local_authority(initial_proof):
+        return {
+            **initial_proof,
+            "authority_failure_reasons": [],
+            "appeal_incomplete": True,
+            "appeal_status": "incomplete_initial_error_preserved",
+            "verdict_authority_scope": "initial_local_positive",
+            "non_authoritative_appeal_diagnostic": failure,
+        }
+    return {
+        **initial_proof,
+        "state": "unresolved",
+        "responsible_event_id": None,
+        "impact_status": None,
+        "winning_impact_kind": None,
+        "winning_error_certificate_id": None,
+        "surviving_error_certificate_ids": [],
+        "decision_authority": "invalid",
+        "authority_failure_reasons": [failure],
+        "appeal_incomplete": True,
+        "appeal_status": "incomplete_fail_closed",
+        "verdict_authority_scope": "invalid",
+    }
 
 
 # ============================================================
@@ -663,28 +790,32 @@ def adjudicate_case(
         # H2: Tightened trigger calibrator (priority 0-1 only)
         appeal_candidates = _appeal_trigger_calibrator_v35(
             base=base, proof=initial_proof, prosecution=prosecution, defense=defense, built=built,
+            focused_prosecution_metas=focused_metas,
         )
 
         if appeal_candidates:
             allowed_ids = {str(row.get("candidate_id") or "") for row in appeal_candidates}
             try:
-                # H2: Symmetric appeal with informed defender
+                # H2: Appeal prosecution first; the informed defender needs to
+                # see the appeal prosecution certificates.
                 appeal_user = _appeal_prosecutor_user_v35(
                     built=built, candidates=appeal_candidates, base=base,
                     prosecution=prosecution, defense=defense, proof=initial_proof,
                 )
-
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    appeal_pros_future = executor.submit(
-                        provider_call, route=config["appeal_prosecutor_route"],
-                        system=APPEAL_PROSECUTOR_SYSTEM_V35, user=appeal_user,
-                        cache_dir=output_dir / "appeal_prosecutor_cache",
-                    )
-                    # Defender runs in parallel but we need prosecution first for informed defense
-                    # Solution: run prosecutor first, then defender with prosecution info
-                appeal_prosecution, providers["appeal_prosecutor"] = appeal_pros_future.result()
+                appeal_prosecution, providers["appeal_prosecutor"] = provider_call(
+                    route=config["appeal_prosecutor_route"],
+                    system=APPEAL_PROSECUTOR_SYSTEM_V35, user=appeal_user,
+                    cache_dir=output_dir / "appeal_prosecutor_cache",
+                )
                 if str(appeal_prosecution.get("coverage_state") or "") != "complete":
                     raise ValueError("required appeal prosecution is incomplete")
+                returned_prosecution_ids = {
+                    str(row.get("source_candidate_id") or "")
+                    for row in appeal_prosecution.get("candidates") or []
+                    if isinstance(row, dict)
+                }
+                if not returned_prosecution_ids <= allowed_ids:
+                    raise ValueError("required appeal prosecution contains another candidate")
 
                 # H2: Informed defender (sees prosecution certificates)
                 appeal_defender_user = _appeal_defender_user_v35(
@@ -724,26 +855,7 @@ def adjudicate_case(
                 )
             except Exception as exc:
                 providers["appeal_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
-                # Appeal was required by the calibrated trigger. Reusing the
-                # initial verdict would turn an incomplete court process into a
-                # valid decisive output, so fail closed instead.
-                proof = {
-                    **initial_proof,
-                    "state": "unresolved",
-                    "responsible_event_id": None,
-                    "impact_status": None,
-                    "winning_impact_kind": None,
-                    "winning_error_certificate_id": None,
-                    "surviving_error_certificate_ids": [],
-                    "decision_authority": "invalid",
-                    "authority_failure_reasons": [{
-                        "component": "appeal",
-                        "code": "required_appeal_incomplete",
-                        "error_type": type(exc).__name__,
-                        "error": str(exc)[:500],
-                    }],
-                    "appeal_incomplete": True,
-                }
+                proof = _resolve_incomplete_appeal(initial_proof, exc)
 
         # H3: Two-Phase Localization (only if multiple surviving origins)
         surviving_ids = proof.get("surviving_error_certificate_ids") or []
@@ -776,10 +888,22 @@ def adjudicate_case(
         proof, construct_authoritative, construct_authority_reasons = (
             _apply_construct_authority(proof, construct_audit)
         )
+        if proof.get("state") == "verified_error":
+            surviving = proof.get("surviving_error_certificate_ids") or []
+            proof["localization_status"] = (
+                "complete" if counterfactual_rankings else
+                "not_applicable" if len(surviving) < 2 else
+                "failed_temporal_fallback"
+            )
+        else:
+            proof["localization_status"] = "not_applicable"
         runtime_valid = (
             _proof_runtime_valid(base_runtime_valid, proof)
             and construct_authoritative
-            and "appeal_error" not in providers
+            and (
+                "appeal_error" not in providers
+                or proof.get("verdict_authority_scope") == "initial_local_positive"
+            )
         )
     except Exception as exc:
         proof = {
@@ -865,6 +989,9 @@ def adjudicate_case(
             "appeal_prosecutor_certificate_count": len((appeal_prosecution or {}).get("candidates") or []),
             "appeal_defender_certificate_count": len((appeal_defense_certs or {}).get("candidates") or []),
             "appeal_status": "not_required" if not appeal_candidates else (
+                "incomplete_initial_error_preserved" if (
+                    proof.get("verdict_authority_scope") == "initial_local_positive"
+                ) else
                 "complete" if (
                     appeal_prosecution is not None
                     and appeal_defense_certs is not None
@@ -875,6 +1002,12 @@ def adjudicate_case(
             "focused_prosecution_candidate_count": len(_required_candidates(base)),
             "focused_prosecution_certificate_count": len((prosecution or {}).get("candidates") or []),
             "focused_prosecution_audit_count": len(focused_audits),
+            # v3.5.2: candidates whose focused certificates were all quarantined
+            # (open structural concern → forced incomplete coverage + appealable)
+            "focused_prosecution_quarantined_candidate_count": sum(
+                1 for meta in (providers.get("focused_prosecution") or {}).values()
+                if isinstance(meta, dict) and meta.get("all_quarantined")
+            ),
             # v3.5.1-D3: distinguish LLM-empty (explicit no-error) from LLM-crash (provider error)
             "focused_prosecution_explicit_no_error_count": sum(
                 1 for meta in (providers.get("focused_prosecution") or {}).values()
@@ -891,10 +1024,8 @@ def adjudicate_case(
             "consensus_gate_applied": proof.get("consensus_gate_applied", False),
             "consensus_gate_blocked_count": len(proof.get("consensus_gate_blocked_ids") or []),
             "counterfactual_rankings_used": proof.get("counterfactual_rankings_used", False),
-            "trigger_type_counts": dict(Counter(
-                "triggered" if appeal_candidates else "not_triggered"
-                for _ in [1]
-            )),
+            "localization_status": proof.get("localization_status", "not_applicable"),
+            "appeal_triggered": bool(appeal_candidates),
             "materiality_hits": proof.get("synthetic_defense_count") or 0,
             "evidence_authority_routes": proof.get("evidence_authority_routes") or {},
         },

@@ -17,13 +17,19 @@ class OcsePacketError(ValueError):
     """A raw AgentHallu record cannot safely enter the frozen OCSE runtime."""
 
 
-FORBIDDEN_PACKET_KEYS = {
+EVALUATOR_ONLY_FIELDS = frozenset({
     "is_hallucination",
     "hallucination_step",
     "hallucination_reason",
     "hallucination_category",
     "hallucination_subcategory",
     "gold_label",
+    "gold_steps",
+    "gold_explanation",
+    "outer_feedback",
+})
+
+FORBIDDEN_PACKET_KEYS = EVALUATOR_ONLY_FIELDS | {
     "case_id",
     "source",
     "source_dir",

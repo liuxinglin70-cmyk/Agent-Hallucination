@@ -57,6 +57,25 @@ python -m src.sehd_v6.detector \
   --output-dir detector_output
 ```
 
+Run independent trajectories concurrently with hash-bound resume:
+
+```bash
+python -m src.sehd_v6.detector \
+  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --records trajectories.jsonl \
+  --max-parallel 10 \
+  --output-dir detector_output/batch
+```
+
+`--records` accepts JSON, JSONL, a directory of trajectory JSON files, or a
+JSON manifest containing `{"cases":[{"case_id":"...","record_path":"..."}]}`.
+Every case has an isolated directory with an atomically written
+`prediction.json` and hash-bound `completion.json`. A subsequent invocation
+resumes only cases whose input, resolved detector config and prediction hashes
+still match. Failed or interrupted cases are retried; `--no-resume` forces all
+cases to run again. Dataset labels are stripped before `detect_record()` and
+are never included in provider prompts or detector output.
+
 ## Provider Configuration
 
 `load_detector_config()` resolves route values without experiment policy. The

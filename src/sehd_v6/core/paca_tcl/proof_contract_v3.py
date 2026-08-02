@@ -61,6 +61,15 @@ def validate_error_certificate(
     origin = row.get("origin_event_id")
     control = row.get("agent_control_event_id")
     source_candidate = str(row.get("source_candidate_id") or "")
+    def anchored(refs: Any, event_id: Any) -> bool:
+        event = str(event_id or "")
+        return isinstance(refs, list) and any(
+            str(ref) == event or str(ref).startswith(event + "_tool_")
+            for ref in refs
+        )
+
+    impact_evidence = row.get("impact_evidence_refs")
+    causal_evidence = row.get("benchmark_causal_evidence_refs")
     candidate_scope = (
         candidate_origins is None
         or source_candidate in candidate_origins
@@ -85,9 +94,15 @@ def validate_error_certificate(
         "violation_evidence": v1._evidence_refs(row.get("violation_evidence_refs"), addressable, nonempty=True),
         "agent_control": v1._event_ref(control, event_order),
         "agent_control_evidence": v1._evidence_refs(row.get("agent_control_evidence_refs"), addressable, nonempty=True),
+        "agent_control_evidence_binding": anchored(
+            row.get("agent_control_evidence_refs"), control,
+        ),
         "impact_kind": str(row.get("impact_kind") or "") in IMPACT_KINDS,
         "impact_events": v1._event_refs(impact_events, event_order, nonempty=True),
         "impact_evidence": v1._evidence_refs(row.get("impact_evidence_refs"), addressable, nonempty=True),
+        "impact_evidence_binding": isinstance(impact_events, list) and any(
+            anchored(impact_evidence, event_id) for event_id in impact_events
+        ),
         "recovery_state": recovery in RECOVERY_STATES,
         "recovery_evidence": v1._evidence_refs(
             row.get("recovery_evidence_refs"), addressable,
@@ -95,10 +110,18 @@ def validate_error_certificate(
         ),
         "benchmark_causal_status": str(row.get("benchmark_causal_status") or "") in BENCHMARK_CAUSAL_STATES,
         "benchmark_causal_evidence": v1._evidence_refs(
-            row.get("benchmark_causal_evidence_refs"), addressable,
+            causal_evidence, addressable,
             nonempty=str(row.get("benchmark_causal_status") or "") in {
                 "causes_incorrect_result", "propagates_to_incorrect_result",
             },
+        ),
+        "benchmark_causal_evidence_binding": (
+            str(row.get("benchmark_causal_status") or "") not in {
+                "causes_incorrect_result", "propagates_to_incorrect_result",
+            }
+            or isinstance(impact_events, list) and any(
+                anchored(causal_evidence, event_id) for event_id in impact_events
+            )
         ),
         "ordered_chain": ordered,
         "rationale": bool(str(row.get("rationale") or "").strip()),

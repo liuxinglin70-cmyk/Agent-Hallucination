@@ -103,14 +103,10 @@ def route_evidence_authority(error_certificate: dict[str, Any]) -> str:
 # Module 2: Materiality / Equivalence Verifier (deterministic)
 # ============================================================
 
-# Numerical tolerance for routine floating-point / rounding comparisons.
-# This is NOT a case-specific threshold search; it reflects the standard
-# expectation that agent answers using reasonable rounding (e.g., 26.33 vs
-# 26.333...) do not constitute a material error unless the task explicitly
-# demands exact precision.
-DEFAULT_NUMERICAL_TOLERANCE = 1e-3  # 0.1% relative or absolute
-
-# Patterns that indicate the task demands exact precision
+# The materiality check below is keyword-driven: it flags contradictions whose
+# rationale declares tolerance/rounding language as immaterial.  A true
+# recomputation-based numeric comparison is intentionally out of scope here
+# (see the math evidence-authority route); no tolerance constant is claimed.
 EXACT_PRECISION_KEYWORDS = [
     "exact", "precise", "exactly", "precisely", "to the last digit",
     "精确", "准确到", "保留所有小数",

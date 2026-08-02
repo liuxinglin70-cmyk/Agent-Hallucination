@@ -479,7 +479,11 @@ def test_compiled_stage_modules_are_registered() -> None:
 def test_standalone_detector_rejects_gold_and_returns_label_free(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "src.sehd_v6.core.paca_tcl.detector.adjudicate_case",
-        lambda **_kwargs: {"state": "verified_clean", "runtime_valid": True},
+        lambda **_kwargs: {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+        },
     )
     result = detect_record(
         record={"history": [{"role": "assistant", "content": "answer"}]},
@@ -487,7 +491,11 @@ def test_standalone_detector_rejects_gold_and_returns_label_free(monkeypatch, tm
         output_dir=tmp_path,
         census_root=tmp_path,
     )
-    assert result == {"state": "verified_clean", "runtime_valid": True}
+    assert result == {
+        "state": "verified_clean",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+    }
 
     try:
         detect_record(
@@ -570,3 +578,320 @@ def test_standalone_config_ignores_experiment_policy(tmp_path: Path, monkeypatch
     loaded = load_detector_config(path, require_credentials=False)
     assert loaded["detector_mode"] == "standalone"
     assert loaded["execution_authorized"] is False
+
+
+def test_quarantine_only_focused_prosecution_fails_closed_and_triggers_appeal(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """v3.5.2: a candidate whose focused certificates are all quarantined must
+    (a) force incomplete prosecution coverage and (b) be re-opened by the H2
+    calibrated trigger instead of being silently dropped."""
+    packet = _packet()
+    candidate = _candidate()
+    base = {"census": [candidate], "qualifications": [], "propagations": [], "boundary_path": {}}
+
+    def bad_provider(**_kwargs):
+        return ({"coverage_state": "complete", "candidates": [_error_certificate(ordered=False)]}, {"usage": {}})
+
+    monkeypatch.setattr(proof_engine, "provider_call", bad_provider)
+    merged, audits, metas = proof_engine._run_focused_prosecution(
+        built=packet, base=base,
+        config={"focused_prosecution_route": {}, "max_focused_parallel": 4, "focused_prosecution_retries": 0},
+        output_dir=tmp_path,
+    )
+    assert merged["candidates"] == []
+    assert merged["coverage_state"] == "incomplete"
+    assert metas["candidate_001"]["all_quarantined"] is True
+    assert audits and all(a["decision"] == "quarantine" for a in audits)
+
+    initial_proof = proof_contract.adjudicate_proof_court(
+        required_candidates=base["census"], prosecution=merged,
+        defense={"coverage_state": "complete", "candidates": []}, packet=packet,
+        apply_materiality_check=True, apply_commitment_check=True,
+        apply_consensus_gate_flag=False,
+    )
+    triggered = proof_engine._appeal_trigger_calibrator_v35(
+        base=base, proof=initial_proof, prosecution=merged,
+        defense={"coverage_state": "complete", "candidates": []}, built=packet,
+        focused_prosecution_metas=metas,
+    )
+    assert [row["candidate_id"] for row in triggered] == ["candidate_001"]
+
+
+def test_focused_prosecution_explicit_no_error_stays_complete(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """LLM-empty (explicit no-error) must not be conflated with quarantine."""
+    packet = _packet()
+    candidate = _candidate()
+    base = {"census": [candidate], "qualifications": [], "propagations": [], "boundary_path": {}}
+
+    def empty_provider(**_kwargs):
+        return ({"coverage_state": "complete", "candidates": []}, {"usage": {}})
+
+    monkeypatch.setattr(proof_engine, "provider_call", empty_provider)
+    merged, _audits, metas = proof_engine._run_focused_prosecution(
+        built=packet, base=base,
+        config={"focused_prosecution_route": {}, "max_focused_parallel": 4},
+        output_dir=tmp_path,
+    )
+    assert merged["coverage_state"] == "complete"
+    assert "all_quarantined" not in metas["candidate_001"]
+
+
+def test_global_cache_is_opt_in_without_fixed_system_path(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """v3.5.2: the global cache is disabled unless PACA_GLOBAL_CACHE_ROOT is
+    set; the previous hard-coded remote path must never be assumed."""
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    monkeypatch.delenv("PACA_GLOBAL_CACHE_ROOT", raising=False)
+    assert basic_runner._global_cache_root() is None
+    assert basic_runner._global_cache_path("abcd1234") is None
+
+    monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", str(tmp_path))
+    root = basic_runner._global_cache_root()
+    assert root == tmp_path
+    path = basic_runner._global_cache_path("abcd1234")
+    assert path is not None
+    assert path == tmp_path / "ab" / "abcd1234.json"
+
+
+def test_detect_record_fail_closed_clears_decisive_fields(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """An invalid run must not carry stale decisive prediction fields."""
+    monkeypatch.setattr(
+        "src.sehd_v6.core.paca_tcl.detector.adjudicate_case",
+        lambda **_kwargs: {
+            "runtime_valid": False,
+            "state": "verified_error",
+            "incident_state": "verified_hallucination",
+            "responsible_event_id": "event_001",
+            "responsible_step": 1,
+            "impact_status": "unrecovered",
+            "impact_kind": "final_answer",
+            "wide_construct_state": "verified_hallucination",
+            "occurrence_state": "verified_error",
+            "incident_occurred": True,
+            "occurrence_responsible_event_id": "event_001",
+            "occurrence_responsible_step": 1,
+            "occurrence_impact_status": "unrecovered",
+            "occurrence_impact_kind": "final_answer",
+            "occurrence_recovery_state": "none",
+            "occurrence_ledger": {"state": "verified_error"},  # append-only: preserved
+        },
+    )
+    result = detect_record(
+        record={"history": [{"role": "assistant", "content": "answer"}]},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+    )
+    assert result["state"] == "unresolved"
+    assert result["decision_authority"] == "invalid"
+    assert result["incident_state"] == "unresolved"
+    assert result["responsible_event_id"] is None
+    assert result["responsible_step"] is None
+    assert result["impact_kind"] is None
+    assert result["wide_construct_state"] == "unresolved"
+    assert result["occurrence_state"] == "unresolved"
+    assert result["incident_occurred"] is None
+    assert result["occurrence_responsible_event_id"] is None
+    assert result["occurrence_impact_kind"] is None
+    assert result["occurrence_ledger"] == {"state": "verified_error"}
+
+
+def test_detect_record_invalid_authority_fails_closed(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "src.sehd_v6.core.paca_tcl.detector.adjudicate_case",
+        lambda **_kwargs: {
+            "runtime_valid": True,
+            "decision_authority": "invalid",
+            "state": "verified_error",
+            "incident_state": "verified_hallucination",
+            "occurrence_state": "verified_error",
+        },
+    )
+    result = detect_record(
+        record={"history": [{"role": "assistant", "content": "answer"}]},
+        config={}, output_dir=tmp_path,
+    )
+    assert result["state"] == "unresolved"
+    assert result["occurrence_state"] == "unresolved"
+    assert result["decision_authority"] == "invalid"
+
+
+def test_standalone_rejects_nested_evaluator_fields(tmp_path: Path) -> None:
+    for record in (
+        {
+            "gold_explanation": "label rationale",
+            "history": [{"role": "assistant", "content": "answer"}],
+        },
+        {
+            "history": [{
+                "role": "assistant",
+                "content": "answer",
+                "tool_calls": [{"function": {
+                    "name": "tool", "arguments": {"gold_label": True},
+                }}],
+            }],
+        },
+    ):
+        try:
+            detect_record(record=record, config={}, output_dir=tmp_path)
+        except ValueError as exc:
+            assert "label-free" in str(exc)
+        else:
+            raise AssertionError("nested evaluator metadata entered detector")
+
+
+def test_standalone_rejects_nested_evaluator_output(tmp_path: Path) -> None:
+    try:
+        detect_record(
+            record={"history": [{"role": "assistant", "content": "answer"}]},
+            config={}, output_dir=tmp_path,
+            adjudicator=lambda **_kwargs: {
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "state": "verified_clean",
+                "proof": {"gold_label": False},
+            },
+        )
+    except RuntimeError as exc:
+        assert "evaluation fields" in str(exc)
+    else:
+        raise AssertionError("nested evaluator metadata left detector")
+
+
+def test_counterfactual_localization_requires_all_origins(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        proof_engine, "json_object_provider_call",
+        lambda **_kwargs: ({
+            "rankings": {
+                "event_002": {
+                    "causal_sufficiency_score": 1.0,
+                    "is_root_cause": True,
+                },
+            },
+        }, {}),
+    )
+    rankings = proof_engine._run_counterfactual_localization(
+        built=_packet(),
+        surviving_errors=[
+            _error_certificate(),
+            {**_error_certificate(), "origin_event_id": "event_002"},
+        ],
+        config={"focused_prosecution_route": {}}, output_dir=tmp_path,
+    )
+    assert rankings is None
+
+
+def test_causal_chain_completeness_uses_scaffold_markers() -> None:
+    """v3.5.2: chain completeness must be marker/section based so the metric
+    does not saturate on ubiquitous keywords."""
+    full = _error_certificate()
+    full["rationale"] = (
+        "NORM: the arithmetic invariant was violated | "
+        "ORIGIN: event_001 misread the table | "
+        "CONTROL: the agent generated the claim | "
+        "PROPAGATION: the value carried into the final answer | "
+        "IMPACT: the wrong final answer was produced | "
+        "COUNTERFACTUAL: correcting event_001 alone fixes the result"
+    )
+    audit = proof_contract.validate_focused_prosecution(
+        full, _packet(), {"candidate_001": "event_001"},
+    )
+    assert audit["causal_chain_completeness"] == 1.0
+    assert audit["missing_chain_stages"] == []
+
+    sparse = dict(full, rationale=(
+        "NORM: x | ORIGIN: x | CONTROL: x | PROPAGATION: x | IMPACT: x | COUNTERFACTUAL: x"
+    ))
+    audit = proof_contract.validate_focused_prosecution(
+        sparse, _packet(), {"candidate_001": "event_001"},
+    )
+    assert audit["causal_chain_completeness"] == 0.0
+    assert set(audit["missing_chain_stages"]) == set(proof_contract.CAUSAL_CHAIN_STAGES)
+
+
+def test_appeal_prompts_include_only_triggered_candidate_evidence() -> None:
+    candidate = _candidate()
+    other = {"candidate_id": "candidate_002", "origin_hypothesis_event_id": "event_002"}
+    prosecution = {
+        "coverage_state": "complete",
+        "candidates": [
+            _error_certificate(),
+            {**_error_certificate(), "certificate_id": "error_002", "source_candidate_id": "candidate_002", "origin_event_id": "event_002"},
+        ],
+    }
+    defense = {
+        "coverage_state": "complete",
+        "candidates": [
+            _defense(),
+            {**_defense(), "certificate_id": "defense_002", "target_candidate_id": "candidate_002", "target_origin_event_id": "event_002"},
+        ],
+    }
+    base = {"qualifications": [], "propagations": [], "boundary_path": {}}
+    proof = {"state": "unresolved", "error_audits": [{"large": "omitted"}]}
+    prosecutor = proof_engine._appeal_prosecutor_user_v35(
+        built=_packet(), candidates=[candidate], base=base,
+        prosecution=prosecution, defense=defense, proof=proof,
+    )
+    defender = proof_engine._appeal_defender_user_v35(
+        built=_packet(), candidates=[candidate], base=base,
+        prosecution=prosecution, defense=defense, proof=proof,
+        appeal_prosecution={"coverage_state": "complete", "candidates": []},
+    )
+    for prompt in (prosecutor, defender):
+        assert "candidate_001" in prompt
+        assert "candidate_002" not in prompt
+        assert '"large":"omitted"' not in prompt
+    assert other["candidate_id"] == "candidate_002"
+
+
+def test_initial_error_local_authority_requires_complete_closed_proof() -> None:
+    proof = {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "prosecution_coverage": "complete",
+        "defense_coverage": "complete",
+        "quarantined_error_certificate_ids": [],
+        "quarantined_defense_certificate_ids": [],
+        "required_candidate_count": 2,
+        "resolved_candidate_count": 2,
+        "winning_error_certificate_id": "error_001",
+        "surviving_error_certificate_ids": ["error_001"],
+    }
+    assert proof_engine._initial_error_has_local_authority(proof) is True
+
+    for field, invalid in (
+        ("state", "unresolved"),
+        ("decision_authority", "invalid"),
+        ("prosecution_coverage", "incomplete"),
+        ("defense_coverage", "unresolved"),
+        ("quarantined_error_certificate_ids", ["error_002"]),
+        ("quarantined_defense_certificate_ids", ["defense_001"]),
+        ("resolved_candidate_count", 1),
+        ("winning_error_certificate_id", "error_missing"),
+    ):
+        assert proof_engine._initial_error_has_local_authority(
+            {**proof, field: invalid},
+        ) is False
+
+    preserved = proof_engine._resolve_incomplete_appeal(
+        proof, RuntimeError("appeal transport failed"),
+    )
+    assert preserved["state"] == "verified_error"
+    assert preserved["decision_authority"] == "authoritative"
+    assert preserved["verdict_authority_scope"] == "initial_local_positive"
+    assert preserved["authority_failure_reasons"] == []
+    assert preserved["non_authoritative_appeal_diagnostic"]["component"] == "appeal"
+
+    failed_closed = proof_engine._resolve_incomplete_appeal(
+        {**proof, "resolved_candidate_count": 1},
+        RuntimeError("appeal transport failed"),
+    )
+    assert failed_closed["state"] == "unresolved"
+    assert failed_closed["decision_authority"] == "invalid"
+    assert failed_closed["responsible_event_id"] is None
+    assert failed_closed["surviving_error_certificate_ids"] == []

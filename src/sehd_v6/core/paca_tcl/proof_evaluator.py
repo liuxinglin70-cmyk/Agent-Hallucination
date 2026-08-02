@@ -134,7 +134,7 @@ def _json_object_provider_call(
 
     # v3.5.1: 全局缓存查找（不依赖 cache_dir，所有 output_dir 共享）
     global_target = _global_cache_path(request_hash)
-    if global_target.is_file():
+    if global_target is not None and global_target.is_file():
         try:
             cached = read_json(global_target)
             if cached.get("request_hash") == request_hash:
@@ -210,10 +210,11 @@ def _json_object_provider_call(
                 "contains_credentials": False,
             }
             # v3.5.1: 写入全局缓存（原子写，防止并发冲突）
-            try:
-                _atomic_write_json(global_target, cached)
-            except Exception:
-                pass  # 写缓存失败不影响主流程
+            if global_target is not None:
+                try:
+                    _atomic_write_json(global_target, cached)
+                except Exception:
+                    pass  # 写缓存失败不影响主流程
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,

@@ -2,6 +2,7 @@
   "schema_version": "agenthallu.paca_tcl_detector_config.v3_5",
   "outer_opened": false,
   "max_focused_parallel": 4,
+  "focused_prosecution_retries": 1,
   "candidate_fallback_route": {},
   "construct_census_route": {},
   "qualification_route": {},

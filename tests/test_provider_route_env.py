@@ -77,6 +77,22 @@ def test_official_v4_mutation_defaults_to_non_thinking_json_mode():
     ) == {"type": "enabled"}
 
 
+def test_official_detector_config_preserves_model_reasoning_defaults():
+    from pathlib import Path
+
+    from src.sehd_v6.core.paca_tcl.detector import load_detector_config
+
+    config = load_detector_config(
+        Path("src/sehd_v6/configs/paca_tcl_detector_v3_5.json"),
+        require_credentials=False,
+    )
+    for name, route in config.items():
+        if not name.endswith("_route"):
+            continue
+        assert "thinking" not in route
+        assert "max_tokens" not in route
+
+
 def test_unified_route_resolution_precedence_and_official_defaults(monkeypatch):
     from src.sehd_v6.provider_routes import resolve_provider_route
 
@@ -321,6 +337,45 @@ def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, mo
     )
 
     assert value == {}
+    assert "response_format" not in captured["payload"]
+
+
+def test_detector_transport_omits_pro_response_format(tmp_path, monkeypatch):
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "choices": [{"message": {"content": "{}"}}], "usage": {},
+            }).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "transport_retries": 0,
+        },
+        system="return json", user="{}", cache_dir=tmp_path,
+        require_candidates=False,
+    )
     assert "response_format" not in captured["payload"]
 
 
