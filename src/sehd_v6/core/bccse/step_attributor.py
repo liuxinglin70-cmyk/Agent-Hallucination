@@ -54,6 +54,11 @@ class ErrorType(str, Enum):
     CANDIDATE_MISS = "candidate_miss"
     CRS_CONTRADICTION = "crs_contradiction"  # self-supervised
     EVIDENCE_INCOMPLETE = "evidence_incomplete"  # self-supervised
+    FOCUSED_CERTIFICATE_QUARANTINE = "focused_certificate_quarantine"
+    APPEAL_PROSECUTOR_FAILURE = "appeal_prosecutor_failure"
+    APPEAL_DEFENDER_FAILURE = "appeal_defender_failure"
+    APPEAL_COVERAGE_MISMATCH = "appeal_coverage_mismatch"
+    LOCALIZATION_AMBIGUOUS = "localization_ambiguous"
     # Retired in v5.4 (unreachable: v3.5 coverage is categorical, never
     # quantitative). Retained so historical attribution records stay readable.
     BOUNDARY_HESITATION = "boundary_hesitation"
@@ -78,6 +83,9 @@ class TriggerSource(str, Enum):
     EVIDENCE_INCOMPLETE = "evidence_incomplete"
     BOUNDARY_HESITATION = "boundary_hesitation"  # retired in v5.4 (unreachable)
     SIGNAL_UNAVAILABLE = "signal_unavailable"
+    FOCUSED_QUARANTINE = "focused_quarantine"
+    APPEAL_FAILURE = "appeal_failure"
+    LOCALIZATION = "localization"
     GOLD_MISMATCH = "gold_mismatch"  # optional enhancement
     NONE = "none"  # no trigger (stable success)
 
@@ -99,6 +107,11 @@ ERROR_MODULE_MAP: dict[ErrorType, str] = {
     ErrorType.CANDIDATE_MISS: "candidate_trigger",
     ErrorType.CRS_CONTRADICTION: "evidence_obligation",
     ErrorType.EVIDENCE_INCOMPLETE: "evidence_obligation",
+    ErrorType.FOCUSED_CERTIFICATE_QUARANTINE: "atomic_verifier_instruction",
+    ErrorType.APPEAL_PROSECUTOR_FAILURE: "atomic_verifier_instruction",
+    ErrorType.APPEAL_DEFENDER_FAILURE: "clean_defense_boundary",
+    ErrorType.APPEAL_COVERAGE_MISMATCH: "candidate_to_verifier_route",
+    ErrorType.LOCALIZATION_AMBIGUOUS: "earliest_origin_tiebreak",
     ErrorType.BOUNDARY_HESITATION: "clean_defense_boundary",
     ErrorType.SIGNAL_UNAVAILABLE: "evidence_obligation",
 }
@@ -120,6 +133,11 @@ ERROR_MODULE_SECONDARY: dict[ErrorType, str] = {
     ErrorType.CANDIDATE_MISS: "candidate_to_verifier_route",
     ErrorType.CRS_CONTRADICTION: "atomic_verifier_instruction",
     ErrorType.EVIDENCE_INCOMPLETE: "atomic_verifier_instruction",
+    ErrorType.FOCUSED_CERTIFICATE_QUARANTINE: "evidence_obligation",
+    ErrorType.APPEAL_PROSECUTOR_FAILURE: "evidence_obligation",
+    ErrorType.APPEAL_DEFENDER_FAILURE: "atomic_verifier_instruction",
+    ErrorType.APPEAL_COVERAGE_MISMATCH: "atomic_verifier_instruction",
+    ErrorType.LOCALIZATION_AMBIGUOUS: "causal_link_test",
     ErrorType.BOUNDARY_HESITATION: "abstention_rule",
     ErrorType.SIGNAL_UNAVAILABLE: "atomic_verifier_instruction",
 }
@@ -281,7 +299,11 @@ def _prediction_state(row: Mapping[str, Any]) -> bool | None:
 
 def _check_step_correct(row: Mapping[str, Any]) -> bool:
     """Check if responsible step localization is correct."""
-    gold_steps = tuple(str(s) for s in row.get("gold_steps") or ())
+    raw_steps = row.get("gold_steps", row.get("hallucination_step"))
+    values = raw_steps if isinstance(raw_steps, (list, tuple, set)) else (
+        () if raw_steps is None else (raw_steps,)
+    )
+    gold_steps = tuple(str(s) for s in values if s is not None and str(s) != "")
     predicted = row.get("responsible_step")
     if not gold_steps or predicted is None:
         return False
@@ -311,6 +333,38 @@ def _has_surviving_error_certificate(row: Mapping[str, Any]) -> bool:
     if not isinstance(proof, Mapping):
         return False
     return bool(proof.get("surviving_error_certificate_ids") or [])
+
+
+def _process_diagnostics(row: Mapping[str, Any]) -> dict[str, Any]:
+    diagnostics = row.get("diagnostics")
+    if isinstance(diagnostics, Mapping):
+        return dict(diagnostics)
+    health = row.get("evidence_health")
+    health = health if isinstance(health, Mapping) else {}
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    providers = row.get("providers")
+    providers = providers if isinstance(providers, Mapping) else {}
+    focused = providers.get("focused_prosecution")
+    focused = focused if isinstance(focused, Mapping) else {}
+    appeal_error = providers.get("appeal_error")
+    appeal_error = appeal_error if isinstance(appeal_error, Mapping) else {}
+    return {
+        "focused_quarantined_candidate_count": int(
+            health.get("focused_prosecution_quarantined_candidate_count") or sum(
+                isinstance(meta, Mapping) and bool(meta.get("all_quarantined"))
+                for meta in focused.values()
+            )
+        ),
+        "appeal_status": str(
+            proof.get("appeal_status") or health.get("appeal_status") or "not_required"
+        ),
+        "appeal_error_type": str(appeal_error.get("error_type") or ""),
+        "appeal_error": str(appeal_error.get("error") or ""),
+        "localization_status": str(
+            proof.get("localization_status") or health.get("localization_status") or "not_applicable"
+        ),
+    }
 
 
 def _route_process_failure(
