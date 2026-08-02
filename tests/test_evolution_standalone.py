@@ -211,3 +211,53 @@ def test_standalone_evolution_accepts_gold_enhanced_records(
     )
     assert result.use_gold is True
     assert result.total_cases == 2
+
+
+def test_closed_loop_counter_invariants_hold(tmp_path, offline_evolution) -> None:
+    """Counter invariants must hold across a full closed-loop run.
+
+    - processed = triggered + stable + runtime_invalid
+      (i.e. total_cases == edits_accepted + edits_rejected + stable
+       + runtime_invalid, since every case either reaches the gate as
+       accept/reject or is skipped as stable/runtime_invalid)
+    - gate_summary accepted/rejected mirror the result counters
+    - accepted + rejected == total gate evaluations
+    - all three product artifacts are written
+    """
+    records_path = _write_records(tmp_path, jsonl=True)
+    config_path = _write_config(tmp_path)
+    output_dir = tmp_path / "counter_out"
+
+    result = run_evolution(
+        records=records_path,
+        detector_config=config_path,
+        output_dir=output_dir,
+        run_id="counter_invariants",
+    )
+
+    # Every case is either a gate accept/reject or a no-edit skip
+    # (stable + runtime_invalid). triggered cases are a subset that
+    # reached the gate, so accepted+rejected covers the gate side.
+    no_edit_skips = result.stable_cases + result.runtime_invalid_cases
+    assert (
+        result.edits_accepted + result.edits_rejected + no_edit_skips
+        == result.total_cases
+    ), {
+        "accepted": result.edits_accepted,
+        "rejected": result.edits_rejected,
+        "stable": result.stable_cases,
+        "runtime_invalid": result.runtime_invalid_cases,
+        "total": result.total_cases,
+    }
+
+    gate = result.gate_summary
+    assert gate["accepted"] == result.edits_accepted
+    assert gate["rejected"] == result.edits_rejected
+    assert gate["accepted"] + gate["rejected"] == gate["total_evaluations"]
+
+    for name in (
+        "evolution_result.json",
+        "champion_genome.json",
+        "htc_tes_experience_memory.json",
+    ):
+        assert (output_dir / name).is_file(), name
