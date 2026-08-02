@@ -401,7 +401,6 @@ evolution/runner.py (run_evolution)
         ├── safety_gate.py (StructuralGate)
         ├── types.py (EvaluationOutcome, ExperienceRecord) ← breaks circular dep
         ├── promotion_gates.py (MetricSnapshot, ReplayEvidence)
-        ├── mutator.py (MutationProvider, AtomicMutation)
         └── htc_tes/ (HallucinationTypeClassifier, TypeConditionedEvolution, TypeAwareFitness)
                 └── type_classifier.py::_normalize_signal() ← accepts AttributionSignal | Mapping
 

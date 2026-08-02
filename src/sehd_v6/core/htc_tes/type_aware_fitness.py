@@ -225,13 +225,29 @@ class TypeExperienceMemory:
         This is deliberately an audit summary rather than a verdict source:
         only previously observed edits and their replay metadata are exposed.
         """
-        entries = self.get_type_experiences(hallucination_type, direction)
-        entries = entries[-max(0, int(limit)):]
+        all_entries = self.get_type_experiences(hallucination_type, direction)
+        entries = all_entries[-max(0, int(limit)):]
+        # Aggregate over the closed outcome vocabulary so reflection can see
+        # WHERE attempts keep failing, not just that they failed.
+        outcome_counts: Counter[str] = Counter()
+        stage_counts: Counter[str] = Counter()
+        for entry in all_entries:
+            outcome = _safe_category(entry.metadata.get("outcome"))
+            if outcome:
+                outcome_counts[outcome] += 1
+            stage = _safe_category(entry.metadata.get("outcome_stage"))
+            if stage:
+                stage_counts[stage] += 1
         return {
             "type": hallucination_type.value,
             "direction": direction,
-            "total": len(self.get_type_experiences(hallucination_type, direction)),
+            "total": len(all_entries),
             "successes": sum(bool(e.detection_improved) for e in entries),
+            "outcome_counts": dict(outcome_counts),
+            "outcome_stage_counts": dict(stage_counts),
+            "promotable_evidence_count": sum(
+                bool(e.metadata.get("promotable_evidence")) for e in all_entries
+            ),
             "experiences": [
                 {
                     "module": e.module_targeted,
@@ -243,6 +259,17 @@ class TypeExperienceMemory:
                     "process_state": e.metadata.get("process_state"),
                     "operation": _safe_category(e.metadata.get("operation")),
                     "outcome": _safe_category(e.metadata.get("outcome")),
+                    # v5.5 structured outcome: the stage an attempt stopped at
+                    # and whether it may be cited as real improvement.
+                    "outcome_stage": _safe_category(
+                        e.metadata.get("outcome_stage")
+                    ),
+                    "promotable_evidence": bool(
+                        e.metadata.get("promotable_evidence", False)
+                    ),
+                    "diagnostic_only": bool(
+                        e.metadata.get("diagnostic_only", False)
+                    ),
                     "reason_categories": [
                         _safe_category(value)
                         for value in list(

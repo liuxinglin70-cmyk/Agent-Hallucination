@@ -69,6 +69,7 @@ from .step_attributor import (
     ErrorType,
     TriggerSource,
     attribute_failure,
+    runtime_invalid_signal,
 )
 from .signal_adapter import (
     decision_authority_invalid,
@@ -310,6 +311,90 @@ def _no_edit_reason_categories(reason: str) -> list[str]:
     if any(token in lowered for token in ("unsafe", "speculative", "false positive")):
         categories.append("unsafe_generalization_risk")
     return categories
+
+
+# ============================================================
+# Structured experience outcome (v5.5)
+# ============================================================
+
+# The stage at which an attempt stopped. Free-form strings previously made
+# experience memory unqueryable ("no_edit" / "structural_reject" were the
+# only values that ever reached it, and they encoded stage and result in one
+# opaque token). The vocabulary below is closed so that reflection can
+# aggregate over it safely.
+OUTCOME_STAGES = frozenset({
+    "mutation",            # the mutator declined or returned an invalid edit
+    "structural_gate",     # the structural constraint gate rejected the edit
+    "source_replay",       # the edit was replayed on its own source case
+    "batch_commit",        # the edit was evaluated in the shadow batch
+    "detection_runtime",   # the detector never produced a verdict
+})
+
+# Whether the attempt produced usable evidence, and of what strength.
+OUTCOME_CLASSES = frozenset({
+    "improved",             # promotable improvement (gold-assisted)
+    "directional",          # process moved, correctness unproven
+    "no_effect",            # measurably nothing changed
+    "regressed",            # measurably worse
+    "rejected",             # blocked before any replay evidence existed
+    "not_attempted",        # no edit was proposed
+    "runtime_invalid",      # execution failed; observation only
+})
+
+# Maps a FitnessAssessment.decision onto the closed outcome vocabulary.
+_ASSESSMENT_OUTCOME_CLASS = {
+    "strong_improvement": "improved",
+    "local_improvement": "improved",
+    "directional_evidence": "directional",
+    "no_effect": "no_effect",
+    "worse": "regressed",
+}
+
+# Outcomes that may be cited as evidence that an edit actually helped.
+_PROMOTABLE_OUTCOME_CLASSES = frozenset({"improved"})
+
+
+def outcome_class_for(decision: str) -> str:
+    """Map a fitness decision onto the closed outcome vocabulary."""
+    return _ASSESSMENT_OUTCOME_CLASS.get(str(decision), "rejected")
+
+
+def _structured_outcome(
+    *,
+    outcome: str,
+    stage: str,
+    operation: str,
+    expected_effect_status: str,
+    reason_categories: Sequence[str] = (),
+    observable_deltas: Sequence[str] = (),
+    promotable: bool | None = None,
+    diagnostic_only: bool = False,
+    decision: str = "",
+) -> dict[str, Any]:
+    """Build the structured outcome payload stored in experience memory.
+
+    Replaces the previous free-form ``{"outcome": "<some string>"}``. Every
+    field is drawn from a closed vocabulary or is already category-reduced,
+    so the payload can be aggregated, filtered, and safely re-entered into a
+    reflection prompt.
+    """
+    outcome_class = outcome if outcome in OUTCOME_CLASSES else "rejected"
+    if promotable is None:
+        promotable = outcome_class in _PROMOTABLE_OUTCOME_CLASSES
+    return {
+        "outcome": outcome_class,
+        "outcome_stage": stage if stage in OUTCOME_STAGES else "mutation",
+        "outcome_decision": str(decision or outcome_class),
+        "operation": operation,
+        "reason_categories": [str(value) for value in reason_categories][:5],
+        "observable_deltas": [str(value) for value in observable_deltas][:8],
+        "expected_effect_status": expected_effect_status,
+        # Explicit claim scope: label-free/diagnostic evidence must never be
+        # read back as proof that an edit improved detection.
+        "promotable_evidence": bool(promotable) and not diagnostic_only,
+        "diagnostic_only": bool(diagnostic_only),
+        "schema_version": "agenthallu.bccse_experience_outcome.v1",
+    }
 
 
 @dataclass
@@ -886,6 +971,10 @@ def run_online_evolution(
     triggered_cases = 0
     edits_accepted = 0
     edits_rejected = 0
+    # Diagnostic-only counters: runtime failures are observations, never
+    # evolution evidence, so they are tracked separately from triggered cases.
+    runtime_invalid_cases = 0
+    runtime_error_categories: dict[str, int] = {}
 
     def run_detection(
         *,
@@ -1402,22 +1491,28 @@ def run_online_evolution(
                     target_module=item.edit.target_module,
                     override_success=_htc_success,
                     feature_description=item.edit.feature_description,
-                    attempt_metadata={
-                        "operation": (
+                    attempt_metadata=_structured_outcome(
+                        outcome=outcome_class_for(
+                            item.individual_assessment.decision
+                        ),
+                        stage="batch_commit",
+                        operation=(
                             item.edit.operation.value
                             if isinstance(item.edit.operation, SkillOp)
                             else str(item.edit.operation)
                         ),
-                        "outcome": item.individual_assessment.decision,
-                        "reason_categories": [
+                        expected_effect_status=_effect_audit["status"],
+                        reason_categories=[
                             str(value).split(":", 1)[0]
                             for value in item.individual_assessment.reasons
                         ],
-                        "observable_deltas": _effect_audit[
-                            "observable_deltas"
-                        ],
-                        "expected_effect_status": _effect_audit["status"],
-                    },
+                        observable_deltas=_effect_audit["observable_deltas"],
+                        # Only a gold-assisted batch commit may claim the
+                        # edit actually improved detection.
+                        promotable=_htc_success and fitness_use_gold,
+                        diagnostic_only=not fitness_use_gold,
+                        decision=item.individual_assessment.decision,
+                    ),
                 )
                 # A successfully repaired source becomes a future regression
                 # anchor, so later edits cannot silently forget the fix.
@@ -1498,24 +1593,29 @@ def run_online_evolution(
                                 target_module=item.edit.target_module,
                                 override_success=False,
                                 feature_description=item.edit.feature_description,
-                                attempt_metadata={
-                                    "operation": (
+                                attempt_metadata=_structured_outcome(
+                                    outcome=outcome_class_for(
+                                        item_assessment.decision
+                                    ),
+                                    stage="batch_commit",
+                                    operation=(
                                         item.edit.operation.value
                                         if isinstance(item.edit.operation, SkillOp)
                                         else str(item.edit.operation)
                                     ),
-                                    "outcome": item_assessment.decision,
-                                    "reason_categories": [
+                                    expected_effect_status=rejected_effect[
+                                        "status"
+                                    ],
+                                    reason_categories=[
                                         str(value).split(":", 1)[0]
                                         for value in item_assessment.reasons
                                     ],
-                                    "observable_deltas": rejected_effect[
+                                    observable_deltas=rejected_effect[
                                         "observable_deltas"
                                     ],
-                                    "expected_effect_status": rejected_effect[
-                                        "status"
-                                    ],
-                                },
+                                    promotable=False,
+                                    decision=item_assessment.decision,
+                                ),
                             )
                         except Exception as exc:
                             runtime_errors.append(
@@ -1658,6 +1758,13 @@ def run_online_evolution(
                 output_path=output_dir,
             )
         except Exception as exc:
+            runtime_error = f"{type(exc).__name__}: {exc}"
+            # Diagnostic-only telemetry. A crashed detector run cannot be
+            # attributed to a skill module (no verdict, no coverage, no CRS),
+            # so this signal never triggers evolution. It is recorded so the
+            # run audit and the type-conditioned memory can still show which
+            # genome failed to execute, and why, in bounded categories.
+            invalid_signal = runtime_invalid_signal(error=runtime_error)
             _atomic_write_json(
                 output_dir / "runtime_failures" / f"{idx:04d}.json",
                 {
@@ -1666,16 +1773,46 @@ def run_online_evolution(
                     "case_id": case_id,
                     "case_index": idx,
                     "genome_hash": current_genome.content_hash,
-                    "error": f"{type(exc).__name__}: {exc}",
+                    "error": runtime_error,
+                    "error_category": invalid_signal.runtime_error_category,
                     "action": "case_skipped",
+                    "claim_scope": "diagnostic_only_not_evolution_evidence",
                 },
+            )
+            runtime_invalid_cases += 1
+            runtime_error_categories[invalid_signal.runtime_error_category] = (
+                runtime_error_categories.get(
+                    invalid_signal.runtime_error_category, 0
+                ) + 1
+            )
+            # Record the lapse as an explicitly non-improving, diagnostic-only
+            # experience so a repeatedly crashing strategy is visible to later
+            # reflection without ever counting as a detection outcome.
+            type_fitness.get_experience_memory().add_experience(
+                hallucination_type=HallucinationType.UNKNOWN,
+                evolution_direction="runtime_invalid",
+                module_targeted="",
+                strategy_used="runtime_invalid",
+                detection_improved=False,
+                source_case_id=case_id,
+                metadata=_structured_outcome(
+                    outcome="runtime_invalid",
+                    stage="detection_runtime",
+                    operation="none",
+                    expected_effect_status="not_replayed",
+                    reason_categories=[invalid_signal.runtime_error_category],
+                    promotable=False,
+                    diagnostic_only=True,
+                ),
+                feature_description="",
+                type_confidence=0.0,
             )
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
                 trigger_source="runtime_invalid",
-                attribution=None,
+                attribution=invalid_signal.to_dict(),
                 edit_proposal=None,
                 mutation_applied=None,
                 gate_decision="skip_runtime_invalid",
@@ -1684,11 +1821,16 @@ def run_online_evolution(
                 detection_state="runtime_invalid",
                 timestamp=time.time(),
                 fitness_check={
-                    "runtime_error": f"{type(exc).__name__}: {exc}",
+                    "runtime_error": runtime_error,
+                    "runtime_error_category": (
+                        invalid_signal.runtime_error_category
+                    ),
+                    "diagnostic_only": True,
+                    "claim_scope": "diagnostic_only_not_evolution_evidence",
                     "passed": False,
                 },
             ), next_case_index=idx + 1)
-            print(f"  [{idx}] RUNTIME_INVALID {case_id}: {type(exc).__name__}: {exc}")
+            print(f"  [{idx}] RUNTIME_INVALID {case_id}: {runtime_error}")
             continue
         detection_state = resolve_authoritative_state(detection_result)
 
@@ -1962,15 +2104,16 @@ def run_online_evolution(
                 strategy_used="model_no_edit",
                 detection_improved=False,
                 source_case_id=case_id,
-                metadata={
-                    "operation": "no_edit",
-                    "outcome": "no_edit",
-                    "reason_categories": _no_edit_reason_categories(
+                metadata=_structured_outcome(
+                    outcome="not_attempted",
+                    stage="mutation",
+                    operation="no_edit",
+                    expected_effect_status="not_proposed",
+                    reason_categories=_no_edit_reason_categories(
                         no_edit_reason
                     ),
-                    "observable_deltas": [],
-                    "expected_effect_status": "not_proposed",
-                },
+                    decision="no_edit",
+                ),
                 feature_description="",
                 type_confidence=type_result.confidence,
             )
@@ -2160,20 +2303,21 @@ def run_online_evolution(
                     ),
                     detection_improved=False,
                     source_case_id=case_id,
-                    metadata={
-                        "operation": (
+                    metadata=_structured_outcome(
+                        outcome="rejected",
+                        stage="structural_gate",
+                        operation=(
                             edit.operation.value
                             if isinstance(edit.operation, SkillOp)
                             else str(edit.operation)
                         ),
-                        "outcome": "structural_reject",
-                        "reason_categories": [
+                        expected_effect_status="not_replayed",
+                        reason_categories=[
                             str(value).split(":", 1)[0]
                             for value in reject_reasons
                         ],
-                        "observable_deltas": [],
-                        "expected_effect_status": "not_replayed",
-                    },
+                        decision="structural_reject",
+                    ),
                     feature_description=edit.feature_description,
                     type_confidence=type_result.confidence,
                 )
@@ -2375,22 +2519,25 @@ def run_online_evolution(
                     target_module=edit.target_module,
                     override_success=False,
                     feature_description=edit.feature_description,
-                    attempt_metadata={
-                        "operation": (
+                    attempt_metadata=_structured_outcome(
+                        outcome=outcome_class_for(assessment.decision),
+                        stage="source_replay",
+                        operation=(
                             edit.operation.value
                             if isinstance(edit.operation, SkillOp)
                             else str(edit.operation)
                         ),
-                        "outcome": assessment.decision,
-                        "reason_categories": [
+                        expected_effect_status=effect_audit["status"],
+                        reason_categories=[
                             str(value).split(":", 1)[0]
                             for value in assessment.reasons
                         ],
-                        "observable_deltas": effect_audit[
-                            "observable_deltas"
-                        ],
-                        "expected_effect_status": effect_audit["status"],
-                    },
+                        observable_deltas=effect_audit["observable_deltas"],
+                        # A source replay is generated by the same detector
+                        # being edited, so it is never promotable on its own.
+                        promotable=False,
+                        decision=assessment.decision,
+                    ),
                 )
                 if assessment.decision != "no_effect":
                     reasons = [
@@ -2634,6 +2781,11 @@ def run_online_evolution(
             "result_scope": "development_candidate_not_final_holdout_champion",
             "label_free_accuracy_claim": False,
             "no_gold_promotion_allowed": False,
+            "runtime_invalid_cases": runtime_invalid_cases,
+            "runtime_error_categories": dict(runtime_error_categories),
+            "runtime_invalid_claim_scope": (
+                "diagnostic_only_not_evolution_evidence"
+            ),
         },
     )
 

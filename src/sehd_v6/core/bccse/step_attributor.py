@@ -252,10 +252,28 @@ class AttributionSignal:
     has_gold: bool
     gold_enhanced: bool
     responsible_step_correct: bool
+    # v5.5: label-free process diagnostics used for root-cause routing.
+    localization_status: str = "not_applicable"
+    appeal_status: str = "not_required"
+    focused_quarantined_candidate_count: int = 0
+    process_diagnostic_applied: bool = False
+    runtime_valid: bool = True
+    # v5.5: when True this signal records an observation only. The detector
+    # never produced an authoritative verdict, so the signal must never be
+    # used as evolution, fitness, or correctness evidence.
+    diagnostic_only: bool = False
+    runtime_error_category: str = ""
 
     @property
     def should_evolve(self) -> bool:
-        """Whether this case provides an evolution signal (triggers reflection)."""
+        """Whether this case provides an evolution signal (triggers reflection).
+
+        Diagnostic-only signals never trigger evolution: without an
+        authoritative detector verdict there is no observable process to
+        attribute a skill defect to.
+        """
+        if self.diagnostic_only:
+            return False
         return self.error_type != ErrorType.CORRECT
 
     def to_dict(self) -> dict[str, Any]:
@@ -283,8 +301,95 @@ class AttributionSignal:
             "has_gold": self.has_gold,
             "gold_enhanced": self.gold_enhanced,
             "responsible_step_correct": self.responsible_step_correct,
+            "localization_status": self.localization_status,
+            "appeal_status": self.appeal_status,
+            "focused_quarantined_candidate_count": (
+                self.focused_quarantined_candidate_count
+            ),
+            "process_diagnostic_applied": self.process_diagnostic_applied,
+            "runtime_valid": self.runtime_valid,
+            "diagnostic_only": self.diagnostic_only,
+            "runtime_error_category": self.runtime_error_category,
             "should_evolve": self.should_evolve,
         }
+
+
+# Runtime failure categories. Free-form exception text must never reach a
+# reflection prompt, so the runtime error is reduced to a bounded category.
+_RUNTIME_ERROR_CATEGORIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("provider_timeout", ("timeout", "timederror", "deadline")),
+    ("provider_rate_limit", ("rate limit", "ratelimit", "429", "too many requests")),
+    ("provider_auth", ("unauthorized", "forbidden", "401", "403", "api key")),
+    ("provider_transport", ("connection", "socket", "ssl", "dns", "network")),
+    ("provider_contract", ("json", "schema", "parse", "decode", "validation")),
+    ("detector_authority", ("decision authority", "runtime_valid", "authority")),
+    ("detector_contract", ("firewall", "coverage", "certificate", "census")),
+)
+
+
+def classify_runtime_error(error: str) -> str:
+    """Reduce a runtime failure to a bounded, promptable category."""
+    lowered = str(error or "").lower()
+    for category, markers in _RUNTIME_ERROR_CATEGORIES:
+        if any(marker in lowered for marker in markers):
+            return category
+    return "unclassified_runtime_error"
+
+
+def runtime_invalid_signal(
+    *,
+    error: str = "",
+    state: str = "runtime_invalid",
+) -> AttributionSignal:
+    """Build diagnostic-only telemetry for a detector run that never completed.
+
+    A runtime failure is genuinely informative — it says the current genome
+    could not be executed on this case — but it is NOT an attribution: there
+    is no authoritative verdict, no coverage reading, and no CRS signal, so
+    nothing can be blamed on a specific skill module.
+
+    The returned signal therefore:
+    - reports ``should_evolve == False`` so it can never drive a mutation;
+    - carries ``diagnostic_only=True`` so downstream consumers cannot
+      mistake it for fitness or correctness evidence;
+    - reduces the exception to a bounded ``runtime_error_category`` so no
+      free-form runtime text can leak into a reflection prompt.
+    """
+    category = classify_runtime_error(error)
+    return AttributionSignal(
+        error_type=ErrorType.CORRECT,
+        target_module="",
+        secondary_module="",
+        attribution_confidence="none",
+        reflection_type=ReflectionType.EXECUTION_LAPSE,
+        trigger_source=TriggerSource.SIGNAL_UNAVAILABLE,
+        evidence_summary=" | ".join((
+            f"state={state}",
+            "trigger=runtime_invalid",
+            "attribution=unavailable_no_authoritative_verdict",
+            f"runtime_error_category={category}",
+            "claim_scope=diagnostic_only_not_evolution_evidence",
+        )),
+        prosecution_coverage=None,
+        defense_coverage=None,
+        prosecution_coverage_state=None,
+        defense_coverage_state=None,
+        coverage_quantitative=False,
+        crs_scores={},
+        crs_aggregate=0.0,
+        crs_source="unavailable",
+        crs_complete=False,
+        consensus_gate_applied=False,
+        candidate_count=0,
+        state=state,
+        gold_label=None,
+        has_gold=False,
+        gold_enhanced=False,
+        responsible_step_correct=False,
+        runtime_valid=False,
+        diagnostic_only=True,
+        runtime_error_category=category,
+    )
 
 
 def _prediction_state(row: Mapping[str, Any]) -> bool | None:
@@ -336,9 +441,23 @@ def _has_surviving_error_certificate(row: Mapping[str, Any]) -> bool:
 
 
 def _process_diagnostics(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize the detector's label-free process diagnostics block.
+
+    Prefers the canonical ``diagnostics`` projection emitted by
+    ``paca_tcl.evolution_contract.project_for_evolution``. When a raw
+    detector result is supplied instead, the same fields are derived from
+    ``evidence_health`` / ``proof_adjudication`` / ``providers`` so that
+    attribution behaves identically on both shapes.
+    """
     diagnostics = row.get("diagnostics")
     if isinstance(diagnostics, Mapping):
-        return dict(diagnostics)
+        merged = dict(diagnostics)
+        merged.setdefault("focused_quarantined_candidate_count", 0)
+        merged.setdefault("appeal_status", "not_required")
+        merged.setdefault("appeal_error_type", "")
+        merged.setdefault("appeal_error", "")
+        merged.setdefault("localization_status", "not_applicable")
+        return merged
     health = row.get("evidence_health")
     health = health if isinstance(health, Mapping) else {}
     proof = row.get("proof_adjudication")
@@ -365,6 +484,108 @@ def _process_diagnostics(row: Mapping[str, Any]) -> dict[str, Any]:
             proof.get("localization_status") or health.get("localization_status") or "not_applicable"
         ),
     }
+
+
+# Appeal failure messages raised by the v3.5 proof engine appeal stage.
+# Matched as substrings against ``diagnostics.appeal_error`` to decide which
+# side of the appellate court actually broke.
+_APPEAL_PROSECUTION_MARKERS = (
+    "appeal prosecution is incomplete",
+    "appeal prosecution contains another candidate",
+    "appeal prosecutor input firewall violation",
+)
+_APPEAL_DEFENSE_MARKERS = (
+    "appeal defense is incomplete",
+    "appeal defender input firewall violation",
+)
+_APPEAL_COVERAGE_MARKERS = (
+    "appeal defense candidate coverage mismatch",
+)
+# Appeal statuses indicating the appellate stage did not complete.
+_APPEAL_INCOMPLETE_STATUSES = frozenset({
+    "incomplete_initial_error_preserved",
+    "incomplete_fail_closed",
+    "provider_error",
+})
+
+# Error types whose polarity is established by an external gold label.
+# Process diagnostics may refine their partner module but must never
+# overwrite the polarity itself.
+_GOLD_POLARITY_ERROR_TYPES = frozenset({
+    ErrorType.FALSE_POSITIVE,
+    ErrorType.FALSE_NEGATIVE,
+    ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+    ErrorType.FALSE_NEGATIVE_CLEAN,
+    ErrorType.UNRESOLVED_SHOULD_ERROR,
+    ErrorType.UNRESOLVED_SHOULD_CLEAN,
+    ErrorType.LOCALIZATION_ERROR,
+    ErrorType.CANDIDATE_MISS,
+})
+
+# Generic self-supervised outcomes that a concrete process diagnostic
+# should refine into a specific broken stage.
+_REFINABLE_ERROR_TYPES = frozenset({
+    ErrorType.CORRECT,
+    ErrorType.UNRESOLVED_UNKNOWN,
+    ErrorType.CRS_CONTRADICTION,
+    ErrorType.EVIDENCE_INCOMPLETE,
+    ErrorType.SIGNAL_UNAVAILABLE,
+})
+
+
+def _classify_appeal_failure(diagnostics: Mapping[str, Any]) -> ErrorType | None:
+    """Classify which appellate party failed, if the appeal stage broke."""
+    status = str(diagnostics.get("appeal_status") or "not_required")
+    error_text = str(diagnostics.get("appeal_error") or "").lower()
+    error_type = str(diagnostics.get("appeal_error_type") or "")
+    if status not in _APPEAL_INCOMPLETE_STATUSES and not error_type:
+        return None
+    if any(marker in error_text for marker in _APPEAL_COVERAGE_MARKERS):
+        return ErrorType.APPEAL_COVERAGE_MISMATCH
+    if any(marker in error_text for marker in _APPEAL_DEFENSE_MARKERS):
+        return ErrorType.APPEAL_DEFENDER_FAILURE
+    if any(marker in error_text for marker in _APPEAL_PROSECUTION_MARKERS):
+        return ErrorType.APPEAL_PROSECUTOR_FAILURE
+    # An unrecognized appeal breakage still broke the prosecution-side
+    # appellate obligation, which is the stage that runs first.
+    return ErrorType.APPEAL_PROSECUTOR_FAILURE
+
+
+def _classify_process_diagnostics(
+    diagnostics: Mapping[str, Any],
+) -> tuple[ErrorType, TriggerSource] | None:
+    """Identify the process stage that broke, from label-free diagnostics.
+
+    Priority reflects execution order in the v3.5 proof court: an appeal
+    breakage invalidates more of the trace than a per-candidate quarantine,
+    which in turn is more fundamental than a localization tie-break.
+
+    Returns None when diagnostics show no process-stage defect.
+    """
+    appeal_error_type = _classify_appeal_failure(diagnostics)
+    if appeal_error_type is not None:
+        return appeal_error_type, TriggerSource.APPEAL_FAILURE
+
+    if _diagnostic_int(diagnostics, "focused_quarantined_candidate_count") > 0:
+        return (
+            ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
+            TriggerSource.FOCUSED_QUARANTINE,
+        )
+
+    localization = str(diagnostics.get("localization_status") or "not_applicable")
+    if localization == "failed_temporal_fallback":
+        # Two or more error certificates survived but counterfactual
+        # localization could not rank them, so the responsible step was
+        # chosen by temporal fallback rather than causal sufficiency.
+        return ErrorType.LOCALIZATION_AMBIGUOUS, TriggerSource.LOCALIZATION
+    return None
+
+
+def _diagnostic_int(diagnostics: Mapping[str, Any], key: str) -> int:
+    try:
+        return int(diagnostics.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _route_process_failure(
@@ -650,34 +871,47 @@ def attribute_failure(
             else:
                 error_type = ErrorType.UNRESOLVED_UNKNOWN
 
-        # Trigger 2: required diagnostic proof signals are unavailable.
-        elif not crs_signal.complete:
-            trigger_source = TriggerSource.SIGNAL_UNAVAILABLE
-            error_type = ErrorType.SIGNAL_UNAVAILABLE
-
-        # Trigger 3: CRS contradiction
-        elif _detect_crs_contradiction(state, crs_signal):
-            trigger_source = TriggerSource.CRS_CONTRADICTION
-            error_type = ErrorType.CRS_CONTRADICTION
-
-        # Trigger 4: Evidence incomplete
-        elif _detect_evidence_incomplete(prosecution, defense, state):
-            trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
-            error_type = ErrorType.EVIDENCE_INCOMPLETE
-
-        # Trigger 5 (boundary hesitation) retired in v5.4: it required
-        # quantitative coverage readings that the v3.5 proof court never
-        # emits, so the trigger was unreachable in production.
-
-        # Trigger 6: Gold mismatch (optional, lowest priority)
+        # Trigger 2: gold polarity. An external label is stronger evidence
+        # than any detector-internal process signal, so a gold-established
+        # FP/FN must claim the error type before the self-supervised
+        # triggers below can relabel the case as a mere process defect.
         elif use_gold and has_gold and predicted is not None and predicted != gold:
             trigger_source = TriggerSource.GOLD_MISMATCH
             if predicted is True and gold is False:
                 error_type = ErrorType.FALSE_POSITIVE
-            elif predicted is False and gold is True:
-                error_type = ErrorType.FALSE_NEGATIVE_CLEAN
             else:
-                error_type = ErrorType.CORRECT
+                error_type = ErrorType.FALSE_NEGATIVE_CLEAN
+
+        # Trigger 3: gold-confirmed verdict with a mislocalized origin.
+        elif (
+            use_gold
+            and has_gold
+            and predicted is not None
+            and predicted == gold
+            and gold is True
+            and not step_correct
+        ):
+            trigger_source = TriggerSource.GOLD_MISMATCH
+            error_type = ErrorType.LOCALIZATION_ERROR
+
+        # Trigger 4: required diagnostic proof signals are unavailable.
+        elif not crs_signal.complete:
+            trigger_source = TriggerSource.SIGNAL_UNAVAILABLE
+            error_type = ErrorType.SIGNAL_UNAVAILABLE
+
+        # Trigger 5: CRS contradiction
+        elif _detect_crs_contradiction(state, crs_signal):
+            trigger_source = TriggerSource.CRS_CONTRADICTION
+            error_type = ErrorType.CRS_CONTRADICTION
+
+        # Trigger 6: Evidence incomplete
+        elif _detect_evidence_incomplete(prosecution, defense, state):
+            trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
+            error_type = ErrorType.EVIDENCE_INCOMPLETE
+
+        # Boundary hesitation retired in v5.4: it required quantitative
+        # coverage readings the v3.5 proof court never emits, so the
+        # trigger was unreachable in production.
 
     # --- Additional: candidate miss detection ---
     if (
@@ -707,10 +941,82 @@ def attribute_failure(
             error_type = ErrorType.UNRESOLVED_UNKNOWN  # re-route below
 
     # ================================================================
+    # Process diagnostics (v5.5)
+    # ================================================================
+    # The detector emits a label-free diagnostics block describing which
+    # pipeline stage broke (focused-prosecution quarantine, appeal failure,
+    # ambiguous localization). This is strictly a ROOT-CAUSE signal:
+    #
+    #   - Gold FP/FN and gold localization polarity always win. Diagnostics
+    #     may only refine the partner module on those cases.
+    #   - A gold-confirmed correct verdict is never turned into a failure by
+    #     a process irregularity that did not change the outcome.
+    #   - In self-supervised mode, diagnostics refine a generic outcome into
+    #     the concrete stage that failed, so mutation targets the right
+    #     module instead of defaulting to evidence_obligation.
+    diagnostics = _process_diagnostics(row)
+    quarantined_count = _diagnostic_int(
+        diagnostics, "focused_quarantined_candidate_count"
+    )
+    diagnostic_finding = _classify_process_diagnostics(diagnostics)
+    process_diagnostic_applied = False
+
+    # Gold localization polarity beats the localization process diagnostic:
+    # if gold confirms the responsible step is right, an ambiguous tie-break
+    # did not actually mislocalize, so earliest_origin_tiebreak is not the
+    # module to blame.
+    if (
+        diagnostic_finding is not None
+        and diagnostic_finding[0] == ErrorType.LOCALIZATION_AMBIGUOUS
+        and has_gold
+        and step_correct
+    ):
+        diagnostic_finding = None
+
+    # Gold-verified polarity precedence: when gold matches the prediction and
+    # localization is right, the case is CORRECT. Self-supervised cascade
+    # reclassifications (SIGNAL_UNAVAILABLE, CRS_CONTRADICTION, ...) are
+    # diagnostic artifacts and must not supersede a gold-confirmed outcome.
+    gold_verified_correct = (
+        has_gold
+        and predicted is not None
+        and predicted == gold
+        and (not gold or step_correct)
+    )
+    if gold_verified_correct:
+        error_type = ErrorType.CORRECT
+        trigger_source = TriggerSource.NONE
+
+    gold_polarity_locked = has_gold and (
+        error_type in _GOLD_POLARITY_ERROR_TYPES or gold_verified_correct
+    )
+
+    if (
+        diagnostic_finding is not None
+        and not gold_polarity_locked
+        and error_type in _REFINABLE_ERROR_TYPES
+    ):
+        error_type, trigger_source = diagnostic_finding
+        process_diagnostic_applied = True
+
+    # ================================================================
     # Module attribution
     # ================================================================
     target_module = ERROR_MODULE_MAP.get(error_type, "evidence_obligation")
     secondary_module = ERROR_MODULE_SECONDARY.get(error_type, "abstention_rule")
+
+    # Gold keeps polarity AND its primary module (an FP is a defense failure,
+    # not a localization failure). Diagnostics only supply the partner module
+    # so the repair prompt names both the gold failure and the process defect.
+    if (
+        gold_polarity_locked
+        and not gold_verified_correct
+        and diagnostic_finding is not None
+    ):
+        diagnostic_module = ERROR_MODULE_MAP.get(diagnostic_finding[0])
+        if diagnostic_module is not None and diagnostic_module != target_module:
+            secondary_module = diagnostic_module
+            process_diagnostic_applied = True
 
     if error_type in {
         ErrorType.UNRESOLVED_UNKNOWN,
@@ -764,6 +1070,15 @@ def attribute_failure(
         ErrorType.SIGNAL_UNAVAILABLE,
     ):
         reflection_type = ReflectionType.OPTIMIZATION
+    elif error_type in (
+        ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
+        ErrorType.APPEAL_PROSECUTOR_FAILURE,
+        ErrorType.APPEAL_DEFENDER_FAILURE,
+        ErrorType.APPEAL_COVERAGE_MISMATCH,
+    ):
+        # A named stage failed to produce the output its contract requires:
+        # the skill text for that stage is deficient, not merely suboptimal.
+        reflection_type = ReflectionType.SKILL_DEFECT
     else:
         reflection_type = ReflectionType.OPTIMIZATION
 
@@ -803,6 +1118,20 @@ def attribute_failure(
         )
     if error_type == ErrorType.CRS_CONTRADICTION:
         evidence_parts.append("crs_dimensions_contradict_final_decision")
+    if process_diagnostic_applied:
+        evidence_parts.append("process_diagnostic=applied")
+    localization_status = str(
+        diagnostics.get("localization_status") or "not_applicable"
+    )
+    appeal_status = str(diagnostics.get("appeal_status") or "not_required")
+    if localization_status != "not_applicable":
+        evidence_parts.append(f"localization_status={localization_status}")
+    if appeal_status != "not_required":
+        evidence_parts.append(f"appeal_status={appeal_status}")
+    if quarantined_count:
+        evidence_parts.append(
+            f"focused_quarantined_candidates={quarantined_count}"
+        )
 
     # Attribution confidence (v5.3): high for definite error types,
     # medium for CRS/boundary signals, low for unresolved/unavailable.
@@ -812,11 +1141,19 @@ def attribute_failure(
     if error_type in (ErrorType.FALSE_POSITIVE, ErrorType.FALSE_NEGATIVE_UNRESOLVED,
                       ErrorType.FALSE_NEGATIVE_CLEAN, ErrorType.LOCALIZATION_ERROR):
         attribution_confidence = "high"
+    elif error_type in (ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
+                        ErrorType.APPEAL_PROSECUTOR_FAILURE,
+                        ErrorType.APPEAL_DEFENDER_FAILURE,
+                        ErrorType.APPEAL_COVERAGE_MISMATCH,
+                        ErrorType.LOCALIZATION_AMBIGUOUS):
+        # The detector reported exactly which stage broke; the root-cause
+        # module follows from the pipeline structure, not from inference.
+        attribution_confidence = "high"
     elif error_type in (ErrorType.UNRESOLVED_SHOULD_ERROR,
                         ErrorType.UNRESOLVED_SHOULD_CLEAN,
                         ErrorType.CRS_CONTRADICTION,
                         ErrorType.BOUNDARY_HESITATION):
-        # Gold direction is known → attribution is more reliable
+        # Gold direction is known -> attribution is more reliable
         attribution_confidence = "medium"
     else:
         attribution_confidence = "low"
@@ -845,6 +1182,13 @@ def attribute_failure(
         has_gold=has_gold,
         gold_enhanced=has_gold,
         responsible_step_correct=step_correct,
+        localization_status=str(
+            diagnostics.get("localization_status") or "not_applicable"
+        ),
+        appeal_status=str(diagnostics.get("appeal_status") or "not_required"),
+        focused_quarantined_candidate_count=quarantined_count,
+        process_diagnostic_applied=process_diagnostic_applied,
+        runtime_valid=row.get("runtime_valid") is not False,
     )
 
 

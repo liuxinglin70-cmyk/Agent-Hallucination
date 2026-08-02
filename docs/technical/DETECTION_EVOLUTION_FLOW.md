@@ -135,9 +135,40 @@ edit 先应用到 candidate/shadow genome，champion 暂时不变。
 - CRS 五维投影；
 - candidate count；
 - detection state；
-- responsible step 是否可用。
+- responsible step 是否可用；
+- process diagnostics（`localization_status`、`appeal_status`、
+  `focused_quarantined_candidate_count`）。
 
 默认 self-supervised 模式不使用 gold。只有显式启用 `use_gold` 或 `fitness_use_gold` 时，gold 才能进入对应的评估路径。
+
+#### process diagnostics 与 gold 的优先级
+
+detector 会输出一个 label-free 的 `diagnostics` 块，说明**哪个流水线阶段**出了问题
+（focused-prosecution quarantine、appeal 失败、localization 无法排歧）。
+它只用于确定**根因模块**，绝不改写极性：
+
+| 情况 | 极性来源 | primary module | secondary module |
+| --- | --- | --- | --- |
+| self-supervised + diagnostic | diagnostics | diagnostics | diagnostics |
+| gold FP/FN | **gold** | **gold** | diagnostics |
+| gold 判定正确 | **CORRECT，不触发** | — | — |
+
+三条不变式：
+
+1. gold 建立的 FP/FN/localization 极性优先于任何 detector 内部信号；
+2. gold 确认正确的 case 不会因为“过程有瑕疵但结论没变”而被制造出 trigger；
+3. diagnostics 只能补充 secondary module——把 false positive 归因到
+   `earliest_origin_tiebreak` 会把修复送到一个无法纠正错误结论的模块。
+
+阶段优先级按 proof court 的实际执行顺序：appeal > quarantine > localization。
+
+#### runtime-invalid 只作为遥测
+
+detector 运行崩溃时产生 `runtime_invalid_signal()`：`should_evolve` 恒为
+`False`，`diagnostic_only=True`。没有权威判决就没有 coverage、没有 CRS，
+因此无法归因到任何模块，只记录“当前 genome 在这个 case 上跑不起来”。
+异常文本会被归约成有限类别（`provider_timeout`、`provider_auth` 等），
+防止原始 runtime 字符串（可能含泄漏的 label）进入 reflection prompt。
 
 ### 3.3 HTC-TES 类型路由
 
@@ -172,6 +203,20 @@ HTC-TES 根据 trace 将问题归为 factual、instructional、tool、reasoning�
 - capacity guidance；
 - HTC-TES type guidance；
 - experience memory。
+
+experience memory 里每条记录的 outcome 都是结构化的（封闭词表），而不是自由文本：
+
+- `outcome`：`improved` / `directional` / `no_effect` / `regressed` /
+  `rejected` / `not_attempted` / `runtime_invalid`；
+- `outcome_stage`：`mutation` / `structural_gate` / `source_replay` /
+  `batch_commit` / `detection_runtime`；
+- `promotable_evidence`：这条记录是否可以被引用为“确实改善了检测”。
+  source replay 和 label-free batch commit 恒为 `False`——由被编辑的
+  detector 自己生成的 replay 不能自证正确性；
+- `diagnostic_only`：仅遥测，不构成任何证据。
+
+因此 `get_reflection_summary()` 可以按 stage 聚合，告诉反思“**尝试通常卡在哪一阶段**”，
+而不只是“失败了”。
 
 LLM 只能返回一个 `no_edit` 或一个单模块 edit。合法 edit 要满足：
 
@@ -217,6 +262,7 @@ fitness 检查包括：
 
 - authority/runtime 是否仍然有效；
 - CRS complete 等必要诊断信号是否丢失；
+- responsible step 是否被新 edit 丢掉（保持结论但丢失定位同样算 regression）；
 - source 是否从 triggered 变成 stable；
 - stable case 是否被新 edit 变成 triggered；
 - 目标 module local score 是否至少跨过 epsilon；
@@ -224,6 +270,20 @@ fitness 检查包括：
 - 是否出现新的 failure trigger。
 
 同一个结果没有发生可测变化时，必须是 `no_effect`，不能因为规则文字“听起来合理”而接受。
+
+#### localization 打分按正确性而非“有没有输出”
+
+`earliest_origin_tiebreak` 的 local score 曾经只看 `responsible_step` 非空，
+于是“永远输出一个 origin”的规则也会被记成改进。现在按质量打分：
+
+- 没有 origin → `0.0`；
+- 有 gold 且是 error case → 以 gold 的正确性为准（对 `1.0` / 错 `0.0`）；
+- 否则用 detector 自己的定位质量：`complete` `1.0` >
+  `not_applicable` `0.8` > `failed_temporal_fallback` `0.2`。
+
+注意 `responsible_step_correct` 只在 gold error case 上可信——没有提供
+gold steps 时它同样是 `False`，直接当成“定位错误”会把所有 self-supervised
+的定位分数清零。
 
 ### 3.7 canary、batch commit 与 rollback
 

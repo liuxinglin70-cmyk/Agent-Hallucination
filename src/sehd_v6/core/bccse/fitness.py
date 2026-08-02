@@ -174,6 +174,47 @@ def _responsible_step_present(row: Mapping[str, Any]) -> float:
     return 1.0 if value is not None and str(value) != "" else 0.0
 
 
+# How much confidence the detector's own localization procedure earned.
+# "complete"  -> counterfactual ranking actually resolved the origin.
+# "not_applicable" -> a single surviving origin, so nothing to disambiguate.
+# "failed_temporal_fallback" -> two or more origins survived and the ranking
+#   failed, so the origin was picked by timestamp rather than causal
+#   sufficiency. That is a genuinely weaker localization.
+_LOCALIZATION_STATUS_QUALITY = {
+    "complete": 1.0,
+    "not_applicable": 0.8,
+    "failed_temporal_fallback": 0.2,
+}
+
+
+def _localization_quality(
+    signal: AttributionSignal,
+    row: Mapping[str, Any],
+) -> float:
+    """Grade localization by correctness, not by mere emission of a step.
+
+    The previous metric rewarded any non-empty ``responsible_step``, so a
+    module could "improve" simply by always naming an origin — including
+    the wrong one. This grades the origin instead:
+
+    - No origin emitted at all -> 0.0.
+    - Gold available for an error case -> correctness is authoritative.
+    - Otherwise -> the detector's own localization procedure quality, so
+      an ambiguous temporal fallback scores well below a counterfactually
+      ranked origin and evolution has a real gradient to climb.
+    """
+    if not _responsible_step_present(row):
+        return 0.0
+    # ``responsible_step_correct`` is only trustworthy as POSITIVE evidence:
+    # it is also False when no gold steps were supplied. Consult it only on
+    # gold-labelled error cases, where an origin is genuinely expected.
+    if signal.has_gold and signal.gold_label is True:
+        return 1.0 if signal.responsible_step_correct else 0.0
+    return _LOCALIZATION_STATUS_QUALITY.get(
+        str(signal.localization_status or ""), 0.4
+    )
+
+
 def module_local_score(
     module: str,
     signal: AttributionSignal,
@@ -202,7 +243,10 @@ def module_local_score(
     if module == "causal_link_test":
         return _causal_field_score(row)
     if module == "earliest_origin_tiebreak":
-        return _responsible_step_present(row) + _causal_field_score(row)
+        # Correctness/quality of the chosen origin, not merely that one
+        # exists. Guarding against "emit any step" gaming is the whole
+        # point of this module's score.
+        return _localization_quality(signal, row) + _causal_field_score(row)
     if module == "abstention_rule":
         # v5.3.2: graduated score reflecting partial progress toward verdict.
         # Full resolution is best, but CRS/consensus progress is measurable.
@@ -319,6 +363,17 @@ def observable_process_delta(
         changes.append(
             "responsible_step:added" if after_responsible else "responsible_step:removed"
         )
+    if before.localization_status != after.localization_status:
+        changes.append(
+            f"localization_status:{before.localization_status}"
+            f"->{after.localization_status}"
+        )
+    before_localization = _localization_quality(before, before_result)
+    after_localization = _localization_quality(after, after_result)
+    if after_localization - before_localization > epsilon:
+        changes.append("localization_quality:increased")
+    elif before_localization - after_localization > epsilon:
+        changes.append("localization_quality:decreased")
     if before.crs_complete != after.crs_complete:
         changes.append(
             "diagnostic_signal:gained" if after.crs_complete else "diagnostic_signal:lost"
@@ -358,6 +413,15 @@ def assess_source_fitness(
         return FitnessAssessment("worse", ("invalid_after_state",))
     if before.crs_complete and not after.crs_complete:
         return FitnessAssessment("worse", ("required_diagnostic_signal_lost",))
+    # A verdict-preserving edit that degrades the origin is still a
+    # regression: downstream repair depends on the responsible step, and
+    # the module_local_score below only sees it when the edit happened to
+    # target earliest_origin_tiebreak.
+    if (
+        _responsible_step_present(before_result or {})
+        and not _responsible_step_present(after_result or {})
+    ):
+        return FitnessAssessment("worse", ("responsible_step_lost",))
 
     task_before: int | None = None
     task_after: int | None = None

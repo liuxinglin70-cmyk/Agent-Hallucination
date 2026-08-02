@@ -1115,3 +1115,616 @@ def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
     )
     assert probe_audit["case_audits"][0]["gold_correct"] is None
     assert result.evolution_audit["label_free_accuracy_claim"] is False
+
+
+# ============================================================
+# v5.5 — process diagnostics routing
+# ============================================================
+
+
+def _diagnostic_row(state: str = "verified_error", **diagnostics: object) -> dict:
+    """A minimal authoritative detector row with a diagnostics projection."""
+    payload = {
+        "focused_quarantined_candidate_count": 0,
+        "appeal_status": "not_required",
+        "appeal_error_type": "",
+        "appeal_error": "",
+        "localization_status": "not_applicable",
+    }
+    payload.update(diagnostics)
+    return {
+        "state": state,
+        "occurrence_state": state,
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "census": [{"candidate_id": "c1"}],
+        "proof_adjudication": {
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "surviving_error_certificate_ids": ["c1", "c2"],
+        },
+        "diagnostics": payload,
+    }
+
+
+def test_focused_quarantine_diagnostic_routes_to_verifier_module() -> None:
+    signal = attribute_failure(
+        _diagnostic_row(focused_quarantined_candidate_count=2)
+    )
+    assert signal.error_type is ErrorType.FOCUSED_CERTIFICATE_QUARANTINE
+    assert signal.trigger_source is TriggerSource.FOCUSED_QUARANTINE
+    assert signal.target_module == "atomic_verifier_instruction"
+    assert signal.attribution_confidence == "high"
+    assert signal.process_diagnostic_applied is True
+    assert signal.focused_quarantined_candidate_count == 2
+    assert signal.should_evolve
+
+
+def test_appeal_failure_diagnostic_distinguishes_broken_party() -> None:
+    prosecutor = attribute_failure(_diagnostic_row(
+        appeal_status="incomplete_fail_closed",
+        appeal_error_type="ValueError",
+        appeal_error="required appeal prosecution is incomplete",
+    ))
+    assert prosecutor.error_type is ErrorType.APPEAL_PROSECUTOR_FAILURE
+    assert prosecutor.target_module == "atomic_verifier_instruction"
+
+    defender = attribute_failure(_diagnostic_row(
+        appeal_status="incomplete_fail_closed",
+        appeal_error_type="ValueError",
+        appeal_error="required appeal defense is incomplete",
+    ))
+    assert defender.error_type is ErrorType.APPEAL_DEFENDER_FAILURE
+    assert defender.target_module == "clean_defense_boundary"
+
+    mismatch = attribute_failure(_diagnostic_row(
+        appeal_status="incomplete_fail_closed",
+        appeal_error_type="ValueError",
+        appeal_error="required appeal defense candidate coverage mismatch",
+    ))
+    assert mismatch.error_type is ErrorType.APPEAL_COVERAGE_MISMATCH
+    assert mismatch.target_module == "candidate_to_verifier_route"
+
+    for signal in (prosecutor, defender, mismatch):
+        assert signal.trigger_source is TriggerSource.APPEAL_FAILURE
+        assert signal.reflection_type is ReflectionType.SKILL_DEFECT
+
+
+def test_appeal_failure_outranks_quarantine_and_localization() -> None:
+    """Appeal breakage invalidates more of the trace than later stages."""
+    signal = attribute_failure(_diagnostic_row(
+        appeal_status="incomplete_fail_closed",
+        appeal_error_type="ValueError",
+        appeal_error="required appeal prosecution is incomplete",
+        focused_quarantined_candidate_count=3,
+        localization_status="failed_temporal_fallback",
+    ))
+    assert signal.error_type is ErrorType.APPEAL_PROSECUTOR_FAILURE
+    assert signal.trigger_source is TriggerSource.APPEAL_FAILURE
+
+
+def test_failed_temporal_fallback_routes_to_origin_tiebreak() -> None:
+    signal = attribute_failure(
+        _diagnostic_row(localization_status="failed_temporal_fallback")
+    )
+    assert signal.error_type is ErrorType.LOCALIZATION_AMBIGUOUS
+    assert signal.trigger_source is TriggerSource.LOCALIZATION
+    assert signal.target_module == "earliest_origin_tiebreak"
+    assert signal.localization_status == "failed_temporal_fallback"
+
+
+def test_complete_localization_does_not_trigger_diagnostic() -> None:
+    signal = attribute_failure(_diagnostic_row(localization_status="complete"))
+    assert signal.error_type is not ErrorType.LOCALIZATION_AMBIGUOUS
+    assert signal.process_diagnostic_applied is False
+
+
+def test_gold_false_positive_polarity_outranks_process_diagnostic() -> None:
+    """Gold FP keeps its polarity AND its defense-side primary module.
+
+    A process diagnostic may only contribute the partner module: blaming
+    earliest_origin_tiebreak for a false positive would send the mutation
+    to a module that cannot fix a wrong verdict.
+    """
+    row = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row["gold_label"] = False
+    signal = attribute_failure(row, use_gold=True)
+
+    assert signal.error_type is ErrorType.FALSE_POSITIVE
+    assert signal.trigger_source is TriggerSource.GOLD_MISMATCH
+    assert signal.target_module == "clean_defense_boundary"
+    # Diagnostics still surface the observed process defect as secondary.
+    assert signal.secondary_module == "earliest_origin_tiebreak"
+    assert signal.process_diagnostic_applied is True
+
+
+def test_gold_false_negative_polarity_survives_quarantine_diagnostic() -> None:
+    row = _diagnostic_row("verified_clean", focused_quarantined_candidate_count=1)
+    row["gold_label"] = True
+    signal = attribute_failure(row, use_gold=True)
+    assert signal.error_type is ErrorType.FALSE_NEGATIVE_CLEAN
+    assert signal.trigger_source is TriggerSource.GOLD_MISMATCH
+
+
+def test_gold_localization_error_is_not_relabelled_as_ambiguous() -> None:
+    """Gold says the origin is wrong; that outranks 'the tie-break was hard'."""
+    row = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row.update({"gold_label": True, "gold_steps": [5], "responsible_step": 2})
+    signal = attribute_failure(row, use_gold=True)
+    assert signal.error_type is ErrorType.LOCALIZATION_ERROR
+    assert signal.trigger_source is TriggerSource.GOLD_MISMATCH
+    assert signal.responsible_step_correct is False
+
+
+def test_gold_confirmed_correct_case_is_never_triggered_by_diagnostics() -> None:
+    """A process irregularity that did not change the verdict is not a failure."""
+    row = _diagnostic_row(
+        localization_status="failed_temporal_fallback",
+        focused_quarantined_candidate_count=2,
+    )
+    row.update({"gold_label": True, "gold_steps": [2], "responsible_step": 2})
+    signal = attribute_failure(row, use_gold=True)
+
+    assert signal.error_type is ErrorType.CORRECT
+    assert signal.trigger_source is TriggerSource.NONE
+    assert signal.should_evolve is False
+    assert signal.process_diagnostic_applied is False
+    # The raw diagnostic facts stay auditable even when they are not acted on.
+    assert signal.localization_status == "failed_temporal_fallback"
+    assert signal.focused_quarantined_candidate_count == 2
+
+
+def test_self_supervised_mode_ignores_gold_for_diagnostic_refinement() -> None:
+    """Without the use_gold opt-in, gold must not suppress a refinement."""
+    row = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row.update({"gold_label": True, "gold_steps": [2], "responsible_step": 2})
+    signal = attribute_failure(row, use_gold=False)
+    assert signal.has_gold is False
+    assert signal.error_type is ErrorType.LOCALIZATION_AMBIGUOUS
+
+
+def test_process_diagnostics_derived_from_raw_detector_result() -> None:
+    """A raw v3.5 result (no diagnostics block) yields the same routing."""
+    raw = {
+        "state": "verified_error",
+        "occurrence_state": "verified_error",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "census": [{"candidate_id": "c1"}],
+        "proof_adjudication": {
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "surviving_error_certificate_ids": ["c1", "c2"],
+            "localization_status": "failed_temporal_fallback",
+        },
+    }
+    signal = attribute_failure(raw)
+    assert signal.error_type is ErrorType.LOCALIZATION_AMBIGUOUS
+    assert signal.target_module == "earliest_origin_tiebreak"
+
+
+def test_diagnostics_appear_in_evidence_summary_and_payload() -> None:
+    signal = attribute_failure(_diagnostic_row(
+        localization_status="failed_temporal_fallback",
+        focused_quarantined_candidate_count=2,
+    ))
+    assert "process_diagnostic=applied" in signal.evidence_summary
+    assert "localization_status=failed_temporal_fallback" in signal.evidence_summary
+    payload = signal.to_dict()
+    assert payload["localization_status"] == "failed_temporal_fallback"
+    assert payload["process_diagnostic_applied"] is True
+    # The summary must stay label-free in self-supervised mode.
+    assert "gold" not in signal.evidence_summary.replace("supervision=", "")
+
+
+def test_malformed_diagnostic_counts_do_not_crash_attribution() -> None:
+    signal = attribute_failure(
+        _diagnostic_row(focused_quarantined_candidate_count="not-a-number")
+    )
+    assert signal.focused_quarantined_candidate_count == 0
+    assert signal.error_type is not ErrorType.FOCUSED_CERTIFICATE_QUARANTINE
+
+
+# ============================================================
+# v5.5 — localization fitness
+# ============================================================
+
+
+def test_emitting_any_responsible_step_is_not_localization_progress() -> None:
+    """The core anti-gaming property: presence alone must not score full marks.
+
+    Previously ``earliest_origin_tiebreak`` scored 1.0 for any non-empty
+    responsible_step, so a rule that always names an origin looked like an
+    improvement even when the origin was chosen by temporal fallback.
+    """
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    ambiguous = replace(
+        _signal("verified_error"), localization_status="failed_temporal_fallback"
+    )
+    ranked = replace(_signal("verified_error"), localization_status="complete")
+    row = {"responsible_step": 3}
+
+    ambiguous_score = module_local_score("earliest_origin_tiebreak", ambiguous, row)
+    ranked_score = module_local_score("earliest_origin_tiebreak", ranked, row)
+
+    assert ambiguous_score < ranked_score
+    # A fallback origin must not be scored as a fully localized one.
+    assert ambiguous_score < 1.0
+
+
+def test_missing_responsible_step_scores_zero_localization() -> None:
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    signal = replace(_signal("verified_error"), localization_status="complete")
+    assert module_local_score("earliest_origin_tiebreak", signal, {}) == 0.0
+    assert module_local_score(
+        "earliest_origin_tiebreak", signal, {"responsible_step": ""}
+    ) == 0.0
+
+
+def test_gold_localization_correctness_outranks_status_quality() -> None:
+    """With gold present, correctness of the origin is authoritative."""
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    row = {"responsible_step": 3}
+    # Detector is confident ("complete") but gold says the origin is wrong.
+    wrong = replace(
+        _signal("verified_error"),
+        localization_status="complete",
+        has_gold=True,
+        gold_label=True,
+        responsible_step_correct=False,
+    )
+    right = replace(wrong, responsible_step_correct=True)
+
+    assert module_local_score("earliest_origin_tiebreak", wrong, row) == 0.0
+    assert module_local_score("earliest_origin_tiebreak", right, row) == 1.0
+
+
+def test_localization_correctness_flag_ignored_without_gold_error_case() -> None:
+    """``responsible_step_correct`` is False when no gold steps were given.
+
+    Treating that as a wrong origin would zero out every self-supervised
+    localization score, so it must only be read on gold error cases.
+    """
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    row = {"responsible_step": 3}
+    self_supervised = replace(
+        _signal("verified_error"),
+        localization_status="complete",
+        has_gold=False,
+        responsible_step_correct=False,
+    )
+    gold_clean = replace(
+        _signal("verified_clean"),
+        localization_status="complete",
+        has_gold=True,
+        gold_label=False,
+        responsible_step_correct=False,
+    )
+    assert module_local_score("earliest_origin_tiebreak", self_supervised, row) > 0.0
+    assert module_local_score("earliest_origin_tiebreak", gold_clean, row) > 0.0
+
+
+def test_localization_quality_change_is_reported_as_observable_delta() -> None:
+    before = replace(
+        _signal("verified_error"), localization_status="failed_temporal_fallback"
+    )
+    after = replace(_signal("verified_error"), localization_status="complete")
+    changes = observable_process_delta(
+        before,
+        after,
+        target_module="earliest_origin_tiebreak",
+        before_result={"responsible_step": 3},
+        after_result={"responsible_step": 3},
+    )
+    assert (
+        "localization_status:failed_temporal_fallback->complete" in changes
+    )
+    assert "localization_quality:increased" in changes
+
+
+# ============================================================
+# v5.5 — runtime-invalid diagnostic-only telemetry
+# ============================================================
+
+
+def test_runtime_invalid_signal_is_never_evolution_evidence() -> None:
+    from src.sehd_v6.core.bccse.step_attributor import runtime_invalid_signal
+
+    signal = runtime_invalid_signal(error="TimeoutError: deadline exceeded")
+
+    # The decisive property: a crashed run must not drive a mutation.
+    assert signal.should_evolve is False
+    assert signal.diagnostic_only is True
+    assert signal.runtime_valid is False
+    assert signal.reflection_type is ReflectionType.EXECUTION_LAPSE
+    # No module may be blamed without an authoritative verdict.
+    assert signal.target_module == ""
+    assert signal.attribution_confidence == "none"
+    assert signal.crs_complete is False
+    assert signal.has_gold is False
+
+
+def test_runtime_error_is_reduced_to_bounded_category() -> None:
+    """Raw exception text must never be able to reach a reflection prompt."""
+    from src.sehd_v6.core.bccse.step_attributor import (
+        classify_runtime_error,
+        runtime_invalid_signal,
+    )
+
+    assert classify_runtime_error("TimeoutError: deadline exceeded") == (
+        "provider_timeout"
+    )
+    assert classify_runtime_error("HTTP 429 too many requests") == (
+        "provider_rate_limit"
+    )
+    assert classify_runtime_error("401 Unauthorized api key") == "provider_auth"
+    assert classify_runtime_error("JSONDecodeError: bad parse") == (
+        "provider_contract"
+    )
+    assert classify_runtime_error("weird internal glitch") == (
+        "unclassified_runtime_error"
+    )
+
+    secret = "ValueError: gold_label=True leaked into prompt"
+    signal = runtime_invalid_signal(error=secret)
+    assert secret not in signal.evidence_summary
+    assert "gold_label" not in signal.evidence_summary
+    assert signal.runtime_error_category in signal.evidence_summary
+
+
+def test_diagnostic_only_signal_cannot_be_promoted_by_fitness() -> None:
+    """Even a 'closed trigger' must not promote a diagnostic-only signal."""
+    from src.sehd_v6.core.bccse.step_attributor import runtime_invalid_signal
+
+    invalid = runtime_invalid_signal(error="TimeoutError: x")
+    # should_evolve is False on both sides, so the "failure closed" reward
+    # path cannot fire, and an invalid state is rejected outright.
+    assessment = assess_source_fitness(
+        invalid,
+        invalid,
+        target_module="evidence_obligation",
+        gold_label=True,
+    )
+    assert not assessment.passed
+
+
+def test_runner_records_runtime_invalid_as_diagnostic_only_telemetry(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        if case_id == "boom":
+            raise TimeoutError("provider deadline exceeded")
+        return {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "valid",
+            "census": [],
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("boom", "stable"),
+        records={"boom": {}, "stable": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        run_id="runtime_invalid_telemetry",
+    )
+
+    audit = result.evolution_audit
+    assert audit["runtime_invalid_cases"] == 1
+    assert audit["runtime_error_categories"] == {"provider_timeout": 1}
+    assert audit["runtime_invalid_claim_scope"] == (
+        "diagnostic_only_not_evolution_evidence"
+    )
+
+    step = next(
+        s for s in result.steps if s.gate_decision == "skip_runtime_invalid"
+    )
+    # The attribution slot is now populated telemetry rather than None...
+    assert step.attribution is not None
+    assert step.attribution["diagnostic_only"] is True
+    assert step.attribution["runtime_error_category"] == "provider_timeout"
+    # ...but it must still not count as an evolution trigger.
+    assert step.attribution["should_evolve"] is False
+    assert step.fitness_check["diagnostic_only"] is True
+    assert step.fitness_check["passed"] is False
+    # A runtime failure is not a triggered case.
+    assert result.triggered_cases == 0
+
+
+def test_runtime_invalid_experience_is_recorded_but_not_promotable(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        if case_id == "boom":
+            raise ConnectionError("socket reset by peer")
+        return {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "valid",
+            "census": [],
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+
+    runner.run_online_evolution(
+        evolution_case_ids=("boom", "stable"),
+        records={"boom": {}, "stable": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        run_id="runtime_invalid_experience",
+    )
+
+    import json
+
+    payload = json.loads(
+        (tmp_path / "htc_tes_experience_memory.json").read_text(encoding="utf-8")
+    )
+    entries = [
+        entry
+        for rows in payload["types"].values()
+        for entry in rows
+        if entry["metadata"].get("outcome") == "runtime_invalid"
+    ]
+    assert len(entries) == 1
+    metadata = entries[0]["metadata"]
+    assert metadata["outcome_stage"] == "detection_runtime"
+    assert metadata["diagnostic_only"] is True
+    assert metadata["promotable_evidence"] is False
+    assert metadata["reason_categories"] == ["provider_transport"]
+    assert entries[0]["detection_improved"] is False
+
+
+# ============================================================
+# v5.5 — structured experience outcome
+# ============================================================
+
+
+def test_structured_outcome_uses_closed_vocabulary() -> None:
+    from src.sehd_v6.core.bccse.evolution_runner import (
+        OUTCOME_CLASSES,
+        OUTCOME_STAGES,
+        _structured_outcome,
+        outcome_class_for,
+    )
+
+    assert outcome_class_for("strong_improvement") == "improved"
+    assert outcome_class_for("local_improvement") == "improved"
+    assert outcome_class_for("directional_evidence") == "directional"
+    assert outcome_class_for("no_effect") == "no_effect"
+    assert outcome_class_for("worse") == "regressed"
+    # An unknown decision must degrade safely, not leak through.
+    assert outcome_class_for("something_new") == "rejected"
+
+    payload = _structured_outcome(
+        outcome="not_a_real_class",
+        stage="not_a_real_stage",
+        operation="add_rule",
+        expected_effect_status="observed",
+    )
+    assert payload["outcome"] in OUTCOME_CLASSES
+    assert payload["outcome_stage"] in OUTCOME_STAGES
+
+
+def test_structured_outcome_marks_promotability_explicitly() -> None:
+    from src.sehd_v6.core.bccse.evolution_runner import _structured_outcome
+
+    improved = _structured_outcome(
+        outcome="improved",
+        stage="batch_commit",
+        operation="add_rule",
+        expected_effect_status="observed",
+    )
+    assert improved["promotable_evidence"] is True
+
+    # Directional (label-free) evidence must never look promotable.
+    directional = _structured_outcome(
+        outcome="directional",
+        stage="source_replay",
+        operation="add_rule",
+        expected_effect_status="observed",
+    )
+    assert directional["promotable_evidence"] is False
+
+    # diagnostic_only always wins over an improved classification.
+    diagnostic = _structured_outcome(
+        outcome="improved",
+        stage="batch_commit",
+        operation="add_rule",
+        expected_effect_status="observed",
+        diagnostic_only=True,
+    )
+    assert diagnostic["promotable_evidence"] is False
+
+
+def test_structured_outcome_bounds_reason_and_delta_lists() -> None:
+    from src.sehd_v6.core.bccse.evolution_runner import _structured_outcome
+
+    payload = _structured_outcome(
+        outcome="regressed",
+        stage="source_replay",
+        operation="modify_rule",
+        expected_effect_status="contradicted",
+        reason_categories=[f"reason_{i}" for i in range(20)],
+        observable_deltas=[f"delta_{i}" for i in range(20)],
+    )
+    assert len(payload["reason_categories"]) == 5
+    assert len(payload["observable_deltas"]) == 8
+
+
+def test_reflection_summary_aggregates_structured_outcomes() -> None:
+    memory = TypeExperienceMemory()
+    for index, (outcome, stage) in enumerate((
+        ("rejected", "structural_gate"),
+        ("rejected", "structural_gate"),
+        ("directional", "source_replay"),
+        ("improved", "batch_commit"),
+    )):
+        memory.add_experience(
+            HallucinationType.FACTUAL,
+            "unresolved_to_error",
+            "evidence_obligation",
+            "strategy",
+            outcome == "improved",
+            f"case_{index}",
+            metadata={
+                "outcome": outcome,
+                "outcome_stage": stage,
+                "promotable_evidence": outcome == "improved",
+            },
+            feature_description=f"distinct feature {index}",
+        )
+
+    summary = memory.get_reflection_summary(HallucinationType.FACTUAL)
+    assert summary["total"] == 4
+    assert summary["outcome_counts"]["rejected"] == 2
+    assert summary["outcome_stage_counts"]["structural_gate"] == 2
+    assert summary["promotable_evidence_count"] == 1
+    assert summary["experiences"][0]["outcome_stage"] == "structural_gate"
+
+
+def test_losing_responsible_step_is_a_regression_for_any_module() -> None:
+    """Verdict-preserving edits must not silently drop the origin."""
+    before = _signal("verified_error")
+    after = _signal("verified_error")
+    assessment = assess_source_fitness(
+        before,
+        after,
+        target_module="evidence_obligation",
+        before_result={
+            "responsible_step": 3,
+            "state": "verified_error",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+        },
+        after_result={
+            "state": "verified_error",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+        },
+        gold_label=True,
+    )
+    assert assessment.decision == "worse"
+    assert "responsible_step_lost" in assessment.reasons
+    assert assessment.worsened
