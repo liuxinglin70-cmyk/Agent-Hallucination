@@ -1,17 +1,26 @@
 # 50 例自进化实验：实时监督与自动修复 Prompt
 
+> **STATUS: SUPERSEDED (v5.7)**
+>
+> 本文的启动命令引用已退役的 `src.sehd_v6.main` 入口。当前框架入口为
+> `python -m src.sehd_v6.evolution`（见仓库 README 的 Standalone Self-Evolution
+> 一节）。先运行
+> [CLOSED_LOOP_REVIEW_STARTUP_PROMPT.md](CLOSED_LOOP_REVIEW_STARTUP_PROMPT.md)
+> 完成闭环审查与小规模验证前置准备，再根据其结论决定是否以更新后的命令启动
+> 50 例实验。本文的实时监督规则与诊断-修复-恢复协议仍有效，保留作为参考。
+
 你现在负责在本仓库中直接启动并监督一次 50 例自进化实验。目标不是把 50 例跑完就结束，而是确保自进化闭环真正能够产生可执行、可观测、经过独立证据验证的有效 skill 经验。
 
 ## 任务范围
 
 - 工作目录：`C:\Users\liuxinglin\Desktop\agent hallucination`
 - 实验规模：50 个已注册 development/evolution source cases
-- 运行命令：
+- 运行命令（**入口已更新**，见上方 STATUS 说明；示例参数需按当前 CLI 调整）：
 
   ```powershell
-  python -m src.sehd_v6.main evolve --size 50 --use-gold `
-    --probe-interval 10 --probe-budget 5 `
-    --max-mutation-attempts-per-case 2
+  python -m src.sehd_v6.evolution --records records.jsonl `
+    --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json `
+    --output-dir evolution_output --use-gold --fitness-use-gold
   ```
 
 - 使用 `.env` 中已配置的 provider，但绝不打印、复制或写入 API key。

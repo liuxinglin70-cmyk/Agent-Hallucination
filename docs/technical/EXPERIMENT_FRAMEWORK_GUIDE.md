@@ -320,13 +320,15 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 [ ] 结论同时报告三态、selective、paired、CI 和 blocking reasons
 ```
 
-常用入口：
+常用入口（框架当前的实际入口；`src.sehd_v6.main` 已退役）：
 
 ```bash
-python -m src.sehd_v6.main partition --probe-size 10 --holdout-size 20 --seed 42
-python -m src.sehd_v6.main evolve --size 50 --probe-interval 10 --probe-budget 5
-python -m src.sehd_v6.main evaluate --set probe --genome <path>
-python -m src.sehd_v6.main evaluate --set final_holdout --genome <path>
+# 单例检测（每份 record 一个 JSON，不含 gold 字段）
+python -m src.sehd_v6.detector --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --record trajectory.json --case-id example --output-dir detector_output
+# 独立自进化循环（records.jsonl：每行一个 case）
+python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --output-dir evolution_output
+# 从上次结果继续
+python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --output-dir evolution_output_2 --initial-genome evolution_output/champion_genome.json --experience-memory evolution_output/htc_tes_experience_memory.json
 ```
 
-这些命令不会绕过授权检查。以当前默认 P0 配置直接运行包含 D cases 的 `evolve` 或任一正式 evaluation 时，预期行为是 fail closed；需要先注册与目标阶段相符的冻结配置和角色 manifests。
+这些命令不会绕过授权检查。角色 manifest、probe/外分层隔离和 final-holdout 授权属于实验协议层，位于 `experiments/` 而不是框架入口内；需要按协议先注册与目标阶段相符的冻结配置和角色 manifests。

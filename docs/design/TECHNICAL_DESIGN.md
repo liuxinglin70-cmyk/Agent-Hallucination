@@ -254,7 +254,8 @@ fitness credit and experience records.
 
 ## Dry-Run Wiring Exercise
 
-`src/sehd_v6/dry_run_5.py` supports two modes:
+The standalone self-evolution module (`python -m src.sehd_v6.evolution`)
+supports the same two wiring modes the retired `dry_run_5.py` script used:
 
 - no mutation environment: deterministic local mutation plumbing;
 - configured mutation API: one proposal per case, structural validation,

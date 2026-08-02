@@ -1728,3 +1728,602 @@ def test_losing_responsible_step_is_a_regression_for_any_module() -> None:
     assert assessment.decision == "worse"
     assert "responsible_step_lost" in assessment.reasons
     assert assessment.worsened
+
+
+# ============================================================
+# v5.6 — module_local_score: direct per-branch coverage
+#
+# module_local_score is the scalar that decides every shadow admission,
+# yet it previously had no direct tests: it was only ever exercised
+# transitively through observable_process_delta / assess_source_fitness.
+# The tests below pin each of the 8 module branches AND the anti-bias
+# invariants, so a future refactor cannot silently re-introduce a
+# systematic clean/error preference.
+# ============================================================
+
+
+def _score_signal(
+    state: str = "unresolved",
+    prosecution: str | None = "unresolved",
+    defense: str | None = "unresolved",
+    **overrides: object,
+) -> AttributionSignal:
+    """Build a signal with directly controllable coverage states."""
+    base = replace(
+        _signal(state),
+        state=state,
+        prosecution_coverage=None,
+        defense_coverage=None,
+        prosecution_coverage_state=prosecution,
+        defense_coverage_state=defense,
+        coverage_quantitative=False,
+        crs_complete=False,
+        consensus_gate_applied=False,
+        candidate_count=0,
+    )
+    return replace(base, **overrides)  # type: ignore[arg-type]
+
+
+def _abstention(signal: AttributionSignal) -> float:
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    return module_local_score("abstention_rule", signal, {})
+
+
+def test_module_local_score_covers_every_genome_module() -> None:
+    """No module may fall through to the 0.0 default unnoticed.
+
+    A module missing from the score function is invisible: its edits
+    would always measure as ``no_effect`` and never be admitted.
+    """
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+    from src.sehd_v6.core.bccse.genome import MODULE_IDS
+
+    # A row/signal rich enough that every branch can produce a non-zero score.
+    signal = _score_signal(
+        "verified_error",
+        prosecution="complete",
+        defense="complete",
+        candidate_count=2,
+        localization_status="complete",
+    )
+    row = {
+        "responsible_step": 3,
+        "combined_prosecution": {
+            "candidates": [
+                {
+                    "certificate_id": "c1",
+                    "norm_evidence_refs": ["n"],
+                    "violation_evidence_refs": ["v"],
+                    "agent_control_evidence_refs": ["a"],
+                    "impact_evidence_refs": ["i"],
+                }
+            ]
+        },
+        "combined_defense": {"certificates": [{"certificate_id": "d1"}]},
+    }
+    for module in MODULE_IDS:
+        assert module_local_score(module, signal, row) > 0.0, module
+
+    # An unknown module must degrade to 0.0 rather than raise.
+    assert module_local_score("not_a_module", signal, row) == 0.0
+
+
+def test_candidate_trigger_score_is_a_bounded_crossing_not_a_count() -> None:
+    """Rewarding raw candidate volume would incentivise over-triggering."""
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    none_found = _score_signal(candidate_count=0)
+    one_found = _score_signal(candidate_count=1)
+    many_found = _score_signal(candidate_count=50)
+
+    assert module_local_score("candidate_trigger", none_found, {}) == 0.0
+    assert module_local_score("candidate_trigger", one_found, {}) == 1.0
+    # The decisive property: 50 candidates is not "better" than 1.
+    assert module_local_score("candidate_trigger", many_found, {}) == 1.0
+
+
+def test_candidate_to_verifier_route_score_tracks_routed_rows() -> None:
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    signal = _score_signal(prosecution="complete")
+    empty = module_local_score("candidate_to_verifier_route", signal, {})
+    routed = module_local_score(
+        "candidate_to_verifier_route",
+        signal,
+        {"combined_prosecution": {"candidates": [{"certificate_id": "c1"}]}},
+    )
+    assert routed > empty
+    # Prosecution coverage contributes, so a complete side outranks a bare one.
+    assert empty == pytest.approx(1.0)
+
+
+def test_atomic_verifier_instruction_score_penalises_quarantine() -> None:
+    """Emitting certificates that get quarantined is not progress."""
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    signal = _score_signal(prosecution="complete")
+    row = {
+        "combined_prosecution": {
+            "candidates": [{"certificate_id": "c1"}, {"certificate_id": "c2"}]
+        }
+    }
+    clean = module_local_score("atomic_verifier_instruction", signal, row)
+    quarantined = module_local_score(
+        "atomic_verifier_instruction",
+        signal,
+        {**row, "proof_adjudication": {
+            "quarantined_error_certificate_ids": ["c1", "c2"]
+        }},
+    )
+    assert clean > quarantined
+    # Two valid certificates, both quarantined -> no net verifier progress.
+    assert quarantined == pytest.approx(1.0)
+
+
+def test_evidence_obligation_rewards_the_weaker_side_only() -> None:
+    """min() must make starving the challenger unprofitable."""
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    def score(prosecution: str, defense: str) -> float:
+        return module_local_score(
+            "evidence_obligation", _score_signal(
+                prosecution=prosecution, defense=defense
+            ), {}
+        )
+
+    both_weak = score("unresolved", "unresolved")
+    both_mid = score("incomplete", "incomplete")
+    both_strong = score("complete", "complete")
+
+    # Audit point: "both weak" and "both strong" must remain distinguishable.
+    assert both_weak < both_mid < both_strong
+
+    # Starving one side yields nothing, regardless of which side dominates.
+    assert score("complete", "unresolved") == both_weak
+    assert score("unresolved", "complete") == both_weak
+    # ...and it is symmetric under prosecution/defense swap.
+    assert score("complete", "incomplete") == score("incomplete", "complete")
+
+
+def test_clean_defense_boundary_and_causal_link_test_scores() -> None:
+    from src.sehd_v6.core.bccse.fitness import module_local_score
+
+    weak = _score_signal(defense="unresolved")
+    strong = _score_signal(defense="complete")
+    row = {"combined_defense": {"certificates": [{"certificate_id": "d1"}]}}
+    assert module_local_score("clean_defense_boundary", strong, row) > (
+        module_local_score("clean_defense_boundary", weak, row)
+    )
+
+    # causal_link_test grades how completely causal fields are populated.
+    signal = _score_signal()
+    bare = {"combined_prosecution": {"candidates": [{"certificate_id": "c1"}]}}
+    full = {"combined_prosecution": {"candidates": [{
+        "certificate_id": "c1",
+        "norm_evidence_refs": ["n"],
+        "violation_evidence_refs": ["v"],
+        "agent_control_evidence_refs": ["a"],
+        "impact_evidence_refs": ["i"],
+    }]}}
+    assert module_local_score("causal_link_test", signal, bare) == 0.0
+    assert module_local_score("causal_link_test", signal, full) == 1.0
+    # No certificates at all must not be scored as full coverage.
+    assert module_local_score("causal_link_test", signal, {}) == 0.0
+
+
+# ---------- abstention_rule: the B2 bias invariants ----------
+
+
+def test_abstention_rule_clean_and_error_are_symmetric_under_gold() -> None:
+    """B2 regression lock (verdict branch).
+
+    The pre-B2 score was clean=2.0 / error=1.5, which made evolution
+    systematically push unresolved cases toward ``verified_clean``
+    irrespective of the truth. Correct and incorrect verdicts must now
+    score identically regardless of polarity.
+    """
+    correct_clean = _score_signal(
+        "verified_clean", has_gold=True, gold_label=False
+    )
+    correct_error = _score_signal(
+        "verified_error", has_gold=True, gold_label=True
+    )
+    wrong_clean = _score_signal(
+        "verified_clean", has_gold=True, gold_label=True
+    )
+    wrong_error = _score_signal(
+        "verified_error", has_gold=True, gold_label=False
+    )
+
+    # Correct verdicts score the same in both polarities.
+    assert _abstention(correct_clean) == _abstention(correct_error) == 2.0
+    # Wrong verdicts score the same in both polarities.
+    assert _abstention(wrong_clean) == _abstention(wrong_error) == 0.0
+
+
+def test_abstention_rule_is_polarity_neutral_when_self_supervised() -> None:
+    """Without gold, clean and error must be exactly equivalent.
+
+    A self-supervised asymmetry here is the most dangerous form of this
+    bug: there is no label to reveal that the drift is happening.
+    """
+    clean = _score_signal("verified_clean", has_gold=False, gold_label=None)
+    error = _score_signal("verified_error", has_gold=False, gold_label=None)
+    assert _abstention(clean) == _abstention(error) == 2.0
+
+
+def test_abstention_unresolved_progress_is_symmetric_across_sides() -> None:
+    """B2 regression lock (unresolved graduated branch).
+
+    The graduated sub-score used to weight defense above prosecution
+    (complete 0.3 vs 0.2) and combine them with max(), so completing the
+    defense scored higher than completing the prosecution from the same
+    state — the same clean-leaning bias as B2, at lower amplitude.
+    """
+    defense_done = _score_signal(prosecution="unresolved", defense="complete")
+    prosecution_done = _score_signal(prosecution="complete", defense="unresolved")
+    assert _abstention(defense_done) == _abstention(prosecution_done)
+
+    # And the mirror-image "finish the second side" edits must be credited
+    # identically. Under max() one of these measured a 0.0 delta.
+    partial_p = _score_signal(prosecution="complete", defense="unresolved")
+    partial_d = _score_signal(prosecution="unresolved", defense="complete")
+    both = _score_signal(prosecution="complete", defense="complete")
+    assert _abstention(both) - _abstention(partial_p) == pytest.approx(
+        _abstention(both) - _abstention(partial_d)
+    )
+    assert _abstention(both) > _abstention(partial_p)
+
+
+def test_abstention_unresolved_never_outranks_a_definite_verdict() -> None:
+    """The graduated score must stay below the verdict tier, and its
+    documented 1.2 cap must actually be reachable."""
+    best_unresolved = _score_signal(
+        prosecution="complete",
+        defense="complete",
+        crs_complete=True,
+        consensus_gate_applied=True,
+    )
+    worst_unresolved = _score_signal(
+        prosecution="unresolved", defense="unresolved", crs_complete=False
+    )
+    assert _abstention(worst_unresolved) == 0.0
+    # Cap is exactly attainable: previously the maximum was 1.1, so the
+    # stated 1.2 ceiling was unreachable and the comment was misleading.
+    assert _abstention(best_unresolved) == pytest.approx(1.2)
+    assert _abstention(best_unresolved) < 2.0
+
+
+def test_abstention_partial_progress_is_measurable() -> None:
+    """Diagnostic progress on an unresolved case must produce a gradient."""
+    nothing = _score_signal(crs_complete=False, consensus_gate_applied=False)
+    crs_only = _score_signal(crs_complete=True, consensus_gate_applied=False)
+    both = _score_signal(crs_complete=True, consensus_gate_applied=True)
+    assert _abstention(nothing) < _abstention(crs_only) < _abstention(both)
+
+
+# ---------- gold-direction table invariants ----------
+
+
+def test_symmetric_module_scores_declare_no_gold_direction() -> None:
+    """A polarity-neutral score must not carry a polarity direction.
+
+    ``_MODULE_SCORE_GOLD_DIRECTION`` gates whether a local-score gain is
+    credited on a gold case. If a score is symmetric under
+    prosecution/defense swap but the table still claims a direction, then
+    genuine gains get demoted to ``no_effect`` on one polarity only —
+    a systematic, silent bias. This is what happened to
+    ``evidence_obligation`` when its score changed from ``_coverage_gap``
+    to ``min(prosecution, defense)`` and the table was not updated.
+    """
+    from src.sehd_v6.core.bccse.fitness import (
+        _MODULE_SCORE_GOLD_DIRECTION,
+        module_local_score,
+    )
+    from src.sehd_v6.core.bccse.genome import MODULE_IDS
+
+    assert set(_MODULE_SCORE_GOLD_DIRECTION) == set(MODULE_IDS)
+
+    # A proof side is "strong" in two independent media: its categorical
+    # coverage state and the certificates it filed. Mirroring only the
+    # coverage states would miss modules (like causal_link_test) that read
+    # prosecution certificates directly, so both are swapped together.
+    strong_certificates = [{
+        "certificate_id": "x1",
+        "norm_evidence_refs": ["n"],
+        "violation_evidence_refs": ["v"],
+        "agent_control_evidence_refs": ["a"],
+        "impact_evidence_refs": ["i"],
+    }]
+    prosecution_strong = _score_signal(prosecution="complete", defense="unresolved")
+    defense_strong = _score_signal(prosecution="unresolved", defense="complete")
+    prosecution_row = {
+        "responsible_step": 3,
+        "combined_prosecution": {"candidates": strong_certificates},
+        "combined_defense": {"certificates": []},
+    }
+    defense_row = {
+        "responsible_step": 3,
+        "combined_prosecution": {"candidates": []},
+        "combined_defense": {"certificates": strong_certificates},
+    }
+
+    for module, direction in _MODULE_SCORE_GOLD_DIRECTION.items():
+        if direction is None:
+            continue
+        # Declaring a direction is only legitimate for a score that is
+        # actually asymmetric between the two proof sides.
+        forward = module_local_score(module, prosecution_strong, prosecution_row)
+        mirrored = module_local_score(module, defense_strong, defense_row)
+        assert forward != mirrored, (
+            f"{module} declares gold direction {direction} but its score is "
+            "symmetric under prosecution/defense swap"
+        )
+        # And the sign of the asymmetry must match the declared direction:
+        # direction=True means "score up favours error" (prosecution side).
+        assert (forward > mirrored) is bool(direction), (
+            f"{module} declares gold direction {direction} but its score "
+            "favours the opposite proof side"
+        )
+
+
+def test_evidence_obligation_gain_is_credited_on_both_gold_polarities() -> None:
+    """Regression lock for the direction-table drift.
+
+    ``min(prosecution, defense)`` rises only when the weaker side improves,
+    which is good on an error case and on a clean case alike. Before the
+    fix the stale ``direction=True`` demoted the gold-clean case to
+    ``no_effect``, so this module could only ever be credited on gold-error
+    cases.
+    """
+    before = _score_signal(prosecution="incomplete", defense="incomplete")
+    after = _score_signal(prosecution="complete", defense="complete")
+
+    for gold in (True, False):
+        assessment = assess_source_fitness(
+            before, after, target_module="evidence_obligation", gold_label=gold
+        )
+        assert assessment.decision == "local_improvement", gold
+        assert assessment.passed
+
+    # Self-supervised gains stay non-promotable regardless.
+    self_supervised = assess_source_fitness(
+        before, after, target_module="evidence_obligation", gold_label=None
+    )
+    assert self_supervised.decision == "directional_evidence"
+    assert not self_supervised.passed
+
+
+def test_directional_module_still_rejects_wrong_polarity_gain() -> None:
+    """The direction check must keep working where it is genuinely correct.
+
+    ``causal_link_test`` rises as the prosecution's causal chain is filled
+    in, so a gain on a gold-CLEAN case is evidence in the wrong direction.
+    """
+    signal = _score_signal()
+    # assess_source_fitness re-resolves state from the row, so the row must
+    # carry an authoritative verdict.
+    authoritative = {
+        "state": "verified_error",
+        "occurrence_state": "verified_error",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+    }
+    bare = {
+        **authoritative,
+        "combined_prosecution": {"candidates": [{"certificate_id": "c1"}]},
+    }
+    full = {
+        **authoritative,
+        "combined_prosecution": {"candidates": [{
+            "certificate_id": "c1",
+            "norm_evidence_refs": ["n"],
+            "violation_evidence_refs": ["v"],
+            "agent_control_evidence_refs": ["a"],
+            "impact_evidence_refs": ["i"],
+        }]},
+    }
+    on_error = assess_source_fitness(
+        signal, signal, target_module="causal_link_test",
+        before_result=bare, after_result=full, gold_label=True,
+    )
+    on_clean = assess_source_fitness(
+        signal, signal, target_module="causal_link_test",
+        before_result=bare, after_result=full, gold_label=False,
+    )
+    assert on_error.decision == "local_improvement"
+    assert on_clean.decision == "no_effect"
+    assert "score_direction_mismatch_with_gold" in on_clean.reasons
+
+
+def test_coverage_rank_table_is_not_duplicated_across_modules() -> None:
+    """fitness and signal_adapter must share one categorical table.
+
+    Two independent literal copies drift silently; the ``incomplete=0.3``
+    value is deliberately tied to COVERAGE_LOW_THRESHOLD.
+    """
+    from src.sehd_v6.core.bccse import fitness
+    from src.sehd_v6.core.bccse.signal_adapter import COVERAGE_STATE_SCORE
+    from src.sehd_v6.core.bccse.step_attributor import COVERAGE_LOW_THRESHOLD
+
+    assert fitness.COVERAGE_STATE_SCORE is COVERAGE_STATE_SCORE
+    assert COVERAGE_STATE_SCORE["incomplete"] <= COVERAGE_LOW_THRESHOLD
+
+    # And the ranks the scorer actually reads follow that shared table.
+    for state, expected in COVERAGE_STATE_SCORE.items():
+        signal = _score_signal(prosecution=state, defense=state)
+        assert fitness._coverage_rank(signal, "prosecution") == expected
+        assert fitness._coverage_rank(signal, "defense") == expected
+
+    # An unrecognised state must fail closed to 0.0, not to "complete".
+    unknown = _score_signal(prosecution="garbage", defense=None)
+    assert fitness._coverage_rank(unknown, "prosecution") == 0.0
+    assert fitness._coverage_rank(unknown, "defense") == 0.0
+
+
+def test_quantitative_coverage_overrides_categorical_rank() -> None:
+    """Legacy numeric coverage must win over the categorical fallback."""
+    from src.sehd_v6.core.bccse import fitness
+
+    signal = _score_signal(prosecution="unresolved", defense="unresolved")
+    numeric = replace(signal, prosecution_coverage=0.9, defense_coverage=0.9)
+    assert fitness._coverage_rank(signal, "prosecution") == 0.0
+    assert fitness._coverage_rank(numeric, "prosecution") == pytest.approx(0.9)
+
+
+# ============================================================
+# v5.7 — package import-cycle regression locks
+# ============================================================
+
+
+def test_htc_tes_imports_first_without_circular_import_error() -> None:
+    """``bccse`` and ``htc_tes`` are mutually dependent at package level.
+
+    The cycle used to be order-dependent: importing ``htc_tes`` before
+    ``bccse`` raised ``ImportError`` (partially initialized module), while
+    importing ``bccse`` first happened to work. Tests never noticed because
+    their own import order accidentally broke the cycle. Any future script
+    or test that imports the type layer first would crash.
+    """
+    import importlib
+    import os
+    import subprocess
+    import sys
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    code = (
+        "import sys; sys.path.insert(0, r'{root}'); "
+        "import {pkg}; print('OK')"
+    )
+    for package in ("src.sehd_v6.core.htc_tes", "src.sehd_v6.core.bccse"):
+        result = subprocess.run(
+            [sys.executable, "-c", code.format(root=root, pkg=package)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (
+            f"importing {package!r} first failed:\n"
+            f"{result.stderr.strip()}"
+        )
+        assert result.stdout.strip() == "OK"
+
+    # The package cycle must not break repeat imports in-process either.
+    importlib.invalidate_caches()
+    for package in (
+        "src.sehd_v6.core.htc_tes",
+        "src.sehd_v6.core.bccse",
+    ):
+        importlib.import_module(package)
+    # And a clean reload must still resolve the public runner symbols.
+    from src.sehd_v6.core.bccse import (
+        EvolutionStep,
+        OnlineEvolutionResult,
+        ProvisionalEdit,
+        run_online_evolution,
+    )
+
+    assert callable(run_online_evolution)
+    assert EvolutionStep.__name__ == "EvolutionStep"
+    assert OnlineEvolutionResult.__name__ == "OnlineEvolutionResult"
+    assert ProvisionalEdit.__name__ == "ProvisionalEdit"
+
+
+def test_dead_fitness_and_fitness_v1_helpers_are_gone() -> None:
+    """Dead dual implementations must not silently reappear.
+
+    ``_determine_global_fitness`` (v1) was superseded by
+    ``_determine_global_fitness_v2`` and had zero callers; ``_coverage_gap``
+    lost its last caller when ``evidence_obligation`` moved to
+    ``min(prosecution, defense)``. Both are gone, and nothing may re-import
+    them.
+    """
+    import src.sehd_v6.core.bccse.fitness as fitness
+    from src.sehd_v6.core.htc_tes.type_aware_fitness import TypeAwareFitness
+
+    assert not hasattr(fitness, "_coverage_gap")
+    assert not hasattr(TypeAwareFitness, "_determine_global_fitness")
+    # The v2 implementation (the live one) must still exist.
+    assert hasattr(TypeAwareFitness, "_determine_global_fitness_v2")
+
+
+# ============================================================
+# v5.7 — type_classifier CRS-pattern and confidence audit locks
+# ============================================================
+
+
+def _classifier() -> "object":
+    from src.sehd_v6.core.htc_tes.type_classifier import (
+        HallucinationTypeClassifier,
+    )
+
+    return HallucinationTypeClassifier()
+
+
+def test_crs_pattern_risk_semantics_are_consistent() -> None:
+    """Native CRS scores use risk semantics: HIGH risk dims are anomalous,
+    while recovery is inverted (LOW recovery is the anomaly)."""
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    classifier = _classifier()
+    assert classifier._analyze_crs_pattern(
+        {"factuality": 0.9}, risk_semantics=True
+    ) is HallucinationType.FACTUAL
+    assert classifier._analyze_crs_pattern(
+        {"counterfactual": 0.9}, risk_semantics=True
+    ) is HallucinationType.REASONING
+    assert classifier._analyze_crs_pattern(
+        {"process": 0.9}, risk_semantics=True
+    ) is HallucinationType.TOOL
+    assert classifier._analyze_crs_pattern(
+        {"scope": 0.9}, risk_semantics=True
+    ) is HallucinationType.CONTEXTUAL
+    # Recovery is an inverted dimension: a HIGH score is the non-anomalous
+    # (repaired) case and must not contribute a type.
+    assert classifier._analyze_crs_pattern(
+        {"recovery": 0.9}, risk_semantics=True
+    ) is None
+    assert classifier._analyze_crs_pattern(
+        {"recovery": 0.1}, risk_semantics=True
+    ) is HallucinationType.INSTRUCTIONAL
+
+
+def test_crs_pattern_unknown_dimensions_are_ignored() -> None:
+    classifier = _classifier()
+    assert classifier._analyze_crs_pattern(
+        {"mystery_dim": 0.9}, risk_semantics=True
+    ) is None
+    # Out-of-range scores must not crash or contribute.
+    assert classifier._analyze_crs_pattern(
+        {"factuality": 1.7}, risk_semantics=True
+    ) is None
+    assert classifier._analyze_crs_pattern(
+        {"factuality": "not-a-number"}, risk_semantics=True
+    ) is None
+
+
+def test_normalize_confidence_bounds_and_dominance() -> None:
+    classifier = _classifier()
+    # No signal -> 0 confidence.
+    assert classifier._normalize_confidence({}, 0) == 0.0
+    # A single strong signal is capped by the single-family ceiling.
+    single = classifier._normalize_confidence({"factual": 0.4}, 1)
+    assert 0.0 <= single <= 0.55
+    # A two-family split cannot reach the single-family ceiling.
+    split = classifier._normalize_confidence(
+        {"factual": 0.4, "tool": 0.3}, 2
+    )
+    assert split < single
+    # A wider margin between top and runner-up raises confidence
+    # (dominance and margin components both increase).
+    narrow_margin = classifier._normalize_confidence(
+        {"factual": 0.4, "tool": 0.39}, 2
+    )
+    wide_margin = classifier._normalize_confidence(
+        {"factual": 0.4, "tool": 0.05}, 2
+    )
+    assert narrow_margin < wide_margin
+    # Confidence is always a valid probability, even with out-of-range raw
+    # score inputs.
+    strong = classifier._normalize_confidence({"factual": 1.2}, 1)
+    assert 0.0 <= strong <= 1.0
