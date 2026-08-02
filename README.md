@@ -34,6 +34,7 @@ SEHD v6
 └── experiments/          # ④ experiment workspace
     ├── plans/            #   experiment plans (tracked)
     ├── protocols/        #   experiment protocol + benchmark workspace
+    ├── cache/            #   experiment-run caches (local-only)
     ├── progress/         #   local-only
     ├── results/          #   local-only
     └── logs/             #   local-only
@@ -93,15 +94,18 @@ follow these rules:
    framework capability, add it as a generic API in the framework and
    implement the experiment-specific policy in `experiments/protocols/`.
 
-Large local workspaces that stay in place and are git-ignored: none —
-obsolete `tmp*` directories, `_server_latest/` and the legacy validation data
-were removed.  Ten empty `tmp/pytest-*` shell directories created by a past
-pytest run have broken ACLs and cannot be removed from a non-admin shell;
-delete them from an elevated terminal or after a reboot:
+## Caches and Logs
 
-```powershell
-Remove-Item -Recurse -Force "$PWD\tmp"
-```
+Experiment runs keep their caches and logs under `experiments/` so the
+framework never depends on a fixed system path:
+
+- `experiments/cache/provider/` — global provider cache.  Point the framework
+  at it with `PACA_GLOBAL_CACHE_ROOT=experiments/cache/provider`.
+- `experiments/logs/` — run logs.
+- `experiments/results/<run>/` — per-run artifacts; the framework writes its
+  `shared_cache/` and route caches inside each run's output directory.
+
+All of these directories are git-ignored and safe to delete between runs.
 
 ## Core Methodology
 

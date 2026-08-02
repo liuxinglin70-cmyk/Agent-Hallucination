@@ -8,6 +8,7 @@ tmp_upload_*/
 *.txt
 
 # Experiment workspace (local-only)
+experiments/cache/
 experiments/progress/
 experiments/results/
 experiments/logs/
