@@ -201,6 +201,105 @@ def sanitize_expected_effect(content: str) -> str:
     return normalized if valid else ""
 
 
+# ============================================================
+# Structured expected-effect contract (v5.4)
+# ============================================================
+# Replaces the legacy free-text expected_effect with a source-level
+# provenance contract: which observable detector field the edit is
+# supposed to move, in which direction, on which case subset, under
+# what trigger condition. The audit function compares this contract
+# against the source-replay delta token-by-token instead of doing
+# substring matching against the legacy text markers.
+
+OBSERVABLE_FIELDS: tuple[str, ...] = (
+    "candidate_count",
+    "prosecution_coverage",
+    "defense_coverage",
+    "prosecution_certificates",
+    "defense_certificates",
+    "quarantined_certificates",
+    "causal_field_coverage",
+    "responsible_step",
+    "localization_status",
+    "target_local_score",
+    "state",
+    "trigger",
+)
+
+EXPECTED_DIRECTIONS: tuple[str, ...] = (
+    "increase",
+    "decrease",
+    "added",
+    "removed",
+    "shift",
+    "opened",
+    "closed",
+)
+
+EXPECTED_SCOPES: tuple[str, ...] = (
+    "all_cases",
+    "positive_cases",
+    "negative_cases",
+    "quarantined_cases",
+    "unresolved_cases",
+)
+
+
+def validate_expected_effect_contract(content: Any) -> tuple[bool, str]:
+    """Validate the structured counterfactual contract.
+
+    Empty contracts are allowed (legacy edits did not produce one). When
+    present, the contract must carry an actionable observable_field, a
+    recognised direction, and a recognised scope. The trigger_condition
+    is sanity-checked for prompt-pollution / case-id leakage using the
+    same rules as feature descriptions.
+    """
+    if content is None:
+        return True, ""
+    if not isinstance(content, dict):
+        return False, "expected_effect_contract_not_object"
+    if not content:
+        return True, ""
+    observable = str(content.get("observable_field") or "")
+    if observable not in OBSERVABLE_FIELDS:
+        return False, f"expected_effect_contract_invalid_field:{observable[:40]}"
+    direction = str(content.get("expected_direction") or "")
+    if direction not in EXPECTED_DIRECTIONS:
+        return False, f"expected_effect_contract_invalid_direction:{direction[:40]}"
+    scope = str(content.get("expected_scope") or "")
+    if scope not in EXPECTED_SCOPES:
+        return False, f"expected_effect_contract_invalid_scope:{scope[:40]}"
+    trigger = str(content.get("trigger_condition") or "")
+    if trigger:
+        valid, reason = validate_feature_description(trigger)
+        if not valid:
+            return False, reason.replace("feature_", "expected_effect_contract_", 1)
+    return True, ""
+
+
+def sanitize_expected_effect_contract(content: Any) -> dict[str, Any]:
+    """Return a persistence-safe structured contract or an empty dict."""
+    if not isinstance(content, dict):
+        return {}
+    sanitized: dict[str, Any] = {}
+    observable = str(content.get("observable_field") or "")
+    if observable in OBSERVABLE_FIELDS:
+        sanitized["observable_field"] = observable
+    direction = str(content.get("expected_direction") or "")
+    if direction in EXPECTED_DIRECTIONS:
+        sanitized["expected_direction"] = direction
+    scope = str(content.get("expected_scope") or "")
+    if scope in EXPECTED_SCOPES:
+        sanitized["expected_scope"] = scope
+    trigger = " ".join(str(content.get("trigger_condition") or "").split())[:240]
+    if trigger:
+        valid, _ = validate_feature_description(trigger)
+        if valid:
+            sanitized["trigger_condition"] = trigger
+    valid, _ = validate_expected_effect_contract(sanitized)
+    return sanitized if valid else {}
+
+
 def normalize_type_confidence(value: Any) -> float:
     """Bound untrusted serialized confidence without failing restoration."""
     try:
@@ -433,6 +532,10 @@ class SkillEdit:
     # A short counterfactual contract supplied by the reflection engine. It is
     # telemetry, not a verdict: source replay remains authoritative.
     expected_effect: str = ""
+    # v5.4 structured counterfactual contract. When populated, the audit
+    # function compares this against the source-replay delta token-by-token
+    # instead of doing substring matching on `expected_effect`.
+    expected_effect_contract: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -461,6 +564,9 @@ class SkillEdit:
                 if value in MODULE_IDS
             ],
             "expected_effect": sanitize_expected_effect(self.expected_effect),
+            "expected_effect_contract": sanitize_expected_effect_contract(
+                self.expected_effect_contract
+            ),
         }
 
     @classmethod
@@ -494,6 +600,9 @@ class SkillEdit:
             ),
             expected_effect=sanitize_expected_effect(
                 str(data.get("expected_effect") or "")
+            ),
+            expected_effect_contract=sanitize_expected_effect_contract(
+                data.get("expected_effect_contract")
             ),
         )
 
@@ -619,6 +728,11 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     effect_valid, effect_reason = validate_expected_effect(edit.expected_effect)
     if not effect_valid:
         return False, effect_reason
+    contract_valid, contract_reason = validate_expected_effect_contract(
+        edit.expected_effect_contract
+    )
+    if not contract_valid:
+        return False, contract_reason
     try:
         confidence = float(edit.type_confidence)
     except (TypeError, ValueError):

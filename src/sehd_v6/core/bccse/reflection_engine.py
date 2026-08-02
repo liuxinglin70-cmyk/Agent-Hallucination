@@ -443,6 +443,7 @@ Otherwise return exactly one JSON object:
  "rule_index":<index or null>,"new_content":"<rule>",
  "feature_description":"<short descriptive trajectory pattern>",
  "expected_effect":"<one concrete runtime-observable change>",
+ "expected_effect_contract":{"observable_field":"<field>","expected_direction":"<dir>","expected_scope":"<scope>","trigger_condition":"<short rule trigger>"},
  "rationale":"<brief causal justification>"}
 
 feature_description is persisted and may be shown in a later reflection. It
@@ -457,6 +458,32 @@ prosecution evidence-field coverage, but it must not predict defense coverage
 because that module is not injected into a defense provider. If no single
 target-aligned observable change can be predicted from the trace, return
 no_edit instead.
+
+expected_effect_contract is the STRUCTURED form of that same prediction and is
+the authoritative contract used by the source-replay audit. It MUST be filled
+whenever expected_effect is filled. Allowed values:
+- observable_field: one of candidate_count | prosecution_coverage |
+  defense_coverage | prosecution_certificates | defense_certificates |
+  quarantined_certificates | causal_field_coverage | responsible_step |
+  localization_status | target_local_score | state | trigger
+- expected_direction: one of increase | decrease | added | removed | shift |
+  opened | closed
+- expected_scope: one of all_cases | positive_cases | negative_cases |
+  quarantined_cases | unresolved_cases
+- trigger_condition: a short, case-agnostic description of when the new rule
+  fires (no case ids, no gold/answer info, no URLs, no prompt text).
+
+The observable_field MUST be one that the target_module can actually move:
+candidate_trigger -> candidate_count; evidence_obligation ->
+prosecution_coverage / prosecution_certificates / causal_field_coverage;
+candidate_to_verifier_route -> prosecution_certificates;
+atomic_verifier_instruction -> quarantined_certificates /
+causal_field_coverage; clean_defense_boundary -> defense_coverage /
+defense_certificates; causal_link_test -> causal_field_coverage /
+localization_status; earliest_origin_tiebreak -> responsible_step /
+localization_status; abstention_rule -> state / trigger. A contract that
+predicts a field the edited module cannot move will be flagged as
+misaligned and the edit will be rejected.
 """
 
     # Build rejected edits section
@@ -595,7 +622,9 @@ no_edit instead.
         f'{{"target_module":"<{allowed_modules_text}>",'
         '"operation":"add_rule|modify_rule|remove_rule","rule_index":null,'
         '"new_content":"...","feature_description":"...",'
-        '"expected_effect":"...","rationale":"..."}}\n'
+        '"expected_effect":"...",'
+        '"expected_effect_contract":{{"observable_field":"...","expected_direction":"...","expected_scope":"...","trigger_condition":"..."}},'
+        '"rationale":"..."}}\n'
         "</task>"
     )
     return system, user

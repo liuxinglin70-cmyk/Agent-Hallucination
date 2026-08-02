@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 from ..core.bccse.evolution_runner import (
     OnlineEvolutionResult,
+    load_evolution_checkpoint,
     run_online_evolution,
 )
 from ..core.bccse.genome import SkillGenome
@@ -72,6 +73,15 @@ def load_records(path: Path) -> dict[str, dict[str, Any]]:
     return records
 
 
+def load_checkpoint(output_dir: Path) -> dict[str, Any]:
+    """Public wrapper around :func:`load_evolution_checkpoint`.
+
+    Returns ``{}`` when no checkpoint exists.  See the upstream docstring
+    for the returned schema.
+    """
+    return load_evolution_checkpoint(Path(output_dir))
+
+
 def _resolve_mutation_route(
     route: Path | Mapping[str, Any] | None,
 ) -> dict[str, Any]:
@@ -117,6 +127,7 @@ def run_evolution(
     convergence_window: int = 20,
     max_mutation_attempts_per_case: int = 2,
     canary_limit: int = 2,
+    resume_from: Path | None = None,
 ) -> OnlineEvolutionResult:
     """Run the label-free detector -> evolution -> experience closed loop.
 
@@ -142,6 +153,18 @@ def run_evolution(
         run_id: Optional run identifier.
         module_cooldown / max_total_edits / convergence_window /
             max_mutation_attempts_per_case / canary_limit: framework knobs.
+        resume_from: Optional directory holding a previously persisted
+            checkpoint (``evolution_checkpoint.json`` + champion/shadow
+            genome checkpoints + HTC-TES experience memory).  When set, the
+            run restores champion / shadow genomes, accumulated steps,
+            accepted-edits history, budget usage and stable canaries, then
+            resumes the work queue from ``next_case_index``.  The supplied
+            ``records`` mapping must contain every case_id from the
+            original run (matching the checkpoint's ``evolution_case_ids``),
+            otherwise a ``ValueError`` is raised.  ``initial_genome`` and
+            ``experience_memory_path`` are ignored when resuming (the
+            checkpoint's champion genome and experience memory take
+            precedence).  Use ``load_evolution_checkpoint`` for inspection.
 
     Returns:
         OnlineEvolutionResult with the champion genome and audit trail.
@@ -191,4 +214,5 @@ def run_evolution(
         max_mutation_attempts_per_case=max_mutation_attempts_per_case,
         initial_genome=_load_initial_genome(initial_genome),
         run_id=run_id,
+        resume_from=Path(resume_from) if resume_from is not None else None,
     )

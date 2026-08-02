@@ -56,6 +56,10 @@ from .genome import (
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
     FITNESS_STATUS_STRONG,
+    OBSERVABLE_FIELDS,
+    EXPECTED_DIRECTIONS,
+    EXPECTED_SCOPES,
+    sanitize_expected_effect_contract,
 )
 from .fitness import (
     FitnessAssessment,
@@ -123,6 +127,33 @@ class EvolutionStep:
             "attempt_index": self.attempt_index,
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "EvolutionStep":
+        """Reconstruct an EvolutionStep from a persisted dict."""
+        return cls(
+            case_id=str(data.get("case_id") or ""),
+            case_index=int(data.get("case_index") or 0),
+            trigger_source=str(data.get("trigger_source") or "none"),
+            attribution=dict(data.get("attribution") or {})
+            if data.get("attribution") is not None
+            else None,
+            edit_proposal=dict(data.get("edit_proposal") or {})
+            if data.get("edit_proposal") is not None
+            else None,
+            mutation_applied=dict(data.get("mutation_applied") or {})
+            if data.get("mutation_applied") is not None
+            else None,
+            gate_decision=str(data.get("gate_decision") or "skip_stable"),
+            genome_hash_before=str(data.get("genome_hash_before") or ""),
+            genome_hash_after=str(data.get("genome_hash_after") or ""),
+            detection_state=str(data.get("detection_state") or ""),
+            timestamp=float(data.get("timestamp") or 0.0),
+            fitness_check=dict(data.get("fitness_check") or {})
+            if data.get("fitness_check") is not None
+            else None,
+            attempt_index=int(data.get("attempt_index") or 0),
+        )
+
 
 @dataclass
 class OnlineEvolutionResult:
@@ -178,7 +209,15 @@ def _expected_effect_audit(
     before_result: Mapping[str, Any] | None = None,
     after_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compare the mutator's counterfactual prediction with source replay."""
+    """Compare the mutator's counterfactual prediction with source replay.
+
+    When ``edit.expected_effect_contract`` is populated (v5.4), the audit
+    is driven by the structured contract: the predicted observable_field
+    and direction are matched token-by-token against the
+    ``observable_process_delta`` output. The legacy free-text
+    ``expected_effect`` substring matching is retained only as a fallback
+    for edits produced before the contract was introduced.
+    """
     expected = " ".join(str(edit.expected_effect or "").split())[:240]
     lowered_expected = expected.lower()
     effect_markers: dict[str, tuple[str, ...]] = {
@@ -211,16 +250,6 @@ def _expected_effect_audit(
         if not expected
         else any(marker in lowered_expected for marker in markers)
     )
-    if not expected:
-        status = "unspecified"
-    elif target_aligned is False:
-        status = "misaligned"
-    elif assessment.worsened:
-        status = "contradicted"
-    elif assessment.decision == "no_effect":
-        status = "not_observed"
-    else:
-        status = "observed"
     observable_deltas = (
         observable_process_delta(
             before,
@@ -232,14 +261,89 @@ def _expected_effect_audit(
         if before is not None and after is not None
         else ()
     )
+    observable_delta_tokens = list(observable_deltas)
+
+    # ---- v5.4 structured contract path ----
+    contract = sanitize_expected_effect_contract(edit.expected_effect_contract)
+    contract_status: str | None = None
+    contract_field_observed = False
+    contract_direction_observed = False
+    if contract:
+        cfield = str(contract.get("observable_field") or "")
+        cdir = str(contract.get("expected_direction") or "")
+        # Map contract field -> the prefixes that observable_process_delta
+        # emits for that field. This is the source-level provenance link.
+        field_prefixes: dict[str, tuple[str, ...]] = {
+            "candidate_count": ("candidate_count:",),
+            "prosecution_coverage": ("prosecution_coverage:",),
+            "defense_coverage": ("defense_coverage:",),
+            "prosecution_certificates": ("prosecution_certificates:",),
+            "defense_certificates": ("defense_certificates:",),
+            "quarantined_certificates": ("quarantined_certificates:",),
+            "causal_field_coverage": ("causal_field_coverage:",),
+            "responsible_step": ("responsible_step:",),
+            "localization_status": ("localization_status:",),
+            "target_local_score": ("target_local_score:",),
+            "state": ("state:",),
+            "trigger": ("trigger:",),
+        }
+        direction_tokens: dict[str, tuple[str, ...]] = {
+            "increase": ("increased", "added", "opened"),
+            "decrease": ("decreased", "removed", "closed"),
+            "added": ("added", "opened"),
+            "removed": ("removed", "closed"),
+            "shift": ("shift", "->"),
+            "opened": ("opened",),
+            "closed": ("closed",),
+        }
+        prefixes = field_prefixes.get(cfield, ())
+        dir_tokens = direction_tokens.get(cdir, ())
+        for token in observable_delta_tokens:
+            lowered_token = token.lower()
+            if prefixes and any(token.startswith(p) for p in prefixes):
+                contract_field_observed = True
+                if dir_tokens and any(d in lowered_token for d in dir_tokens):
+                    contract_direction_observed = True
+        if not prefixes:
+            # Unknown field: cannot validate; treat as unspecified.
+            contract_status = "unspecified"
+        elif assessment.worsened:
+            contract_status = "contradicted"
+        elif not observable_delta_tokens:
+            contract_status = "not_observed"
+        elif contract_field_observed and contract_direction_observed:
+            contract_status = "observed"
+        elif contract_field_observed:
+            contract_status = "field_observed_direction_mismatch"
+        else:
+            contract_status = "not_observed"
+
+    # ---- legacy free-text path (fallback) ----
+    if not expected:
+        legacy_status = "unspecified"
+    elif target_aligned is False:
+        legacy_status = "misaligned"
+    elif assessment.worsened:
+        legacy_status = "contradicted"
+    elif assessment.decision == "no_effect":
+        legacy_status = "not_observed"
+    else:
+        legacy_status = "observed"
+
+    status = contract_status if contract else legacy_status
     return {
         "expected": expected,
+        "expected_effect_contract": contract,
         "status": status,
+        "contract_status": contract_status,
+        "legacy_status": legacy_status,
+        "contract_field_observed": contract_field_observed,
+        "contract_direction_observed": contract_direction_observed,
         "target_aligned": target_aligned,
         "observed_decision": assessment.decision,
         "observed_reasons": list(assessment.reasons),
-        "observable_deltas": list(observable_deltas),
-        "target_output_changed": bool(observable_deltas),
+        "observable_deltas": observable_delta_tokens,
+        "target_output_changed": bool(observable_delta_tokens),
         "local_score_before": assessment.local_score_before,
         "local_score_after": assessment.local_score_after,
     }
@@ -589,6 +693,167 @@ def _atomic_write_json(path: Path, value: Any) -> None:
     os.replace(temporary, path)
 
 
+# ============================================================
+# Public checkpoint inspection / resume API (v5.4)
+# ============================================================
+# `persist_progress` already writes `evolution_checkpoint.json`,
+# `champion_checkpoint.json`, `shadow_checkpoint.json` and the HTC-TES
+# experience memory atomically after every step. The functions below
+# expose the previously-internal recovery path as a public contract so
+# that interrupted runs can be resumed without re-running already
+# processed cases (and without losing the audit trail).
+
+_CHECKPOINT_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v2"
+_CHECKPOINT_REQUIRED_FILES: tuple[str, ...] = (
+    "evolution_checkpoint.json",
+    "champion_checkpoint.json",
+    "shadow_checkpoint.json",
+)
+
+
+def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
+    """Load and validate a persisted evolution checkpoint.
+
+    This is the PUBLIC read side of the recovery contract. It returns a
+    typed dict carrying the resumable state: champion/shadow genomes, the
+    next-case index, accumulated steps, accepted-edits history, budget
+    usage, stable canaries, and the path to the persisted HTC-TES
+    experience memory. Returns ``{}`` when no checkpoint exists.
+
+    The returned dict is intended for inspection and for passing to
+    ``run_online_evolution(..., resume_from=output_dir)``.
+    """
+    output_dir = Path(output_dir)
+    checkpoint_path = output_dir / "evolution_checkpoint.json"
+    if not checkpoint_path.is_file():
+        return {}
+    with checkpoint_path.open(encoding="utf-8") as handle:
+        checkpoint = json.load(handle)
+    if not isinstance(checkpoint, dict):
+        raise ValueError("evolution_checkpoint.json must contain an object")
+    schema = str(checkpoint.get("schema_version") or "")
+    if schema != _CHECKPOINT_SCHEMA_VERSION:
+        raise ValueError(
+            f"unsupported checkpoint schema_version: {schema!r} "
+            f"(expected {_CHECKPOINT_SCHEMA_VERSION!r})"
+        )
+    for filename in _CHECKPOINT_REQUIRED_FILES:
+        path = output_dir / filename
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"checkpoint artifact missing: {path}"
+            )
+    next_case_index = int(checkpoint.get("next_case_index") or 0)
+    evolution_case_ids = list(checkpoint.get("evolution_case_ids") or [])
+    if next_case_index < 0 or next_case_index > len(evolution_case_ids):
+        raise ValueError(
+            f"checkpoint next_case_index out of range: {next_case_index} "
+            f"for {len(evolution_case_ids)} evolution_case_ids"
+        )
+    champion_path = output_dir / "champion_checkpoint.json"
+    shadow_path = output_dir / "shadow_checkpoint.json"
+    with champion_path.open(encoding="utf-8") as handle:
+        champion_payload = json.load(handle)
+    with shadow_path.open(encoding="utf-8") as handle:
+        shadow_payload = json.load(handle)
+    experience_path = output_dir / "htc_tes_experience_memory.json"
+    return {
+        "schema_version": schema,
+        "run_id": str(checkpoint.get("run_id") or ""),
+        "status": str(checkpoint.get("status") or "in_progress"),
+        "next_case_index": next_case_index,
+        "evolution_case_ids": evolution_case_ids,
+        "champion_genome_payload": champion_payload,
+        "shadow_genome_payload": shadow_payload,
+        "experience_memory_path": (
+            str(experience_path) if experience_path.is_file() else None
+        ),
+        "steps": list(checkpoint.get("steps") or []),
+        "accepted_edits_history": list(
+            checkpoint.get("accepted_edits_history") or []
+        ),
+        "batch_history": list(checkpoint.get("batch_history") or []),
+        "probe_history": list(checkpoint.get("probe_history") or []),
+        "baseline_canary_audit": list(
+            checkpoint.get("baseline_canary_audit") or []
+        ),
+        "canary_case_ids": list(checkpoint.get("canary_case_ids") or []),
+        "budget_usage": dict(checkpoint.get("budget_usage") or {}),
+        "rollback_reason": str(checkpoint.get("rollback_reason") or ""),
+        "pending_probe_step_indexes": list(
+            checkpoint.get("pending_probe_step_indexes") or []
+        ),
+        "counters": dict(checkpoint.get("counters") or {}),
+        "updated_at": float(checkpoint.get("updated_at") or 0.0),
+        "checkpoint_dir": str(output_dir),
+    }
+
+
+def _restore_state_from_checkpoint(
+    checkpoint: Mapping[str, Any],
+    *,
+    champion_genome: SkillGenome,
+    current_genome: SkillGenome,
+    stable_genome: SkillGenome,
+    type_fitness: Any,
+    evolution_case_ids: Sequence[str],
+) -> dict[str, Any]:
+    """Restore in-memory evolution state from a loaded checkpoint.
+
+    Mutates the supplied genomes/experience-memory in place and returns a
+    dict of the remaining scalar/collection state that the caller must
+    bind to the matching local variables before entering the work queue.
+    """
+    champion_payload = dict(checkpoint.get("champion_genome_payload") or {})
+    shadow_payload = dict(checkpoint.get("shadow_genome_payload") or {})
+    if champion_payload:
+        restored_champion = SkillGenome.from_dict(champion_payload)
+        champion_genome.modules = restored_champion.modules
+        champion_genome.edits_applied = restored_champion.edits_applied
+        champion_genome.parent_hash = restored_champion.parent_hash
+        champion_genome.generation = restored_champion.generation
+        champion_genome.metadata = restored_champion.metadata
+    if shadow_payload:
+        restored_shadow = SkillGenome.from_dict(shadow_payload)
+        current_genome.modules = restored_shadow.modules
+        current_genome.edits_applied = restored_shadow.edits_applied
+        current_genome.parent_hash = restored_shadow.parent_hash
+        current_genome.generation = restored_shadow.generation
+        current_genome.metadata = restored_shadow.metadata
+        stable_genome.modules = restored_shadow.modules
+        stable_genome.edits_applied = restored_shadow.edits_applied
+        stable_genome.parent_hash = restored_shadow.parent_hash
+        stable_genome.generation = restored_shadow.generation
+        stable_genome.metadata = restored_shadow.metadata
+
+    experience_path_str = checkpoint.get("experience_memory_path")
+    if experience_path_str:
+        experience_path = Path(experience_path_str)
+        if experience_path.is_file():
+            with experience_path.open(encoding="utf-8") as handle:
+                memory_payload = json.load(handle)
+            type_fitness.get_experience_memory().from_dict(memory_payload)
+
+    return {
+        "steps": list(checkpoint.get("steps") or []),
+        "accepted_edits_history": list(
+            checkpoint.get("accepted_edits_history") or []
+        ),
+        "batch_history": list(checkpoint.get("batch_history") or []),
+        "probe_history": list(checkpoint.get("probe_history") or []),
+        "baseline_canary_audit": list(
+            checkpoint.get("baseline_canary_audit") or []
+        ),
+        "budget_usage": dict(checkpoint.get("budget_usage") or {}),
+        "rollback_reason": str(checkpoint.get("rollback_reason") or ""),
+        "pending_probe_step_indexes": list(
+            checkpoint.get("pending_probe_step_indexes") or []
+        ),
+        "counters": dict(checkpoint.get("counters") or {}),
+        "next_case_index": int(checkpoint.get("next_case_index") or 0),
+    }
+
+
 _EVALUATOR_ONLY_FIELDS = frozenset({
     "gold_label",
     "gold_explanation",
@@ -741,6 +1006,7 @@ def run_online_evolution(
     max_mutation_attempts_per_case: int = 2,
     initial_genome: SkillGenome | None = None,
     run_id: str | None = None,
+    resume_from: Path | None = None,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
@@ -796,6 +1062,16 @@ def run_online_evolution(
         initial_genome: Optional audited champion to continue evolving. When
             omitted, evolution starts from the frozen baseline genome.
         run_id: Optional run identifier.
+        resume_from: Optional directory containing a previously persisted
+            checkpoint (``evolution_checkpoint.json`` + champion/shadow
+            genome checkpoints). When set, the run restores champion /
+            shadow genomes, accumulated steps, accepted-edits history,
+            budget usage, stable canaries and the HTC-TES experience
+            memory, then resumes the work queue from ``next_case_index``.
+            The supplied ``evolution_case_ids`` MUST match the checkpoint's
+            ``evolution_case_ids`` (otherwise a ``ValueError`` is raised),
+            so that case ordering is unambiguous. ``initial_genome`` is
+            ignored when resuming.
 
     Returns:
         OnlineEvolutionResult with champion genome and audit trail.
@@ -955,6 +1231,70 @@ def run_online_evolution(
     stable_canaries: dict[str, dict[str, Any]] = {}
     stable_canaries_checkpoint: dict[str, dict[str, Any]] = {}
     baseline_canary_audit: list[dict[str, Any]] = []
+    # Diagnostic-only counters: runtime failures are observations, never
+    # evolution evidence, so they are tracked separately from triggered cases.
+    stable_cases = 0
+    triggered_cases = 0
+    edits_accepted = 0
+    edits_rejected = 0
+    runtime_invalid_cases = 0
+    runtime_error_categories: dict[str, int] = {}
+
+    # ---- v5.4: optional resume from a persisted checkpoint ----
+    resume_next_case_index = 0
+    if resume_from is not None:
+        checkpoint = load_evolution_checkpoint(Path(resume_from))
+        if not checkpoint:
+            raise FileNotFoundError(
+                f"resume_from set but no evolution_checkpoint.json found in "
+                f"{resume_from}"
+            )
+        checkpoint_case_ids = list(checkpoint.get("evolution_case_ids") or [])
+        if checkpoint_case_ids != list(evolution_case_ids):
+            raise ValueError(
+                "resume_from checkpoint evolution_case_ids do not match the "
+                "supplied evolution_case_ids; cannot resume safely"
+            )
+        restored = _restore_state_from_checkpoint(
+            checkpoint,
+            champion_genome=champion_genome,
+            current_genome=current_genome,
+            stable_genome=stable_genome,
+            type_fitness=type_fitness,
+            evolution_case_ids=evolution_case_ids,
+        )
+        steps = [
+            EvolutionStep.from_dict(step_payload)
+            for step_payload in (restored.get("steps") or [])
+            if isinstance(step_payload, Mapping)
+        ]  # type: ignore[assignment]
+        accepted_edits_history = list(restored["accepted_edits_history"])  # type: ignore[assignment]
+        batch_history = list(restored["batch_history"])  # type: ignore[assignment]
+        probe_history = list(restored["probe_history"])  # type: ignore[assignment]
+        baseline_canary_audit = list(restored["baseline_canary_audit"])  # type: ignore[assignment]
+        restored_budget = dict(restored.get("budget_usage") or {})
+        for key, value in restored_budget.items():
+            if key in budget_usage and isinstance(value, (int, float)):
+                budget_usage[key] = value
+        rollback_reason = str(restored.get("rollback_reason") or "")
+        pending_probe_step_indexes = list(
+            restored.get("pending_probe_step_indexes") or []
+        )
+        restored_counters = dict(restored.get("counters") or {})
+        stable_cases = int(restored_counters.get("stable_cases") or 0)
+        triggered_cases = int(restored_counters.get("triggered_cases") or 0)
+        edits_accepted = int(restored_counters.get("edits_accepted") or 0)
+        edits_rejected = int(restored_counters.get("edits_rejected") or 0)
+        resume_next_case_index = int(restored.get("next_case_index") or 0)
+        stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+        if run_id is None:
+            run_id = str(checkpoint.get("run_id") or run_id or "")
+        print(
+            f"[resume] restored checkpoint from {resume_from}: "
+            f"next_case_index={resume_next_case_index}, "
+            f"steps={len(steps)}, edits_accepted={edits_accepted}, "
+            f"edits_rejected={edits_rejected}"
+        )
 
     def canary_preserved(
         parent_result: Mapping[str, Any],
@@ -1003,14 +1343,6 @@ def run_online_evolution(
           f"max_edits={max_total_edits}, convergence_window={convergence_window}")
     print(f"  HTC-TES v3: type-conditioned evolution enabled")
 
-    stable_cases = 0
-    triggered_cases = 0
-    edits_accepted = 0
-    edits_rejected = 0
-    # Diagnostic-only counters: runtime failures are observations, never
-    # evolution evidence, so they are tracked separately from triggered cases.
-    runtime_invalid_cases = 0
-    runtime_error_categories: dict[str, int] = {}
 
     def run_detection(
         *,
@@ -1766,12 +2098,18 @@ def run_online_evolution(
         persist_progress(next_case_index)
         return passed
 
-    persist_progress(0)
+    persist_progress(resume_next_case_index)
 
     source_work_queue = deque(
         (index, case_id, 0)
         for index, case_id in enumerate(evolution_case_ids)
+        if index >= resume_next_case_index
     )
+    if resume_next_case_index > 0:
+        print(
+            f"[resume] skipping first {resume_next_case_index} case(s); "
+            f"{len(source_work_queue)} case(s) remaining in work queue"
+        )
     while source_work_queue:
         idx, case_id, active_attempt_index = source_work_queue.popleft()
         if active_attempt_index > 0:
@@ -2095,6 +2433,14 @@ def run_online_evolution(
                 )
                 feature_description = str(parsed.get("feature_description") or "")[:500]
                 expected_effect = str(parsed.get("expected_effect") or "")[:240]
+                expected_effect_contract_raw = parsed.get("expected_effect_contract")
+                if not isinstance(expected_effect_contract_raw, dict):
+                    expected_effect_contract_raw = None
+                expected_effect_contract = (
+                    expected_effect_contract_raw
+                    if expected_effect_contract_raw is not None
+                    else {}
+                )
 
                 if operation == "no_edit":
                     no_edit_reason = (
@@ -2120,6 +2466,7 @@ def run_online_evolution(
                         type_confidence=type_result.confidence,
                         routing_allowed_modules=tuple(allowed_modules),
                         expected_effect=expected_effect,
+                        expected_effect_contract=expected_effect_contract,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation} "
@@ -2150,6 +2497,7 @@ def run_online_evolution(
                         type_confidence=type_result.confidence,
                         routing_allowed_modules=tuple(allowed_modules),
                         expected_effect=expected_effect,
+                        expected_effect_contract=expected_effect_contract,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "

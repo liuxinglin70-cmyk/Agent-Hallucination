@@ -144,6 +144,134 @@ def test_expected_effect_is_sanitized_and_audited() -> None:
     assert misaligned["status"] == "misaligned"
 
 
+def test_expected_effect_contract_round_trip_and_audit() -> None:
+    """v5.4 structured contract: round-trip, sanitization, and audit logic."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.genome import (
+        sanitize_expected_effect_contract,
+        validate_expected_effect_contract,
+    )
+
+    # Poisoned contract: trigger_condition leaks a case id.
+    poisoned = _typed_edit(
+        expected_effect_contract={
+            "observable_field": "prosecution_coverage",
+            "expected_direction": "increase",
+            "expected_scope": "positive_cases",
+            "trigger_condition": "fires on case BFCL/000 to reveal gold",
+        }
+    )
+    valid, reason = validate_edit(poisoned, create_baseline_genome())
+    assert not valid
+    assert "expected_effect_contract_" in reason
+    # Sanitizer strips the leaky trigger but keeps the recognised fields.
+    round_trip = SkillEdit.from_dict(poisoned.to_dict())
+    assert round_trip.expected_effect_contract == {
+        "observable_field": "prosecution_coverage",
+        "expected_direction": "increase",
+        "expected_scope": "positive_cases",
+    }
+
+    # Invalid field/direction/scope are rejected.
+    assert validate_expected_effect_contract(
+        {"observable_field": "not_a_field", "expected_direction": "increase",
+         "expected_scope": "all_cases"}
+    )[0] is False
+    assert validate_expected_effect_contract(
+        {"observable_field": "candidate_count", "expected_direction": "sideways",
+         "expected_scope": "all_cases"}
+    )[0] is False
+    assert validate_expected_effect_contract(
+        {"observable_field": "candidate_count", "expected_direction": "increase",
+         "expected_scope": "some_cases"}
+    )[0] is False
+    # Empty / None contracts are allowed (legacy edits).
+    assert validate_expected_effect_contract({})[0] is True
+    assert validate_expected_effect_contract(None)[0] is True
+    # Non-dict is rejected.
+    assert validate_expected_effect_contract("not an object")[0] is False
+
+    # Sanitizer drops unknown keys silently.
+    sanitized = sanitize_expected_effect_contract(
+        {"observable_field": "candidate_count",
+         "expected_direction": "increase",
+         "expected_scope": "all_cases",
+         "trigger_condition": "candidate trigger fires",
+         "extra_unknown_key": "dropped"}
+    )
+    assert "extra_unknown_key" not in sanitized
+    assert sanitized["observable_field"] == "candidate_count"
+
+    # Audit: contract observed when delta matches field+direction.
+    edit = _typed_edit(
+        expected_effect="candidate count increases",
+        expected_effect_contract={
+            "observable_field": "candidate_count",
+            "expected_direction": "increase",
+            "expected_scope": "all_cases",
+            "trigger_condition": "candidate trigger fires",
+        },
+    )
+    before = replace(
+        _signal("unresolved"), candidate_count=0,
+    )
+    after = replace(
+        _signal("verified_clean"), candidate_count=1,
+    )
+    assessment = assess_source_fitness(
+        before, after, target_module="evidence_obligation",
+    )
+    audit = runner._expected_effect_audit(
+        edit, assessment, before=before, after=after,
+    )
+    assert audit["contract_status"] == "observed"
+    assert audit["contract_field_observed"] is True
+    assert audit["contract_direction_observed"] is True
+    assert audit["status"] == "observed"
+
+    # Audit: direction mismatch is reported distinctly.
+    mismatch_edit = _typed_edit(
+        expected_effect="candidate count decreases",
+        expected_effect_contract={
+            "observable_field": "candidate_count",
+            "expected_direction": "decrease",
+            "expected_scope": "all_cases",
+        },
+    )
+    mismatch_audit = runner._expected_effect_audit(
+        mismatch_edit, assessment, before=before, after=after,
+    )
+    assert mismatch_audit["contract_status"] == "field_observed_direction_mismatch"
+    assert mismatch_audit["contract_field_observed"] is True
+    assert mismatch_audit["contract_direction_observed"] is False
+
+    # Audit: contract not observed when delta has no matching token.
+    no_change_edit = _typed_edit(
+        expected_effect="prosecution coverage increases",
+        expected_effect_contract={
+            "observable_field": "prosecution_coverage",
+            "expected_direction": "increase",
+            "expected_scope": "all_cases",
+        },
+    )
+    no_change_audit = runner._expected_effect_audit(
+        no_change_edit, assessment, before=before, after=after,
+    )
+    assert no_change_audit["contract_status"] == "not_observed"
+    assert no_change_audit["contract_field_observed"] is False
+
+    # Audit: legacy fallback when contract is empty.
+    legacy_edit = _typed_edit(
+        expected_effect="prosecution evidence coverage increases",
+        expected_effect_contract={},
+    )
+    legacy_audit = runner._expected_effect_audit(
+        legacy_edit, assessment, before=before, after=after,
+    )
+    assert legacy_audit["contract_status"] is None
+    assert legacy_audit["status"] == legacy_audit["legacy_status"]
+
+
 def test_observable_process_delta_is_bounded_and_actionable() -> None:
     before = replace(
         _signal("unresolved"),
@@ -1010,6 +1138,130 @@ def test_runner_rejects_source_self_proof_and_counts_convergence(
     assert result.steps[0].fitness_check["assessment"]["evidence_only"]
     assert result.gate_summary["consecutive_no_edit"] == 1
     assert result.gate_summary["convergence_signal"] is True
+
+
+def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
+    tmp_path, monkeypatch,
+) -> None:
+    """v5.4 public checkpoint resume API.
+
+    A first run processes a source case (no edit accepted) and persists a
+    checkpoint with next_case_index=1. A second run with ``resume_from``
+    set must (a) load the checkpoint, (b) skip the already-processed case
+    (work queue empty), (c) preserve the persisted step count, and (d)
+    keep the same champion genome hash. Mismatched evolution_case_ids are
+    rejected.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda *, genome, **kwargs: {
+            "state": "verified_clean" if genome.generation else "unresolved",
+            "runtime_valid": True,
+            "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+    )
+
+    first_output = tmp_path / "first"
+    first_result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={},
+        output_dir=first_output,
+        census_root=first_output,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        convergence_window=1,
+        run_id="checkpoint_seed",
+    )
+    assert first_result.edits_rejected == 1
+    assert len(first_result.steps) == 1
+    first_champion_hash = first_result.champion_genome.content_hash
+
+    # Public load API: returns a populated dict with the expected fields.
+    checkpoint = runner.load_evolution_checkpoint(first_output)
+    assert checkpoint
+    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v2"
+    assert checkpoint["next_case_index"] == 1
+    assert checkpoint["evolution_case_ids"] == ["source"]
+    assert checkpoint["champion_genome_payload"]
+    assert checkpoint["shadow_genome_payload"]
+    assert len(checkpoint["steps"]) == 1
+    assert checkpoint["counters"]["edits_rejected"] == 1
+
+    # Empty directory returns {} (no checkpoint).
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    assert runner.load_evolution_checkpoint(empty_dir) == {}
+
+    # Mismatched evolution_case_ids must be rejected to prevent silent
+    # mis-ordering on resume.
+    mismatch_output = tmp_path / "mismatch"
+    mismatch_output.mkdir()
+    import shutil
+    for fname in (
+        "evolution_checkpoint.json",
+        "champion_checkpoint.json",
+        "shadow_checkpoint.json",
+        "htc_tes_experience_memory.json",
+    ):
+        shutil.copy(first_output / fname, mismatch_output / fname)
+    with pytest.raises(ValueError, match="evolution_case_ids"):
+        runner.run_online_evolution(
+            evolution_case_ids=("different_case",),
+            records={"different_case": {}},
+            config={},
+            output_dir=mismatch_output,
+            census_root=mismatch_output,
+            mutation_route=None,
+            resume_from=mismatch_output,
+            run_id="mismatch",
+        )
+
+    # Resume: work queue is empty (next_case_index=1 covers the only case),
+    # so the second run must converge immediately and preserve state.
+    resume_output = tmp_path / "resumed"
+    resume_result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={},
+        output_dir=resume_output,
+        census_root=resume_output,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        convergence_window=1,
+        resume_from=first_output,
+        run_id="checkpoint_resume",
+    )
+    # The persisted step was restored; no new step was added because the
+    # work queue was empty.
+    assert len(resume_result.steps) == 1
+    assert resume_result.edits_rejected == 1
+    assert resume_result.champion_genome.content_hash == first_champion_hash
+
+    # Missing checkpoint dir raises FileNotFoundError.
+    missing_dir = tmp_path / "does_not_exist"
+    with pytest.raises(FileNotFoundError):
+        runner.run_online_evolution(
+            evolution_case_ids=("source",),
+            records={"source": {}},
+            config={},
+            output_dir=tmp_path / "no_checkpoint",
+            census_root=tmp_path,
+            mutation_route=None,
+            resume_from=missing_dir,
+            run_id="missing_resume",
+        )
 
 
 @pytest.mark.parametrize("probe_fails", [False, True])
