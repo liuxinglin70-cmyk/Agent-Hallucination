@@ -1476,6 +1476,88 @@ def test_runtime_error_is_reduced_to_bounded_category() -> None:
     assert signal.runtime_error_category in signal.evidence_summary
 
 
+def test_evidence_summary_does_not_leak_gold_polarity_or_step_values() -> None:
+    """gold_label/gold_steps must not enter evidence_summary (invariant #3).
+
+    The reflection prompt injects ``signal.evidence_summary`` verbatim into
+    the user prompt (reflection_engine builds ``attribution_evidence=...``).
+    gold polarity is already disclosed through the controlled ``gold_section``
+    with an explicit "diagnostic reference only" rule; duplicating it as a
+    raw ``gold=positive`` literal here is an uncontrolled leak. Likewise the
+    concrete ``gold_steps`` values must not be serialized into the prompt.
+    """
+    row = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row.update({"gold_label": True, "gold_steps": [5], "responsible_step": 2})
+    signal = attribute_failure(row, use_gold=True)
+
+    assert signal.error_type is ErrorType.LOCALIZATION_ERROR
+    summary = signal.evidence_summary
+    assert "gold=positive" not in summary
+    assert "gold=negative" not in summary
+    # The concrete gold step values must not be serialized.
+    assert "_gold=[" not in summary
+    assert "gold_step_count=1" in summary  # count is fine; values are not
+    assert "supervision=gold_enhanced" in summary
+
+
+def test_gold_polarity_locked_preserves_diagnostic_secondary_module() -> None:
+    """A gold-locked error's diagnostic partner must survive coverage re-route.
+
+    For UNRESOLVED_SHOULD_ERROR with a complete defense, ``_route_process_failure``
+    refines the primary to ``abstention_rule`` (defensible: the detector
+    abstained though defense was complete). But the diagnostic secondary set
+    at L1011-1019 (e.g. ``earliest_origin_tiebreak`` for a localization
+    diagnostic) was being clobbered by the routed secondary, contradicting
+    the "diagnostics only supply the partner module" contract.
+    """
+    row = _diagnostic_row("unresolved", localization_status="failed_temporal_fallback")
+    row["gold_label"] = True
+    signal = attribute_failure(row, use_gold=True)
+
+    assert signal.error_type is ErrorType.UNRESOLVED_SHOULD_ERROR
+    # Coverage refinement of the primary is preserved.
+    assert signal.target_module == "abstention_rule"
+    # The gold diagnostic partner survives (currently clobbered to
+    # "clean_defense_boundary" — the defect under test).
+    assert signal.secondary_module == "earliest_origin_tiebreak"
+    assert signal.process_diagnostic_applied is True
+
+
+def test_online_evolution_result_exposes_runtime_invalid_counter() -> None:
+    """processed = triggered + stable + runtime_invalid must be auditable.
+
+    ``runtime_invalid_cases`` was only buried inside ``evolution_audit``; the
+    top-level ``to_dict()`` did not expose it, so external auditors checking
+    ``total_cases == triggered + stable`` would see a phantom mismatch.
+    """
+    from src.sehd_v6.core.bccse.evolution_runner import OnlineEvolutionResult
+
+    result = OnlineEvolutionResult(
+        run_id="audit",
+        champion_genome=create_baseline_genome(),
+        steps=[],
+        gate_summary={},
+        total_cases=5,
+        triggered_cases=2,
+        edits_accepted=1,
+        edits_rejected=1,
+        stable_cases=2,
+        runtime_invalid_cases=1,
+        use_gold=False,
+        halted=False,
+        halt_reason="",
+        duration_seconds=0.0,
+    )
+    payload = result.to_dict()
+    assert payload["runtime_invalid_cases"] == 1
+    assert (
+        payload["total_cases"]
+        == payload["triggered_cases"]
+        + payload["stable_cases"]
+        + payload["runtime_invalid_cases"]
+    )
+
+
 def test_diagnostic_only_signal_cannot_be_promoted_by_fitness() -> None:
     """Even a 'closed trigger' must not promote a diagnostic-only signal."""
     from src.sehd_v6.core.bccse.step_attributor import runtime_invalid_signal

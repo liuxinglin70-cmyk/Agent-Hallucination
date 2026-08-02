@@ -1008,6 +1008,7 @@ def attribute_failure(
     # Gold keeps polarity AND its primary module (an FP is a defense failure,
     # not a localization failure). Diagnostics only supply the partner module
     # so the repair prompt names both the gold failure and the process defect.
+    gold_diagnostic_secondary = None
     if (
         gold_polarity_locked
         and not gold_verified_correct
@@ -1016,6 +1017,7 @@ def attribute_failure(
         diagnostic_module = ERROR_MODULE_MAP.get(diagnostic_finding[0])
         if diagnostic_module is not None and diagnostic_module != target_module:
             secondary_module = diagnostic_module
+            gold_diagnostic_secondary = diagnostic_module
             process_diagnostic_applied = True
 
     if error_type in {
@@ -1026,7 +1028,7 @@ def attribute_failure(
         ErrorType.CANDIDATE_MISS,
         ErrorType.SIGNAL_UNAVAILABLE,
     }:
-        target_module, secondary_module = _route_process_failure(
+        routed_target, routed_secondary = _route_process_failure(
             row,
             state=state,
             candidate_count=candidate_count,
@@ -1035,6 +1037,12 @@ def attribute_failure(
             default_module=target_module,
             default_secondary=secondary_module,
         )
+        target_module = routed_target
+        # gold 锁定的 diagnostic partner 必须挺过 coverage 重路由：上方注释
+        # 承诺 "diagnostics only supply the partner module"，故路由出的
+        # secondary 不得覆盖 gold 设定的 diagnostic secondary（不变式 #1）。
+        if gold_diagnostic_secondary is None:
+            secondary_module = routed_secondary
 
     # Special routing for unresolved with weak defense
     if error_type == ErrorType.UNRESOLVED_UNKNOWN:
@@ -1104,7 +1112,11 @@ def attribute_failure(
         evidence_parts.append(f"crs_aggregate={crs_signal.aggregate:.3f}")
         evidence_parts.append(f"crs_source={crs_signal.source}")
     if has_gold:
-        evidence_parts.append(f"gold={'positive' if gold else 'negative'}")
+        # gold 极性已由 reflection prompt 中受控的 gold_section 通道披露
+        # （附带 "diagnostic reference only" 使用规则）。evidence_summary 会被
+        # 原样拼入 user prompt，不得在此重复 gold 极性字面量（不变式 #3：
+        # gold 不得进入 skill/prompt 内容，除非经由审计过、规则受限的通道）。
+        evidence_parts.append("supervision=gold_enhanced")
     else:
         evidence_parts.append("supervision=self_supervised")
     if state == "unresolved":
@@ -1113,8 +1125,10 @@ def attribute_failure(
         evidence_parts.append("defense_boundary_insufficient_to_protect_clean_case")
     if error_type == ErrorType.LOCALIZATION_ERROR:
         gold_steps = row.get("gold_steps") or []
+        # 只报告数量，绝不序列化具体 gold 步骤值，避免反思 prompt 被植入
+        # 标注答案（不变式 #3）。
         evidence_parts.append(
-            f"step_mismatch:predicted={row.get('responsible_step')}_gold={gold_steps}"
+            f"step_mismatch:predicted={row.get('responsible_step')}_gold_step_count={len(gold_steps)}"
         )
     if error_type == ErrorType.CRS_CONTRADICTION:
         evidence_parts.append("crs_dimensions_contradict_final_decision")

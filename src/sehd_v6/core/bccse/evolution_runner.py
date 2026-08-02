@@ -137,6 +137,10 @@ class OnlineEvolutionResult:
     edits_accepted: int
     edits_rejected: int
     stable_cases: int
+    # runtime_invalid 是已处理但检测运行时失败的 case（diagnostic_only 遥测，
+    # 不计入 triggered/stable）。暴露在顶层使 processed = triggered + stable
+    # + runtime_invalid 可被外部审计对账（任务二计数不变式）。
+    runtime_invalid_cases: int
     use_gold: bool
     halted: bool
     halt_reason: str
@@ -155,6 +159,7 @@ class OnlineEvolutionResult:
             "edits_accepted": self.edits_accepted,
             "edits_rejected": self.edits_rejected,
             "stable_cases": self.stable_cases,
+            "runtime_invalid_cases": self.runtime_invalid_cases,
             "supervision_mode": "gold_enhanced" if self.use_gold else "self_supervised",
             "use_gold": self.use_gold,
             "halted": self.halted,
@@ -2766,6 +2771,7 @@ def run_online_evolution(
         edits_accepted=edits_accepted,
         edits_rejected=edits_rejected,
         stable_cases=stable_cases,
+        runtime_invalid_cases=runtime_invalid_cases,
         use_gold=use_gold,
         halted=gate.is_halted,
         halt_reason=gate.halt_reason,
