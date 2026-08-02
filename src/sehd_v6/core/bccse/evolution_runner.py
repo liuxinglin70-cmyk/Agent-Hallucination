@@ -318,6 +318,28 @@ def _no_edit_reason_categories(reason: str) -> list[str]:
     return categories
 
 
+def _classify_mutation_failure(reason: str) -> str:
+    """Reduce a mutation invalid-schema reason to a stable retry-feedback category.
+
+    The category is the only case-agnostic signal fed back into the retry
+    prompt; raw provider text (which may embed case ids, rule content or
+    evaluator metadata fragments) is never echoed back. This keeps the retry
+    request body deterministic w.r.t. failure class only, and ensures the
+    cache key differs from the initial attempt.
+    """
+    text = str(reason or "")
+    if text.startswith("single_reflection_runtime_error"):
+        return "mutation_provider_exception"
+    if "operation=" in text and "content_length=0" in text:
+        return "mutation_empty_content"
+    if "operation=" in text:
+        # Non-empty content but unknown/garbage operation
+        return "mutation_invalid_operation"
+    if "json" in text.lower() or "parse" in text.lower():
+        return "mutation_unparseable_json"
+    return "mutation_invalid_schema"
+
+
 # ============================================================
 # Structured experience outcome (v5.5)
 # ============================================================
@@ -897,6 +919,15 @@ def run_online_evolution(
         "mutation_cache_hits": 0,
         "mutation_retry_attempts": 0,
     }
+    # v3.5.3: per-case stable failure categories for mutation retry feedback.
+    # When a mutation returns an invalid schema, the case is requeued with
+    # attempt_index+1. On the retry, the stored categories are appended to the
+    # reflection prompt as MUTATION_RETRY_FEEDBACK. This (a) changes the
+    # request body so the provider cache key differs (otherwise the retry
+    # would hit the same cache entry and return the same invalid response),
+    # and (b) gives the LLM structured, case-agnostic feedback. Raw provider
+    # text is never echoed back (no prompt poison, no evaluator metadata).
+    mutation_retry_feedback: dict[str, list[str]] = {}
     rollback_reason = ""
     stable_genome = champion_genome.clone()
     pending_probe_step_indexes: list[int] = []
@@ -2019,6 +2050,30 @@ def run_online_evolution(
                     "strategies, and do not treat this memory as verdict authority."
                 )
 
+            # v3.5.3: On a mutation retry, append structured failure feedback so
+            # the request body (and thus the provider cache key) differs from
+            # the initial attempt. Only stable case-agnostic categories are
+            # fed back; raw provider text is never echoed (no prompt poison).
+            if active_attempt_index > 0:
+                prior_categories = mutation_retry_feedback.get(case_id, [])
+                if prior_categories:
+                    user_prompt += (
+                        "\n[MUTATION_RETRY_FEEDBACK]\n"
+                        + json.dumps(
+                            {
+                                "attempt_index": active_attempt_index,
+                                "previous_failure_categories": prior_categories,
+                                "required_action": (
+                                    "previous mutation output was structurally "
+                                    "invalid; return a valid JSON edit with "
+                                    "operation in {add_rule,modify_rule,remove_rule,"
+                                    "no_edit} and non-empty new_content"
+                                ),
+                            },
+                            ensure_ascii=False, sort_keys=True,
+                        )
+                    )
+
             # One semantic reflection call per source. Invalid output remains an
             # auditable no-mutation event; it is never "prompted into" an edit.
             try:
@@ -2160,6 +2215,14 @@ def run_online_evolution(
                 and active_attempt_index + 1 < max_mutation_attempts_per_case
             )
             if retry_scheduled:
+                # v3.5.3: record a stable failure category so the retry prompt
+                # can carry structured feedback (and a different cache key).
+                failure_category = _classify_mutation_failure(
+                    invalid_mutation_reason or "mutation provider unavailable",
+                )
+                mutation_retry_feedback.setdefault(case_id, []).append(
+                    failure_category
+                )
                 source_work_queue.appendleft(
                     (idx, case_id, active_attempt_index + 1)
                 )
@@ -2188,6 +2251,10 @@ def run_online_evolution(
                     "retry_scheduled": retry_scheduled,
                     "mutation_error": invalid_mutation_reason
                     or "mutation provider unavailable",
+                    "retry_failure_category": (
+                        mutation_retry_feedback.get(case_id, [None])[-1]
+                        if retry_scheduled else None
+                    ),
                 },
             ), next_case_index=(idx if retry_scheduled else idx + 1))
             continue

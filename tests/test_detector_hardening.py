@@ -895,3 +895,144 @@ def test_initial_error_local_authority_requires_complete_closed_proof() -> None:
     assert failed_closed["decision_authority"] == "invalid"
     assert failed_closed["responsible_event_id"] is None
     assert failed_closed["surviving_error_certificate_ids"] == []
+
+
+def test_appeal_prosecution_contract_accepts_complete_empty_candidates() -> None:
+    """v3.5.3: coverage_state=complete + reviewed_candidate_ids=[all] +
+    candidates=[] is a legitimate 'reviewed all, no prosecution' outcome."""
+    allowed = {"candidate_001"}
+    response = {
+        "coverage_state": "complete",
+        "reviewed_candidate_ids": ["candidate_001"],
+        "candidates": [],
+    }
+    # No retry call should be invoked when the contract is satisfied.
+    providers: dict = {}
+    result = proof_engine._validate_appeal_prosecution_contract_or_retry(
+        response, allowed_ids=allowed,
+        retry_call=lambda _cat: (_ for _ in ()).throw(AssertionError("no retry")),
+        providers=providers,
+    )
+    assert result is response
+    assert "appeal_prosecutor_retry" not in providers
+
+
+def test_appeal_prosecution_contract_retries_on_missing_reviewed_ids() -> None:
+    """v3.5.3: missing reviewed_candidate_ids triggers ONE bounded retry with a
+    different request body; a successful retry is accepted and audited."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "complete",
+        "candidates": [],  # missing reviewed_candidate_ids
+    }
+    good_response = {
+        "coverage_state": "complete",
+        "reviewed_candidate_ids": ["candidate_001"],
+        "candidates": [],
+    }
+    calls: list[str] = []
+    providers: dict = {}
+
+    def retry_call(failure_category: str):
+        calls.append(failure_category)
+        return good_response, {"usage": {"retry": True}}
+
+    result = proof_engine._validate_appeal_prosecution_contract_or_retry(
+        bad_response, allowed_ids=allowed,
+        retry_call=retry_call, providers=providers,
+    )
+    assert result is good_response
+    assert calls == ["missing_reviewed_candidate_ids"]
+    assert providers["appeal_prosecutor_retry"]["outcome"] == "repaired"
+    assert providers["appeal_prosecutor_retry"]["parent_failure_category"] == "missing_reviewed_candidate_ids"
+
+
+def test_appeal_prosecution_contract_fail_closes_after_retry_failure() -> None:
+    """v3.5.3: when the bounded retry still fails the contract, the function
+    raises ValueError so the caller fail-closes via _resolve_incomplete_appeal
+    — authority is never fabricated."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "incomplete",
+        "candidates": [],
+    }
+    still_bad = {
+        "coverage_state": "complete",
+        "candidates": [],  # still missing reviewed_candidate_ids
+    }
+    calls: list[str] = []
+    providers: dict = {}
+
+    def retry_call(failure_category: str):
+        calls.append(failure_category)
+        return still_bad, {"usage": {"retry": True}}
+
+    try:
+        proof_engine._validate_appeal_prosecution_contract_or_retry(
+            bad_response, allowed_ids=allowed,
+            retry_call=retry_call, providers=providers,
+        )
+    except ValueError as exc:
+        assert "bounded retry" in str(exc)
+    else:
+        raise AssertionError("retry failure must raise to fail-closed")
+    assert calls == ["incomplete_coverage_state"]
+    assert providers["appeal_prosecutor_retry"]["outcome"] == "failed_closed"
+    assert providers["appeal_prosecutor_retry"]["retry_failure_category"] == "missing_reviewed_candidate_ids"
+
+
+def test_appeal_prosecution_contract_rejects_foreign_candidate_after_retry() -> None:
+    """v3.5.3: a foreign candidate id is a repairable failure that triggers
+    retry; if the retry returns a foreign id again it fail-closes."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "complete",
+        "reviewed_candidate_ids": ["candidate_001"],
+        "candidates": [{
+            "certificate_id": "appeal_error_001",
+            "source_candidate_id": "candidate_999",  # foreign
+        }],
+    }
+    providers: dict = {}
+    retry_calls: list[str] = []
+
+    def retry_call(failure_category: str):
+        retry_calls.append(failure_category)
+        # Retry returns a valid complete-empty response.
+        return {
+            "coverage_state": "complete",
+            "reviewed_candidate_ids": ["candidate_001"],
+            "candidates": [],
+        }, {}
+
+    result = proof_engine._validate_appeal_prosecution_contract_or_retry(
+        bad_response, allowed_ids=allowed,
+        retry_call=retry_call, providers=providers,
+    )
+    assert retry_calls == ["foreign_candidate_id"]
+    assert result["candidates"] == []
+    assert providers["appeal_prosecutor_retry"]["outcome"] == "repaired"
+
+
+def test_appeal_prosecutor_retry_prompt_differs_from_initial() -> None:
+    """v3.5.3: the retry user prompt must differ from the initial prompt so the
+    provider cache key changes (otherwise the retry would hit the same cache
+    entry and return the same invalid response)."""
+    base_kwargs = dict(
+        built=_packet(),
+        candidates=[_candidate()],
+        base={"qualifications": [], "propagations": [], "boundary_path": {}},
+        prosecution={"coverage_state": "complete", "candidates": []},
+        defense={"coverage_state": "complete", "candidates": []},
+        proof={"state": "unresolved"},
+    )
+    initial = proof_engine._appeal_prosecutor_user_v35(**base_kwargs)
+    retry = proof_engine._appeal_prosecutor_retry_user_v35(
+        failure_category="missing_reviewed_candidate_ids", **base_kwargs,
+    )
+    assert retry.startswith(initial)
+    assert "APPEAL_RETRY_FEEDBACK=" in retry
+    assert "missing_reviewed_candidate_ids" in retry
+    # No evaluator metadata leaked into the retry feedback block.
+    for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"'):
+        assert field not in retry
