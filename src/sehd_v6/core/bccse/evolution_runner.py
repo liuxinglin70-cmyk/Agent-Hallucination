@@ -340,7 +340,7 @@ def _run_detection_with_genome(
     record: dict[str, Any],
     config: dict[str, Any],
     output_dir: Path,
-    census_root: Path,
+    census_root: Path | None = None,
     baseline_cache_root: Path | None = None,
     shared_cache_root: Path | None = None,
     provider_already_patched: bool = False,
@@ -441,7 +441,24 @@ def _run_detection_with_genome(
     if not str(result.get("decision_authority") or "").strip():
         raise RuntimeError("detector returned missing decision authority")
     if decision_authority_invalid(result):
-        raise RuntimeError("detector returned invalid decision authority")
+        # 附加详细错误信息便于排查（appeal_error / proof_court_error 等）
+        reasons = result.get("authority_failure_reasons") or []
+        providers_data = result.get("providers") or {}
+        error_details = []
+        for r in reasons:
+            if isinstance(r, dict):
+                error_details.append(
+                    f"{r.get('component', '?')}/{r.get('code', '?')}: "
+                    f"{r.get('error_type', '')} {str(r.get('error', ''))[:200]}"
+                )
+        for k, v in providers_data.items():
+            if "error" in str(k).lower() or (isinstance(v, dict) and v.get("error_type")):
+                if isinstance(v, dict):
+                    error_details.append(
+                        f"provider[{k}]: {v.get('error_type', '')} {str(v.get('error', ''))[:200]}"
+                    )
+        detail = " | ".join(error_details) if error_details else "no details"
+        raise RuntimeError(f"detector returned invalid decision authority: {detail}")
     try:
         resolve_authoritative_state(result)
     except ValueError as exc:
@@ -592,7 +609,7 @@ def run_online_evolution(
     records: Mapping[str, dict[str, Any]],
     config: dict[str, Any],
     output_dir: Path,
-    census_root: Path,
+    census_root: Path | None = None,
     use_gold: bool = False,
     mutation_route: dict[str, Any] | None = None,
     baseline_cache_root: Path | None = None,

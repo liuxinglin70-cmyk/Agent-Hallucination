@@ -11,12 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from ...provider_routes import resolve_config_provider_routes
 from ...utils import ocse_packet
-from .basic_runner import read_json
 from . import proof_engine
+from .basic_runner import read_json
 
 # Kept as an injectable seam for lightweight adapters and tests. Production
 # callers should use detect_record rather than importing this implementation.
@@ -55,20 +55,31 @@ def validate_record(record: dict[str, Any]) -> None:
     ocse_packet.build_packet(record)
 
 
-def load_detector_config(path: Path, *, require_credentials: bool = True) -> dict[str, Any]:
-    """Load detector routes without partition or execution authorization checks."""
-    config = resolve_config_provider_routes(read_json(path), purpose="detector")
-    missing = [name for name in REQUIRED_ROUTES if not isinstance(config.get(name), dict)]
+def resolve_detector_config(
+    config: Mapping[str, Any], *, require_credentials: bool = False,
+) -> dict[str, Any]:
+    """Resolve one detector config without partition or experiment policy.
+
+    Credential validation is intentionally separate from config loading so
+    offline tests and provider adapters can construct the detector first.
+    """
+    resolved = resolve_config_provider_routes(dict(config), purpose="detector")
+    missing = [name for name in REQUIRED_ROUTES if not isinstance(resolved.get(name), dict)]
     if missing:
         raise ValueError("detector config missing routes: " + ", ".join(missing))
-    config["detector_mode"] = "standalone"
+    resolved["detector_mode"] = "standalone"
     if require_credentials:
-        # Credential validation is intentionally separate from config loading so
-        # offline tests and provider adapters can construct the detector first.
         from ...provider_routes import resolve_provider_credential, route_purpose
         for name in REQUIRED_ROUTES:
-            resolve_provider_credential(config[name], purpose=route_purpose(name))
-    return config
+            resolve_provider_credential(resolved[name], purpose=route_purpose(name))
+    return resolved
+
+
+def load_detector_config(path: Path, *, require_credentials: bool = True) -> dict[str, Any]:
+    """Load detector routes without partition or execution authorization checks."""
+    return resolve_detector_config(
+        read_json(path), require_credentials=require_credentials,
+    )
 
 
 def detect_record(

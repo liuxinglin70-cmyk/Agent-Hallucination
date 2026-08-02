@@ -17,6 +17,11 @@ SEHD v6
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   └── README.md
+│   ├── evolution/            # Independent self-evolution framework API
+│   │   ├── __init__.py
+│   │   ├── runner.py         # run_evolution public API
+│   │   ├── __main__.py
+│   │   └── README.md
 │   ├── core/
 │   │   ├── paca_tcl/      # PACA-TCL v3.5: Court-style causal attribution detector
 │   │   │   ├── contract_v1.py          # Typed causal-ledger contract
@@ -227,6 +232,50 @@ execution authorization flag, or precomputed census cache. A cache root is an
 optional optimization; when omitted, the detector uses provider census
 fallback. Genome injection is explicit through `detect_record(..., genome=...)`
 and is not inferred from global evaluation state.
+
+### Standalone Self-Evolution
+
+The evolution framework is equally independent from experiment protocols. It
+accepts raw trajectories (one case or a batch), runs the detector loop, and
+writes the evolved champion genome plus typed experience memory.
+
+```bash
+python -m src.sehd_v6.evolution \
+  --records records.jsonl \
+  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --output-dir evolution_output
+```
+
+`records.jsonl` is one record per line; each line is either
+`{"case_id": "...", "record": {...}}` or a record with an embedded
+`case_id`. A JSON object mapping `case_id -> record` also works. The loop for
+every case is:
+
+`detect -> attribute (self-supervised) -> HTC-TES type routing ->
+reflect/mutate -> structural gate -> source replay + canary fitness ->
+commit/rollback -> experience memory`
+
+Artifacts written to `evolution_output`:
+
+- `evolution_result.json` — audit trail
+- `champion_genome.json` — evolved skill genome
+- `htc_tes_experience_memory.json` — typed experience memory
+
+The loop can continue from its own outputs:
+
+```bash
+python -m src.sehd_v6.evolution \
+  --records records.jsonl \
+  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --output-dir evolution_output_2 \
+  --initial-genome evolution_output/champion_genome.json \
+  --experience-memory evolution_output/htc_tes_experience_memory.json
+```
+
+The standalone evolution module does not require partitions, manifests,
+development probes, pre-registered canaries, execution authorization, or a
+census cache. Those are experiment protocols and belong to experiment
+orchestration (`src/sehd_v6/main.py`), not to the framework loop.
 
 ```bash
 # 5-case dry-run wiring exercise (mock detections; optionally uses configured mutation LLM)
