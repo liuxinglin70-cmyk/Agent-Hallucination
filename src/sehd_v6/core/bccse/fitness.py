@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from .step_attributor import AttributionSignal
-from .signal_adapter import resolve_authoritative_state
+from .signal_adapter import COVERAGE_STATE_SCORE, resolve_authoritative_state
 
 
 VALID_STATES = {"verified_error", "verified_clean", "unresolved"}
@@ -34,7 +34,15 @@ _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
     "candidate_trigger": None,
     "candidate_to_verifier_route": None,
     "atomic_verifier_instruction": None,
-    "evidence_obligation": True,   # gap up = prosecution stronger
+    # v5.6 fix: this was ``True`` ("gap up = prosecution stronger"), an
+    # annotation left over from when the score was ``_coverage_gap``. The
+    # score has been ``min(prosecution, defense)`` since the one-sided-proof
+    # fix, i.e. it rises only when the WEAKER side improves, which is
+    # polarity-neutral by construction. Keeping the stale ``True`` meant
+    # every genuine evidence_obligation gain on a gold-CLEAN case failed the
+    # direction check and was demoted to ``no_effect``: the module could only
+    # ever be credited on gold-error cases. Same bias class as B2.
+    "evidence_obligation": None,
     "clean_defense_boundary": False,  # defense up = cleaner
     "causal_link_test": True,      # causal chain up = more error-like
     "earliest_origin_tiebreak": None,
@@ -116,14 +124,10 @@ def _coverage_rank(signal: AttributionSignal, side: str) -> float:
     if value is not None:
         return value
     state = getattr(signal, f"{side}_coverage_state")
-    return {"complete": 1.0, "incomplete": 0.3, "unresolved": 0.0}.get(
-        str(state or ""),
-        0.0,
-    )
-
-
-def _coverage_gap(signal: AttributionSignal) -> float:
-    return abs(_coverage_rank(signal, "prosecution") - _coverage_rank(signal, "defense"))
+    # Single source of truth: the categorical->numeric mapping is owned by
+    # signal_adapter (where "incomplete"=0.3 is deliberately aligned with
+    # COVERAGE_LOW_THRESHOLD). A second literal copy here silently drifts.
+    return COVERAGE_STATE_SCORE.get(str(state or ""), 0.0)
 
 
 def _candidate_rows(row: Mapping[str, Any]) -> int:
@@ -272,14 +276,21 @@ def module_local_score(
         # Consensus gate applied means evidence was sufficient for a decision
         if signal.consensus_gate_applied:
             score += 0.4
-        # Coverage progress: defense complete is strong signal for clean
-        defense_rank = {"complete": 0.3, "incomplete": 0.15, "unresolved": 0.0}.get(
-            str(signal.defense_coverage_state or ""), 0.0
-        )
-        prosecution_rank = {"complete": 0.2, "incomplete": 0.1, "unresolved": 0.0}.get(
-            str(signal.prosecution_coverage_state or ""), 0.0
-        )
-        score += max(defense_rank, prosecution_rank)
+        # v5.6 fix (B2, second half): the graduated sub-score used to weight
+        # defense above prosecution (complete: 0.3 vs 0.2) and then take
+        # max(), which re-introduced exactly the clean-leaning bias B2 was
+        # opened to remove — only at lower amplitude and only on the
+        # unresolved branch, so the B2 verdict-level fix did not cover it.
+        # Two consequences, both observed:
+        #   - completing the DEFENSE scored higher than completing the
+        #     PROSECUTION from the same starting point (0.7 vs 0.6);
+        #   - because of max(), an edit that completed the second side was
+        #     credited when that side was the defense but registered exactly
+        #     0.0 delta ("no_effect") in the mirror-image case.
+        # Coverage progress is now the MEAN of both sides' ranks: symmetric
+        # under prosecution/defense swap, and it keeps rewarding the second
+        # side because an unresolved case needs both to resolve.
+        score += 0.4 * (prosecution + defense) / 2.0
         return min(score, 1.2)  # cap below definite verdict scores
     return 0.0
 

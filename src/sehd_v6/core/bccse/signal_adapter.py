@@ -142,11 +142,15 @@ class CRSSignal:
     projection_confidence: float = 1.0
 
 
-_COVERAGE_STATE_SCORE = {
+COVERAGE_STATE_SCORE = {
     "complete": 1.0,
     "incomplete": 0.3,  # was 0.5 — lowered to align with COVERAGE_LOW_THRESHOLD
     "unresolved": 0.0,
 }
+# Backwards-compatible private alias. ``COVERAGE_STATE_SCORE`` is the single
+# source of truth and is also consumed by fitness._coverage_rank, which used
+# to keep its own duplicate literal of this table.
+_COVERAGE_STATE_SCORE = COVERAGE_STATE_SCORE
 
 
 def _unit_float(value: Any) -> float | None:
