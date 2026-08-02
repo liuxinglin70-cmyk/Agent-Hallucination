@@ -118,12 +118,15 @@ def private_ref(case_id: str, prefix: str) -> str:
 
 
 def parse_gold_label(value: Any) -> bool:
+    """Parse an evaluator label; missing labels are not clean examples."""
+    if value is None:
+        raise ValueError("gold label is required for evaluation")
     if isinstance(value, bool):
         return value
     normalized = str(value or "").strip().lower()
     if normalized in {"true", "1", "yes"}:
         return True
-    if normalized in {"false", "0", "no", "", "none", "null"}:
+    if normalized in {"false", "0", "no"}:
         return False
     raise ValueError("unrecognized gold label")
 
@@ -173,7 +176,11 @@ def _parse_bool(value: Any) -> bool:
     raise ValueError(f"invalid boolean value: {value!r}")
 
 
-def load_paca_census(*, case_id: str, built: dict[str, Any], cache_root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def load_paca_census(
+    *, case_id: str, built: dict[str, Any], cache_root: Path | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if cache_root is None:
+        return [], {"status": "disabled", "reason": "no census cache configured"}
     source = cache_root / private_ref(case_id, "p0_") / "paca_v1_canary_results.json"
     if not source.is_file():
         return [], {"status": "missing", "path": str(source)}
@@ -566,8 +573,6 @@ def adjudicate_case(*, case_id: str, record: dict[str, Any], config: dict[str, A
             candidate_provider = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
     result = {
         "case_ref": private_ref(case_id, "case_"),
-        "gold_label": parse_gold_label(record.get("is_hallucination")),
-        "gold_steps": sorted(parse_gold_steps(record.get("hallucination_step"))),
         "census": census,
         "census_audit": census_audit,
         "candidate_provider": candidate_provider,

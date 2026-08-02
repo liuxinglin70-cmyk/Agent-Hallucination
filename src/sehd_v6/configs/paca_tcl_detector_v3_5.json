@@ -1,0 +1,15 @@
+{
+  "schema_version": "agenthallu.paca_tcl_detector_config.v3_5",
+  "outer_opened": false,
+  "max_focused_parallel": 4,
+  "candidate_fallback_route": {},
+  "construct_census_route": {},
+  "qualification_route": {},
+  "propagation_route": {},
+  "boundary_route": {},
+  "focused_prosecution_route": {},
+  "defense_route": {},
+  "appeal_prosecutor_route": {},
+  "appeal_defender_route": {},
+  "counterfactual_route": {}
+}

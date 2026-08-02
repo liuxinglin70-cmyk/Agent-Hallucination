@@ -8,6 +8,14 @@ from src.sehd_v6.core.bccse.types import FailureEpisode
 from src.sehd_v6.core.paca_tcl import proof_contract
 from src.sehd_v6.core.paca_tcl import proof_contract_v3_4
 from src.sehd_v6.core.paca_tcl import proof_engine
+from src.sehd_v6.core.paca_tcl.detector import detect_record
+from src.sehd_v6.core.paca_tcl.evolution_contract import project_for_evolution
+from src.sehd_v6.core.paca_tcl.skill_integration import (
+    PACA_MODULE_STAGE,
+    PacaStage,
+    compile_genome_for_paca,
+)
+from src.sehd_v6.core.bccse.genome import create_baseline_genome
 from src.sehd_v6.core.paca_tcl.proof_evaluator import (
     PacaTclV35EvolutionEvaluator,
     _prediction_state,
@@ -412,3 +420,153 @@ def test_invalid_occurrence_cannot_count_as_replay_correction() -> None:
     assert replay.targeted_error_total == 1
     assert replay.targeted_error_corrected == 0
     assert replay.valid_outputs == 0
+
+
+def test_malformed_required_appeal_defense_fails_closed() -> None:
+    prosecution = {
+        "coverage_state": "complete",
+        "candidates": [_error_certificate()],
+    }
+    for module in (proof_contract_v3_4, proof_contract):
+        kwargs = {"apply_consensus_gate_flag": False} if module is proof_contract else {}
+        try:
+            module.adjudicate_proof_court(
+                required_candidates=[_candidate()],
+                prosecution=prosecution,
+                defense={"coverage_state": "complete", "candidates": [_defense()]},
+                appeal_defense={"coverage_state": "incomplete", "candidates": []},
+                packet=_packet(),
+                **kwargs,
+            )
+        except ValueError as exc:
+            assert "appeal defense" in str(exc)
+        else:
+            raise AssertionError("invalid required appeal defense must fail closed")
+
+
+def test_focused_prosecution_respects_declared_coverage(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        proof_engine,
+        "provider_call",
+        lambda **_kwargs: ({
+            "coverage_state": "incomplete",
+            "candidates": [_error_certificate()],
+        }, {}),
+    )
+    certificates, audits, meta = proof_engine._run_focused_prosecution_for_candidate(
+        candidate=_candidate(),
+        built=_packet(),
+        base={"census": [_candidate()]},
+        config={"focused_prosecution_route": {}},
+        output_dir=tmp_path,
+    )
+    assert certificates == []
+    assert audits == []
+    assert meta["coverage_error"]["declared_coverage_state"] == "incomplete"
+
+
+def test_compiled_stage_modules_are_registered() -> None:
+    compiled = compile_genome_for_paca(create_baseline_genome())
+    for stage in PacaStage:
+        expected = tuple(
+            module_id for module_id, registered_stage in PACA_MODULE_STAGE.items()
+            if registered_stage == stage
+        )
+        assert compiled.stages[stage].module_ids == expected
+        assert expected
+
+
+def test_standalone_detector_rejects_gold_and_returns_label_free(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "src.sehd_v6.core.paca_tcl.detector.adjudicate_case",
+        lambda **_kwargs: {"state": "verified_clean", "runtime_valid": True},
+    )
+    result = detect_record(
+        record={"history": [{"role": "assistant", "content": "answer"}]},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+    )
+    assert result == {"state": "verified_clean", "runtime_valid": True}
+
+    try:
+        detect_record(
+            record={"history": [], "gold_label": False},
+            config={}, output_dir=tmp_path, census_root=tmp_path,
+        )
+    except ValueError as exc:
+        assert "label-free" in str(exc)
+    else:
+        raise AssertionError("standalone detector must reject gold fields")
+
+
+def test_evolution_projection_is_label_free_and_canonical() -> None:
+    result = {
+        "state": "verified_clean",
+        "occurrence_state": "verified_clean",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "responsible_event_id": None,
+        "responsible_step": None,
+        "census": [],
+        "prosecution": {"coverage_state": "complete", "candidates": []},
+        "defense": {"coverage_state": "complete", "candidates": []},
+        "proof_adjudication": {
+            "occurrence_state": "verified_clean",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+        },
+        "gold_label": True,
+    }
+    projected = project_for_evolution(result).to_dict()
+    assert projected["state"] == "verified_clean"
+    assert projected["crs_complete"] is True
+    assert "gold_label" not in projected
+
+
+def test_stable_detector_package_does_not_load_evolution_modules() -> None:
+    import subprocess
+    import sys
+
+    script = (
+        "import sys; import src.sehd_v6.detector; "
+        "assert not any(n.endswith('.bccse') or '.bccse.' in n for n in sys.modules)"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True)
+
+
+def test_standalone_detector_validates_trajectory_before_provider(monkeypatch, tmp_path: Path) -> None:
+    called = False
+
+    def adjudicator(**_kwargs):
+        nonlocal called
+        called = True
+        return {}
+
+    try:
+        detect_record(
+            record={"history": []}, config={}, output_dir=tmp_path,
+            adjudicator=adjudicator,
+        )
+    except ValueError as exc:
+        assert "history" in str(exc)
+    else:
+        raise AssertionError("empty trajectories must be rejected")
+    assert called is False
+
+
+def test_standalone_config_ignores_experiment_policy(tmp_path: Path, monkeypatch) -> None:
+    import json
+
+    from src.sehd_v6.core.paca_tcl.detector import REQUIRED_ROUTES, load_detector_config
+
+    config = {
+        "execution_authorized": False,
+        "authorized_phase": "forbidden_experiment_phase",
+        **{name: {} for name in REQUIRED_ROUTES},
+    }
+    path = tmp_path / "detector.json"
+    path.write_text(json.dumps(config), encoding="utf-8")
+    loaded = load_detector_config(path, require_credentials=False)
+    assert loaded["detector_mode"] == "standalone"
+    assert loaded["execution_authorized"] is False

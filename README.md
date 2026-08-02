@@ -13,6 +13,10 @@ limits, see [EXPERIMENT_FRAMEWORK_GUIDE.md](EXPERIMENT_FRAMEWORK_GUIDE.md).
 ```
 SEHD v6
 ├── src/sehd_v6/
+│   ├── detector/             # Independent single-trajectory detector API
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   └── README.md
 │   ├── core/
 │   │   ├── paca_tcl/      # PACA-TCL v3.5: Court-style causal attribution detector
 │   │   │   ├── contract_v1.py          # Typed causal-ledger contract
@@ -162,6 +166,67 @@ been successfully optimized.
 - A dry-run rule application is not counted as detection improvement unless source replay changes the authoritative detector outcome
 
 ## Usage
+
+### Standalone Detector
+
+The detector can run independently from BCCSE evolution and evaluation. The
+input JSON must contain a non-empty `history` and must not contain dataset gold
+fields such as `is_hallucination`, `hallucination_step`, or `gold_label`.
+
+```bash
+# Required credential. Route-specific and purpose-specific variables override
+# the provider defaults; credential values are never stored in config files.
+set DEEPSEEK_API_KEY=<secret>
+
+python -m src.sehd_v6.detector \
+  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --record trajectory.json \
+  --case-id example \
+  --output-dir detector_output
+```
+
+The prediction is written to `detector_output/prediction.json`. Provider
+settings use one precedence rule throughout the detector:
+
+- `SEHD_ROUTE_<ROUTE>_*`, for example `SEHD_ROUTE_DEFENSE_MODEL`
+- `SEHD_DETECTOR_*` or `SEHD_JUDGE_*`, selected by route responsibility
+- `SEHD_PROVIDER_*`
+- values in the JSON config
+- official DeepSeek endpoint/model defaults
+
+Supported suffixes are `ENDPOINT`, `MODEL`, `API_KEY_ENV`, `TEMPERATURE`,
+`MAX_TOKENS`, `TRANSPORT_RETRIES`, `TIMEOUT_SECONDS`, and
+`TOTAL_TIMEOUT_SECONDS`. The process environment overrides repository `.env`.
+
+The stable application-facing import is now `src.sehd_v6.detector`. The
+detector itself does not load partition/manifest files and does not enforce
+experiment authorization. Those policies belong to experiment orchestration;
+the self-evolution framework reads the optional `project_for_evolution()`
+projection from the detector result.
+
+For self-evolution, the same detector boundary is used directly:
+
+```python
+from pathlib import Path
+from src.sehd_v6.detector import (
+    detect_record,
+    project_for_evolution,
+)
+
+prediction = detect_record(
+    record=trajectory_without_gold,
+    config=detector_config,
+    case_id="case-001",
+    output_dir=Path("detector_output"),
+)
+evolution_input = project_for_evolution(prediction).to_dict()
+```
+
+The single-case detector does not require a partition, manifest, P0 role,
+execution authorization flag, or precomputed census cache. A cache root is an
+optional optimization; when omitted, the detector uses provider census
+fallback. Genome injection is explicit through `detect_record(..., genome=...)`
+and is not inferred from global evaluation state.
 
 ```bash
 # 5-case dry-run wiring exercise (mock detections; optionally uses configured mutation LLM)

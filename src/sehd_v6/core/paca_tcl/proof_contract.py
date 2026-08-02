@@ -327,35 +327,41 @@ def adjudicate_proof_court(
 
     # v3.4: merge appeal defender into defense pool (preserved)
     if appeal_defense is not None:
-        try:
-            ad_coverage, ad_rows = _validate_top(appeal_defense)
-            ad_audits = [validate_defense_certificate(row, packet, candidate_origins) for row in ad_rows]
-            ad_valid = [row for row, audit in zip(ad_rows, ad_audits) if audit["decision"] == "pass"]
-            ad_dominating = {
-                str(row["target_candidate_id"]): row
-                for row in ad_valid
-                if str(row.get("defense_type") or "") in DOMINATING_DEFENSES
-            }
-            valid_defenses = [
-                row for row in valid_defenses
-                if not (
-                    str(row.get("defense_type") or "") == "insufficient_evidence"
-                    and str(row.get("target_candidate_id") or "") in ad_dominating
-                )
-            ]
-            seen_defense_keys = {
-                (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
-                for row in valid_defenses
-            }
-            for row in ad_valid:
-                key = (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
-                if key not in seen_defense_keys:
-                    valid_defenses.append(row)
-                    seen_defense_keys.add(key)
-            for audit in ad_audits:
-                d_audits.append(audit)
-        except (ValueError, KeyError):
-            pass
+        ad_coverage, ad_rows = _validate_top(appeal_defense)
+        ad_audits = [
+            validate_defense_certificate(row, packet, candidate_origins)
+            for row in ad_rows
+        ]
+        if ad_coverage != "complete" or any(
+            audit["decision"] != "pass" for audit in ad_audits
+        ):
+            raise ValueError("required appeal defense is incomplete or invalid")
+        ad_valid = [
+            row for row, audit in zip(ad_rows, ad_audits)
+            if audit["decision"] == "pass"
+        ]
+        ad_dominating = {
+            str(row["target_candidate_id"]): row
+            for row in ad_valid
+            if str(row.get("defense_type") or "") in DOMINATING_DEFENSES
+        }
+        valid_defenses = [
+            row for row in valid_defenses
+            if not (
+                str(row.get("defense_type") or "") == "insufficient_evidence"
+                and str(row.get("target_candidate_id") or "") in ad_dominating
+            )
+        ]
+        seen_defense_keys = {
+            (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
+            for row in valid_defenses
+        }
+        for row in ad_valid:
+            key = (str(row["target_candidate_id"]), str(row.get("defense_type") or ""))
+            if key not in seen_defense_keys:
+                valid_defenses.append(row)
+                seen_defense_keys.add(key)
+        d_audits.extend(ad_audits)
 
     defenses_by_candidate: dict[str, list[dict[str, Any]]] = {}
     for row in valid_defenses:

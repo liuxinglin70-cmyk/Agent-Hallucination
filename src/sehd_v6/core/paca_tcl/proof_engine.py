@@ -12,9 +12,7 @@ Information flow topology change:
 
 from __future__ import annotations
 
-import argparse
 import json
-import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -23,16 +21,9 @@ from typing import Any
 from ...utils import ocse_packet as packet
 from . import proof_contract as contract
 from . import layered_engine as v2
-from ...utils.preflight import discover_records
-from ...provider_routes import (
-    resolve_config_provider_routes,
-    resolve_provider_credential,
-    resolve_provider_route,
-    route_purpose,
-)
 from .basic_runner import (
-    _responsible_step, p0_case_ids, provider_call, read_json, validate_provider_census,
-    append_jsonl, json_object_provider_call, write_json, write_jsonl,
+    _responsible_step, provider_call, validate_provider_census,
+    json_object_provider_call,
 )
 from .proof_engine_v3_4 import (
     CONSTRUCT_CENSUS_SYSTEM, CONSTRUCT_AXIS_ALIASES,
@@ -231,7 +222,22 @@ def _run_focused_prosecution_for_candidate(
         provider_meta["round1_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
         return [], [], provider_meta
 
+    coverage_state = str(value.get("coverage_state") or "unresolved")
     certificates = list(value.get("candidates") or [])
+    if coverage_state != "complete":
+        provider_meta["coverage_error"] = {
+            "declared_coverage_state": coverage_state,
+        }
+        return [], [], provider_meta
+    if any(
+        not isinstance(cert, dict)
+        or str(cert.get("source_candidate_id") or "") != candidate_id
+        for cert in certificates
+    ):
+        provider_meta["coverage_error"] = {
+            "error": "focused response contains another candidate",
+        }
+        return [], [], provider_meta
     if not certificates:
         # Provider determined no error — this is a valid "no prosecution" result
         return [], [], provider_meta
@@ -272,7 +278,22 @@ def _run_focused_prosecution_for_candidate(
             provider_meta[f"retry_{retry_round}_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
             break
 
+        coverage_state = str(value.get("coverage_state") or "unresolved")
         certificates = list(value.get("candidates") or [])
+        if coverage_state != "complete":
+            provider_meta[f"retry_{retry_round}_coverage_error"] = {
+                "declared_coverage_state": coverage_state,
+            }
+            break
+        if any(
+            not isinstance(cert, dict)
+            or str(cert.get("source_candidate_id") or "") != candidate_id
+            for cert in certificates
+        ):
+            provider_meta[f"retry_{retry_round}_coverage_error"] = {
+                "error": "focused response contains another candidate",
+            }
+            break
         if not certificates:
             break
 
@@ -561,7 +582,7 @@ def _run_counterfactual_localization(
 
 def adjudicate_case(
     *, case_id: str, record: dict[str, Any], config: dict[str, Any],
-    output_dir: Path, census_root: Path,
+    output_dir: Path, census_root: Path | None = None,
 ) -> dict[str, Any]:
     built = packet.build_packet(record)
 
@@ -661,7 +682,9 @@ def adjudicate_case(
                     )
                     # Defender runs in parallel but we need prosecution first for informed defense
                     # Solution: run prosecutor first, then defender with prosecution info
-                    appeal_prosecution, providers["appeal_prosecutor"] = appeal_pros_future.result()
+                appeal_prosecution, providers["appeal_prosecutor"] = appeal_pros_future.result()
+                if str(appeal_prosecution.get("coverage_state") or "") != "complete":
+                    raise ValueError("required appeal prosecution is incomplete")
 
                 # H2: Informed defender (sees prosecution certificates)
                 appeal_defender_user = _appeal_defender_user_v35(
@@ -674,6 +697,15 @@ def adjudicate_case(
                     system=APPEAL_DEFENDER_SYSTEM_V35, user=appeal_defender_user,
                     cache_dir=output_dir / "appeal_defender_cache",
                 )
+                if str(appeal_defense_certs.get("coverage_state") or "") != "complete":
+                    raise ValueError("required appeal defense is incomplete")
+                returned_defense_ids = {
+                    str(row.get("target_candidate_id") or "")
+                    for row in appeal_defense_certs.get("candidates") or []
+                    if isinstance(row, dict)
+                }
+                if returned_defense_ids != allowed_ids:
+                    raise ValueError("required appeal defense candidate coverage mismatch")
 
                 # Merge prosecutions
                 combined_prosecution = _merge_prosecutions(
@@ -833,7 +865,11 @@ def adjudicate_case(
             "appeal_prosecutor_certificate_count": len((appeal_prosecution or {}).get("candidates") or []),
             "appeal_defender_certificate_count": len((appeal_defense_certs or {}).get("candidates") or []),
             "appeal_status": "not_required" if not appeal_candidates else (
-                "complete" if appeal_prosecution is not None else "provider_error"
+                "complete" if (
+                    appeal_prosecution is not None
+                    and appeal_defense_certs is not None
+                    and "appeal_error" not in providers
+                ) else "provider_error"
             ),
             # v3.5 diagnostics
             "focused_prosecution_candidate_count": len(_required_candidates(base)),
@@ -969,128 +1005,3 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         ),
     })
     return metrics
-
-
-def evaluate_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> dict[str, Any]:
-    mappings = {
-        "macro_f1_min": ("macro_f1", ">="),
-        "hallucination_precision_min": ("precision", ">="),
-        "hallucination_recall_min": ("recall", ">="),
-        "clean_fpr_max": ("clean_fpr", "<="),
-        "responsible_step_accuracy_min": ("responsible_step_recall_over_all_gold_positive", ">="),
-        "runtime_valid_rate_min": ("runtime_valid_rate", ">="),
-        "candidate_origin_coverage_min": ("candidate_origin_coverage_on_gold_positive", ">="),
-        "causal_chain_validity_min": ("causal_chain_validity", ">="),
-    }
-    checks = {}
-    for gate_key, (metric_key, operator) in mappings.items():
-        if gate_key not in gate:
-            continue
-        observed, required = float(metrics.get(metric_key) or 0.0), float(gate[gate_key])
-        passed = observed >= required if operator == ">=" else observed <= required
-        checks[gate_key] = {
-            "metric": metric_key, "observed": observed, "operator": operator,
-            "required": required, "passed": passed,
-        }
-    failed = sorted(key for key, value in checks.items() if not value["passed"])
-    return {"decision": "pass" if not failed else "fail", "checks": checks, "failed_checks": failed}
-
-
-def preflight(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    base = v2.preflight(config_path=config_path, dataset_root=dataset_root, manifest_path=manifest_path, census_root=census_root)
-    required_routes = {
-        "construct_census_route", "focused_prosecution_route", "defense_route",
-        "appeal_prosecutor_route", "appeal_defender_route",
-    }
-    failures = list(base.get("failures") or [])
-    if not required_routes <= set(config):
-        failures.append({"error": "missing proof routes", "missing": sorted(required_routes - set(config))})
-    construct_path = Path(str(config.get("hallucination_construct") or ""))
-    if not construct_path.is_absolute():
-        construct_path = config_path.resolve().parents[1] / construct_path
-    try:
-        construct_value = read_json(construct_path)
-        if construct_value.get("status") not in {"canonical_for_PACA_TCL_v3", "canonical_for_PACA_TCL_v3_1"}:
-            failures.append({"error": "hallucination construct is not canonical"})
-    except Exception as exc:
-        failures.append({"error": "hallucination construct unreadable", "error_type": type(exc).__name__})
-    decision = "pass" if base.get("decision") == "pass" and not failures else "fail"
-    return {
-        "schema_version": "agenthallu.paca_tcl_proof_preflight.v3_5", "decision": decision,
-        "case_count": base.get("case_count"), "counts": base.get("counts"), "failures": failures,
-        "provider_calls_made": 0, "outer_opened": False,
-        "construct": config.get("hallucination_construct"),
-    }
-
-
-def run(*, config_path: Path, dataset_root: Path, manifest_path: Path, census_root: Path, output_dir: Path) -> dict[str, Any]:
-    config = resolve_config_provider_routes(read_json(config_path), purpose="detector")
-    if config.get("execution_authorized") is not True or config.get("authorized_phase") != "P0_diagnostic_only":
-        raise RuntimeError("proof P0 execution is not authorized")
-    for name in (
-        "qualification_route", "propagation_route", "boundary_route", "construct_census_route",
-        "focused_prosecution_route", "defense_route", "appeal_prosecutor_route", "appeal_defender_route",
-    ):
-        route = resolve_provider_route(
-            config[name], purpose=route_purpose(name), route_name=name
-        )
-        resolve_provider_credential(route, purpose=route_purpose(name))
-    manifest, records = read_json(manifest_path), discover_records(dataset_root)
-    case_ids, by_case = p0_case_ids(manifest), {}
-    predictions_path = output_dir / "predictions.jsonl"
-    # v3.5.1: 清空旧文件，改用追加写避免 O(n^2) 全量重写
-    predictions_path.unlink(missing_ok=True)
-    with ThreadPoolExecutor(max_workers=int(config.get("max_parallel_cases", 4))) as executor:
-        futures = {executor.submit(
-            adjudicate_case, case_id=case_id, record=records[case_id],
-            config=config, output_dir=output_dir, census_root=census_root,
-        ): case_id for case_id in case_ids}
-        for future in as_completed(futures):
-            result = future.result()
-            by_case[futures[future]] = result
-            # v3.5.1: 追加单行（O(1)），替代全量重写（O(n)）
-            append_jsonl(predictions_path, result)
-    # v3.5.1: 最终按 case_ids 顺序重排，保持审计一致性
-    write_jsonl(predictions_path, [by_case[key] for key in case_ids])
-    rows = [by_case[key] for key in case_ids]
-    metrics = evaluate(rows)
-    report = {
-        "schema_version": "agenthallu.paca_tcl_proof_p0.v3_5", "experiment_id": config["experiment_id"],
-        "effectiveness_scope": "opened_P0_diagnostic_only", "outer_opened": False,
-        "hallucination_construct": config["hallucination_construct"], "metrics": metrics,
-        "primary_gate": evaluate_gate(metrics, config.get("primary_p0_gate") or {}),
-    }
-    write_json(output_dir / "metrics.json", report)
-    return report
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--dataset-root", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--paca-census-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--preflight-only", action="store_true")
-    args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.preflight_only:
-        report = preflight(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root)
-        write_json(args.output_dir / "preflight.json", report)
-    else:
-        lock = args.output_dir / ".paca_tcl_proof.lock"
-        try:
-            with lock.open("x", encoding="utf-8") as handle:
-                handle.write(str(os.getpid()) + "\n")
-        except FileExistsError as exc:
-            raise RuntimeError("output directory is locked") from exc
-        try:
-            report = run(config_path=args.config, dataset_root=args.dataset_root, manifest_path=args.manifest, census_root=args.paca_census_root, output_dir=args.output_dir)
-        finally:
-            lock.unlink(missing_ok=True)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()

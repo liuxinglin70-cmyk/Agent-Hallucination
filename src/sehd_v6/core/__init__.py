@@ -1,62 +1,44 @@
-"""SEHD v6 Core — Unified API for detection and evolution.
+"""Lazy public facade for the core packages.
 
-Import top-level components from here:
-    from sehd_v6.core import run_online_evolution, adjudicate_case
-
-Architecture:
-    PACA-TCL v3.5 (frozen detector base)
-        ↕ genome injection
-    BCCSE v5 (self-evolution framework)
-        ↕ type conditioning
-    HTC-TES v3 (hallucination-typed conditioning layer)
+The detector is a standalone runtime.  Imports from BCCSE and HTC-TES are
+resolved only when those names are requested, so importing
+``sehd_v6.core.paca_tcl`` does not load experiment orchestration or evolution.
 """
 
-from .bccse import (
-    run_online_evolution,
-    SkillGenome,
-    create_baseline_genome,
-    ErrorType,
-    attribute_failure,
-    AttributionSignal,
-    SkillEdit,
-    SkillOp,
-    apply_edit,
-    validate_edit,
-    StructuralGate,
-    create_structural_gate,
-)
-from .paca_tcl import adjudicate_case, evaluate
-from .htc_tes import (
-    HallucinationType,
-    HallucinationTypeClassifier,
-    TypeClassificationResult,
-    TypeConditionedEvolution,
-    TypeAwareFitness,
-    classify_hallucination_type,
-)
+_MODULE_EXPORTS = {
+    "run_online_evolution": ("bccse", "run_online_evolution"),
+    "SkillGenome": ("bccse", "SkillGenome"),
+    "create_baseline_genome": ("bccse", "create_baseline_genome"),
+    "ErrorType": ("bccse", "ErrorType"),
+    "attribute_failure": ("bccse", "attribute_failure"),
+    "AttributionSignal": ("bccse", "AttributionSignal"),
+    "SkillEdit": ("bccse", "SkillEdit"),
+    "SkillOp": ("bccse", "SkillOp"),
+    "apply_edit": ("bccse", "apply_edit"),
+    "validate_edit": ("bccse", "validate_edit"),
+    "StructuralGate": ("bccse", "StructuralGate"),
+    "create_structural_gate": ("bccse", "create_structural_gate"),
+    "adjudicate_case": ("paca_tcl", "adjudicate_case"),
+    "evaluate": ("paca_tcl", "evaluate"),
+    "HallucinationType": ("htc_tes", "HallucinationType"),
+    "HallucinationTypeClassifier": ("htc_tes", "HallucinationTypeClassifier"),
+    "TypeClassificationResult": ("htc_tes", "TypeClassificationResult"),
+    "TypeConditionedEvolution": ("htc_tes", "TypeConditionedEvolution"),
+    "TypeAwareFitness": ("htc_tes", "TypeAwareFitness"),
+    "classify_hallucination_type": ("htc_tes", "classify_hallucination_type"),
+}
 
-__all__ = [
-    # BCCSE — Self-evolution
-    "run_online_evolution",
-    "SkillGenome",
-    "create_baseline_genome",
-    "SkillEdit",
-    "SkillOp",
-    "apply_edit",
-    "validate_edit",
-    "ErrorType",
-    "AttributionSignal",
-    "attribute_failure",
-    "StructuralGate",
-    "create_structural_gate",
-    # PACA-TCL — Frozen detector
-    "adjudicate_case",
-    "evaluate",
-    # HTC-TES — Type conditioning
-    "HallucinationType",
-    "HallucinationTypeClassifier",
-    "TypeClassificationResult",
-    "TypeConditionedEvolution",
-    "TypeAwareFitness",
-    "classify_hallucination_type",
-]
+
+def __getattr__(name: str):
+    import importlib
+
+    try:
+        module_name, attribute = _MODULE_EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+    value = getattr(importlib.import_module(f"{__name__}.{module_name}"), attribute)
+    globals()[name] = value
+    return value
+
+
+__all__ = sorted(_MODULE_EXPORTS)

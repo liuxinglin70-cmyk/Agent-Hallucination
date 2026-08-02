@@ -25,7 +25,6 @@ from ..bccse import cesv_contract as cesv
 from ..bccse.genome import (
     MODULE_IDS,
     MODULE_DISPLAY_NAMES,
-    MODULE_STAGE,
     SkillGenome,
     SkillModule,
     create_baseline_genome,
@@ -47,7 +46,7 @@ class PacaStage(str, Enum):
     STAGE_3_CAUSAL_COURT = "stage_3_causal_court"
 
 
-MODULE_STAGE: Mapping[str, PacaStage] = {
+PACA_MODULE_STAGE: Mapping[str, PacaStage] = {
     "candidate_trigger": PacaStage.STAGE_1_CENSUS,
     "evidence_obligation": PacaStage.STAGE_2_VERIFICATION,
     "candidate_to_verifier_route": PacaStage.STAGE_2_VERIFICATION,
@@ -291,7 +290,9 @@ def compile_genome_for_paca(
 
     stages: dict[PacaStage, CompiledStageSkill] = {}
     for stage in PacaStage:
-        module_ids = tuple(mid for mid in MODULE_IDS if MODULE_STAGE[mid] == stage.value)
+        module_ids = tuple(
+            mid for mid in MODULE_IDS if PACA_MODULE_STAGE[mid] == stage
+        )
         changed = tuple(
             module_id for module_id in module_ids if module_texts[module_id]
         )

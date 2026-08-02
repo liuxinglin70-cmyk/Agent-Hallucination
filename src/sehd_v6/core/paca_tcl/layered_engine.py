@@ -25,8 +25,6 @@ from .basic_runner import (
     candidate_provider_user_prompt,
     load_paca_census,
     p0_case_ids,
-    parse_gold_label,
-    parse_gold_steps,
     private_ref,
     provider_call,
     read_json,
@@ -103,7 +101,7 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
     }
 
 
-def adjudicate_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, census_root: Path) -> dict[str, Any]:
+def adjudicate_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, census_root: Path | None = None) -> dict[str, Any]:
     built = packet.build_packet(record)
     census, census_audit = load_paca_census(case_id=case_id, built=built, cache_root=census_root)
     candidate_provider: dict[str, Any] = {"calls": 0, "source": "frozen_paca_stage1_cache"}
@@ -122,8 +120,6 @@ def adjudicate_case(*, case_id: str, record: dict[str, Any], config: dict[str, A
 
     result: dict[str, Any] = {
         "case_ref": private_ref(case_id, "case_"),
-        "gold_label": parse_gold_label(record.get("is_hallucination")),
-        "gold_steps": sorted(parse_gold_steps(record.get("hallucination_step"))),
         "census": census, "census_audit": census_audit, "candidate_provider": candidate_provider,
     }
     providers: dict[str, Any] = {}

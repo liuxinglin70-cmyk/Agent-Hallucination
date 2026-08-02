@@ -1,29 +1,37 @@
-"""PACA-TCL v3.5 — Court-style causal attribution detector.
+"""Standalone PACA-TCL detector public facade.
 
-Public API for the frozen detection base.
-Import from this package rather than individual modules.
+This module deliberately uses lazy exports.  The core detector path imports
+only packet, transport, and proof-court code; BCCSE skill integration is loaded
+only when an integration symbol is explicitly requested.
 """
 
-from .proof_engine import adjudicate_case, evaluate
-from .skill_integration import (
-    PacaStage,
-    MODULE_STAGE,
-    compile_genome_for_paca,
-    integrated_v35_provider,
-)
-from .basic_runner import write_json, write_jsonl, read_json
+_EXPORTS = {
+    "adjudicate_case": ("proof_engine", "adjudicate_case"),
+    "evaluate": ("proof_engine", "evaluate"),
+    "detect_record": ("detector", "detect_record"),
+    "load_detector_config": ("detector", "load_detector_config"),
+    "EvolutionDetection": ("evolution_contract", "EvolutionDetection"),
+    "project_for_evolution": ("evolution_contract", "project_for_evolution"),
+    "PacaStage": ("skill_integration", "PacaStage"),
+    "PACA_MODULE_STAGE": ("skill_integration", "PACA_MODULE_STAGE"),
+    "compile_genome_for_paca": ("skill_integration", "compile_genome_for_paca"),
+    "integrated_v35_provider": ("skill_integration", "integrated_v35_provider"),
+    "write_json": ("basic_runner", "write_json"),
+    "write_jsonl": ("basic_runner", "write_jsonl"),
+    "read_json": ("basic_runner", "read_json"),
+}
 
-__all__ = [
-    # Engine
-    "adjudicate_case",
-    "evaluate",
-    # Integration
-    "PacaStage",
-    "MODULE_STAGE",
-    "compile_genome_for_paca",
-    "integrated_v35_provider",
-    # I/O
-    "write_json",
-    "write_jsonl",
-    "read_json",
-]
+
+def __getattr__(name: str):
+    import importlib
+
+    try:
+        module_name, attribute = _EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+    value = getattr(importlib.import_module(f"{__name__}.{module_name}"), attribute)
+    globals()[name] = value
+    return value
+
+
+__all__ = sorted(_EXPORTS)
