@@ -542,7 +542,20 @@ class TypeAwareFitness:
         elif after_state == before_state:
             process_state = "no_effect"
         else:
-            process_state = "improvement" if decisive_correct else "regression"
+            # Reaching here requires after_state != before_state AND a truthy
+            # decisive_correct (the preceding branch already claimed every
+            # falsy case), so the old ``"improvement" if decisive_correct
+            # else "regression"`` ternary had a provably dead else-half.
+            #
+            # What survives is the direction/state bookkeeping disagreement:
+            # the edit landed on the polarity the gold-implied direction was
+            # aiming for, but the recorded direction implies a different
+            # before-state than the one actually replayed. In production the
+            # direction is derived from the same row as ``detection_before``,
+            # so the two agree and this branch is unreachable; it is kept as
+            # a defensive classification for callers that pass a direction
+            # inferred from a different snapshot.
+            process_state = "improvement"
 
         improved = process_state == "improvement"
 
@@ -765,21 +778,6 @@ class TypeAwareFitness:
             "top_modules": top_modules,
             "strategy_effectiveness": strategy_effectiveness,
         }
-
-    def _determine_global_fitness(
-        self,
-        improved: bool,
-        decisive_accuracy: float,
-        coverage_rate: float,
-    ) -> str:
-        """Determine global fitness level (legacy, kept for compatibility)."""
-        if not improved and decisive_accuracy < 0.3:
-            return "none"
-        if improved and decisive_accuracy > 0.6 and coverage_rate > 0.5:
-            return "strong"
-        if improved or decisive_accuracy > 0.4:
-            return "weak"
-        return "none"
 
     def _determine_global_fitness_v2(
         self,

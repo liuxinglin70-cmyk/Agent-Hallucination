@@ -1481,7 +1481,7 @@ def run_online_evolution(
                     before_result=item.source_result,
                     after_result=_shadow_result,
                 )
-                type_fitness.assess_edit(
+                typed_assessment = type_fitness.assess_edit(
                     source_case_id=item.case_id,
                     hallucination_type=_type_result.primary_type,
                     evolution_direction=_direction,
@@ -1513,6 +1513,13 @@ def run_online_evolution(
                         diagnostic_only=not fitness_use_gold,
                         decision=item.individual_assessment.decision,
                     ),
+                )
+                # Persist the typed-fitness assessment in the batch audit
+                # trail: it was previously computed and silently discarded,
+                # so its metrics (global fitness, DACR, decisive accuracy)
+                # were unobservable in evolution results.
+                batch_audit.setdefault("typed_fitness_assessments", []).append(
+                    typed_assessment.to_dict()
                 )
                 # A successfully repaired source becomes a future regression
                 # anchor, so later edits cannot silently forget the fix.
@@ -1580,7 +1587,7 @@ def run_online_evolution(
                             rejected_type = type_classifier.classify(
                                 item.source_result, item.source_signal,
                             )
-                            type_fitness.assess_edit(
+                            rejected_assessment = type_fitness.assess_edit(
                                 source_case_id=item.case_id,
                                 hallucination_type=rejected_type.primary_type,
                                 evolution_direction=type_evolution._infer_evolution_direction(
@@ -1617,6 +1624,9 @@ def run_online_evolution(
                                     decision=item_assessment.decision,
                                 ),
                             )
+                            batch_audit.setdefault(
+                                "rejected_typed_fitness_assessments", []
+                            ).append(rejected_assessment.to_dict())
                         except Exception as exc:
                             runtime_errors.append(
                                 f"experience:{item.case_id}:{type(exc).__name__}:{exc}"
@@ -2507,7 +2517,7 @@ def run_online_evolution(
                 fitness_audit["directional_evidence_canary_preserved"] = True
                 fitness_audit["shadow_admissible"] = True
             if not assessment.passed and not directional_canary_support:
-                type_fitness.assess_edit(
+                typed_assessment = type_fitness.assess_edit(
                     source_case_id=case_id,
                     hallucination_type=type_result.primary_type,
                     evolution_direction=type_evolution._infer_evolution_direction(
@@ -2538,6 +2548,9 @@ def run_online_evolution(
                         promotable=False,
                         decision=assessment.decision,
                     ),
+                )
+                fitness_audit["htc_tes_typed_fitness"] = (
+                    typed_assessment.to_dict()
                 )
                 if assessment.decision != "no_effect":
                     reasons = [
