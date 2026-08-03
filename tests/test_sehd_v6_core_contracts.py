@@ -375,6 +375,22 @@ def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
     assert rejected is None
 
 
+def test_candidate_normalization_deduplicates_repeated_samples() -> None:
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        extract_intervention_candidates,
+    )
+
+    candidate = {
+        "target_module": "evidence_obligation",
+        "operation": "add_rule",
+        "new_content": "Require one cited event-backed certificate.",
+    }
+    values, _ = extract_intervention_candidates(
+        {"candidates": [candidate, dict(candidate)]}, limit=3,
+    )
+    assert values == [candidate]
+
+
 def test_collaborative_prompt_has_one_consistent_json_protocol() -> None:
     signal = _reflection_signal_for_test()
     system, user = build_causal_reflection_prompt(

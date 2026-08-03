@@ -71,6 +71,9 @@ def test_official_v4_mutation_defaults_to_non_thinking_json_mode():
     assert provider_thinking_control(route, purpose="mutation") == {
         "type": "disabled"
     }
+    assert provider_thinking_control(route, purpose="reflection_critic") == {
+        "type": "disabled"
+    }
     assert provider_thinking_control(route, purpose="detector") is None
     assert provider_thinking_control(
         {**route, "thinking": "enabled"}, purpose="mutation"

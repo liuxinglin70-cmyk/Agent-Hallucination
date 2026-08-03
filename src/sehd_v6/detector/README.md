@@ -191,11 +191,15 @@ before proposing a rule. This is the first stage of the planned collaborative
 reflection design, not a correctness vote.
 
 Evolution reflection supports bounded test-time scaling through
-`--reflection-candidates` (default `3`). Multiple candidate rules are generated
+`--reflection-candidates` (default `3` for the CLI). Multiple candidate rules are generated
 in one structured response, then a critic selects one replay candidate without
 rewriting it. The critic is a search-prioritization role, not an independent
 correctness authority; source replay and separately authorized evaluation remain
 responsible for evidence.
+
+The library also enforces `--max-mutation-calls` (CLI default `100`) across
+generation, critic, attribution, and conflict-gate calls. Exhausting this budget
+fails closed and is recorded in the evolution audit.
 
 ## Online Evolution Semantics
 

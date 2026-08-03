@@ -299,3 +299,66 @@ def test_online_evolution_passes_committed_genome_to_next_case(
     assert result.edits_accepted == 1
     # The source replay sees generation 1, and case after starts with it too.
     assert observed[-1] == ("after", 1)
+
+
+def test_online_evolution_runs_independent_candidates_and_critic(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls: list[tuple[str, str]] = []
+    responses = [
+        {
+            "target_module": "evidence_obligation", "operation": "add_rule",
+            "new_content": "Require a cited event-backed certificate.",
+            "feature_description": "missing cited support",
+        },
+        {
+            "target_module": "evidence_obligation", "operation": "add_rule",
+            "new_content": "If a certificate event is absent, keep the evidence incomplete.",
+            "feature_description": "absent evidence event",
+        },
+        {
+            "target_module": "evidence_obligation", "operation": "add_rule",
+            "new_content": "Require a cited event-backed certificate.",
+            "feature_description": "duplicate sample",
+        },
+        {"decision": "select", "selected_index": 1, "reason": "distinct owner-local effect"},
+    ]
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        calls.append((kwargs["purpose"], kwargs["user"]))
+        return responses.pop(0), {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=3,
+        run_id="independent_reflection",
+    )
+
+    assert result.edits_accepted == 1
+    assert [purpose for purpose, _ in calls] == [
+        "mutation", "mutation", "mutation", "reflection_critic",
+    ]
+    assert len({user for _, user in calls[:3]}) == 3
+    reflection = result.steps[-1].fitness_check["reflection"]
+    assert reflection["generated_candidates"] == 2
+    assert reflection["critic"]["selected_index"] == 1

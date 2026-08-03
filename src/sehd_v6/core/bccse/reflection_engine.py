@@ -782,16 +782,65 @@ predicts another field is not a usable intervention plan.
 def extract_intervention_candidates(
     response: Mapping[str, Any], *, limit: int = 3,
 ) -> tuple[list[dict[str, Any]], str]:
-    """Normalize bounded collaborative or legacy mutation output."""
+    """Normalize bounded collaborative or legacy mutation output.
+
+    Obvious schema failures are removed before critic selection. Semantic and
+    module-specific validation remains the responsibility of the structural
+    gate, so this pre-check does not duplicate the admission policy.
+    """
     if limit < 1 or limit > 5:
         raise ValueError("limit must be in 1..5")
     raw = response.get("candidates")
     if isinstance(raw, list):
-        candidates = [dict(value) for value in raw if isinstance(value, Mapping)]
-        return candidates[:limit], str(response.get("no_edit_rationale") or "")[:300]
+        candidates = [
+            dict(value) for value in raw
+            if isinstance(value, Mapping) and _candidate_shape_valid(value)
+        ]
+        return _deduplicate_candidates(candidates, limit), str(
+            response.get("no_edit_rationale") or ""
+        )[:300]
     if str(response.get("operation") or "") == "no_edit":
         return [], str(response.get("rationale") or "")[:300]
-    return [dict(response)], ""
+    return ([dict(response)], "") if _candidate_shape_valid(response) else (
+        [], "mutation candidate has an invalid basic schema"
+    )
+
+
+def _deduplicate_candidates(
+    candidates: Sequence[Mapping[str, Any]], limit: int,
+) -> list[dict[str, Any]]:
+    """Remove repeated independent samples before critic selection."""
+    seen: set[tuple[str, str, str, str | None]] = set()
+    result: list[dict[str, Any]] = []
+    for candidate in candidates:
+        key = (
+            str(candidate.get("target_module") or ""),
+            str(candidate.get("operation") or ""),
+            str(candidate.get("new_content") or "").strip(),
+            str(candidate.get("rule_index"))
+            if candidate.get("rule_index") is not None else None,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(dict(candidate))
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _candidate_shape_valid(candidate: Mapping[str, Any]) -> bool:
+    """Reject malformed candidate envelopes without deciding correctness."""
+    operation = str(candidate.get("operation") or "").strip()
+    if operation == "no_edit":
+        return True
+    if operation not in {"add_rule", "modify_rule", "remove_rule"}:
+        return False
+    if not str(candidate.get("target_module") or "").strip():
+        return False
+    if operation in {"add_rule", "modify_rule"}:
+        return bool(str(candidate.get("new_content") or "").strip())
+    return candidate.get("rule_index") is not None
 
 
 def build_intervention_critic_prompt(
