@@ -544,3 +544,66 @@ def test_stable_cases_do_not_advance_convergence_streak(
     assert "halted" not in decisions
     assert decisions.count("skip_no_edit") == 3
     assert decisions.count("skip_stable") == 1
+
+
+def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
+    """v5.9b: cases skipped by convergence were persisted as halted
+    placeholders with the queue advanced past them, so a resume dropped them
+    forever. Resume must rewind trailing placeholder steps and re-examine
+    those cases."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        return {
+            "state": "unresolved", "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        if kwargs.get("purpose") == "reflection_diagnosis":
+            return {
+                "owner_executable": False, "owner_module": None,
+                "failure_field": "", "observed_gap": "",
+                "reasoning": "nothing executable",
+            }, {"cache_hit": False}
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    output_dir = tmp_path / "converged_run"
+    records = {"s1": {}, "s2": {}, "s3": {}}
+    first = runner.run_online_evolution(
+        evolution_case_ids=("s1", "s2", "s3"),
+        records=records,
+        config={}, output_dir=output_dir, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        convergence_window=2,
+        run_id="resume_rewind_first",
+    )
+    first_decisions = [step.gate_decision for step in first.steps]
+    assert first_decisions.count("skip_no_edit") == 2
+    assert first_decisions.count("halted") == 1
+
+    resumed = runner.run_online_evolution(
+        evolution_case_ids=("s1", "s2", "s3"),
+        records=records,
+        config={}, output_dir=output_dir, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        convergence_window=2,
+        resume_from=output_dir,
+        run_id="resume_rewind_second",
+    )
+    resumed_decisions = [step.gate_decision for step in resumed.steps]
+    # The placeholder was rewound and s3 was genuinely re-examined.
+    assert "halted" not in resumed_decisions
+    assert resumed_decisions.count("skip_no_edit") == 3
+    assert len(resumed.steps) == 3

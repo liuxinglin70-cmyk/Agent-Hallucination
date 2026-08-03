@@ -1918,6 +1918,27 @@ def run_online_evolution(
         edits_accepted = int(restored_counters.get("edits_accepted") or 0)
         edits_rejected = int(restored_counters.get("edits_rejected") or 0)
         resume_next_case_index = int(restored.get("next_case_index") or 0)
+        # v5.9b: cases skipped by a halt/convergence were persisted as
+        # "halted" placeholder steps with next_case_index advanced past
+        # them, which made a resume treat them as processed and drop them
+        # forever. Rewind over any trailing unprocessed placeholder steps so
+        # the queue re-examines them under the restored champion genome.
+        rewound = 0
+        while steps and (
+            steps[-1].gate_decision == "halted"
+            or steps[-1].detection_state == "skipped"
+        ):
+            skipped_step = steps.pop()
+            rewound += 1
+            resume_next_case_index = min(
+                resume_next_case_index, skipped_step.case_index,
+            )
+        if rewound:
+            print(
+                f"[resume] rewinding {rewound} halted/skipped placeholder "
+                f"step(s); work queue restarts at case index "
+                f"{resume_next_case_index}"
+            )
         stable_memory_payload = type_fitness.get_experience_memory().to_dict()
         if run_id is None:
             run_id = str(checkpoint.get("run_id") or run_id or "")
