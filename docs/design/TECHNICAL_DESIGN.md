@@ -329,7 +329,11 @@ artifact/authorization audit.
 ## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Implemented)
 
 Implementation status: mechanism 1 (implemented as a deterministic,
-provider-free dual-channel owner arbitration; the LLM cross-examination
+provider-free dual-channel owner arbitration, including the FN
+complete-defense channel: a false-negative clean verdict carried by a
+complete clean defense widens the route to evidence_obligation, unlocking
+the abstention-rule NO_EDIT deadlock observed on Camel/006 and
+Magentic_One/019; the LLM cross-examination
 variant remains a possible later extension), mechanism 2 (contrastive replay
 acceptance: one nearest stable same-type neighbour replay gates every
 otherwise-accepted edit; polarity flips and gold-informed task-score

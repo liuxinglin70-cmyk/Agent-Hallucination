@@ -649,8 +649,12 @@ def _owner_arbitration(
     missing-action candidate -> ``candidate_trigger``.
     Channel B (verdict-vs-evidence gap): quarantined error certificates on a
     false-negative verdict mean error evidence was built but failed
-    validation -> ``evidence_obligation``; on a false-positive verdict with a
-    complete defense the defense boundary is the gap owner.
+    validation -> ``evidence_obligation``; a false-negative clean verdict
+    carried by a COMPLETE clean defense means the defense-side evidence
+    construction over-persuaded the court (the abstention module shows no
+    observable failure, the observed NO_EDIT deadlock) -> likewise
+    ``evidence_obligation``; on a false-positive verdict with a complete
+    defense the defense boundary is the gap owner.
 
     Returns ``("", "")`` when no channel has label-free evidence.  Callers
     append the hypothesis to the bounded attribution route; the attributor's
@@ -679,6 +683,15 @@ def _owner_arbitration(
     )
     if fn_side and quarantined > 0:
         return "evidence_obligation", "verdict_evidence_gap"
+    if fn_side:
+        # FN carried by a complete clean defense: the defense-side evidence
+        # construction over-persuaded the court.  The gold-locked route holds
+        # such cases at abstention_rule/causal_link_test, where the trace
+        # offers no observable failure to edit; evidence_obligation owns the
+        # defense-side evidence standard and stays inside the FN polarity.
+        defense_coverage = str(detection_result.get("defense_coverage") or "")
+        if defense_coverage == "complete":
+            return "evidence_obligation", "verdict_evidence_gap"
     if fp_side:
         defense_coverage = str(detection_result.get("defense_coverage") or "")
         if defense_coverage == "complete":

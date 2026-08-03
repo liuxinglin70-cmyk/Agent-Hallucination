@@ -3772,6 +3772,69 @@ def test_arbitration_quarantined_error_certs_route_evidence_obligation() -> None
     assert channel == "verdict_evidence_gap"
 
 
+def test_arbitration_fn_complete_defense_routes_evidence_obligation() -> None:
+    """FN with a complete clean defense: the defense side over-persuaded.
+
+    The gold-locked route sends prosecution-complete FN cases to
+    abstention_rule/causal_link_test, but when the trace shows the clean
+    verdict was carried by a COMPLETE defense, the broken stage is the
+    defense-side evidence construction; the abstention module has no
+    observable failure to edit (observed NO_EDIT deadlock on Camel/006 and
+    Magentic_One/019).  The verdict-vs-evidence-gap channel must widen the
+    route to evidence_obligation.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "quarantined_error_certificate_count": 0,
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == "evidence_obligation"
+    assert channel == "verdict_evidence_gap"
+
+
+def test_arbitration_fn_channel_priority_quarantine_beats_defense() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    # With quarantined error certificates the built-error-evidence channel is
+    # more specific than the complete-defense channel.
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "quarantined_error_certificate_count": 1,
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == "evidence_obligation"
+    assert channel == "verdict_evidence_gap"
+
+
+def test_arbitration_fn_no_channel_without_defense_evidence() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "complete",
+            "defense_coverage": "incomplete",
+            "quarantined_error_certificate_count": 0,
+        },
+        primary_type=HallucinationType.FACTUAL,
+    )
+    assert owner == ""
+    assert channel == ""
+
+
 def test_arbitration_respects_gold_polarity_lock() -> None:
     from types import SimpleNamespace
     from src.sehd_v6.core.bccse import evolution_runner as runner
