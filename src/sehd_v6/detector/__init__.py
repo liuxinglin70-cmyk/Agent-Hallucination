@@ -12,7 +12,20 @@ from ..core.paca_tcl.detector import (
     validate_record,
 )
 from ..core.paca_tcl.evolution_contract import EvolutionDetection, project_for_evolution
-from .batch import label_free_record, load_batch_records, run_batch
+from .batch import (
+    collect_replica_predictions,
+    label_free_record,
+    load_batch_records,
+    run_batch,
+    run_replicated_batch,
+)
+from .replica_aggregation import (
+    POLICY_CONSENSUS,
+    POLICY_MAJORITY,
+    POLICIES,
+    aggregate_replicas,
+    aggregate_states,
+)
 
 __all__ = [
     "detect_record",
@@ -24,4 +37,11 @@ __all__ = [
     "label_free_record",
     "load_batch_records",
     "run_batch",
+    "run_replicated_batch",
+    "collect_replica_predictions",
+    "aggregate_replicas",
+    "aggregate_states",
+    "POLICIES",
+    "POLICY_CONSENSUS",
+    "POLICY_MAJORITY",
 ]

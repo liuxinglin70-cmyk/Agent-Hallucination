@@ -332,3 +332,12 @@ python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/con
 ```
 
 这些命令不会绕过授权检查。角色 manifest、probe/外分层隔离和 final-holdout 授权属于实验协议层，位于 `experiments/` 而不是框架入口内；需要按协议先注册与目标阶段相符的冻结配置和角色 manifests。
+
+## 13. Decision Profile Calibration（决策阈值校准挂载点）
+
+`experiments/analyze_decision_profile.py` 产出 `experiments/results/decision_profile_report.json`，其中两个字段的消费契约如下：
+
+- `flip_band_case_ids`：已被 `experiments/run_decision_replicas.py` 主动消费，用于挑选 test-time-scaling 副本实验的案例预算。
+- `metrics_by_tau`：**选择性判决（selective classification）校准挂载点**。每个条目的字段集 `tau / confusion / decision_coverage / selective_accuracy / unresolved_should_clean_rate / unresolved_should_error_rate` 视为稳定接口（由 `tests/test_decision_profile.py::test_metrics_for_tau_key_set_is_stable_interface` 钉死）。
+
+当前状态：`metrics_by_tau` 仅有报告产出、无自动运行时消费方。未来接入位置：tau 选择/校准步骤（如副本触发带选择、champion 验收评审的操作点证据）。约束：任何校准步骤只能**只读**消费报告 JSON；模拟操作点永远不得回灌进确定性 proof court 终判（CRS 是诊断投影，不是判决引擎）。

@@ -9,13 +9,16 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from ..core.paca_tcl.detector import FORBIDDEN_INPUT_FIELDS, detect_record
 from ..utils.ocse_packet import canonical_json, stable_hash
+from .replica_aggregation import POLICIES, aggregate_replicas
 
 
 BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v2"
+REPLICA_REPORT_SCHEMA_VERSION = "agenthallu.decision_replicas.v1"
+MAX_REPLICAS = 5
 
 
 def load_batch_records(path: Path) -> dict[str, dict[str, Any]]:
@@ -239,3 +242,159 @@ def run_batch(
     _atomic_json(output_dir / "predictions.json", predictions)
     _atomic_json(output_dir / "summary.json", summary)
     return summary
+
+
+# ============================================================
+# Test-time-scaling replica orchestration (library-level)
+# ============================================================
+
+
+def collect_replica_predictions(
+    replica_roots: Sequence[Path], case_ids: Sequence[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Collect per-case replica predictions from each replica directory.
+
+    ``run_batch`` persists the rows under ``predictions.json``; the returned
+    summary intentionally carries no ``predictions`` key.
+    """
+    predictions_by_case: dict[str, list[dict[str, Any]]] = {
+        str(case_id): [] for case_id in case_ids
+    }
+    for replica_root in replica_roots:
+        predictions_path = Path(replica_root) / "predictions.json"
+        if not predictions_path.is_file():
+            continue
+        for row in json.loads(predictions_path.read_text(encoding="utf-8")):
+            case_id = str(row.get("case_id"))
+            if case_id in predictions_by_case:
+                predictions_by_case[case_id].append(row.get("prediction") or {})
+    return predictions_by_case
+
+
+def _all_routes_deterministic(config: Mapping[str, Any]) -> bool:
+    """Whether every provider route runs at temperature 0 (or unset).
+
+    Detector routes live as top-level ``*_route`` keys. With all routes
+    deterministic, k replicas collapse into k identical cache copies, so
+    replica diversity is impossible without an explicit temperature change.
+    """
+    temperatures = [
+        route.get("temperature")
+        for name, route in config.items()
+        if name.endswith("_route") and isinstance(route, Mapping)
+    ]
+    return bool(temperatures) and all(
+        temperature in (0, 0.0, None) for temperature in temperatures
+    )
+
+
+def run_replicated_batch(
+    *,
+    records: Mapping[str, Mapping[str, Any]],
+    config: dict[str, Any],
+    output_root: Path,
+    replicas: int = 1,
+    replica_policy: str = "majority",
+    max_parallel: int = 10,
+    resume: bool = True,
+) -> dict[str, Any]:
+    """Run the detector k times per case and aggregate fail-closed.
+
+    Each replica executes under an isolated global provider-cache root so
+    identical payloads do not collapse into one cached response; replicas are
+    strictly serial because ``PACA_GLOBAL_CACHE_ROOT`` is process-global and
+    ``run_batch`` already parallelizes across cases internally. Verdicts are
+    combined with ``aggregate_replicas`` (majority/consensus, fail-closed).
+
+    Degradation guard: when every route is deterministic (temperature 0 or
+    unset), requesting replicas > 1 would burn k identical provider calls,
+    so the run degrades to a single replica and records the reason. The
+    temperature is never raised implicitly.
+
+    ``run_batch`` itself is untouched: its hash-bound resume and artifact
+    schema stay exactly as before.
+    """
+    if not 1 <= replicas <= MAX_REPLICAS:
+        raise ValueError(f"replicas must be in 1..{MAX_REPLICAS}")
+    if replica_policy not in POLICIES:
+        raise ValueError(f"unknown replica policy: {replica_policy!r}")
+    output_root = Path(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    replica_degradation: dict[str, Any] | None = None
+    effective_replicas = replicas
+    if replicas > 1 and _all_routes_deterministic(config):
+        effective_replicas = 1
+        replica_degradation = {
+            "reason": "temperature_zero",
+            "requested": replicas,
+        }
+
+    original_global_cache = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
+    replica_roots: list[Path] = []
+    try:
+        for index in range(effective_replicas):
+            replica_root = output_root / f"replica_{index}"
+            # Isolate the global provider cache per replica so identical
+            # payloads cannot collapse k runs into one cached response.
+            os.environ["PACA_GLOBAL_CACHE_ROOT"] = str(
+                replica_root / "provider_cache"
+            )
+            run_batch(
+                records=records,
+                config=config,
+                output_dir=replica_root,
+                max_parallel=max_parallel,
+                resume=resume,
+            )
+            replica_roots.append(replica_root)
+    finally:
+        if original_global_cache is None:
+            os.environ.pop("PACA_GLOBAL_CACHE_ROOT", None)
+        else:
+            os.environ["PACA_GLOBAL_CACHE_ROOT"] = original_global_cache
+
+    case_ids = [str(case_id) for case_id in records]
+    predictions_by_case = collect_replica_predictions(replica_roots, case_ids)
+
+    cases: list[dict[str, Any]] = []
+    for case_id in case_ids:
+        replica_predictions = predictions_by_case[case_id]
+        if len(replica_predictions) < effective_replicas:
+            aggregate = {
+                "state": "unresolved",
+                "policy": replica_policy,
+                "replica_count": len(replica_predictions),
+                "invalid_replica_indexes": [],
+                "replica_states": [
+                    str(prediction.get("state") or "unresolved")
+                    for prediction in replica_predictions
+                ],
+                "unanimous": False,
+                "runtime_valid": False,
+                "note": "incomplete_replicas",
+            }
+        else:
+            aggregate = aggregate_replicas(
+                replica_predictions, policy=replica_policy
+            )
+        cases.append({"case_id": case_id, "aggregate": aggregate})
+
+    report = {
+        "schema_version": REPLICA_REPORT_SCHEMA_VERSION,
+        "config_hash": stable_hash(config),
+        "k": replicas,
+        "replicas_effective": effective_replicas,
+        "replica_degradation": replica_degradation,
+        # Kept in the library report so aggregated_report.json and the CLI
+        # artifact share one field set under the same schema_version.
+        "deterministic_route_warning": _all_routes_deterministic(config),
+        "policy": replica_policy,
+        "case_count": len(cases),
+        "unanimous_cases": sum(
+            case["aggregate"]["unanimous"] for case in cases
+        ),
+        "cases": cases,
+    }
+    _atomic_json(output_root / "aggregated_report.json", report)
+    return report

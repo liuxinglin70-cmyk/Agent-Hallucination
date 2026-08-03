@@ -472,3 +472,77 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
     memory = (tmp_path / "htc_tes_experience_memory.json").read_text("utf-8")
     assert '"detection_improved": false' in memory
     assert '"source_case_id": "source"' in memory
+
+
+# ============================================================
+# abstention_rule indirect channel: boundary finding -> proof court
+# ============================================================
+
+
+def test_boundary_finding_feeds_proof_court_neutral_evidence() -> None:
+    """Second hop of the abstention_rule channel (pure function, no LLM).
+
+    The boundary-route output (the only provider an abstention_rule edit can
+    reach) enters the final adjudication deterministically: its finding is
+    embedded as ``case_boundary_finding`` inside NEUTRAL_EVIDENCE of the
+    proof prompt.
+    """
+    import json as _json
+
+    from src.sehd_v6.core.paca_tcl import proof_engine_v3_4 as v34
+
+    base = {
+        "census": [],
+        "boundary_path": {
+            "state": "verified_clean",
+            "responsible_event_id": "event_007",
+            "evidence_refs": ["event_005", "event_006"],
+            "rationale": "defense evidence fully established, no surviving "
+                          "error certificate",
+        },
+    }
+    value = v34._proof_user({"events": []}, base)
+    assert "NEUTRAL_EVIDENCE=" in value
+    neutral = _json.loads(value.split("NEUTRAL_EVIDENCE=\n", 1)[1])
+    finding = neutral["case_boundary_finding"]
+    assert finding["state"] == "verified_clean"
+    assert finding["responsible_event_id"] == "event_007"
+    assert finding["evidence_refs"] == ["event_005", "event_006"]
+    assert "fully established" in finding["rationale"]
+
+
+def test_boundary_responsible_event_becomes_required_proof_input() -> None:
+    """The boundary finding also constrains the court's required evidence."""
+    from src.sehd_v6.core.paca_tcl import proof_engine_v3_4 as v34
+
+    base = {
+        "census": [],
+        "boundary_path": {
+            "state": "unresolved",
+            "responsible_event_id": "event_007",
+        },
+    }
+    assert "event_007" in v34._required_origins(base)
+    candidates = v34._required_candidates(base)
+    boundary_rows = [
+        row for row in candidates
+        if row.get("origin_hypothesis_event_id") == "event_007"
+    ]
+    assert boundary_rows
+    assert boundary_rows[0]["candidate_kind"] == "independent_boundary_finding"
+
+
+def test_abstention_rule_guidance_describes_indirect_channel_only() -> None:
+    """Reflection guidance must not promise direct verdict overwrites."""
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        MODULE_OBSERVABLE_EFFECTS,
+        MODULE_RUNTIME_CONTRACTS,
+    )
+
+    contract = MODULE_RUNTIME_CONTRACTS["abstention_rule"]
+    assert "case_boundary_finding" in contract
+    assert "NEUTRAL_EVIDENCE" in contract
+    assert "never claim to overwrite" in contract
+    effects = MODULE_OBSERVABLE_EFFECTS["abstention_rule"]
+    assert "NEUTRAL_EVIDENCE" in effects
+    assert "authoritative state" not in effects

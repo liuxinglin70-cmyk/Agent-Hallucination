@@ -37,6 +37,7 @@ from ..paca_tcl.basic_runner import (
     write_jsonl,
 )
 from ...utils import ocse_packet as packet
+from ...utils.gold_label import coerce_gold_label
 from .reflection_engine import (
     RejectedEditEntry,
     build_causal_reflection_prompt,
@@ -634,7 +635,23 @@ def _probe_certification(
     - any probe case regressed         -> regressed
     - no regression, >=1 improvement   -> certified
     - all unchanged                    -> neutral
+
+    The returned label must belong to ``PROBE_CERTIFICATION_LABELS``; the
+    closed vocabulary is the schema contract for audit artifacts and the
+    opt-in experience record.
     """
+    label = _probe_certification_label(current_audits, previous_audits)
+    if label not in PROBE_CERTIFICATION_LABELS:
+        raise ValueError(
+            f"probe certification produced unknown label: {label!r}"
+        )
+    return label
+
+
+def _probe_certification_label(
+    current_audits: Sequence[Mapping[str, Any]],
+    previous_audits: Sequence[Mapping[str, Any]] | None,
+) -> str:
     if not previous_audits:
         return "neutral"
     previous_by_case = {
@@ -991,20 +1008,17 @@ def _detector_record(record: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
-    """Join a label only inside an evaluator; never pass it to detection."""
-    value = record.get("gold_label")
-    if isinstance(value, bool):
+    """Join a label only inside an evaluator; never pass it to detection.
+
+    Both label keys accept booleans and the string token forms handled by
+    ``coerce_gold_label`` (dataset dumps are inconsistent about types);
+    unrecognizable values stay ``None`` so the opt-in gold paths remain
+    fail-closed.
+    """
+    value = coerce_gold_label(record.get("gold_label"))
+    if value is not None:
         return value
-    value = record.get("is_hallucination")
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.lower().strip()
-        if normalized in {"true", "1", "yes"}:
-            return True
-        if normalized in {"false", "0", "no"}:
-            return False
-    return None
+    return coerce_gold_label(record.get("is_hallucination"))
 
 
 # ============================================================
@@ -3516,7 +3530,13 @@ def run_online_evolution(
                         if isinstance(edit.operation, SkillOp)
                         else str(edit.operation)
                     ),
-                    "content": edit.new_content[:200],
+                    # Store the full rule text: the retry-deduplication gate
+                    # compares bigram overlap against this content, and a
+                    # truncated prefix systematically underestimates overlap
+                    # for long rules (letting paraphrase retries escape).
+                    # This structure is in-memory only (never checkpointed),
+                    # so storing full text carries no compatibility cost.
+                    "content": edit.new_content,
                     "content_hash": hashlib.sha256(
                         edit.new_content.encode("utf-8")
                     ).hexdigest()[:12],

@@ -3512,3 +3512,122 @@ def test_probe_certification_off_by_default_leaves_memory_untouched(
     assert "probe_certification" not in default_text
 
 
+# ============================================================
+# W3: retry-deduplication gate must stay symmetric for long rules
+# ============================================================
+
+
+def test_rejected_proposal_duplicate_catches_long_rule_paraphrase() -> None:
+    """Long rules share a long prefix and diverge only at the tail.
+
+    While the stored content was truncated to 200 chars, the bigram Jaccard
+    against the full new content was systematically diluted (< 0.85), letting
+    same-owner paraphrase retries escape the gate. Storing the full text
+    restores symmetric comparison.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    base = (
+        "if the trajectory shows a tool acknowledgement followed by a "
+        "repaired interaction before any material impact is observable, "
+        "then the boundary finding must record the recovery chain and keep "
+        "the case on the clean evidence standard unless a surviving error "
+        "certificate cites an unrepaired consumption event; "
+    )
+    assert len(base) > 200  # the historically truncated prefix length
+    long_a = base + "tail-alpha"
+    long_b = base + "tail-bravo"
+    assert long_a != long_b
+
+    rejected = [{
+        "target_module": "abstention_rule",
+        "operation": "add_rule",
+        "content": long_a,  # full text, as stored after the fix
+        "content_hash": runner.hashlib.sha256(
+            long_a.encode("utf-8")
+        ).hexdigest()[:12],
+        "observable_deltas": [],
+    }]
+    # Different hash but near-identical long content: must be caught.
+    assert runner._rejected_proposal_duplicate(
+        rejected,
+        target_module="abstention_rule",
+        new_content=long_b,
+    ) is True
+    # Genuinely different long intervention: allowed through.
+    assert runner._rejected_proposal_duplicate(
+        rejected,
+        target_module="abstention_rule",
+        new_content=(
+            "when the prosecution certificates lack any cited trajectory "
+            "support for the claimed tool output, quarantine the earliest "
+            "origin and require an explicit evidence obligation before the "
+            "court may treat the claim as established; never infer support "
+            "from narrative description alone in any module; "
+            "conditions stay trajectory-observable."
+        ),
+    ) is False
+
+
+# ============================================================
+# S5: probe certification labels stay inside the closed vocabulary
+# ============================================================
+
+
+def test_probe_certification_labels_within_closed_vocabulary() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    current = [{"case_id": "p", "task_score": 2, "runtime_valid": True}]
+    prev_low = [{"case_id": "p", "task_score": 1, "runtime_valid": True}]
+    prev_same = [{"case_id": "p", "task_score": 2, "runtime_valid": True}]
+    for label in (
+        runner._probe_certification(current, None),          # neutral
+        runner._probe_certification(current, prev_low),      # certified
+        runner._probe_certification(current, prev_same),     # neutral
+        runner._probe_certification(
+            [{"case_id": "p", "task_score": 0, "runtime_valid": True}],
+            prev_same,
+        ),                                                   # regressed
+    ):
+        assert label in runner.PROBE_CERTIFICATION_LABELS
+
+
+# ============================================================
+# S6: evaluator gold labels accept the string token forms
+# ============================================================
+
+
+def test_evaluator_gold_coerces_string_labels() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._evaluator_gold({"gold_label": True}) is True
+    assert runner._evaluator_gold({"gold_label": False}) is False
+    assert runner._evaluator_gold({"gold_label": "true"}) is True
+    assert runner._evaluator_gold({"gold_label": " 0 "}) is False
+    assert runner._evaluator_gold({"is_hallucination": "yes"}) is True
+    assert runner._evaluator_gold({"is_hallucination": "no"}) is False
+    # gold_label wins over is_hallucination.
+    assert runner._evaluator_gold(
+        {"gold_label": "false", "is_hallucination": True}
+    ) is False
+    # Unrecognizable values stay fail-closed (no fabricated label).
+    assert runner._evaluator_gold({"gold_label": "maybe"}) is None
+    assert runner._evaluator_gold({}) is None
+
+
+def test_coerce_gold_label_single_source_of_truth() -> None:
+    from src.sehd_v6.utils.gold_label import coerce_gold_label
+
+    assert coerce_gold_label(True) is True
+    assert coerce_gold_label(False) is False
+    assert coerce_gold_label("TRUE") is True
+    assert coerce_gold_label(" 1 ") is True
+    assert coerce_gold_label("no") is False
+    assert coerce_gold_label(1) is True
+    assert coerce_gold_label(0) is False
+    assert coerce_gold_label("maybe") is None
+    assert coerce_gold_label(None) is None
+    assert coerce_gold_label(2) is None
+
+
+

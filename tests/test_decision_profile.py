@@ -17,6 +17,7 @@ _SPEC.loader.exec_module(profile_module)
 
 verdict_at_operating_point = profile_module.verdict_at_operating_point
 flip_band_case_ids = profile_module.flip_band_case_ids
+_metrics_for_tau = profile_module._metrics_for_tau
 
 
 def test_high_crs_with_complete_prosecution_is_error_above_tau() -> None:
@@ -116,3 +117,38 @@ def test_flip_band_detects_unstable_cases_only() -> None:
     }
     flips = flip_band_case_ids([stable_error, flipping, unresolved_band])
     assert flips == ["BFCL/002", "BFCL/003"]
+
+
+def test_metrics_for_tau_key_set_is_stable_interface() -> None:
+    """metrics_by_tau is the registered calibration mount point; downstream
+    consumers rely on this exact field set (see module docstring)."""
+    profiles = [
+        {
+            "case_id": "BFCL/001",
+            "crs_aggregate": 0.5,
+            "prosecution_coverage_state": "complete",
+            "defense_coverage_state": "incomplete",
+            "gold_label": True,
+        },
+        {
+            "case_id": "BFCL/002",
+            "crs_aggregate": None,
+            "prosecution_coverage_state": "incomplete",
+            "defense_coverage_state": "complete",
+            "gold_label": False,
+        },
+    ]
+    metrics = _metrics_for_tau(profiles, 0.28)
+    assert set(metrics.keys()) == {
+        "tau",
+        "confusion",
+        "decision_coverage",
+        "selective_accuracy",
+        "unresolved_should_clean_rate",
+        "unresolved_should_error_rate",
+    }
+    assert metrics["tau"] == 0.28
+    assert metrics["selective_accuracy"] == 1.0
+    assert metrics["decision_coverage"] == 0.5
+    assert metrics["unresolved_should_clean_rate"] == 0.5
+    assert metrics["unresolved_should_error_rate"] == 0.0

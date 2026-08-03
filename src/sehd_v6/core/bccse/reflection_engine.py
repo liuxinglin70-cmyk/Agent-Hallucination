@@ -169,10 +169,13 @@ MODULE_RUNTIME_CONTRACTS: dict[str, str] = {
         "causal origins"
     ),
     "abstention_rule": (
-        "choose clean, error, or unresolved only from complete admissible "
-        "prosecution and defense outputs; a conditional evidence standard "
-        "(when to lower or raise the bar for a decisive verdict based on "
-        "trajectory-observable facts) is a legal action for this module"
+        "shape the boundary-route finding (its state and rationale) so that "
+        "a conditional evidence standard — when the bar for a decisive "
+        "verdict should lower or raise based on trajectory-observable facts "
+        "— reaches the proof court as the case_boundary_finding inside "
+        "NEUTRAL_EVIDENCE and constrains evidence construction; the final "
+        "verdict stays with the deterministic proof court, so a rule here "
+        "must never claim to overwrite an authoritative ruling directly"
     ),
 }
 
@@ -188,7 +191,10 @@ MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
     "clean_defense_boundary": "defense certificate count/coverage changes",
     "causal_link_test": "causal-field coverage or propagation state changes",
     "earliest_origin_tiebreak": "responsible-step/origin selection changes",
-    "abstention_rule": "authoritative state or unresolved trigger changes",
+    "abstention_rule": (
+        "case boundary finding state/rationale changes (feeds "
+        "NEUTRAL_EVIDENCE of the proof court)"
+    ),
 }
 
 # Machine-readable source-of-truth for reflection contracts. Keeping this next
@@ -480,13 +486,18 @@ Good examples:
 - When correcting an alleged origin would not change the result, reject that
   origin as non-causal.
 - When the defense evidence is fully established and no error certificate
-  survives, conclude clean instead of abstaining. (Conditional evidence
-  standard for abstention_rule: conditions must stay trajectory-observable.)
+  survives, the boundary finding should record that the decisive evidence
+  standard is met instead of abstaining. (Conditional evidence standard for
+  abstention_rule: conditions must stay trajectory-observable.)
 
 Conditional evidence standards (abstention_rule only): when the trace shows
 the court abstained although one side's evidence was fully established, you
-may add one rule that conditions a decisive verdict on trajectory-observable
-facts (cited support, surviving certificates, acknowledged repairs). Never
+may add one rule that conditions the boundary finding's decisive-verdict
+standard on trajectory-observable facts (cited support, surviving
+certificates, acknowledged repairs). Such a rule acts on the evidence side
+only: the boundary finding enters the proof court as case_boundary_finding
+inside NEUTRAL_EVIDENCE and constrains how prosecution/defense evidence is
+constructed; it never rewrites the deterministic adjudication itself. Never
 name internal scores or coverage field identifiers in such a rule; describe
 the observable evidence pattern instead.
 

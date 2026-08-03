@@ -283,3 +283,195 @@ def test_collect_replica_predictions_missing_file_yields_incomplete(
     # One replica produced no predictions.json: the case stays below k so the
     # caller routes it to the fail-closed incomplete_replicas branch.
     assert len(collected["case_a"]) == 1
+
+
+# --- W1: library-level replica orchestration (run_replicated_batch) ------
+
+
+def _stochastic_config() -> dict:
+    # At least one route with temperature > 0: replicas are meaningful and
+    # the degradation guard must not fire.
+    return {"boundary_route": {"model": "mock", "temperature": 0.7}}
+
+
+def test_run_replicated_batch_isolates_env_and_restores_it(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import os
+
+    seen_cache_roots: list[str] = []
+    states = ["verified_error", "verified_error", "verified_clean"]
+    counter = {"calls": 0}
+
+    def detector(*, case_id, **_kwargs):
+        seen_cache_roots.append(os.environ.get("PACA_GLOBAL_CACHE_ROOT", ""))
+        state = states[counter["calls"] % len(states)]
+        counter["calls"] += 1
+        return {
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "state": state,
+        }
+
+    monkeypatch.setattr(batch, "detect_record", detector)
+    monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", "original-root")
+
+    report = batch.run_replicated_batch(
+        records=_records(1),
+        config=_stochastic_config(),
+        output_root=tmp_path,
+        replicas=3,
+        replica_policy="majority",
+        max_parallel=1,
+    )
+
+    # Every replica ran under its own isolated global cache root...
+    assert len(seen_cache_roots) == 3
+    assert len(set(seen_cache_roots)) == 3
+    for index, root in enumerate(seen_cache_roots):
+        assert f"replica_{index}" in root
+    # ...and the original environment is restored afterwards.
+    assert os.environ["PACA_GLOBAL_CACHE_ROOT"] == "original-root"
+
+    # Majority aggregation: 2x verified_error beats 1x verified_clean.
+    assert report["replicas_effective"] == 3
+    assert report["replica_degradation"] is None
+    case = report["cases"][0]
+    assert case["aggregate"]["state"] == "verified_error"
+    assert case["aggregate"]["unanimous"] is False
+    assert (tmp_path / "aggregated_report.json").is_file()
+    for index in range(3):
+        assert (tmp_path / f"replica_{index}" / "predictions.json").is_file()
+
+
+def test_run_replicated_batch_degrades_when_all_routes_deterministic(
+    monkeypatch, tmp_path: Path
+) -> None:
+    counter = {"calls": 0}
+
+    def detector(*, case_id, **_kwargs):
+        counter["calls"] += 1
+        return {
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "state": "verified_clean",
+        }
+
+    monkeypatch.setattr(batch, "detect_record", detector)
+
+    # Temperature 0 (and unset) routes make k replicas identical cache
+    # copies: the guard degrades to one replica instead of burning k calls.
+    report = batch.run_replicated_batch(
+        records=_records(2),
+        config={"boundary_route": {"model": "mock", "temperature": 0}},
+        output_root=tmp_path,
+        replicas=3,
+        max_parallel=1,
+    )
+    assert counter["calls"] == 2  # exactly one detection per case
+    assert report["replicas_effective"] == 1
+    assert report["replica_degradation"] == {
+        "reason": "temperature_zero", "requested": 3,
+    }
+    assert report["cases"][0]["aggregate"]["unanimous"] is True
+    assert not (tmp_path / "replica_1").exists()
+
+
+def test_run_replicated_batch_disagreement_is_fail_closed(
+    monkeypatch, tmp_path: Path
+) -> None:
+    states = iter(["verified_error", "verified_clean", "unresolved"])
+
+    def detector(**_kwargs):
+        return {
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "state": next(states),
+        }
+
+    monkeypatch.setattr(batch, "detect_record", detector)
+    report = batch.run_replicated_batch(
+        records=_records(1),
+        config=_stochastic_config(),
+        output_root=tmp_path,
+        replicas=3,
+        max_parallel=1,
+    )
+    assert report["cases"][0]["aggregate"]["state"] == "unresolved"
+
+
+def test_run_replicated_batch_incomplete_replicas_are_fail_closed(
+    monkeypatch, tmp_path: Path
+) -> None:
+    replica_index = {"value": 0}
+    original_run_batch = batch.run_batch
+
+    def detector(**_kwargs):
+        # Replica 0 succeeds; later replicas crash -> no predictions rows.
+        # The stub increments the counter *before* delegating to the real
+        # run_batch, so the first replica observes value 1 here.
+        if replica_index["value"] > 1:
+            raise RuntimeError("replica provider failure")
+        return {
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "state": "verified_error",
+        }
+
+    def run_batch_stub(*, records, config, output_dir, max_parallel, resume):
+        replica_index["value"] += 1
+        return original_run_batch(
+            records=records, config=config, output_dir=output_dir,
+            max_parallel=max_parallel, resume=resume,
+        )
+
+    monkeypatch.setattr(batch, "detect_record", detector)
+    monkeypatch.setattr(batch, "run_batch", run_batch_stub)
+    report = batch.run_replicated_batch(
+        records=_records(1),
+        config=_stochastic_config(),
+        output_root=tmp_path,
+        replicas=3,
+        max_parallel=1,
+    )
+    aggregate = report["cases"][0]["aggregate"]
+    assert aggregate["state"] == "unresolved"
+    assert aggregate["note"] == "incomplete_replicas"
+    assert aggregate["runtime_valid"] is False
+    assert aggregate["replica_count"] == 1
+
+
+def test_run_replicated_batch_validates_arguments(tmp_path: Path) -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        batch.run_replicated_batch(
+            records=_records(1), config={}, output_root=tmp_path, replicas=0,
+        )
+    with pytest.raises(ValueError):
+        batch.run_replicated_batch(
+            records=_records(1), config={}, output_root=tmp_path,
+            replicas=batch.MAX_REPLICAS + 1,
+        )
+    with pytest.raises(ValueError):
+        batch.run_replicated_batch(
+            records=_records(1), config={}, output_root=tmp_path,
+            replica_policy="weighted",
+        )
+
+
+def test_detector_boundary_exports_replica_api() -> None:
+    # The stable application-facing boundary must expose the aggregation
+    # and orchestration entry points (previously only the experiment script
+    # could reach them).
+    from src.sehd_v6 import detector
+
+    for name in (
+        "aggregate_states",
+        "aggregate_replicas",
+        "POLICIES",
+        "run_replicated_batch",
+        "collect_replica_predictions",
+    ):
+        assert name in detector.__all__
+        assert hasattr(detector, name)

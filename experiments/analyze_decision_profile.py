@@ -12,6 +12,18 @@ CRS is a diagnostic projection, not the proof-court verdict engine, so every
 recomputed verdict is explicitly marked as an operating-point simulation.
 Cases whose CRS projection is incomplete (``crs_complete=False`` or missing
 aggregate) are reported separately and never counted as decisive.
+
+Consumption contract (calibration mount point)
+----------------------------------------------
+``flip_band_case_ids`` is actively consumed by ``run_decision_replicas.py``
+(test-time-scaling replica budget selection). ``metrics_by_tau`` is the
+registered mount point for selective-classification calibration: its field
+set (``tau`` / ``confusion`` / ``decision_coverage`` / ``selective_accuracy``
+/ ``unresolved_should_clean_rate`` / ``unresolved_should_error_rate``) is a
+stable interface. It currently has no automated runtime consumer; a future
+tau-selection / calibration step (e.g. replica trigger-band choice) must
+consume the report JSON read-only and must never feed a simulated operating
+point back into the deterministic proof court.
 """
 
 from __future__ import annotations
@@ -180,6 +192,11 @@ def _outcome(verdict: str, gold: bool | None) -> str:
 def _metrics_for_tau(
     profiles: Sequence[Mapping[str, Any]], tau: float
 ) -> dict[str, Any]:
+    """Selective-classification metrics at one operating point.
+
+    The returned key set is a stable interface (see the module docstring
+    calibration mount point); downstream consumers may rely on it.
+    """
     confusion: Counter[str] = Counter()
     for profile in profiles:
         verdict = verdict_at_operating_point(
@@ -306,6 +323,8 @@ def main() -> int:
         "case_count": len(reliable),
         "excluded_case_count": len(excluded),
         "excluded_case_ids": [p["case_id"] for p in excluded],
+        # Calibration mount point: see module docstring. Field set of each
+        # entry is a stable interface for future tau-selection consumers.
         "metrics_by_tau": [
             _metrics_for_tau(reliable, tau) for tau in args.taus
         ],
