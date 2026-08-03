@@ -1268,3 +1268,110 @@ def test_appeal_prosecutor_retry_system_prompt_states_hard_requirements() -> Non
     assert "response_truncated" in prompt
     assert "foreign_candidate_id" in prompt
     assert "missing_reviewed_candidate_ids" in prompt
+
+
+def test_appeal_defense_deep_repair_runs_and_fail_closes_when_still_invalid() -> None:
+    """Deep certificate-level defense repair is bounded and never weakens the
+    court validator: a still-invalid repair returns the original response and
+    the court fail-closes as before."""
+    packet = _packet()
+    # Initial response is invalid at the certificate level (wrong origin), so
+    # the top-level coverage contract passes but the deep validator fails.
+    response = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "certificate_id": "ad_001",
+                "target_candidate_id": "candidate_001",
+                "target_origin_event_id": "event_002",  # wrong origin
+                "defense_type": "supported_or_correct",
+                "evidence_refs": ["event_001"],
+                "rationale": "ok",
+            },
+        ],
+    }
+    required = [_candidate()]
+
+    def retry_call(invalid_audits):
+        return (
+            {
+                "coverage_state": "complete",
+                "candidates": [
+                    {
+                        "certificate_id": "ad_002",
+                        "target_candidate_id": "candidate_001",
+                        "target_origin_event_id": "event_001",
+                        "defense_type": "supported_or_correct",
+                        "evidence_refs": ["event_001"],
+                        "rationale": "repaired",
+                    },
+                ],
+            },
+            {"cache_hit": False},
+        )
+
+    providers: dict = {}
+    repaired = proof_engine._validate_appeal_defense_deep_or_repair(
+        response,
+        built=packet,
+        candidates=required,
+        base={},
+        prosecution={},
+        defense={},
+        proof={},
+        appeal_prosecution=None,
+        required_candidates=required,
+        retry_call=retry_call,
+        providers=providers,
+    )
+    assert providers["appeal_defender_deep"]["outcome"] == "repaired"
+    assert repaired["candidates"][0]["certificate_id"] == "ad_002"
+
+    # A still-invalid repair keeps the original response and records the audit;
+    # the court validator (unchanged) will fail-close downstream.
+    def bad_retry_call(invalid_audits):
+        return (
+            {
+                "coverage_state": "complete",
+                "candidates": [
+                    {
+                        "certificate_id": "ad_003",
+                        "target_candidate_id": "candidate_001",
+                        # wrong origin on purpose
+                        "target_origin_event_id": "event_002",
+                        "defense_type": "supported_or_correct",
+                        "evidence_refs": ["event_001"],
+                        "rationale": "still wrong",
+                    },
+                ],
+            },
+            {"cache_hit": False},
+        )
+
+    providers2: dict = {}
+    kept = proof_engine._validate_appeal_defense_deep_or_repair(
+        response,
+        built=packet,
+        candidates=required,
+        base={},
+        prosecution={},
+        defense={},
+        proof={},
+        appeal_prosecution=None,
+        required_candidates=required,
+        retry_call=bad_retry_call,
+        providers=providers2,
+    )
+    assert providers2["appeal_defender_deep"]["outcome"] == "still_invalid"
+    assert kept is response
+    # The court still rejects this invalid appeal defense (fail-closed).
+    import pytest
+
+    with pytest.raises(ValueError):
+        proof_contract.adjudicate_proof_court(
+            required_candidates=required,
+            prosecution={"coverage_state": "complete", "candidates": []},
+            defense={"coverage_state": "complete", "candidates": []},
+            packet=packet,
+            appeal_defense=kept,
+        )

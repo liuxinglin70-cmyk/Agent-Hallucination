@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-from src.sehd_v6.detector import batch
+from src.sehd_v6.detector import batch, replica_aggregation
 
 
 def _records(count: int = 4) -> dict[str, dict]:
@@ -118,3 +118,88 @@ def test_failed_case_is_recorded_and_retried(monkeypatch, tmp_path: Path) -> Non
     assert second["completed_case_count"] == 1
     assert second["resumed_case_count"] == 0
     assert (case_dir / "completion.json").is_file()
+
+
+# --- WF4: fail-closed replica aggregation (pure functions) ---------------
+
+
+def _prediction(state: str, runtime_valid: bool = True) -> dict:
+    return {"runtime_valid": runtime_valid, "state": state}
+
+
+def test_aggregate_states_unanimous_and_majority() -> None:
+    assert replica_aggregation.aggregate_states(
+        ["verified_error", "verified_error", "verified_error"]
+    ) == "verified_error"
+    assert replica_aggregation.aggregate_states(
+        ["verified_clean", "verified_clean", "unresolved"]
+    ) == "verified_clean"
+
+
+def test_aggregate_states_disagreement_and_tie_stay_unresolved() -> None:
+    assert replica_aggregation.aggregate_states(
+        ["verified_error", "verified_clean", "unresolved"]
+    ) == "unresolved"
+    assert replica_aggregation.aggregate_states(
+        ["verified_error", "verified_error", "verified_clean", "verified_clean"]
+    ) == "unresolved"
+
+
+def test_aggregate_states_consensus_policy_requires_full_agreement() -> None:
+    assert replica_aggregation.aggregate_states(
+        ["verified_clean", "verified_clean"], policy="consensus"
+    ) == "verified_clean"
+    assert replica_aggregation.aggregate_states(
+        ["verified_clean", "verified_clean", "unresolved"], policy="consensus"
+    ) == "unresolved"
+
+
+def test_aggregate_states_unknown_state_votes_as_unresolved() -> None:
+    # Unknown values are downgraded to unresolved votes, never upgraded.
+    assert replica_aggregation.aggregate_states(
+        ["verified_error", "verified_error", "banana"]
+    ) == "verified_error"
+    assert replica_aggregation.aggregate_states(
+        ["verified_error", "banana", ""]
+    ) == "unresolved"
+
+
+def test_aggregate_states_rejects_empty_input_and_unknown_policy() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        replica_aggregation.aggregate_states([])
+    with pytest.raises(ValueError):
+        replica_aggregation.aggregate_states(["unresolved"], policy="weighted")
+
+
+def test_aggregate_replicas_single_replica_passthrough() -> None:
+    result = replica_aggregation.aggregate_replicas([_prediction("verified_error")])
+    assert result["state"] == "verified_error"
+    assert result["unanimous"] is True
+    assert result["runtime_valid"] is True
+    assert result["replica_count"] == 1
+
+
+def test_aggregate_replicas_runtime_invalid_replica_downgrades_whole_run() -> None:
+    # Even with a unanimous verdict among healthy replicas, one crashed
+    # replica means an incomplete adversarial test: fail-closed to unresolved.
+    result = replica_aggregation.aggregate_replicas(
+        [
+            _prediction("verified_clean"),
+            _prediction("verified_clean"),
+            _prediction("verified_clean", runtime_valid=False),
+        ]
+    )
+    assert result["state"] == "unresolved"
+    assert result["runtime_valid"] is False
+    assert result["invalid_replica_indexes"] == [2]
+    assert result["unanimous"] is False
+    assert result["replica_states"] == ["verified_clean"] * 3
+
+
+def test_aggregate_replicas_rejects_empty_input() -> None:
+    import pytest
+
+    with pytest.raises(ValueError):
+        replica_aggregation.aggregate_replicas([])

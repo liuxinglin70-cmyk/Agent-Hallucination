@@ -16,7 +16,7 @@ import json
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from ...utils import ocse_packet as packet
 from . import proof_contract as contract
@@ -911,6 +911,159 @@ def _validate_appeal_defense_contract_or_retry(
     )
 
 
+def _deep_validate_appeal_defense(
+    response: dict[str, Any],
+    *,
+    built: dict[str, Any],
+    required_candidates: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Run the same deep validator the court uses on appeal defense rows.
+
+    Returns ``(valid_rows, invalid_audits)``. Invalid audits carry the
+    concrete ``failed_checks`` list, which the current top-level contract
+    retry never sees. This is the diagnostic precursor to a bounded
+    certificate-level repair.
+    """
+    candidate_origins: dict[str, str] = {}
+    for row in required_candidates:
+        candidate_id = str(row.get("candidate_id") or "")
+        origin = str(row.get("origin_hypothesis_event_id") or "")
+        if candidate_id:
+            candidate_origins[candidate_id] = origin
+    rows = response.get("candidates") or []
+    if not isinstance(rows, list):
+        return [], [{"failed_checks": ["candidates_not_list"]}]
+    valid_rows: list[dict[str, Any]] = []
+    invalid_audits: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            invalid_audits.append({"failed_checks": ["certificate_not_object"]})
+            continue
+        audit = contract.validate_defense_certificate(
+            row, built, candidate_origins,
+        )
+        if audit.get("decision") == "pass":
+            valid_rows.append(dict(row))
+        else:
+            invalid_audits.append({
+                "target_candidate_id": str(row.get("target_candidate_id") or ""),
+                "failed_checks": audit.get("failed_checks") or [],
+            })
+    return valid_rows, invalid_audits
+
+
+def _appeal_defender_deep_repair_user_v35(
+    *,
+    built: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    base: dict[str, Any],
+    prosecution: dict[str, Any],
+    defense: dict[str, Any],
+    proof: dict[str, Any],
+    appeal_prosecution: dict[str, Any] | None,
+    invalid_audits: Sequence[Mapping[str, Any]],
+) -> str:
+    """Build a compact deep-repair prompt for invalid appeal defense certs.
+
+    Only stable failed-check categories and the affected candidate's required
+    origin/addressable refs are fed back; raw provider text is never echoed.
+    The repair asks for replacement certificates ONLY for invalid candidates;
+    every certificate must still pass the unmodified deep validator.
+    """
+    base_user = _appeal_defender_user_v35(
+        built=built, candidates=candidates, base=base,
+        prosecution=prosecution, defense=defense, proof=proof,
+        appeal_prosecution=appeal_prosecution,
+    )
+    event_ids = [str(event["event_id"]) for event in built["events"]]
+    repair_hints = []
+    for audit in invalid_audits:
+        candidate_id = str(audit.get("target_candidate_id") or "")
+        candidate = next(
+            (c for c in candidates if str(c.get("candidate_id") or "") == candidate_id),
+            {},
+        )
+        origin = str(candidate.get("origin_hypothesis_event_id") or "")
+        hint = {
+            "target_candidate_id": candidate_id,
+            "required_origin_event_id": origin,
+            "failed_checks": audit.get("failed_checks") or [],
+            "allowed_defense_types": contract.DEFENSE_TYPES,
+            "addressable_event_ids": event_ids,
+        }
+        repair_hints.append(hint)
+    feedback = packet.canonical_json({
+        "repair_required": "one replacement defense certificate per listed "
+        "candidate",
+        "candidate_repairs": repair_hints,
+        "hard_requirements": (
+            "coverage_state must remain complete; target_candidate_id must "
+            "match the supplied id; target_origin_event_id must equal the "
+            "required_origin_event_id; evidence_refs must be non-empty and "
+            "copied from addressable_event_ids; defense_type must be one of "
+            "allowed_defense_types; rationale must be non-empty."
+        ),
+    })
+    value = base_user + "\nAPPEAL_DEFENSE_DEEP_REPAIR=\n" + feedback
+    for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"'):
+        if field in value:
+            raise ValueError("appeal defender deep repair input firewall violation: " + field)
+    return value
+
+
+def _validate_appeal_defense_deep_or_repair(
+    response: dict[str, Any],
+    *,
+    built: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    base: dict[str, Any],
+    prosecution: dict[str, Any],
+    defense: dict[str, Any],
+    proof: dict[str, Any],
+    appeal_prosecution: dict[str, Any] | None,
+    required_candidates: list[dict[str, Any]],
+    retry_call: Any,
+    providers: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate appeal defense at the certificate level; on invalid certs do ONE
+    bounded deep repair.
+
+    The final deep validator (``adjudicate_proof_court``) is unchanged and
+    remains authoritative. This repair only gives the defender a second,
+    compact, validator-driven chance to fix malformed certificates for the
+    specific failed candidates. If the repair is not called or still fails,
+    the response is returned unchanged and the court fail-closes as before.
+    """
+    valid_rows, invalid_audits = _deep_validate_appeal_defense(
+        response, built=built, required_candidates=required_candidates,
+    )
+    if not invalid_audits:
+        providers.setdefault("appeal_defender_deep", {})["status"] = "complete"
+        return response
+    providers["appeal_defender_deep"] = {
+        "status": "repaired_attempted",
+        "invalid_candidate_count": len(invalid_audits),
+    }
+    try:
+        repair_response, repair_meta = retry_call(invalid_audits)
+    except Exception as exc:
+        providers["appeal_defender_deep"]["outcome"] = "repair_provider_exception"
+        providers["appeal_defender_deep"]["error"] = str(exc)[:200]
+        return response
+    providers["appeal_defender_deep"]["repair_meta"] = repair_meta
+    repair_rows, repair_audits = _deep_validate_appeal_defense(
+        repair_response, built=built, required_candidates=required_candidates,
+    )
+    if not repair_audits:
+        providers["appeal_defender_deep"]["outcome"] = "repaired"
+        return repair_response
+    providers["appeal_defender_deep"]["outcome"] = "still_invalid"
+    providers["appeal_defender_deep"]["remaining_failed_checks"] = [
+        a.get("failed_checks") for a in repair_audits
+    ]
+    return response
+
+
 def _appeal_defender_user_v35(
     *, built: dict[str, Any], candidates: list[dict[str, Any]], base: dict[str, Any],
     prosecution: dict[str, Any], defense: dict[str, Any], proof: dict[str, Any],
@@ -1249,6 +1402,37 @@ def adjudicate_case(
                             failure_category=failure_category,
                         ),
                         cache_dir=output_dir / "appeal_defender_cache" / "retry_1",
+                    ),
+                    providers=providers,
+                )
+
+                # v5.6: deep certificate-level defense validation with ONE
+                # bounded compact repair. The top-level contract retry above
+                # cannot see per-certificate schema failures (a structurally
+                # complete defense may still contain an invalid target_origin
+                # or evidence_ref). Give the defender one validator-driven
+                # repair for the specific failed candidates; the final court
+                # validator is unchanged and remains fail-closed.
+                appeal_defense_certs = _validate_appeal_defense_deep_or_repair(
+                    appeal_defense_certs,
+                    built=built,
+                    candidates=appeal_candidates,
+                    base=base,
+                    prosecution=prosecution,
+                    defense=defense,
+                    proof=initial_proof,
+                    appeal_prosecution=appeal_prosecution,
+                    required_candidates=_required_candidates(base),
+                    retry_call=lambda invalid_audits: provider_call(
+                        route=config["appeal_defender_route"],
+                        system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
+                        user=_appeal_defender_deep_repair_user_v35(
+                            built=built, candidates=appeal_candidates, base=base,
+                            prosecution=prosecution, defense=defense, proof=initial_proof,
+                            appeal_prosecution=appeal_prosecution,
+                            invalid_audits=invalid_audits,
+                        ),
+                        cache_dir=output_dir / "appeal_defender_cache" / "deep_repair_1",
                     ),
                     providers=providers,
                 )

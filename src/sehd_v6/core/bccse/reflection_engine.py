@@ -170,7 +170,9 @@ MODULE_RUNTIME_CONTRACTS: dict[str, str] = {
     ),
     "abstention_rule": (
         "choose clean, error, or unresolved only from complete admissible "
-        "prosecution and defense outputs"
+        "prosecution and defense outputs; a conditional evidence standard "
+        "(when to lower or raise the bar for a decisive verdict based on "
+        "trajectory-observable facts) is a legal action for this module"
     ),
 }
 
@@ -477,6 +479,16 @@ Good examples:
   certificate before accepting it.
 - When correcting an alleged origin would not change the result, reject that
   origin as non-causal.
+- When the defense evidence is fully established and no error certificate
+  survives, conclude clean instead of abstaining. (Conditional evidence
+  standard for abstention_rule: conditions must stay trajectory-observable.)
+
+Conditional evidence standards (abstention_rule only): when the trace shows
+the court abstained although one side's evidence was fully established, you
+may add one rule that conditions a decisive verdict on trajectory-observable
+facts (cited support, surviving certificates, acknowledged repairs). Never
+name internal scores or coverage field identifiers in such a rule; describe
+the observable evidence pattern instead.
 
 Do not copy one rule across modules. Do not modify or remove immutable baseline
 rules. Only rules explicitly marked evolvable may be modified or removed. If

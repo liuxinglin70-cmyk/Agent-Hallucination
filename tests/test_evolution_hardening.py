@@ -1574,6 +1574,29 @@ def test_gold_false_negative_polarity_survives_quarantine_diagnostic() -> None:
     assert signal.trigger_source is TriggerSource.GOLD_MISMATCH
 
 
+def test_gold_false_negative_complete_prosecution_routes_to_adjudication() -> None:
+    """FN with complete prosecution is an adjudication defect, not missing
+    evidence. This is the Camel/Magentic/SmolAgents misrouting: all three had
+    prosecution complete yet were routed to evidence_obligation, producing
+    three no-effect paraphrases."""
+    row = _diagnostic_row("verified_clean")
+    row["gold_label"] = True
+    signal = attribute_failure(row, use_gold=True)
+    assert signal.error_type is ErrorType.FALSE_NEGATIVE_CLEAN
+    assert signal.target_module == "abstention_rule"
+    assert signal.secondary_module == "causal_link_test"
+
+
+def test_gold_false_negative_incomplete_prosecution_stays_evidence() -> None:
+    """FN with incomplete prosecution is still an evidence-construction defect."""
+    row = _diagnostic_row("verified_clean")
+    row["proof_adjudication"]["prosecution_coverage"] = "incomplete"
+    row["gold_label"] = True
+    signal = attribute_failure(row, use_gold=True)
+    assert signal.error_type is ErrorType.FALSE_NEGATIVE_CLEAN
+    assert signal.target_module == "evidence_obligation"
+
+
 def test_gold_localization_error_is_not_relabelled_as_ambiguous() -> None:
     """Gold says the origin is wrong; that outranks 'the tie-break was hard'."""
     row = _diagnostic_row(localization_status="failed_temporal_fallback")
@@ -1600,6 +1623,71 @@ def test_gold_confirmed_correct_case_is_never_triggered_by_diagnostics() -> None
     # The raw diagnostic facts stay auditable even when they are not acted on.
     assert signal.localization_status == "failed_temporal_fallback"
     assert signal.focused_quarantined_candidate_count == 2
+
+
+def test_missing_gold_step_is_not_a_localization_error() -> None:
+    """Absent gold step annotation must not be treated as wrong localization.
+
+    This is the Octotools/018 failure: gold=error, verdict already
+    verified_error, but no gold_steps existed, so responsible_step_correct
+    collapsed to False and the case was spuriously re-evolved as
+    LOCALIZATION_ERROR. Unverified localization is not evidence of a defect.
+    """
+    row = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row.update({"gold_label": True, "gold_steps": [], "responsible_step": 2})
+    signal = attribute_failure(row, use_gold=True)
+    assert signal.error_type is ErrorType.CORRECT
+    assert signal.trigger_source is TriggerSource.NONE
+    assert signal.should_evolve is False
+    assert signal.has_gold is True
+    assert signal.responsible_step_correct is False  # unverified, not wrong
+
+    # When gold steps DO exist and disagree, localization error still fires.
+    row2 = _diagnostic_row(localization_status="failed_temporal_fallback")
+    row2.update({"gold_label": True, "gold_steps": [5], "responsible_step": 2})
+    signal2 = attribute_failure(row2, use_gold=True)
+    assert signal2.error_type is ErrorType.LOCALIZATION_ERROR
+    assert signal2.should_evolve is True
+
+
+def test_retry_duplicate_proposal_rejects_same_owner_paraphrase() -> None:
+    """A retry that repeats a rejected source proposal is discarded pre-replay."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    rejected = [{
+        "target_module": "evidence_obligation",
+        "operation": "add_rule",
+        "content": (
+            "When a candidate's final numerical result is inconsistent with "
+            "the intermediate values it cites, require an error certificate."
+        ),
+        "content_hash": "deadbeef",
+        "observable_deltas": [],
+    }]
+    # Exact hash match.
+    assert runner._rejected_proposal_duplicate(
+        rejected,
+        target_module="evidence_obligation",
+        new_content=(
+            "When a candidate's final numerical result is inconsistent with "
+            "the intermediate values it cites, require an error certificate."
+        ),
+    ) is True
+    # Different owner: allowed.
+    assert runner._rejected_proposal_duplicate(
+        rejected,
+        target_module="atomic_verifier_instruction",
+        new_content="same content but different owner",
+    ) is False
+    # Genuinely different intervention: allowed.
+    assert runner._rejected_proposal_duplicate(
+        rejected,
+        target_module="evidence_obligation",
+        new_content=(
+            "When a tool response confirms an action but not its downstream "
+            "effect, quarantine the certificate."
+        ),
+    ) is False
 
 
 def test_self_supervised_mode_ignores_gold_for_diagnostic_refinement() -> None:
@@ -3199,3 +3287,228 @@ def test_provider_transport_recovers_truncated_json_with_repair_call(
     )
     assert value == {"coverage_state": "complete", "candidates": []}
     assert captured["url"].startswith("https://api.deepseek.com/")
+
+
+# ============================================================
+# v5.7 — unresolved_should_clean routing (defense complete gate)
+# ============================================================
+
+
+def _unresolved_routing_row(
+    *,
+    census_count: int,
+    prosecution_coverage: str,
+    defense_coverage: str,
+    surviving: list[str],
+) -> dict:
+    return {
+        "state": "unresolved",
+        "occurrence_state": "unresolved",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "census": [{"candidate_id": f"c{i}"} for i in range(census_count)],
+        "proof_adjudication": {
+            "prosecution_coverage": prosecution_coverage,
+            "defense_coverage": defense_coverage,
+            "surviving_error_certificate_ids": surviving,
+        },
+    }
+
+
+def test_defense_complete_no_survivor_routes_to_abstention_even_without_candidates() -> None:
+    """The abstention defect is the root cause even when the census is empty.
+
+    Previously ``candidate_count == 0`` short-circuited to candidate_trigger,
+    sending unresolved_should_clean mutations to a module that cannot fix a
+    wrong abstention. Defense complete + no surviving error certificate means
+    the court abstained despite a fully established clean defense.
+    """
+    row = _unresolved_routing_row(
+        census_count=0,
+        prosecution_coverage="incomplete",
+        defense_coverage="complete",
+        surviving=[],
+    )
+    signal = attribute_failure(row)
+    assert signal.target_module == "abstention_rule"
+    assert signal.secondary_module == "clean_defense_boundary"
+    assert signal.should_evolve
+
+
+def test_surviving_error_certificate_skips_defense_complete_shortcut() -> None:
+    """With real error evidence alive, abstention is not a clean-defense bug.
+
+    The case must fall through to the generic unresolved route, whose
+    secondary is causal_link_test rather than clean_defense_boundary.
+    """
+    row = _unresolved_routing_row(
+        census_count=1,
+        prosecution_coverage="complete",
+        defense_coverage="complete",
+        surviving=["c0"],
+    )
+    signal = attribute_failure(row)
+    assert signal.target_module == "abstention_rule"
+    assert signal.secondary_module == "causal_link_test"
+
+
+def test_zero_candidates_with_incomplete_defense_stays_candidate_trigger() -> None:
+    """Regression guard: empty census without a complete defense is still a
+    candidate-generation failure, not an abstention failure."""
+    row = _unresolved_routing_row(
+        census_count=0,
+        prosecution_coverage="incomplete",
+        defense_coverage="incomplete",
+        surviving=[],
+    )
+    signal = attribute_failure(row)
+    assert signal.target_module == "candidate_trigger"
+    assert signal.secondary_module == "candidate_to_verifier_route"
+
+
+# ============================================================
+# v5.8 — probe certification (opt-in experience record)
+# ============================================================
+
+
+def test_probe_certification_pure_functions_fail_closed() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    current = [{"case_id": "p", "task_score": 2, "runtime_valid": True}]
+    # No baseline probe yet -> nothing can be certified.
+    assert runner._probe_certification(current, None) == "neutral"
+    assert runner._probe_certification(current, []) == "neutral"
+
+    # Scored improvement certifies; unchanged stays neutral; any regression
+    # wins over any improvement (fail-closed).
+    prev_low = [{"case_id": "p", "task_score": 1, "runtime_valid": True}]
+    assert runner._probe_certification(current, prev_low) == "certified"
+    prev_same = [{"case_id": "p", "task_score": 2, "runtime_valid": True}]
+    assert runner._probe_certification(current, prev_same) == "neutral"
+    prev_high = [{"case_id": "p", "task_score": 2, "runtime_valid": True}]
+    worse_now = [{"case_id": "p", "task_score": 0, "runtime_valid": True}]
+    assert runner._probe_certification(worse_now, prev_high) == "regressed"
+    mixed = [
+        {"case_id": "a", "task_score": 2, "runtime_valid": True},
+        {"case_id": "b", "task_score": 0, "runtime_valid": True},
+    ]
+    mixed_prev = [
+        {"case_id": "a", "task_score": 1, "runtime_valid": True},
+        {"case_id": "b", "task_score": 2, "runtime_valid": True},
+    ]
+    assert runner._probe_certification(mixed, mixed_prev) == "regressed"
+
+    # Label-free probes compare runtime validity only.
+    free_prev = [{"case_id": "p", "task_score": None, "runtime_valid": True}]
+    free_bad = [{"case_id": "p", "task_score": None, "runtime_valid": False}]
+    assert runner._probe_certification(free_bad, free_prev) == "regressed"
+    assert runner._probe_certification(free_prev, free_prev) == "neutral"
+
+
+def _probe_certification_fixture(tmp_path, monkeypatch, **extra_kwargs):
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, record, **kwargs):
+        if case_id.startswith("stable"):
+            state = "verified_clean"
+        elif case_id == "source":
+            state = "verified_clean" if genome.generation else "unresolved"
+        elif case_id == "dev_probe":
+            state = "verified_clean"
+        else:  # pragma: no cover - closed fixture universe
+            raise AssertionError(case_id)
+        return {"state": state, "runtime_valid": True, "census": []}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+    )
+
+    records = {
+        "stable_1": {},
+        "stable_2": {},
+        "stable_3": {},
+        "source": {"gold_label": False},
+        "dev_probe": {"gold_label": False},
+    }
+    return runner.run_online_evolution(
+        evolution_case_ids=("stable_1", "stable_2", "stable_3", "source"),
+        records=records,
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        validation_probe_every=1,
+        probe_ids=("dev_probe",),
+        run_id="probe_cert",
+        **extra_kwargs,
+    )
+
+
+def test_probe_certification_recorded_when_opted_in(tmp_path, monkeypatch) -> None:
+    import json
+
+    result = _probe_certification_fixture(
+        tmp_path, monkeypatch, probe_experience_record=True,
+    )
+    assert result.edits_accepted == 1
+    audit = result.evolution_audit
+    # First probe has no baseline -> neutral, always auditable on the step.
+    assert audit["probe_history"][0]["probe_certification"] == "neutral"
+    probed_steps = [
+        step for step in result.steps
+        if isinstance(step.fitness_check, dict)
+        and "development_probe" in step.fitness_check
+    ]
+    assert probed_steps
+    assert all(
+        step.fitness_check["development_probe"]["probe_certification"] == "neutral"
+        for step in probed_steps
+    )
+    # Opt-in write reaches the experience memory (metadata-only).
+    memory_text = (tmp_path / "htc_tes_experience_memory.json").read_text(
+        encoding="utf-8"
+    )
+    memory = json.loads(memory_text)
+    entries = [
+        entry
+        for entries in memory.get("experiences", {}).values()
+        for entry in entries
+    ] if isinstance(memory.get("experiences"), dict) else []
+    if not entries:
+        # Schema-shape fallback: search the serialized payload directly.
+        assert "probe_certification" in memory_text
+    certification_entries = [
+        entry for entry in entries
+        if "probe_certification" in str(entry.get("metadata", {}))
+    ]
+    assert certification_entries or "probe_certification" in memory_text
+
+
+def test_probe_certification_off_by_default_leaves_memory_untouched(
+    tmp_path, monkeypatch,
+) -> None:
+    # Explicit False and omitted-parameter runs must produce identical
+    # memory content (no certification record ever written when off).
+    off_dir = tmp_path / "off"
+    default_dir = tmp_path / "default"
+    _probe_certification_fixture(off_dir, monkeypatch, probe_experience_record=False)
+    _probe_certification_fixture(default_dir, monkeypatch)
+    off_text = (off_dir / "htc_tes_experience_memory.json").read_text(
+        encoding="utf-8"
+    )
+    default_text = (default_dir / "htc_tes_experience_memory.json").read_text(
+        encoding="utf-8"
+    )
+    assert "probe_certification" not in off_text
+    assert "probe_certification" not in default_text
+
+

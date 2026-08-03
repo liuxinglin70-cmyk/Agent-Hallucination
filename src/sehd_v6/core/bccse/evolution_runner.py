@@ -412,6 +412,42 @@ def _structural_rejection_retryable(reasons: Sequence[str]) -> bool:
     return bool(categories) and categories <= _REPAIRABLE_STRUCTURAL_REASONS
 
 
+def _rejected_proposal_duplicate(
+    rejected: Sequence[Mapping[str, Any]],
+    *,
+    target_module: str,
+    new_content: str,
+) -> bool:
+    """Return True when a retry repeats an already-rejected source proposal.
+
+    A duplicate is defined by the same owner module AND a near-identical rule
+    (same content hash or high token overlap). This is the enforcement arm of
+    the source-scoped diversity contract: the reflection prompt says "do not
+    repeat", and this gate makes that a hard rejection before any replay.
+    """
+    if not rejected or not new_content:
+        return False
+    try:
+        from .genome import semantic_overlap
+    except Exception:
+        semantic_overlap = None
+    new_hash = hashlib.sha256(new_content.encode("utf-8")).hexdigest()[:12]
+    for prior in rejected:
+        if str(prior.get("target_module") or "") != target_module:
+            continue
+        prior_hash = str(prior.get("content_hash") or "")
+        if prior_hash and prior_hash == new_hash:
+            return True
+        prior_content = str(prior.get("content") or "")
+        if semantic_overlap is not None and prior_content and new_content:
+            try:
+                if semantic_overlap(prior_content, new_content) >= 0.85:
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 def _no_edit_reason_categories(reason: str) -> list[str]:
     """Reduce free-form mutator abstention text to safe learning categories."""
     lowered = str(reason or "").lower()
@@ -553,6 +589,70 @@ class ProvisionalEdit:
     # AND returned "pass". A skipped gate (no live route) stays False, so the
     # T6 provisional path cannot fire without an explicit conflict check.
     conflict_gate_passed: bool = False
+
+
+# ============================================================
+# Development-probe certification (opt-in experience record)
+# ============================================================
+
+PROBE_CERTIFICATION_LABELS = ("certified", "neutral", "regressed")
+
+
+def _probe_case_delta(
+    previous: Mapping[str, Any], current: Mapping[str, Any]
+) -> str:
+    """Classify one probe case outcome change: improved/unchanged/regressed.
+
+    Scored (gold) probes compare ``task_score``; label-free probes can only
+    compare runtime validity, so a state flip without scores is recorded as
+    unchanged rather than guessed as an improvement.
+    """
+    previous_score = previous.get("task_score")
+    current_score = current.get("task_score")
+    if isinstance(previous_score, int) and isinstance(current_score, int):
+        if current_score < previous_score:
+            return "regressed"
+        if current_score > previous_score:
+            return "improved"
+        return "unchanged"
+    previous_valid = previous.get("runtime_valid") is True
+    current_valid = current.get("runtime_valid") is True
+    if previous_valid and not current_valid:
+        return "regressed"
+    if not previous_valid and current_valid:
+        return "improved"
+    return "unchanged"
+
+
+def _probe_certification(
+    current_audits: Sequence[Mapping[str, Any]],
+    previous_audits: Sequence[Mapping[str, Any]] | None,
+) -> str:
+    """Fail-closed certification of pending edits by a passing probe.
+
+    - no prior probe baseline          -> neutral (nothing to certify against)
+    - any probe case regressed         -> regressed
+    - no regression, >=1 improvement   -> certified
+    - all unchanged                    -> neutral
+    """
+    if not previous_audits:
+        return "neutral"
+    previous_by_case = {
+        str(entry.get("case_id")): entry for entry in previous_audits
+    }
+    deltas: list[str] = []
+    for case_audit in current_audits:
+        previous = previous_by_case.get(str(case_audit.get("case_id")))
+        if previous is None:
+            # A case with no baseline cannot certify an improvement.
+            deltas.append("unchanged")
+        else:
+            deltas.append(_probe_case_delta(previous, case_audit))
+    if "regressed" in deltas:
+        return "regressed"
+    if "improved" in deltas:
+        return "certified"
+    return "neutral"
 
 
 # ============================================================
@@ -1032,6 +1132,7 @@ def run_online_evolution(
     run_id: str | None = None,
     resume_from: Path | None = None,
     gold_reflection: bool = False,
+    probe_experience_record: bool = False,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
@@ -1097,6 +1198,11 @@ def run_online_evolution(
             ``evolution_case_ids`` (otherwise a ``ValueError`` is raised),
             so that case ordering is unambiguous. ``initial_genome`` is
             ignored when resuming.
+        probe_experience_record: Opt-in (default False). When True, each
+            passing development probe writes a certification record
+            (certified / neutral / regressed) for its pending edits into the
+            HTC-TES experience memory. Metadata-only: the memory schema and
+            the default (off) behavior are unchanged.
 
     Returns:
         OnlineEvolutionResult with champion genome and audit trail.
@@ -1127,6 +1233,8 @@ def run_online_evolution(
         raise ValueError("max_mutation_attempts_per_case must be between 1 and 3")
     if probe_limit < 0 or probe_limit > 20:
         raise ValueError("probe_limit must be between 0 and 20")
+    if not isinstance(probe_experience_record, bool):
+        raise ValueError("probe_experience_record must be a bool")
     if len(probe_ids) != len(set(probe_ids)):
         raise ValueError("probe_ids contains duplicates")
     if len(canary_case_ids) != len(set(canary_case_ids)):
@@ -1229,6 +1337,11 @@ def run_online_evolution(
     # and (b) gives the LLM structured, case-agnostic feedback. Raw provider
     # text is never echoed back (no prompt poison, no evaluator metadata).
     mutation_retry_feedback: dict[str, list[str]] = {}
+    # v5.6: source-scoped rejected-proposal tracking. Retry must explore a
+    # genuinely different intervention, not paraphrase the rejected owner. The
+    # canonical signature is (case, owner module, operation, content hash) and
+    # ``observable_deltas`` records what the rejected edit actually moved.
+    rejected_source_proposals: dict[str, list[dict[str, Any]]] = {}
     rollback_reason = ""
     stable_genome = champion_genome.clone()
     pending_probe_step_indexes: list[int] = []
@@ -1684,6 +1797,38 @@ def run_online_evolution(
             audit["rolled_back_edits"] = 0
             stable_genome = champion_genome.clone()
             stable_history_length = len(accepted_edits_history)
+            # v5.8: fail-closed probe certification. Compared against the
+            # previous probe baseline; the first probe has no baseline and
+            # stays neutral. The label is auditable from the step record and
+            # (opt-in) persisted to the experience memory.
+            previous_probe_audits = (
+                probe_history[-1].get("case_audits") if probe_history else None
+            )
+            certification = _probe_certification(
+                audit["case_audits"], previous_probe_audits
+            )
+            audit["probe_certification"] = certification
+            if probe_experience_record:
+                probe_case_ids = [
+                    str(case_audit.get("case_id"))
+                    for case_audit in audit["case_audits"]
+                ]
+                # Written before the stable-memory snapshot so a certified
+                # edit's record survives together with the edit itself.
+                for item in pending_probe_commits:
+                    type_fitness.get_experience_memory().add_experience(
+                        hallucination_type=HallucinationType.UNKNOWN,
+                        evolution_direction="probe_certification",
+                        module_targeted=item.edit.target_module,
+                        strategy_used=f"probe_certification:{certification}",
+                        detection_improved=certification == "certified",
+                        source_case_id=item.case_id,
+                        metadata={
+                            "probe_certification": certification,
+                            "probe_index": audit["probe_index"],
+                            "probe_case_ids": probe_case_ids,
+                        },
+                    )
             stable_memory_payload = type_fitness.get_experience_memory().to_dict()
             stable_canaries_checkpoint = dict(stable_canaries)
             for item in pending_probe_commits:
@@ -2416,6 +2561,26 @@ def run_online_evolution(
                     if module != signal.target_module
                 ),
             )
+        # v5.6 owner escalation: on a retry, move owners that already produced
+        # source_no_effect to the end of the allowed-module order. The model is
+        # then nudged toward a different attributed owner; the hard duplicate
+        # gate above rejects an actual paraphrase regardless of order.
+        if active_attempt_index > 0:
+            exhausted_owners = {
+                str(prior.get("target_module") or "")
+                for prior in rejected_source_proposals.get(case_id, [])
+            }
+            if exhausted_owners:
+                type_allowed_modules = (
+                    *(
+                        module for module in type_allowed_modules
+                        if module not in exhausted_owners
+                    ),
+                    *(
+                        module for module in type_allowed_modules
+                        if module in exhausted_owners
+                    ),
+                )
         if not type_allowed_modules:
             gate.record_no_edit()
             record_step(EvolutionStep(
@@ -2513,21 +2678,38 @@ def run_online_evolution(
             # fed back; raw provider text is never echoed (no prompt poison).
             if active_attempt_index > 0:
                 prior_categories = mutation_retry_feedback.get(case_id, [])
+                retry_block = {}
                 if prior_categories:
+                    retry_block["attempt_index"] = active_attempt_index
+                    retry_block["previous_failure_categories"] = prior_categories
+                    retry_block["required_action"] = (
+                        "previous mutation output was structurally "
+                        "invalid or had no observable target change; "
+                        "return a DIFFERENT valid JSON edit with a distinct "
+                        "trigger, a distinct output action, and if possible a "
+                        "different owner module, with operation in "
+                        "{add_rule,modify_rule,remove_rule,no_edit} and "
+                        "non-empty new_content"
+                    )
+                rejected_prior = rejected_source_proposals.get(case_id, [])
+                if rejected_prior:
+                    retry_block["rejected_source_attempts"] = [
+                        {
+                            "target_module": prior["target_module"],
+                            "observable_deltas": prior["observable_deltas"],
+                        }
+                        for prior in rejected_prior
+                    ]
+                    retry_block.setdefault("required_action", (
+                        "return a DIFFERENT valid JSON edit with a distinct "
+                        "trigger, a distinct output action, and if possible a "
+                        "different owner module"
+                    ))
+                if retry_block:
                     user_prompt += (
                         "\n[MUTATION_RETRY_FEEDBACK]\n"
                         + json.dumps(
-                            {
-                                "attempt_index": active_attempt_index,
-                                "previous_failure_categories": prior_categories,
-                                "required_action": (
-                                    "previous mutation output was structurally "
-                                    "invalid or had no observable target change; "
-                                    "return a different valid JSON edit with "
-                                    "operation in {add_rule,modify_rule,remove_rule,"
-                                    "no_edit} and non-empty new_content"
-                                ),
-                            },
+                            retry_block,
                             ensure_ascii=False, sort_keys=True,
                         )
                     )
@@ -2616,6 +2798,20 @@ def run_online_evolution(
                     invalid_mutation_reason = (
                         "invalid_intervention_contract:"
                         f"module={target_module},field={contract_field or 'missing'}"
+                    )
+                elif active_attempt_index > 0 and _rejected_proposal_duplicate(
+                    rejected_source_proposals.get(case_id, []),
+                    target_module=target_module,
+                    new_content=new_content,
+                ):
+                    # v5.6: a retry that repeats an already-rejected source
+                    # proposal (same owner + near-identical rule) is discarded
+                    # before replay. This stops the same-owner paraphrase loop
+                    # that repeated Camel/Octotools edits three times without
+                    # spending more detector calls.
+                    invalid_mutation_reason = (
+                        "retry_duplicate_proposal:"
+                        f"module={target_module}"
                     )
                 elif operation == "remove_rule" and rule_index is not None:
                     edit = SkillEdit(
@@ -3320,6 +3516,21 @@ def run_online_evolution(
                     ),
                 )
                 rejected_buffer.append(rejected_entry)
+                rejected_source_proposals.setdefault(case_id, []).append({
+                    "target_module": edit.target_module,
+                    "operation": (
+                        edit.operation.value
+                        if isinstance(edit.operation, SkillOp)
+                        else str(edit.operation)
+                    ),
+                    "content": edit.new_content[:200],
+                    "content_hash": hashlib.sha256(
+                        edit.new_content.encode("utf-8")
+                    ).hexdigest()[:12],
+                    "observable_deltas": list(
+                        effect_audit["observable_deltas"]
+                    ),
+                })
                 retry_scheduled = (
                     mutation_route is not None
                     and active_attempt_index + 1 < max_mutation_attempts_per_case

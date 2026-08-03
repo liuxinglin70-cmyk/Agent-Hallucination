@@ -297,6 +297,62 @@ def test_self_supervised_reflection_prompt_does_not_claim_gold_mode() -> None:
     assert "<gold_diagnostic_reference>" not in user
 
 
+POLICY_SKILL_EXAMPLE = (
+    "When the defense evidence is fully established and no error certificate "
+    "survives, conclude clean instead of abstaining."
+)
+
+
+def test_policy_skill_guidance_present_and_rule_passes_structural_gate() -> None:
+    """The conditional-evidence-standard channel must be prompt-visible and
+    gate-survivable: the advertised example rule has to pass the real
+    structural gate for abstention_rule, otherwise the guidance is dead."""
+    signal = AttributionSignal(
+        error_type=ErrorType.UNRESOLVED_UNKNOWN,
+        target_module="abstention_rule",
+        secondary_module="clean_defense_boundary",
+        attribution_confidence="medium",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.UNRESOLVED,
+        evidence_summary="defense established, court abstained",
+        prosecution_coverage=None,
+        defense_coverage=None,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={},
+        crs_aggregate=0.0,
+        crs_source="unavailable",
+        crs_complete=False,
+        consensus_gate_applied=False,
+        candidate_count=1,
+        state="unresolved",
+        gold_label=None,
+        has_gold=False,
+        gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+    system, _ = build_causal_reflection_prompt(
+        signal,
+        current_skill_text="rules",
+        detection_context="trace",
+    )
+    assert "Conditional evidence standards" in system
+
+    gate = create_structural_gate()
+    accepted, _, result = gate.evaluate(
+        case_id="case",
+        case_index=0,
+        target_module="abstention_rule",
+        operation="add_rule",
+        content=POLICY_SKILL_EXAMPLE,
+        preconditions=(),
+        current_genome=create_baseline_genome(),
+        expected_module="abstention_rule",
+    )
+    assert accepted, f"policy example rejected by structural gate: {result}"
+
+
 def test_replay_rejection_does_not_fake_multiple_convergence_cases() -> None:
     gate = create_structural_gate(convergence_window=2)
     accepted, certificate, _ = gate.evaluate(

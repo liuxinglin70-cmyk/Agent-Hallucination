@@ -408,8 +408,15 @@ def _prediction_state(row: Mapping[str, Any]) -> bool | None:
     return None  # unresolved
 
 
-def _check_step_correct(row: Mapping[str, Any]) -> bool:
-    """Check if responsible step localization is correct."""
+def _check_step_correct(row: Mapping[str, Any]) -> bool | None:
+    """Check if responsible step localization is correct.
+
+    Returns ``None`` when no gold step annotation exists. The absence of a
+    gold step is not evidence of mislocalization: a gold-labelled case that
+    never received a step annotation must not be converted into a
+    ``LOCALIZATION_ERROR`` trigger (this previously turned every all-positive
+    dataset into an unnecessary evolution signal for verdict-correct cases).
+    """
     raw_steps = row.get("gold_steps", row.get("hallucination_step"))
     values = raw_steps if isinstance(raw_steps, (list, tuple, set)) else (
         () if raw_steps is None else (raw_steps,)
@@ -417,7 +424,7 @@ def _check_step_correct(row: Mapping[str, Any]) -> bool:
     gold_steps = tuple(str(s) for s in values if s is not None and str(s) != "")
     predicted = row.get("responsible_step")
     if not gold_steps or predicted is None:
-        return False
+        return None
     return str(predicted) in gold_steps
 
 
@@ -605,14 +612,23 @@ def _route_process_failure(
     default_secondary: str,
 ) -> tuple[str, str]:
     """Route a process failure to the stage where the trace actually broke."""
+    # v5.3 fix + v5.7 hardening: When defense is already complete, no error
+    # certificate survived, and the output is still unresolved, the root cause
+    # is abstention_rule (defense complete → should be clean). Secondary is
+    # clean_defense_boundary (verify defense is correctly formed). This check
+    # must run BEFORE the candidate_count==0 short-circuit: an abstention
+    # defect is fixable via the abstention_rule module even when the census
+    # found no candidates. A surviving error certificate means the court had
+    # real error evidence, so the case falls through to the routes below.
+    if (
+        state == "unresolved"
+        and defense.state == "complete"
+        and not _has_surviving_error_certificate(row)
+    ):
+        return "abstention_rule", "clean_defense_boundary"
+
     if candidate_count == 0:
         return "candidate_trigger", "candidate_to_verifier_route"
-
-    # v5.3 fix: When defense is already complete but output is unresolved,
-    # root cause is abstention_rule (defense complete → should be clean),
-    # Secondary is clean_defense_boundary (verify defense is correctly formed).
-    if state == "unresolved" and defense.state == "complete":
-        return "abstention_rule", "clean_defense_boundary"
 
     proof = row.get("proof_adjudication") or {}
     prosecution_payload = (
@@ -642,6 +658,52 @@ def _route_process_failure(
     if state == "unresolved":
         return "abstention_rule", "causal_link_test"
 
+    return default_module, default_secondary
+
+
+def _route_gold_locked_owner(
+    *,
+    state: str,
+    prosecution: CoverageReading,
+    defense: CoverageReading,
+    default_module: str,
+    default_secondary: str,
+) -> tuple[str, str]:
+    """Route a gold-locked FP/FN to the stage where the court actually broke.
+
+    Gold polarity says which side was wrong; it cannot say which module.
+    Coverage states are label-free and identify the stage:
+
+    - FN (clean verdict, gold=error): if prosecution is already complete, the
+      court wrongly accepted clean despite a complete error proof. That is an
+      abstention/adjudication failure, not a missing-evidence failure. If
+      prosecution is incomplete, evidence construction is the defect. If
+      defense is the only complete side, the court over-deferred to it.
+    - FP (error verdict, gold=clean): if defense is already complete, the
+      court wrongly issued error despite a complete defense. That is an
+      abstention/adjudication failure, not a boundary-formation failure.
+
+    The ``default_module`` from the error-type map is used only as a fallback.
+    """
+    if state == "verified_clean":
+        # FN side: gold says a real error was missed.
+        if prosecution.state in {"complete"}:
+            # Error proof exists but the court returned clean -> the final
+            # adjudication (abstention) defeated it, or the causal link did
+            # not survive. Prefer the adjudication boundary.
+            return "abstention_rule", "causal_link_test"
+        if prosecution.state in {"incomplete", "unresolved"}:
+            # Error proof was not constructed -> evidence construction.
+            return default_module or "evidence_obligation", "atomic_verifier_instruction"
+        # Unknown prosecution state -> keep default evidence construction.
+        return "evidence_obligation", "atomic_verifier_instruction"
+    if state == "verified_error":
+        # FP side: gold says a clean case was wrongly condemned.
+        if defense.state in {"complete"}:
+            return "abstention_rule", "clean_defense_boundary"
+        if defense.state in {"incomplete", "unresolved"}:
+            return default_module or "clean_defense_boundary", "abstention_rule"
+        return "clean_defense_boundary", "abstention_rule"
     return default_module, default_secondary
 
 
@@ -853,7 +915,7 @@ def attribute_failure(
         else:
             # Truly stable success
             if use_gold and predicted is not None and has_gold and predicted == gold:
-                if gold and not step_correct:
+                if gold and step_correct is False:
                     error_type = ErrorType.LOCALIZATION_ERROR
                     trigger_source = TriggerSource.GOLD_MISMATCH
                 else:
@@ -890,13 +952,15 @@ def attribute_failure(
                 error_type = ErrorType.FALSE_NEGATIVE_CLEAN
 
         # Trigger 3: gold-confirmed verdict with a mislocalized origin.
+        # Only fires when a gold step annotation actually exists: an absent
+        # gold step means localization is unverified, not wrong.
         elif (
             use_gold
             and has_gold
             and predicted is not None
             and predicted == gold
             and gold is True
-            and not step_correct
+            and step_correct is False
         ):
             trigger_source = TriggerSource.GOLD_MISMATCH
             error_type = ErrorType.LOCALIZATION_ERROR
@@ -931,6 +995,9 @@ def attribute_failure(
         trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
 
     # --- Refine unresolved with self-supervised sub-signals ---
+    # Note: module routing for these sub-signals happens in
+    # ``_route_process_failure`` below; the branches here keep the
+    # UNRESOLVED_UNKNOWN error type and only document the expected route.
     if error_type == ErrorType.UNRESOLVED_UNKNOWN:
         # Further attribute unresolved cases by internal signals
         if (
@@ -944,8 +1011,9 @@ def attribute_failure(
         elif prosecution_cov is not None and prosecution_cov < COVERAGE_LOW_THRESHOLD:
             pass  # prosecution weak → evidence_obligation (default)
         elif defense_cov is not None and defense_cov < COVERAGE_LOW_THRESHOLD:
-            # Defense weak → clean_defense_boundary needs enrichment
-            error_type = ErrorType.UNRESOLVED_UNKNOWN  # re-route below
+            # Defense weak → routed to clean_defense_boundary in
+            # ``_route_process_failure`` / the weak-defense special route.
+            error_type = ErrorType.UNRESOLVED_UNKNOWN
 
     # ================================================================
     # Process diagnostics (v5.5)
@@ -976,7 +1044,7 @@ def attribute_failure(
         diagnostic_finding is not None
         and diagnostic_finding[0] == ErrorType.LOCALIZATION_AMBIGUOUS
         and has_gold
-        and step_correct
+        and step_correct is True
     ):
         diagnostic_finding = None
 
@@ -984,11 +1052,17 @@ def attribute_failure(
     # localization is right, the case is CORRECT. Self-supervised cascade
     # reclassifications (SIGNAL_UNAVAILABLE, CRS_CONTRADICTION, ...) are
     # diagnostic artifacts and must not supersede a gold-confirmed outcome.
+    # ``step_correct is not False`` keeps an UNVERIFIED localization (no gold
+    # step annotation, ``None``) on the correct side: absence of supervision
+    # is not evidence of a localization defect, so the verdict is treated as
+    # gold-confirmed and process diagnostics cannot re-evolve it. Only an
+    # explicit gold-step disagreement (``step_correct is False``) is a
+    # localization failure.
     gold_verified_correct = (
         has_gold
         and predicted is not None
         and predicted == gold
-        and (not gold or step_correct)
+        and (not gold or step_correct is not False)
     )
     if gold_verified_correct:
         error_type = ErrorType.CORRECT
@@ -1022,6 +1096,32 @@ def attribute_failure(
     # ================================================================
     target_module = ERROR_MODULE_MAP.get(error_type, "evidence_obligation")
     secondary_module = ERROR_MODULE_SECONDARY.get(error_type, "abstention_rule")
+
+    # v5.6 gold-constrained module routing. Gold polarity selects the failure
+    # side (FP vs FN) but the STATIC error-type map can point at the wrong
+    # owner when the process is already complete. The real defect is wherever
+    # the proof court broke. For example, a FALSE_NEGATIVE_CLEAN whose
+    # prosecution coverage is already complete is NOT an evidence_obligation
+    # failure: the court wrongly accepted a clean verdict despite a complete
+    # error proof, so the defect is abstention/adjudication (or a causal link
+    # that never survived). Coverage states are label-free and authoritative,
+    # so this refines the owner while preserving the gold polarity. The FP
+    # side keeps its documented defense-side default (an FP is a defense
+    # failure); only the FN side is refined because that was the observed
+    # misrouting.
+    if gold_polarity_locked and error_type in {
+        ErrorType.FALSE_NEGATIVE,
+        ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+        ErrorType.FALSE_NEGATIVE_CLEAN,
+    }:
+        routed = _route_gold_locked_owner(
+            state=state,
+            prosecution=prosecution,
+            defense=defense,
+            default_module=target_module,
+            default_secondary=secondary_module,
+        )
+        target_module, secondary_module = routed
 
     # Gold keeps polarity AND its primary module (an FP is a defense failure,
     # not a localization failure). Diagnostics only supply the partner module
@@ -1214,7 +1314,7 @@ def attribute_failure(
         has_gold=has_gold,
         gold_enhanced=has_gold,
         gold_reflection=bool(gold_reflection and has_gold),
-        responsible_step_correct=step_correct,
+        responsible_step_correct=bool(step_correct),
         localization_status=str(
             diagnostics.get("localization_status") or "not_applicable"
         ),
