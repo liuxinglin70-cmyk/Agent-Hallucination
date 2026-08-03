@@ -49,6 +49,8 @@ from .reflection_engine import (
     extract_intervention_candidates,
     build_intervention_critic_prompt,
     select_intervention_candidate,
+    build_failure_diagnosis_prompt,
+    sanitize_diagnosis,
     format_skill_context_for_llm,
 )
 from .genome import (
@@ -74,6 +76,7 @@ from .fitness import (
     task_state_score,
 )
 from .safety_gate import StructuralGate, create_structural_gate
+from .signal_adapter import parse_coverage
 from .step_attributor import (
     AttributionSignal,
     ErrorType,
@@ -434,8 +437,10 @@ _RUNTIME_RULE_CONSTRAINT_TEXT: dict[str, str] = {
         " action"
     ),
     "condition_overload": (
-        "a rule must have at most 2 conditions; 3+ conditions will be"
-        " rejected by the structural gate"
+        "the rule condition must be ONE clause with at most one conjunction"
+        " (and/or/且/并且/以及/或); the structural gate rejects conditions"
+        " with two or more conjunctions, so keep one decisive observable"
+        " pattern instead of a compound enumeration"
     ),
     "multiple_actions": (
         "the rule must prescribe exactly one observable action"
@@ -627,6 +632,7 @@ def _build_mutation_retry_feedback(
 _FN_POLARITY_MODULES = frozenset({
     "candidate_trigger", "evidence_obligation", "candidate_to_verifier_route",
     "atomic_verifier_instruction", "causal_link_test", "abstention_rule",
+    "clean_defense_boundary",
 })
 _FP_POLARITY_MODULES = frozenset({
     "clean_defense_boundary", "abstention_rule", "causal_link_test",
@@ -682,23 +688,52 @@ def _owner_arbitration(
     type_value = str(getattr(primary_type, "value", primary_type) or "")
     if fn_side and type_value == "omission":
         return "candidate_trigger", "process_channel"
-    quarantined = int(
-        detection_result.get("quarantined_error_certificate_count") or 0
+    # v5.9 fix: the quarantined count lives under evidence_health and the
+    # defense coverage under proof_adjudication. Reading top-level keys
+    # silently returned None/"" for every case, which disabled this channel
+    # entirely and left FN-clean cases deadlocked at abstention_rule NO_EDIT.
+    health = detection_result.get("evidence_health") or {}
+    quarantined_raw = (
+        health.get("quarantined_error_certificate_count")
+        if isinstance(health, Mapping) else None
+    )
+    try:
+        quarantined = int(quarantined_raw or 0)
+    except (TypeError, ValueError):
+        quarantined = 0
+    proof = detection_result.get("proof_adjudication") or {}
+    defense_reading = parse_coverage(
+        proof.get("defense_coverage") if isinstance(proof, Mapping) else None
+    )
+    defense_complete = (
+        defense_reading.state == "complete"
+        or defense_reading.score == 1.0
     )
     if fn_side and quarantined > 0:
         return "evidence_obligation", "verdict_evidence_gap"
-    if fn_side:
-        # FN carried by a complete clean defense: the defense-side evidence
-        # construction over-persuaded the court.  The gold-locked route holds
-        # such cases at abstention_rule/causal_link_test, where the trace
-        # offers no observable failure to edit; evidence_obligation owns the
-        # defense-side evidence standard and stays inside the FN polarity.
-        defense_coverage = str(detection_result.get("defense_coverage") or "")
-        if defense_coverage == "complete":
-            return "evidence_obligation", "verdict_evidence_gap"
+    if fn_side and defense_complete:
+        # v5.9: prefer the most specific executable owner. When defense
+        # certificates exist, the clean verdict was carried by the defense
+        # side; a rule tightening when a defense/boundary record may be
+        # emitted is an action clean_defense_boundary's provider can execute,
+        # and it stays inside the FN polarity (gold=error). The previous
+        # evidence_obligation-only channel asked the prosecution-side module
+        # to fix a defense-side construction, which source replay can score
+        # but which the trace rarely justifies.
+        defense = detection_result.get("combined_defense") or detection_result.get("defense") or {}
+        defense_rows: Any = []
+        if isinstance(defense, Mapping):
+            defense_rows = defense.get("candidates") or defense.get("certificates") or []
+        if isinstance(defense_rows, list) and any(
+            isinstance(row, Mapping) for row in defense_rows
+        ):
+            return "clean_defense_boundary", "verdict_evidence_gap"
+        # FN carried by a complete clean defense without enumerable rows:
+        # evidence_obligation owns the defense-side evidence standard and
+        # stays inside the FN polarity.
+        return "evidence_obligation", "verdict_evidence_gap"
     if fp_side:
-        defense_coverage = str(detection_result.get("defense_coverage") or "")
-        if defense_coverage == "complete":
+        if defense_complete:
             return "clean_defense_boundary", "verdict_evidence_gap"
     return "", ""
 
@@ -3013,6 +3048,18 @@ def run_online_evolution(
                     if module != signal.target_module
                 ),
             )
+        # v5.9: the arbitration owner is derived from label-free runtime
+        # evidence (who carried the verdict) and is already polarity-bounded.
+        # A partial typed intersection can silently drop it (e.g. type=TOOL
+        # filters out clean_defense_boundary), which reintroduces the exact
+        # NO_EDIT deadlock the arbitration exists to break. Keep it as the
+        # lowest-priority fallback so reflection always has an executable
+        # owner; the attributor's owner keeps root-cause priority.
+        if (
+            arbitration_owner
+            and arbitration_owner not in type_allowed_modules
+        ):
+            type_allowed_modules = (*type_allowed_modules, arbitration_owner)
         # v5.6 owner escalation: on a retry, move owners that already produced
         # source_no_effect to the end of the allowed-module order. The model is
         # then nudged toward a different attributed owner; the hard duplicate
@@ -3236,11 +3283,97 @@ def run_online_evolution(
                             )
                         parsed = {}
                 elif not candidates:
-                    no_edit_reason = (
-                        no_edit_reasons[0]
-                        if no_edit_reasons else "LLM found no safe general edit"
-                    )
+                    # v5.9 structured collaboration: when the overloaded
+                    # primary pass retreats to no_edit, split the work into a
+                    # diagnosis-only stage and a targeted generation stage.
+                    # The diagnosis locates one failing output and an
+                    # executable owner; the generation pass is then bound to
+                    # implement it instead of re-deriving the diagnosis.
                     parsed = {}
+                    diagnosis: dict[str, Any] = {}
+                    try:
+                        diag_system, diag_user = build_failure_diagnosis_prompt(
+                            signal=signal,
+                            runtime_observation=runtime_observation,
+                            detection_context=detection_context,
+                            current_skill_text=skill_context,
+                            allowed_target_modules=allowed_modules,
+                        )
+                        diag_parsed, _diag_meta = run_mutation_call(
+                            route=mutation_route,
+                            purpose="reflection_diagnosis",
+                            system=diag_system,
+                            user=diag_user,
+                            cache_dir=mutation_cache / "diagnosis",
+                        )
+                        diagnosis = sanitize_diagnosis(diag_parsed, allowed_modules)
+                    except Exception as exc:
+                        diagnosis = {
+                            "owner_executable": False, "owner_module": None,
+                            "failure_field": "",
+                            "observed_gap": "",
+                            "reasoning": f"diagnosis_unavailable:{type(exc).__name__}",
+                        }
+                    reflection_audit["diagnosis"] = diagnosis
+                    if diagnosis.get("owner_executable"):
+                        targeted_system, targeted_user = build_causal_reflection_prompt(
+                            signal=signal,
+                            current_skill_text=skill_context,
+                            detection_context=detection_context,
+                            rejected_buffer=rejected_buffer,
+                            template_hint=template_hint,
+                            accepted_edits_summary=accepted_summary,
+                            capacity_guidance=capacity_guidance,
+                            allowed_target_modules=allowed_modules,
+                            runtime_observation=runtime_observation,
+                            candidate_count=1,
+                            targeted_diagnosis=diagnosis,
+                        )
+                        if active_attempt_index > 0:
+                            targeted_system += _build_structural_system_constraints(
+                                mutation_retry_feedback.get(case_id, []),
+                            )
+                        try:
+                            targeted_parsed, _target_meta = run_mutation_call(
+                                route=mutation_route,
+                                purpose="mutation",
+                                system=targeted_system,
+                                user=targeted_user,
+                                cache_dir=mutation_cache / "targeted",
+                            )
+                            targeted_candidates, targeted_no_edit = (
+                                extract_intervention_candidates(
+                                    targeted_parsed, limit=1,
+                                )
+                            )
+                            reflection_audit["targeted_retry"] = True
+                            reflection_audit["targeted_cache_hit"] = bool(
+                                isinstance(_target_meta, Mapping)
+                                and _target_meta.get("cache_hit")
+                            )
+                            if targeted_candidates:
+                                parsed = targeted_candidates[0]
+                                reflection_audit["generated_candidates"] = 1
+                            elif targeted_no_edit:
+                                no_edit_reason = targeted_no_edit
+                            else:
+                                no_edit_reason = (
+                                    no_edit_reasons[0]
+                                    if no_edit_reasons
+                                    else "LLM found no safe general edit"
+                                )
+                        except Exception as exc:
+                            reflection_audit["targeted_retry"] = True
+                            no_edit_reason = (
+                                no_edit_reasons[0]
+                                if no_edit_reasons
+                                else f"targeted_generation_unavailable:{type(exc).__name__}"
+                            )
+                    else:
+                        no_edit_reason = (
+                            no_edit_reasons[0]
+                            if no_edit_reasons else "LLM found no safe general edit"
+                        )
                 else:
                     parsed = candidates[0]
                     reflection_audit["selected_index"] = 0

@@ -41,6 +41,8 @@ from src.sehd_v6.core.bccse.reflection_engine import (
     extract_intervention_candidates,
     build_intervention_critic_prompt,
     select_intervention_candidate,
+    build_failure_diagnosis_prompt,
+    sanitize_diagnosis,
 )
 from src.sehd_v6.core.bccse.safety_gate import create_structural_gate
 from src.sehd_v6.core.bccse.step_attributor import (
@@ -333,6 +335,7 @@ def test_reflection_receives_structured_runtime_output_ownership() -> None:
             "prosecution_coverage": "incomplete",
             "defense_coverage": "complete",
         },
+        "evidence_health": {"quarantined_error_certificate_count": 0},
     }
     observation = build_runtime_observation(
         result, signal,
@@ -347,6 +350,59 @@ def test_reflection_receives_structured_runtime_output_ownership() -> None:
     assert observation["module_output_ownership"]["evidence_obligation"]
     assert "<structured_runtime_observation>" in user
     assert "gold_label" not in user
+
+
+def test_runtime_observation_court_balance_locates_verdict_carrier() -> None:
+    """v5.9: court_balance must expose who carried the verdict so reflection
+    can target the executable owner instead of a downstream symptom."""
+    signal = AttributionSignal(
+        error_type=ErrorType.FALSE_NEGATIVE_CLEAN,
+        target_module="abstention_rule",
+        secondary_module="causal_link_test",
+        attribution_confidence="high",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.GOLD_MISMATCH,
+        evidence_summary="clean verdict carried by complete defense",
+        prosecution_coverage=1.0,
+        defense_coverage=1.0,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={}, crs_aggregate=0.0, crs_source="mock",
+        crs_complete=True, consensus_gate_applied=False,
+        candidate_count=7, state="verified_clean", gold_label=None,
+        has_gold=False, gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+    result = {
+        "state": "verified_clean", "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "census": [{"candidate_id": f"c{i}"} for i in range(7)],
+        "combined_prosecution": {"candidates": [
+            {"candidate_id": "c1"}, {"candidate_id": "c2"},
+        ]},
+        "combined_defense": {"certificates": [
+            {"target_candidate_id": "c1"}, {"target_candidate_id": "c2"},
+        ]},
+        "proof_adjudication": {
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "quarantined_error_certificate_ids": ["cert_x"],
+            "clean_covered_candidate_ids": ["c1", "c2"],
+            "positive_candidate_ids": [],
+            "consensus_gate_blocked_ids": [],
+        },
+        "evidence_health": {"quarantined_error_certificate_count": 1},
+    }
+    observation = build_runtime_observation(
+        result, signal, allowed_modules=("clean_defense_boundary",),
+    )
+    balance = observation["court_balance"]
+    assert balance["defense_certificates"] == 2
+    assert balance["quarantined_error_certificates"] == 1
+    assert balance["surviving_error_certificates"] == 1
+    assert balance["candidates_covered_by_clean_defense"] == 2
+    assert balance["verdict_state"] == "verified_clean"
 
 
 def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
@@ -373,6 +429,100 @@ def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
         normalized, {"decision": "select", "selected_index": 9},
     )
     assert rejected is None
+
+
+def _fn_clean_signal() -> AttributionSignal:
+    return AttributionSignal(
+        error_type=ErrorType.FALSE_NEGATIVE_CLEAN,
+        target_module="abstention_rule",
+        secondary_module="causal_link_test",
+        attribution_confidence="high",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.GOLD_MISMATCH,
+        evidence_summary="clean verdict carried by complete defense",
+        prosecution_coverage=1.0,
+        defense_coverage=1.0,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={}, crs_aggregate=0.0, crs_source="mock",
+        crs_complete=True, consensus_gate_applied=False,
+        candidate_count=7, state="verified_clean", gold_label=None,
+        has_gold=False, gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+
+
+def test_failure_diagnosis_prompt_bounded_and_label_free() -> None:
+    system, user = build_failure_diagnosis_prompt(
+        signal=_fn_clean_signal(),
+        runtime_observation={"court_balance": {"defense_certificates": 2}},
+        detection_context="trace",
+        current_skill_text="rules",
+        allowed_target_modules=("clean_defense_boundary", "abstention_rule"),
+    )
+    assert "diagnose only" in system
+    assert "clean_defense_boundary" in user
+    assert "owner_executable" in user
+    assert "gold" not in user.lower().replace("gold_mismatch", "")
+
+
+def test_sanitize_diagnosis_downgrades_illegal_owner() -> None:
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "candidate_trigger",
+            "failure_field": "defense_coverage",
+            "observed_gap": "x" * 900,
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("clean_defense_boundary",),
+    )
+    assert bounded["owner_executable"] is False
+    assert bounded["owner_module"] is None
+    assert "intervention_hint" not in bounded
+    assert len(bounded["observed_gap"]) <= 300
+
+
+def test_sanitize_diagnosis_keeps_allowed_owner_and_hint() -> None:
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "clean_defense_boundary",
+            "failure_field": "defense_coverage",
+            "observed_gap": "certificates never assembled",
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("clean_defense_boundary",),
+    )
+    assert bounded["owner_executable"] is True
+    assert bounded["owner_module"] == "clean_defense_boundary"
+    assert bounded["intervention_hint"]["action"] == "a"
+
+
+def test_targeted_diagnosis_directive_enters_reflection_prompt() -> None:
+    diagnosis = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "abstention_rule",
+            "failure_field": "state",
+            "observed_gap": "unresolved despite complete defense",
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("abstention_rule",),
+    )
+    _, user = build_causal_reflection_prompt(
+        _fn_clean_signal(),
+        current_skill_text="rules",
+        detection_context="trace",
+        allowed_target_modules=("abstention_rule",),
+        targeted_diagnosis=diagnosis,
+    )
+    assert "<targeted_diagnosis" in user
+    assert "abstention_rule" in user
 
 
 def test_candidate_normalization_deduplicates_repeated_samples() -> None:

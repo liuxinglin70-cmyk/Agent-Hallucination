@@ -251,6 +251,34 @@ replay/evaluator 仍负责验证二者是否一致。多个请求提供搜索多
 owner 和 provider cache 命中会写入 step 的 reflection audit。旧的单 edit JSON
 仍可被兼容解析。
 
+v5.9 在协作反思之上引入**诊断-干预二级结构化管线**，解决单一反思调用
+同时承担诊断、owner 路由、规则生成与反事实预测造成的过载问题（观测到
+LLM 诊断正确却全部回退 no_edit 的失效模式）：
+
+1. **诊断阶段**（`purpose=reflection_diagnosis`）：只诊断不写规则。输入
+   与主反思相同，但只要求输出一个 JSON：失败输出字段、允许模块集合内
+   可执行修复的 owner、以及干预提示（一个条件 + 一个模块局部动作）。
+   `sanitize_diagnosis()` 把不受信的 LLM 输出约束为封闭词表：owner 必须
+   在允许集合内，否则降级为不可执行；文本字段全部截断。
+2. **定向生成阶段**：仅当所有主候选都是 no_edit 且诊断给出可执行 owner
+   时触发。主反思 prompt 注入 `<targeted_diagnosis binding="true">` 指令，
+   要求实现该干预（同一 owner、单条件子句、单动作），只有结构性不可能
+   时才允许再次 no_edit。
+
+诊断结果（含降级原因）写入 step 的 `reflection.diagnosis` 审计字段。
+该管线只在主反思失败时消耗 1-2 次额外 mutation 调用，仍受
+`max_mutation_calls` 硬上限约束。
+
+runtime observation 现在还包含 `court_balance`（裁决收支表）：幸存/被隔离
+的错误证书数、defense 证书数、clean defense 覆盖的候选数等。反思 prompt
+据此解读“谁支撑了判决”，把 edit 送到真正决定结果的模块，而不是下游症状。
+
+v5.9 同时修复了 `_owner_arbitration` 读取顶层 `defense_coverage` /
+`quarantined_error_certificate_count` 的字段错读（真实布局嵌套在
+`proof_adjudication` / `evidence_health` 下），该缺陷曾使
+verdict-evidence-gap 通道完全失效、FN-clean 案例死锁在 abstention_rule
+NO_EDIT；并补充仲裁 owner 不被 HTC-TES 类型交集静默丢弃的保险。
+
 所有 attribution、reflection、critic 和 conflict-gate provider 调用共享
 `max_mutation_calls` 硬上限。CLI 参数为 `--max-mutation-calls`，默认 100；
 耗尽后 fail-closed，并记录 `mutation_budget_exhausted`，避免候选数和 retry

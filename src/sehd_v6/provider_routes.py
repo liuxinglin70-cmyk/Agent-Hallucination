@@ -186,7 +186,7 @@ def provider_thinking_control(
     endpoint = str(route.get("endpoint") or "").rstrip("/")
     model = str(route.get("model") or "").lower()
     if (
-        purpose in {"mutation", "reflection_critic"}
+        purpose in {"mutation", "reflection_critic", "reflection_diagnosis"}
         and endpoint == OFFICIAL_ENDPOINT
         and model.startswith("deepseek-v4-")
     ):

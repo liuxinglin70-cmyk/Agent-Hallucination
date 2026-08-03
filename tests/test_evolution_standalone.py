@@ -362,3 +362,124 @@ def test_online_evolution_runs_independent_candidates_and_critic(
     reflection = result.steps[-1].fitness_check["reflection"]
     assert reflection["generated_candidates"] == 2
     assert reflection["critic"]["selected_index"] == 1
+
+
+def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
+    tmp_path, monkeypatch,
+) -> None:
+    """v5.9: when every primary candidate retreats to no_edit, the diagnosis
+    stage locates an executable owner and the targeted generation stage is
+    bound to implement it; the edit still passes the normal gates."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls: list[tuple[str, str]] = []
+    responses = [
+        {"operation": "no_edit", "rationale": "primary pass 1 declined"},
+        {"operation": "no_edit", "rationale": "primary pass 2 declined"},
+        {
+            "owner_executable": True,
+            "owner_module": "evidence_obligation",
+            "failure_field": "prosecution_coverage",
+            "observed_gap": "cited evidence fields never populated",
+            "intervention_hint": {
+                "condition": "a claim lacks cited event support",
+                "action": "keep the evidence field incomplete",
+            },
+            "reasoning": "evidence construction owns the gap",
+        },
+        {
+            "target_module": "evidence_obligation", "operation": "add_rule",
+            "new_content": "If a claim lacks cited event support, keep the evidence field incomplete.",
+            "feature_description": "uncited claim keeps evidence incomplete",
+        },
+    ]
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        calls.append((kwargs["purpose"], kwargs["user"]))
+        return responses.pop(0), {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=2,
+        run_id="diagnosis_unlock",
+    )
+
+    assert [purpose for purpose, _ in calls] == [
+        "mutation", "mutation", "reflection_diagnosis", "mutation",
+    ]
+    assert "<targeted_diagnosis" in calls[-1][1]
+    reflection = result.steps[-1].fitness_check["reflection"]
+    assert reflection["diagnosis"]["owner_module"] == "evidence_obligation"
+    assert reflection.get("targeted_retry") is True
+    assert result.edits_accepted == 1
+
+
+def test_online_evolution_diagnosis_downgrades_illegal_owner(
+    tmp_path, monkeypatch,
+) -> None:
+    """A diagnosis proposing an owner outside the allowed set is downgraded
+    to non-executable and the step stays a fail-closed no_edit."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls: list[str] = []
+    responses = [
+        {"operation": "no_edit", "rationale": "declined"},
+        {
+            "owner_executable": True,
+            "owner_module": "earliest_origin_tiebreak",
+            "failure_field": "state",
+            "observed_gap": "gap",
+            "reasoning": "illegal owner",
+        },
+    ]
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        calls.append(kwargs["purpose"])
+        return responses.pop(0), {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=1,
+        run_id="diagnosis_downgrade",
+    )
+
+    assert calls == ["mutation", "reflection_diagnosis"]
+    reflection = result.steps[-1].edit_proposal["reflection"]
+    assert reflection["diagnosis"]["owner_executable"] is False
+    assert result.edits_accepted == 0

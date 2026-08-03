@@ -3663,7 +3663,7 @@ def test_retry_feedback_carries_structural_hard_constraints() -> None:
     )
     assert "[MUTATION_RETRY_FEEDBACK]" in text
     assert "structural_hard_constraints" in text
-    assert "at most 2 conditions" in text
+    assert "at most one conjunction" in text
 
 
 def test_retry_feedback_multiple_actions_constraint() -> None:
@@ -3763,8 +3763,8 @@ def test_arbitration_quarantined_error_certs_route_evidence_obligation() -> None
     owner, channel = runner._owner_arbitration(
         signal=_fn_signal(),
         detection_result={
-            "prosecution_coverage": "incomplete",
-            "quarantined_error_certificate_count": 2,
+            "proof_adjudication": {"prosecution_coverage": "incomplete"},
+            "evidence_health": {"quarantined_error_certificate_count": 2},
         },
         primary_type=HallucinationType.FACTUAL,
     )
@@ -3789,14 +3789,61 @@ def test_arbitration_fn_complete_defense_routes_evidence_obligation() -> None:
     owner, channel = runner._owner_arbitration(
         signal=_fn_signal(),
         detection_result={
-            "prosecution_coverage": "complete",
-            "defense_coverage": "complete",
-            "quarantined_error_certificate_count": 0,
+            "proof_adjudication": {
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
         },
         primary_type=HallucinationType.UNKNOWN,
     )
     assert owner == "evidence_obligation"
     assert channel == "verdict_evidence_gap"
+
+
+def test_arbitration_fn_defense_rows_route_clean_defense_boundary() -> None:
+    """v5.9: when enumerable defense certificates carried the clean verdict,
+    the executable owner is clean_defense_boundary (its provider can tighten
+    emission conditions), which stays inside the FN polarity."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "proof_adjudication": {
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
+            "combined_defense": {"certificates": [
+                {"target_candidate_id": "c1", "defense_type": "support"},
+            ]},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == "clean_defense_boundary"
+    assert channel == "verdict_evidence_gap"
+
+
+def test_arbitration_ignores_flat_legacy_field_layout() -> None:
+    """v5.9 regression: the detector nests coverage under proof_adjudication
+    and the quarantined count under evidence_health. The old top-level reads
+    always returned None, which silently disabled the channel (observed
+    NO_EDIT deadlock). Top-level flat values must NOT fire the channel."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "defense_coverage": "complete",
+            "quarantined_error_certificate_count": 2,
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == ""
+    assert channel == ""
 
 
 def test_arbitration_fn_channel_priority_quarantine_beats_defense() -> None:
@@ -3808,9 +3855,12 @@ def test_arbitration_fn_channel_priority_quarantine_beats_defense() -> None:
     owner, channel = runner._owner_arbitration(
         signal=_fn_signal(),
         detection_result={
-            "prosecution_coverage": "complete",
-            "defense_coverage": "complete",
-            "quarantined_error_certificate_count": 1,
+            "proof_adjudication": {
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 1},
+            "combined_defense": {"certificates": [{"target_candidate_id": "c1"}]},
         },
         primary_type=HallucinationType.UNKNOWN,
     )
@@ -3825,9 +3875,11 @@ def test_arbitration_fn_no_channel_without_defense_evidence() -> None:
     owner, channel = runner._owner_arbitration(
         signal=_fn_signal(),
         detection_result={
-            "prosecution_coverage": "complete",
-            "defense_coverage": "incomplete",
-            "quarantined_error_certificate_count": 0,
+            "proof_adjudication": {
+                "prosecution_coverage": "complete",
+                "defense_coverage": "incomplete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
         },
         primary_type=HallucinationType.FACTUAL,
     )
@@ -3854,9 +3906,11 @@ def test_arbitration_respects_gold_polarity_lock() -> None:
     owner, _ = runner._owner_arbitration(
         signal=fp_signal,
         detection_result={
-            "prosecution_coverage": "complete",
-            "quarantined_error_certificate_count": 0,
-            "defense_coverage": "complete",
+            "proof_adjudication": {
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
         },
         primary_type=HallucinationType.OMISSION,
     )
@@ -3948,7 +4002,7 @@ def test_structural_system_constraints_binding_block() -> None:
     )
     assert "STRUCTURAL HARD CONSTRAINTS" in text
     assert "binding" in text
-    assert "at most 2 conditions" in text
+    assert "at most one conjunction" in text
 
 
 def test_structural_system_constraints_empty_without_structural() -> None:
