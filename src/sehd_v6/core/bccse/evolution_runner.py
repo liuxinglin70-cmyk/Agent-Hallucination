@@ -45,6 +45,10 @@ from .reflection_engine import (
     build_capacity_guidance,
     build_accepted_edits_summary,
     format_detection_context_for_llm,
+    build_runtime_observation,
+    extract_intervention_candidates,
+    build_intervention_critic_prompt,
+    select_intervention_candidate,
     format_skill_context_for_llm,
 )
 from .genome import (
@@ -1544,6 +1548,7 @@ def run_online_evolution(
     resume_from: Path | None = None,
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
+    reflection_candidate_count: int = 3,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
@@ -1620,6 +1625,8 @@ def run_online_evolution(
     """
     if not evolution_case_ids:
         raise ValueError("evolution_case_ids must not be empty")
+    if reflection_candidate_count < 1 or reflection_candidate_count > 5:
+        raise ValueError("reflection_candidate_count must be between 1 and 5")
     if len(evolution_case_ids) != len(set(evolution_case_ids)):
         raise ValueError("evolution_case_ids contains duplicates")
     missing_records = [case_id for case_id in evolution_case_ids if case_id not in records]
@@ -3047,6 +3054,11 @@ def run_online_evolution(
         edit = None
         no_edit_reason = ""
         invalid_mutation_reason = ""
+        reflection_audit: dict[str, Any] = {
+            "requested_candidates": reflection_candidate_count,
+            "generated_candidates": 0,
+            "critic": None,
+        }
 
         if mutation_route is not None:
             mutation_cache = output_dir / "mutation_cache"
@@ -3084,6 +3096,9 @@ def run_online_evolution(
             accepted_summary = build_accepted_edits_summary(accepted_edits_history)
 
             # Build the primary causal reflection prompt
+            runtime_observation = build_runtime_observation(
+                detection_result, signal, allowed_modules=allowed_modules,
+            )
             system_prompt, user_prompt = build_causal_reflection_prompt(
                 signal=signal,
                 current_skill_text=skill_context,
@@ -3093,6 +3108,8 @@ def run_online_evolution(
                 accepted_edits_summary=accepted_summary,
                 capacity_guidance=capacity_guidance,
                 allowed_target_modules=allowed_modules,
+                runtime_observation=runtime_observation,
+                candidate_count=reflection_candidate_count,
             )
 
             # HTC-TES v3: Append type-conditioned guidance to reflection prompt
@@ -3137,7 +3154,60 @@ def run_online_evolution(
                     user=user_prompt,
                     cache_dir=mutation_cache,
                 )
-                target_module = str(parsed.get("target_module") or "")
+                reflection_audit["primary_cache_hit"] = bool(
+                    isinstance(meta, Mapping) and meta.get("cache_hit")
+                )
+                candidates, candidate_no_edit_reason = extract_intervention_candidates(
+                    parsed, limit=reflection_candidate_count,
+                )
+                reflection_audit["generated_candidates"] = len(candidates)
+                if len(candidates) > 1:
+                    critic_system, critic_user = build_intervention_critic_prompt(
+                        candidates=candidates,
+                        runtime_observation=runtime_observation,
+                        current_skill_text=skill_context,
+                        allowed_target_modules=allowed_modules,
+                    )
+                    critic_parsed, _critic_meta = run_mutation_call(
+                        route=mutation_route,
+                        purpose="mutation",
+                        system=critic_system,
+                        user=critic_user,
+                        cache_dir=mutation_cache / "critic",
+                    )
+                    reflection_audit["critic_cache_hit"] = bool(
+                        isinstance(_critic_meta, Mapping)
+                        and _critic_meta.get("cache_hit")
+                    )
+                    parsed, critic_audit = select_intervention_candidate(
+                        candidates, critic_parsed,
+                    )
+                    reflection_audit["critic"] = critic_audit
+                    if parsed is None:
+                        if critic_audit.get("decision") == "no_edit":
+                            no_edit_reason = str(
+                                critic_audit.get("reason") or "critic found no safe candidate"
+                            )
+                        else:
+                            invalid_mutation_reason = (
+                                "critic_rejected_candidates:"
+                                + str(critic_audit.get("reason") or "no_selection")
+                            )
+                        parsed = {}
+                elif not candidates:
+                    no_edit_reason = candidate_no_edit_reason or "LLM found no safe general edit"
+                    parsed = {}
+                else:
+                    parsed = candidates[0]
+                    reflection_audit["selected_index"] = 0
+                raw_target_module = str(parsed.get("target_module") or "")
+                if raw_target_module and raw_target_module not in allowed_modules:
+                    invalid_mutation_reason = (
+                        "candidate_target_outside_allowed_modules:"
+                        + raw_target_module
+                    )
+                    parsed = {}
+                target_module = raw_target_module
                 if target_module not in allowed_modules:
                     target_module = allowed_modules[0]
                 operation = str(parsed.get("operation") or "")
@@ -3198,7 +3268,11 @@ def run_online_evolution(
                     )
                 )
 
-                if operation == "no_edit":
+                if no_edit_reason:
+                    print(f"    LLM requested NO_EDIT: {no_edit_reason}")
+                elif invalid_mutation_reason:
+                    pass
+                elif operation == "no_edit":
                     no_edit_reason = (
                         rationale[:300] or "LLM found no safe general edit"
                     )
@@ -3323,6 +3397,7 @@ def run_online_evolution(
                 edit_proposal={
                     "operation": "no_edit",
                     "rationale": no_edit_reason,
+                    "reflection": reflection_audit,
                 },
                 mutation_applied=None,
                 gate_decision="skip_no_edit",
@@ -3378,6 +3453,7 @@ def run_online_evolution(
                     "retry_scheduled": retry_scheduled,
                     "mutation_error": invalid_mutation_reason
                     or "mutation provider unavailable",
+                    "reflection": reflection_audit,
                     "retry_failure_category": (
                         mutation_retry_feedback.get(case_id, [None])[-1]
                         if retry_scheduled else None
@@ -3716,6 +3792,7 @@ def run_online_evolution(
             except Exception as exc:
                 reason = f"source_replay_runtime_error:{type(exc).__name__}:{exc}"
                 fitness_audit = {
+                    "reflection": reflection_audit,
                     "source_before": signal.to_dict(),
                     "source_after": None,
                     "source_improved": False,
@@ -3780,6 +3857,7 @@ def run_online_evolution(
                             "error": f"{type(exc).__name__}:{exc}",
                         })
             fitness_audit = {
+                "reflection": reflection_audit,
                 "source_before": signal.to_dict(),
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),

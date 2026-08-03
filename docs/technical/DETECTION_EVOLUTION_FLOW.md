@@ -204,6 +204,13 @@ HTC-TES 根据 trace 将问题归为 factual、instructional、tool、reasoning�
 - HTC-TES type guidance；
 - experience memory。
 
+反思 prompt 现在还包含一个受限的 `structured_runtime_observation`。它明确列出
+当前运行实际产生的候选、控方/辩方证书、责任步骤、状态和各允许模块能够
+影响的输出字段。这个对象不是 verdict，也不是 gold 代理；它的作用是把
+“我认为哪里有问题”约束为“哪个可执行输出缺失或异常、由哪个模块拥有”。
+这样可以减少单次 LLM 同时承担诊断、owner 路由、规则生成和反事实预测所
+造成的过载。
+
 experience memory 里每条记录的 outcome 都是结构化的（封闭词表），而不是自由文本：
 
 - `outcome`：`improved` / `directional` / `no_effect` / `regressed` /
@@ -227,6 +234,18 @@ LLM 只能返回一个 `no_edit` 或一个单模块 edit。合法 edit 要满足
 - `expected_effect` 明确预测一个 source replay 可观察的变化。
 
 `expected_effect` 只是反思假设，不是通过凭证。它用于审查 LLM 是否提出了可验证目标；真正是否产生变化仍由 detector replay 决定。
+
+当前这一步是反思引擎重构的第一阶段，而不是完整的多 Agent 认证。后续应将
+反思拆成至少两个结构：`failure_observation`（事实性输出差分）和
+`intervention_proposal`（单模块、单动作规则假设），再由独立的 replay/evaluator
+角色验证二者是否一致。多次候选生成可以作为 test-time scaling 使用，但不能
+把同一模型的多数票当作独立正确性证据。
+
+当前实现已进一步提供有限的协作反思路径：一次 mutation 请求可以返回最多
+`reflection_candidate_count` 个候选；当候选超过一个时，critic 只选择最值得
+replay 的候选，不改写规则，也不判断最终 verdict。选择结果、候选数量和
+provider cache 命中会写入 step 的 reflection audit。旧的单 edit JSON 仍可被
+兼容解析，但不再强制所有 provider 一次生成多个候选。
 
 ### 3.5 structural/type gate
 

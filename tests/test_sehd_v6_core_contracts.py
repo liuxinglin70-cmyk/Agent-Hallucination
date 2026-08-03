@@ -35,7 +35,13 @@ from src.sehd_v6.core.paca_tcl.skill_integration import (
     make_skill_aware_provider,
 )
 from src.sehd_v6.core.bccse.genome import SkillEdit, SkillOp, apply_edit
-from src.sehd_v6.core.bccse.reflection_engine import build_causal_reflection_prompt
+from src.sehd_v6.core.bccse.reflection_engine import (
+    build_causal_reflection_prompt,
+    build_runtime_observation,
+    extract_intervention_candidates,
+    build_intervention_critic_prompt,
+    select_intervention_candidate,
+)
 from src.sehd_v6.core.bccse.safety_gate import create_structural_gate
 from src.sehd_v6.core.bccse.step_attributor import (
     AttributionSignal,
@@ -295,6 +301,111 @@ def test_self_supervised_reflection_prompt_does_not_claim_gold_mode() -> None:
     )
     assert "uses gold-assisted selection" not in system
     assert "<gold_diagnostic_reference>" not in user
+
+
+def test_reflection_receives_structured_runtime_output_ownership() -> None:
+    signal = AttributionSignal(
+        error_type=ErrorType.EVIDENCE_INCOMPLETE,
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+        attribution_confidence="high",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.EVIDENCE_INCOMPLETE,
+        evidence_summary="missing prosecution evidence",
+        prosecution_coverage=0.0,
+        defense_coverage=1.0,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={}, crs_aggregate=0.0, crs_source="mock",
+        crs_complete=True, consensus_gate_applied=True,
+        candidate_count=1, state="unresolved", gold_label=None,
+        has_gold=False, gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+    result = {
+        "state": "unresolved", "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "census": [{"candidate_id": "c1"}],
+        "combined_prosecution": {"candidates": []},
+        "combined_defense": {"certificates": [{"candidate_id": "c1"}]},
+        "proof_adjudication": {
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "complete",
+        },
+    }
+    observation = build_runtime_observation(
+        result, signal,
+        allowed_modules=("evidence_obligation", "atomic_verifier_instruction"),
+    )
+    _, user = build_causal_reflection_prompt(
+        signal, current_skill_text="rules", detection_context="trace",
+        runtime_observation=observation,
+    )
+    assert observation["observed_fields"]["prosecution_certificates"] == 0
+    assert observation["observed_fields"]["defense_certificates"] == 1
+    assert observation["module_output_ownership"]["evidence_obligation"]
+    assert "<structured_runtime_observation>" in user
+    assert "gold_label" not in user
+
+
+def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
+    candidates = [
+        {"target_module": "evidence_obligation", "operation": "add_rule", "new_content": "one"},
+        {"target_module": "atomic_verifier_instruction", "operation": "add_rule", "new_content": "two"},
+    ]
+    normalized, reason = extract_intervention_candidates({"candidates": candidates})
+    assert len(normalized) == 2
+    system, user = build_intervention_critic_prompt(
+        candidates=normalized,
+        runtime_observation={"observed_fields": {"prosecution_certificates": 0}},
+        current_skill_text="rules",
+        allowed_target_modules=("evidence_obligation", "atomic_verifier_instruction"),
+    )
+    assert "do not generate" in system.lower()
+    assert "CANDIDATES" in user
+    selected, audit = select_intervention_candidate(
+        normalized, {"decision": "select", "selected_index": 1, "reason": "owned output"},
+    )
+    assert selected == candidates[1]
+    assert audit["selected_index"] == 1
+    rejected, _ = select_intervention_candidate(
+        normalized, {"decision": "select", "selected_index": 9},
+    )
+    assert rejected is None
+
+
+def test_collaborative_prompt_has_one_consistent_json_protocol() -> None:
+    signal = _reflection_signal_for_test()
+    system, user = build_causal_reflection_prompt(
+        signal,
+        current_skill_text="rules",
+        detection_context="trace",
+        allowed_target_modules=("evidence_obligation",),
+        candidate_count=3,
+    )
+    assert "candidates" in system
+    assert "single-edit-schema" not in user
+    assert "candidates" in user
+    assert user.rstrip().endswith("</task>")
+
+
+def _reflection_signal_for_test() -> AttributionSignal:
+    return AttributionSignal(
+        error_type=ErrorType.EVIDENCE_INCOMPLETE,
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+        attribution_confidence="medium",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.EVIDENCE_INCOMPLETE,
+        evidence_summary="missing output", prosecution_coverage=0.0,
+        defense_coverage=1.0, prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete", coverage_quantitative=False,
+        crs_scores={}, crs_aggregate=0.0, crs_source="test",
+        crs_complete=True, consensus_gate_applied=True, candidate_count=1,
+        state="unresolved", gold_label=None, has_gold=False,
+        gold_enhanced=False, responsible_step_correct=False,
+    )
 
 
 POLICY_SKILL_EXAMPLE = (

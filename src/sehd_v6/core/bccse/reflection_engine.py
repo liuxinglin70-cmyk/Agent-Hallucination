@@ -227,6 +227,71 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
 }
 
 
+def build_runtime_observation(
+    detection_result: Mapping[str, Any],
+    signal: AttributionSignal,
+    *,
+    allowed_modules: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Build a bounded, structured observation for reflection.
+
+    The reflection model must reason about executable outputs, not only a
+    prose summary.  This is deliberately derived from detector output and
+    contains no labels or case identity.  It is an observation, not a verdict
+    or a correctness claim.
+    """
+    def rows(name: str) -> list[Mapping[str, Any]]:
+        payload = detection_result.get(name) or {}
+        if not isinstance(payload, Mapping):
+            return []
+        value = payload.get("candidates") or payload.get("certificates") or []
+        return [item for item in value if isinstance(item, Mapping)] if isinstance(value, list) else []
+
+    prosecution = rows("combined_prosecution") or rows("prosecution")
+    defense = rows("combined_defense") or rows("defense")
+    proof = detection_result.get("proof_adjudication") or {}
+    if not isinstance(proof, Mapping):
+        proof = {}
+    field_presence = {
+        "candidate_count": len(detection_result.get("census") or []),
+        "prosecution_certificates": len(prosecution),
+        "defense_certificates": len(defense),
+        "responsible_step": detection_result.get("responsible_step") is not None,
+        "prosecution_coverage": proof.get("prosecution_coverage"),
+        "defense_coverage": proof.get("defense_coverage"),
+        "state": detection_result.get("state"),
+        "trigger": signal.trigger_source.value,
+    }
+    owner_fields = {
+        module: list(MODULE_OBSERVABLE_FIELDS.get(module, ()))
+        for module in allowed_modules
+    }
+    return {
+        "authority": {
+            "runtime_valid": detection_result.get("runtime_valid") is True,
+            "decision_authority": detection_result.get("decision_authority"),
+        },
+        "observed_fields": field_presence,
+        "non_empty_evidence": {
+            "census": field_presence["candidate_count"] > 0,
+            "prosecution": bool(prosecution),
+            "defense": bool(defense),
+        },
+        "diagnostic_gap": {
+            "trigger": signal.trigger_source.value,
+            "error_type": signal.error_type.value,
+            "primary_module": signal.target_module,
+            "secondary_module": signal.secondary_module,
+            "confidence": signal.attribution_confidence,
+        },
+        "module_output_ownership": owner_fields,
+        "instruction": (
+            "Select one observed missing or malformed output field owned by the "
+            "target module. Do not claim an effect on fields outside its ownership."
+        ),
+    }
+
+
 # Mapping from reflection type to preferred operation
 REFLECTION_OPERATION_MAP: dict[ReflectionType, str] = {
     ReflectionType.DISCOVERY: "tighten_precondition",
@@ -378,6 +443,8 @@ def build_causal_reflection_prompt(
     accepted_edits_summary: str = "",
     capacity_guidance: str = "",
     allowed_target_modules: Sequence[str] | None = None,
+    runtime_observation: Mapping[str, Any] | None = None,
+    candidate_count: int = 1,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -406,6 +473,8 @@ def build_causal_reflection_prompt(
         )
     )
     allowed_modules_text = ", ".join(allowed_modules)
+    if candidate_count < 1 or candidate_count > 5:
+        raise ValueError("candidate_count must be in 1..5")
     runtime_contract_text = "\n".join(
         f"- {module}: action={MODULE_RUNTIME_CONTRACTS.get(module, 'module-local output')}; "
         f"expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}; "
@@ -502,18 +571,7 @@ name internal scores or coverage field identifiers in such a rule; describe
 the observable evidence pattern instead.
 
 Do not copy one rule across modules. Do not modify or remove immutable baseline
-rules. Only rules explicitly marked evolvable may be modified or removed. If
-the trace does not support a safe, runtime-observable, generalizable rule, return:
-{"operation":"no_edit","rationale":"<why no safe general edit is justified>"}
-
-Otherwise return exactly one JSON object:
-{"target_module":"<allowed module>","operation":"add_rule|modify_rule|remove_rule",
- "rule_index":<index or null>,"new_content":"<rule>",
- "feature_description":"<short descriptive trajectory pattern>",
- "expected_effect":"<one concrete runtime-observable change>",
- "expected_effect_contract":{"observable_field":"<field>","expected_direction":"<dir>","expected_scope":"<scope>","trigger_condition":"<short rule trigger>"},
- "diagnosis":{"failed_output":"<missing or wrong runtime output>","owner_module":"<allowed module>","existing_rule_gap":"<distinct missing discriminator>"},
- "rationale":"<brief causal justification>"}
+rules. Only rules explicitly marked evolvable may be modified or removed.
 
 feature_description is persisted and may be shown in a later reflection. It
 must be descriptive rather than imperative and must not contain a case/source
@@ -546,6 +604,21 @@ The observable_field MUST occur in the selected module's
 allowed_observable_fields list in runtime_output_contracts. A contract that
 predicts another field is not a usable intervention plan.
 """
+    if candidate_count > 1:
+        system += (
+            "\nCollaborative generation mode is active. Return one JSON object "
+            "with a 'candidates' array containing up to the requested number "
+            "of materially different edits, or an empty array with "
+            "'no_edit_rationale'. Do not return multiple top-level JSON objects.\n"
+        )
+    else:
+        system += (
+            "Return one edit object or {\"operation\":\"no_edit\","
+            "\"rationale\":\"...\"}. An edit object must contain "
+            '"target_module", "operation", "rule_index", "new_content", '
+            '"feature_description", "expected_effect", '
+            '"expected_effect_contract", "diagnosis", and "rationale".\n'
+        )
 
     # Build rejected edits section
     rejected_info = ""
@@ -597,6 +670,14 @@ predicts another field is not a usable intervention plan.
     if signal.crs_scores:
         crs_lines = [f"  - {dim}: {score:.3f}" for dim, score in signal.crs_scores.items()]
         crs_section = "\n".join(crs_lines)
+
+    observation_section = ""
+    if runtime_observation is not None:
+        observation_section = (
+            "\n<structured_runtime_observation>\n"
+            + json.dumps(runtime_observation, ensure_ascii=False, sort_keys=True)
+            + "\n</structured_runtime_observation>\n"
+        )
 
     # Gold diagnostic reference (B+ mode, v5.3): provides directional
     # context without revealing the answer. Four symmetric paths.
@@ -661,6 +742,7 @@ predicts another field is not a usable intervention plan.
         f"attribution_evidence={html.escape(signal.evidence_summary[:1200], quote=True)}\n"
         f"{crs_section}\n"
         "</diagnostic_signal>\n\n"
+        f"{observation_section}"
         f"{gold_section}"
         "<detection_trace>\n"
         f"{detection_context}\n"
@@ -673,26 +755,93 @@ predicts another field is not a usable intervention plan.
         "</runtime_output_contracts>\n"
         f"{rejected_info}{accepted_section}{capacity_section}{hint_section}\n"
         "<task>\n"
-        "Decide whether one safe general rule is justified by observable "
+        "Decide whether a safe general rule is justified by observable "
         "trajectory evidence. Do not assume the present class is wrong.\n"
         "A rule must have at most 2 conditions; 3+ conditions will be rejected "
         "by the structural gate.\n"
         f"The allowed target_module values are: {allowed_modules_text}.\n"
         "Use a 0-based rule_index only for an explicitly evolvable rule. "
         "remove_rule uses an empty new_content.\n"
-        "Return exactly one JSON object and no other text. Either:\n"
-        '{"operation":"no_edit","rationale":"..."}\n'
-        "or\n"
-        f'{{"target_module":"<{allowed_modules_text}>",'
-        '"operation":"add_rule|modify_rule|remove_rule","rule_index":null,'
-        '"new_content":"...","feature_description":"...",'
-        '"expected_effect":"...",'
-        '"expected_effect_contract":{{"observable_field":"...","expected_direction":"...","expected_scope":"...","trigger_condition":"..."}},'
-        '"diagnosis":{{"failed_output":"...","owner_module":"...","existing_rule_gap":"..."}},'
-        '"rationale":"..."}}\n'
-        "</task>"
+        + (
+            "Return exactly one JSON object and no other text. Either:\n"
+            '{"operation":"no_edit","rationale":"..."}\n'
+            "or the single-edit schema shown in the system prompt.\n"
+            if candidate_count == 1 else
+            f"Generate up to {candidate_count} materially different candidates, "
+            "not paraphrases, and return exactly:\n"
+            '{"candidates":[{"target_module":"...","operation":"add_rule",'
+            '"rule_index":null,"new_content":"...","feature_description":"...",'
+            '"expected_effect":"...","expected_effect_contract":{},'
+            '"diagnosis":{},"rationale":"..."}],"no_edit_rationale":"..."}\n'
+        )
+        + "</task>"
     )
     return system, user
+
+
+def extract_intervention_candidates(
+    response: Mapping[str, Any], *, limit: int = 3,
+) -> tuple[list[dict[str, Any]], str]:
+    """Normalize bounded collaborative or legacy mutation output."""
+    if limit < 1 or limit > 5:
+        raise ValueError("limit must be in 1..5")
+    raw = response.get("candidates")
+    if isinstance(raw, list):
+        candidates = [dict(value) for value in raw if isinstance(value, Mapping)]
+        return candidates[:limit], str(response.get("no_edit_rationale") or "")[:300]
+    if str(response.get("operation") or "") == "no_edit":
+        return [], str(response.get("rationale") or "")[:300]
+    return [dict(response)], ""
+
+
+def build_intervention_critic_prompt(
+    *, candidates: Sequence[Mapping[str, Any]],
+    runtime_observation: Mapping[str, Any], current_skill_text: str,
+    allowed_target_modules: Sequence[str],
+) -> tuple[str, str]:
+    """Build a selection prompt for a critic that cannot rewrite rules."""
+    if len(candidates) < 2:
+        raise ValueError("critic requires at least two candidates")
+    system = (
+        "You are the BCCSE intervention critic. Do not generate or rewrite "
+        "rules. Select the candidate most likely to change the observed runtime "
+        "output through its declared owner. Reject unowned fields, restated "
+        "rules, multiple actions, or non-observable triggers. This is replay "
+        "prioritization, not a correctness vote. Return JSON only."
+    )
+    user = (
+        "RUNTIME_OBSERVATION="
+        + json.dumps(runtime_observation, ensure_ascii=False, sort_keys=True)
+        + "\nCURRENT_SKILL=" + current_skill_text[:6000]
+        + "\nALLOWED_MODULES="
+        + json.dumps(list(allowed_target_modules), ensure_ascii=False)
+        + "\nCANDIDATES="
+        + json.dumps([dict(value) for value in candidates[:5]], ensure_ascii=False, sort_keys=True)
+        + '\nReturn {"decision":"select","selected_index":0,"reason":"..."} '
+        + 'or {"decision":"no_edit","selected_index":null,"reason":"..."}.'
+    )
+    return system, user
+
+
+def select_intervention_candidate(
+    candidates: Sequence[Mapping[str, Any]], critic_response: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Apply a fail-closed critic decision without rewriting a candidate."""
+    decision = str(critic_response.get("decision") or "").strip().lower()
+    audit: dict[str, Any] = {
+        "decision": decision or "invalid", "selected_index": None,
+        "reason": str(critic_response.get("reason") or "")[:300],
+    }
+    if decision != "select":
+        return None, audit
+    try:
+        index = int(critic_response.get("selected_index"))
+    except (TypeError, ValueError):
+        return None, audit
+    if index < 0 or index >= len(candidates):
+        return None, audit
+    audit["selected_index"] = index
+    return dict(candidates[index]), audit
 
 
 def format_skill_context_for_llm(genome_modules: dict, target_module: str) -> str:

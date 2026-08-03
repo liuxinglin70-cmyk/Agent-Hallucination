@@ -184,6 +184,19 @@ replays are regression checks. Correctness-oriented promotion requires an
 independent evaluation authority, such as a gold development set or a separate
 evaluation agent whose inputs and artifacts are isolated from mutation.
 
+The reflection engine also receives a structured runtime observation in
+addition to the prose trace. It records observed executable fields and module
+ownership so the generator must name one missing or malformed provider output
+before proposing a rule. This is the first stage of the planned collaborative
+reflection design, not a correctness vote.
+
+Evolution reflection supports bounded test-time scaling through
+`--reflection-candidates` (default `3`). Multiple candidate rules are generated
+in one structured response, then a critic selects one replay candidate without
+rewriting it. The critic is a search-prioritization role, not an independent
+correctness authority; source replay and separately authorized evaluation remain
+responsible for evidence.
+
 ## Online Evolution Semantics
 
 The online runner is sequential, not a static batch optimizer:

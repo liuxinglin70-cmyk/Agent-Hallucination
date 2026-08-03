@@ -127,6 +127,7 @@ def run_evolution(
     max_total_edits: int = 200,
     convergence_window: int = 20,
     max_mutation_attempts_per_case: int = 2,
+    reflection_candidate_count: int = 3,
     canary_limit: int = 2,
     resume_from: Path | None = None,
 ) -> OnlineEvolutionResult:
@@ -213,6 +214,7 @@ def run_evolution(
         probe_limit=0,
         validation_probe_trigger_threshold=0,
         max_mutation_attempts_per_case=max_mutation_attempts_per_case,
+        reflection_candidate_count=reflection_candidate_count,
         initial_genome=_load_initial_genome(initial_genome),
         run_id=run_id,
         resume_from=Path(resume_from) if resume_from is not None else None,

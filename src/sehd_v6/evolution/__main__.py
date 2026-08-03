@@ -56,6 +56,7 @@ def main() -> int:
     parser.add_argument("--max-edits", type=int, default=200)
     parser.add_argument("--convergence-window", type=int, default=20)
     parser.add_argument("--max-mutation-attempts", type=int, default=2)
+    parser.add_argument("--reflection-candidates", type=int, default=3)
     parser.add_argument("--canary-limit", type=int, default=2)
     args = parser.parse_args()
 
@@ -76,6 +77,7 @@ def main() -> int:
         max_total_edits=args.max_edits,
         convergence_window=args.convergence_window,
         max_mutation_attempts_per_case=args.max_mutation_attempts,
+        reflection_candidate_count=args.reflection_candidates,
         canary_limit=args.canary_limit,
     )
     summary = {
