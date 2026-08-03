@@ -326,16 +326,21 @@ artifact/authorization audit.
   hash-bound real-ID Outer manifest remain Inner evidence and are not upgraded
   by this protocol.
 
-## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Pending Approval)
+## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Implemented)
 
 Implementation status: mechanism 1 (implemented as a deterministic,
 provider-free dual-channel owner arbitration; the LLM cross-examination
-variant remains a possible later extension), mechanism 4 (structuralized
-rejection feedback, including the same-category retry cooldown), mechanism 5
+variant remains a possible later extension), mechanism 2 (contrastive replay
+acceptance: one nearest stable same-type neighbour replay gates every
+otherwise-accepted edit; polarity flips and gold-informed task-score
+regressions count as inversions), mechanism 3 (procedural abstention ladder:
+an accepted abstention_rule clean-to-unresolved demotion re-queues the source
+exactly once for the evidence_obligation rung), mechanism 4 (structuralized
+rejection feedback, including the same-category retry cooldown and binding
+hard constraints promoted into the retry system prompt), mechanism 5
 (base-layer failure surfacing) and mechanism 4-localization telemetry
 (`terminal_step_bias`, audit-only) are implemented and covered by regression
-tests. Mechanisms 2 (contrastive replay acceptance) and 3 (procedural
-abstention ladder) stay pending approval.
+tests.
 
 This section records a design proposal produced from the 2026-08-03 five-case
 dry-run (`trial_5case_official_r1`) and a survey of current self-evolving
@@ -429,7 +434,7 @@ without changing any verdict. This unblocks modules such as
 `candidate_trigger` and `evidence_obligation` for FN cases whose coverage
 states prove the court, not the evidence budget, is the broken stage.
 
-### Mechanism 2: Contrastive replay acceptance
+### Mechanism 2: Contrastive replay acceptance (implemented)
 
 An edit candidate is replayed not only on the triggering case but also on one
 nearest stable neighbour of the same classified type. Acceptance additionally
@@ -437,7 +442,7 @@ requires a target-aligned process delta on the source and no contrast
 inversion on the neighbour. This reduces single-trajectory overfitting
 without weakening canary non-regression.
 
-### Mechanism 3: Procedural abstention ladder for false-negative recovery
+### Mechanism 3: Procedural abstention ladder for false-negative recovery (implemented)
 
 Grounded in PVD and UniCR: the abstention signal is procedural evidence, not
 a thresholded scalar, and abstention policy is expressed as evolved rules

@@ -3871,4 +3871,180 @@ def test_localization_bias_signal_silent_on_complete_localization() -> None:
     assert runner._localization_bias_signal(None) == ""
 
 
+# ---------------------------------------------------------------------------
+# v5.8 fix 2 strengthening: binding structural constraints are promoted into
+# the retry SYSTEM prompt, not only echoed in the trailing feedback block.
+# ---------------------------------------------------------------------------
+
+
+def test_structural_system_constraints_binding_block() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    text = runner._build_structural_system_constraints(
+        ["structural:runtime_rule_contract:condition_overload"],
+    )
+    assert "STRUCTURAL HARD CONSTRAINTS" in text
+    assert "binding" in text
+    assert "at most 2 conditions" in text
+
+
+def test_structural_system_constraints_empty_without_structural() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._build_structural_system_constraints([]) == ""
+    assert runner._build_structural_system_constraints(
+        ["runtime_error", "mutation_parse_failure"],
+    ) == ""
+
+
+def test_structural_hard_constraints_dedup_and_filter() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    constraints = runner._structural_retry_hard_constraints([
+        "structural:runtime_rule_contract:condition_overload",
+        "structural:runtime_rule_contract:condition_overload",
+        "structural:duplicate_content",
+        "runtime_error",
+    ])
+    assert len(constraints) == 2
+    assert all(isinstance(item, str) and item for item in constraints)
+
+
+# ---------------------------------------------------------------------------
+# v5.8 mechanism 3: procedural abstention ladder.  Rung 1 completes only for
+# an accepted abstention_rule edit demoting a gold-hallucination clean
+# verdict to unresolved, and the ladder fires at most once per source.
+# ---------------------------------------------------------------------------
+
+
+def test_abstention_ladder_rung_complete_conditions() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=True,
+        ladder_used=False,
+        assessment_passed=True,
+    )
+    # Every single precondition is mandatory.
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="evidence_obligation",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=True,
+        ladder_used=False,
+        assessment_passed=True,
+    )
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="verified_error",
+        gold_label=True,
+        ladder_used=False,
+        assessment_passed=True,
+    )
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=None,
+        ladder_used=False,
+        assessment_passed=True,
+    )
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=False,
+        ladder_used=False,
+        assessment_passed=True,
+    )
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=True,
+        ladder_used=True,
+        assessment_passed=True,
+    )
+    assert not runner._abstention_ladder_rung_complete(
+        target_module="abstention_rule",
+        before_state="verified_clean",
+        after_state="unresolved",
+        gold_label=True,
+        ladder_used=False,
+        assessment_passed=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# v5.8 mechanism 2: contrastive replay acceptance.  Neighbour selection is
+# deterministic (most recent resolved same-type row, self excluded) and an
+# inversion is a polarity flip or a gold-informed task-score regression.
+# ---------------------------------------------------------------------------
+
+
+def test_contrast_neighbor_selection_most_recent_resolved() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    entries = [
+        {"case_id": "A/1", "state": "verified_error"},
+        {"case_id": "B/2", "state": "unresolved"},
+        {"case_id": "C/3", "state": "verified_clean"},
+    ]
+    neighbor = runner._select_contrast_neighbor(entries, case_id="X/9")
+    assert neighbor is not None
+    assert neighbor["case_id"] == "C/3"
+    # Self exclusion falls back to the earlier resolved row.
+    fallback = runner._select_contrast_neighbor(entries, case_id="C/3")
+    assert fallback is not None
+    assert fallback["case_id"] == "A/1"
+    assert runner._select_contrast_neighbor([], case_id="X/9") is None
+    assert runner._select_contrast_neighbor(
+        [{"case_id": "B/2", "state": "unresolved"}], case_id="X/9",
+    ) is None
+
+
+def test_contrast_inversion_rules() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    # Polarity flips are inversions regardless of gold availability.
+    assert runner._contrast_inversion(
+        before_state="verified_error",
+        after_state="verified_clean",
+        gold_label=None,
+    )
+    assert runner._contrast_inversion(
+        before_state="verified_clean",
+        after_state="verified_error",
+        gold_label=False,
+    )
+    # No change is never an inversion.
+    assert not runner._contrast_inversion(
+        before_state="verified_error",
+        after_state="verified_error",
+        gold_label=None,
+    )
+    # Without gold, unresolved transitions are telemetry only.
+    assert not runner._contrast_inversion(
+        before_state="verified_error",
+        after_state="unresolved",
+        gold_label=None,
+    )
+    # With gold, task-score regressions are inversions...
+    assert runner._contrast_inversion(
+        before_state="verified_error",
+        after_state="unresolved",
+        gold_label=True,
+    )
+    # ...and target-aligned improvements are not.
+    assert not runner._contrast_inversion(
+        before_state="unresolved",
+        after_state="verified_error",
+        gold_label=True,
+    )
+
+
 

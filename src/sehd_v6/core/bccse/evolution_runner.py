@@ -520,6 +520,47 @@ def _structural_hard_constraint(category: str) -> str | None:
     )
 
 
+def _structural_retry_hard_constraints(
+    prior_categories: Sequence[str],
+) -> list[str]:
+    """Collect the binding hard-constraint texts for prior categories."""
+    return sorted({
+        constraint
+        for category in prior_categories
+        if str(category).startswith("structural:")
+        for constraint in (
+            _structural_hard_constraint(
+                str(category)[len("structural:"):],
+            ),
+        )
+        if constraint
+    })
+
+
+def _build_structural_system_constraints(
+    prior_categories: Sequence[str],
+) -> str:
+    """Render binding structural constraints for the retry SYSTEM prompt.
+
+    v5.8 fix 2 strengthening: the dry-run showed a bounded retry that only
+    carried the hard constraints in a trailing user-prompt feedback block
+    still repeated the same ``condition_overload`` defect.  On a retry the
+    constraints are therefore also promoted into the system prompt, where
+    they hold instruction-level priority.  Deterministic and case-agnostic:
+    only registered category texts exist.
+    """
+    constraints = _structural_retry_hard_constraints(prior_categories)
+    if not constraints:
+        return ""
+    lines = "\n".join(f"- {constraint}" for constraint in constraints)
+    return (
+        "\n\n[STRUCTURAL HARD CONSTRAINTS - binding for this attempt]\n"
+        "A previous proposal for this source was rejected by the structural"
+        " gate. The constraints below are binding; violating any of them"
+        " will reject this attempt as well:\n" + lines
+    )
+
+
 def _build_mutation_retry_feedback(
     *,
     attempt_index: int,
@@ -548,17 +589,7 @@ def _build_mutation_retry_feedback(
             "{add_rule,modify_rule,remove_rule,no_edit} and "
             "non-empty new_content"
         )
-        hard_constraints = sorted({
-            constraint
-            for category in prior_categories
-            if str(category).startswith("structural:")
-            for constraint in (
-                _structural_hard_constraint(
-                    str(category)[len("structural:"):],
-                ),
-            )
-            if constraint
-        })
+        hard_constraints = _structural_retry_hard_constraints(prior_categories)
         if hard_constraints:
             retry_block["structural_hard_constraints"] = hard_constraints
     if rejected_prior:
@@ -677,6 +708,100 @@ def _localization_bias_signal(
     if responsible_step is None:
         return ""
     return "terminal_step_bias"
+
+
+# ---------------------------------------------------------------------------
+# v5.8 mechanism 3: procedural abstention ladder for FN recovery.
+# ---------------------------------------------------------------------------
+
+
+def _abstention_ladder_rung_complete(
+    *,
+    target_module: str,
+    before_state: str,
+    after_state: str,
+    gold_label: bool | None,
+    ladder_used: bool,
+    assessment_passed: bool,
+) -> bool:
+    """Whether rung 1 of the abstention ladder completed on this edit.
+
+    An FN source (gold hallucination) whose verdict was a confident but
+    thin-evidence ``verified_clean`` becomes recoverable through two
+    sequential, individually gated edits instead of one impossible edit.
+    Rung 1 completes when an accepted ``abstention_rule`` edit demotes the
+    clean verdict to ``unresolved``; the re-queued source then fires
+    ``unresolved_should_error`` and routes ``evidence_obligation`` (rung 2).
+    Every rung still passes the same structural gate, source replay and
+    canary checks; no rung may be merged or credited together.  The ladder
+    fires at most once per source (``ladder_used``).
+    """
+    return (
+        target_module == "abstention_rule"
+        and before_state == "verified_clean"
+        and after_state == "unresolved"
+        and gold_label is True
+        and assessment_passed
+        and not ladder_used
+    )
+
+
+# ---------------------------------------------------------------------------
+# v5.8 mechanism 2: contrastive replay acceptance.
+# ---------------------------------------------------------------------------
+
+_CONTRAST_RESOLVED_STATES = frozenset({"verified_error", "verified_clean"})
+
+
+def _select_contrast_neighbor(
+    entries: Sequence[Mapping[str, Any]],
+    *,
+    case_id: str,
+) -> Mapping[str, Any] | None:
+    """Pick the nearest stable same-type neighbour for a contrast replay.
+
+    ``entries`` are same-type registry rows in processing order; nearest is
+    the most recently registered row with a resolved verdict that is not the
+    triggering case itself.  Deterministic and replay-cheap: neighbours are
+    drawn only from cases the current run already detected.
+    """
+    for entry in reversed(list(entries or [])):
+        if str(entry.get("case_id") or "") == case_id:
+            continue
+        if str(entry.get("state") or "") in _CONTRAST_RESOLVED_STATES:
+            return entry
+    return None
+
+
+def _contrast_inversion(
+    *,
+    before_state: str,
+    after_state: str,
+    gold_label: bool | None,
+) -> bool:
+    """Whether a neighbour replay flip is a contrast inversion.
+
+    A polarity flip (verified_error <-> verified_clean) is always an
+    inversion.  With a gold label any task-score regression (including a
+    resolved verdict demoting towards the wrong side) is an inversion.
+    Without gold, transitions through ``unresolved`` are telemetry only:
+    the self-supervised run has no correctness authority to call them.
+    """
+    if before_state == after_state:
+        return False
+    if (
+        before_state in _CONTRAST_RESOLVED_STATES
+        and after_state in _CONTRAST_RESOLVED_STATES
+    ):
+        return True
+    if gold_label is not None:
+        try:
+            return task_state_score(
+                after_state, gold_label,
+            ) < task_state_score(before_state, gold_label)
+        except ValueError:
+            return False
+    return False
 
 
 def _rejected_proposal_duplicate(
@@ -1590,6 +1715,7 @@ def run_online_evolution(
     budget_usage = {
         "source_replays": 0,
         "canary_cases": 0,
+        "contrast_replays": 0,
         "probe_cases": 0,
         # ``provider_calls`` is retained as the historical detector-call
         # counter. Explicit fields avoid conflating detector replays with
@@ -1613,6 +1739,14 @@ def run_online_evolution(
     # v5.8 fix 4: label-free localization-bias telemetry collected during the
     # run; audit output only, never feeds verdicts or fitness.
     localization_bias_signals: list[dict[str, str]] = []
+    # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
+    # the ladder at most once; advances are audit telemetry only.
+    abstention_ladder_used: set[str] = set()
+    abstention_ladder_advances: list[dict[str, str]] = []
+    # v5.8 mechanism 2: same-type neighbour registry for contrastive replay
+    # acceptance.  Rows are registered when a triggered case is classified;
+    # neighbours are replayed only when an edit would otherwise be accepted.
+    contrast_registry: dict[str, list[dict[str, Any]]] = {}
     # v5.6: source-scoped rejected-proposal tracking. Retry must explore a
     # genuinely different intervention, not paraphrase the rejected owner. The
     # canonical signature is (case, owner module, operation, content hash) and
@@ -1796,6 +1930,7 @@ def run_online_evolution(
         budget_field = {
             "source": "source_replays",
             "canary": "canary_cases",
+            "contrast": "contrast_replays",
             "probe": "probe_cases",
         }.get(budget_kind)
         if budget_field is not None:
@@ -2904,6 +3039,15 @@ def run_online_evolution(
         print(f"    [HTC-TES] type={type_result.primary_type.value} "
               f"confidence={type_result.confidence:.2f}")
 
+        # v5.8 mechanism 2: register this triggered case as a candidate
+        # same-type neighbour for later contrastive replays.  Only resolved
+        # verdicts are stable enough to serve as contrast anchors; the
+        # registry is replay-side bookkeeping and never feeds the verdict.
+        if detection_state in _CONTRAST_RESOLVED_STATES:
+            contrast_registry.setdefault(
+                type_result.primary_type.value, []
+            ).append({"case_id": case_id, "state": detection_state})
+
         # --- [3] LLM Causal Process Reflection (PRIMARY PATH) ---
         # The LLM is the core engine of evolution — it reasons about WHY
         # the skill failed and GENERATES a novel edit.
@@ -2978,6 +3122,12 @@ def run_online_evolution(
             # the initial attempt. Only stable case-agnostic categories are
             # fed back; raw provider text is never echoed (no prompt poison).
             if active_attempt_index > 0:
+                # v5.8 fix 2 strengthening: binding structural constraints are
+                # promoted into the system prompt (instruction-level priority),
+                # not only echoed in the trailing user-prompt feedback block.
+                system_prompt += _build_structural_system_constraints(
+                    mutation_retry_feedback.get(case_id, []),
+                )
                 user_prompt += _build_mutation_retry_feedback(
                     attempt_index=active_attempt_index,
                     prior_categories=mutation_retry_feedback.get(case_id, []),
@@ -3692,6 +3842,82 @@ def run_online_evolution(
                 and assessment.decision == "directional_evidence"
                 and conflict_gate_passed
             )
+            # v5.8 mechanism 2: contrastive replay acceptance.  When the edit
+            # would otherwise be admitted, replay it once on the nearest
+            # stable same-type neighbour; a contrast inversion (polarity
+            # flip, or a gold-informed task-score regression) vetoes the
+            # admission.  A neighbour replay runtime error is fail-open but
+            # audited: the neighbour gate is an overfitting guard, not a
+            # verdict authority.  Costs at most one detector call per
+            # otherwise-accepted edit.
+            contrast_audit: dict[str, Any] | None = None
+            if (
+                (assessment.passed or provisional_accept_eligible)
+                and not canary_regressions
+            ):
+                neighbor = _select_contrast_neighbor(
+                    contrast_registry.get(
+                        type_result.primary_type.value, ()
+                    ),
+                    case_id=case_id,
+                )
+                if neighbor is not None:
+                    neighbor_id = str(neighbor["case_id"])
+                    neighbor_before_state = str(neighbor["state"])
+                    try:
+                        neighbor_result = run_detection(
+                            budget_kind="contrast",
+                            genome=candidate_genome,
+                            case_id=neighbor_id,
+                            output_path=(
+                                replay_root / "contrast"
+                                / neighbor_id.replace("/", "_")
+                            ),
+                        )
+                        neighbor_after_state = str(
+                            neighbor_result.get("state") or ""
+                        )
+                        inverted = _contrast_inversion(
+                            before_state=neighbor_before_state,
+                            after_state=neighbor_after_state,
+                            gold_label=fitness_gold(neighbor_id),
+                        )
+                        contrast_audit = {
+                            "neighbor_case_id": neighbor_id,
+                            "state_before": neighbor_before_state,
+                            "state_after": neighbor_after_state,
+                            "inverted": inverted,
+                        }
+                    except Exception as exc:
+                        inverted = False
+                        contrast_audit = {
+                            "neighbor_case_id": neighbor_id,
+                            "state_before": neighbor_before_state,
+                            "state_after": None,
+                            "inverted": False,
+                            "runtime_error": f"{type(exc).__name__}:{exc}",
+                        }
+                    fitness_audit["contrast_replay"] = contrast_audit
+                    if inverted:
+                        assessment = FitnessAssessment(
+                            "worse",
+                            (f"contrast_neighbor_inversion:{neighbor_id}",),
+                            assessment.task_score_before,
+                            assessment.task_score_after,
+                            assessment.local_score_before,
+                            assessment.local_score_after,
+                        )
+                        fitness_audit["assessment"] = assessment.to_dict()
+                        fitness_audit["passed"] = False
+                        fitness_audit["shadow_admissible"] = False
+                        provisional_accept_eligible = False
+                        directional_canary_support = False
+                        print(
+                            f"  [{idx}] CONTRAST_INVERSION {case_id}: "
+                            f"neighbour {neighbor_id} flipped "
+                            f"{neighbor_before_state}->"
+                            f"{neighbor_after_state}"
+                        )
             fitness_audit["llm_conflict_gate"] = {
                 "passed": conflict_gate_passed,
                 "ran": conflict_gate_ran,
@@ -3955,6 +4181,32 @@ def run_online_evolution(
         )
         flush_shadow_batch(next_case_index=idx + 1)
 
+        # v5.8 mechanism 3: rung 1 of the procedural abstention ladder.  An
+        # accepted abstention_rule edit that demoted a confident-but-thin
+        # clean verdict to unresolved re-queues the SAME source exactly once:
+        # the next detection fires unresolved_should_error and routes
+        # evidence_obligation (rung 2).  Each rung already passed the same
+        # structural gate, source replay and canary checks individually.
+        if _abstention_ladder_rung_complete(
+            target_module=edit.target_module,
+            before_state=str(signal.state),
+            after_state=str(candidate_signal.state),
+            gold_label=signal.gold_label,
+            ladder_used=case_id in abstention_ladder_used,
+            assessment_passed=assessment.passed,
+        ):
+            abstention_ladder_used.add(case_id)
+            abstention_ladder_advances.append({
+                "case_id": case_id,
+                "rung": "abstention_demotion_clean_to_unresolved",
+            })
+            source_work_queue.append((idx, case_id, 0))
+            print(
+                f"  [{idx}] [LADDER] {case_id}: rung 1 complete "
+                f"(verified_clean->unresolved); source re-queued for the "
+                f"evidence_obligation rung"
+            )
+
     # --- Final summary ---
     flush_shadow_batch(
         next_case_index=len(evolution_case_ids),
@@ -3986,6 +4238,7 @@ def run_online_evolution(
                 budget_usage["detector_calls"] + budget_usage["mutation_calls"]
             ),
             "localization_bias_signals": localization_bias_signals,
+            "abstention_ladder_advances": abstention_ladder_advances,
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,
             "validation_probe_every": validation_probe_every,
