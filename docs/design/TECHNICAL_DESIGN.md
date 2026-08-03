@@ -325,3 +325,160 @@ artifact/authorization audit.
 - Existing artifacts with `outer_exposure=false`, zero Outer cases or no
   hash-bound real-ID Outer manifest remain Inner evidence and are not upgraded
   by this protocol.
+
+## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Pending Approval)
+
+This section records a design proposal produced from the 2026-08-03 five-case
+dry-run (`trial_5case_official_r1`) and a survey of current self-evolving
+agent work. It changes only the BCCSE evolution layer; the frozen PACA-TCL
+v3.5 base, CRS weights and proof-court decision rules are untouched.
+
+### Dry-run evidence motivating the restructuring
+
+Five gold-positive cases were evolved with `--use-gold --fitness-use-gold`
+against the official DeepSeek-V4-Flash endpoint:
+
+- 3/5 authoritative verdicts were `verified_clean` (false negatives) and 1/5
+  `unresolved`; effective detection recall on the subset was 0/5.
+- All 4 triggered cases routed to a narrow module set (`abstention_rule`,
+  `causal_link_test`). For two FN cases the reflection LLM explicitly
+  diagnosed the true root cause as candidate-generation sensitivity but
+  returned `no_edit`, because the routed module set contained no module able
+  to express that fix. Result: 0 accepted edits, 3 rejected, 2 no-edit.
+- One forensic re-run of a runtime-invalid case later produced an
+  authoritative `verified_error`, showing the base detector can detect these
+  cases; the miss is a sensitivity/routing problem, not a capability ceiling.
+- One base-layer contract quarantine (propagation `impact_surfaces`) produced
+  `runtime_valid=false` with empty `authority_failure_reasons`: an
+  observability gap, not a verdict logic error.
+- Local proxy instability (`IncompleteRead`, SSL EOF) caused two transport
+  failures; this is environmental and outside the framework.
+
+### Related-work positioning
+
+Skill-library optimizers such as SkillOpt (arXiv:2605.23904), SkillCAT
+(arXiv:2606.13317) and certificate-gated self-evolution such as SEA
+(arXiv:2607.00871) were already incorporated into earlier BCCSE versions
+(bounded edits, structural gate, source replay, canary, rejected buffer).
+The remaining gap is not gating but attribution and abstention, so this
+proposal draws on three fresher lines:
+
+- AgentDebugX / DeepDebug (arXiv:2607.18754): multi-round root-cause
+  diagnosis for agent trajectories. Core insight: the step where a failure
+  surfaces is rarely the step where it was planted. Method: two independent
+  investigations produce candidate root steps, and a cross-examination
+  converts the needle-in-a-haystack search into an evidenced two-candidate
+  choice. The analogues here are the observed localization bias
+  (detector-localized step 12 versus gold step 1) and the static
+  error-type-to-module map that misroutes FN cases.
+- Prover-Verifier Deliberation, PVD (arXiv:2605.25133): selective prediction
+  where the confidence signal is procedural, not a thresholded scalar: a
+  prover defends and a verifier attacks, and the Accept/Challenge/Reject
+  dialogue outcome drives deferral. PACA-TCL already implements an
+  adversarial court; what is missing is treating the court's procedural
+  evidence (coverage states, quarantine counts, appeal balance) as a
+  first-class abstention signal instead of collapsing it into a verdict.
+- UniCR (arXiv:2509.01455) and the selective-prediction literature (Chow
+  reject option, risk-coverage curves, AURC): heterogeneous evidence fusion
+  into a calibrated correctness probability plus risk-controlled refusal.
+  This supplies the audit lens for abstention policy: coverage-conditioned
+  risk curves rather than full-coverage accuracy.
+
+None of these evolves a *detector* whose runtime is an adversarial,
+evidence-gated adjudication system, and none addresses the specific failure
+mode observed here: an internally coherent verdict that misses the label.
+The proposal below targets exactly that gap while preserving every
+architectural invariant.
+
+### Mechanism 1: Dual-pass cross-examination attribution (attribution v2)
+
+Adapted from AgentDebugX. Replace the single-pass static error-type-to-module
+map with two independent owner hypotheses followed by an evidenced
+adjudication:
+
+```text
+h_process  = owner proposed from label-free diagnostics
+             (coverage states, quarantine counts, candidate structure)
+h_counter  = owner proposed from the verdict-vs-process gap analysis
+             (which stage's evidence is too thin for the verdict strength)
+owner      = cross_examine(h_process, h_counter)
+subject to: polarity(owner) == polarity(gold_mismatch)
+            structural gate and fitness unchanged
+```
+
+The cross-examination is a bounded two-candidate comparison with mandatory
+evidence references, not an open-ended choice; the static map remains the
+deterministic fallback when both hypotheses are missing or polarity-invalid.
+The same dual pass feeds the localization audit, so a detector-localized
+step that disagrees with the earliest sufficient-evidence step is recorded
+as a localization signal for `causal_link_test`/`earliest_origin_tiebreak`
+routing rather than silently accepted. This unblocks modules such as
+`candidate_trigger` and `evidence_obligation` for FN cases whose coverage
+states prove the court, not the evidence budget, is the broken stage.
+
+### Mechanism 2: Contrastive replay acceptance
+
+An edit candidate is replayed not only on the triggering case but also on one
+nearest stable neighbour of the same classified type. Acceptance additionally
+requires a target-aligned process delta on the source and no contrast
+inversion on the neighbour. This reduces single-trajectory overfitting
+without weakening canary non-regression.
+
+### Mechanism 3: Procedural abstention ladder for false-negative recovery
+
+Grounded in PVD and UniCR: the abstention signal is procedural evidence, not
+a thresholded scalar, and abstention policy is expressed as evolved rules
+rather than tuned constants. FN cases whose prosecution evidence is thin
+become recoverable through two sequential, individually gated edits instead
+of one impossible edit:
+
+1. an `abstention_rule` edit demotes confident-but-thin-evidence clean
+   verdicts to `unresolved`. The rule conditions only on label-free
+   procedural evidence (coverage states, certificate balance, quarantine
+   counts), which is exactly the threshold-behaviour-as-skill requirement;
+2. the resulting `unresolved_should_error` trigger routes
+   `evidence_obligation` evolution on the same source.
+
+Each rung passes the same structural gate, source replay and canary checks;
+no rung may be merged or credited together. The selective risk-coverage view
+(AURC-style audit of error versus abstention rate) is recorded as telemetry
+for the abstention module; it steers evolution direction but never enters
+the proof-court verdict and never promotes a candidate on its own.
+
+### Mechanism 4: Structuralized rejection feedback
+
+Retry prompts must carry the exact structural failure category as a hard
+constraint (for example `condition_overload` implies "at most 2
+conditions"), and a repeated-rejection cycle on the same module and failure
+category engages the module cooldown. This converts the existing rejection
+buffer from context into contract.
+
+### Mechanism 5: Base-layer failure surfacing
+
+Base-layer quarantine outcomes (for example propagation `impact_surfaces`
+quarantine counts) must be projected into `authority_failure_reasons` so a
+`runtime_valid=false` run always carries a machine-readable cause. This is
+observability only and cannot change any verdict.
+
+### Invariant compliance
+
+- Frozen base: mechanisms 1-5 mutate only the genome, routing, retry contract
+  and audit projection; CRS weights, court rules and stage structure are
+  unchanged.
+- Gold isolation: gold continues to select polarity and fitness credit only;
+  it never enters skill content or reflection prompts.
+- No self-promotion: every mechanism still requires source replay plus canary
+  non-regression; directional evidence remains non-promotable.
+- Fail-closed: any proposal failing polarity, structural or fitness checks is
+  rejected and recorded as negative experience.
+
+### Validation plan
+
+1. Minimal reproduction tests for mechanisms 1, 3 and 5 before any code
+   change (mutant-style tests in `tests/`).
+2. Re-run the same five-case dry-run; success criterion: at least one
+   accepted edit with a target-aligned process delta and unchanged canary
+   states, with counters consistent.
+3. Only after a green dry-run, extend to the registered 50-case fast set at
+   the approved concurrency.
+
