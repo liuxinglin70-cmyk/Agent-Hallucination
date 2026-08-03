@@ -3630,4 +3630,91 @@ def test_coerce_gold_label_single_source_of_truth() -> None:
     assert coerce_gold_label(2) is None
 
 
+# ---------------------------------------------------------------------------
+# v5.8 fix 2: structuralized rejection feedback.  Structural gate rejections
+# must reach the bounded retry as explicit hard constraints, and a repeated
+# same-category structural defect must not consume another retry.
+# ---------------------------------------------------------------------------
+
+
+def test_structural_reject_category_is_case_agnostic() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._structural_reject_category(
+        "runtime_rule_contract:condition_overload"
+    ) == "runtime_rule_contract:condition_overload"
+    # Long case-specific detail text is reduced to the stable leading token.
+    assert runner._structural_reject_category(
+        "runtime_rule_contract:condition_overload: 3 rules already share prefix 'When'"
+    ) == "runtime_rule_contract:condition_overload"
+    assert runner._structural_reject_category(
+        "duplicate_content: identical to existing rule"
+    ) == "duplicate_content"
+    assert runner._structural_reject_category("") == ""
+
+
+def test_retry_feedback_carries_structural_hard_constraints() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    text = runner._build_mutation_retry_feedback(
+        attempt_index=1,
+        prior_categories=["structural:runtime_rule_contract:condition_overload"],
+        rejected_prior=[],
+    )
+    assert "[MUTATION_RETRY_FEEDBACK]" in text
+    assert "structural_hard_constraints" in text
+    assert "at most 2 conditions" in text
+
+
+def test_retry_feedback_multiple_actions_constraint() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    text = runner._build_mutation_retry_feedback(
+        attempt_index=1,
+        prior_categories=["structural:runtime_rule_contract:multiple_actions"],
+        rejected_prior=[],
+    )
+    assert "exactly one observable action" in text
+
+
+def test_retry_feedback_preserves_plain_categories() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    text = runner._build_mutation_retry_feedback(
+        attempt_index=2,
+        prior_categories=[
+            "invalid_json",
+            "structural:duplicate_content",
+        ],
+        rejected_prior=[],
+    )
+    assert "invalid_json" in text
+    assert "previous_failure_categories" in text
+    # duplicate_content carries its own constraint text
+    assert "duplicate" in text.lower()
+
+
+def test_retry_feedback_empty_when_nothing_recorded() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._build_mutation_retry_feedback(
+        attempt_index=1, prior_categories=[], rejected_prior=[],
+    ) == ""
+
+
+def test_retry_feedback_includes_rejected_source_attempts() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    text = runner._build_mutation_retry_feedback(
+        attempt_index=1,
+        prior_categories=[],
+        rejected_prior=[{
+            "target_module": "abstention_rule",
+            "observable_deltas": ["state:verified_clean->unresolved"],
+        }],
+    )
+    assert "rejected_source_attempts" in text
+    assert "abstention_rule" in text
+
+
 

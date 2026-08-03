@@ -328,6 +328,11 @@ artifact/authorization audit.
 
 ## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Pending Approval)
 
+Implementation status: mechanism 4 (structuralized rejection feedback,
+including the same-category retry cooldown) and mechanism 5 (base-layer
+failure surfacing) are implemented and covered by regression tests. The
+remaining mechanisms stay pending approval.
+
 This section records a design proposal produced from the 2026-08-03 five-case
 dry-run (`trial_5case_official_r1`) and a survey of current self-evolving
 agent work. It changes only the BCCSE evolution layer; the frozen PACA-TCL
@@ -445,7 +450,7 @@ no rung may be merged or credited together. The selective risk-coverage view
 for the abstention module; it steers evolution direction but never enters
 the proof-court verdict and never promotes a candidate on its own.
 
-### Mechanism 4: Structuralized rejection feedback
+### Mechanism 4: Structuralized rejection feedback (implemented)
 
 Retry prompts must carry the exact structural failure category as a hard
 constraint (for example `condition_overload` implies "at most 2
@@ -453,7 +458,7 @@ conditions"), and a repeated-rejection cycle on the same module and failure
 category engages the module cooldown. This converts the existing rejection
 buffer from context into contract.
 
-### Mechanism 5: Base-layer failure surfacing
+### Mechanism 5: Base-layer failure surfacing (implemented)
 
 Base-layer quarantine outcomes (for example propagation `impact_surfaces`
 quarantine counts) must be projected into `authority_failure_reasons` so a

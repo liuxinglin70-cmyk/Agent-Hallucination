@@ -1375,3 +1375,124 @@ def test_appeal_defense_deep_repair_runs_and_fail_closes_when_still_invalid() ->
             packet=packet,
             appeal_defense=kept,
         )
+
+
+# ---------------------------------------------------------------------------
+# v5.8 fix 5: base-layer failure surfacing (observability).  A run that is
+# invalidated by the base layer or the construct view must carry a
+# machine-readable cause in authority_failure_reasons; the projection is
+# diagnostic only and never changes a verdict.
+# ---------------------------------------------------------------------------
+
+
+def test_failure_reasons_surface_base_provider_error():
+    base = {
+        "providers": {
+            "candidate_path_error": {
+                "error_type": "IncompleteRead",
+                "error": "IncompleteRead(61313 bytes read)",
+            },
+            "qualification": {"calls": 1},
+        },
+        "census_audit": {"status": "complete"},
+        "candidate_path": {},
+    }
+    reasons = proof_engine._surface_runtime_failure_reasons(
+        proof_reasons=[], base=base,
+        construct_authoritative=True, construct_authority_reasons=[],
+    )
+    assert any(
+        r["component"] == "base_layer" and r["code"] == "candidate_path_error"
+        for r in reasons
+    )
+    # Healthy provider entries never surface.
+    assert not any(r["code"] == "qualification" for r in reasons)
+
+
+def test_failure_reasons_surface_base_certificate_quarantine():
+    base = {
+        "providers": {},
+        "census_audit": {"status": "complete"},
+        "candidate_path": {
+            "state": "unresolved",
+            "layer_audits": {
+                "candidate_001": {
+                    "qualification": {"decision": "pass", "failed_checks": []},
+                    "propagation": {
+                        "decision": "quarantine",
+                        "failed_checks": ["impact_surfaces"],
+                    },
+                },
+            },
+        },
+    }
+    reasons = proof_engine._surface_runtime_failure_reasons(
+        proof_reasons=[], base=base,
+        construct_authoritative=True, construct_authority_reasons=[],
+    )
+    quarantined_entries = [
+        r for r in reasons if r.get("code") == "certificate_quarantine"
+    ]
+    assert quarantined_entries
+    entry = quarantined_entries[0]
+    assert entry["component"] == "base_layer"
+    assert entry["quarantined"][0]["candidate_id"] == "candidate_001"
+    assert entry["quarantined"][0]["failed_checks"] == ["impact_surfaces"]
+
+
+def test_failure_reasons_surface_census_fallback_and_construct():
+    base = {
+        "providers": {},
+        "census_audit": {
+            "status": "fallback_failed",
+            "error_type": "URLError",
+            "error": "SSL EOF",
+        },
+        "candidate_path": {},
+    }
+    construct_reasons = [{
+        "component": "construct_census",
+        "code": "construct_not_complete",
+        "observed_status": "provider_error",
+    }]
+    reasons = proof_engine._surface_runtime_failure_reasons(
+        proof_reasons=[], base=base,
+        construct_authoritative=False,
+        construct_authority_reasons=construct_reasons,
+    )
+    codes = {r.get("code") for r in reasons}
+    assert "census_fallback_failed" in codes
+    assert "construct_not_complete" in codes
+
+
+def test_failure_reasons_never_empty_on_invalidation():
+    reasons = proof_engine._surface_runtime_failure_reasons(
+        proof_reasons=[],
+        base={
+            "providers": {},
+            "census_audit": {"status": "complete"},
+            "candidate_path": {},
+        },
+        construct_authoritative=True, construct_authority_reasons=[],
+    )
+    assert reasons == [{
+        "component": "runtime",
+        "code": "unknown_runtime_invalidation",
+    }]
+
+
+def test_failure_reasons_keep_proof_reasons_first():
+    proof_reasons = [{"component": "proof_court", "code": "proof_court_exception"}]
+    base = {
+        "providers": {
+            "boundary_error": {"error_type": "ValueError", "error": "bad"},
+        },
+        "census_audit": {"status": "complete"},
+        "candidate_path": {},
+    }
+    reasons = proof_engine._surface_runtime_failure_reasons(
+        proof_reasons=proof_reasons, base=base,
+        construct_authoritative=True, construct_authority_reasons=[],
+    )
+    assert reasons[0]["code"] == "proof_court_exception"
+    assert any(r["code"] == "boundary_error" for r in reasons)

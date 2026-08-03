@@ -1188,6 +1188,93 @@ def _initial_error_has_local_authority(proof: dict[str, Any]) -> bool:
     )
 
 
+def _surface_runtime_failure_reasons(
+    *,
+    proof_reasons: Sequence[Mapping[str, Any]],
+    base: Mapping[str, Any],
+    construct_authoritative: bool,
+    construct_authority_reasons: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Project base-layer and construct failures into authority failure reasons.
+
+    v5.8 observability fix: a ``runtime_valid=False`` run must always carry a
+    machine-readable cause.  Base-layer provider errors, census fallback
+    failures, base certificate quarantines and non-authoritative construct
+    views previously invalidated a run without leaving any top-level reason
+    entry.  This projection is diagnostic only: it never changes a verdict,
+    an authority scope or any fail-closed behaviour.
+    """
+    reasons: list[dict[str, Any]] = [
+        dict(row) for row in (proof_reasons or []) if isinstance(row, Mapping)
+    ]
+    providers = base.get("providers") if isinstance(base, Mapping) else None
+    if isinstance(providers, Mapping):
+        for key in sorted(providers, key=str):
+            meta = providers.get(key)
+            if not str(key).endswith("_error") or not isinstance(meta, Mapping):
+                continue
+            reasons.append({
+                "component": "base_layer",
+                "code": str(key),
+                "error_type": str(meta.get("error_type") or ""),
+                "error": str(meta.get("error") or "")[:500],
+            })
+    census_audit = base.get("census_audit") if isinstance(base, Mapping) else None
+    if (
+        isinstance(census_audit, Mapping)
+        and str(census_audit.get("status") or "") == "fallback_failed"
+    ):
+        reasons.append({
+            "component": "base_layer",
+            "code": "census_fallback_failed",
+            "error_type": str(census_audit.get("error_type") or ""),
+            "error": str(census_audit.get("error") or "")[:500],
+        })
+    candidate_path = (
+        base.get("candidate_path") if isinstance(base, Mapping) else None
+    )
+    layer_audits = (
+        candidate_path.get("layer_audits")
+        if isinstance(candidate_path, Mapping) else None
+    )
+    quarantined: list[dict[str, Any]] = []
+    if isinstance(layer_audits, Mapping):
+        for candidate_id in sorted(layer_audits, key=str):
+            audits = layer_audits.get(candidate_id)
+            if not isinstance(audits, Mapping):
+                continue
+            for stage in sorted(audits, key=str):
+                audit = audits.get(stage)
+                if (
+                    not isinstance(audit, Mapping)
+                    or audit.get("decision") != "quarantine"
+                ):
+                    continue
+                failed = list(audit.get("failed_checks") or [])
+                if failed:
+                    quarantined.append({
+                        "candidate_id": str(candidate_id),
+                        "stage": str(stage),
+                        "failed_checks": [str(item) for item in failed],
+                    })
+    if quarantined:
+        reasons.append({
+            "component": "base_layer",
+            "code": "certificate_quarantine",
+            "quarantined": quarantined,
+        })
+    if not construct_authoritative:
+        for row in construct_authority_reasons or []:
+            if isinstance(row, Mapping):
+                reasons.append(dict(row))
+    if not reasons:
+        reasons.append({
+            "component": "runtime",
+            "code": "unknown_runtime_invalidation",
+        })
+    return reasons
+
+
 def _resolve_incomplete_appeal(
     initial_proof: dict[str, Any], exc: Exception,
 ) -> dict[str, Any]:
@@ -1536,12 +1623,23 @@ def adjudicate_case(
         runtime_valid = False
 
     # Build output
+    failure_reasons = proof.get("authority_failure_reasons") or []
+    if not runtime_valid:
+        # v5.8 observability: every invalidated run carries a machine-readable
+        # cause, including base-layer and construct failures that previously
+        # left the top-level reason list empty. Diagnostic only.
+        failure_reasons = _surface_runtime_failure_reasons(
+            proof_reasons=failure_reasons,
+            base=base,
+            construct_authoritative=construct_authoritative,
+            construct_authority_reasons=construct_authority_reasons,
+        )
     output = dict(base)
     output.update({
         "runtime_valid": runtime_valid,
         "state": proof["state"],
         "decision_authority": proof.get("decision_authority", "invalid"),
-        "authority_failure_reasons": proof.get("authority_failure_reasons") or [],
+        "authority_failure_reasons": failure_reasons,
         "incident_state": {
             "verified_error": "verified_hallucination",
             "verified_clean": "verified_non_hallucination",

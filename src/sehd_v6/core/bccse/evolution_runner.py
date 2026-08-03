@@ -413,6 +413,175 @@ def _structural_rejection_retryable(reasons: Sequence[str]) -> bool:
     return bool(categories) and categories <= _REPAIRABLE_STRUCTURAL_REASONS
 
 
+# v5.8 fix 2: structural rejection categories are translated into stable,
+# case-agnostic hard constraints for the bounded retry prompt.  Only
+# registered categories exist; raw reject text is never echoed (no prompt
+# poison, no evaluator metadata).
+_RUNTIME_RULE_CONSTRAINT_TEXT: dict[str, str] = {
+    "content_too_short": (
+        "rule content must be a substantive natural-language instruction"
+    ),
+    "not_if_then_instruction": (
+        "the rule must be an observable 'if/when <condition> -> <one action>'"
+        " instruction"
+    ),
+    "multi_step_pseudocode": (
+        "no multi-step pseudocode or procedures; prescribe one observable"
+        " action"
+    ),
+    "condition_overload": (
+        "a rule must have at most 2 conditions; 3+ conditions will be"
+        " rejected by the structural gate"
+    ),
+    "multiple_actions": (
+        "the rule must prescribe exactly one observable action"
+    ),
+}
+_STRUCTURAL_CATEGORY_CONSTRAINT_TEXT: dict[str, str] = {
+    "duplicate_content": (
+        "the content duplicates an existing rule; propose a genuinely"
+        " different discriminator or use modify_rule/remove_rule"
+    ),
+    "cross_module_near_duplicate": (
+        "the content is a near-duplicate of another module's rule; propose a"
+        " genuinely distinct discriminator"
+    ),
+    "cross_module_merge_required": (
+        "the proposal semantically overlaps an existing rule; return a"
+        " distinct single-action discriminator, never a compound merge"
+    ),
+    "merge_required": (
+        "the proposal semantically overlaps an existing rule; return a"
+        " distinct single-action discriminator, never a compound merge"
+    ),
+    "semantic_overlap_requires_distinct_discriminator": (
+        "the proposal semantically overlaps an existing rule; return a"
+        " distinct single-action discriminator, never a compound merge"
+    ),
+    "diagnostic_only_condition": (
+        "conditions must not reference internal diagnostic state, dataset"
+        " labels or case identifiers"
+    ),
+    "cross_module_reference": (
+        "the rule must not reference other modules or their rules"
+    ),
+    "modify_bloat": (
+        "modify_rule must keep a comparable length and structure to the"
+        " original rule"
+    ),
+    "source_no_effect": (
+        "the previous edit produced no observable target change; propose an"
+        " intervention with a concrete observable effect contract"
+    ),
+    "case_specific_pattern": (
+        "the rule must be general: no case-specific identifiers or dataset"
+        " labels"
+    ),
+    "label_or_case_leakage": (
+        "the rule must not mention dataset labels, case identifiers or"
+        " evaluator fields"
+    ),
+}
+
+
+def _structural_reject_category(reason: str) -> str:
+    """Reduce one structural reject reason to a stable case-agnostic category.
+
+    ``runtime_rule_contract:condition_overload: 3 rules already share ...``
+    becomes ``runtime_rule_contract:condition_overload``; the free-text tail
+    is dropped so retry feedback never carries case-specific content.
+    """
+    text = str(reason or "").strip()
+    if not text:
+        return ""
+    prefix, _, detail = text.partition(":")
+    prefix = prefix.strip()
+    if not detail.strip():
+        return prefix
+    key = detail.strip().split(" ", 1)[0].strip(":").strip()
+    if not key:
+        return prefix
+    if prefix == "runtime_rule_contract" and key in _RUNTIME_RULE_CONSTRAINT_TEXT:
+        return f"{prefix}:{key}"
+    if key in _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT:
+        return f"{prefix}:{key}" if prefix else key
+    return prefix
+
+
+def _structural_hard_constraint(category: str) -> str | None:
+    """Map a stable structural category to its retry hard-constraint text."""
+    value = str(category or "")
+    prefix, _, detail = value.partition(":")
+    if prefix == "runtime_rule_contract":
+        return _RUNTIME_RULE_CONSTRAINT_TEXT.get(detail)
+    return (
+        _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT.get(value)
+        or _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT.get(prefix)
+    )
+
+
+def _build_mutation_retry_feedback(
+    *,
+    attempt_index: int,
+    prior_categories: Sequence[str],
+    rejected_prior: Sequence[Mapping[str, Any]],
+) -> str:
+    """Render the MUTATION_RETRY_FEEDBACK block; empty string when nothing.
+
+    v5.8 fix 2: structural rejection categories recorded with the
+    ``structural:`` marker are additionally translated into explicit
+    ``structural_hard_constraints`` so a bounded retry cannot repeat the same
+    structural defect.  The block also changes the request body (and thus the
+    provider cache key) relative to the initial attempt.  Only stable
+    case-agnostic categories are used; raw provider text is never echoed.
+    """
+    retry_block: dict[str, Any] = {}
+    if prior_categories:
+        retry_block["attempt_index"] = attempt_index
+        retry_block["previous_failure_categories"] = list(prior_categories)
+        retry_block["required_action"] = (
+            "previous mutation output was structurally "
+            "invalid or had no observable target change; "
+            "return a DIFFERENT valid JSON edit with a distinct "
+            "trigger, a distinct output action, and if possible a "
+            "different owner module, with operation in "
+            "{add_rule,modify_rule,remove_rule,no_edit} and "
+            "non-empty new_content"
+        )
+        hard_constraints = sorted({
+            constraint
+            for category in prior_categories
+            if str(category).startswith("structural:")
+            for constraint in (
+                _structural_hard_constraint(
+                    str(category)[len("structural:"):],
+                ),
+            )
+            if constraint
+        })
+        if hard_constraints:
+            retry_block["structural_hard_constraints"] = hard_constraints
+    if rejected_prior:
+        retry_block["rejected_source_attempts"] = [
+            {
+                "target_module": prior["target_module"],
+                "observable_deltas": prior["observable_deltas"],
+            }
+            for prior in rejected_prior
+        ]
+        retry_block.setdefault("required_action", (
+            "return a DIFFERENT valid JSON edit with a distinct "
+            "trigger, a distinct output action, and if possible a "
+            "different owner module"
+        ))
+    if not retry_block:
+        return ""
+    return (
+        "\n[MUTATION_RETRY_FEEDBACK]\n"
+        + json.dumps(retry_block, ensure_ascii=False, sort_keys=True)
+    )
+
+
 def _rejected_proposal_duplicate(
     rejected: Sequence[Mapping[str, Any]],
     *,
@@ -2684,42 +2853,11 @@ def run_online_evolution(
             # the initial attempt. Only stable case-agnostic categories are
             # fed back; raw provider text is never echoed (no prompt poison).
             if active_attempt_index > 0:
-                prior_categories = mutation_retry_feedback.get(case_id, [])
-                retry_block = {}
-                if prior_categories:
-                    retry_block["attempt_index"] = active_attempt_index
-                    retry_block["previous_failure_categories"] = prior_categories
-                    retry_block["required_action"] = (
-                        "previous mutation output was structurally "
-                        "invalid or had no observable target change; "
-                        "return a DIFFERENT valid JSON edit with a distinct "
-                        "trigger, a distinct output action, and if possible a "
-                        "different owner module, with operation in "
-                        "{add_rule,modify_rule,remove_rule,no_edit} and "
-                        "non-empty new_content"
-                    )
-                rejected_prior = rejected_source_proposals.get(case_id, [])
-                if rejected_prior:
-                    retry_block["rejected_source_attempts"] = [
-                        {
-                            "target_module": prior["target_module"],
-                            "observable_deltas": prior["observable_deltas"],
-                        }
-                        for prior in rejected_prior
-                    ]
-                    retry_block.setdefault("required_action", (
-                        "return a DIFFERENT valid JSON edit with a distinct "
-                        "trigger, a distinct output action, and if possible a "
-                        "different owner module"
-                    ))
-                if retry_block:
-                    user_prompt += (
-                        "\n[MUTATION_RETRY_FEEDBACK]\n"
-                        + json.dumps(
-                            retry_block,
-                            ensure_ascii=False, sort_keys=True,
-                        )
-                    )
+                user_prompt += _build_mutation_retry_feedback(
+                    attempt_index=active_attempt_index,
+                    prior_categories=mutation_retry_feedback.get(case_id, []),
+                    rejected_prior=rejected_source_proposals.get(case_id, []),
+                )
 
             # One semantic reflection call per source. Invalid output remains an
             # auditable no-mutation event; it is never "prompted into" an edit.
@@ -3087,12 +3225,34 @@ def run_online_evolution(
                     feature_description=edit.feature_description,
                     type_confidence=type_result.confidence,
                 )
+                retry_categories = [
+                    _structural_reject_category(reason)
+                    for reason in reject_reasons
+                ]
+                retry_categories = [c for c in retry_categories if c]
+                # v5.8 fix 2: a structural defect category that already
+                # consumed one retry enters cooldown; the bounded retry budget
+                # is never spent twice on the same defect class.
+                prior_feedback = mutation_retry_feedback.get(case_id, [])
+                repeated_category = any(
+                    f"structural:{category}" in prior_feedback
+                    for category in retry_categories
+                )
                 retry_scheduled = (
                     mutation_route is not None
                     and active_attempt_index + 1 < max_mutation_attempts_per_case
                     and _structural_rejection_retryable(reject_reasons)
+                    and not repeated_category
                 )
                 if retry_scheduled:
+                    # v5.8 fix 2: record stable structural categories so the
+                    # retry prompt carries explicit hard constraints (and the
+                    # provider cache key differs from the rejected attempt).
+                    feedback = mutation_retry_feedback.setdefault(case_id, [])
+                    for category in retry_categories:
+                        marker = f"structural:{category}"
+                        if marker not in feedback:
+                            feedback.append(marker)
                     gate.defer_structural_reject(cert)
                     source_work_queue.appendleft(
                         (idx, case_id, active_attempt_index + 1)
