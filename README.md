@@ -250,9 +250,11 @@ Supported suffixes are `ENDPOINT`, `MODEL`, `API_KEY_ENV`, `TEMPERATURE`,
 
 The stable application-facing import is now `src.sehd_v6.detector`. The
 detector itself does not load partition/manifest files and does not enforce
-experiment authorization. Those policies belong to experiment orchestration;
-the self-evolution framework reads the optional `project_for_evolution()`
-projection from the detector result.
+experiment authorization. Those policies belong to experiment orchestration.
+The evolution loop consumes an equivalent label-free projection inline
+(`signal_adapter.resolve_authoritative_state()`); the `project_for_evolution()`
+adapter remains available for external consumers that want the same projection
+as an explicit object.
 
 For self-evolution, the same detector boundary is used directly:
 

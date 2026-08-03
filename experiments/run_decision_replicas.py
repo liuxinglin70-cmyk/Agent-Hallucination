@@ -23,10 +23,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.sehd_v6.detector import load_detector_config
 from src.sehd_v6.detector.batch import load_batch_records, run_batch
 from src.sehd_v6.detector.replica_aggregation import aggregate_replicas
 from src.sehd_v6.utils.ocse_packet import stable_hash
@@ -41,6 +42,28 @@ def _load_case_ids(args: argparse.Namespace) -> list[str]:
         report = json.loads(args.flip_band.read_text(encoding="utf-8"))
         return [str(case_id) for case_id in report.get("flip_band_case_ids") or []]
     raise SystemExit("provide --case-ids or --flip-band <decision_profile_report.json>")
+
+
+def collect_replica_predictions(
+    replica_roots: Sequence[Path], case_ids: Sequence[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Collect per-case replica predictions from each replica directory.
+
+    ``run_batch`` persists the rows under ``predictions.json``; the returned
+    summary intentionally carries no ``predictions`` key.
+    """
+    predictions_by_case: dict[str, list[dict[str, Any]]] = {
+        case_id: [] for case_id in case_ids
+    }
+    for replica_root in replica_roots:
+        predictions_path = Path(replica_root) / "predictions.json"
+        if not predictions_path.is_file():
+            continue
+        for row in json.loads(predictions_path.read_text(encoding="utf-8")):
+            case_id = str(row.get("case_id"))
+            if case_id in predictions_by_case:
+                predictions_by_case[case_id].append(row.get("prediction") or {})
+    return predictions_by_case
 
 
 def main() -> int:
@@ -69,7 +92,10 @@ def main() -> int:
         print("--max-cases must be at least 1", file=sys.stderr)
         return 2
 
-    config = json.loads(args.config.read_text(encoding="utf-8"))
+    # Public API resolution keeps the documented precedence chain intact
+    # (SEHD_ROUTE_<ROUTE>_* overrides included); a raw json.loads would lose
+    # the route-level selectors at the transport boundary.
+    config = load_detector_config(args.config)
     config_hash = stable_hash(config)
     case_ids = _load_case_ids(args)[: args.max_cases]
     all_records = load_batch_records(args.records)
@@ -80,46 +106,42 @@ def main() -> int:
     records = {case_id: all_records[case_id] for case_id in case_ids}
 
     # Sampled-only warning: with temperature 0 every replica is a cache copy.
-    routes = config.get("routes") if isinstance(config.get("routes"), dict) else {}
-    temperatures = [
-        route.get("temperature")
-        for route in routes.values()
-        if isinstance(route, dict)
-    ]
+    # Detector routes live as top-level ``*_route`` keys, not under "routes".
+    routes = {
+        name: value
+        for name, value in config.items()
+        if name.endswith("_route") and isinstance(value, dict)
+    }
+    temperatures = [route.get("temperature") for route in routes.values()]
     deterministic = bool(temperatures) and all(
         temperature in (0, 0.0, None) for temperature in temperatures
     )
 
     original_global_cache = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
-    replica_summaries: list[dict[str, Any]] = []
+    replica_roots: list[Path] = []
     try:
         for index in range(args.k):
             replica_root = args.output_root / f"replica_{index}"
             # Isolate the global provider cache per replica so identical
             # payloads cannot collapse k runs into one cached response.
             os.environ["PACA_GLOBAL_CACHE_ROOT"] = str(replica_root / "provider_cache")
-            summary = run_batch(
+            run_batch(
                 records=records,
                 config=config,
                 output_dir=replica_root,
                 max_parallel=args.max_parallel,
                 resume=True,
             )
-            replica_summaries.append(summary)
+            replica_roots.append(replica_root)
     finally:
         if original_global_cache is None:
             os.environ.pop("PACA_GLOBAL_CACHE_ROOT", None)
         else:
             os.environ["PACA_GLOBAL_CACHE_ROOT"] = original_global_cache
 
-    predictions_by_case: dict[str, list[dict[str, Any]]] = {
-        case_id: [] for case_id in case_ids
-    }
-    for summary in replica_summaries:
-        for row in summary.get("predictions") or []:
-            case_id = str(row.get("case_id"))
-            if case_id in predictions_by_case:
-                predictions_by_case[case_id].append(row.get("prediction") or {})
+    # run_batch returns a summary without per-case predictions; the rows are
+    # persisted separately under each replica's predictions.json.
+    predictions_by_case = collect_replica_predictions(replica_roots, case_ids)
 
     cases: list[dict[str, Any]] = []
     for case_id in case_ids:

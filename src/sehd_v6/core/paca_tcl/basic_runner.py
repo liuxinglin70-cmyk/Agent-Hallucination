@@ -582,7 +582,10 @@ def provider_call_with_schema(
             retryable = not isinstance(exc, urlerror.HTTPError) or exc.code in {
                 408, 425, 429, 500, 502, 503, 504,
             }
-            if attempt < retries and retryable:
+            if not retryable:
+                # Fail fast: auth/validation errors will not heal on retry.
+                break
+            if attempt < retries:
                 backoff = float(2**attempt)
                 if isinstance(exc, urlerror.HTTPError) and exc.code == 429:
                     retry_after = exc.headers.get("Retry-After") if exc.headers else None

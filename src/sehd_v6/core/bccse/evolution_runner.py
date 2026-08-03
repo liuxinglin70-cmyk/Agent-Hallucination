@@ -976,16 +976,9 @@ def _restore_state_from_checkpoint(
     }
 
 
-_EVALUATOR_ONLY_FIELDS = frozenset({
-    "gold_label",
-    "gold_explanation",
-    "is_hallucination",
-    "hallucination_step",
-    "hallucination_reason",
-    "hallucination_category",
-    "hallucination_subcategory",
-    "outer_feedback",
-})
+# Single source of truth: the OCSE packet firewall owns the evaluator-only
+# field list so both detector boundaries strip the identical label set.
+_EVALUATOR_ONLY_FIELDS = packet.EVALUATOR_ONLY_FIELDS
 
 
 def _detector_record(record: Mapping[str, Any]) -> dict[str, Any]:
