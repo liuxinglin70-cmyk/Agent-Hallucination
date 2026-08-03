@@ -303,6 +303,25 @@ source replay 通过后，若存在 stable canary，会对其做抽样 replay。
 - `no_effect`、`worse`、runtime error、canary regression 都回滚；
 - label-free 运行永远不自动宣称最终 champion 或 accuracy gain。
 
+### 3.8 逐案例 Skill 继承与运行时激活
+
+在线进化不是先收集所有 edit 再统一应用。`fitness_batch_size` 固定为 1，
+因此一个 source case 的 edit 只有在 source replay、必要的 canary/probe 流程
+完成并进入 commit 后，才会成为下一个 case 的 `current_genome`：
+
+```text
+case N: current_genome
+  -> apply edit -> shadow genome
+  -> source replay -> commit
+  -> champion_genome = current_genome = committed genome
+case N+1: detect(current_genome)
+```
+
+checkpoint 恢复只恢复最后持久化的 committed champion；未完成验证的 shadow
+不会被复活。每个标准检测入口仍要求显式传入 `--genome`，以避免 evolution
+artifact 未经审计就静默改变生产检测。batch completion、prediction、summary
+和 replica report 都记录 `genome_hash`，resume 也以该 hash 作为身份的一部分。
+
 ## 4. 本次 5/5 触发、0 接受的逐例解释
 
 本次 replay 使用的是已保存的真实 detector 输出，并没有让每个 child genome 重新调用 detector；因此它是“真实轨迹输出的进化回放”，不是 fresh child-detector experiment。
@@ -322,6 +341,11 @@ source replay 通过后，若存在 stable canary，会对其做抽样 replay。
 3. 其中一次是 provider transport，不是反思内容质量；
 4. 真实 fresh run 还受到 appeal defender SSL EOF 影响，导致 authority invalid，不能进入进化；
 5. 即使这五例中的 edit 真能关闭 source trigger，若没有独立 stable canary，label-free 模式也只能停留在 telemetry/provisional，不应直接成为 protected champion。现在通过 `canary_case_ids` 显式提供该锚点。
+
+这里还要区分两个问题：canary/contrast 负责发现回归，不能单独证明新 verdict
+正确；而 self-replay 负责暴露候选是否改变了可观测检测过程，也不能单独证明
+正确性。后续反思引擎应把“可执行变化”和“正确性证据”拆成两个结构化产物，
+不要用一个总分或一次 LLM 判断同时承担诊断、生成和认证。
 
 ## 5. 当前关键指标解释
 

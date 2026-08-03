@@ -121,10 +121,35 @@ def load_detector_config(path: Path, *, require_credentials: bool = True) -> dic
     )
 
 
+def load_skill_genome(path: Path, *, expected_hash: str | None = None) -> Any:
+    """Explicitly load and validate one persisted evolved genome.
+
+    Loading is intentionally opt-in.  A malformed or stale genome fails closed
+    instead of silently falling back to the baseline detector.
+    """
+    from ..bccse.genome import MODULE_IDS, SkillGenome
+
+    path = Path(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("genome file must contain an object")
+    modules = payload.get("modules")
+    if not isinstance(modules, dict) or set(modules) != set(MODULE_IDS):
+        raise ValueError("genome must contain exactly the registered modules")
+    genome = SkillGenome.from_dict(payload)
+    persisted_hash = str(payload.get("content_hash") or "")
+    if persisted_hash and persisted_hash != genome.content_hash:
+        raise ValueError("persisted genome content_hash does not match content")
+    if expected_hash is not None and genome.content_hash != expected_hash:
+        raise ValueError("loaded genome hash does not match expected_hash")
+    return genome
+
+
 def detect_record(
     *, record: dict[str, Any], config: dict[str, Any], case_id: str = "case",
     output_dir: Path | None = None, census_root: Path | None = None,
-    genome: Any | None = None, adjudicator: Any | None = None,
+    genome: Any | None = None, genome_source: str | None = None,
+    adjudicator: Any | None = None,
 ) -> dict[str, Any]:
     """Detect one trajectory and return a label-free result."""
     validate_record(record)
@@ -170,6 +195,11 @@ def detect_record(
         result["occurrence_impact_status"] = None
         result["occurrence_impact_kind"] = None
         result["occurrence_recovery_state"] = None
+    if genome is not None:
+        result["provenance"] = {
+            "genome_hash": genome.content_hash,
+            "genome_source": genome_source,
+        }
     return result
 
 
@@ -191,8 +221,14 @@ def main() -> int:
         "--census-root", type=Path, default=None,
         help="optional precomputed census cache; provider census is used when omitted",
     )
+    parser.add_argument(
+        "--genome", type=Path, default=None,
+        help="optional persisted SkillGenome JSON; loading is explicit and fail-closed",
+    )
     args = parser.parse_args()
     config = load_detector_config(args.config)
+    genome = load_skill_genome(args.genome) if args.genome is not None else None
+    genome_source = str(args.genome.resolve()) if args.genome is not None else None
     if args.records is not None:
         from ...detector.batch import load_batch_records, run_batch
         records = load_batch_records(args.records)
@@ -203,6 +239,7 @@ def main() -> int:
         summary = run_batch(
             records=records, config=config, output_dir=args.output_dir,
             max_parallel=args.max_parallel, resume=not args.no_resume,
+            genome=genome, genome_source=genome_source,
         )
         print(args.output_dir / "summary.json")
         return 0 if summary["failed_case_count"] == 0 else 2
@@ -210,6 +247,7 @@ def main() -> int:
     result = detect_record(
         record=record, config=config, case_id=args.case_id,
         output_dir=args.output_dir, census_root=args.census_root,
+        genome=genome, genome_source=genome_source,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = args.output_dir / "prediction.json"

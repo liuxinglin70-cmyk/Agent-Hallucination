@@ -261,3 +261,41 @@ def test_closed_loop_counter_invariants_hold(tmp_path, offline_evolution) -> Non
         "htc_tes_experience_memory.json",
     ):
         assert (output_dir / name).is_file(), name
+
+
+def test_online_evolution_passes_committed_genome_to_next_case(
+    tmp_path, offline_evolution,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    observed: list[tuple[str, int]] = []
+
+    def detector(*, genome, case_id, **kwargs):
+        observed.append((case_id, genome.generation))
+        return {
+            "state": (
+                "verified_clean"
+                if case_id == "stable" or genome.generation > 0
+                else "unresolved"
+            ),
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+        result = runner.run_online_evolution(
+            evolution_case_ids=("stable", "source", "after"),
+            records={"stable": {}, "source": {}, "after": {}},
+            config={}, output_dir=tmp_path, census_root=tmp_path,
+            mutation_route={"model": "DeepSeek-V4-Flash"},
+            run_id="sequential_genome_inheritance",
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert result.edits_accepted == 1
+    # The source replay sees generation 1, and case after starts with it too.
+    assert observed[-1] == ("after", 1)

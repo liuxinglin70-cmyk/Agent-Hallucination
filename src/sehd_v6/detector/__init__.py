@@ -7,6 +7,7 @@ or execute it.
 
 from ..core.paca_tcl.detector import (
     detect_record,
+    load_skill_genome,
     load_detector_config,
     resolve_detector_config,
     validate_record,
@@ -29,6 +30,7 @@ from .replica_aggregation import (
 
 __all__ = [
     "detect_record",
+    "load_skill_genome",
     "load_detector_config",
     "resolve_detector_config",
     "validate_record",

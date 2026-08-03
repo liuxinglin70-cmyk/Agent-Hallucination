@@ -16,7 +16,7 @@ from ..utils.ocse_packet import canonical_json, stable_hash
 from .replica_aggregation import POLICIES, aggregate_replicas
 
 
-BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v2"
+BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v3"
 REPLICA_REPORT_SCHEMA_VERSION = "agenthallu.decision_replicas.v1"
 MAX_REPLICAS = 5
 
@@ -107,6 +107,7 @@ def _atomic_json(path: Path, value: Any) -> None:
 
 def _completed_prediction(
     case_dir: Path, *, case_id: str, input_hash: str, config_hash: str,
+    genome_hash: str | None,
 ) -> dict[str, Any] | None:
     completion_path = case_dir / "completion.json"
     prediction_path = case_dir / "prediction.json"
@@ -125,6 +126,7 @@ def _completed_prediction(
         "case_id": case_id,
         "input_hash": input_hash,
         "config_hash": config_hash,
+        "genome_hash": genome_hash,
         "prediction_hash": stable_hash(prediction),
     }
     if any(completion.get(key) != value for key, value in expected.items()):
@@ -137,6 +139,7 @@ def _completed_prediction(
 def run_batch(
     *, records: Mapping[str, Mapping[str, Any]], config: dict[str, Any],
     output_dir: Path, max_parallel: int = 10, resume: bool = True,
+    genome: Any | None = None, genome_source: str | None = None,
 ) -> dict[str, Any]:
     """Detect independent trajectories concurrently with hash-bound resume."""
     if max_parallel < 1:
@@ -144,6 +147,7 @@ def run_batch(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     config_hash = stable_hash(config)
+    genome_hash = getattr(genome, "content_hash", None)
     started = time.time()
     results: dict[str, dict[str, Any]] = {}
     statuses: dict[str, dict[str, Any]] = {}
@@ -155,7 +159,7 @@ def run_batch(
         case_dir = _case_directory(output_dir, str(case_id))
         resumed = _completed_prediction(
             case_dir, case_id=str(case_id), input_hash=input_hash,
-            config_hash=config_hash,
+            config_hash=config_hash, genome_hash=genome_hash,
         ) if resume else None
         if resumed is not None:
             results[str(case_id)] = resumed
@@ -170,10 +174,26 @@ def run_batch(
         case_id, record, input_hash, case_dir = item
         case_started = time.time()
         try:
-            prediction = detect_record(
-                record=record, config=config, case_id=case_id,
-                output_dir=case_dir / "trace",
-            )
+            detect_kwargs: dict[str, Any] = {
+                "record": record, "config": config, "case_id": case_id,
+                "output_dir": case_dir / "trace",
+            }
+            if genome is not None:
+                detect_kwargs["genome"] = genome
+                detect_kwargs["genome_source"] = genome_source
+            prediction = detect_record(**detect_kwargs)
+            if genome is not None:
+                provenance = prediction.get("provenance")
+                if not isinstance(provenance, dict):
+                    provenance = {}
+                prediction = {
+                    **prediction,
+                    "provenance": {
+                        **provenance,
+                        "genome_hash": genome_hash,
+                        "genome_source": genome_source,
+                    },
+                }
             if prediction.get("runtime_valid") is not True:
                 raise RuntimeError(
                     "detector returned runtime_valid=false; not a completed "
@@ -186,6 +206,7 @@ def run_batch(
                 "case_id": case_id,
                 "input_hash": input_hash,
                 "config_hash": config_hash,
+                "genome_hash": genome_hash,
                 "prediction_hash": stable_hash(prediction),
                 "duration_seconds": round(time.time() - case_started, 3),
             }
@@ -226,6 +247,10 @@ def run_batch(
     summary = {
         "schema_version": BATCH_SCHEMA_VERSION,
         "config_hash": config_hash,
+        "genome_hash": genome_hash,
+        "provenance": ({
+            "genome_hash": genome_hash, "genome_source": genome_source,
+        } if genome is not None else None),
         "requested_case_count": len(records),
         "completed_case_count": len(predictions),
         "failed_case_count": sum(
@@ -297,6 +322,7 @@ def run_replicated_batch(
     replica_policy: str = "majority",
     max_parallel: int = 10,
     resume: bool = True,
+    genome: Any | None = None, genome_source: str | None = None,
 ) -> dict[str, Any]:
     """Run the detector k times per case and aggregate fail-closed.
 
@@ -340,13 +366,17 @@ def run_replicated_batch(
             os.environ["PACA_GLOBAL_CACHE_ROOT"] = str(
                 replica_root / "provider_cache"
             )
-            run_batch(
-                records=records,
-                config=config,
-                output_dir=replica_root,
-                max_parallel=max_parallel,
-                resume=resume,
-            )
+            batch_kwargs: dict[str, Any] = {
+                "records": records,
+                "config": config,
+                "output_dir": replica_root,
+                "max_parallel": max_parallel,
+                "resume": resume,
+            }
+            if genome is not None:
+                batch_kwargs["genome"] = genome
+                batch_kwargs["genome_source"] = genome_source
+            run_batch(**batch_kwargs)
             replica_roots.append(replica_root)
     finally:
         if original_global_cache is None:
@@ -383,6 +413,11 @@ def run_replicated_batch(
     report = {
         "schema_version": REPLICA_REPORT_SCHEMA_VERSION,
         "config_hash": stable_hash(config),
+        "genome_hash": getattr(genome, "content_hash", None),
+        "provenance": ({
+            "genome_hash": getattr(genome, "content_hash", None),
+            "genome_source": genome_source,
+        } if genome is not None else None),
         "k": replicas,
         "replicas_effective": effective_replicas,
         "replica_degradation": replica_degradation,

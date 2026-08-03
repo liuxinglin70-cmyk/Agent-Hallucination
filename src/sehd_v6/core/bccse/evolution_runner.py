@@ -2331,24 +2331,16 @@ def run_online_evolution(
                     for audit in provisional_edits[i].canary_audits
                 )
             )
-            # T6: self-supervised provisional acceptance. A directional source
-            # replay (trigger closed, NOT worse, NOT no_effect) is accepted
-            # when the LLM no-conflict gate was actually consulted and passed.
-            # This opens the previously-dead path where directional_evidence
-            # could not be accepted because no independent canary was available.
-            # Canary regressions never reach here: they were rewritten to
-            # "worse" before admission and dec != "directional_evidence".
-            provisional_accept = (
-                not fitness_use_gold
-                and dec == "directional_evidence"
-                and bool(provisional_edits[i].conflict_gate_passed)
-            )
+            # Self-supervised directional evidence is not correctness evidence.
+            # It may be retained as telemetry, but it must not enter the
+            # champion. Independent canaries protect known behavior; they do
+            # not establish that a newly decisive verdict is correct.
+            provisional_accept = False
             if provisional_accept:
                 provisional_accept_indices.append(i)
             if (
                 dec in {"strong_improvement", "local_improvement"}
                 or label_free_provisional
-                or provisional_accept
             ):
                 accepted_indices.append(i)
             else:
@@ -2434,9 +2426,9 @@ def run_online_evolution(
                     source_audits[idx]["assessment"]["decision"]
                     if idx < len(source_audits) else ""
                 )
-                # T6 provisional accepts gain protected weak fitness so the
-                # rule is anchored as a regression guard. The label-free
-                # canary path and gold path keep their original semantics.
+                # Gold-assisted edits are the only edits that receive fitness
+                # status in the protected champion. Label-free replay remains
+                # explicitly non-promotable telemetry.
                 _is_provisional_accept = (
                     not fitness_use_gold
                     and assessment_decision == "directional_evidence"
@@ -2497,18 +2489,10 @@ def run_online_evolution(
                 _htc_success = assessment_decision in {
                     "strong_improvement", "local_improvement",
                 }
-                # T6: a provisional accept is a positive experience. The
-                # source replay closed the trigger and the LLM no-conflict
-                # gate verified the rule, so it is recorded as detection
-                # improved and promotable evidence (still bounded by the
-                # assess_edit regression guard, which refuses to flip an
-                # independently observed regression to success).
-                _provisional_accept_edit = (
-                    not fitness_use_gold
-                    and assessment_decision == "directional_evidence"
-                    and bool(item.conflict_gate_passed)
-                )
-                _override_success = _htc_success or _provisional_accept_edit
+                # A label-free source replay cannot self-certify correctness,
+                # even when the conflict gate agrees with the proposal.
+                _provisional_accept_edit = False
+                _override_success = _htc_success
                 _shadow_result = source_audits[idx].get("shadow_result", {})
                 _effect_audit = _expected_effect_audit(
                     item.edit,
@@ -2544,13 +2528,9 @@ def run_online_evolution(
                             for value in item.individual_assessment.reasons
                         ],
                         observable_deltas=_effect_audit["observable_deltas"],
-                        # Only a gold-assisted batch commit OR a T6
-                        # provisional accept (LLM-verified, trigger-closed)
-                        # may claim the edit actually improved detection.
-                        promotable=(
-                            (_htc_success and fitness_use_gold)
-                            or _provisional_accept_edit
-                        ),
+                            # Only independent gold-assisted fitness may claim
+                            # that the edited detector improved correctness.
+                            promotable=(_htc_success and fitness_use_gold),
                         diagnostic_only=(
                             not fitness_use_gold
                             and not _provisional_accept_edit

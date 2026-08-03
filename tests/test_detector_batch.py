@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 
 from src.sehd_v6.detector import batch, replica_aggregation
+from src.sehd_v6.core.bccse.genome import create_baseline_genome
+from src.sehd_v6.core.paca_tcl.detector import load_skill_genome
 
 
 def _records(count: int = 4) -> dict[str, dict]:
@@ -86,6 +88,62 @@ def test_batch_resume_requires_matching_hashes(monkeypatch, tmp_path: Path) -> N
     )
     assert third["resumed_case_count"] == 1
     assert calls[-1] == "case/0"
+
+
+def test_batch_resume_does_not_reuse_prediction_for_new_genome(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    calls = []
+    genome = create_baseline_genome()
+
+    def detector(*, case_id, genome=None, **_kwargs):
+        calls.append((case_id, genome.content_hash if genome is not None else None))
+        return {
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "state": "verified_clean",
+        }
+
+    monkeypatch.setattr(batch, "detect_record", detector)
+    records = _records(1)
+    batch.run_batch(records=records, config={}, output_dir=tmp_path)
+    genome.modules["evidence_obligation"].rules.append(
+        "When a cited event is absent, keep the evidence obligation incomplete."
+    )
+    second = batch.run_batch(
+        records=records, config={}, output_dir=tmp_path, genome=genome,
+    )
+    assert second["resumed_case_count"] == 0
+    assert len(calls) == 2
+    assert calls[0][1] is None
+    assert calls[1][1] == genome.content_hash
+    completion = next((tmp_path / "cases").glob("*/completion.json"))
+    import json
+    payload = json.loads(completion.read_text(encoding="utf-8"))
+    assert payload["genome_hash"] == genome.content_hash
+
+
+def test_persisted_genome_loader_validates_hash_and_module_set(tmp_path: Path) -> None:
+    import json
+
+    genome = create_baseline_genome()
+    path = tmp_path / "champion_genome.json"
+    path.write_text(json.dumps(genome.to_dict()), encoding="utf-8")
+    loaded = load_skill_genome(path)
+    assert loaded.content_hash == genome.content_hash
+
+    poisoned = genome.to_dict()
+    poisoned["content_hash"] = "0" * 64
+    path.write_text(json.dumps(poisoned), encoding="utf-8")
+    import pytest
+    with pytest.raises(ValueError, match="content_hash"):
+        load_skill_genome(path)
+
+    incomplete = genome.to_dict()
+    incomplete["modules"].pop("abstention_rule")
+    path.write_text(json.dumps(incomplete), encoding="utf-8")
+    with pytest.raises(ValueError, match="exactly the registered modules"):
+        load_skill_genome(path)
 
 
 def test_failed_case_is_recorded_and_retried(monkeypatch, tmp_path: Path) -> None:
