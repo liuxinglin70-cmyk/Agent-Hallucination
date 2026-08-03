@@ -40,8 +40,17 @@ def main() -> int:
     )
     parser.add_argument("--initial-genome", type=Path, default=None)
     parser.add_argument("--experience-memory", type=Path, default=None)
+    parser.add_argument(
+        "--resume-from", type=Path, default=None,
+        help="resume an interrupted run from its checkpoint directory",
+    )
     parser.add_argument("--use-gold", action="store_true")
     parser.add_argument("--fitness-use-gold", action="store_true")
+    parser.add_argument(
+        "--use-gold-reflection", action="store_true",
+        help="explicit opt-in: expose evolution gold polarity to the mutation "
+        "LLM as a bounded diagnostic reference (default: label-free)",
+    )
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--module-cooldown", type=int, default=0)
     parser.add_argument("--max-edits", type=int, default=200)
@@ -60,7 +69,9 @@ def main() -> int:
         experience_memory_path=args.experience_memory,
         use_gold=args.use_gold,
         fitness_use_gold=args.fitness_use_gold,
+        gold_reflection=args.use_gold_reflection,
         run_id=args.run_id,
+        resume_from=args.resume_from,
         module_cooldown=args.module_cooldown,
         max_total_edits=args.max_edits,
         convergence_window=args.convergence_window,

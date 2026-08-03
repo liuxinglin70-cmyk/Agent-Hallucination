@@ -61,7 +61,7 @@ def test_type_route_keeps_primary_module_first() -> None:
         HallucinationType.FACTUAL,
         ("candidate_trigger", "evidence_obligation"),
     )
-    assert allowed == ("evidence_obligation", "candidate_trigger")
+    assert allowed == ("candidate_trigger", "evidence_obligation")
 
 
 def test_self_supervised_decisive_result_is_not_counted_as_accuracy() -> None:
@@ -376,7 +376,7 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: signal(str(result["state"])),
     )
     monkeypatch.setattr(runner, "integrated_v35_provider", provider_context)
     monkeypatch.setattr(

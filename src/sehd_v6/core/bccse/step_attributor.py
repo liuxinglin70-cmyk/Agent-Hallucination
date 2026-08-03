@@ -252,6 +252,11 @@ class AttributionSignal:
     has_gold: bool
     gold_enhanced: bool
     responsible_step_correct: bool
+    # v5.6: explicit opt-in that permits the gold polarity to appear as a
+    # bounded diagnostic reference in the reflection prompt. Default False:
+    # even when use_gold routes on labels, the mutation LLM stays label-free
+    # unless this separate flag is enabled.
+    gold_reflection: bool = False
     # v5.5: label-free process diagnostics used for root-cause routing.
     localization_status: str = "not_applicable"
     appeal_status: str = "not_required"
@@ -300,6 +305,7 @@ class AttributionSignal:
             "gold_label": self.gold_label,
             "has_gold": self.has_gold,
             "gold_enhanced": self.gold_enhanced,
+            "gold_reflection": self.gold_reflection,
             "responsible_step_correct": self.responsible_step_correct,
             "localization_status": self.localization_status,
             "appeal_status": self.appeal_status,
@@ -750,6 +756,7 @@ def attribute_failure(
     row: Mapping[str, Any],
     *,
     use_gold: bool = False,
+    gold_reflection: bool = False,
 ) -> AttributionSignal:
     """Perform causal process reflection on a single detection result.
 
@@ -1206,6 +1213,7 @@ def attribute_failure(
         gold_label=gold,
         has_gold=has_gold,
         gold_enhanced=has_gold,
+        gold_reflection=bool(gold_reflection and has_gold),
         responsible_step_correct=step_correct,
         localization_status=str(
             diagnostics.get("localization_status") or "not_applicable"
@@ -1262,7 +1270,7 @@ Prosecution coverage: {signal.prosecution_coverage} ({signal.prosecution_coverag
 Defense coverage: {signal.defense_coverage} ({signal.defense_coverage_state})
 Candidate count: {signal.candidate_count}
 CRS aggregate: {signal.crs_aggregate:.3f} ({signal.crs_source})
-Gold label: {signal.gold_label}
+Gold label: {signal.gold_label if signal.gold_reflection else 'unavailable'}
 
 Current rule-based attribution: primary={signal.target_module}, secondary={signal.secondary_module}
 

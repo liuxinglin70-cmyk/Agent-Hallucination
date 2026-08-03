@@ -9,6 +9,7 @@ import pytest
 
 from src.sehd_v6.core.bccse.fitness import (
     assess_source_fitness,
+    module_local_score,
     observable_process_delta,
 )
 from src.sehd_v6.core.bccse.genome import (
@@ -403,7 +404,7 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(runner, "json_object_provider_call", mutation)
 
@@ -801,7 +802,7 @@ def test_classifier_is_conservative_and_secondary_affects_bounded_route() -> Non
         ("candidate_to_verifier_route", "evidence_obligation"),
         secondary_type=mixed.secondary_type,
     )
-    assert route == ("evidence_obligation", "candidate_to_verifier_route")
+    assert route == ("candidate_to_verifier_route", "evidence_obligation")
 
 
 def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch) -> None:
@@ -840,7 +841,7 @@ def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch)
             result["gold_label"] = gold
         return result
 
-    def attributed(result, use_gold=False):
+    def attributed(result, use_gold=False, gold_reflection=False):
         signal = _signal(str(result["state"]))
         gold = result.get("gold_label")
         if use_gold and isinstance(gold, bool):
@@ -909,7 +910,7 @@ def test_directional_evidence_is_provisional_with_stable_canary(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -962,7 +963,7 @@ def test_independent_registered_canary_unblocks_all_triggered_source_pool(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1015,7 +1016,7 @@ def test_label_free_run_fails_before_mutation_when_registered_canary_is_unstable
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal("unresolved"),
+        lambda result, use_gold=False, gold_reflection=False: _signal("unresolved"),
     )
     monkeypatch.setattr(runner, "json_object_provider_call", mutation)
 
@@ -1046,7 +1047,7 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
             "process_improved": genome.generation > 0,
         }
 
-    def attributed(result, use_gold=False):
+    def attributed(result, use_gold=False, gold_reflection=False):
         if result["state"] == "verified_clean":
             return _signal("verified_clean")
         improved = bool(result.get("process_improved"))
@@ -1114,7 +1115,7 @@ def test_runner_rejects_source_self_proof_and_counts_convergence(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1167,7 +1168,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1291,7 +1292,7 @@ def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1363,7 +1364,7 @@ def test_no_gold_run_has_provisional_telemetry_but_no_accuracy_claim(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1413,7 +1414,7 @@ def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
@@ -1753,6 +1754,18 @@ def test_localization_quality_change_is_reported_as_observable_delta() -> None:
     assert "localization_quality:increased" in changes
 
 
+def test_causal_link_score_includes_controllable_localization_quality() -> None:
+    """Counterfactual localization is a causal_link_test provider output."""
+    before = replace(
+        _signal("verified_error"), localization_status="failed_temporal_fallback"
+    )
+    after = replace(_signal("verified_error"), localization_status="complete")
+    row = {"responsible_step": 3}
+    assert module_local_score("causal_link_test", after, row) > (
+        module_local_score("causal_link_test", before, row)
+    )
+
+
 # ============================================================
 # v5.5 — runtime-invalid diagnostic-only telemetry
 # ============================================================
@@ -1920,7 +1933,7 @@ def test_runner_records_runtime_invalid_as_diagnostic_only_telemetry(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
 
     result = runner.run_online_evolution(
@@ -1973,7 +1986,7 @@ def test_runtime_invalid_experience_is_recorded_but_not_promotable(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
 
     runner.run_online_evolution(
@@ -3045,3 +3058,144 @@ def test_normalize_confidence_bounds_and_dominance() -> None:
     # score inputs.
     strong = classifier._normalize_confidence({"factual": 1.2}, 1)
     assert 0.0 <= strong <= 1.0
+
+
+# ---------- v5.6: gold-reflection opt-in gating ----------
+
+
+def test_gold_reflection_requires_explicit_opt_in() -> None:
+    from src.sehd_v6.core.bccse import reflection_engine
+    from src.sehd_v6.core.bccse.step_attributor import (
+        ErrorType,
+        ReflectionType,
+        TriggerSource,
+    )
+
+    base = dict(
+        error_type=ErrorType.FALSE_NEGATIVE_CLEAN,
+        target_module="causal_link_test",
+        secondary_module="evidence_obligation",
+        attribution_confidence="medium",
+        reflection_type=ReflectionType.SKILL_DEFECT,
+        trigger_source=TriggerSource.GOLD_MISMATCH,
+        evidence_summary="process diagnostic",
+        prosecution_coverage=1.0,
+        defense_coverage=1.0,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={},
+        crs_aggregate=0.0,
+        crs_source="test",
+        crs_complete=True,
+        consensus_gate_applied=False,
+        candidate_count=1,
+        state="verified_error",
+        gold_label=False,
+        has_gold=True,
+        gold_enhanced=True,
+        responsible_step_correct=False,
+    )
+
+    signal_no = AttributionSignal(gold_reflection=False, **base)
+    system, user = reflection_engine.build_causal_reflection_prompt(
+        signal_no,
+        current_skill_text="rules",
+        detection_context="trace",
+    )
+    assert "<gold_diagnostic_reference>" not in user
+
+    signal_yes = AttributionSignal(gold_reflection=True, **base)
+    system, user = reflection_engine.build_causal_reflection_prompt(
+        signal_yes,
+        current_skill_text="rules",
+        detection_context="trace",
+    )
+    assert "<gold_diagnostic_reference>" in user
+
+
+def test_reflection_prompt_requires_causal_design_and_module_observable() -> None:
+    from src.sehd_v6.core.bccse import reflection_engine
+
+    signal = _signal("unresolved")
+    system, user = reflection_engine.build_causal_reflection_prompt(
+        signal,
+        current_skill_text="rules",
+        detection_context="trace",
+        allowed_target_modules=("causal_link_test",),
+    )
+    assert "Use this causal design sequence" in system
+    assert '"diagnosis"' in system
+    assert "allowed_observable_fields=causal_field_coverage," in user
+    assert "localization_status" in user
+
+
+def test_attribute_failure_tracks_gold_reflection_opt_in() -> None:
+    from src.sehd_v6.core.bccse.step_attributor import attribute_failure
+
+    row = {
+        "state": "verified_error",
+        "gold_label": False,
+        "runtime_valid": True,
+        "proof_adjudication": {"consensus_gate_applied": True},
+    }
+    off = attribute_failure(row, use_gold=True, gold_reflection=False)
+    assert off.gold_reflection is False
+    assert off.has_gold is True
+    on = attribute_failure(row, use_gold=True, gold_reflection=True)
+    assert on.gold_reflection is True
+    # Without use_gold, gold never enters the signal at all.
+    plain = attribute_failure(row, use_gold=False, gold_reflection=True)
+    assert plain.has_gold is False
+    assert plain.gold_reflection is False
+
+
+# ---------- v5.6: bounded provider JSON-repair ----------
+
+
+def test_provider_transport_recovers_truncated_json_with_repair_call(
+    tmp_path, monkeypatch,
+) -> None:
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "not json"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    monkeypatch.setattr(
+        basic_runner,
+        "_provider_repair_call",
+        lambda **kwargs: {"coverage_state": "complete", "candidates": []},
+    )
+    value, meta = basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "transport_retries": 0,
+        },
+        system="return json",
+        user="{}",
+        cache_dir=tmp_path,
+    )
+    assert value == {"coverage_state": "complete", "candidates": []}
+    assert captured["url"].startswith("https://api.deepseek.com/")

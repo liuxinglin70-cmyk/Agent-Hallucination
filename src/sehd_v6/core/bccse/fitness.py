@@ -245,7 +245,13 @@ def module_local_score(
     if module == "clean_defense_boundary":
         return defense + float(len(_certificate_rows(row, "defense")))
     if module == "causal_link_test":
-        return _causal_field_score(row)
+        # causal_link_test is injected into both causal-field providers and the
+        # counterfactual localization route. A rule that turns temporal
+        # fallback into complete counterfactual ranking is therefore a genuine
+        # module-local gain even when causal certificate field coverage was
+        # already saturated. The old score ignored this executable output and
+        # mislabeled successful localization repairs as no_effect.
+        return _causal_field_score(row) + _localization_quality(signal, row)
     if module == "earliest_origin_tiebreak":
         # Correctness/quality of the chosen origin, not merely that one
         # exists. Guarding against "emit any step" gaming is the whole

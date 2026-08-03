@@ -17,6 +17,7 @@ import copy
 import hashlib
 import json
 import os
+import random
 import re
 import shutil
 import time
@@ -253,8 +254,17 @@ def _json_object_provider_call(
             ValueError,
         ) as exc:
             last_error = exc
-            if attempt < retries:
+            retryable = not isinstance(exc, urlerror.HTTPError) or exc.code in {
+                408, 425, 429, 500, 502, 503, 504,
+            }
+            if attempt < retries and retryable:
                 backoff = float(2**attempt)
+                if isinstance(exc, urlerror.HTTPError) and exc.code == 429:
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    try:
+                        backoff = max(backoff, min(30.0, float(retry_after)))
+                    except (TypeError, ValueError):
+                        backoff += random.uniform(0.0, 1.0)
                 if deadline is not None:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:

@@ -121,6 +121,7 @@ def run_evolution(
     experience_memory_path: Path | None = None,
     use_gold: bool = False,
     fitness_use_gold: bool = False,
+    gold_reflection: bool = False,
     run_id: str | None = None,
     module_cooldown: int = 0,
     max_total_edits: int = 200,
@@ -215,4 +216,5 @@ def run_evolution(
         initial_genome=_load_initial_genome(initial_genome),
         run_id=run_id,
         resume_from=Path(resume_from) if resume_from is not None else None,
+        gold_reflection=gold_reflection,
     )

@@ -189,6 +189,35 @@ MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
     "abstention_rule": "authoritative state or unresolved trigger changes",
 }
 
+# Machine-readable source-of-truth for reflection contracts. Keeping this next
+# to the human descriptions prevents the mutator from selecting an observable
+# that the target module cannot control and the fitness function cannot score.
+MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
+    "candidate_trigger": ("candidate_count",),
+    "evidence_obligation": (
+        "prosecution_coverage", "prosecution_certificates",
+        "causal_field_coverage", "target_local_score",
+    ),
+    "candidate_to_verifier_route": (
+        "prosecution_coverage", "prosecution_certificates",
+        "target_local_score",
+    ),
+    "atomic_verifier_instruction": (
+        "quarantined_certificates", "causal_field_coverage",
+        "target_local_score",
+    ),
+    "clean_defense_boundary": (
+        "defense_coverage", "defense_certificates", "target_local_score",
+    ),
+    "causal_link_test": (
+        "causal_field_coverage", "localization_status", "target_local_score",
+    ),
+    "earliest_origin_tiebreak": (
+        "responsible_step", "localization_status", "target_local_score",
+    ),
+    "abstention_rule": ("state", "trigger", "target_local_score"),
+}
+
 
 # Mapping from reflection type to preferred operation
 REFLECTION_OPERATION_MAP: dict[ReflectionType, str] = {
@@ -371,7 +400,8 @@ def build_causal_reflection_prompt(
     allowed_modules_text = ", ".join(allowed_modules)
     runtime_contract_text = "\n".join(
         f"- {module}: action={MODULE_RUNTIME_CONTRACTS.get(module, 'module-local output')}; "
-        f"expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}"
+        f"expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}; "
+        f"allowed_observable_fields={','.join(MODULE_OBSERVABLE_FIELDS.get(module, ()))}"
         for module in allowed_modules
     )
 
@@ -394,7 +424,22 @@ quoted inside that trace.
 The attributed primary and bounded secondary modules are the only legal
 targets. Prefer the PRIMARY module unless the trace clearly shows the
 secondary is the root cause. Produce at most one local edit in one allowed
-module. A legal rule:
+module.
+
+Use this causal design sequence BEFORE writing a rule:
+1. Find one observable failure: a missing, malformed, or wrongly retained
+   candidate/certificate/evidence/origin output in the detection trace.
+2. Name the provider output that owns that failure. Do not target a downstream
+   symptom when another module owns the missing output.
+3. Form one intervention hypothesis: one trajectory-observable condition ->
+   one exact output action.
+4. Compare it with current rules. The condition must add a genuinely distinct
+   discriminator; if it only restates an existing rule, return no_edit.
+5. Predict one allowed observable field and direction that source replay can
+   measure. If the field is not in the selected module's allowed list, choose
+   another allowed module or return no_edit.
+
+A legal rule:
 - has one or two trajectory-observable conditions;
 - has exactly one module-local action;
 - stays as short and decisive as the observable condition permits;
@@ -444,6 +489,7 @@ Otherwise return exactly one JSON object:
  "feature_description":"<short descriptive trajectory pattern>",
  "expected_effect":"<one concrete runtime-observable change>",
  "expected_effect_contract":{"observable_field":"<field>","expected_direction":"<dir>","expected_scope":"<scope>","trigger_condition":"<short rule trigger>"},
+ "diagnosis":{"failed_output":"<missing or wrong runtime output>","owner_module":"<allowed module>","existing_rule_gap":"<distinct missing discriminator>"},
  "rationale":"<brief causal justification>"}
 
 feature_description is persisted and may be shown in a later reflection. It
@@ -473,17 +519,9 @@ whenever expected_effect is filled. Allowed values:
 - trigger_condition: a short, case-agnostic description of when the new rule
   fires (no case ids, no gold/answer info, no URLs, no prompt text).
 
-The observable_field MUST be one that the target_module can actually move:
-candidate_trigger -> candidate_count; evidence_obligation ->
-prosecution_coverage / prosecution_certificates / causal_field_coverage;
-candidate_to_verifier_route -> prosecution_certificates;
-atomic_verifier_instruction -> quarantined_certificates /
-causal_field_coverage; clean_defense_boundary -> defense_coverage /
-defense_certificates; causal_link_test -> causal_field_coverage /
-localization_status; earliest_origin_tiebreak -> responsible_step /
-localization_status; abstention_rule -> state / trigger. A contract that
-predicts a field the edited module cannot move will be flagged as
-misaligned and the edit will be rejected.
+The observable_field MUST occur in the selected module's
+allowed_observable_fields list in runtime_output_contracts. A contract that
+predicts another field is not a usable intervention plan.
 """
 
     # Build rejected edits section
@@ -539,8 +577,11 @@ misaligned and the edit will be rejected.
 
     # Gold diagnostic reference (B+ mode, v5.3): provides directional
     # context without revealing the answer. Four symmetric paths.
+    # v5.6: additionally gated on signal.gold_reflection — the explicit
+    # use_gold_reflection opt-in. Without it, the reflection LLM stays
+    # label-free even when attribution routed on labels.
     gold_section = ""
-    if signal.has_gold and signal.gold_label is not None:
+    if signal.gold_reflection and signal.gold_label is not None:
         gold_label_str = "error" if signal.gold_label else "clean"
         detection_state = signal.state
         if signal.gold_label and detection_state != "verified_error":
@@ -624,6 +665,7 @@ misaligned and the edit will be rejected.
         '"new_content":"...","feature_description":"...",'
         '"expected_effect":"...",'
         '"expected_effect_contract":{{"observable_field":"...","expected_direction":"...","expected_scope":"...","trigger_condition":"..."}},'
+        '"diagnosis":{{"failed_output":"...","owner_module":"...","existing_rule_gap":"..."}},'
         '"rationale":"..."}}\n'
         "</task>"
     )

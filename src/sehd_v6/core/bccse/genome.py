@@ -522,7 +522,9 @@ class SkillEdit:
     new_content: str = ""  # for add/modify: the rule text
     rationale: str = ""  # LLM's reasoning
     source_case_id: str = ""
-    is_merge: bool = False  # v5.3.5: marks merge-generated edits to bypass similarity check
+    # Historical audit field. v5.6 no longer auto-generates merge edits and
+    # this flag never bypasses validation when old checkpoints are restored.
+    is_merge: bool = False
     feature_description: str = ""
     hallucination_type: str = "unknown"
     secondary_hallucination_type: str = ""
@@ -904,19 +906,16 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
 
     elif edit.operation == SkillOp.MODIFY_RULE:
         old_rule = module.rules[edit.rule_index]
-        # v5.3.5: skip similarity check for merge-generated edits, since
-        # merged content naturally overlaps with the original rule.
-        # FIX: only reject near-identical content (>= 0.95), not merely
-        # similar content (old threshold 0.7 defeated the purpose of
-        # modify_rule — legitimate small improvements were rejected).
-        if not getattr(edit, "is_merge", False):
-            similarity = semantic_overlap(old_rule, edit.new_content)
-            if similarity >= DEDUP_HIGH_THRESHOLD:
-                raise ValueError(
-                    f"semantically_equivalent: overlap={similarity:.2f} "
-                    f">= {DEDUP_HIGH_THRESHOLD} (new rule is near-identical "
-                    f"to existing — use a meaningful modification)"
-                )
+        # Merge provenance is not an escape hatch. Old checkpoints may carry
+        # is_merge=True, but every restored edit must satisfy the same novelty
+        # contract as a newly generated modification.
+        similarity = semantic_overlap(old_rule, edit.new_content)
+        if similarity >= DEDUP_HIGH_THRESHOLD:
+            raise ValueError(
+                f"semantically_equivalent: overlap={similarity:.2f} "
+                f">= {DEDUP_HIGH_THRESHOLD} (new rule is near-identical "
+                f"to existing — use a meaningful modification)"
+            )
         module.rules[edit.rule_index] = edit.new_content
         module.set_rule_meta(edit.rule_index, new_meta)
 

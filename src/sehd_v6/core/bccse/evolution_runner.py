@@ -40,6 +40,7 @@ from ...utils import ocse_packet as packet
 from .reflection_engine import (
     RejectedEditEntry,
     build_causal_reflection_prompt,
+    MODULE_OBSERVABLE_FIELDS,
     build_capacity_guidance,
     build_accepted_edits_summary,
     format_detection_context_for_llm,
@@ -52,7 +53,6 @@ from .genome import (
     apply_edit,
     create_baseline_genome,
     validate_edit,
-    semantic_overlap,
     MODULE_IDS,
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
@@ -402,6 +402,7 @@ _REPAIRABLE_STRUCTURAL_REASONS = frozenset({
     "cross_module_reference",
     "modify_bloat",
     "duplicate_content",
+    "source_no_effect",
 })
 
 
@@ -881,6 +882,8 @@ _EVALUATOR_ONLY_FIELDS = frozenset({
     "is_hallucination",
     "hallucination_step",
     "hallucination_reason",
+    "hallucination_category",
+    "hallucination_subcategory",
     "outer_feedback",
 })
 
@@ -914,91 +917,6 @@ def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
 # ============================================================
 # Main evolution loop
 # ============================================================
-
-
-def _llm_merge_rules(
-    existing_rule: str,
-    new_rule: str,
-    *,
-    mutation_route: dict[str, Any] | None,
-    cache_dir: Path | None = None,
-    budget_usage: dict[str, int] | None = None,
-) -> str | None:
-    """Merge two semantically-overlapping rules into a single rule.
-
-    Uses LLM-assisted merge when a mutation_route is available; falls back to
-    structural merge (newline-separated concatenation) otherwise.
-
-    Args:
-        existing_rule: The existing rule text to merge into.
-        new_rule: The new rule text carrying additional conditions.
-        mutation_route: LLM route for reflection calls (None = structural only).
-        cache_dir: Cache directory for LLM merge calls. Defaults to a
-            relative ``.skill_merge_cache`` only as a last resort; callers
-            should pass ``output_dir / "skill_merge_cache"``.
-
-    Returns:
-        Merged rule text, or None if merge failed.
-    """
-    # Structural fallback: concatenate conditions with a separator.
-    # This preserves both rules' information without semantic analysis.
-    if mutation_route is None:
-        # Simple structural merge: combine unique condition clauses.
-        # Split on common separators and deduplicate clauses.
-        def _split_clauses(text: str) -> list[str]:
-            for sep in ["；", "; ", "；", "。", ". "]:
-                if sep in text:
-                    return [c.strip() for c in text.split(sep) if c.strip()]
-            return [text.strip()]
-
-        existing_clauses = _split_clauses(existing_rule)
-        new_clauses = _split_clauses(new_rule)
-        # Add new clauses that are not near-duplicates of existing ones
-        merged = list(existing_clauses)
-        for nc in new_clauses:
-            is_dup = any(
-                semantic_overlap(nc, ec) >= 0.85 for ec in existing_clauses
-            )
-            if not is_dup:
-                merged.append(nc)
-        return "；".join(merged) if len(merged) > 1 else merged[0] if merged else None
-
-    # LLM-assisted merge
-    system_prompt = (
-        "你是规则合并助手。请将以下两条语义重叠的规则合并为一条更通用的规则，"
-        "保留两条规则的所有有效条件，去除冗余，保持 if-then 格式。"
-    )
-    user_prompt = (
-        f"【已有规则】\n{existing_rule}\n\n"
-        f"【新增规则】\n{new_rule}\n\n"
-        "请直接输出合并后的规则文本，不要包含任何解释或标记。"
-        "合并后的规则应该：\n"
-        "1. 保持简洁的 if-then 行为指令格式\n"
-        "2. 包含两条规则中所有不重复的条件\n"
-        "3. 保留两条规则的有效动作\n"
-        "4. 总长度不超过 120 字符\n"
-        "请以 JSON 格式返回：{\"merged_rule\": \"合并后的规则文本\"}"
-    )
-    try:
-        if budget_usage is not None:
-            budget_usage["mutation_calls"] += 1
-        merged, _ = json_object_provider_call(
-            route=mutation_route,
-            purpose="mutation",
-            system=system_prompt,
-            user=user_prompt,
-            cache_dir=cache_dir if cache_dir is not None else Path(".skill_merge_cache"),
-        )
-        if merged and isinstance(merged, dict):
-            rule = merged.get("merged_rule", "").strip()
-            if rule and len(rule) <= 120:
-                return rule
-    except Exception:
-        if budget_usage is not None:
-            budget_usage["mutation_errors"] += 1
-        pass
-    # Fallback to structural merge
-    return _llm_merge_rules(existing_rule, new_rule, mutation_route=None)
 
 
 def _llm_no_conflict_gate(
@@ -1113,6 +1031,7 @@ def run_online_evolution(
     initial_genome: SkillGenome | None = None,
     run_id: str | None = None,
     resume_from: Path | None = None,
+    gold_reflection: bool = False,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution with condition-triggered self-supervised reflection.
 
@@ -1526,7 +1445,9 @@ def run_online_evolution(
             gold = _evaluator_gold(records[case_id])
             if gold is not None:
                 payload["gold_label"] = gold
-        return attribute_failure(payload, use_gold=use_gold)
+        return attribute_failure(
+            payload, use_gold=use_gold, gold_reflection=gold_reflection,
+        )
 
     # Seed independent label-free anchors before processing the evolution
     # sample. Without this explicit pool, an all-triggered sample has no
@@ -2483,6 +2404,18 @@ def run_online_evolution(
             (signal.target_module, signal.secondary_module),
             secondary_type=type_result.secondary_type,
         )
+        # Keep the causal attributor's owner first. Type classification may
+        # bound the route but cannot promote a secondary module over the
+        # diagnosed root cause. This is repeated here as an execution-boundary
+        # invariant so future classifier refactors cannot silently reorder it.
+        if signal.target_module in type_allowed_modules:
+            type_allowed_modules = (
+                signal.target_module,
+                *(
+                    module for module in type_allowed_modules
+                    if module != signal.target_module
+                ),
+            )
         if not type_allowed_modules:
             gate.record_no_edit()
             record_step(EvolutionStep(
@@ -2589,7 +2522,8 @@ def run_online_evolution(
                                 "previous_failure_categories": prior_categories,
                                 "required_action": (
                                     "previous mutation output was structurally "
-                                    "invalid; return a valid JSON edit with "
+                                    "invalid or had no observable target change; "
+                                    "return a different valid JSON edit with "
                                     "operation in {add_rule,modify_rule,remove_rule,"
                                     "no_edit} and non-empty new_content"
                                 ),
@@ -2627,12 +2561,62 @@ def run_online_evolution(
                     if expected_effect_contract_raw is not None
                     else {}
                 )
+                diagnosis = parsed.get("diagnosis")
+                diagnosis_present = isinstance(diagnosis, Mapping)
+                diagnosis_valid = (
+                    not diagnosis_present
+                    or (
+                        bool(str(diagnosis.get("failed_output") or "").strip())
+                        and str(diagnosis.get("owner_module") or "")
+                        == target_module
+                        and bool(
+                            str(
+                                diagnosis.get("existing_rule_gap") or ""
+                            ).strip()
+                        )
+                    )
+                )
+                contract_field = str(
+                    expected_effect_contract.get("observable_field") or ""
+                )
+                contract_present = bool(expected_effect_contract)
+                contract_valid = (
+                    not contract_present
+                    or (
+                        contract_field
+                        in MODULE_OBSERVABLE_FIELDS.get(target_module, ())
+                        and str(
+                            expected_effect_contract.get(
+                                "expected_direction"
+                            ) or ""
+                        ) in EXPECTED_DIRECTIONS
+                        and str(
+                            expected_effect_contract.get("expected_scope") or ""
+                        ) in EXPECTED_SCOPES
+                        and bool(
+                            str(
+                                expected_effect_contract.get(
+                                    "trigger_condition"
+                                ) or ""
+                            ).strip()
+                        )
+                    )
+                )
 
                 if operation == "no_edit":
                     no_edit_reason = (
                         rationale[:300] or "LLM found no safe general edit"
                     )
                     print(f"    LLM requested NO_EDIT: {no_edit_reason}")
+                elif diagnosis_present and not diagnosis_valid:
+                    invalid_mutation_reason = (
+                        "invalid_causal_diagnosis:owner_or_gap_missing"
+                    )
+                elif contract_present and not contract_valid:
+                    invalid_mutation_reason = (
+                        "invalid_intervention_contract:"
+                        f"module={target_module},field={contract_field or 'missing'}"
+                    )
                 elif operation == "remove_rule" and rule_index is not None:
                     edit = SkillEdit(
                         edit_id=f"edit_{uuid.uuid4().hex[:8]}",
@@ -2808,95 +2792,58 @@ def run_online_evolution(
 
         if not accepted:
             repairable_certificate = cert
-            # v5.3.5: Handle merge_required signal from tiered dedup.
-            # When overlap is in [0.70, 0.95), instead of dropping the edit,
-            # route to LLM-assisted merge: convert add_rule → modify_rule on
-            # the existing rule, with merged content combining both rules.
+            retry_scheduled = False
+            # v5.6: semantic overlap is generation feedback, not permission to
+            # synthesize a compound rule. Automatic cross-module merge changed
+            # module ownership, modified protected rules and routinely combined
+            # two actions into an inert instruction. A fresh reflection can
+            # propose a genuinely distinct discriminator; the original edit is
+            # never rewritten into a different operation behind the mutator.
             merge_reason = next(
                 (r for r in reject_reasons if r.startswith("cross_module_merge_required")
                  or r.startswith("merge_required:")),
                 None,
             )
             if merge_reason is not None and edit.operation == "add_rule":
-                # Find the existing rule to merge with
-                merge_target_module: str | None = None
-                merge_rule_index: int | None = None
-                for mid in MODULE_IDS:
-                    mod = current_genome.modules.get(mid)
-                    if not mod or not mod.active:
-                        continue
-                    for ri, existing_rule in enumerate(mod.rules):
-                        if semantic_overlap(existing_rule, edit.new_content) >= 0.70:
-                            merge_target_module = mid
-                            merge_rule_index = ri
-                            break
-                    if merge_target_module is not None:
-                        break
-                if (
-                    merge_target_module is not None
-                    and merge_rule_index is not None
-                    and merge_target_module in allowed_modules
-                ):
-                    # Build merged content via LLM (or structural fallback)
-                    existing_text = current_genome.modules[merge_target_module].rules[merge_rule_index]
-                    merged_content = _llm_merge_rules(
-                        existing_text,
-                        edit.new_content,
-                        mutation_route=mutation_route,
-                        # FIX (B3): 缓存目录放入 output_dir，避免相对路径
-                        # 依赖当前工作目录。
-                        cache_dir=output_dir / "skill_merge_cache",
-                        budget_usage=budget_usage,
-                    )
-                    if merged_content is not None:
-                        # Convert to modify_rule on the existing rule
-                        edit = SkillEdit(
-                            operation=SkillOp.MODIFY_RULE,
-                            target_module=merge_target_module,
-                            new_content=merged_content,
-                            rule_index=merge_rule_index,
-                            edit_id=edit.edit_id,
-                            rationale=f"merged: {edit.rationale[:60]}",
-                            source_case_id=case_id,
-                            is_merge=True,
-                            feature_description=edit.feature_description,
-                            hallucination_type=edit.hallucination_type,
-                            secondary_hallucination_type=(
-                                edit.secondary_hallucination_type
-                            ),
-                            evolution_direction=edit.evolution_direction,
-                            type_confidence=edit.type_confidence,
-                            routing_allowed_modules=edit.routing_allowed_modules,
-                            expected_effect=edit.expected_effect,
-                        )
-                        # Re-run structural gate on the merged edit
-                        gate.defer_structural_reject(repairable_certificate)
-                        gate.mark_repaired(
-                            repairable_certificate,
-                            "semantic_merge_attempt",
-                        )
-                        accepted, cert, reject_reasons = gate.evaluate(
-                            case_id=case_id,
-                            case_index=idx,
-                            target_module=edit.target_module,
-                            operation=edit.operation,
-                            content=edit.new_content,
-                            preconditions=(),
-                            current_genome=current_genome,
-                            rule_index=edit.rule_index,
-                            expected_module={merge_target_module},
-                        )
-                        if accepted:
-                            print(
-                                f"  [{idx}] MERGE {case_id}: add_rule converted to "
-                                f"modify_rule on {merge_target_module}[{merge_rule_index}]"
-                            )
-                        else:
-                            print(
-                                f"  [{idx}] MERGE_FAILED {case_id}: merged edit rejected: "
-                                f"{reject_reasons}"
-                            )
+                mutation_retry_feedback.setdefault(case_id, []).append(
+                    "semantic_overlap_requires_distinct_discriminator"
+                )
+                retry_scheduled = (
+                    mutation_route is not None
+                    and active_attempt_index + 1 < max_mutation_attempts_per_case
+                )
             if not accepted:
+                if retry_scheduled:
+                    # Record semantic-overlap feedback and regenerate a
+                    # distinct single-action intervention from the same parent.
+                    gate.defer_structural_reject(cert)
+                    source_work_queue.appendleft(
+                        (idx, case_id, active_attempt_index + 1)
+                    )
+                    record_step(EvolutionStep(
+                        case_id=case_id,
+                        case_index=idx,
+                        trigger_source=signal.trigger_source.value,
+                        attribution=signal.to_dict(),
+                        edit_proposal=edit.to_dict(),
+                        mutation_applied=None,
+                        gate_decision="retry_structural",
+                        genome_hash_before=genome_before,
+                        genome_hash_after=current_genome.content_hash,
+                        detection_state=detection_state,
+                        timestamp=time.time(),
+                        fitness_check={
+                            "retry_scheduled": True,
+                            "retry_reason": "semantic_overlap; "
+                            + ", ".join(
+                                str(value).split(":", 1)[0]
+                                for value in reject_reasons
+                            ),
+                        },
+                    ), next_case_index=idx)
+                    edits_rejected += 1
+                    print(f"  [{idx}] NOVELTY_RETRY {case_id}: {reject_reasons}")
+                    continue
                 edits_rejected += 1
                 rejected_entry = RejectedEditEntry(
                     proposal=type('P', (), {'target_module': edit.target_module, 'operation': edit.operation, 'content': edit.new_content[:80]})(),

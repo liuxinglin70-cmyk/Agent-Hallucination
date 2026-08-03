@@ -7,19 +7,23 @@
   "construct_census_route": {},
   "qualification_route": {},
   "propagation_route": {},
-  "boundary_route": {},
+  "boundary_route": {
+    "thinking": {"type": "disabled"}
+  },
   "focused_prosecution_route": {},
   "defense_route": {},
   "appeal_prosecutor_route": {
-    "max_tokens": 4096,
-    "timeout_seconds": 120,
-    "total_timeout_seconds": 180,
+    "thinking": {"type": "disabled"},
+    "max_tokens": 8192,
+    "timeout_seconds": 180,
+    "total_timeout_seconds": 240,
     "transport_retries": 3
   },
   "appeal_defender_route": {
-    "max_tokens": 4096,
-    "timeout_seconds": 120,
-    "total_timeout_seconds": 180,
+    "thinking": {"type": "disabled"},
+    "max_tokens": 8192,
+    "timeout_seconds": 180,
+    "total_timeout_seconds": 240,
     "transport_retries": 3
   },
   "counterfactual_route": {}

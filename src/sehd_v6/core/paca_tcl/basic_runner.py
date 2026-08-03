@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import threading
 import time
 from collections import Counter, defaultdict
@@ -87,6 +88,90 @@ def _local_cache_path(cache_dir: Path, request_hash: str) -> Path:
     same sharding scheme.
     """
     return Path(cache_dir) / request_hash[:2] / f"{request_hash}.json"
+
+
+def _provider_repair_payload(
+    payload: dict[str, Any],
+    system: str,
+    user: str,
+) -> tuple[bytes, str]:
+    """Build a bounded repair request body for truncated JSON.
+
+    The repair re-sends the same system prompt with a compact instruction
+    appended to the user prompt, so the canonical body differs from the
+    original request and the cache key differs. Returns (body, user).
+    """
+    repair_user = user + (
+        "\n\nJSON_RECOVERY: Your previous response was truncated before the "
+        "closing brace. Return the COMPLETE JSON object now, with every "
+        "required field and no commentary. Start directly with {."
+    )
+    repair_payload = dict(payload)
+    repair_payload["messages"] = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": repair_user},
+    ]
+    return packet.canonical_json(repair_payload).encode("utf-8"), repair_user
+
+
+def _provider_repair_call(
+    *,
+    route: dict[str, Any],
+    api_key: str,
+    payload: bytes,
+    repair_user: str,
+    repair_system: str,
+    cache_dir: Path,
+    request_hash: str,
+) -> dict[str, Any] | None:
+    """One bounded repair provider call for a truncated JSON response.
+
+    The repair body has a different cache key, so a repair result is never
+    confused with the original request. Any provider/parse failure returns
+    None, and the caller fail-closes with the original error.
+    """
+    repair_hash = hashlib.sha256(
+        b"provider_repair|" + request_hash.encode("utf-8") + payload
+    ).hexdigest()
+    local_target = _local_cache_path(cache_dir, repair_hash)
+    if local_target.is_file():
+        try:
+            cached = read_json(local_target)
+            if cached.get("request_hash") == repair_hash:
+                return cached.get("parsed")
+        except Exception:
+            pass
+    req = urlrequest.Request(
+        route["endpoint"].rstrip("/") + "/chat/completions",
+        data=payload,
+        headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=120) as response:
+            raw = response.read()
+        value = json.loads(raw.decode("utf-8"))
+        content = value["choices"][0]["message"].get("content")
+        if not isinstance(content, str) or not content.strip():
+            return None
+        parsed = json.loads(content)
+        if not isinstance(parsed, dict):
+            return None
+        cached = {
+            "request_hash": repair_hash,
+            "response_hash": hashlib.sha256(raw).hexdigest(),
+            "parsed": parsed,
+            "usage": value.get("usage") or {},
+            "latency_seconds": 0.0,
+            "contains_credentials": False,
+        }
+        try:
+            _atomic_write_json(local_target, cached)
+        except Exception:
+            pass
+        return parsed
+    except Exception:
+        return None
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -311,6 +396,7 @@ def provider_call_with_schema(
         # Config routes may be shared by worker threads; canonicalize a copy
         # so transport preparation never mutates the frozen config object.
         route = dict(route)
+    transport_purpose = str(route.get("_provider_purpose") or purpose)
     try:
         route["model"] = canonical_model_name(str(route.get("model") or ""))
     except ValueError:
@@ -331,7 +417,7 @@ def provider_call_with_schema(
         payload["response_format"] = {"type": "json_object"}
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
-    thinking = provider_thinking_control(route, purpose=purpose)
+    thinking = provider_thinking_control(route, purpose=transport_purpose)
     if thinking is not None:
         payload["thinking"] = thinking
     body = packet.canonical_json(payload).encode("utf-8")
@@ -382,7 +468,7 @@ def provider_call_with_schema(
         except Exception:
             pass  # 缓存文件损坏，继续调用大模型
 
-    api_key = resolve_provider_credential(route, purpose=purpose)
+    api_key = resolve_provider_credential(route, purpose=transport_purpose)
     retries = int(route.get("transport_retries", 2))
     per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
     # A retry budget without a total deadline can turn one provider call into
@@ -427,7 +513,41 @@ def provider_call_with_schema(
                     "reasoning_content_present="
                     f"{bool(message.get('reasoning_content'))}"
                 )
-            parsed = json.loads(content)
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                # v3.5.6: one bounded provider repair. A truncated JSON body
+                # (reasoning consumed the budget or output hit max_tokens) is
+                # repairable only with a DIFFERENT request body (cache key
+                # differs). The repair re-sends the same system prompt with a
+                # compact instruction asking for strict JSON continuation.
+                # Failure remains fail-closed: the original error is raised.
+                repair_body, repair_target = _provider_repair_payload(
+                    payload, system, user,
+                )
+                try:
+                    repair_value = _provider_repair_call(
+                        route=route, api_key=api_key,
+                        payload=repair_body, repair_user=user,
+                        repair_system=system,
+                        cache_dir=cache_dir, request_hash=request_hash,
+                    )
+                except Exception as exc:
+                    raise ValueError(
+                        "provider_empty_content:"
+                        f"finish_reason={choice.get('finish_reason') or 'unknown'},"
+                        "reasoning_content_present="
+                        f"{bool(message.get('reasoning_content'))}"
+                    ) from exc
+                if repair_value is None:
+                    raise ValueError(
+                        "provider_empty_content:"
+                        f"finish_reason={choice.get('finish_reason') or 'unknown'},"
+                        "reasoning_content_present="
+                        f"{bool(message.get('reasoning_content'))}"
+                    )
+                parsed = repair_value
+                choice = {"finish_reason": "repair"}
             if not isinstance(parsed, dict):
                 raise ValueError("provider response is not a JSON object")
             if require_candidates and not isinstance(parsed.get("candidates"), list):
@@ -459,8 +579,18 @@ def provider_call_with_schema(
             }
         except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
-            if attempt < retries:
+            retryable = not isinstance(exc, urlerror.HTTPError) or exc.code in {
+                408, 425, 429, 500, 502, 503, 504,
+            }
+            if attempt < retries and retryable:
                 backoff = float(2**attempt)
+                if isinstance(exc, urlerror.HTTPError) and exc.code == 429:
+                    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                    try:
+                        backoff = max(backoff, min(30.0, float(retry_after)))
+                    except (TypeError, ValueError):
+                        # Jitter prevents concurrent workers from retrying together.
+                        backoff += random.uniform(0.0, 1.0)
                 if deadline is not None:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:

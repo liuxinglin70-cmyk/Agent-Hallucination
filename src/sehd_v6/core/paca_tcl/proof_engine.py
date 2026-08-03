@@ -1096,6 +1096,27 @@ def adjudicate_case(
             construct_value, axis_normalized_count = _normalize_construct_value(construct_value)
             construct_census, construct_audit = validate_provider_census(construct_value, built)
             construct_audit["axis_normalized_count"] = axis_normalized_count
+            # v3.5.6: one bounded census-repair call. A structurally incomplete
+            # or schema-invalid census response is repairable under the same
+            # coverage contract (coverage_state="complete" + every supplied
+            # candidate returned). The retry uses a different request body so
+            # the cache key differs, and never weakens the fail-closed
+            # construct authority: a still-incomplete retry keeps the same
+            # non-authoritative outcome.
+            if construct_audit.get("status") != "complete":
+                repair_user = v2._provider_user(built) + (
+                    "\nCONSTRUCT_CENSUS_REPAIR=coverage_state must be \"complete\" "
+                    "and every supplied candidate must be returned. Return JSON only."
+                )
+                repair_value, repair_provider = provider_call(
+                    route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
+                    user=repair_user, cache_dir=output_dir / "construct_census_cache" / "repair_1",
+                )
+                construct_provider = {"initial": construct_provider, "repair": repair_provider}
+                construct_value, axis_normalized_count = _normalize_construct_value(repair_value)
+                construct_census, construct_audit = validate_provider_census(repair_value, built)
+                construct_audit["axis_normalized_count"] = axis_normalized_count
+                construct_audit["repaired_after_incomplete"] = True
         except Exception as exc:
             construct_census = []
             construct_audit = {"status": "provider_error", "error_type": type(exc).__name__, "error": str(exc)[:500]}

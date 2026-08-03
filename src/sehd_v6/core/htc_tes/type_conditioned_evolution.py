@@ -272,27 +272,27 @@ class TypeConditionedEvolution:
         This is provenance-aware routing, not isolated runtime strands: every
         candidate must still fall inside the attributor's bounded modules.
         """
-        allowed = set(attribution_modules)
-        # Preserve the routing table's priority: the primary module is the
-        # first candidate, while secondary modules are fallback options.
-        primary = tuple(
-            module for module in self.get_target_modules(hallucination_type, primary=True)
-            if module in allowed
-        ) + tuple(
-            module for module in self.get_target_modules(hallucination_type, primary=False)
-            if module in allowed
+        attributed = tuple(dict.fromkeys(str(module) for module in attribution_modules))
+        allowed = set(attributed)
+        typed_modules = set(
+            self.get_target_modules(hallucination_type, primary=True)
+            + self.get_target_modules(hallucination_type, primary=False)
         )
-        secondary = (
-            tuple(
-                module
-                for module in self.get_target_modules(secondary_type, primary=True)
+        if secondary_type is not None:
+            typed_modules.update(
+                self.get_target_modules(secondary_type, primary=True)
                 + self.get_target_modules(secondary_type, primary=False)
-                if module in allowed and module not in primary
             )
-            if secondary_type is not None
-            else ()
+        # Causal attribution owns root-cause priority. Type classification is
+        # advisory and may filter implausible modules, but must not reorder the
+        # attributor's primary/secondary diagnosis. The previous typed-first
+        # order turned earliest_origin_tiebreak localization failures into
+        # causal_link_test mutations solely because the type was REASONING.
+        primary = tuple(
+            module for module in attributed
+            if module in typed_modules
         )
-        routed = primary + secondary
+        routed = primary
         if routed:
             return routed
 

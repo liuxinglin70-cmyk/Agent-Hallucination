@@ -1240,9 +1240,9 @@ def test_appeal_routes_carry_bounded_transport_budget() -> None:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     for route_name in ("appeal_prosecutor_route", "appeal_defender_route"):
         route = config[route_name]
-        assert route["max_tokens"] == 4096, route_name
-        assert route["timeout_seconds"] == 120, route_name
-        assert route["total_timeout_seconds"] == 180, route_name
+        assert route["max_tokens"] == 8192, route_name
+        assert route["timeout_seconds"] == 180, route_name
+        assert route["total_timeout_seconds"] == 240, route_name
         assert route["transport_retries"] == 3, route_name
 
 

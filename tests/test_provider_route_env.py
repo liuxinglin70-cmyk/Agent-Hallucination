@@ -77,7 +77,7 @@ def test_official_v4_mutation_defaults_to_non_thinking_json_mode():
     ) == {"type": "enabled"}
 
 
-def test_official_detector_config_preserves_model_reasoning_defaults():
+def test_official_detector_config_bounds_strict_judge_json_routes():
     from pathlib import Path
 
     from src.sehd_v6.core.paca_tcl.detector import load_detector_config
@@ -86,25 +86,26 @@ def test_official_detector_config_preserves_model_reasoning_defaults():
         Path("src/sehd_v6/configs/paca_tcl_detector_v3_5.json"),
         require_credentials=False,
     )
-    # v3.5.4: the appeal prosecutor/defender routes are the ONLY routes
-    # allowed to carry an explicit output budget and bounded transport
-    # timeouts. trial_5 showed that long Camel/000-style math trajectories
-    # truncated the appeal certificate and fail-closed the whole case, so
-    # these two routes get a deliberate, audited max_tokens/timeout budget.
-    # Every other route must keep the model's reasoning defaults intact
-    # (no max_tokens cap, no thinking override).
+    # Strict judge JSON routes disable provider-side thinking so reasoning does
+    # not consume the entire output budget and leave the contract body empty.
+    # Other detector routes retain model reasoning defaults for detection
+    # quality; only appeal routes carry an explicit generation/time budget.
     appeal_routes_with_budget = {
         "appeal_prosecutor_route", "appeal_defender_route",
     }
+    bounded_judge_routes = appeal_routes_with_budget | {"boundary_route"}
     for name, route in config.items():
         if not name.endswith("_route"):
             continue
-        assert "thinking" not in route
+        if name in bounded_judge_routes:
+            assert route.get("thinking") == {"type": "disabled"}, name
+        else:
+            assert "thinking" not in route, name
         if name in appeal_routes_with_budget:
-            assert route.get("max_tokens") == 4096, name
+            assert route.get("max_tokens") == 8192, name
             assert route.get("transport_retries") == 3, name
-            assert route.get("timeout_seconds") == 120, name
-            assert route.get("total_timeout_seconds") == 180, name
+            assert route.get("timeout_seconds") == 180, name
+            assert route.get("total_timeout_seconds") == 240, name
         else:
             assert "max_tokens" not in route, name
 
@@ -249,6 +250,102 @@ def test_config_route_purpose_is_not_overwritten_at_transport_boundary(
     )
     assert str(captured["url"]).startswith("https://judge.example/")
     assert captured["payload"]["model"] == "deepseek-v4-pro"
+
+
+def test_resolved_judge_route_uses_judge_thinking_control(tmp_path, monkeypatch):
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode())
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "thinking": {"type": "disabled"},
+            "_provider_purpose": "judge",
+            "_provider_route_resolved": True,
+            "transport_retries": 0,
+        },
+        system="return json", user="{}", cache_dir=tmp_path,
+        require_candidates=False,
+    )
+    assert captured["payload"]["thinking"] == {"type": "disabled"}
+
+
+def test_provider_transport_retries_429_using_bounded_retry_after(
+    tmp_path, monkeypatch,
+):
+    import io
+    import json
+    from urllib import error as urlerror
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    attempts = 0
+    sleeps = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise urlerror.HTTPError(
+                request.full_url, 429, "Too Many Requests",
+                {"Retry-After": "12"}, io.BytesIO(),
+            )
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.time, "sleep", sleeps.append)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    value, _meta = basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "transport_retries": 1,
+            "total_timeout_seconds": 60,
+        },
+        system="return json", user="{}", cache_dir=tmp_path,
+        require_candidates=False,
+    )
+    assert value == {}
+    assert attempts == 2
+    assert sleeps == [12.0]
 
 
 def test_provider_transport_honors_route_generation_budget_and_total_timeout(

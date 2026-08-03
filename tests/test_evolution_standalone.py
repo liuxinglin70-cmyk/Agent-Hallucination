@@ -117,7 +117,7 @@ def offline_evolution(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False: _signal(str(result["state"])),
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
     )
     monkeypatch.setattr(
         runner,
