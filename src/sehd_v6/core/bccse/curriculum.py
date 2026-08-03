@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from .signal_adapter import resolve_authoritative_state
+from ..paca_tcl.basic_runner import parse_gold_label
 
 
 def order_evolution_cases(
@@ -64,7 +65,7 @@ def order_evolution_cases(
             if use_gold:
                 if not isinstance(pred.get("gold_label"), bool):
                     raise ValueError("gold_label must be bool in gold-enhanced mode")
-                gold = bool(pred["gold_label"])
+                gold = parse_gold_label(pred["gold_label"])
                 predicted_positive = state == "verified_error"
                 informative = predicted_positive != gold
             else:
@@ -100,7 +101,7 @@ def get_case_priority_label(
     if use_gold:
         if not isinstance(pred.get("gold_label"), bool):
             raise ValueError("gold_label must be bool in gold-enhanced mode")
-        gold = bool(pred["gold_label"])
+        gold = parse_gold_label(pred["gold_label"])
         predicted_positive = state == "verified_error"
         return (
             "boundary_incorrect"

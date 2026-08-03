@@ -36,6 +36,8 @@ from .skill_integration import (
 from .basic_runner import (
     _atomic_write_json,
     _global_cache_path,
+    _local_cache_path,
+    parse_gold_label,
     private_ref,
     read_json,
     write_json,
@@ -132,6 +134,23 @@ def _json_object_provider_call(
         b"eval_jsonobj|" + (route["endpoint"] + "|" + route["model"] + "|").encode("utf-8") + body
     ).hexdigest()
 
+    local_target = _local_cache_path(cache_dir, request_hash)
+    if local_target.is_file():
+        try:
+            cached = read_json(local_target)
+            if cached.get("request_hash") == request_hash:
+                parsed = cached.get("parsed")
+                if not isinstance(parsed, dict):
+                    raise ValueError("cached mutation response root is not an object")
+                return parsed, {
+                    "cache_hit": True,
+                    "request_hash": request_hash,
+                    "usage": cached.get("usage") or {},
+                    "cache_source": "local",
+                }
+        except Exception:
+            pass
+
     # v3.5.1: 全局缓存查找（不依赖 cache_dir，所有 output_dir 共享）
     global_target = _global_cache_path(request_hash)
     if global_target is not None and global_target.is_file():
@@ -215,12 +234,16 @@ def _json_object_provider_call(
                     _atomic_write_json(global_target, cached)
                 except Exception:
                     pass  # 写缓存失败不影响主流程
+            try:
+                _atomic_write_json(local_target, cached)
+            except Exception:
+                pass
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,
                 "usage": cached["usage"],
                 "latency_seconds": cached["latency_seconds"],
-                "cache_source": "global",
+                "cache_source": "local",
             }
         except (
             urlerror.URLError,
@@ -455,7 +478,7 @@ def experience_record_from_row(
     return ExperienceRecord(
         record_key=str(row.get("case_ref") or ""),
         partition="evolution",
-        gold_positive=(bool(row.get("gold_label")) if include_gold else None),
+        gold_positive=(parse_gold_label(row.get("gold_label")) if include_gold else None),
         predicted_positive=_prediction_state(row),
         gold_responsible_ref=(gold_steps[0] if include_gold and gold_steps else None),
         predicted_responsible_ref=_prediction_responsible_ref(row),
@@ -508,7 +531,7 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         gold = row.get("gold_label")
         if gold is None:
             continue
-        gold_is_positive = bool(gold)
+        gold_is_positive = parse_gold_label(gold)
         predicted = _prediction_state(row)
         gold_positive += int(gold_is_positive)
         gold_negative += int(not gold_is_positive)

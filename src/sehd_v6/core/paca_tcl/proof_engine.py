@@ -106,12 +106,22 @@ Return JSON only using the prosecution certificate schema. ``reviewed_candidate_
 
 APPEAL_PROSECUTOR_RETRY_SYSTEM_V35 = """You are the candidate-level appellate prosecutor in PACA-TCL v3.5, RETRYING after a structurally incomplete first response. Re-open only the supplied APPEAL_CANDIDATES.
 
-Your previous response was rejected for a structured reason supplied in APPEAL_RETRY_FEEDBACK. Fix that specific defect while keeping the same APPEAL_CANDIDATES and evidence. Do NOT repeat the same malformed output.
+Your previous response was rejected for a structured reason supplied in APPEAL_RETRY_FEEDBACK (see the failure_category and missing_field there). Fix that specific defect while keeping the same APPEAL_CANDIDATES and evidence. Do NOT repeat the same malformed output.
 
-COVERAGE CONTRACT (unchanged): ``coverage_state="complete"`` requires ``reviewed_candidate_ids`` to list EVERY supplied APPEAL_CANDIDATE id. Empty ``candidates`` with ``coverage_state="complete"`` is a valid "reviewed all, no prosecution" outcome.
+TWO HARD REQUIREMENTS (both must hold, no exceptions, no defaults):
+1. ``coverage_state`` MUST be exactly the string ``"complete"``. Do not return ``"incomplete"``, ``"unresolved"``, or omit the field.
+2. ``reviewed_candidate_ids`` MUST be a JSON array listing EVERY supplied APPEAL_CANDIDATE id verbatim (copy the ids from APPEAL_CANDIDATES; do not omit, rename, or invent any). An empty ``candidates`` list with these two fields satisfied is a valid "reviewed all, no prosecution" outcome.
+
+DEFECT-SPECIFIC FIX (match APPEAL_RETRY_FEEDBACK.failure_category):
+- ``missing_coverage_state`` / ``incomplete_coverage_state``: set ``coverage_state="complete"``.
+- ``missing_reviewed_candidate_ids``: add ``reviewed_candidate_ids`` listing every supplied APPEAL_CANDIDATE id.
+- ``unreviewed_candidate_ids``: re-read the supplied APPEAL_CANDIDATES and set ``reviewed_candidate_ids`` to exactly that id set.
+- ``foreign_candidate_id``: drop any ``candidates[].source_candidate_id`` not among the supplied APPEAL_CANDIDATES.
+- ``response_truncated``: your previous output was cut off before the JSON closed. Emit the JSON object immediately — do not re-narrate evidence or repeat the trajectory; ``candidates`` may be empty if no prosecution applies.
+- ``provider_exception``: re-emit the same structured JSON; do not echo the exception text.
 
 Return JSON only with the same schema as the initial call:
-{"coverage_state":"complete|incomplete|unresolved","reviewed_candidate_ids":["v3_candidate_001"],"candidates":[...]}"""
+{"coverage_state":"complete","reviewed_candidate_ids":["<every supplied APPEAL_CANDIDATE id>"],"candidates":[...]}"""
 
 APPEAL_DEFENDER_SYSTEM_V35 = """You are the candidate-level appellate defender in PACA-TCL v3.5. An appellate prosecutor is constructing new prosecution certificates for the same APPEAL_CANDIDATES. Your job is to construct the strongest possible clean-boundary defense.
 
@@ -130,6 +140,25 @@ If no specific defense can be proven with addressable evidence, use insufficient
 
 Return one certificate for every supplied appeal candidate. evidence_refs must be non-empty and copied exactly from TRAJECTORY_PACKET. Return JSON only:
 {"coverage_state":"complete|incomplete|unresolved","candidates":[{"certificate_id":"appeal_defense_001","target_candidate_id":"v3_candidate_001","target_origin_event_id":"event_001","defense_type":"supported_or_correct|external_unadopted|explicitly_authorized|ordinary_failure_without_commitment|legitimate_retry_with_state_change|information_gainful_repetition|required_revalidation|materially_equivalent_or_within_tolerance|rejected_attempt_no_state_change|absence_of_observation_not_fabrication|insufficient_evidence","evidence_refs":["event_001"],"rationale":"..."}]}"""
+
+
+APPEAL_DEFENDER_RETRY_SYSTEM_V35 = """You are the candidate-level appellate defender in PACA-TCL v3.5, RETRYING after a structurally incomplete first response. An appellate prosecutor's certificates are supplied unchanged; construct the strongest possible clean-boundary defense for the supplied APPEAL_CANDIDATES.
+
+Your previous response was rejected for a structured reason supplied in APPEAL_RETRY_FEEDBACK (see the failure_category and missing_field there). Fix that specific defect. Do NOT repeat the same malformed output.
+
+TWO HARD REQUIREMENTS (both must hold, no exceptions, no defaults):
+1. ``coverage_state`` MUST be exactly the string ``"complete"``. Do not return ``"incomplete"``, ``"unresolved"``, or omit the field.
+2. ``candidates[].target_candidate_id`` MUST cover EVERY supplied APPEAL_CANDIDATE id verbatim (copy the ids from APPEAL_CANDIDATES; do not omit, rename, or invent any). Return exactly one defense certificate per supplied appeal candidate. An ``insufficient_evidence`` certificate is a legitimate defense when no stronger defense applies.
+
+DEFECT-SPECIFIC FIX (match APPEAL_RETRY_FEEDBACK.failure_category):
+- ``missing_coverage_state`` / ``incomplete_coverage_state``: set ``coverage_state="complete"``.
+- ``missing_defense_candidates``: emit a ``candidates`` array with one defense certificate per supplied APPEAL_CANDIDATE.
+- ``unreviewed_candidate_ids`` / ``defense_coverage_mismatch``: re-read the supplied APPEAL_CANDIDATES and ensure ``candidates[].target_candidate_id`` is exactly that id set.
+- ``response_truncated``: your previous output was cut off before the JSON closed. Emit the JSON object immediately — do not re-narrate evidence; an ``insufficient_evidence`` certificate per candidate is acceptable.
+- ``provider_exception``: re-emit the same structured JSON; do not echo the exception text.
+
+Return JSON only with the same schema as the initial call:
+{"coverage_state":"complete","candidates":[{"certificate_id":"appeal_defense_001","target_candidate_id":"<every supplied APPEAL_CANDIDATE id>","target_origin_event_id":"event_001","defense_type":"...","evidence_refs":["event_001"],"rationale":"..."}]}"""
 
 
 # ============================================================
@@ -594,6 +623,42 @@ def _classify_appeal_prosecution_failure(
     return None  # contract satisfied
 
 
+# Stable, case-agnostic mappings from a prosecutor failure category to the
+# specific missing field name and the required fix. These feed the retry
+# feedback JSON so the model gets a concrete field name (not raw provider
+# text) telling it exactly what to repair. ``None`` means the failure is not
+# tied to a single field (e.g. truncation / provider exception).
+_APPEAL_PROSECUTOR_FAILURE_FIELD: dict[str, str | None] = {
+    "missing_coverage_state": "coverage_state",
+    "incomplete_coverage_state": "coverage_state",
+    "missing_reviewed_candidate_ids": "reviewed_candidate_ids",
+    "unreviewed_candidate_ids": "reviewed_candidate_ids",
+    "foreign_candidate_id": "candidates[].source_candidate_id",
+    "response_truncated": None,
+    "provider_exception": None,
+    "missing_response": None,
+}
+
+_APPEAL_PROSECUTOR_FAILURE_ACTION: dict[str, str] = {
+    "missing_coverage_state": 'set coverage_state="complete"',
+    "incomplete_coverage_state": 'set coverage_state="complete"',
+    "missing_reviewed_candidate_ids": (
+        "add reviewed_candidate_ids listing every supplied APPEAL_CANDIDATE id"
+    ),
+    "unreviewed_candidate_ids": (
+        "set reviewed_candidate_ids to exactly the supplied APPEAL_CANDIDATE id set"
+    ),
+    "foreign_candidate_id": (
+        "drop any candidates[].source_candidate_id not in the supplied APPEAL_CANDIDATES"
+    ),
+    "response_truncated": (
+        "emit the JSON object immediately without re-narrating evidence; "
+        "candidates may be empty if no prosecution applies"
+    ),
+    "provider_exception": "re-emit the same structured JSON; do not echo the exception",
+}
+
+
 def _appeal_prosecutor_retry_user_v35(
     *, built: dict[str, Any], candidates: list[dict[str, Any]], base: dict[str, Any],
     prosecution: dict[str, Any], defense: dict[str, Any], proof: dict[str, Any],
@@ -612,11 +677,12 @@ def _appeal_prosecutor_retry_user_v35(
     )
     feedback = packet.canonical_json({
         "failure_category": failure_category,
-        "required_action": (
+        "missing_field": _APPEAL_PROSECUTOR_FAILURE_FIELD.get(failure_category),
+        "required_action": _APPEAL_PROSECUTOR_FAILURE_ACTION.get(failure_category, (
             "set coverage_state=complete and reviewed_candidate_ids to every "
             "supplied APPEAL_CANDIDATE id; candidates may be empty if no "
             "prosecution applies"
-        ),
+        )),
     })
     value = base_user + "\nAPPEAL_RETRY_FEEDBACK=\n" + feedback
     for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"'):
@@ -671,6 +737,176 @@ def _validate_appeal_prosecution_contract_or_retry(
     providers["appeal_prosecutor_retry"]["retry_failure_category"] = retry_failure
     raise ValueError(
         "required appeal prosecution is incomplete after bounded retry: "
+        f"{failure_category} -> {retry_failure}"
+    )
+
+
+# ============================================================
+# v3.5.4 — appeal defender symmetric retry
+#
+# The prosecutor already had ONE bounded retry on a structurally incomplete
+# response (missing coverage_state / missing reviewed_candidate_ids / foreign
+# candidate id / truncation). The defender used to raise immediately on the
+# same defects, so a single truncated defender response fail-closed the whole
+# appeal — the asymmetry that produced the trial_5 runtime_invalid cases. The
+# defender now gets the same ONE bounded retry with structured case-agnostic
+# feedback, restoring symmetry. The fail-closed contract is unchanged: the
+# retry only repairs the top-level structural envelope (coverage_state +
+# target_candidate_id coverage); per-certificate schema validation in
+# ``proof_contract.adjudicate_proof_court`` still raises on malformed
+# certificates and the caller fail-closes via ``_resolve_incomplete_appeal``.
+# ============================================================
+
+
+def _classify_appeal_defense_failure(
+    *, response: dict[str, Any] | None, allowed_ids: set[str],
+    error: Exception | None = None,
+) -> str | None:
+    """Classify an appeal defense failure into a stable category.
+
+    Mirrors ``_classify_appeal_prosecution_failure`` for the defender schema.
+    Returns ``None`` when the contract is satisfied. Otherwise one of:
+      ``missing_coverage_state`` / ``incomplete_coverage_state`` /
+      ``missing_defense_candidates`` / ``unreviewed_candidate_ids`` /
+      ``defense_coverage_mismatch`` / ``response_truncated`` /
+      ``provider_exception`` / ``missing_response``.
+
+    The category is the only signal fed back into the retry prompt (raw
+    provider text is never echoed back).
+    """
+    if error is not None and response is None:
+        return "response_truncated" if "truncat" in str(error).lower() else "provider_exception"
+    if response is None:
+        return "missing_response"
+    coverage = str(response.get("coverage_state") or "")
+    if coverage != "complete":
+        return "missing_coverage_state" if not coverage else "incomplete_coverage_state"
+    rows = response.get("candidates")
+    if not isinstance(rows, list) or not rows:
+        return "missing_defense_candidates"
+    returned_ids = {
+        str(row.get("target_candidate_id") or "")
+        for row in rows
+        if isinstance(row, dict)
+    }
+    if not returned_ids:
+        return "missing_defense_candidates"
+    if returned_ids != allowed_ids:
+        return "defense_coverage_mismatch"
+    return None  # contract satisfied
+
+
+_APPEAL_DEFENDER_FAILURE_FIELD: dict[str, str | None] = {
+    "missing_coverage_state": "coverage_state",
+    "incomplete_coverage_state": "coverage_state",
+    "missing_defense_candidates": "candidates",
+    "unreviewed_candidate_ids": "candidates[].target_candidate_id",
+    "defense_coverage_mismatch": "candidates[].target_candidate_id",
+    "response_truncated": None,
+    "provider_exception": None,
+    "missing_response": None,
+}
+
+_APPEAL_DEFENDER_FAILURE_ACTION: dict[str, str] = {
+    "missing_coverage_state": 'set coverage_state="complete"',
+    "incomplete_coverage_state": 'set coverage_state="complete"',
+    "missing_defense_candidates": (
+        "emit a candidates array with one defense certificate per supplied "
+        "APPEAL_CANDIDATE id; insufficient_evidence is a valid defense"
+    ),
+    "unreviewed_candidate_ids": (
+        "ensure every supplied APPEAL_CANDIDATE id appears exactly once as a "
+        "target_candidate_id"
+    ),
+    "defense_coverage_mismatch": (
+        "set candidates[].target_candidate_id to exactly the supplied "
+        "APPEAL_CANDIDATE id set (no missing, no foreign ids)"
+    ),
+    "response_truncated": (
+        "emit the JSON object immediately without re-narrating evidence; "
+        "an insufficient_evidence certificate per candidate is acceptable"
+    ),
+    "provider_exception": "re-emit the same structured JSON; do not echo the exception",
+}
+
+
+def _appeal_defender_retry_user_v35(
+    *, built: dict[str, Any], candidates: list[dict[str, Any]], base: dict[str, Any],
+    prosecution: dict[str, Any], defense: dict[str, Any], proof: dict[str, Any],
+    appeal_prosecution: dict[str, Any] | None,
+    failure_category: str,
+) -> str:
+    """Build appellate defender retry input with structured failure feedback.
+
+    Mirrors ``_appeal_prosecutor_retry_user_v35``. The retry request body
+    differs from the initial call only by the appended APPEAL_RETRY_FEEDBACK
+    block, so the cache key changes (no stale hit) without leaking raw
+    provider text.
+    """
+    base_user = _appeal_defender_user_v35(
+        built=built, candidates=candidates, base=base,
+        prosecution=prosecution, defense=defense, proof=proof,
+        appeal_prosecution=appeal_prosecution,
+    )
+    feedback = packet.canonical_json({
+        "failure_category": failure_category,
+        "missing_field": _APPEAL_DEFENDER_FAILURE_FIELD.get(failure_category),
+        "required_action": _APPEAL_DEFENDER_FAILURE_ACTION.get(failure_category, (
+            "set coverage_state=complete and return one defense certificate "
+            "per supplied APPEAL_CANDIDATE id"
+        )),
+    })
+    value = base_user + "\nAPPEAL_RETRY_FEEDBACK=\n" + feedback
+    for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"'):
+        if field in value:
+            raise ValueError("appeal defender retry input firewall violation: " + field)
+    return value
+
+
+def _validate_appeal_defense_contract_or_retry(
+    response: dict[str, Any],
+    *,
+    allowed_ids: set[str],
+    retry_call: Any,
+    providers: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate appeal defense contract; on repairable failure do ONE retry.
+
+    Mirrors ``_validate_appeal_prosecution_contract_or_retry``. Contract:
+      - ``coverage_state`` must be ``"complete"``.
+      - ``candidates`` must be a non-empty list.
+      - ``candidates[].target_candidate_id`` must equal ``allowed_ids``.
+
+    On a structurally repairable failure the function invokes ``retry_call``
+    exactly once with the classified failure category. If the retry still
+    fails, the function raises ``ValueError`` and the caller's except block
+    fail-closes via ``_resolve_incomplete_appeal`` — authority is never
+    fabricated. The deeper per-certificate schema check stays in
+    ``proof_contract.adjudicate_proof_court`` (unchanged) so a structurally
+    complete but schema-invalid defense still fail-closes there.
+    """
+    failure_category = _classify_appeal_defense_failure(
+        response=response, allowed_ids=allowed_ids,
+    )
+    if failure_category is None:
+        return response  # contract already satisfied
+
+    # One bounded retry with a different request body (different cache key).
+    retry_response, retry_meta = retry_call(failure_category)
+    providers["appeal_defender_retry"] = {
+        "parent_failure_category": failure_category,
+        "retry_meta": retry_meta,
+    }
+    retry_failure = _classify_appeal_defense_failure(
+        response=retry_response, allowed_ids=allowed_ids,
+    )
+    if retry_failure is None:
+        providers["appeal_defender_retry"]["outcome"] = "repaired"
+        return retry_response
+    providers["appeal_defender_retry"]["outcome"] = "failed_closed"
+    providers["appeal_defender_retry"]["retry_failure_category"] = retry_failure
+    raise ValueError(
+        "required appeal defense is incomplete after bounded retry: "
         f"{failure_category} -> {retry_failure}"
     )
 
@@ -970,15 +1206,31 @@ def adjudicate_case(
                     system=APPEAL_DEFENDER_SYSTEM_V35, user=appeal_defender_user,
                     cache_dir=output_dir / "appeal_defender_cache",
                 )
-                if str(appeal_defense_certs.get("coverage_state") or "") != "complete":
-                    raise ValueError("required appeal defense is incomplete")
-                returned_defense_ids = {
-                    str(row.get("target_candidate_id") or "")
-                    for row in appeal_defense_certs.get("candidates") or []
-                    if isinstance(row, dict)
-                }
-                if returned_defense_ids != allowed_ids:
-                    raise ValueError("required appeal defense candidate coverage mismatch")
+                # v3.5.4: Validate the defender coverage contract with ONE
+                # bounded retry, symmetric with the prosecutor above. A
+                # structurally repairable failure (missing coverage_state,
+                # missing/unreviewed target_candidate_ids, truncation)
+                # triggers ONE retry with a different request body (different
+                # cache key, structured case-agnostic feedback). The deeper
+                # per-certificate schema check stays in adjudicate_proof_court
+                # so a structurally complete but schema-invalid defense still
+                # fail-closes there — the retry never weakens the contract.
+                appeal_defense_certs = _validate_appeal_defense_contract_or_retry(
+                    appeal_defense_certs,
+                    allowed_ids=allowed_ids,
+                    retry_call=lambda failure_category: provider_call(
+                        route=config["appeal_defender_route"],
+                        system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
+                        user=_appeal_defender_retry_user_v35(
+                            built=built, candidates=appeal_candidates, base=base,
+                            prosecution=prosecution, defense=defense, proof=initial_proof,
+                            appeal_prosecution=appeal_prosecution,
+                            failure_category=failure_category,
+                        ),
+                        cache_dir=output_dir / "appeal_defender_cache" / "retry_1",
+                    ),
+                    providers=providers,
+                )
 
                 # Merge prosecutions
                 combined_prosecution = _merge_prosecutions(

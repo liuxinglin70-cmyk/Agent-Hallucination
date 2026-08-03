@@ -10,7 +10,17 @@
   "boundary_route": {},
   "focused_prosecution_route": {},
   "defense_route": {},
-  "appeal_prosecutor_route": {},
-  "appeal_defender_route": {},
+  "appeal_prosecutor_route": {
+    "max_tokens": 4096,
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 180,
+    "transport_retries": 3
+  },
+  "appeal_defender_route": {
+    "max_tokens": 4096,
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 180,
+    "transport_retries": 3
+  },
   "counterfactual_route": {}
 }

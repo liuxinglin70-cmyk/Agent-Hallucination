@@ -86,11 +86,27 @@ def test_official_detector_config_preserves_model_reasoning_defaults():
         Path("src/sehd_v6/configs/paca_tcl_detector_v3_5.json"),
         require_credentials=False,
     )
+    # v3.5.4: the appeal prosecutor/defender routes are the ONLY routes
+    # allowed to carry an explicit output budget and bounded transport
+    # timeouts. trial_5 showed that long Camel/000-style math trajectories
+    # truncated the appeal certificate and fail-closed the whole case, so
+    # these two routes get a deliberate, audited max_tokens/timeout budget.
+    # Every other route must keep the model's reasoning defaults intact
+    # (no max_tokens cap, no thinking override).
+    appeal_routes_with_budget = {
+        "appeal_prosecutor_route", "appeal_defender_route",
+    }
     for name, route in config.items():
         if not name.endswith("_route"):
             continue
         assert "thinking" not in route
-        assert "max_tokens" not in route
+        if name in appeal_routes_with_budget:
+            assert route.get("max_tokens") == 4096, name
+            assert route.get("transport_retries") == 3, name
+            assert route.get("timeout_seconds") == 120, name
+            assert route.get("total_timeout_seconds") == 180, name
+        else:
+            assert "max_tokens" not in route, name
 
 
 def test_unified_route_resolution_precedence_and_official_defaults(monkeypatch):

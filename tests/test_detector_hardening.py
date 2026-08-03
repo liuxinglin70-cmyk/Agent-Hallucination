@@ -1036,3 +1036,235 @@ def test_appeal_prosecutor_retry_prompt_differs_from_initial() -> None:
     # No evaluator metadata leaked into the retry feedback block.
     for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"'):
         assert field not in retry
+
+
+# ============================================================
+# v3.5.4 — appeal defender symmetric retry + prosecutor
+# missing_field feedback + appeal route transport hardening
+# ============================================================
+
+
+def _good_defense_response(candidate_id: str = "candidate_001") -> dict:
+    return {
+        "coverage_state": "complete",
+        "candidates": [{
+            "certificate_id": "appeal_defense_001",
+            "target_candidate_id": candidate_id,
+            "target_origin_event_id": "event_001",
+            "defense_type": "insufficient_evidence",
+            "evidence_refs": ["event_001"],
+            "rationale": "No specific defense proven.",
+        }],
+    }
+
+
+def test_appeal_prosecutor_retry_feedback_names_missing_field() -> None:
+    """v3.5.4: the retry feedback block carries the concrete missing field
+    name so the model knows exactly what to repair (not just a category)."""
+    base_kwargs = dict(
+        built=_packet(),
+        candidates=[_candidate()],
+        base={"qualifications": [], "propagations": [], "boundary_path": {}},
+        prosecution={"coverage_state": "complete", "candidates": []},
+        defense={"coverage_state": "complete", "candidates": []},
+        proof={"state": "unresolved"},
+    )
+    # Each category maps to the specific missing field name.
+    cases = {
+        "missing_coverage_state": "coverage_state",
+        "incomplete_coverage_state": "coverage_state",
+        "missing_reviewed_candidate_ids": "reviewed_candidate_ids",
+        "unreviewed_candidate_ids": "reviewed_candidate_ids",
+        "foreign_candidate_id": "candidates[].source_candidate_id",
+    }
+    for category, field in cases.items():
+        retry = proof_engine._appeal_prosecutor_retry_user_v35(
+            failure_category=category, **base_kwargs,
+        )
+        assert f'"missing_field":"{field}"' in retry, category
+        assert category in retry
+    # Truncation / provider exception have no single field.
+    for category in ("response_truncated", "provider_exception"):
+        retry = proof_engine._appeal_prosecutor_retry_user_v35(
+            failure_category=category, **base_kwargs,
+        )
+        assert '"missing_field":null' in retry, category
+
+
+def test_appeal_defense_contract_accepts_complete_full_coverage() -> None:
+    """v3.5.4: coverage_state=complete + one defense per supplied id is the
+    satisfied contract; no retry is invoked."""
+    allowed = {"candidate_001"}
+    response = _good_defense_response()
+    providers: dict = {}
+    result = proof_engine._validate_appeal_defense_contract_or_retry(
+        response, allowed_ids=allowed,
+        retry_call=lambda _cat: (_ for _ in ()).throw(AssertionError("no retry")),
+        providers=providers,
+    )
+    assert result is response
+    assert "appeal_defender_retry" not in providers
+
+
+def test_appeal_defense_contract_retries_on_missing_candidates() -> None:
+    """v3.5.4: a complete coverage_state but empty/missing candidates is a
+    repairable failure that triggers ONE bounded retry; a good retry is
+    accepted and audited as repaired."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "complete",
+        "candidates": [],  # no defense certificates
+    }
+    good_response = _good_defense_response()
+    calls: list[str] = []
+    providers: dict = {}
+
+    def retry_call(failure_category: str):
+        calls.append(failure_category)
+        return good_response, {"usage": {"retry": True}}
+
+    result = proof_engine._validate_appeal_defense_contract_or_retry(
+        bad_response, allowed_ids=allowed,
+        retry_call=retry_call, providers=providers,
+    )
+    assert result is good_response
+    assert calls == ["missing_defense_candidates"]
+    assert providers["appeal_defender_retry"]["outcome"] == "repaired"
+    assert providers["appeal_defender_retry"]["parent_failure_category"] == "missing_defense_candidates"
+
+
+def test_appeal_defense_contract_retries_on_coverage_mismatch() -> None:
+    """v3.5.4: target_candidate_ids that do not match allowed_ids is a
+    repairable failure; the retry can repair it."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "complete",
+        "candidates": [{
+            "certificate_id": "appeal_defense_001",
+            "target_candidate_id": "candidate_999",  # foreign
+            "target_origin_event_id": "event_001",
+            "defense_type": "insufficient_evidence",
+            "evidence_refs": ["event_001"],
+            "rationale": "wrong target.",
+        }],
+    }
+    good_response = _good_defense_response()
+    calls: list[str] = []
+    providers: dict = {}
+
+    def retry_call(failure_category: str):
+        calls.append(failure_category)
+        return good_response, {"usage": {"retry": True}}
+
+    result = proof_engine._validate_appeal_defense_contract_or_retry(
+        bad_response, allowed_ids=allowed,
+        retry_call=retry_call, providers=providers,
+    )
+    assert result is good_response
+    assert calls == ["defense_coverage_mismatch"]
+    assert providers["appeal_defender_retry"]["outcome"] == "repaired"
+
+
+def test_appeal_defense_contract_fail_closes_after_retry_failure() -> None:
+    """v3.5.4: when the bounded retry still fails the contract, the function
+    raises ValueError so the caller fail-closes via _resolve_incomplete_appeal
+    — authority is never fabricated (symmetric with the prosecutor path)."""
+    allowed = {"candidate_001"}
+    bad_response = {
+        "coverage_state": "incomplete",
+        "candidates": [],
+    }
+    still_bad = {
+        "coverage_state": "complete",
+        "candidates": [],  # still missing defense certificates
+    }
+    calls: list[str] = []
+    providers: dict = {}
+
+    def retry_call(failure_category: str):
+        calls.append(failure_category)
+        return still_bad, {"usage": {"retry": True}}
+
+    try:
+        proof_engine._validate_appeal_defense_contract_or_retry(
+            bad_response, allowed_ids=allowed,
+            retry_call=retry_call, providers=providers,
+        )
+    except ValueError as exc:
+        assert "bounded retry" in str(exc)
+    else:
+        raise AssertionError("retry failure must raise to fail-closed")
+    assert calls == ["incomplete_coverage_state"]
+    assert providers["appeal_defender_retry"]["outcome"] == "failed_closed"
+    assert providers["appeal_defender_retry"]["retry_failure_category"] == "missing_defense_candidates"
+
+
+def test_appeal_defender_retry_prompt_differs_from_initial() -> None:
+    """v3.5.4: the defender retry user prompt must differ from the initial
+    prompt so the provider cache key changes (otherwise the retry would hit
+    the same cache entry and return the same invalid response)."""
+    base_kwargs = dict(
+        built=_packet(),
+        candidates=[_candidate()],
+        base={"qualifications": [], "propagations": [], "boundary_path": {}},
+        prosecution={"coverage_state": "complete", "candidates": []},
+        defense={"coverage_state": "complete", "candidates": []},
+        proof={"state": "unresolved"},
+        appeal_prosecution={"coverage_state": "complete", "candidates": []},
+    )
+    initial = proof_engine._appeal_defender_user_v35(**base_kwargs)
+    retry = proof_engine._appeal_defender_retry_user_v35(
+        failure_category="missing_defense_candidates", **base_kwargs,
+    )
+    assert retry.startswith(initial)
+    assert "APPEAL_RETRY_FEEDBACK=" in retry
+    assert "missing_defense_candidates" in retry
+    assert '"missing_field":"candidates"' in retry
+    for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"'):
+        assert field not in retry
+
+
+def test_appeal_routes_carry_bounded_transport_budget() -> None:
+    """v3.5.4: appeal prosecutor/defender routes must ship an explicit output
+    budget and bounded timeouts so a long Camel/000-style math trajectory
+    cannot truncate the appeal certificate and fail-close the whole case.
+
+    The contract is fail-closed: the route values just give the provider room
+    to return a complete structured response; they do NOT relax the
+    coverage_state / reviewed_candidate_ids hard requirements.
+    """
+    import json
+    from pathlib import Path
+
+    config_path = Path(__file__).resolve().parent.parent / "src" / "sehd_v6" / "configs" / "paca_tcl_detector_v3_5.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    for route_name in ("appeal_prosecutor_route", "appeal_defender_route"):
+        route = config[route_name]
+        assert route["max_tokens"] == 4096, route_name
+        assert route["timeout_seconds"] == 120, route_name
+        assert route["total_timeout_seconds"] == 180, route_name
+        assert route["transport_retries"] == 3, route_name
+
+
+def test_appeal_defender_system_retry_prompt_requires_complete_coverage() -> None:
+    """v3.5.4: the defender retry system prompt must state the two hard
+    requirements (coverage_state=complete + target_candidate_id coverage)
+    so the model cannot satisfy the retry with a partial envelope."""
+    prompt = proof_engine.APPEAL_DEFENDER_RETRY_SYSTEM_V35
+    assert 'coverage_state' in prompt
+    assert '"complete"' in prompt
+    assert "target_candidate_id" in prompt
+    assert "APPEAL_RETRY_FEEDBACK" in prompt
+    assert "response_truncated" in prompt
+
+
+def test_appeal_prosecutor_retry_system_prompt_states_hard_requirements() -> None:
+    """v3.5.4: the prosecutor retry system prompt must state the two hard
+    requirements explicitly and map each failure_category to a fix."""
+    prompt = proof_engine.APPEAL_PROSECUTOR_RETRY_SYSTEM_V35
+    assert "TWO HARD REQUIREMENTS" in prompt
+    assert '"complete"' in prompt
+    assert "reviewed_candidate_ids" in prompt
+    assert "response_truncated" in prompt
+    assert "foreign_candidate_id" in prompt
+    assert "missing_reviewed_candidate_ids" in prompt

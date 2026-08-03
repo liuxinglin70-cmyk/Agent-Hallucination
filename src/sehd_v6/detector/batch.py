@@ -15,7 +15,7 @@ from ..core.paca_tcl.detector import FORBIDDEN_INPUT_FIELDS, detect_record
 from ..utils.ocse_packet import canonical_json, stable_hash
 
 
-BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v1"
+BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v2"
 
 
 def load_batch_records(path: Path) -> dict[str, dict[str, Any]]:
@@ -126,6 +126,8 @@ def _completed_prediction(
     }
     if any(completion.get(key) != value for key, value in expected.items()):
         return None
+    if prediction.get("runtime_valid") is not True:
+        return None
     return prediction
 
 
@@ -169,6 +171,11 @@ def run_batch(
                 record=record, config=config, case_id=case_id,
                 output_dir=case_dir / "trace",
             )
+            if prediction.get("runtime_valid") is not True:
+                raise RuntimeError(
+                    "detector returned runtime_valid=false; not a completed "
+                    "prediction"
+                )
             _atomic_json(case_dir / "prediction.json", prediction)
             completion = {
                 "schema_version": BATCH_SCHEMA_VERSION,

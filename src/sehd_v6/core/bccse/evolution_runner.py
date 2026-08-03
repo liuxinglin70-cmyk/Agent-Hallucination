@@ -36,6 +36,7 @@ from ..paca_tcl.basic_runner import (
     write_json,
     write_jsonl,
 )
+from ...utils import ocse_packet as packet
 from .reflection_engine import (
     RejectedEditEntry,
     build_causal_reflection_prompt,
@@ -87,6 +88,7 @@ from ..htc_tes import (
     classify_hallucination_type,
 )
 from ..provider_models import canonical_model_name
+from ...provider_routes import has_provider_credential
 
 # ============================================================
 # Data structures
@@ -362,6 +364,8 @@ def _build_rejection_summary(
         reasons = [str(value) for value in certificate.get("reject_reasons") or ()]
         if any("runtime" in value or "apply_edit_failed" in value for value in reasons):
             stage = "runtime"
+        elif any("llm_conflict" in value for value in reasons):
+            stage = "conflict"
         elif any("no_effect" in value for value in reasons):
             stage = "evidence_no_effect"
         elif any("directional_evidence" in value for value in reasons):
@@ -544,6 +548,10 @@ class ProvisionalEdit:
     step_index: int
     applied_rule_idx: int | None = None  # v5.3.4: rule index at apply time
     canary_audits: list[dict[str, Any]] = field(default_factory=list)
+    # T5/T6: True only when the LLM no-conflict gate was actually consulted
+    # AND returned "pass". A skipped gate (no live route) stays False, so the
+    # T6 provisional path cannot fire without an explicit conflict check.
+    conflict_gate_passed: bool = False
 
 
 # ============================================================
@@ -703,7 +711,7 @@ def _atomic_write_json(path: Path, value: Any) -> None:
 # that interrupted runs can be resumed without re-running already
 # processed cases (and without losing the audit trail).
 
-_CHECKPOINT_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v2"
+_CHECKPOINT_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v3"
 _CHECKPOINT_REQUIRED_FILES: tuple[str, ...] = (
     "evolution_checkpoint.json",
     "champion_checkpoint.json",
@@ -750,6 +758,13 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
             f"checkpoint next_case_index out of range: {next_case_index} "
             f"for {len(evolution_case_ids)} evolution_case_ids"
         )
+    input_content_hash = str(checkpoint.get("input_content_hash") or "")
+    config_hash = str(checkpoint.get("config_hash") or "")
+    if not input_content_hash or not config_hash:
+        raise ValueError(
+            "checkpoint is missing run identity (input_content_hash / "
+            "config_hash); refusing to resume an unidentifiable run"
+        )
     champion_path = output_dir / "champion_checkpoint.json"
     shadow_path = output_dir / "shadow_checkpoint.json"
     with champion_path.open(encoding="utf-8") as handle:
@@ -763,6 +778,11 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "status": str(checkpoint.get("status") or "in_progress"),
         "next_case_index": next_case_index,
         "evolution_case_ids": evolution_case_ids,
+        "input_content_hash": input_content_hash,
+        "config_hash": config_hash,
+        "champion_genome_hash": str(checkpoint.get("champion_genome_hash") or ""),
+        "shadow_genome_hash": str(checkpoint.get("shadow_genome_hash") or ""),
+        "provisional_edit_count": int(checkpoint.get("provisional_edit_count") or 0),
         "champion_genome_payload": champion_payload,
         "shadow_genome_payload": shadow_payload,
         "experience_memory_path": (
@@ -805,7 +825,6 @@ def _restore_state_from_checkpoint(
     bind to the matching local variables before entering the work queue.
     """
     champion_payload = dict(checkpoint.get("champion_genome_payload") or {})
-    shadow_payload = dict(checkpoint.get("shadow_genome_payload") or {})
     if champion_payload:
         restored_champion = SkillGenome.from_dict(champion_payload)
         champion_genome.modules = restored_champion.modules
@@ -813,18 +832,20 @@ def _restore_state_from_checkpoint(
         champion_genome.parent_hash = restored_champion.parent_hash
         champion_genome.generation = restored_champion.generation
         champion_genome.metadata = restored_champion.metadata
-    if shadow_payload:
-        restored_shadow = SkillGenome.from_dict(shadow_payload)
-        current_genome.modules = restored_shadow.modules
-        current_genome.edits_applied = restored_shadow.edits_applied
-        current_genome.parent_hash = restored_shadow.parent_hash
-        current_genome.generation = restored_shadow.generation
-        current_genome.metadata = restored_shadow.metadata
-        stable_genome.modules = restored_shadow.modules
-        stable_genome.edits_applied = restored_shadow.edits_applied
-        stable_genome.parent_hash = restored_shadow.parent_hash
-        stable_genome.generation = restored_shadow.generation
-        stable_genome.metadata = restored_shadow.metadata
+    # An uncommitted shadow genome is never restored.  The reversible working
+    # genome and the rollback anchor both resume from the last committed
+    # champion; resurrecting an uncommitted shadow would silently advance a
+    # genome whose source/canary evidence was never persisted.
+    current_genome.modules = champion_genome.modules
+    current_genome.edits_applied = champion_genome.edits_applied
+    current_genome.parent_hash = champion_genome.parent_hash
+    current_genome.generation = champion_genome.generation
+    current_genome.metadata = champion_genome.metadata
+    stable_genome.modules = champion_genome.modules
+    stable_genome.edits_applied = champion_genome.edits_applied
+    stable_genome.parent_hash = champion_genome.parent_hash
+    stable_genome.generation = champion_genome.generation
+    stable_genome.metadata = champion_genome.metadata
 
     experience_path_str = checkpoint.get("experience_memory_path")
     if experience_path_str:
@@ -978,6 +999,91 @@ def _llm_merge_rules(
         pass
     # Fallback to structural merge
     return _llm_merge_rules(existing_rule, new_rule, mutation_route=None)
+
+
+def _llm_no_conflict_gate(
+    new_rule: str,
+    existing_rules: Sequence[str],
+    *,
+    target_module: str,
+    mutation_route: dict[str, Any] | None,
+    cache_dir: Path | None = None,
+    budget_usage: dict[str, int] | None = None,
+) -> tuple[bool, str, list[int], bool]:
+    """LLM no-conflict gate (T5).
+
+    Checks whether ``new_rule`` semantically conflicts with the target
+    module's existing rules. Two rules conflict when, under the same trigger
+    conditions, they prescribe contradictory verdicts/actions or one directly
+    negates the other. Mere condition overlap or complementarity is NOT a
+    conflict.
+
+    The gate reuses the mutation route (AutoDL, thinking disabled). It runs
+    only when a live provider credential is configured, so offline/test runs
+    without a credential skip it (structural dedup still provides the baseline
+    safety). When the gate runs it is fail-closed: any provider exception or
+    parse failure is treated as a conflict, because a safety gate must never
+    default to "pass" on uncertainty.
+
+    Returns ``(passed, reason, conflicting_rule_indices, ran)``. ``ran`` is
+    True only when the LLM was actually consulted; a skipped gate returns
+    ``passed=True`` with ``ran=False`` so callers can distinguish a verified
+    "no conflict" from a gate that could not run.
+    """
+    existing = [rule for rule in existing_rules if rule and rule.strip()]
+    if not existing:
+        return True, "no_existing_rules", [], False
+    if mutation_route is None or not has_provider_credential(mutation_route):
+        return True, "skipped_no_live_route", [], False
+    system_prompt = (
+        "你是规则冲突判定器。判断新增规则是否与目标模块已有规则存在语义冲突。"
+        "冲突指：在相同触发条件下，两条规则给出相互矛盾的判定或动作，或一条规则"
+        "直接否定另一条的结论。仅条件重叠或互补不构成冲突。"
+    )
+    rules_block = "\n".join(
+        f"[{i}] {rule}" for i, rule in enumerate(existing)
+    )
+    user_prompt = (
+        f"【目标模块】{target_module}\n"
+        f"【已有规则】\n{rules_block}\n\n"
+        f"【新增规则】\n{new_rule}\n\n"
+        "判断新增规则是否与已有规则冲突。仅返回JSON："
+        '{"decision":"pass"或"conflict","reason":"简短理由",'
+        '"conflicting_rule_indices":[冲突的已有规则索引]}'
+    )
+    try:
+        if budget_usage is not None:
+            budget_usage["mutation_calls"] += 1
+        result, _meta = json_object_provider_call(
+            route=mutation_route,
+            purpose="mutation",
+            system=system_prompt,
+            user=user_prompt,
+            cache_dir=(
+                cache_dir if cache_dir is not None
+                else Path(".conflict_gate_cache")
+            ),
+        )
+    except Exception:
+        if budget_usage is not None:
+            budget_usage["mutation_errors"] += 1
+        return False, "provider_exception", [], True
+    if not isinstance(result, dict):
+        return False, "parse_failure", [], True
+    decision = str(result.get("decision", "")).strip().lower()
+    reason = str(result.get("reason", "")).strip() or "llm_conflict"
+    raw_indices = result.get("conflicting_rule_indices", [])
+    if not isinstance(raw_indices, list):
+        raw_indices = []
+    indices: list[int] = []
+    for value in raw_indices:
+        try:
+            indices.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    if decision == "pass":
+        return True, reason, [], True
+    return False, reason, indices, True
 
 
 def run_online_evolution(
@@ -1255,6 +1361,22 @@ def run_online_evolution(
                 "resume_from checkpoint evolution_case_ids do not match the "
                 "supplied evolution_case_ids; cannot resume safely"
             )
+        checkpoint_input_hash = str(checkpoint.get("input_content_hash") or "")
+        checkpoint_config_hash = str(checkpoint.get("config_hash") or "")
+        current_input_hash = packet.stable_hash(
+            {case_id: records[case_id] for case_id in evolution_case_ids}
+        )
+        current_config_hash = packet.stable_hash(config)
+        if checkpoint_input_hash != current_input_hash:
+            raise ValueError(
+                "resume_from checkpoint input_content_hash does not match the "
+                "supplied records; cannot resume safely"
+            )
+        if checkpoint_config_hash != current_config_hash:
+            raise ValueError(
+                "resume_from checkpoint config_hash does not match the "
+                "supplied detector config; cannot resume safely"
+            )
         restored = _restore_state_from_checkpoint(
             checkpoint,
             champion_genome=champion_genome,
@@ -1289,6 +1411,15 @@ def run_online_evolution(
         stable_memory_payload = type_fitness.get_experience_memory().to_dict()
         if run_id is None:
             run_id = str(checkpoint.get("run_id") or run_id or "")
+        provisional_count = int(checkpoint.get("provisional_edit_count") or 0)
+        shadow_hash = str(checkpoint.get("shadow_genome_hash") or "")
+        champion_hash = str(checkpoint.get("champion_genome_hash") or "")
+        if provisional_count > 0 or (shadow_hash and shadow_hash != champion_hash):
+            print(
+                f"[resume] checkpoint held {provisional_count} uncommitted "
+                f"shadow edit(s); reverting to the last committed champion "
+                f"(shadow evidence was not persisted)"
+            )
         print(
             f"[resume] restored checkpoint from {resume_from}: "
             f"next_case_index={resume_next_case_index}, "
@@ -1464,12 +1595,16 @@ def run_online_evolution(
         _atomic_write_json(
             output_dir / "evolution_checkpoint.json",
             {
-                "schema_version": "agenthallu.bccse_v5_checkpoint.v2",
+                "schema_version": "agenthallu.bccse_v5_checkpoint.v3",
                 "run_id": run_id,
                 "status": status,
                 "next_case_index": next_case_index,
                 "evolution_case_count": len(evolution_case_ids),
                 "evolution_case_ids": list(evolution_case_ids),
+                "input_content_hash": packet.stable_hash(
+                    {case_id: records[case_id] for case_id in evolution_case_ids}
+                ),
+                "config_hash": packet.stable_hash(config),
                 "genome_hash": champion_genome.content_hash,
                 "champion_genome_hash": champion_genome.content_hash,
                 "shadow_genome_hash": current_genome.content_hash,
@@ -1691,6 +1826,7 @@ def run_online_evolution(
         # no-effect edit is retained as telemetry, not silently committed.
         accepted_indices: list[int] = []
         rejected_indices: list[int] = []
+        provisional_accept_indices: list[int] = []
         for i, dec in enumerate(decisions):
             # Label-free directional evidence may advance the reversible
             # working genome only when an independent sampled canary proves
@@ -1705,7 +1841,25 @@ def run_online_evolution(
                     for audit in provisional_edits[i].canary_audits
                 )
             )
-            if dec in {"strong_improvement", "local_improvement"} or label_free_provisional:
+            # T6: self-supervised provisional acceptance. A directional source
+            # replay (trigger closed, NOT worse, NOT no_effect) is accepted
+            # when the LLM no-conflict gate was actually consulted and passed.
+            # This opens the previously-dead path where directional_evidence
+            # could not be accepted because no independent canary was available.
+            # Canary regressions never reach here: they were rewritten to
+            # "worse" before admission and dec != "directional_evidence".
+            provisional_accept = (
+                not fitness_use_gold
+                and dec == "directional_evidence"
+                and bool(provisional_edits[i].conflict_gate_passed)
+            )
+            if provisional_accept:
+                provisional_accept_indices.append(i)
+            if (
+                dec in {"strong_improvement", "local_improvement"}
+                or label_free_provisional
+                or provisional_accept
+            ):
                 accepted_indices.append(i)
             else:
                 rejected_indices.append(i)
@@ -1735,6 +1889,7 @@ def run_online_evolution(
             "worse_count": worse_count,
             "accepted_indices": accepted_indices,
             "rejected_indices": rejected_indices,
+            "provisional_accept_indices": provisional_accept_indices,
             "fitness_use_gold": fitness_use_gold,
             "commit_validation": "single_source_replay_plus_sampled_canaries",
             "source_replays": len(source_audits),
@@ -1789,14 +1944,34 @@ def run_online_evolution(
                     source_audits[idx]["assessment"]["decision"]
                     if idx < len(source_audits) else ""
                 )
+                # T6 provisional accepts gain protected weak fitness so the
+                # rule is anchored as a regression guard. The label-free
+                # canary path and gold path keep their original semantics.
+                _is_provisional_accept = (
+                    not fitness_use_gold
+                    and assessment_decision == "directional_evidence"
+                    and bool(item.conflict_gate_passed)
+                )
                 if not fitness_use_gold:
-                    fitness_status = FITNESS_STATUS_NONE
+                    if _is_provisional_accept:
+                        fitness_status = FITNESS_STATUS_WEAK
+                    else:
+                        fitness_status = FITNESS_STATUS_NONE
                 else:
                     fitness_status = (
                         FITNESS_STATUS_STRONG
                         if assessment_decision == "strong_improvement"
                         else FITNESS_STATUS_WEAK
                     )
+                _promotion_status = (
+                    "provisional_accept"
+                    if _is_provisional_accept
+                    else (
+                        "provisional_label_free"
+                        if not fitness_use_gold
+                        else "gold_development_candidate"
+                    )
+                )
                 mod = champion_genome.modules[item.edit.target_module]
                 rule_idx = item.applied_rule_idx
                 if rule_idx is None and item.edit.rule_index is not None:
@@ -1804,11 +1979,7 @@ def run_online_evolution(
                 if rule_idx is not None and rule_idx < len(mod.rules):
                     meta = mod.get_rule_meta(rule_idx)
                     meta["fitness_status"] = fitness_status
-                    meta["promotion_status"] = (
-                        "provisional_label_free"
-                        if not fitness_use_gold
-                        else "gold_development_candidate"
-                    )
+                    meta["promotion_status"] = _promotion_status
                     mod.set_rule_meta(rule_idx, meta)
                 accepted_edits_history.append({
                     "edit_id": item.edit.edit_id,
@@ -1817,11 +1988,7 @@ def run_online_evolution(
                     "new_content": item.edit.new_content,
                     "case_id": item.case_id,
                     "batch_id": batch_id,
-                    "promotion_status": (
-                        "provisional_label_free"
-                        if not fitness_use_gold
-                        else "gold_development_candidate"
-                    ),
+                    "promotion_status": _promotion_status,
                 })
                 pending_probe_commits.append(item)
                 pending_probe_step_indexes.append(item.step_index)
@@ -1840,6 +2007,18 @@ def run_online_evolution(
                 _htc_success = assessment_decision in {
                     "strong_improvement", "local_improvement",
                 }
+                # T6: a provisional accept is a positive experience. The
+                # source replay closed the trigger and the LLM no-conflict
+                # gate verified the rule, so it is recorded as detection
+                # improved and promotable evidence (still bounded by the
+                # assess_edit regression guard, which refuses to flip an
+                # independently observed regression to success).
+                _provisional_accept_edit = (
+                    not fitness_use_gold
+                    and assessment_decision == "directional_evidence"
+                    and bool(item.conflict_gate_passed)
+                )
+                _override_success = _htc_success or _provisional_accept_edit
                 _shadow_result = source_audits[idx].get("shadow_result", {})
                 _effect_audit = _expected_effect_audit(
                     item.edit,
@@ -1857,7 +2036,7 @@ def run_online_evolution(
                     detection_after=_shadow_result,
                     type_result=_type_result,
                     target_module=item.edit.target_module,
-                    override_success=_htc_success,
+                    override_success=_override_success,
                     feature_description=item.edit.feature_description,
                     attempt_metadata=_structured_outcome(
                         outcome=outcome_class_for(
@@ -1875,10 +2054,17 @@ def run_online_evolution(
                             for value in item.individual_assessment.reasons
                         ],
                         observable_deltas=_effect_audit["observable_deltas"],
-                        # Only a gold-assisted batch commit may claim the
-                        # edit actually improved detection.
-                        promotable=_htc_success and fitness_use_gold,
-                        diagnostic_only=not fitness_use_gold,
+                        # Only a gold-assisted batch commit OR a T6
+                        # provisional accept (LLM-verified, trigger-closed)
+                        # may claim the edit actually improved detection.
+                        promotable=(
+                            (_htc_success and fitness_use_gold)
+                            or _provisional_accept_edit
+                        ),
+                        diagnostic_only=(
+                            not fitness_use_gold
+                            and not _provisional_accept_edit
+                        ),
                         decision=item.individual_assessment.decision,
                     ),
                 )
@@ -2783,6 +2969,129 @@ def run_online_evolution(
                 print(f"  [{idx}] REJECT {case_id}: {reject_reasons}")
                 continue
 
+        # --- [4b] LLM no-conflict gate (T5) ---
+        # Runs only after structural dedup passes (Jaccard < 0.70 against
+        # every existing rule). Structural dedup failures
+        # (merge_required / near_duplicate) never reach this gate. The gate
+        # is fail-closed: a provider exception or parse failure is treated
+        # as a conflict and the edit is rejected before any source replay.
+        # ``conflict_gate_passed`` is True only when the LLM was actually
+        # consulted and returned "pass"; a skipped gate (no live route)
+        # stays False so the T6 provisional path cannot fire.
+        conflict_gate_passed = False
+        conflict_gate_ran = False
+        if edit.operation in (SkillOp.ADD_RULE, SkillOp.MODIFY_RULE):
+            _existing_rules = list(
+                current_genome.modules[edit.target_module].rules
+            )
+            if (
+                edit.operation == SkillOp.MODIFY_RULE
+                and edit.rule_index is not None
+            ):
+                _existing_rules = [
+                    rule for i, rule in enumerate(_existing_rules)
+                    if i != edit.rule_index
+                ]
+            (
+                _cg_passed, _cg_reason, _cg_indices, _cg_ran,
+            ) = _llm_no_conflict_gate(
+                edit.new_content,
+                _existing_rules,
+                target_module=edit.target_module,
+                mutation_route=mutation_route,
+                cache_dir=output_dir / "conflict_gate_cache",
+                budget_usage=budget_usage,
+            )
+            conflict_gate_ran = _cg_ran
+            if _cg_ran and _cg_passed:
+                conflict_gate_passed = True
+            elif _cg_ran and not _cg_passed:
+                gate.revoke_structural_accept(
+                    cert,
+                    [
+                        f"llm_conflict:{_cg_reason}",
+                        f"conflicting_rule_indices:{_cg_indices}",
+                    ],
+                )
+                gate.record_no_edit()
+                edits_rejected += 1
+                _conflict_reasons = [
+                    f"llm_conflict:{_cg_reason}",
+                    f"conflicting_rule_indices:{_cg_indices}",
+                ]
+                rejected_buffer.append(RejectedEditEntry(
+                    proposal=type(
+                        "P",
+                        (),
+                        {
+                            "target_module": edit.target_module,
+                            "operation": edit.operation,
+                            "content": edit.new_content[:80],
+                        },
+                    )(),
+                    regressed_cases=[],
+                    budget_consumed=0,
+                    reject_reasons=_conflict_reasons,
+                    rejection_stage="llm_conflict",
+                ))
+                type_fitness.get_experience_memory().add_experience(
+                    hallucination_type=type_result.primary_type,
+                    evolution_direction=evolution_direction,
+                    module_targeted=edit.target_module,
+                    strategy_used=(
+                        "operation:"
+                        + (
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        )
+                    ),
+                    detection_improved=False,
+                    source_case_id=case_id,
+                    metadata=_structured_outcome(
+                        outcome="rejected",
+                        stage="structural_gate",
+                        operation=(
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        ),
+                        expected_effect_status="not_replayed",
+                        reason_categories=["llm_conflict"],
+                        observable_deltas=[],
+                        promotable=False,
+                        decision="reject_conflict",
+                    ),
+                    feature_description=edit.feature_description,
+                    type_confidence=type_result.confidence,
+                )
+                record_step(EvolutionStep(
+                    case_id=case_id,
+                    case_index=idx,
+                    trigger_source=signal.trigger_source.value,
+                    attribution=signal.to_dict(),
+                    edit_proposal=edit.to_dict(),
+                    mutation_applied=None,
+                    gate_decision="reject_conflict",
+                    genome_hash_before=genome_before,
+                    genome_hash_after=current_genome.content_hash,
+                    detection_state=detection_state,
+                    timestamp=time.time(),
+                    fitness_check={
+                        "llm_conflict_gate": {
+                            "passed": False,
+                            "ran": True,
+                            "reason": _cg_reason,
+                            "conflicting_rule_indices": _cg_indices,
+                        },
+                    },
+                ), next_case_index=idx + 1)
+                print(
+                    f"  [{idx}] REJECT_CONFLICT {case_id}: "
+                    f"{_cg_reason} indices={_cg_indices}"
+                )
+                continue
+
         # --- [5] Apply edit ---
         try:
             candidate_genome = apply_edit(current_genome, edit)
@@ -2936,7 +3245,30 @@ def run_online_evolution(
             if directional_canary_support:
                 fitness_audit["directional_evidence_canary_preserved"] = True
                 fitness_audit["shadow_admissible"] = True
-            if not assessment.passed and not directional_canary_support:
+            # T6: self-supervised provisional acceptance path. A directional
+            # source replay (trigger closed, NOT worse, NOT no_effect) may be
+            # admitted when the LLM no-conflict gate was actually consulted
+            # and returned "pass". Canary regression has already rewritten
+            # the assessment to "worse" above, so this can never fire on a
+            # canary regression. ``no_effect`` and ``worse`` decisions are
+            # excluded by the strict equality check on "directional_evidence".
+            provisional_accept_eligible = (
+                not fitness_use_gold
+                and assessment.decision == "directional_evidence"
+                and conflict_gate_passed
+            )
+            fitness_audit["llm_conflict_gate"] = {
+                "passed": conflict_gate_passed,
+                "ran": conflict_gate_ran,
+            }
+            if provisional_accept_eligible:
+                fitness_audit["provisional_accept"] = True
+                fitness_audit["shadow_admissible"] = True
+            if (
+                not assessment.passed
+                and not directional_canary_support
+                and not provisional_accept_eligible
+            ):
                 typed_assessment = type_fitness.assess_edit(
                     source_case_id=case_id,
                     hallucination_type=type_result.primary_type,
@@ -3144,6 +3476,7 @@ def run_online_evolution(
             individual_assessment=assessment,
             step_index=step_index,
             canary_audits=canary_audit,
+            conflict_gate_passed=conflict_gate_passed,
         ))
         record_step(EvolutionStep(
             case_id=case_id,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import replace
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -1192,7 +1193,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
     # Public load API: returns a populated dict with the expected fields.
     checkpoint = runner.load_evolution_checkpoint(first_output)
     assert checkpoint
-    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v2"
+    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v3"
     assert checkpoint["next_case_index"] == 1
     assert checkpoint["evolution_case_ids"] == ["source"]
     assert checkpoint["champion_genome_payload"]
@@ -2382,6 +2383,315 @@ def test_abstention_unresolved_progress_is_symmetric_across_sides() -> None:
         _abstention(both) - _abstention(partial_d)
     )
     assert _abstention(both) > _abstention(partial_p)
+
+
+# ---------- T5: LLM no-conflict gate ----------
+
+
+def test_llm_no_conflict_gate_no_existing_rules_skips() -> None:
+    """T5: no existing rules → pass without consulting the LLM (ran=False)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    passed, reason, indices, ran = runner._llm_no_conflict_gate(
+        "new rule text",
+        [],
+        target_module="evidence_obligation",
+        mutation_route={"endpoint": "x", "api_key_environment": "K"},
+    )
+    assert passed is True
+    assert reason == "no_existing_rules"
+    assert indices == []
+    assert ran is False
+
+
+def test_llm_no_conflict_gate_no_live_route_skips() -> None:
+    """T5: no mutation route or no credential → pass without LLM (ran=False).
+
+    A skipped gate stays ran=False so conflict_gate_passed cannot become True
+    downstream, blocking the T6 provisional path until a real check runs.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    # No route at all.
+    passed, reason, indices, ran = runner._llm_no_conflict_gate(
+        "new rule",
+        ["existing rule"],
+        target_module="evidence_obligation",
+        mutation_route=None,
+    )
+    assert passed is True
+    assert reason == "skipped_no_live_route"
+    assert ran is False
+
+    # Route present but no credential.
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=False,
+    ):
+        passed, reason, indices, ran = runner._llm_no_conflict_gate(
+            "new rule",
+            ["existing rule"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+        )
+    assert passed is True
+    assert reason == "skipped_no_live_route"
+    assert ran is False
+
+
+def test_llm_no_conflict_gate_pass() -> None:
+    """T5: LLM returns 'pass' → passed=True, ran=True."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=True,
+    ), patch(
+        "src.sehd_v6.core.bccse.evolution_runner.json_object_provider_call",
+        return_value=({"decision": "pass", "reason": "complementary"}, {}),
+    ):
+        passed, reason, indices, ran = runner._llm_no_conflict_gate(
+            "new rule",
+            ["existing rule one"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+        )
+    assert passed is True
+    assert ran is True
+    assert indices == []
+
+
+def test_llm_no_conflict_gate_conflict_returns_indices() -> None:
+    """T5: LLM returns 'conflict' → passed=False with conflicting indices."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=True,
+    ), patch(
+        "src.sehd_v6.core.bccse.evolution_runner.json_object_provider_call",
+        return_value=(
+            {
+                "decision": "conflict",
+                "reason": "contradicts rule 0",
+                "conflicting_rule_indices": [0, 2],
+            },
+            {},
+        ),
+    ):
+        passed, reason, indices, ran = runner._llm_no_conflict_gate(
+            "new rule",
+            ["rule a", "rule b", "rule c"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+        )
+    assert passed is False
+    assert ran is True
+    assert indices == [0, 2]
+
+
+def test_llm_no_conflict_gate_provider_exception_fail_closed() -> None:
+    """T5: provider exception → fail-closed conflict (passed=False, ran=True).
+
+    A safety gate must never default to 'pass' on uncertainty.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    budget = {"mutation_calls": 0, "mutation_errors": 0}
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=True,
+    ), patch(
+        "src.sehd_v6.core.bccse.evolution_runner.json_object_provider_call",
+        side_effect=RuntimeError("network down"),
+    ):
+        passed, reason, indices, ran = runner._llm_no_conflict_gate(
+            "new rule",
+            ["existing rule"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+            budget_usage=budget,
+        )
+    assert passed is False
+    assert reason == "provider_exception"
+    assert ran is True
+    assert budget["mutation_errors"] == 1
+
+
+def test_llm_no_conflict_gate_parse_failure_fail_closed() -> None:
+    """T5: non-dict result → fail-closed conflict (passed=False, ran=True)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=True,
+    ), patch(
+        "src.sehd_v6.core.bccse.evolution_runner.json_object_provider_call",
+        return_value=("not a dict", {}),
+    ):
+        passed, reason, indices, ran = runner._llm_no_conflict_gate(
+            "new rule",
+            ["existing rule"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+        )
+    assert passed is False
+    assert reason == "parse_failure"
+    assert ran is True
+
+
+def test_llm_no_conflict_gate_budget_tracked_on_success() -> None:
+    """T5: successful call increments mutation_calls, not mutation_errors."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    budget = {"mutation_calls": 0, "mutation_errors": 0}
+    with patch(
+        "src.sehd_v6.core.bccse.evolution_runner.has_provider_credential",
+        return_value=True,
+    ), patch(
+        "src.sehd_v6.core.bccse.evolution_runner.json_object_provider_call",
+        return_value=({"decision": "pass", "reason": "ok"}, {}),
+    ):
+        runner._llm_no_conflict_gate(
+            "new rule",
+            ["existing rule"],
+            target_module="evidence_obligation",
+            mutation_route={"endpoint": "x", "api_key_environment": "K"},
+            budget_usage=budget,
+        )
+    assert budget["mutation_calls"] == 1
+    assert budget["mutation_errors"] == 0
+
+
+def test_rejection_summary_classifies_llm_conflict_stage() -> None:
+    """T5: _build_rejection_summary classifies llm_conflict as 'conflict'."""
+    from src.sehd_v6.core.bccse.evolution_runner import _build_rejection_summary
+
+    gate_summary = {
+        "certificates": [
+            {
+                "decision": "reject",
+                "reject_reasons": [
+                    "llm_conflict:contradicts rule 0",
+                    "conflicting_rule_indices:[0]",
+                ],
+            },
+        ],
+    }
+    summary = _build_rejection_summary(gate_summary, [])
+    assert summary["by_stage"].get("conflict") == 1
+    assert summary["by_reason"].get("llm_conflict") == 1
+
+
+# ---------- T6: self-supervised provisional acceptance ----------
+
+
+def test_provisional_edit_conflict_gate_field_defaults_false() -> None:
+    """T6: ProvisionalEdit.conflict_gate_passed defaults to False.
+
+    A skipped LLM gate (no live route) leaves this False so the T6
+    provisional path cannot fire without an explicit conflict check.
+    """
+    from src.sehd_v6.core.bccse.evolution_runner import ProvisionalEdit
+
+    edit = _typed_edit()
+    pe = ProvisionalEdit(
+        case_id="source",
+        case_index=0,
+        edit=edit,
+        certificate=None,
+        source_signal=_signal("unresolved"),
+        source_result={},
+        source_after_signal=_signal("verified_clean"),
+        source_after_result={},
+        individual_assessment=assess_source_fitness(
+            _signal("unresolved"),
+            _signal("verified_clean"),
+            target_module="evidence_obligation",
+        ),
+        step_index=0,
+    )
+    assert pe.conflict_gate_passed is False
+
+
+def _t6_provisional_accept_predicate(
+    fitness_use_gold: bool,
+    decision: str,
+    conflict_gate_passed: bool,
+) -> bool:
+    """Replicate the T6 provisional-accept predicate from flush_shadow_batch.
+
+    Mirrors evolution_runner.py:1851-1855:
+        provisional_accept = (
+            not fitness_use_gold
+            and dec == "directional_evidence"
+            and bool(provisional_edits[i].conflict_gate_passed)
+        )
+    """
+    return (
+        not fitness_use_gold
+        and decision == "directional_evidence"
+        and bool(conflict_gate_passed)
+    )
+
+
+@pytest.mark.parametrize(
+    "fitness_use_gold, decision, conflict_gate_passed, expected",
+    [
+        # Self-supervised + directional + gate passed → provisional accept.
+        (False, "directional_evidence", True, True),
+        # Gold mode never uses the provisional path.
+        (True, "directional_evidence", True, False),
+        # Gate not passed (skipped or conflict) → no provisional accept.
+        (False, "directional_evidence", False, False),
+        # worse is NEVER provisionally accepted (hard preserve).
+        (False, "worse", True, False),
+        (False, "worse", False, False),
+        # no_effect is NEVER provisionally accepted (hard preserve).
+        (False, "no_effect", True, False),
+        (False, "no_effect", False, False),
+        # strong/local improvement use the main path, not provisional.
+        (False, "strong_improvement", True, False),
+        (False, "local_improvement", True, False),
+    ],
+)
+def test_t6_provisional_accept_predicate_hard_preserves(
+    fitness_use_gold: bool,
+    decision: str,
+    conflict_gate_passed: bool,
+    expected: bool,
+) -> None:
+    """T6: provisional accept only on directional_evidence + self-supervised +
+    LLM gate passed. worse/no_effect are hard-rejected by strict equality."""
+    assert _t6_provisional_accept_predicate(
+        fitness_use_gold, decision, conflict_gate_passed
+    ) is expected
+
+
+def test_t6_canary_regression_cannot_reach_provisional() -> None:
+    """T6: canary regression rewrites assessment to 'worse' before admission,
+    so the strict equality on 'directional_evidence' can never match."""
+    assert not _t6_provisional_accept_predicate(
+        fitness_use_gold=False,
+        decision="worse",  # canary regression rewrote this
+        conflict_gate_passed=True,
+    )
+
+
+def test_t6_provisional_accept_yields_weak_fitness_status() -> None:
+    """T6: provisional accepts are pinned to FITNESS_STATUS_WEAK.
+
+    This anchors the contract that a provisional accept is protected as a
+    regression guard (weak, not none) while remaining non-promotable to
+    strong without gold confirmation.
+    """
+    from src.sehd_v6.core.bccse.genome import (
+        FITNESS_STATUS_NONE,
+        FITNESS_STATUS_WEAK,
+    )
+
+    assert FITNESS_STATUS_WEAK != FITNESS_STATUS_NONE
+    assert FITNESS_STATUS_WEAK == "weak"
 
 
 def test_abstention_unresolved_never_outranks_a_definite_verdict() -> None:

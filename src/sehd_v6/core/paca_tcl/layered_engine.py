@@ -17,6 +17,7 @@ from .basic_runner import (
     candidate_provider_user_prompt,
     candidate_system_prompt,
     load_paca_census,
+    parse_gold_label,
     private_ref,
     provider_call,
     validate_provider_census,
@@ -174,12 +175,19 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     confusion, states, path_pairs = Counter(), Counter(), Counter()
     runtime_valid = step_correct = positive_total = candidate_hits = 0
     for row in rows:
-        gold = bool(row["gold_label"])
-        predicted = row["state"] == "verified_error"
+        raw_gold = row.get("gold_label")
+        if raw_gold is None:
+            continue
+        gold = parse_gold_label(raw_gold)
+        state = str(row.get("state") or "unresolved")
+        predicted = state == "verified_error"
         positive_total += int(gold)
-        runtime_valid += int(bool(row["runtime_valid"]))
+        runtime_valid += int(bool(row.get("runtime_valid")))
         states[row["state"]] += 1
         path_pairs[(row["candidate_path"]["state"], row["boundary_path"]["state"])] += 1
+        if state == "unresolved":
+            confusion["unresolved"] += 1
+            continue
         if gold and predicted:
             confusion["tp"] += 1
             step_correct += int(row.get("responsible_step") in set(row.get("gold_steps") or []))

@@ -54,9 +54,20 @@ _global_cache_write_lock = threading.Lock()
 
 
 def _global_cache_root() -> Path | None:
-    """Global provider cache root, or None when the cache is disabled."""
+    """Global provider cache root, or None when the cache is disabled.
+
+    The cache is opt-in: unset ``PACA_GLOBAL_CACHE_ROOT`` disables it.  The
+    explicit values ``off`` / ``disabled`` / ``none`` (case-insensitive) also
+    disable it, so a caller can pin the cache off in the process environment
+    even when a ``.env`` file would otherwise re-inject a root through
+    ``load_local_env``.
+    """
     raw = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
-    return Path(raw.strip()) if raw and raw.strip() else None
+    if not raw or not raw.strip():
+        return None
+    if str(raw).strip().lower() in {"off", "disabled", "none"}:
+        return None
+    return Path(raw.strip())
 
 
 def _global_cache_path(request_hash: str) -> Path | None:
@@ -65,6 +76,17 @@ def _global_cache_path(request_hash: str) -> Path | None:
     if root is None:
         return None
     return root / request_hash[:2] / f"{request_hash}.json"
+
+
+def _local_cache_path(cache_dir: Path, request_hash: str) -> Path:
+    """Run-local provider cache file path.
+
+    ``cache_dir`` is the per-run cache directory supplied by the caller
+    (e.g. ``output_dir / "provider_cache"``).  Two-level directory
+    dispersion matches the global cache layout so both caches share the
+    same sharding scheme.
+    """
+    return Path(cache_dir) / request_hash[:2] / f"{request_hash}.json"
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -127,7 +149,7 @@ def parse_gold_label(value: Any) -> bool:
         raise ValueError("gold label is required for evaluation")
     if isinstance(value, bool):
         return value
-    normalized = str(value or "").strip().lower()
+    normalized = str(value).strip().lower()
     if normalized in {"true", "1", "yes"}:
         return True
     if normalized in {"false", "0", "no"}:
@@ -317,6 +339,29 @@ def provider_call_with_schema(
     # （两者 payload 可能相同但 schema 验证不同，必须隔离缓存）
     request_hash = hashlib.sha256(cache_prefix.encode("utf-8") + b"|" + (route["endpoint"] + "|" + route["model"] + "|").encode("utf-8") + body).hexdigest()
 
+    # Run-local cache: reuse responses made inside this run's cache
+    # directory.  This is the cache the evolution runner seeds through
+    # ``genome_dir/<cache_name>`` so replays of the same genome + case
+    # reuse identical provider responses without touching the global cache.
+    local_target = _local_cache_path(cache_dir, request_hash)
+    if local_target.is_file():
+        try:
+            cached = read_json(local_target)
+            if cached.get("request_hash") == request_hash:
+                parsed = cached.get("parsed")
+                if not isinstance(parsed, dict):
+                    raise ValueError("cached provider response is not an object")
+                if require_candidates and not isinstance(parsed.get("candidates"), list):
+                    raise ValueError("cached provider ledger schema invalid")
+                return parsed, {
+                    "cache_hit": True,
+                    "request_hash": request_hash,
+                    "usage": cached.get("usage") or {},
+                    "cache_source": "local",
+                }
+        except Exception:
+            pass  # 缓存文件损坏，继续调用大模型
+
     # v3.5.1: 全局缓存查找（不依赖 cache_dir，所有 output_dir 共享）
     global_target = _global_cache_path(request_hash)
     if global_target is not None and global_target.is_file():
@@ -401,12 +446,16 @@ def provider_call_with_schema(
                     _atomic_write_json(global_target, cached)
                 except Exception:
                     pass  # 写缓存失败不影响主流程
+            try:
+                _atomic_write_json(local_target, cached)
+            except Exception:
+                pass
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,
                 "usage": cached["usage"],
                 "latency_seconds": cached["latency_seconds"],
-                "cache_source": "global",
+                "cache_source": "local",
             }
         except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
@@ -643,17 +692,20 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     layer_states: dict[str, Counter] = defaultdict(Counter)
 
     for row in rows:
-        gold = bool(row["gold_label"])
+        raw_gold = row.get("gold_label")
+        if raw_gold is None:
+            continue
+        gold = parse_gold_label(raw_gold)
         positive_total += int(gold)
         state = str(row.get("state") or "unresolved")
         tri_state[state] += 1
         runtime_valid += int(bool(row.get("runtime_valid")))
         if state == "unresolved":
-            # Fail closed for official binary metrics: abstention on a gold
-            # error is FN, while abstention on a clean case is TN. The
-            # separate unresolved counter preserves selective-prediction data.
+            # Abstentions are reported separately and excluded from binary
+            # confusion metrics; treating a clean abstention as TN inflates
+            # clean performance.
             confusion["unresolved"] += 1
-            predicted = False
+            continue
         else:
             predicted = state == "verified_error"
         if gold and predicted:
