@@ -1039,7 +1039,17 @@ def sanitize_diagnosis(
 
     Only closed-vocabulary fields survive; the owner must be inside the
     allowed set, otherwise the diagnosis is downgraded to non-executable.
+
+    v5.9b contract-awareness: when the named failure field is a known
+    observable field, the chosen owner must actually own it.  A diagnosis
+    that asks a prosecution-side module to repair defense_coverage is
+    inert (observed on Camel/061): the owner is deterministically remapped
+    to the first allowed module that owns the field, or the diagnosis is
+    downgraded when no allowed module owns it.
     """
+    from .genome import OBSERVABLE_FIELDS
+
+    allowed = tuple(dict.fromkeys(str(module) for module in allowed_modules))
     bounded: dict[str, Any] = {
         "owner_executable": bool(parsed.get("owner_executable")),
         "failure_field": str(parsed.get("failure_field") or "")[:120],
@@ -1047,11 +1057,36 @@ def sanitize_diagnosis(
         "reasoning": str(parsed.get("reasoning") or "")[:300],
     }
     owner = str(parsed.get("owner_module") or "").strip()
-    if owner in set(allowed_modules):
-        bounded["owner_module"] = owner
-    else:
+    if owner not in set(allowed):
         bounded["owner_executable"] = False
         bounded["owner_module"] = None
+        return bounded
+
+    # Ownership check against the module runtime contracts. Free-text failure
+    # fields are left alone; a field from the closed observable vocabulary is
+    # checked and remapped deterministically.
+    failure_field = bounded["failure_field"].strip().lower()
+    if failure_field in set(OBSERVABLE_FIELDS):
+        owned = failure_field in MODULE_OBSERVABLE_FIELDS.get(owner, ())
+        if not owned:
+            remapped = next(
+                (
+                    module for module in allowed
+                    if failure_field in MODULE_OBSERVABLE_FIELDS.get(module, ())
+                ),
+                None,
+            )
+            if remapped is None:
+                bounded["owner_executable"] = False
+                bounded["owner_module"] = None
+                bounded["remap_reason"] = (
+                    f"no_allowed_module_owns_{failure_field}"
+                )
+                return bounded
+            bounded["remapped_from"] = owner
+            owner = remapped
+
+    bounded["owner_module"] = owner
     hint = parsed.get("intervention_hint")
     if isinstance(hint, Mapping) and bounded["owner_executable"]:
         bounded["intervention_hint"] = {

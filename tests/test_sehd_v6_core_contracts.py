@@ -502,6 +502,43 @@ def test_sanitize_diagnosis_keeps_allowed_owner_and_hint() -> None:
     assert bounded["intervention_hint"]["action"] == "a"
 
 
+def test_sanitize_diagnosis_remaps_owner_without_field_ownership() -> None:
+    """v5.9b: a diagnosis asking evidence_obligation to repair
+    defense_coverage is inert (the module owns prosecution-side fields).
+    The owner is deterministically remapped to an allowed module that owns
+    the field (observed failure mode on Camel/061)."""
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "evidence_obligation",
+            "failure_field": "defense_coverage",
+            "observed_gap": "defense certificates never assembled",
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("evidence_obligation", "clean_defense_boundary"),
+    )
+    assert bounded["owner_executable"] is True
+    assert bounded["owner_module"] == "clean_defense_boundary"
+    assert bounded["remapped_from"] == "evidence_obligation"
+
+
+def test_sanitize_diagnosis_downgrades_when_no_owner_holds_field() -> None:
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "evidence_obligation",
+            "failure_field": "defense_coverage",
+            "observed_gap": "gap",
+            "reasoning": "y",
+        },
+        allowed_modules=("evidence_obligation",),
+    )
+    assert bounded["owner_executable"] is False
+    assert bounded["owner_module"] is None
+    assert bounded["remap_reason"] == "no_allowed_module_owns_defense_coverage"
+
+
 def test_targeted_diagnosis_directive_enters_reflection_prompt() -> None:
     diagnosis = sanitize_diagnosis(
         {
