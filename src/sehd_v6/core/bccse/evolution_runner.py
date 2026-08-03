@@ -2905,7 +2905,9 @@ def run_online_evolution(
                 feature_description="",
                 type_confidence=0.0,
             )
-            gate.record_no_edit()
+            # v5.9b: a runtime-invalid detection carries no information about
+            # reflection productivity; it must not advance the no-edit
+            # convergence streak (infra failures are not fruitless reflection).
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -2976,7 +2978,13 @@ def run_online_evolution(
                 stable_canaries.pop(next(iter(stable_canaries)))
             if not pending_probe_commits:
                 stable_canaries_checkpoint = dict(stable_canaries)
-            gate.record_no_edit()
+            # v5.9b: a stable case is a detection success, not a fruitless
+            # reflection. Feeding it into the no-edit streak conflated
+            # "nothing to evolve here" with "reflection is unproductive"
+            # and halted a live run after a short mixed stream (observed:
+            # 5-case window consumed by 3 no-edits + 1 conflict reject + 1
+            # stable case, skipping the remaining queue). Convergence is
+            # defined over triggered cases only.
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,

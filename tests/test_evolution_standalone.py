@@ -483,3 +483,64 @@ def test_online_evolution_diagnosis_downgrades_illegal_owner(
     reflection = result.steps[-1].edit_proposal["reflection"]
     assert reflection["diagnosis"]["owner_executable"] is False
     assert result.edits_accepted == 0
+
+
+def test_stable_cases_do_not_advance_convergence_streak(
+    tmp_path, monkeypatch,
+) -> None:
+    """v5.9b: convergence is defined over triggered cases only. Stable
+    (untriggered) cases and runtime-invalid detections carry no information
+    about reflection productivity and must not consume the no-edit window;
+    a mixed stream must not halt the queue prematurely."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    responses = iter([
+        {"operation": "no_edit", "rationale": "declined"},
+        {"operation": "no_edit", "rationale": "declined"},
+        {"operation": "no_edit", "rationale": "declined"},
+    ])
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        if kwargs.get("purpose") == "reflection_diagnosis":
+            # No executable owner: the diagnosis stage must not consume the
+            # no-edit window either way; the step stays a plain no_edit.
+            return {
+                "owner_executable": False, "owner_module": None,
+                "failure_field": "", "observed_gap": "",
+                "reasoning": "nothing executable",
+            }, {"cache_hit": False}
+        return next(responses), {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source1", "anchor", "source2", "source3"),
+        records={"source1": {}, "anchor": {}, "source2": {}, "source3": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        convergence_window=3,
+        run_id="convergence_neutral_stable",
+    )
+
+    # Three triggered no-edits with a stable case in between: the stable case
+    # must not count, so the streak is 3 only after the last triggered case.
+    assert result.gate_summary["consecutive_no_edit"] == 3
+    assert result.gate_summary["convergence_signal"] is True
+    # Every case was processed; none was skipped by a premature halt.
+    decisions = [step.gate_decision for step in result.steps]
+    assert "halted" not in decisions
+    assert decisions.count("skip_no_edit") == 3
+    assert decisions.count("skip_stable") == 1
