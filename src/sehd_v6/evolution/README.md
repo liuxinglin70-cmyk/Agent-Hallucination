@@ -38,7 +38,9 @@ Run it directly:
 python -m src.sehd_v6.evolution \
   --records records.jsonl \
   --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
-  --output-dir evolution_output
+  --output-dir evolution_output \
+  --reflection-candidates 3 \
+  --max-mutation-calls 100
 ```
 
 ## Records input
@@ -64,12 +66,26 @@ For each case, in order:
 2. **Attribute**: self-supervised causal process reflection (no gold needed).
 3. **Classify**: HTC-TES type conditioning routes the failure to target
    modules.
-4. **Reflect/Mutate**: LLM or template reflection proposes a typed skill edit.
-5. **Gate**: structural constraint gate validates edit safety.
-6. **Fitness**: source replay plus rolling stable-case canaries; a regression
+4. **Observe**: build a structured runtime observation containing executable
+   output fields, failure owner candidates and module ownership.
+5. **Reflect/Mutate**: make bounded independent mutation calls, normalize and
+   deduplicate candidates, then let a `reflection_critic` call select one
+   replay-worthy edit. The critic does not rewrite rules or certify correctness.
+6. **Gate**: structural constraint gate validates edit safety.
+7. **Fitness**: source replay plus rolling stable-case canaries; a regression
    rejects the edit.
-7. **Commit/Rollback**: one-edit shadow commit with canary non-regression.
-8. **Experience**: HTC-TES experience memory is updated.
+8. **Commit/Rollback**: one-edit shadow commit with canary non-regression.
+9. **Experience**: HTC-TES experience memory is updated.
+
+The public `run_evolution()` API defaults to one reflection candidate for
+backward-compatible cost. The CLI defaults to three independent candidates and
+supports `--reflection-candidates 1..5`. Generation, attribution, critic and
+conflict-gate calls share `--max-mutation-calls` (CLI default `100`); exhaustion
+fails closed and is recorded as `mutation_budget_exhausted`.
+
+The per-step `reflection` audit records generated/selected candidate counts,
+proposed and validated target modules, critic decision, and provider cache-hit
+metadata. A legacy single-edit provider response remains supported.
 
 Artifacts written to `output_dir`:
 

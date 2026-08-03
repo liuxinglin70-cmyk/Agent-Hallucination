@@ -225,7 +225,9 @@ experience memory 里每条记录的 outcome 都是结构化的（封闭词表�
 因此 `get_reflection_summary()` 可以按 stage 聚合，告诉反思“**尝试通常卡在哪一阶段**”，
 而不只是“失败了”。
 
-LLM 只能返回一个 `no_edit` 或一个单模块 edit。合法 edit 要满足：
+每次独立反思请求返回一个 `no_edit` 或一个单模块 edit；CLI 可以对同一
+failure observation 发起最多 5 次独立请求，再进行候选去重和 critic 选择。
+合法 edit 要满足：
 
 - 操作是 `add_rule`、`modify_rule` 或 `remove_rule`；
 - target module 位于 attribution/type 允许集合；
@@ -235,17 +237,24 @@ LLM 只能返回一个 `no_edit` 或一个单模块 edit。合法 edit 要满足
 
 `expected_effect` 只是反思假设，不是通过凭证。它用于审查 LLM 是否提出了可验证目标；真正是否产生变化仍由 detector replay 决定。
 
-当前这一步是反思引擎重构的第一阶段，而不是完整的多 Agent 认证。后续应将
-反思拆成至少两个结构：`failure_observation`（事实性输出差分）和
-`intervention_proposal`（单模块、单动作规则假设），再由独立的 replay/evaluator
-角色验证二者是否一致。多次候选生成可以作为 test-time scaling 使用，但不能
+当前这一步是反思引擎重构的第一阶段，而不是完整的多 Agent 认证。现有流程
+已经拆出 `failure_observation`（事实性运行输出观察）、多个
+`intervention_proposal`（单模块、单动作规则假设）和 critic 选择；source
+replay/evaluator 仍负责验证二者是否一致。多个请求提供搜索多样性，但不能
 把同一模型的多数票当作独立正确性证据。
 
-当前实现已进一步提供有限的协作反思路径：一次 mutation 请求可以返回最多
-`reflection_candidate_count` 个候选；当候选超过一个时，critic 只选择最值得
-replay 的候选，不改写规则，也不判断最终 verdict。选择结果、候选数量和
-provider cache 命中会写入 step 的 reflection audit。旧的单 edit JSON 仍可被
-兼容解析，但不再强制所有 provider 一次生成多个候选。
+当前实现已进一步提供有限的协作反思路径：`reflection_candidate_count` 控制
+独立 mutation 请求数（库 API 默认 1，CLI `--reflection-candidates` 默认 3，
+范围 1..5）。候选按 target module、operation、rule content 和 rule index 去重；
+候选超过一个时，critic 使用 `purpose=reflection_critic` 只选择最值得 replay
+的候选，不改写规则，也不判断最终 verdict。选择结果、候选数量、原始/验证后
+owner 和 provider cache 命中会写入 step 的 reflection audit。旧的单 edit JSON
+仍可被兼容解析。
+
+所有 attribution、reflection、critic 和 conflict-gate provider 调用共享
+`max_mutation_calls` 硬上限。CLI 参数为 `--max-mutation-calls`，默认 100；
+耗尽后 fail-closed，并记录 `mutation_budget_exhausted`，避免候选数和 retry
+次数造成调用量乘法失控。
 
 ### 3.5 structural/type gate
 
@@ -375,8 +384,9 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 - `canary_cases`：用于非回归检查的 detector 次数。
 - `provider_calls`：历史兼容字段，表示 detector-call 计数。
 - `detector_calls`：明确的 detector/source/canary/probe 调用数。
-- `mutation_calls`：attribution/reflection/merge provider 调用数。
+- `mutation_calls`：attribution/reflection/critic/conflict-gate provider 调用数。
 - `mutation_errors`：mutation provider 异常数。
+- `mutation_budget_exhausted`：被 mutation-call 硬上限阻断的调用尝试数。
 - `mutation_cache_hits`：mutation provider 从全局 cache 命中的次数。
 - `total_provider_calls`：`detector_calls + mutation_calls`，用于审计总调用量。
 - `authority_valid_rate` / `invalid_count`：post-hoc 指标只对显式 authority 且 runtime-valid 的输出计算；缺失 authority 的旧 artifact 记为 invalid，不计入 TP/TN/FP/FN。
@@ -391,6 +401,8 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 4. source/canary 的 `genome_hash` 与 detector artifact 路径：排除 replay harness 固定返回 baseline 的假进化；
 5. provider route payload：确认 model、temperature、max_tokens 和 timeout 与配置一致；
 6. authority failure reasons：区分核心 proof 失败、必要 appeal 失败和辅助 provider 降级；
-7. `detector_calls`、`mutation_calls`、`mutation_errors`：不要再把 detector replay 数误认为全部 API 调用数。
+7. `detector_calls`、`mutation_calls`、`mutation_errors`、
+   `mutation_budget_exhausted`：核对 detector replay、反思协作调用和预算阻断，
+   不要把 detector replay 数误认为全部 API 调用数。
 
 实验 harness 的 replay 模式也有明确边界：默认 live 模式会重新运行真实 detector 和 child genome；固定 prediction artifact 只能通过 `FIVE_CASE_REPLAY_MODE=stored_compat` 进入兼容审计，而且缺失显式 authority 时会被阻断。

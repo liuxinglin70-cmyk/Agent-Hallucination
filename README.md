@@ -299,8 +299,27 @@ python -m src.sehd_v6.evolution \
 every case is:
 
 `detect -> attribute (self-supervised) -> HTC-TES type routing ->
-reflect/mutate -> structural gate -> source replay + canary fitness ->
-commit/rollback -> experience memory`
+structured observation -> independent reflection candidates -> candidate
+deduplication -> critic selection -> structural gate -> source replay + canary
+fitness -> commit/rollback -> experience memory`
+
+The CLI exposes bounded reflection test-time scaling:
+
+```bash
+python -m src.sehd_v6.evolution \
+  --records records.jsonl \
+  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --output-dir evolution_output \
+  --reflection-candidates 3 \
+  --max-mutation-calls 100
+```
+
+`--reflection-candidates` controls independent mutation samples per triggered
+case (1..5). The critic only prioritizes which candidate reaches replay; it does
+not certify correctness. Generation, attribution, critic and conflict-gate
+calls share the hard `--max-mutation-calls` budget and fail closed when it is
+exhausted. The evolution audit records candidate count, owner validation,
+critic decision and cache metadata.
 
 Artifacts written to `evolution_output`:
 
