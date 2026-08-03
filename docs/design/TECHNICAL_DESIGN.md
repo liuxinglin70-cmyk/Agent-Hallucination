@@ -328,10 +328,14 @@ artifact/authorization audit.
 
 ## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Pending Approval)
 
-Implementation status: mechanism 4 (structuralized rejection feedback,
-including the same-category retry cooldown) and mechanism 5 (base-layer
-failure surfacing) are implemented and covered by regression tests. The
-remaining mechanisms stay pending approval.
+Implementation status: mechanism 1 (implemented as a deterministic,
+provider-free dual-channel owner arbitration; the LLM cross-examination
+variant remains a possible later extension), mechanism 4 (structuralized
+rejection feedback, including the same-category retry cooldown), mechanism 5
+(base-layer failure surfacing) and mechanism 4-localization telemetry
+(`terminal_step_bias`, audit-only) are implemented and covered by regression
+tests. Mechanisms 2 (contrastive replay acceptance) and 3 (procedural
+abstention ladder) stay pending approval.
 
 This section records a design proposal produced from the 2026-08-03 five-case
 dry-run (`trial_5case_official_r1`) and a survey of current self-evolving
@@ -395,29 +399,33 @@ mode observed here: an internally coherent verdict that misses the label.
 The proposal below targets exactly that gap while preserving every
 architectural invariant.
 
-### Mechanism 1: Dual-pass cross-examination attribution (attribution v2)
+### Mechanism 1: Dual-pass cross-examination attribution (attribution v2, deterministic core implemented)
 
-Adapted from AgentDebugX. Replace the single-pass static error-type-to-module
-map with two independent owner hypotheses followed by an evidenced
-adjudication:
+Adapted from AgentDebugX. Implemented form (v5.8 batch 2): a deterministic,
+provider-free owner arbitration adds ONE second owner hypothesis from
+label-free runtime evidence instead of calling a second LLM investigator:
 
 ```text
-h_process  = owner proposed from label-free diagnostics
-             (coverage states, quarantine counts, candidate structure)
-h_counter  = owner proposed from the verdict-vs-process gap analysis
-             (which stage's evidence is too thin for the verdict strength)
-owner      = cross_examine(h_process, h_counter)
+h_process  = omission-typed FN with a clean verdict
+             -> candidate_trigger (process channel)
+h_counter  = quarantined error certificates on an FN verdict
+             -> evidence_obligation (verdict-vs-evidence gap channel)
+             FP verdict with complete defense -> clean_defense_boundary
+owner route = attribution route + arbitration hypothesis
 subject to: polarity(owner) == polarity(gold_mismatch)
+            attributor's owner keeps root-cause priority
             structural gate and fitness unchanged
 ```
 
-The cross-examination is a bounded two-candidate comparison with mandatory
-evidence references, not an open-ended choice; the static map remains the
-deterministic fallback when both hypotheses are missing or polarity-invalid.
-The same dual pass feeds the localization audit, so a detector-localized
-step that disagrees with the earliest sufficient-evidence step is recorded
-as a localization signal for `causal_link_test`/`earliest_origin_tiebreak`
-routing rather than silently accepted. This unblocks modules such as
+The arbitration hypothesis widens the bounded route; it never replaces or
+reorders the attributor's owner and never crosses the gold polarity side.
+The LLM cross-examination variant (two independent investigations followed
+by an evidenced two-candidate choice) remains a possible later extension.
+The same batch adds localization telemetry: a verified_error localized by
+the temporal fallback records a `terminal_step_bias` audit signal (the
+detector-localized step disagreeing with earlier sufficient-evidence
+origins), routing visibility for `causal_link_test`/`earliest_origin_tiebreak`
+without changing any verdict. This unblocks modules such as
 `candidate_trigger` and `evidence_obligation` for FN cases whose coverage
 states prove the court, not the evidence budget, is the broken stage.
 

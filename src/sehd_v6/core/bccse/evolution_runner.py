@@ -582,6 +582,103 @@ def _build_mutation_retry_feedback(
     )
 
 
+# v5.8 fix 1: dual-channel owner arbitration.  FN cases with an internally
+# coherent clean verdict were previously locked into abstention_rule /
+# causal_link_test by the static attribution map, while the true root cause
+# (candidate-generation sensitivity or quarantined evidence) lives in other
+# genome modules.  Arbitration adds ONE deterministic second owner hypothesis
+# from label-free runtime evidence; it never reorders the attributor's owner,
+# never crosses the gold polarity side, and adds no provider call.
+_FN_POLARITY_MODULES = frozenset({
+    "candidate_trigger", "evidence_obligation", "candidate_to_verifier_route",
+    "atomic_verifier_instruction", "causal_link_test", "abstention_rule",
+})
+_FP_POLARITY_MODULES = frozenset({
+    "clean_defense_boundary", "abstention_rule", "causal_link_test",
+    "earliest_origin_tiebreak", "evidence_obligation",
+})
+_ARBITRATION_POLARIZED_ERROR_TYPES = frozenset({
+    ErrorType.FALSE_POSITIVE,
+    ErrorType.FALSE_NEGATIVE,
+    ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+    ErrorType.FALSE_NEGATIVE_CLEAN,
+})
+
+
+def _owner_arbitration(
+    *,
+    signal: Any,
+    detection_result: Mapping[str, Any] | None,
+    primary_type: Any,
+) -> tuple[str, str]:
+    """Return one deterministic owner hypothesis and its evidence channel.
+
+    Channel A (process): an omission-typed false negative with a clean
+    verdict means the candidate-generation stage never surfaced the
+    missing-action candidate -> ``candidate_trigger``.
+    Channel B (verdict-vs-evidence gap): quarantined error certificates on a
+    false-negative verdict mean error evidence was built but failed
+    validation -> ``evidence_obligation``; on a false-positive verdict with a
+    complete defense the defense boundary is the gap owner.
+
+    Returns ``("", "")`` when no channel has label-free evidence.  Callers
+    append the hypothesis to the bounded attribution route; the attributor's
+    owner keeps root-cause priority and gold polarity is never crossed.
+    """
+    if getattr(signal, "error_type", None) not in _ARBITRATION_POLARIZED_ERROR_TYPES:
+        return "", ""
+    detection_result = detection_result or {}
+    state = str(
+        getattr(signal, "state", "") or detection_result.get("state") or ""
+    )
+    gold_label = getattr(signal, "gold_label", None)
+    fn_side = bool(gold_label) and state == "verified_clean"
+    fp_side = gold_label is False and state == "verified_error"
+    if fn_side:
+        pool = _FN_POLARITY_MODULES
+    elif fp_side:
+        pool = _FP_POLARITY_MODULES
+    else:
+        return "", ""
+    type_value = str(getattr(primary_type, "value", primary_type) or "")
+    if fn_side and type_value == "omission":
+        return "candidate_trigger", "process_channel"
+    quarantined = int(
+        detection_result.get("quarantined_error_certificate_count") or 0
+    )
+    if fn_side and quarantined > 0:
+        return "evidence_obligation", "verdict_evidence_gap"
+    if fp_side:
+        defense_coverage = str(detection_result.get("defense_coverage") or "")
+        if defense_coverage == "complete":
+            return "clean_defense_boundary", "verdict_evidence_gap"
+    return "", ""
+
+
+def _localization_bias_signal(
+    detection_result: Mapping[str, Any] | None,
+) -> str:
+    """Label-free telemetry for terminal-step localization bias.
+
+    v5.8 fix 4: when a verified_error was localized by the temporal fallback
+    and the responsible step is the last audited step, earlier
+    sufficient-evidence origins were likely skipped (the observed dry-run
+    case localized step 12 while the planted error was step 1). Diagnostic
+    only: the signal feeds routing telemetry, never the verdict.
+    """
+    detection_result = detection_result or {}
+    if str(detection_result.get("state") or "") != "verified_error":
+        return ""
+    if str(
+        detection_result.get("localization_status") or ""
+    ) != "failed_temporal_fallback":
+        return ""
+    responsible_step = detection_result.get("responsible_step")
+    if responsible_step is None:
+        return ""
+    return "terminal_step_bias"
+
+
 def _rejected_proposal_duplicate(
     rejected: Sequence[Mapping[str, Any]],
     *,
@@ -1513,6 +1610,9 @@ def run_online_evolution(
     # and (b) gives the LLM structured, case-agnostic feedback. Raw provider
     # text is never echoed back (no prompt poison, no evaluator metadata).
     mutation_retry_feedback: dict[str, list[str]] = {}
+    # v5.8 fix 4: label-free localization-bias telemetry collected during the
+    # run; audit output only, never feeds verdicts or fitness.
+    localization_bias_signals: list[dict[str, str]] = []
     # v5.6: source-scoped rejected-proposal tracking. Retry must explore a
     # genuinely different intervention, not paraphrase the rejected owner. The
     # canonical signature is (case, owner module, operation, content hash) and
@@ -2720,9 +2820,34 @@ def run_online_evolution(
         evolution_direction = type_evolution._infer_evolution_direction(
             signal.state, signal.gold_label,
         )
+        # v5.8 fix 1: dual-channel owner arbitration. The hypothesis widens
+        # the bounded attribution route; the attributor's owner keeps
+        # root-cause priority (re-enforced below) and gold polarity is
+        # enforced inside the arbitration itself.
+        arbitration_owner, arbitration_channel = _owner_arbitration(
+            signal=signal,
+            detection_result=detection_result,
+            primary_type=type_result.primary_type,
+        )
+        attribution_route = (signal.target_module, signal.secondary_module)
+        if arbitration_owner and arbitration_owner not in attribution_route:
+            attribution_route = (*attribution_route, arbitration_owner)
+            print(
+                f"    [ARB] owner hypothesis: {arbitration_owner} via "
+                f"{arbitration_channel}"
+            )
+        bias_signal = _localization_bias_signal(detection_result)
+        if bias_signal:
+            localization_bias_signals.append({
+                "case_id": case_id,
+                "signal": bias_signal,
+                "responsible_step": str(
+                    detection_result.get("responsible_step")
+                ),
+            })
         type_allowed_modules = type_evolution.intersect_allowed_modules(
             type_result.primary_type,
-            (signal.target_module, signal.secondary_module),
+            attribution_route,
             secondary_type=type_result.secondary_type,
         )
         # Keep the causal attributor's owner first. Type classification may
@@ -3860,6 +3985,7 @@ def run_online_evolution(
             "total_provider_calls": (
                 budget_usage["detector_calls"] + budget_usage["mutation_calls"]
             ),
+            "localization_bias_signals": localization_bias_signals,
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,
             "validation_probe_every": validation_probe_every,

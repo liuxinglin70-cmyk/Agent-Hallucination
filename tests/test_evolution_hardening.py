@@ -3717,4 +3717,158 @@ def test_retry_feedback_includes_rejected_source_attempts() -> None:
     assert "abstention_rule" in text
 
 
+# ---------------------------------------------------------------------------
+# v5.8 fix 1: dual-channel owner arbitration.  Gold polarity stays locked,
+# the attributor's owner stays first, but a second deterministic owner
+# hypothesis (process channel / verdict-vs-evidence gap channel) may widen
+# the allowed module set so FN cases are no longer locked into modules that
+# cannot express the true root cause.
+# ---------------------------------------------------------------------------
+
+
+def _fn_signal():
+    from types import SimpleNamespace
+    from src.sehd_v6.core.bccse.step_attributor import ErrorType
+
+    return SimpleNamespace(
+        state="verified_clean",
+        error_type=ErrorType.FALSE_NEGATIVE_CLEAN,
+        target_module="abstention_rule",
+        secondary_module="causal_link_test",
+        gold_label=True,
+        has_gold=True,
+    )
+
+
+def test_arbitration_omission_clean_routes_candidate_trigger() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "complete",
+            "quarantined_error_certificate_count": 0,
+        },
+        primary_type=HallucinationType.OMISSION,
+    )
+    assert owner == "candidate_trigger"
+    assert channel == "process_channel"
+
+
+def test_arbitration_quarantined_error_certs_route_evidence_obligation() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "incomplete",
+            "quarantined_error_certificate_count": 2,
+        },
+        primary_type=HallucinationType.FACTUAL,
+    )
+    assert owner == "evidence_obligation"
+    assert channel == "verdict_evidence_gap"
+
+
+def test_arbitration_respects_gold_polarity_lock() -> None:
+    from types import SimpleNamespace
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.step_attributor import ErrorType
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    fp_signal = SimpleNamespace(
+        state="verified_error",
+        error_type=ErrorType.FALSE_POSITIVE,
+        target_module="clean_defense_boundary",
+        secondary_module="abstention_rule",
+        gold_label=False,
+        has_gold=True,
+    )
+    # FP polarity must never surface an FN-side module such as
+    # candidate_trigger, even when the omission heuristic matches.
+    owner, _ = runner._owner_arbitration(
+        signal=fp_signal,
+        detection_result={
+            "prosecution_coverage": "complete",
+            "quarantined_error_certificate_count": 0,
+            "defense_coverage": "complete",
+        },
+        primary_type=HallucinationType.OMISSION,
+    )
+    assert owner in {"", "clean_defense_boundary", "abstention_rule"}
+
+
+def test_arbitration_returns_empty_without_label_free_evidence() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_fn_signal(),
+        detection_result={
+            "prosecution_coverage": "complete",
+            "quarantined_error_certificate_count": 0,
+        },
+        primary_type=HallucinationType.FACTUAL,
+    )
+    assert owner == ""
+    assert channel == ""
+
+
+def test_arbitration_skips_non_polarized_error_types() -> None:
+    from types import SimpleNamespace
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.step_attributor import ErrorType
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    neutral = SimpleNamespace(
+        state="unresolved",
+        error_type=ErrorType.CORRECT,
+        target_module="",
+        secondary_module="",
+        gold_label=None,
+        has_gold=False,
+    )
+    owner, channel = runner._owner_arbitration(
+        signal=neutral,
+        detection_result={"prosecution_coverage": "complete"},
+        primary_type=HallucinationType.OMISSION,
+    )
+    assert owner == ""
+    assert channel == ""
+
+
+# ---------------------------------------------------------------------------
+# v5.8 fix 4: localization-bias telemetry.  Diagnostic only; never feeds
+# verdicts or fitness.
+# ---------------------------------------------------------------------------
+
+
+def test_localization_bias_signal_terminal_fallback() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._localization_bias_signal({
+        "state": "verified_error",
+        "localization_status": "failed_temporal_fallback",
+        "responsible_step": 12,
+    }) == "terminal_step_bias"
+
+
+def test_localization_bias_signal_silent_on_complete_localization() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._localization_bias_signal({
+        "state": "verified_error",
+        "localization_status": "complete",
+        "responsible_step": 12,
+    }) == ""
+    assert runner._localization_bias_signal({
+        "state": "verified_clean",
+        "localization_status": "failed_temporal_fallback",
+        "responsible_step": 12,
+    }) == ""
+    assert runner._localization_bias_signal(None) == ""
+
+
 
