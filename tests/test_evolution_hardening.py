@@ -3846,6 +3846,91 @@ def test_arbitration_ignores_flat_legacy_field_layout() -> None:
     assert channel == ""
 
 
+def _unresolved_signal():
+    from types import SimpleNamespace
+    from src.sehd_v6.core.bccse.step_attributor import ErrorType
+
+    return SimpleNamespace(
+        state="unresolved",
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+    )
+
+
+def test_arbitration_unresolved_defense_rows_route_clean_defense_boundary() -> None:
+    """v5.9c: unresolved + complete defense WITH certificates + surviving
+    error certificates. The static route deadlocked these at abstention_rule
+    (10/14 no-edits across four runs); the executable owner is the defense
+    boundary, which must answer the surviving error evidence."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_unresolved_signal(),
+        detection_result={
+            "proof_adjudication": {
+                "prosecution_coverage": "incomplete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
+            "combined_prosecution": {"candidates": [
+                {"candidate_id": "c1"}, {"candidate_id": "c2"},
+            ]},
+            "combined_defense": {"certificates": [
+                {"target_candidate_id": "c1"},
+            ]},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == "clean_defense_boundary"
+    assert channel == "unresolved_balance"
+
+
+def test_arbitration_unresolved_vacuous_defense_routes_evidence_obligation() -> None:
+    """v5.9c: defense coverage complete with ZERO certificates is a vacuous
+    complete; defense-side evidence construction never ran."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_unresolved_signal(),
+        detection_result={
+            "proof_adjudication": {
+                "prosecution_coverage": "incomplete",
+                "defense_coverage": "complete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
+            "combined_prosecution": {"candidates": [{"candidate_id": "c1"}]},
+            "combined_defense": {"certificates": []},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == "evidence_obligation"
+    assert channel == "unresolved_balance"
+
+
+def test_arbitration_unresolved_incomplete_defense_stays_silent() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, channel = runner._owner_arbitration(
+        signal=_unresolved_signal(),
+        detection_result={
+            "proof_adjudication": {
+                "prosecution_coverage": "incomplete",
+                "defense_coverage": "incomplete",
+            },
+            "evidence_health": {"quarantined_error_certificate_count": 0},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+    )
+    assert owner == ""
+    assert channel == ""
+
+
 def test_arbitration_fn_channel_priority_quarantine_beats_defense() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType

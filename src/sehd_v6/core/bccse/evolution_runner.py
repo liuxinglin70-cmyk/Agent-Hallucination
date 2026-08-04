@@ -644,6 +644,35 @@ _ARBITRATION_POLARIZED_ERROR_TYPES = frozenset({
     ErrorType.FALSE_NEGATIVE_UNRESOLVED,
     ErrorType.FALSE_NEGATIVE_CLEAN,
 })
+# v5.9c: unresolved triggers enter arbitration too. Their channel is fully
+# label-free (coverage/certificate balance only), so admitting them crosses
+# no gold polarity. Without this gate the unresolved_balance channel was
+# unreachable and every unresolved+complete-defense case stayed deadlocked
+# at the static abstention_rule route.
+_ARBITRATION_UNRESOLVED_ERROR_TYPES = frozenset({
+    ErrorType.UNRESOLVED_SHOULD_ERROR,
+    ErrorType.UNRESOLVED_SHOULD_CLEAN,
+    ErrorType.UNRESOLVED_UNKNOWN,
+})
+
+
+def _certificate_rows(
+    detection_result: Mapping[str, Any], side: str,
+) -> list[Mapping[str, Any]]:
+    """Return enumerable prosecution/defense certificate rows."""
+    keys = (
+        ("combined_prosecution", "prosecution")
+        if side == "prosecution"
+        else ("combined_defense", "defense")
+    )
+    for key in keys:
+        payload = detection_result.get(key)
+        if not isinstance(payload, Mapping):
+            continue
+        rows = payload.get("candidates") or payload.get("certificates") or []
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, Mapping)]
+    return []
 
 
 def _owner_arbitration(
@@ -670,12 +699,44 @@ def _owner_arbitration(
     append the hypothesis to the bounded attribution route; the attributor's
     owner keeps root-cause priority and gold polarity is never crossed.
     """
-    if getattr(signal, "error_type", None) not in _ARBITRATION_POLARIZED_ERROR_TYPES:
+    if getattr(signal, "error_type", None) not in (
+        _ARBITRATION_POLARIZED_ERROR_TYPES | _ARBITRATION_UNRESOLVED_ERROR_TYPES
+    ):
         return "", ""
     detection_result = detection_result or {}
     state = str(
         getattr(signal, "state", "") or detection_result.get("state") or ""
     )
+    # v5.9c: label-free arbitration for unresolved triggers. The funnel
+    # analysis showed every unresolved case with a complete defense was
+    # statically routed to abstention_rule, whose contract cannot rewrite
+    # the deterministic verdict, so diagnosis+generation correctly produced
+    # only NO_EDIT (10/14 no-edits across four runs). The real owner is
+    # decided by who carried the stalemate:
+    # - complete defense WITH certificates + surviving error certificates:
+    #   the defense boundary must answer the surviving error evidence ->
+    #   clean_defense_boundary;
+    # - complete defense with ZERO certificates (vacuous complete):
+    #   defense-side evidence construction never ran -> evidence_obligation.
+    if state == "unresolved":
+        health_u = detection_result.get("evidence_health") or {}
+        quarantined_u = int(
+            health_u.get("quarantined_error_certificate_count") or 0
+        ) if isinstance(health_u, Mapping) else 0
+        proof_u = detection_result.get("proof_adjudication") or {}
+        defense_complete_u = parse_coverage(
+            proof_u.get("defense_coverage") if isinstance(proof_u, Mapping) else None
+        ).state == "complete"
+        if not defense_complete_u:
+            return "", ""
+        defense_rows_u = _certificate_rows(detection_result, "defense")
+        prosecution_rows_u = _certificate_rows(detection_result, "prosecution")
+        surviving_error = max(len(prosecution_rows_u) - quarantined_u, 0)
+        if defense_rows_u and surviving_error > 0:
+            return "clean_defense_boundary", "unresolved_balance"
+        if not defense_rows_u:
+            return "evidence_obligation", "unresolved_balance"
+        return "", ""
     gold_label = getattr(signal, "gold_label", None)
     fn_side = bool(gold_label) and state == "verified_clean"
     fp_side = gold_label is False and state == "verified_error"
@@ -720,13 +781,7 @@ def _owner_arbitration(
         # evidence_obligation-only channel asked the prosecution-side module
         # to fix a defense-side construction, which source replay can score
         # but which the trace rarely justifies.
-        defense = detection_result.get("combined_defense") or detection_result.get("defense") or {}
-        defense_rows: Any = []
-        if isinstance(defense, Mapping):
-            defense_rows = defense.get("candidates") or defense.get("certificates") or []
-        if isinstance(defense_rows, list) and any(
-            isinstance(row, Mapping) for row in defense_rows
-        ):
+        if _certificate_rows(detection_result, "defense"):
             return "clean_defense_boundary", "verdict_evidence_gap"
         # FN carried by a complete clean defense without enumerable rows:
         # evidence_obligation owns the defense-side evidence standard and
@@ -3335,7 +3390,10 @@ def run_online_evolution(
                             user=diag_user,
                             cache_dir=mutation_cache / "diagnosis",
                         )
-                        diagnosis = sanitize_diagnosis(diag_parsed, allowed_modules)
+                        diagnosis = sanitize_diagnosis(
+                            diag_parsed, allowed_modules,
+                            runtime_observation=runtime_observation,
+                        )
                     except Exception as exc:
                         diagnosis = {
                             "owner_executable": False, "owner_module": None,

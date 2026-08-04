@@ -539,6 +539,47 @@ def test_sanitize_diagnosis_downgrades_when_no_owner_holds_field() -> None:
     assert bounded["remap_reason"] == "no_allowed_module_owns_defense_coverage"
 
 
+def test_sanitize_diagnosis_rejects_trace_contradicting_emptiness_claim() -> None:
+    """v5.9c: a diagnosis claiming 'defense certificates are empty' while
+    court_balance shows 12 contradicts the observation (observed on
+    Camel/072 / Magentic_One/074) and is downgraded before burning a
+    targeted generation call."""
+    observation = {"court_balance": {"defense_certificates": 12}}
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "clean_defense_boundary",
+            "failure_field": "defense_certificates",
+            "observed_gap": "defense certificates are empty so the boundary never fired",
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("clean_defense_boundary",),
+        runtime_observation=observation,
+    )
+    assert bounded["owner_executable"] is False
+    assert bounded["owner_module"] is None
+    assert bounded["remap_reason"] == "condition_contradicts_trace:defense_certificates=12"
+
+
+def test_sanitize_diagnosis_keeps_consistent_claims() -> None:
+    observation = {"court_balance": {"defense_certificates": 0}}
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": True,
+            "owner_module": "clean_defense_boundary",
+            "failure_field": "defense_certificates",
+            "observed_gap": "defense certificates are empty",
+            "reasoning": "y",
+            "intervention_hint": {"condition": "c", "action": "a"},
+        },
+        allowed_modules=("clean_defense_boundary",),
+        runtime_observation=observation,
+    )
+    assert bounded["owner_executable"] is True
+    assert bounded["owner_module"] == "clean_defense_boundary"
+
+
 def test_targeted_diagnosis_directive_enters_reflection_prompt() -> None:
     diagnosis = sanitize_diagnosis(
         {

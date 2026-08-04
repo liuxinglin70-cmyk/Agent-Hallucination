@@ -1014,11 +1014,20 @@ def build_failure_diagnosis_prompt(
         "whose runtime contract can EXECUTE a repair of that output. A module "
         "is executable here if its contract names the failing artifact "
         "(certificate, candidate, boundary finding, evidence field, origin "
-        "selection). abstention_rule is executable when the failing artifact "
-        "is the evidence standard that kept a case unresolved despite "
-        "complete one-sided evidence: its boundary finding changes the "
-        "court's evidence construction and the observable effect is a state "
-        "or trigger change.\n"
+        "selection).\n"
+        "GROUNDING RULES: every count you mention (defense certificates, "
+        "surviving error certificates, quarantined certificates, covered "
+        "candidates) must be copied verbatim from court_balance in "
+        "structured_runtime_observation. Never claim a list is empty or a "
+        "count is zero unless court_balance says so; a claim contradicting "
+        "the observation is discarded automatically.\n"
+        "abstention_rule is executable ONLY when the failing artifact is the "
+        "boundary-route evidence standard itself AND the boundary path has "
+        "not already decided; it cannot rewrite the final adjudication. If "
+        "the stalemate is carried by complete defense evidence against "
+        "surviving error certificates, the executable owner is "
+        "clean_defense_boundary (tighter emission conditions), not "
+        "abstention_rule.\n"
         f"ALLOWED_MODULES={json.dumps(allowed, ensure_ascii=False)}\n"
         "Return exactly one JSON object:\n"
         '{"failure_field":"...","observed_gap":"...","owner_module":"one of ALLOWED_MODULES",'
@@ -1032,8 +1041,34 @@ def build_failure_diagnosis_prompt(
     return system, user
 
 
+# v5.9c: closed-vocabulary emptiness claims that can be checked against
+# court_balance. A diagnosis asserting "no defense certificates" while the
+# trace shows 12 is a hallucinated condition (observed on Camel/072,
+# Magentic_One/074, BFCL/025); the whole pipeline then burns a targeted
+# generation call only to refuse it. Contradictions downgrade the diagnosis.
+_EMPTY_CLAIM_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("defense_certificates", (
+        "no defense certificate",
+        "defense certificates are empty",
+        "defense certificate is empty",
+        "defense_certificates is 0",
+        "defense_certificates is empty",
+        "zero defense certificate",
+        "defense certificate count is 0",
+        "without any defense certificate",
+    )),
+    ("surviving_error_certificates", (
+        "no surviving error certificate",
+        "no error certificate survives",
+        "surviving_error_certificates is 0",
+        "zero surviving error certificate",
+    )),
+)
+
+
 def sanitize_diagnosis(
     parsed: Mapping[str, Any], allowed_modules: Sequence[str],
+    runtime_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bound an untrusted diagnosis payload before it re-enters a prompt.
 
@@ -1087,6 +1122,33 @@ def sanitize_diagnosis(
             owner = remapped
 
     bounded["owner_module"] = owner
+    # v5.9c trace-consistency check: quantitative emptiness claims inside the
+    # diagnosis must agree with court_balance. Only observed contradictions
+    # (claim empty, actual > 0) downgrade; free-text without such claims is
+    # left alone.
+    if runtime_observation is not None and bounded["owner_executable"]:
+        balance = runtime_observation.get("court_balance") or {}
+        hint = parsed.get("intervention_hint")
+        hint = hint if isinstance(hint, Mapping) else {}
+        claim_text = " ".join((
+            bounded["observed_gap"],
+            bounded["reasoning"],
+            str(hint.get("condition") or ""),
+            str(hint.get("action") or ""),
+        )).lower()
+        for field, patterns in _EMPTY_CLAIM_PATTERNS:
+            actual = balance.get(field)
+            if (
+                isinstance(actual, int) and actual > 0
+                and any(pattern in claim_text for pattern in patterns)
+            ):
+                bounded["owner_executable"] = False
+                bounded["owner_module"] = None
+                bounded.pop("intervention_hint", None)
+                bounded["remap_reason"] = (
+                    f"condition_contradicts_trace:{field}={actual}"
+                )
+                return bounded
     hint = parsed.get("intervention_hint")
     if isinstance(hint, Mapping) and bounded["owner_executable"]:
         bounded["intervention_hint"] = {
