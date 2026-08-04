@@ -1168,7 +1168,6 @@ def _run_detection_with_genome(
     census_root: Path | None = None,
     baseline_cache_root: Path | None = None,
     shared_cache_root: Path | None = None,
-    provider_already_patched: bool = False,
     policy_genome: PolicyGenome | None = None,
 ) -> dict[str, Any]:
     """Run PACA-TCL v3.5 with global skill injection.
@@ -1181,10 +1180,8 @@ def _run_detection_with_genome(
     v5: Global injection for ALL cases (not conditional on unresolved).
     If genome == baseline, runs plain v3.5 without injection overhead.
 
-    v3.5.1: ``provider_already_patched`` allows batch flush to enter the
-    integrated provider context once and reuse it for all shadow detections
-    in parallel, avoiding repeated lock acquire/release and enabling true
-    concurrency for same-genome batch evaluations.
+    Replays use the same integrated provider boundary as source detection so
+    genome-specific prompt injection remains scoped to one detector call.
     """
     import shutil
 
@@ -1244,16 +1241,6 @@ def _run_detection_with_genome(
 
     def invoke() -> dict[str, Any]:
         if genome.content_hash == baseline.content_hash:
-            return v35.adjudicate_case(
-                case_id=case_id,
-                record=record,
-                config=config,
-                output_dir=genome_dir,
-                census_root=census_root,
-                policy_items=policy_items,
-            )
-        if provider_already_patched:
-            # v3.5.1: provider already patched by caller (batch flush parallel mode)
             return v35.adjudicate_case(
                 case_id=case_id,
                 record=record,

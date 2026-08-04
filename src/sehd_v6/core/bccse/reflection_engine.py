@@ -30,8 +30,6 @@ from typing import Any, Mapping, Sequence
 from .module_charter import render_all_charters
 from .step_attributor import (
     AttributionSignal,
-    ErrorType,
-    ReflectionType,
     TriggerSource,
 )
 from .signal_adapter import resolve_evolution_state
@@ -341,148 +339,6 @@ def build_runtime_observation(
             "allowed module set is authoritative."
         ),
     }
-
-
-# Mapping from reflection type to preferred operation
-REFLECTION_OPERATION_MAP: dict[ReflectionType, str] = {
-    ReflectionType.DISCOVERY: "tighten_precondition",
-    ReflectionType.OPTIMIZATION: "tighten_precondition",
-    ReflectionType.SKILL_DEFECT: "replace_typed_clause",
-    ReflectionType.EXECUTION_LAPSE: "add_negative_boundary",
-}
-
-# Default clause IDs per module (from baseline genome)
-MODULE_DEFAULT_CLAUSES: dict[str, list[str]] = {
-    "candidate_trigger": ["ct_001"],
-    "evidence_obligation": ["eo_001", "eo_002"],
-    "candidate_to_verifier_route": ["cvr_001"],
-    "atomic_verifier_instruction": ["avi_001", "avi_002"],
-    "clean_defense_boundary": ["cdb_001", "cdb_002", "cdb_003", "cdb_004"],
-    "causal_link_test": ["clt_001"],
-    "earliest_origin_tiebreak": ["eot_001"],
-    "abstention_rule": ["ar_001"],
-}
-
-# Error-type specific compilation templates
-COMPILATION_TEMPLATES: dict[ErrorType, dict[str, str]] = {
-    ErrorType.FALSE_POSITIVE: {
-        "content": "action_supported_by_verified_tool_output_or_direct_observation",
-        "precondition": "defense_evidence_chain_complete_and_admissible",
-        "rationale": "FP indicates defense boundary insufficient to protect clean cases",
-    },
-    ErrorType.UNRESOLVED_SHOULD_ERROR: {
-        "content": "requires_complete_admissible_causal_chain_with_evidence_refs",
-        "precondition": "prosecution_evidence_sufficient_for_error_resolution",
-        "rationale": "Unresolved with gold=positive indicates evidence obligation too strict",
-    },
-    ErrorType.UNRESOLVED_SHOULD_CLEAN: {
-        "content": "supported_or_ordinary_failure_pattern_recognized",
-        "precondition": "defense_boundary_correctly_identifies_support_pattern",
-        "rationale": "Unresolved with gold=negative indicates abstention too conservative",
-    },
-    ErrorType.UNRESOLVED_UNKNOWN: {
-        "content": "evidence_sufficiency_threshold_calibrated_for_decisive_resolution",
-        "precondition": "prosecution_or_defense_coverage_exceeds_resolution_threshold",
-        "rationale": "Self-supervised: unresolved without gold indicates evidence threshold miscalibrated",
-    },
-    ErrorType.LOCALIZATION_ERROR: {
-        "content": "earliest_unverified_assumption_in_causal_chain",
-        "precondition": "counterfactual_isolation_identifies_root_cause",
-        "rationale": "Step mismatch indicates causal link test needs refinement",
-    },
-    ErrorType.CANDIDATE_MISS: {
-        "content": "four_dimensional_scan_covers_all_hallucination_axes",
-        "precondition": "construct_census_exhaustive_for_trajectory",
-        "rationale": "No candidates found indicates trigger coverage gap",
-    },
-    ErrorType.FALSE_NEGATIVE_CLEAN: {
-        "content": "prosecution_requires_materiality_and_causal_sufficiency",
-        "precondition": "error_certificate_meets_admissibility_standard",
-        "rationale": "Verified clean with gold=positive indicates prosecution weakness",
-    },
-    ErrorType.CRS_CONTRADICTION: {
-        "content": "crs_dimension_scores_mutually_consistent_with_aggregate_direction",
-        "precondition": "individual_dimension_evidence_aligns_with_final_verdict",
-        "rationale": "CRS contradiction indicates scoring logic inconsistency across dimensions",
-    },
-    ErrorType.EVIDENCE_INCOMPLETE: {
-        "content": "evidence_collection_strategy_covers_prosecution_and_defense_adequately",
-        "precondition": "minimum_coverage_threshold_met_for_relevant_side",
-        "rationale": "Low coverage indicates evidence collection strategy insufficient",
-    },
-    ErrorType.BOUNDARY_HESITATION: {
-        "content": "decision_boundary_clearly_separates_error_from_clean_patterns",
-        "precondition": "prosecution_defense_gap_exceeds_hesitation_threshold",
-        "rationale": "Close prosecution/defense indicates boundary definition unclear",
-    },
-}
-
-
-def compile_edit_proposal(
-    signal: AttributionSignal,
-    case_id: str,
-    rejected_buffer: Sequence[RejectedEditEntry] = (),
-) -> EditProposal | None:
-    """Compile an attribution signal into a structured edit proposal.
-
-    Uses the error type and reflection type to determine:
-    - Which module to target
-    - Which operation to apply
-    - What content/preconditions to propose
-
-    Returns None if the signal doesn't warrant evolution (e.g., correct case).
-    """
-    if not signal.should_evolve:
-        return None
-
-    # Determine operation from reflection type
-    operation = REFLECTION_OPERATION_MAP.get(
-        signal.reflection_type, "tighten_precondition"
-    )
-
-    # Get compilation template
-    template = COMPILATION_TEMPLATES.get(signal.error_type)
-    if template is None:
-        return None
-
-    # Select target clause
-    module_clauses = MODULE_DEFAULT_CLAUSES.get(signal.target_module, [])
-    target_clause = module_clauses[0] if module_clauses else "unknown"
-
-    # Check rejected buffer for similar proposals (avoid repeating failures)
-    for rejected in rejected_buffer:
-        if (
-            rejected.proposal.target_module == signal.target_module
-            and rejected.proposal.operation == operation
-            and rejected.proposal.content == template["content"]
-        ):
-            # This exact edit was rejected before — try secondary module
-            signal_module = signal.secondary_module
-            secondary_clauses = MODULE_DEFAULT_CLAUSES.get(signal_module, [])
-            if secondary_clauses:
-                target_clause = secondary_clauses[0]
-                return EditProposal(
-                    target_module=signal_module,
-                    operation=operation,
-                    target_clause_id=target_clause,
-                    content=template["content"],
-                    preconditions=(template["precondition"],),
-                    rationale=f"{template['rationale']} (secondary: primary rejected)",
-                    reflection_type=signal.reflection_type.value,
-                    source_case_id=case_id,
-                )
-            return None  # Both primary and secondary exhausted
-
-    return EditProposal(
-        target_module=signal.target_module,
-        operation=operation,
-        target_clause_id=target_clause,
-        content=template["content"],
-        preconditions=(template["precondition"],),
-        rationale=template["rationale"],
-        reflection_type=signal.reflection_type.value,
-        source_case_id=case_id,
-    )
 
 
 def build_causal_reflection_prompt(
@@ -1248,7 +1104,6 @@ def format_skill_context_for_llm(genome_modules: dict, target_module: str) -> st
 
     return "\n".join(lines)
 
-
 def format_detection_context_for_llm(
     detection_result: Mapping[str, Any],
     trajectory_record: Mapping[str, Any] | None = None,
@@ -1524,66 +1379,3 @@ def build_accepted_edits_summary(accepted_edits: list[dict]) -> str:
             lines.append(f"  {i}. [{e.get('target_module', '?')}] {content}")
 
     return "\n".join(lines)
-
-
-def build_mutator_prompt(
-    proposal: EditProposal,
-    signal: AttributionSignal,
-    rejected_buffer: Sequence[RejectedEditEntry] = (),
-) -> tuple[str, str]:
-    """Build FALLBACK prompt (used only when rich context unavailable).
-
-    This is the legacy template-refinement prompt. Kept for backward
-    compatibility but should NOT be the primary path.
-    """
-    system = (
-        "You are a causal process reflection engine for a hallucination detection system. "
-        "Your task: given structured failure attribution signals from the detection pipeline, "
-        "perform step-level causal attribution to identify which skill module deficiency "
-        "caused this detection failure, then propose a precise, generalizable edit.\n\n"
-        "CONSTRAINTS:\n"
-        "- Maximum 1 mutation per response\n"
-        "- Only modify the specified target module\n"
-        "- Do NOT include case IDs, source IDs, gold labels, or case-specific facts\n"
-        "- Edits must be GENERAL rules applicable to many cases, not case-specific fixes\n"
-        "- Prefer tighten_precondition over replace_typed_clause\n"
-        "- Content must be in typed DSL format (structured, not free prose)\n"
-        "- The edit should address the ROOT CAUSE identified by the attribution signal"
-    )
-
-    rejected_info = ""
-    if rejected_buffer:
-        rejected_lines = [
-            f"- REJECTED: {r.proposal.target_module}/{r.proposal.operation}: "
-            f"{r.proposal.content[:80]} ({r.feedback_summary()})"
-            for r in rejected_buffer[-5:]
-        ]
-        rejected_info = f"\n\nPREVIOUSLY REJECTED EDITS (do not repeat):\n" + "\n".join(rejected_lines)
-
-    crs_detail = ""
-    if signal.crs_scores:
-        crs_lines = [f"  - {dim}: {score:.3f}" for dim, score in signal.crs_scores.items()]
-        crs_detail = f"\n- CRS dimension scores:\n" + "\n".join(crs_lines)
-
-    user = (
-        f"FAILURE ATTRIBUTION:\n"
-        f"- Error type: {signal.error_type.value}\n"
-        f"- Target module: {proposal.target_module}\n"
-        f"- Target clause: {proposal.target_clause_id}\n"
-        f"- Detection state: {signal.state}\n"
-        f"- Prosecution coverage: {_format_optional_score(signal.prosecution_coverage)}\n"
-        f"- Defense coverage: {_format_optional_score(signal.defense_coverage)}"
-        f"{crs_detail}\n\n"
-        f"EVIDENCE: {signal.evidence_summary}\n\n"
-        f"PROPOSED EDIT (refine or replace):\n"
-        f"- Operation: {proposal.operation}\n"
-        f"- Content: {proposal.content}\n"
-        f"- Rationale: {proposal.rationale}\n"
-        f"{rejected_info}\n\n"
-        f"Respond with JSON: "
-        f'{{"target_module": "...", "operation": "...", "target_clause_id": "...", '
-        f'"new_content": "...", "feature_description": "reusable trajectory feature", '
-        f'"new_preconditions": ["..."], "rationale": "..."}}'
-    )
-
-    return system, user
