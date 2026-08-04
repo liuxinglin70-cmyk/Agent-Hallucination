@@ -3,6 +3,19 @@ from __future__ import annotations
 import os
 
 
+def _isolate_provider_env(monkeypatch):
+    """Strip ambient SEHD_* route selectors and stop the repository ``.env``
+    from re-injecting them, so a test observes the registered defaults and
+    its own explicit route instead of the deployment routing."""
+    for key in list(os.environ):
+        if key.startswith("SEHD_"):
+            monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "src.sehd_v6.provider_routes.load_local_env",
+        lambda *args, **kwargs: None,
+    )
+
+
 def test_dotenv_loader_does_not_override_process_environment(tmp_path, monkeypatch):
     from src.sehd_v6.env_loader import load_local_env
 
@@ -24,14 +37,7 @@ def test_dotenv_loader_does_not_override_process_environment(tmp_path, monkeypat
 def test_evolution_mutation_route_defaults_to_official_and_supports_overrides(monkeypatch):
     from src.sehd_v6.evolution.runner import default_mutation_route
 
-    for key in (
-        "SEHD_MUTATION_ENDPOINT",
-        "SEHD_MUTATION_MODEL",
-        "SEHD_MUTATION_API_KEY_ENV",
-        "SEHD_MUTATION_TEMPERATURE",
-        "SEHD_MUTATION_MAX_TOKENS",
-    ):
-        monkeypatch.delenv(key, raising=False)
+    _isolate_provider_env(monkeypatch)
     default = default_mutation_route()
     assert default["endpoint"] == "https://api.deepseek.com"
     assert default["model"] == "deepseek-v4-flash"
@@ -378,6 +384,7 @@ def test_provider_transport_honors_route_generation_budget_and_total_timeout(
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    _isolate_provider_env(monkeypatch)
     monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
     monkeypatch.setattr(
         basic_runner,
@@ -432,6 +439,7 @@ def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, mo
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    _isolate_provider_env(monkeypatch)
     monkeypatch.setattr(proof_evaluator.urlrequest, "urlopen", fake_urlopen)
     monkeypatch.setattr(
         proof_evaluator,
@@ -480,6 +488,7 @@ def test_detector_transport_omits_pro_response_format(tmp_path, monkeypatch):
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    _isolate_provider_env(monkeypatch)
     monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     basic_runner.provider_call_with_schema(

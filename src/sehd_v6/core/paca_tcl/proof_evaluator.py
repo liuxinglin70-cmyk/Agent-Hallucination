@@ -121,13 +121,12 @@ def _json_object_provider_call(
     thinking = provider_thinking_control(route, purpose="mutation")
     if thinking is not None:
         payload["thinking"] = thinking
-    # response_format not supported by all models (e.g. DeepSeek-V4-Pro
-    # returns HTTP 400 when response_format is sent). Only add it for
-    # models that support it (Flash supports it; Pro does not).
-    model_name = str(route.get("model", ""))
-    # Canonical routes use lowercase wire names; retain the Pro transport
-    # restriction for both legacy title-case and official lowercase aliases.
-    if "pro" not in model_name.lower():
+    # The DeepSeek-V4 model family rejects response_format on the gateways
+    # tested so far (autodl.art refuses it for both flash and pro) while
+    # still returning JSON when the system prompt requests it. Keep this
+    # transport rule identical to basic_runner's single decision point.
+    model_name = str(route.get("model", "")).lower()
+    if not model_name.startswith("deepseek-v4"):
         payload["response_format"] = {"type": "json_object"}
     body = packet.canonical_json(payload).encode("utf-8")
     # v3.5.1: 缓存键含 "eval_jsonobj" 前缀，与 v1 的 provider_call 区分

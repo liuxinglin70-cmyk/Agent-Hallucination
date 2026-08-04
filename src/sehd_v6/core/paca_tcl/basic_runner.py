@@ -412,9 +412,12 @@ def provider_call_with_schema(
         "temperature": float(route.get("temperature", 0)),
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
-    # DeepSeek V4 Pro rejects response_format even though it still returns JSON
-    # when the system prompt requests it.
-    if str(route["model"]).lower() != "deepseek-v4-pro":
+    # The DeepSeek-V4 models reject response_format on every gateway tested
+    # so far (the official endpoint accepts it for flash but the autodl.art
+    # gateway refuses it for both flash and pro), while still returning JSON
+    # when the system prompt requests it. Drop the parameter for the whole
+    # model family instead of maintaining per-gateway special cases.
+    if not str(route["model"]).lower().startswith("deepseek-v4"):
         payload["response_format"] = {"type": "json_object"}
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])

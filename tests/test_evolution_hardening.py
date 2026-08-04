@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from dataclasses import replace
 from types import SimpleNamespace
@@ -3555,6 +3556,15 @@ def test_provider_transport_recovers_truncated_json_with_repair_call(
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    # Keep the explicit route intact: the repository .env carries deployment
+    # SEHD_* selectors that resolve_provider_route would otherwise inject.
+    for key in list(os.environ):
+        if key.startswith("SEHD_"):
+            monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "src.sehd_v6.provider_routes.load_local_env",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     monkeypatch.setattr(
