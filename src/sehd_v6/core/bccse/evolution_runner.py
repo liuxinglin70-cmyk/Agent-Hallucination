@@ -40,6 +40,7 @@ from ..paca_tcl.basic_runner import (
 from ...utils import ocse_packet as packet
 from ...utils.gold_label import coerce_gold_label
 from .reflection_engine import (
+    EditProposal,
     RejectedEditEntry,
     build_causal_reflection_prompt,
     MODULE_OBSERVABLE_FIELDS,
@@ -71,6 +72,7 @@ from .genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
     sanitize_expected_effect_contract,
+    validate_expected_effect_contract,
 )
 from .rule_contract import RuleSpec, render_rule, validate_rule_spec
 from .fitness import (
@@ -79,7 +81,7 @@ from .fitness import (
     observable_process_delta,
     task_state_score,
 )
-from .safety_gate import StructuralGate, create_structural_gate
+from .safety_gate import GateCertificate, StructuralGate, create_structural_gate
 from .failure_classifier import classify_failure
 from .step_attributor import (
     AttributionSignal,
@@ -90,8 +92,10 @@ from .step_attributor import (
 from .signal_adapter import (
     decision_authority_invalid,
     resolve_authoritative_state,
+    resolve_evolution_state,
 )
 from .v6_contracts import (
+    ENGINE_LEVEL_ACTIONS,
     LAYER_DETECTOR,
     LAYER_L1,
     LAYER_L2,
@@ -1060,6 +1064,17 @@ class ProvisionalEdit:
     conflict_gate_passed: bool = False
 
 
+@dataclass
+class PendingProbeCommit:
+    """Minimal pending edit state needed to resume probe rollback."""
+
+    case_id: str
+    case_index: int
+    edit: SkillEdit
+    certificate: GateCertificate
+    step_index: int
+
+
 # ============================================================
 # Development-probe certification (opt-in experience record)
 # ============================================================
@@ -1263,8 +1278,21 @@ def _run_detection_with_genome(
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
     # but they cannot enter source fitness or champion promotion.
-    if not str(result.get("decision_authority") or "").strip():
+    authority = str(result.get("decision_authority") or "").strip().lower()
+    if not authority:
         raise RuntimeError("detector returned missing decision authority")
+    proof = result.get("proof_adjudication")
+    proof_authority = (
+        str(proof.get("decision_authority") or "").strip().lower()
+        if isinstance(proof, Mapping) else ""
+    )
+    if authority != "authoritative" or (
+        proof_authority and proof_authority != "authoritative"
+    ):
+        raise RuntimeError(
+            "detector returned invalid decision authority: "
+            f"top_level={authority!r}, proof={proof_authority or 'absent'!r}"
+        )
     if decision_authority_invalid(result):
         # 附加详细错误信息便于排查（appeal_error / proof_court_error 等）
         reasons = result.get("authority_failure_reasons") or []
@@ -1372,6 +1400,22 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         champion_payload = json.load(handle)
     with shadow_path.open(encoding="utf-8") as handle:
         shadow_payload = json.load(handle)
+    if not isinstance(champion_payload, dict) or not isinstance(shadow_payload, dict):
+        raise ValueError("genome checkpoint artifacts must contain objects")
+    champion_checkpoint_genome = SkillGenome.from_dict(champion_payload)
+    shadow_checkpoint_genome = SkillGenome.from_dict(shadow_payload)
+    expected_champion_hash = str(checkpoint.get("champion_genome_hash") or "")
+    expected_shadow_hash = str(checkpoint.get("shadow_genome_hash") or "")
+    if (
+        expected_champion_hash
+        and champion_checkpoint_genome.content_hash != expected_champion_hash
+    ):
+        raise ValueError("champion checkpoint hash does not match its content")
+    if (
+        expected_shadow_hash
+        and shadow_checkpoint_genome.content_hash != expected_shadow_hash
+    ):
+        raise ValueError("shadow checkpoint hash does not match its content")
     experience_path = output_dir / "htc_tes_experience_memory.json"
     return {
         "schema_version": schema,
@@ -1386,6 +1430,7 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "provisional_edit_count": int(checkpoint.get("provisional_edit_count") or 0),
         "champion_genome_payload": champion_payload,
         "shadow_genome_payload": shadow_payload,
+        "gate_summary": dict(checkpoint.get("gate_summary") or {}),
         "experience_memory_path": (
             str(experience_path) if experience_path.is_file() else None
         ),
@@ -1404,6 +1449,44 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "pending_probe_step_indexes": list(
             checkpoint.get("pending_probe_step_indexes") or []
         ),
+        "pending_probe_commits": list(
+            checkpoint.get("pending_probe_commits") or []
+        ),
+        "stable_genome_payload": dict(
+            checkpoint.get("stable_genome_payload") or {}
+        ),
+        "stable_canaries": dict(checkpoint.get("stable_canaries") or {}),
+        "stable_canaries_checkpoint": dict(
+            checkpoint.get("stable_canaries_checkpoint") or {}
+        ),
+        "stable_memory_payload": dict(
+            checkpoint.get("stable_memory_payload") or {}
+        ),
+        "stable_history_length": int(
+            checkpoint.get("stable_history_length") or 0
+        ),
+        "last_probe_accepted_count": int(
+            checkpoint.get("last_probe_accepted_count") or 0
+        ),
+        "last_probe_triggered_count": int(
+            checkpoint.get("last_probe_triggered_count") or 0
+        ),
+        "active_attempt_index": int(
+            checkpoint.get("active_attempt_index") or 0
+        ),
+        "mutation_retry_feedback": dict(
+            checkpoint.get("mutation_retry_feedback") or {}
+        ),
+        "rejected_source_proposals": dict(
+            checkpoint.get("rejected_source_proposals") or {}
+        ),
+        "runtime_invalid_cases": int(
+            checkpoint.get("runtime_invalid_cases") or 0
+        ),
+        "runtime_error_categories": dict(
+            checkpoint.get("runtime_error_categories") or {}
+        ),
+        "rejected_buffer": list(checkpoint.get("rejected_buffer") or []),
         "counters": dict(checkpoint.get("counters") or {}),
         "updated_at": float(checkpoint.get("updated_at") or 0.0),
         "checkpoint_dir": str(output_dir),
@@ -1442,11 +1525,16 @@ def _restore_state_from_checkpoint(
     current_genome.parent_hash = champion_genome.parent_hash
     current_genome.generation = champion_genome.generation
     current_genome.metadata = champion_genome.metadata
-    stable_genome.modules = champion_genome.modules
-    stable_genome.edits_applied = champion_genome.edits_applied
-    stable_genome.parent_hash = champion_genome.parent_hash
-    stable_genome.generation = champion_genome.generation
-    stable_genome.metadata = champion_genome.metadata
+    stable_payload = dict(checkpoint.get("stable_genome_payload") or {})
+    restored_stable = (
+        SkillGenome.from_dict(stable_payload)
+        if stable_payload else champion_genome.clone()
+    )
+    stable_genome.modules = restored_stable.modules
+    stable_genome.edits_applied = restored_stable.edits_applied
+    stable_genome.parent_hash = restored_stable.parent_hash
+    stable_genome.generation = restored_stable.generation
+    stable_genome.metadata = restored_stable.metadata
 
     experience_path_str = checkpoint.get("experience_memory_path")
     if experience_path_str:
@@ -1458,6 +1546,7 @@ def _restore_state_from_checkpoint(
 
     return {
         "steps": list(checkpoint.get("steps") or []),
+        "gate_summary": dict(checkpoint.get("gate_summary") or {}),
         "accepted_edits_history": list(
             checkpoint.get("accepted_edits_history") or []
         ),
@@ -1471,6 +1560,41 @@ def _restore_state_from_checkpoint(
         "pending_probe_step_indexes": list(
             checkpoint.get("pending_probe_step_indexes") or []
         ),
+        "pending_probe_commits": list(
+            checkpoint.get("pending_probe_commits") or []
+        ),
+        "stable_canaries": dict(checkpoint.get("stable_canaries") or {}),
+        "stable_canaries_checkpoint": dict(
+            checkpoint.get("stable_canaries_checkpoint") or {}
+        ),
+        "stable_memory_payload": dict(
+            checkpoint.get("stable_memory_payload") or {}
+        ),
+        "stable_history_length": int(
+            checkpoint.get("stable_history_length") or 0
+        ),
+        "last_probe_accepted_count": int(
+            checkpoint.get("last_probe_accepted_count") or 0
+        ),
+        "last_probe_triggered_count": int(
+            checkpoint.get("last_probe_triggered_count") or 0
+        ),
+        "active_attempt_index": int(
+            checkpoint.get("active_attempt_index") or 0
+        ),
+        "mutation_retry_feedback": dict(
+            checkpoint.get("mutation_retry_feedback") or {}
+        ),
+        "rejected_source_proposals": dict(
+            checkpoint.get("rejected_source_proposals") or {}
+        ),
+        "runtime_invalid_cases": int(
+            checkpoint.get("runtime_invalid_cases") or 0
+        ),
+        "runtime_error_categories": dict(
+            checkpoint.get("runtime_error_categories") or {}
+        ),
+        "rejected_buffer": list(checkpoint.get("rejected_buffer") or []),
         "counters": dict(checkpoint.get("counters") or {}),
         "next_case_index": int(checkpoint.get("next_case_index") or 0),
     }
@@ -1585,6 +1709,19 @@ def _llm_no_conflict_gate(
         if budget_usage is not None:
             budget_usage["mutation_errors"] += 1
         return False, "provider_exception", [], True
+    if budget_usage is not None and isinstance(_meta, Mapping) and _meta.get("cache_hit"):
+        budget_usage["mutation_cache_hits"] = (
+            budget_usage.get("mutation_cache_hits", 0) + 1
+        )
+    if budget_usage is not None and isinstance(_meta, Mapping):
+        budget_usage["mutation_transport_attempts"] = (
+            budget_usage.get("mutation_transport_attempts", 0)
+            + int(_meta.get("transport_attempts") or 0)
+        )
+        budget_usage["mutation_repairs"] = (
+            budget_usage.get("mutation_repairs", 0)
+            + int(bool(_meta.get("repair_used")))
+        )
     if not isinstance(result, dict):
         return False, "parse_failure", [], True
     decision = str(result.get("decision", "")).strip().lower()
@@ -1799,9 +1936,6 @@ def run_online_evolution(
     shared_cache_root.mkdir(parents=True, exist_ok=True)
     start_time = time.time()
 
-    if run_id is None:
-        run_id = f"bccse_v5_{uuid.uuid4().hex[:8]}"
-
     # Initialize
     champion_genome = (
         initial_genome.clone() if initial_genome is not None
@@ -1832,6 +1966,8 @@ def run_online_evolution(
         "mutation_calls": 0,
         "mutation_errors": 0,
         "mutation_cache_hits": 0,
+        "mutation_transport_attempts": 0,
+        "mutation_repairs": 0,
         "mutation_retry_attempts": 0,
         "mutation_budget_exhausted": 0,
     }
@@ -1876,10 +2012,11 @@ def run_online_evolution(
     rollback_reason = ""
     stable_genome = champion_genome.clone()
     pending_probe_step_indexes: list[int] = []
-    pending_probe_commits: list[ProvisionalEdit] = []
+    pending_probe_commits: list[PendingProbeCommit] = []
     stable_history_length = 0
     last_probe_accepted_count = 0
     last_probe_triggered_count = 0
+    active_attempt_index = 0
 
     # HTC-TES v3: type-conditioned evolution components
     type_classifier = HallucinationTypeClassifier()
@@ -1970,6 +2107,95 @@ def run_online_evolution(
         triggered_cases = int(restored_counters.get("triggered_cases") or 0)
         edits_accepted = int(restored_counters.get("edits_accepted") or 0)
         edits_rejected = int(restored_counters.get("edits_rejected") or 0)
+        gate.restore_summary(restored.get("gate_summary") or {})
+        stable_canaries.update(restored.get("stable_canaries") or {})
+        stable_canaries_checkpoint.update(
+            restored.get("stable_canaries_checkpoint") or {}
+        )
+        restored_stable_memory = restored.get("stable_memory_payload") or {}
+        if restored_stable_memory:
+            stable_memory_payload = dict(restored_stable_memory)
+        stable_history_length = int(restored.get("stable_history_length") or 0)
+        last_probe_accepted_count = int(
+            restored.get("last_probe_accepted_count") or 0
+        )
+        last_probe_triggered_count = int(
+            restored.get("last_probe_triggered_count") or 0
+        )
+        active_attempt_index = int(restored.get("active_attempt_index") or 0)
+        mutation_retry_feedback = {
+            str(case_id): [str(value) for value in values]
+            for case_id, values in (
+                restored.get("mutation_retry_feedback") or {}
+            ).items()
+            if isinstance(values, list)
+        }
+        rejected_source_proposals = {
+            str(case_id): [dict(value) for value in values]
+            for case_id, values in (
+                restored.get("rejected_source_proposals") or {}
+            ).items()
+            if isinstance(values, list)
+        }
+        runtime_invalid_cases = int(
+            restored.get("runtime_invalid_cases") or 0
+        )
+        runtime_error_categories = {
+            str(category): int(count)
+            for category, count in (
+                restored.get("runtime_error_categories") or {}
+            ).items()
+        }
+        pending_probe_commits = []
+        for pending in restored.get("pending_probe_commits") or ():
+            if not isinstance(pending, Mapping):
+                continue
+            try:
+                certificate_index = int(pending.get("certificate_index"))
+                certificate = gate.certificates[certificate_index]
+                pending_probe_commits.append(PendingProbeCommit(
+                    case_id=str(pending.get("case_id") or ""),
+                    case_index=int(pending.get("case_index") or 0),
+                    edit=SkillEdit.from_dict(dict(pending["edit"])),
+                    certificate=certificate,
+                    step_index=int(pending.get("step_index") or 0),
+                ))
+            except (KeyError, TypeError, ValueError, IndexError):
+                pending_probe_commits = []
+                pending_probe_step_indexes = []
+                break
+        restored_rejected_buffer = restored.get("rejected_buffer") or ()
+        for entry in restored_rejected_buffer:
+            if not isinstance(entry, Mapping):
+                continue
+            proposal_data = entry.get("proposal") or {}
+            if not isinstance(proposal_data, Mapping):
+                continue
+            proposal = EditProposal(
+                target_module=str(proposal_data.get("target_module") or ""),
+                operation=str(proposal_data.get("operation") or ""),
+                target_clause_id="",
+                content=str(proposal_data.get("content") or ""),
+                preconditions=(),
+                rationale="",
+                reflection_type="",
+                source_case_id="",
+            )
+            rejected_buffer.append(RejectedEditEntry(
+                proposal=proposal,
+                regressed_cases=[
+                    str(value) for value in (entry.get("regressed_cases") or ())
+                ],
+                budget_consumed=int(entry.get("budget_consumed") or 0),
+                reject_reasons=[
+                    str(value) for value in (entry.get("reject_reasons") or ())
+                ],
+                rejection_stage=str(entry.get("rejection_stage") or "structural_gate"),
+                observed_effect=str(entry.get("observed_effect") or ""),
+                observable_deltas=tuple(
+                    str(value) for value in (entry.get("observable_deltas") or ())
+                ),
+            ))
         restored_policy_payload = checkpoint.get("policy_genome")
         if (
             isinstance(restored_policy_payload, Mapping)
@@ -2000,12 +2226,14 @@ def run_online_evolution(
                 resume_next_case_index, skipped_step.case_index,
             )
         if rewound:
+            gate.reset_convergence()
             print(
                 f"[resume] rewinding {rewound} halted/skipped placeholder "
                 f"step(s); work queue restarts at case index "
                 f"{resume_next_case_index}"
             )
-        stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+        if not stable_memory_payload:
+            stable_memory_payload = type_fitness.get_experience_memory().to_dict()
         if run_id is None:
             run_id = str(checkpoint.get("run_id") or run_id or "")
         provisional_count = int(checkpoint.get("provisional_edit_count") or 0)
@@ -2024,14 +2252,17 @@ def run_online_evolution(
             f"edits_rejected={edits_rejected}"
         )
 
+    if run_id is None:
+        run_id = f"bccse_v5_{uuid.uuid4().hex[:8]}"
+
     def canary_preserved(
         parent_result: Mapping[str, Any],
         child_result: Mapping[str, Any],
     ) -> tuple[bool, dict[str, Any]]:
         """Require both verdict and process stability on a replay anchor."""
         try:
-            parent_state = resolve_authoritative_state(parent_result)
-            child_state = resolve_authoritative_state(child_result)
+            parent_state = resolve_evolution_state(parent_result)
+            child_state = resolve_evolution_state(child_result)
         except ValueError as exc:
             return False, {
                 "before_state": None,
@@ -2120,6 +2351,13 @@ def run_online_evolution(
             raise
         if isinstance(meta, Mapping) and meta.get("cache_hit"):
             budget_usage["mutation_cache_hits"] += 1
+        if isinstance(meta, Mapping):
+            budget_usage["mutation_transport_attempts"] += int(
+                meta.get("transport_attempts") or 0
+            )
+            budget_usage["mutation_repairs"] += int(
+                bool(meta.get("repair_used"))
+            )
         return parsed, meta
 
     def attribution_for(
@@ -2153,7 +2391,7 @@ def run_online_evolution(
             )
             canary_signal = attribution_for(canary_result, canary_id)
             audit.update({
-                "state": resolve_authoritative_state(canary_result),
+                "state": resolve_evolution_state(canary_result),
                 "should_evolve": canary_signal.should_evolve,
                 "attribution": canary_signal.to_dict(),
             })
@@ -2166,7 +2404,8 @@ def run_online_evolution(
                 "error": f"{type(exc).__name__}:{exc}",
             })
         baseline_canary_audit.append(audit)
-    stable_canaries_checkpoint = dict(stable_canaries)
+    if resume_from is None or not stable_canaries_checkpoint:
+        stable_canaries_checkpoint = dict(stable_canaries)
     if registered_canary_ids and not stable_canaries and not fitness_use_gold:
         raise RuntimeError(
             "No registered canary remained stable under the initial genome; "
@@ -2192,6 +2431,44 @@ def run_online_evolution(
         return ranked[:requested]
 
     def persist_progress(next_case_index: int, status: str = "in_progress") -> None:
+        pending_probe_payloads = []
+        for item in pending_probe_commits:
+            certificate_index = next(
+                (
+                    index for index, certificate in enumerate(gate.certificates)
+                    if certificate is item.certificate
+                ),
+                None,
+            )
+            if certificate_index is None:
+                continue
+            pending_probe_payloads.append({
+                "case_id": item.case_id,
+                "case_index": item.case_index,
+                "edit": item.edit.to_dict(),
+                "certificate_index": certificate_index,
+                "step_index": item.step_index,
+            })
+        rejected_buffer_payloads = []
+        for entry in rejected_buffer:
+            proposal = entry.proposal
+            rejected_buffer_payloads.append({
+                "proposal": {
+                    "target_module": str(proposal.target_module),
+                    "operation": (
+                        proposal.operation.value
+                        if isinstance(proposal.operation, SkillOp)
+                        else str(proposal.operation)
+                    ),
+                    "content": str(proposal.content),
+                },
+                "regressed_cases": list(entry.regressed_cases),
+                "budget_consumed": entry.budget_consumed,
+                "reject_reasons": list(entry.reject_reasons),
+                "rejection_stage": entry.rejection_stage,
+                "observed_effect": entry.observed_effect,
+                "observable_deltas": list(entry.observable_deltas),
+            })
         _atomic_write_json(
             output_dir / "champion_checkpoint.json",
             champion_genome.to_dict(),
@@ -2231,12 +2508,27 @@ def run_online_evolution(
                 "budget_usage": dict(budget_usage),
                 "rollback_reason": rollback_reason,
                 "stable_genome_hash": stable_genome.content_hash,
+                "stable_genome_payload": stable_genome.to_dict(),
+                "stable_canaries": dict(stable_canaries),
+                "stable_canaries_checkpoint": dict(stable_canaries_checkpoint),
+                "stable_memory_payload": stable_memory_payload,
+                "stable_history_length": stable_history_length,
                 "pending_probe_step_indexes": list(pending_probe_step_indexes),
+                "pending_probe_commits": pending_probe_payloads,
+                "active_attempt_index": active_attempt_index,
+                "mutation_retry_feedback": mutation_retry_feedback,
+                "rejected_source_proposals": rejected_source_proposals,
+                "rejected_buffer": rejected_buffer_payloads,
+                "runtime_invalid_cases": runtime_invalid_cases,
+                "runtime_error_categories": runtime_error_categories,
+                "last_probe_accepted_count": last_probe_accepted_count,
+                "last_probe_triggered_count": last_probe_triggered_count,
                 "counters": {
                     "stable_cases": stable_cases,
                     "triggered_cases": triggered_cases,
                     "edits_accepted": edits_accepted,
                     "edits_rejected": edits_rejected,
+                    "runtime_invalid_cases": runtime_invalid_cases,
                 },
                 "policy_genome": policy_genome.to_dict(),
                 "l2_policy_accepts": l2_policy_accepts,
@@ -2248,8 +2540,6 @@ def run_online_evolution(
             output_dir / "htc_tes_experience_memory.json",
             type_fitness.get_experience_memory().to_dict(),
         )
-
-    active_attempt_index = 0
 
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         step.attempt_index = active_attempt_index
@@ -2318,7 +2608,7 @@ def run_online_evolution(
                 # convergence streak exactly like a fruitless L1 reflection.
                 gate.record_no_edit()
                 rejected_policy_summaries.append(
-                    f"{case_id}: {decision} ({reason})"
+                    f"{decision} ({reason})"
                 )
                 del rejected_policy_summaries[:-20]
             audit_entry: dict[str, Any] = {
@@ -2337,7 +2627,7 @@ def run_online_evolution(
                 audit_entry["policy_evaluation"] = dict(
                     replay_adjudication.get("policy_evaluation") or {}
                 )
-                audit_entry["replay_state"] = resolve_authoritative_state(replay)
+                audit_entry["replay_state"] = resolve_evolution_state(replay)
             l2_policy_audit.append(audit_entry)
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -2390,6 +2680,12 @@ def run_online_evolution(
         if proposed_item is None:
             finish("skip_no_policy", reason=parse_reason or "no_proposal")
             return
+        if proposed_item.action in ENGINE_LEVEL_ACTIONS:
+            finish(
+                "skip_no_policy",
+                reason="engine_level_policy_requires_unimplemented_replay",
+            )
+            return
         proposed_item = replace(
             proposed_item,
             item_id=f"policy_{uuid.uuid4().hex[:8]}",
@@ -2429,7 +2725,7 @@ def run_online_evolution(
                 reason=f"replay_runtime_invalid:{type(exc).__name__}",
             )
             return
-        replay_state = resolve_authoritative_state(replay_result)
+        replay_state = resolve_evolution_state(replay_result)
         replay_adjudication = replay_result.get("proof_adjudication") or {}
         if not isinstance(replay_adjudication, Mapping):
             replay_adjudication = {}
@@ -2513,7 +2809,7 @@ def run_online_evolution(
                         / probe_id.replace("/", "_")
                     ),
                 )
-                state = resolve_authoritative_state(result)
+                state = resolve_evolution_state(result)
                 runtime_valid = result.get("runtime_valid") is True
                 authority_invalid = decision_authority_invalid(result)
                 if gold is None:
@@ -2848,7 +3144,13 @@ def run_online_evolution(
                     "batch_id": batch_id,
                     "promotion_status": _promotion_status,
                 })
-                pending_probe_commits.append(item)
+                pending_probe_commits.append(PendingProbeCommit(
+                    case_id=item.case_id,
+                    case_index=item.case_index,
+                    edit=item.edit,
+                    certificate=item.certificate,
+                    step_index=item.step_index,
+                ))
                 pending_probe_step_indexes.append(item.step_index)
                 # HTC-TES v3: Record type-conditioned experience
                 # FIX: pass gold_label (was None) and target_module (was missing)
@@ -2924,7 +3226,7 @@ def run_online_evolution(
                 # A successfully repaired source becomes a future regression
                 # anchor, so later edits cannot silently forget the fix.
                 if (
-                    resolve_authoritative_state(_shadow_result)
+                    resolve_evolution_state(_shadow_result)
                     in {"verified_error", "verified_clean"}
                     and not bool(source_audits[idx]["source_after"].get("should_evolve"))
                 ):
@@ -3132,8 +3434,13 @@ def run_online_evolution(
 
     persist_progress(resume_next_case_index)
 
+    resume_attempt_index = active_attempt_index if resume_from is not None else 0
     source_work_queue = deque(
-        (index, case_id, 0)
+        (
+            index,
+            case_id,
+            resume_attempt_index if index == resume_next_case_index else 0,
+        )
         for index, case_id in enumerate(evolution_case_ids)
         if index >= resume_next_case_index
     )
@@ -3251,7 +3558,7 @@ def run_online_evolution(
             ), next_case_index=idx + 1)
             print(f"  [{idx}] RUNTIME_INVALID {case_id}: {runtime_error}")
             continue
-        detection_state = resolve_authoritative_state(detection_result)
+        detection_state = resolve_evolution_state(detection_result)
 
         # --- [2] Causal process reflection (self-supervised trigger) ---
         signal = attribution_for(detection_result, case_id)
@@ -3261,6 +3568,10 @@ def run_online_evolution(
         if signal.attribution_confidence == "low" and mutation_route is not None:
             from dataclasses import replace as _replace_signal
             from .step_attributor import build_attribution_llm_prompt
+            attribution_route_bound = {
+                signal.target_module,
+                signal.secondary_module,
+            }
             try:
                 attr_system, attr_user = build_attribution_llm_prompt(signal)
                 attr_parsed, _ = run_mutation_call(
@@ -3276,6 +3587,7 @@ def run_online_evolution(
                     confidence = str(attr_parsed.get("confidence", "low")).lower()
                     if (
                         primary in MODULE_IDS
+                        and primary in attribution_route_bound
                         and confidence in ("high", "medium", "low")
                         and (primary != signal.target_module or secondary != signal.secondary_module)
                     ):
@@ -3573,6 +3885,7 @@ def run_online_evolution(
                 candidates: list[dict[str, Any]] = []
                 no_edit_reasons: list[str] = []
                 primary_cache_hits: list[bool] = []
+                mutation_provider_unavailable = False
                 for generation_index in range(reflection_candidate_count):
                     generation_user = (
                         user_prompt
@@ -3637,7 +3950,7 @@ def run_online_evolution(
                                 + str(critic_audit.get("reason") or "no_selection")
                             )
                         parsed = {}
-                elif not candidates:
+                elif not candidates and not mutation_provider_unavailable:
                     # v5.9 structured collaboration: when the overloaded
                     # primary pass retreats to no_edit, split the work into a
                     # diagnosis-only stage and a targeted generation stage.
@@ -3850,10 +4163,14 @@ def run_online_evolution(
                     expected_effect_contract.get("observable_field") or ""
                 )
                 contract_present = bool(expected_effect_contract)
+                contract_shape_valid, contract_shape_reason = (
+                    validate_expected_effect_contract(expected_effect_contract)
+                )
                 contract_valid = (
                     not contract_present
                     or (
-                        contract_field
+                        contract_shape_valid
+                        and contract_field
                         in MODULE_OBSERVABLE_FIELDS.get(target_module, ())
                         and str(
                             expected_effect_contract.get(
@@ -3886,10 +4203,18 @@ def run_online_evolution(
                     invalid_mutation_reason = (
                         "invalid_causal_diagnosis:owner_or_gap_missing"
                     )
+                elif operation in {"add_rule", "modify_rule", "remove_rule"} and (
+                    not expected_effect or not contract_present
+                ):
+                    invalid_mutation_reason = "invalid_intervention_contract:missing"
                 elif contract_present and not contract_valid:
                     invalid_mutation_reason = (
                         "invalid_intervention_contract:"
                         f"module={target_module},field={contract_field or 'missing'}"
+                        + (
+                            f",reason={contract_shape_reason}"
+                            if contract_shape_reason else ""
+                        )
                     )
                 elif active_attempt_index > 0 and _rejected_proposal_duplicate(
                     rejected_source_proposals.get(case_id, []),
@@ -3963,10 +4288,20 @@ def run_online_evolution(
                         f"operation={operation!r},content_length={len(new_content)}"
                     )
             except Exception as exc:
-                invalid_mutation_reason = (
-                    "single_reflection_runtime_error:"
-                    f"{type(exc).__name__}:{exc}"
-                )
+                error_text = str(exc).lower()
+                if (
+                    "missing provider credential" in error_text
+                    or "no valid api-key environment" in error_text
+                ):
+                    mutation_provider_unavailable = True
+                    no_edit_reason = "mutation_provider_credential_unavailable"
+                    parsed = {}
+                else:
+                    invalid_mutation_reason = (
+                        "single_reflection_runtime_error:"
+                        f"{type(exc).__name__}:{exc}"
+                    )
+                    parsed = {}
 
         if edit is None and no_edit_reason:
             type_fitness.get_experience_memory().add_experience(
@@ -4432,6 +4767,7 @@ def run_online_evolution(
                     genome=candidate_genome,
                     case_id=case_id,
                     output_path=replay_root / "source",
+                    policy_genome=policy_genome if policy_genome.items else None,
                 )
             except Exception as exc:
                 reason = f"source_replay_runtime_error:{type(exc).__name__}:{exc}"
@@ -4486,6 +4822,7 @@ def run_online_evolution(
                             genome=candidate_genome,
                             case_id=canary_id,
                             output_path=canary_root / canary_id.replace("/", "_"),
+                            policy_genome=policy_genome if policy_genome.items else None,
                         )
                         preserved, audit = canary_preserved(
                             parent_canary, child_canary,
@@ -4588,6 +4925,7 @@ def run_online_evolution(
                                 replay_root / "contrast"
                                 / neighbor_id.replace("/", "_")
                             ),
+                            policy_genome=policy_genome if policy_genome.items else None,
                         )
                         neighbor_after_state = str(
                             neighbor_result.get("state") or ""

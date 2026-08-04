@@ -74,7 +74,8 @@ def test_prompt_carries_attribution_triple_and_context() -> None:
     assert attribution.reason_code in user
     assert '"defense_coverage": "complete"' in user
     assert "consensus_gate_blocked_nonempty -> emit_telemetry_only()" in user
-    assert "case_x: reject_policy_no_effect (no movement)" in user
+    assert "case_x" not in user
+    assert "reject_policy_no_effect (no movement)" in user
 
 
 def test_parse_policy_proposal_valid_item_leaves_identity_to_caller() -> None:

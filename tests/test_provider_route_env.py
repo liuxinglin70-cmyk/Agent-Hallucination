@@ -506,7 +506,7 @@ def test_evolution_accepts_case_insensitive_route_alias_without_provider_call(
         lambda **kwargs: {
             "state": "verified_clean",
             "runtime_valid": True,
-            "decision_authority": "valid",
+            "decision_authority": "authoritative",
             "census": [],
         },
     )

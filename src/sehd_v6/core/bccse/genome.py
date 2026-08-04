@@ -793,6 +793,8 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     )
     if not contract_valid:
         return False, contract_reason
+    if edit.expected_effect.strip() and not edit.expected_effect_contract:
+        return False, "expected_effect_contract_missing"
     try:
         confidence = float(edit.type_confidence)
     except (TypeError, ValueError):

@@ -85,6 +85,7 @@ def _metric_row(*, proof: dict, prosecution: dict) -> dict:
         "gold_label": False,
         "gold_steps": [],
         "runtime_valid": True,
+        "decision_authority": "authoritative",
         "state": str(proof.get("state") or "unresolved"),
         "responsible_step": None,
         "candidate_path": {"state": "unresolved"},

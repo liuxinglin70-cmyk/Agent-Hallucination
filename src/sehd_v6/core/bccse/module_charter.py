@@ -292,6 +292,84 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
 }
 
 
+MODULE_ACTION_SURFACE_TERMS: dict[str, tuple[str, ...]] = {
+    "candidate_trigger": (
+        "candidate", "origin", "event", "census", "create", "suppress",
+    ),
+    "evidence_obligation": (
+        "evidence", "certificate", "causal", "support", "obligation",
+        "prosecution", "field", "record", "require",
+    ),
+    "candidate_to_verifier_route": (
+        "candidate", "route", "verifier", "qualification", "matching",
+    ),
+    "atomic_verifier_instruction": (
+        "certificate", "verify", "violation", "actor", "boundary",
+        "propagation", "evidence", "quarantine", "test",
+    ),
+    "clean_defense_boundary": (
+        "defense", "boundary", "support", "authorize", "repair", "clean",
+        "recovery",
+    ),
+    "causal_link_test": (
+        "causal", "propagation", "impact", "recovery", "origin", "link",
+    ),
+    "earliest_origin_tiebreak": (
+        "origin", "earliest", "responsible", "event", "select",
+    ),
+    "abstention_rule": (
+        "boundary", "clean", "error", "unresolved", "verdict", "decisive",
+        "abstain", "evidence",
+    ),
+}
+
+MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
+    "candidate_trigger": (
+        "defense certificate", "prosecution certificate", "final verdict",
+        "return clean", "return error", "return unresolved",
+    ),
+    "evidence_obligation": (
+        "defense coverage", "defense certificate", "final verdict",
+        "return clean", "return error", "return unresolved",
+    ),
+    "candidate_to_verifier_route": (
+        "certificate", "coverage", "final verdict", "return clean",
+        "return error", "return unresolved",
+    ),
+    "atomic_verifier_instruction": (
+        "defense coverage", "final verdict", "return clean", "return error",
+        "return unresolved",
+    ),
+    "clean_defense_boundary": (
+        "prosecution coverage", "prosecution certificate", "return error",
+        "return unresolved",
+    ),
+    "causal_link_test": (
+        "defense coverage", "final verdict", "return clean", "return error",
+        "return unresolved",
+    ),
+    "earliest_origin_tiebreak": (
+        "certificate", "coverage", "final verdict", "return clean",
+        "return error", "return unresolved",
+    ),
+    "abstention_rule": (
+        "candidate discovery", "defense certificate", "prosecution certificate",
+        "verification certificate",
+    ),
+}
+
+
+def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
+    """Check that a slot action names the target module's output surface."""
+    lowered = " ".join(str(action or "").lower().split())
+    for marker in MODULE_FORBIDDEN_ACTION_TERMS.get(module_id, ()):
+        if marker in lowered:
+            return False, f"forbidden_action_surface:{marker}"
+    if not any(term in lowered for term in MODULE_ACTION_SURFACE_TERMS.get(module_id, ())):
+        return False, "action_surface_unowned"
+    return True, ""
+
+
 def charter_for(module_id: str) -> ModuleCharter:
     """Return the charter for a registered module, else raise ValueError."""
     charter = MODULE_CHARTERS.get(module_id)

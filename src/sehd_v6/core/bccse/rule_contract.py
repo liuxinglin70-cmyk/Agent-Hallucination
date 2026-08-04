@@ -22,6 +22,7 @@ from .genome import (
     semantic_overlap,
     validate_feature_description,
 )
+from .module_charter import validate_action_surface
 
 # Direction vocabulary mirrors rule_meta["direction"] in genome so slot rules
 # and legacy rules stay comparable during the migration window.
@@ -40,11 +41,16 @@ _TRAILING_PUNCT = ".,;:!?。，；：！？"
 
 # Condition overload: >1 coordinator means the trigger encodes several
 # situations, which breaks per-case attribution of fitness signal.
-_CONDITION_CONJUNCTION_RE = re.compile(r"\band\b|\bor\b|且|或", re.IGNORECASE)
+_CONDITION_CONJUNCTION_RE = re.compile(
+    r"\band\b|\bor\b|且|或|以及", re.IGNORECASE,
+)
 
 # Action splitters: any of these means the rule prescribes several actions,
 # which the evolution loop cannot credit/blame individually.
-_ACTION_SPLIT_RE = re.compile(r";|\bthen also\b|\band then\b", re.IGNORECASE)
+_ACTION_SPLIT_RE = re.compile(
+    r";|\bthen also\b|\band then\b|\band\b|然后|同时|并且|以及|并随后",
+    re.IGNORECASE,
+)
 
 # Verdict permission is an authority check, not a shape guess, so it uses a
 # small closed set of English verdict-emission phrasings (why: only these
@@ -203,7 +209,6 @@ def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
             return False, f"action:rule_forbidden_content:{marker}"
     if _ACTION_POISON_RE.search(lowered_action):
         return False, "action:rule_prompt_or_case_pollution"
-
     # Authority gates run on the rendered text because that is exactly what
     # the provider will see.
     rendered = render_rule(spec).lower()
@@ -216,6 +221,12 @@ def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
     elif _LOCAL_NEGATION_RE.search(rendered):
         if spec.module_id not in LOCAL_NEGATION_MODULES:
             return False, f"local_negation_not_allowed_for_{spec.module_id}"
+
+    action_surface_ok, action_surface_reason = validate_action_surface(
+        spec.module_id, spec.action,
+    )
+    if not action_surface_ok:
+        return False, action_surface_reason
 
     return True, ""
 

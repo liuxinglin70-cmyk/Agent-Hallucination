@@ -15,7 +15,10 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from .step_attributor import AttributionSignal
-from .signal_adapter import COVERAGE_STATE_SCORE, resolve_authoritative_state
+from .signal_adapter import (
+    COVERAGE_STATE_SCORE,
+    resolve_evolution_state,
+)
 
 
 VALID_STATES = {"verified_error", "verified_clean", "unresolved"}
@@ -160,8 +163,50 @@ def _quarantine_count(row: Mapping[str, Any]) -> int:
     return len(values) if isinstance(values, list) else 0
 
 
+def _proof_count(row: Mapping[str, Any], key: str, fallback: int) -> int:
+    proof = row.get("proof_adjudication") or {}
+    if not isinstance(proof, Mapping) or key not in proof:
+        return fallback
+    try:
+        return max(0, int(proof.get(key) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _valid_certificate_count(row: Mapping[str, Any], kind: str) -> int:
+    rows = _certificate_rows(row, kind)
+    if kind == "prosecution":
+        return _proof_count(
+            row,
+            "valid_error_certificate_count",
+            max(0, len(rows) - _quarantine_count(row)),
+        )
+    proof = row.get("proof_adjudication") or {}
+    quarantined = (
+        len(proof.get("quarantined_defense_certificate_ids") or [])
+        if isinstance(proof, Mapping) else 0
+    )
+    return _proof_count(
+        row,
+        "valid_defense_certificate_count",
+        max(0, len(rows) - quarantined),
+    )
+
+
 def _causal_field_score(row: Mapping[str, Any]) -> float:
     certificates = _certificate_rows(row, "prosecution")
+    proof = row.get("proof_adjudication") or {}
+    quarantined = {
+        str(value)
+        for value in (
+            proof.get("quarantined_error_certificate_ids") or []
+        )
+    } if isinstance(proof, Mapping) else set()
+    if quarantined:
+        certificates = [
+            certificate for certificate in certificates
+            if str(certificate.get("certificate_id") or "") not in quarantined
+        ]
     if not certificates:
         return 0.0
     populated = 0
@@ -234,16 +279,15 @@ def module_local_score(
         # unbounded candidate growth is intentionally not rewarded.
         return 1.0 if signal.candidate_count > 0 else 0.0
     if module == "candidate_to_verifier_route":
-        return float(_candidate_rows(row)) + prosecution
+        return float(_valid_certificate_count(row, "prosecution")) + prosecution
     if module == "atomic_verifier_instruction":
-        valid = len(_certificate_rows(row, "prosecution"))
-        return float(valid - _quarantine_count(row)) + prosecution
+        return float(_valid_certificate_count(row, "prosecution")) + prosecution
     if module == "evidence_obligation":
         # A one-sided proof is not progress. Reward the weaker side so that
         # evolution cannot improve this module by starving its challenger.
         return min(prosecution, defense)
     if module == "clean_defense_boundary":
-        return defense + float(len(_certificate_rows(row, "defense")))
+        return defense + float(_valid_certificate_count(row, "defense"))
     if module == "causal_link_test":
         # causal_link_test is injected into both causal-field providers and the
         # counterfactual localization route. A rule that turns temporal
@@ -418,12 +462,12 @@ def assess_source_fitness(
     if before_result is not None:
         before = replace(
             before,
-            state=resolve_authoritative_state(before_result),
+            state=resolve_evolution_state(before_result),
         )
     if after_result is not None:
         after = replace(
             after,
-            state=resolve_authoritative_state(after_result),
+            state=resolve_evolution_state(after_result),
         )
     reasons: list[str] = []
     # 不变式 #4 防御性硬化：diagnostic_only 信号（如 runtime_invalid）永不可

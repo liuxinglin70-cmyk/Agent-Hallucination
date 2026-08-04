@@ -34,6 +34,7 @@ from .signal_adapter import (
     extract_coverage,
     extract_crs_signal,
     resolve_authoritative_state,
+    resolve_evolution_state,
 )
 
 
@@ -400,7 +401,7 @@ def runtime_invalid_signal(
 
 def _prediction_state(row: Mapping[str, Any]) -> bool | None:
     """Extract predicted polarity from state string."""
-    state = resolve_authoritative_state(row)
+    state = resolve_evolution_state(row)
     if state == "verified_error":
         return True
     if state == "verified_clean":
@@ -841,7 +842,7 @@ def attribute_failure(
     - High-confidence verified_error (all CRS dimensions consistently high)
     - High-confidence verified_clean (defense overwhelming)
     """
-    state = resolve_authoritative_state(row)
+    state = resolve_evolution_state(row)
     predicted = _prediction_state(row)
     prosecution, defense = _extract_coverage(row)
     prosecution_cov, defense_cov = prosecution.score, defense.score

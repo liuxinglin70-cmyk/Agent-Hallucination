@@ -87,33 +87,42 @@ def build_adjudication_facts(
     boundary_path_state: str = "",
 ) -> AdjudicationFacts:
     """Derive the addressable fact snapshot from one proof-court result."""
+    def sequence_count(value: Any) -> int:
+        return len(value) if isinstance(value, (list, tuple, set)) else 0
+
+    def nonnegative_int(value: Any) -> int:
+        try:
+            return max(0, int(value or 0))
+        except (TypeError, ValueError):
+            return 0
+
     blocked = court_result.get("consensus_gate_blocked_ids") or []
     quarantined_errors = court_result.get("quarantined_error_certificate_ids") or []
     quarantined_defenses = court_result.get("quarantined_defense_certificate_ids") or []
-    required_count = int(court_result.get("required_candidate_count") or 0)
+    required_count = nonnegative_int(court_result.get("required_candidate_count"))
     return AdjudicationFacts(
         prosecution_coverage=str(court_result.get("prosecution_coverage") or ""),
         defense_coverage=str(court_result.get("defense_coverage") or ""),
-        valid_error_certificate_count=int(
-            court_result.get("valid_error_certificate_count") or 0
+        valid_error_certificate_count=nonnegative_int(
+            court_result.get("valid_error_certificate_count")
         ),
-        valid_defense_certificate_count=int(
-            court_result.get("valid_defense_certificate_count") or 0
+        valid_defense_certificate_count=nonnegative_int(
+            court_result.get("valid_defense_certificate_count")
         ),
-        surviving_error_count=len(
-            court_result.get("surviving_error_certificate_ids") or []
+        surviving_error_count=sequence_count(
+            court_result.get("surviving_error_certificate_ids")
         ),
-        defeated_error_count=len(
-            court_result.get("defeated_error_certificate_ids") or []
+        defeated_error_count=sequence_count(
+            court_result.get("defeated_error_certificate_ids")
         ),
-        quarantined_error_count=len(quarantined_errors),
-        quarantined_defense_count=len(quarantined_defenses),
+        quarantined_error_count=sequence_count(quarantined_errors),
+        quarantined_defense_count=sequence_count(quarantined_defenses),
         consensus_gate_applied=bool(court_result.get("consensus_gate_applied")),
-        consensus_gate_blocked_count=len(blocked),
+        consensus_gate_blocked_count=sequence_count(blocked),
         required_candidate_count=required_count,
         fully_quarantined=(
             required_count > 0
-            and len(quarantined_errors) >= required_count
+            and sequence_count(quarantined_errors) >= required_count
         ),
         boundary_path_state=str(boundary_path_state or ""),
         terminal_state=str(court_result.get("state") or ""),

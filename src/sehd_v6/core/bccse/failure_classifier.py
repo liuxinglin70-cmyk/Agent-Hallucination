@@ -120,7 +120,12 @@ def _find_first_bad_artifact(
             continue
         if bool(item.get("malformed")):
             return item, REASON_PROVIDER_MALFORMED
-        if list(item.get("missing_fields") or []):
+        missing_fields = item.get("missing_fields")
+        if missing_fields not in (None, "") and not isinstance(
+            missing_fields, (list, tuple, set)
+        ):
+            return item, REASON_PROVIDER_MALFORMED
+        if list(missing_fields or []):
             return item, REASON_PROVIDER_MISSING
     return None
 

@@ -51,11 +51,11 @@ class EvolutionDetection:
 
 def project_for_evolution(result: Mapping[str, Any]) -> EvolutionDetection:
     """Validate and normalize one detector result for label-free evolution."""
-    from ..bccse.signal_adapter import extract_crs_signal, resolve_authoritative_state
+    from ..bccse.signal_adapter import extract_crs_signal, resolve_evolution_state
 
     runtime_valid = result.get("runtime_valid") is True
     authority = str(result.get("decision_authority") or "invalid")
-    state = resolve_authoritative_state(result)
+    state = resolve_evolution_state(result)
     proof = result.get("proof_adjudication")
     proof = proof if isinstance(proof, Mapping) else {}
     prosecution = result.get("combined_prosecution") or result.get("prosecution") or {}

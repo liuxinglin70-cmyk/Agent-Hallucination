@@ -268,6 +268,16 @@ def test_content_hash_ignores_meta_but_tracks_content():
     assert child.content_hash != before
 
 
+def test_content_hash_ignores_policy_item_identity():
+    first = apply_policy_edit(
+        create_baseline_policy_genome(), make_add_edit(make_item(item_id="a"))
+    )
+    second = apply_policy_edit(
+        create_baseline_policy_genome(), make_add_edit(make_item(item_id="b"))
+    )
+    assert first.content_hash == second.content_hash
+
+
 def test_remove_item_works_on_unprotected_item():
     genome = apply_policy_edit(
         create_baseline_policy_genome(), make_add_edit(make_item())

@@ -58,6 +58,7 @@ from ..bccse.types import (
 )
 from ..bccse.step_attributor import ErrorType
 from ..bccse.genome import SkillGenome, create_baseline_genome
+from ..bccse.signal_adapter import resolve_evolution_state
 from ..bccse.promotion_gates import G1_CHECKS, MetricSnapshot, ReplayEvidence
 
 
@@ -361,6 +362,18 @@ def _decision_is_invalid(row: Mapping[str, Any]) -> bool:
     )
 
 
+def _has_explicit_authority(row: Mapping[str, Any]) -> bool:
+    """Require the current authoritative result contract for scored metrics."""
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    top_authority = str(row.get("decision_authority") or "").strip().lower()
+    proof_authority = str(proof.get("decision_authority") or "").strip().lower()
+    return (
+        top_authority == "authoritative"
+        and (not proof_authority or proof_authority == "authoritative")
+    )
+
+
 def _prediction_state_detail(row: Mapping[str, Any]) -> tuple[str, bool]:
     """Resolve the scoreable state without mutating the occurrence fact."""
     occurrence_state, occurrence_sourced = _occurrence_fact_state_detail(row)
@@ -424,11 +437,29 @@ def _row_correct(row: Mapping[str, Any]) -> bool:
     letting ``bool(None) == False`` accidentally match a verified_clean
     prediction. Without gold there is no ground truth to confirm.
     """
-    predicted = _prediction_state(row)
+    if row.get("runtime_valid") is not True or not _has_explicit_authority(row):
+        return False
+    predicted_state = _metric_prediction_state(row)
+    predicted = (
+        True if predicted_state == "verified_error"
+        else False if predicted_state == "verified_clean"
+        else None
+    )
     gold = row.get("gold_label")
     if predicted is None or gold is None:
         return False
-    return predicted is bool(gold)
+    try:
+        gold_value = parse_gold_label(gold)
+    except ValueError:
+        return False
+    return predicted is gold_value
+
+
+def _metric_prediction_state(row: Mapping[str, Any]) -> str:
+    """Return unresolved for rows without a scoreable authority envelope."""
+    if row.get("runtime_valid") is not True or not _has_explicit_authority(row):
+        return "unresolved"
+    return resolve_evolution_state(row)
 
 
 def _candidate_origins(row: Mapping[str, Any]) -> tuple[str, ...]:
@@ -460,7 +491,7 @@ def _occurrence_metric_rows(
     normalized_rows: list[dict[str, Any]] = []
     for original in rows:
         row = dict(original)
-        state = _prediction_state_name(original)
+        state = _metric_prediction_state(original)
         row["occurrence_state"] = state
         proof_value = original.get("proof_adjudication")
         proof = dict(proof_value) if isinstance(proof_value, Mapping) else {}
@@ -533,9 +564,9 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         for meta in _walk_provider_meta(row.get("providers") or {})
     )
     case_count = len(rows)
-    unresolved = sum(_prediction_state(row) is None for row in rows)
+    unresolved = sum(_metric_prediction_state(row) == "unresolved" for row in rows)
     valid_outputs = sum(
-        bool(row.get("runtime_valid")) and not _decision_is_invalid(row)
+        _metric_prediction_state(row) != "unresolved"
         for row in rows
     )
     gold_positive = gold_negative = 0
@@ -545,7 +576,12 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         if gold is None:
             continue
         gold_is_positive = parse_gold_label(gold)
-        predicted = _prediction_state(row)
+        predicted_state = _metric_prediction_state(row)
+        predicted = (
+            True if predicted_state == "verified_error"
+            else False if predicted_state == "verified_clean"
+            else None
+        )
         gold_positive += int(gold_is_positive)
         gold_negative += int(not gold_is_positive)
         if predicted is True and gold_is_positive:

@@ -167,12 +167,14 @@ def test_paired_replay_uses_boundary_refs_contract(monkeypatch) -> None:
             "state": "verified_error",
             "gold_label": False,
             "runtime_valid": True,
+            "decision_authority": "authoritative",
         },
         {
             "case_ref": "boundary",
             "state": "verified_clean",
             "gold_label": False,
             "runtime_valid": True,
+            "decision_authority": "authoritative",
         },
     )
     monkeypatch.setattr(evaluator, "_get_rows", lambda genome, keys: rows)
@@ -548,6 +550,18 @@ def test_sanitize_diagnosis_keeps_allowed_owner_and_hint() -> None:
     assert bounded["intervention_hint"]["action"] == "a"
 
 
+def test_sanitize_diagnosis_requires_boolean_owner_flag() -> None:
+    bounded = sanitize_diagnosis(
+        {
+            "owner_executable": "false",
+            "owner_module": "clean_defense_boundary",
+            "failure_field": "defense_coverage",
+        },
+        allowed_modules=("clean_defense_boundary",),
+    )
+    assert bounded["owner_executable"] is False
+
+
 def test_sanitize_diagnosis_remaps_owner_without_field_ownership() -> None:
     """v5.9b: a diagnosis asking evidence_obligation to repair
     defense_coverage is inert (the module owns prosecution-side fields).
@@ -848,6 +862,13 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
             "condition": "a factual claim lacks a cited trajectory event",
             "action": "require one event-backed certificate",
             "evidence_anchor": "factual claim without cited trajectory event",
+            "expected_effect": "prosecution evidence coverage increases",
+            "expected_effect_contract": {
+                "observable_field": "prosecution_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "prosecution evidence is incomplete",
+            },
             "rationale": "Require observable support.",
             "feature_description": "factual claim without cited trajectory evidence",
         }, {}),

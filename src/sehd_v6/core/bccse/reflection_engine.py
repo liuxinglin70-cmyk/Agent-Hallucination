@@ -34,7 +34,7 @@ from .step_attributor import (
     ReflectionType,
     TriggerSource,
 )
-from .signal_adapter import resolve_authoritative_state
+from .signal_adapter import resolve_evolution_state
 
 # Evaluator-only keys that must never enter a reflection prompt (不变式 #3).
 # preferred_keys 路径直接序列化整个子树，若 events/messages 等键的值内部
@@ -43,6 +43,7 @@ from .signal_adapter import resolve_authoritative_state
 _EVALUATOR_TRAJECTORY_KEYS = frozenset({
     "case_id", "source_id", "gold_label", "gold_explanation",
     "is_hallucination", "hallucination_step", "hallucination_reason",
+    "hallucination_category", "hallucination_subcategory",
     "outer_feedback", "gold_steps",
 })
 
@@ -261,12 +262,27 @@ def build_runtime_observation(
         value = proof.get(key)
         return len(value) if isinstance(value, (list, tuple)) else 0
 
+    def _proof_count(key: str, fallback: int) -> int:
+        if key not in proof:
+            return fallback
+        try:
+            return max(0, int(proof.get(key) or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    surviving_ids = proof.get("surviving_error_certificate_ids")
+    surviving_error_certificates = (
+        len(surviving_ids)
+        if isinstance(surviving_ids, (list, tuple))
+        else max(len(prosecution) - _id_count("quarantined_error_certificate_ids"), 0)
+    )
+
     # Court balance: who carried the verdict. Reflection must target the
     # stage that actually decided the outcome, not a stage whose output was
     # consumed downstream without effect.
     court_balance = {
         "surviving_error_certificates": max(
-            len(prosecution) - _id_count("quarantined_error_certificate_ids"),
+            surviving_error_certificates,
             0,
         ),
         "quarantined_error_certificates": (
@@ -274,7 +290,9 @@ def build_runtime_observation(
             if isinstance(health.get("quarantined_error_certificate_count"), int)
             else _id_count("quarantined_error_certificate_ids")
         ),
-        "defense_certificates": len(defense),
+        "defense_certificates": _proof_count(
+            "valid_defense_certificate_count", len(defense),
+        ),
         "candidates_covered_by_clean_defense": _id_count(
             "clean_covered_candidate_ids"
         ),
@@ -1123,11 +1141,18 @@ def sanitize_diagnosis(
     from .genome import OBSERVABLE_FIELDS
 
     allowed = tuple(dict.fromkeys(str(module) for module in allowed_modules))
+    from .genome import validate_feature_description
+
+    def safe_text(value: Any, limit: int) -> str:
+        text = " ".join(str(value or "").split())[:limit]
+        valid, _ = validate_feature_description(text)
+        return text if valid else ""
+
     bounded: dict[str, Any] = {
-        "owner_executable": bool(parsed.get("owner_executable")),
-        "failure_field": str(parsed.get("failure_field") or "")[:120],
-        "observed_gap": str(parsed.get("observed_gap") or "")[:300],
-        "reasoning": str(parsed.get("reasoning") or "")[:300],
+        "owner_executable": parsed.get("owner_executable") is True,
+        "failure_field": safe_text(parsed.get("failure_field"), 120),
+        "observed_gap": safe_text(parsed.get("observed_gap"), 300),
+        "reasoning": safe_text(parsed.get("reasoning"), 300),
     }
     owner = str(parsed.get("owner_module") or "").strip()
     if owner not in set(allowed):
@@ -1190,8 +1215,8 @@ def sanitize_diagnosis(
     hint = parsed.get("intervention_hint")
     if isinstance(hint, Mapping) and bounded["owner_executable"]:
         bounded["intervention_hint"] = {
-            "condition": str(hint.get("condition") or "")[:240],
-            "action": str(hint.get("action") or "")[:240],
+            "condition": safe_text(hint.get("condition"), 240),
+            "action": safe_text(hint.get("action"), 240),
         }
     return bounded
 
@@ -1382,7 +1407,7 @@ def format_detection_context_for_llm(
     adjudication = detection_result.get("adjudication") or {}
     pa = detection_result.get("proof_adjudication") or {}
     parts.append("  <adjudication>")
-    parts.append(f"  最终状态: {resolve_authoritative_state(detection_result)}")
+    parts.append(f"  最终状态: {resolve_evolution_state(detection_result)}")
     if pa.get("prosecution_coverage") is not None:
         parts.append(f"  控方覆盖率: {pa['prosecution_coverage']}")
     if pa.get("defense_coverage") is not None:

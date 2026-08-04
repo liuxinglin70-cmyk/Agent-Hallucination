@@ -28,7 +28,7 @@ from ..bccse.genome import (
     normalize_type_confidence,
     sanitize_feature_description,
 )
-from ..bccse.signal_adapter import resolve_authoritative_state
+from ..bccse.signal_adapter import resolve_evolution_state
 
 
 def _safe_category(value: Any, *, limit: int = 80) -> str:
@@ -504,8 +504,8 @@ class TypeAwareFitness:
             TypeAwareFitnessAssessment with fitness evaluation.
         """
         # Compute per-type improvement
-        before_state = resolve_authoritative_state(detection_before)
-        after_state = resolve_authoritative_state(detection_after)
+        before_state = resolve_evolution_state(detection_before)
+        after_state = resolve_evolution_state(detection_after)
 
         direction_correct = self._check_direction_improvement(
             before_state, after_state, evolution_direction
@@ -855,7 +855,7 @@ class TypeAwareFitness:
             strategy_signals.append(f"module:{target_module}")
 
         # Check for state transition
-        state = resolve_authoritative_state(detection_result)
+        state = resolve_evolution_state(detection_result)
         if state == "verified_error":
             strategy_signals.append("error_detection")
         elif state == "verified_clean":

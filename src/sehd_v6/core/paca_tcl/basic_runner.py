@@ -148,7 +148,8 @@ def _provider_repair_call(
         method="POST",
     )
     try:
-        with urlrequest.urlopen(req, timeout=120) as response:
+        repair_timeout = max(1, int(route.get("timeout_seconds", 120)))
+        with urlrequest.urlopen(req, timeout=repair_timeout) as response:
             raw = response.read()
         value = json.loads(raw.decode("utf-8"))
         content = value["choices"][0]["message"].get("content")
@@ -444,6 +445,8 @@ def provider_call_with_schema(
                     "request_hash": request_hash,
                     "usage": cached.get("usage") or {},
                     "cache_source": "local",
+                    "transport_attempts": int(cached.get("transport_attempts") or 0),
+                    "repair_used": bool(cached.get("repair_used")),
                 }
         except Exception:
             pass  # 缓存文件损坏，继续调用大模型
@@ -464,6 +467,8 @@ def provider_call_with_schema(
                     "request_hash": request_hash,
                     "usage": cached.get("usage") or {},
                     "cache_source": "global",
+                    "transport_attempts": int(cached.get("transport_attempts") or 0),
+                    "repair_used": bool(cached.get("repair_used")),
                 }
         except Exception:
             pass  # 缓存文件损坏，继续调用大模型
@@ -481,6 +486,8 @@ def provider_call_with_schema(
         else None
     )
     last_error: Exception | None = None
+    transport_attempts = 0
+    repair_used = False
     for attempt in range(retries + 1):
         if deadline is not None:
             remaining = deadline - time.monotonic()
@@ -493,6 +500,7 @@ def provider_call_with_schema(
         else:
             request_timeout = per_attempt_timeout
         try:
+            transport_attempts += 1
             req = urlrequest.Request(
                 route["endpoint"].rstrip("/") + "/chat/completions",
                 data=body,
@@ -526,6 +534,7 @@ def provider_call_with_schema(
                     payload, system, user,
                 )
                 try:
+                    transport_attempts += 1
                     repair_value = _provider_repair_call(
                         route=route, api_key=api_key,
                         payload=repair_body, repair_user=user,
@@ -547,6 +556,7 @@ def provider_call_with_schema(
                         f"{bool(message.get('reasoning_content'))}"
                     )
                 parsed = repair_value
+                repair_used = True
                 choice = {"finish_reason": "repair"}
             if not isinstance(parsed, dict):
                 raise ValueError("provider response is not a JSON object")
@@ -559,6 +569,8 @@ def provider_call_with_schema(
                 "usage": value.get("usage") or {},
                 "latency_seconds": time.time() - started,
                 "contains_credentials": False,
+                "transport_attempts": transport_attempts,
+                "repair_used": repair_used,
             }
             # v3.5.1: 写入全局缓存（原子写，防止并发冲突）
             if global_target is not None:
@@ -576,6 +588,8 @@ def provider_call_with_schema(
                 "usage": cached["usage"],
                 "latency_seconds": cached["latency_seconds"],
                 "cache_source": "local",
+                "transport_attempts": transport_attempts,
+                "repair_used": repair_used,
             }
         except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc

@@ -103,6 +103,33 @@ def test_multiple_actions_rejected():
     assert reason == "multiple_actions"
 
 
+def test_chinese_condition_conjunction_is_rejected():
+    ok, reason = validate_rule_spec(
+        _spec(condition="the tool fails 以及 the retry fails 以及 output diverges")
+    )
+    assert not ok
+    assert reason == "condition_overload"
+
+
+def test_plain_action_conjunction_is_rejected():
+    ok, reason = validate_rule_spec(
+        _spec(action="require one certificate and emit one audit record")
+    )
+    assert not ok
+    assert reason == "multiple_actions"
+
+
+def test_cross_module_action_surface_is_rejected():
+    ok, reason = validate_rule_spec(
+        _spec(
+            module_id="evidence_obligation",
+            action="emit a defense certificate",
+        )
+    )
+    assert not ok
+    assert reason == "forbidden_action_surface:defense certificate"
+
+
 # --- pollution firewall ---
 
 def test_case_id_pollution_rejected():

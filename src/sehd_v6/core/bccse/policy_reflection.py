@@ -27,6 +27,21 @@ from .v6_contracts import (
 from .policy_genome import PolicyGenome
 
 
+def _sanitize_rejected_summary(value: str) -> str:
+    """Keep policy feedback categorical before it enters the next prompt."""
+    import re
+
+    text = " ".join(str(value or "").split())
+    text = re.sub(
+        r"\b(?:case|source)[_/ -][A-Za-z0-9_.:/-]+",
+        "[case]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\b[A-Za-z][A-Za-z0-9_.-]*/\d+\b", "[case]", text)
+    return text[:1200]
+
+
 def current_policy_text(genome: PolicyGenome) -> str:
     """Render the policy genome as one ``precondition -> action(params)``
     line per item; the empty baseline renders an explicit placeholder so
@@ -104,7 +119,7 @@ def build_policy_reflection_prompt(
     evidence_text = json.dumps(
         dict(attribution.evidence), ensure_ascii=False, sort_keys=True,
     )
-    rejected_block = rejected_summary.strip() or "(none)"
+    rejected_block = _sanitize_rejected_summary(rejected_summary) or "(none)"
     user = (
         "FAILURE ATTRIBUTION TRIPLE:\n"
         f"- layer: {attribution.layer}\n"

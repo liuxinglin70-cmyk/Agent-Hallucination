@@ -86,6 +86,7 @@ def test_metric_snapshot_parses_string_gold_label() -> None:
         "state": "verified_error",
         "occurrence_state": "verified_error",
         "runtime_valid": True,
+        "decision_authority": "authoritative",
         "census": [],
         "gold_steps": [],
         "candidate_path": {"state": "verified_error"},
@@ -115,6 +116,24 @@ def test_metric_snapshot_abstention_is_not_true_negative() -> None:
     assert snapshot.unresolved_rate == 1.0
     assert snapshot.clean_fpr == 0.0
     assert snapshot.macro_f1 == 0.0
+
+
+def test_metric_snapshot_rejects_missing_authority_envelope() -> None:
+    row = {
+        "gold_label": True,
+        "state": "verified_error",
+        "occurrence_state": "verified_error",
+        "runtime_valid": True,
+        "census": [],
+        "gold_steps": [],
+        "candidate_path": {"state": "verified_error"},
+        "boundary_path": {"state": "verified_clean"},
+    }
+    snapshot = proof_evaluator.metric_snapshot([row])
+    assert snapshot.valid_output_rate == 0.0
+    assert snapshot.invalid_rate == 1.0
+    assert snapshot.unresolved_rate == 1.0
+    assert snapshot.hallucination_recall == 0.0
 
 
 # ---------------------------------------------------------------

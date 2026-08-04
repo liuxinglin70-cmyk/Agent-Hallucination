@@ -94,6 +94,13 @@ def _typed_edit(**overrides: object) -> SkillEdit:
         "hallucination_type": "factual",
         "evolution_direction": "unresolved_to_decisive",
         "type_confidence": 0.43,
+        "expected_effect": "prosecution evidence coverage increases",
+        "expected_effect_contract": {
+            "observable_field": "prosecution_coverage",
+            "expected_direction": "increase",
+            "expected_scope": "all_cases",
+            "trigger_condition": "prosecution evidence is incomplete",
+        },
     }
     values.update(overrides)
     return SkillEdit(**values)
@@ -113,6 +120,13 @@ def _slots_response(**overrides: object) -> dict[str, object]:
         "action": "require one event-backed certificate",
         "evidence_anchor": "factual claim without cited trajectory support",
         "feature_description": "factual claim without cited trajectory support",
+        "expected_effect": "prosecution evidence coverage increases",
+        "expected_effect_contract": {
+            "observable_field": "prosecution_coverage",
+            "expected_direction": "increase",
+            "expected_scope": "all_cases",
+            "trigger_condition": "prosecution evidence is incomplete",
+        },
         "rationale": "Tighten the evidence obligation for unsupported claims.",
     }
     values.update(overrides)
@@ -161,7 +175,11 @@ def test_expected_effect_is_sanitized_and_audited() -> None:
     assert audit["target_aligned"] is True
 
     misaligned = runner._expected_effect_audit(
-        _typed_edit(expected_effect="defense coverage increases"), no_effect
+        _typed_edit(
+            expected_effect="defense coverage increases",
+            expected_effect_contract={},
+        ),
+        no_effect,
     )
     assert misaligned["status"] == "misaligned"
 
@@ -379,6 +397,27 @@ def test_reflection_context_strips_nested_gold_in_preferred_keys() -> None:
     assert "gold_explanation" not in context
     assert "secret_case_xyz" not in context
     assert "leak" not in context
+
+
+def test_runtime_observation_uses_surviving_certificate_ids() -> None:
+    from src.sehd_v6.core.bccse.reflection_engine import build_runtime_observation
+
+    observation = build_runtime_observation(
+        {
+            "state": "verified_clean",
+            "census": [{"candidate_id": "c1"}],
+            "combined_prosecution": {
+                "candidates": [{"certificate_id": "e1"}],
+            },
+            "proof_adjudication": {
+                "surviving_error_certificate_ids": [],
+                "defeated_error_certificate_ids": ["e1"],
+                "quarantined_error_certificate_ids": [],
+            },
+        },
+        _signal("verified_clean"),
+    )
+    assert observation["court_balance"]["surviving_error_certificates"] == 0
 
 
 def test_same_source_no_effect_retry_can_produce_effective_skill(
@@ -646,6 +685,31 @@ def test_detection_runner_rejects_missing_decision_authority(
         )
 
 
+def test_detection_runner_rejects_non_authoritative_decision_token(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner.v35,
+        "adjudicate_case",
+        lambda **kwargs: {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "valid",
+        },
+    )
+    with pytest.raises(RuntimeError, match="invalid decision authority"):
+        runner._run_detection_with_genome(
+            genome=create_baseline_genome(),
+            case_id="non_authoritative",
+            record={},
+            config={},
+            output_dir=tmp_path,
+            census_root=tmp_path,
+        )
+
+
 def test_runner_audit_uses_occurrence_state_over_legacy(
     tmp_path, monkeypatch,
 ) -> None:
@@ -846,7 +910,7 @@ def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch)
         result = {
             "state": state,
             "runtime_valid": True,
-            "decision_authority": "valid",
+            "decision_authority": "authoritative",
             "census": [],
         }
         gold = (kwargs.get("record") or {}).get("gold_label")
@@ -983,7 +1047,13 @@ def test_independent_registered_canary_unblocks_all_triggered_source_pool(
         "json_object_provider_call",
         lambda **kwargs: (
             _slots_response(
-                expected_effect="prosecution evidence coverage becomes complete",
+                    expected_effect="detection state becomes decisive",
+                    expected_effect_contract={
+                        "observable_field": "prosecution_coverage",
+                        "expected_direction": "increase",
+                    "expected_scope": "all_cases",
+                    "trigger_condition": "the evidence process closes the trigger",
+                },
             ),
             {},
         ),
@@ -1004,7 +1074,7 @@ def test_independent_registered_canary_unblocks_all_triggered_source_pool(
     assert result.evolution_audit["canary_case_ids"] == ["anchor"]
     assert result.evolution_audit["baseline_canary_audit"][0]["admitted"] is True
     contract = result.steps[0].fitness_check["expected_effect_contract"]
-    assert contract["status"] == "observed"
+    assert contract["status"] == "not_observed"
     assert result.evolution_audit["rejection_summary"]["by_stage"] == {}
 
 
@@ -1081,9 +1151,16 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
             "target_module": "abstention_rule",
             "operation": "add_rule",
             "condition": "proof participants leave a material claim untested",
-            "action": "request one additional certificate",
+                "action": "record the boundary finding as decisive",
             "evidence_anchor": "material claim left untested",
             "feature_description": "material claim left untested",
+            "expected_effect": "terminal state becomes decisive",
+            "expected_effect_contract": {
+                "observable_field": "state",
+                "expected_direction": "shift",
+                "expected_scope": "unresolved_cases",
+                "trigger_condition": "the evidence boundary is complete",
+            },
             "rationale": "Improve proof completeness.",
         }, {}),
     )
@@ -1418,7 +1495,7 @@ def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
                 else "unresolved"
             ),
             "runtime_valid": True,
-            "decision_authority": "valid",
+            "decision_authority": "authoritative",
             "census": [],
         },
     )
@@ -2024,7 +2101,7 @@ def test_runner_records_runtime_invalid_as_diagnostic_only_telemetry(
         return {
             "state": "verified_clean",
             "runtime_valid": True,
-            "decision_authority": "valid",
+            "decision_authority": "authoritative",
             "census": [],
         }
 
@@ -2077,7 +2154,7 @@ def test_runtime_invalid_experience_is_recorded_but_not_promotable(
         return {
             "state": "verified_clean",
             "runtime_valid": True,
-            "decision_authority": "valid",
+            "decision_authority": "authoritative",
             "census": [],
         }
 
@@ -4497,12 +4574,14 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
             }
             return {
                 "state": "unresolved",
+                "occurrence_state": "verified_clean",
                 "runtime_valid": True,
                 "census": [],
                 "proof_adjudication": adjudication,
             }
         return {
             "state": "verified_clean",
+            "occurrence_state": "verified_clean",
             "runtime_valid": True,
             "census": [],
             "proof_adjudication": adjudication,
@@ -4654,6 +4733,101 @@ def test_l2_state_change_against_gold_polarity_is_rejected(
     assert entry["reason"] == "state_change_against_gold_polarity"
     assert result.evolution_audit["l2_policy_accepts"] == 0
     assert result.evolution_audit["policy_genome"]["items"] == []
+
+
+def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    real_attribute = runner.attribute_failure
+    calls: list[tuple[str, bool]] = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        calls.append((case_id, policy_genome is not None))
+        if case_id == "anchor":
+            return {
+                "state": "verified_clean",
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "census": [],
+            }
+        if case_id == "l2":
+            proof = {
+                "state": "unresolved",
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+                "valid_error_certificate_count": 1,
+                "valid_defense_certificate_count": 1,
+                "required_candidate_count": 1,
+                "consensus_gate_applied": True,
+                "consensus_gate_blocked_ids": ["blocked"],
+            }
+            if policy_genome is not None:
+                item = policy_genome.items[0]
+                proof["policy_evaluation"] = {
+                    "fired": [{"item_id": item.item_id}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "unresolved",
+                }
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "census": [],
+                "proof_adjudication": proof,
+                "kind": "l2",
+            }
+        return {
+            "state": "verified_clean" if genome.generation else "unresolved",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+            "kind": "l1",
+        }
+
+    def attributed(result, use_gold=False, gold_reflection=False):
+        if result.get("kind") == "l2":
+            return real_attribute(
+                result, use_gold=use_gold, gold_reflection=gold_reflection,
+            )
+        return _signal(str(result["state"]))
+
+    def mutation(**kwargs):
+        if kwargs["purpose"] == "policy_reflection":
+            return {
+                "precondition": "consensus_gate_blocked_nonempty",
+                "action": "emit_telemetry_only",
+                "params": {},
+                "rationale": "observe blocked consensus",
+            }, {}
+        return _slots_response(
+            expected_effect="prosecution evidence coverage increases",
+            expected_effect_contract={
+                "observable_field": "prosecution_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "prosecution evidence is incomplete",
+            },
+        ), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "attribute_failure", attributed)
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("l2", "l1"),
+        canary_case_ids=("anchor",),
+        records={"l2": {}, "l1": {}, "anchor": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        run_id="l2_context_preserved",
+    )
+
+    assert result.evolution_audit["l2_policy_accepts"] == 1
+    l1_calls = [has_policy for case_id, has_policy in calls if case_id == "l1"]
+    assert l1_calls and all(l1_calls)
+    assert any(case_id == "anchor" and has_policy for case_id, has_policy in calls)
 
 
 

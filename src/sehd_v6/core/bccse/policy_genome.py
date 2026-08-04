@@ -121,7 +121,6 @@ class PolicyGenome:
         state = {
             "items": [
                 {
-                    "item_id": item.item_id,
                     "precondition": item.precondition,
                     "action": item.action,
                     "params": dict(item.params),

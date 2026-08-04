@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
 
-from ..bccse.signal_adapter import resolve_authoritative_state
+from ..bccse.signal_adapter import resolve_evolution_state
 
 
 def _normalize_signal(signal: Any) -> dict[str, Any]:
@@ -274,7 +274,7 @@ class HallucinationTypeClassifier:
             has_omission=any("omission" in kind for kind in kinds),
             has_adoption=any("adoption" in kind for kind in kinds),
             has_claim=any("claim" in kind or "assert" in kind for kind in kinds),
-            state=resolve_authoritative_state(detection_result),
+            state=resolve_evolution_state(detection_result),
             prosecution_coverage_state=signal.get("prosecution_coverage_state"),
             defense_coverage_state=signal.get("defense_coverage_state"),
             crs_source=str(signal.get("crs_source") or "unknown"),
@@ -342,7 +342,7 @@ class HallucinationTypeClassifier:
                 evidence["crs_pattern"] = crs_type.value
 
         # 1c. State × coverage structural signal
-        state = resolve_authoritative_state(detection_result)
+        state = resolve_evolution_state(detection_result)
         if state == "unresolved":
             raw_aggregate = signal_dict.get("crs_aggregate")
             crs_agg = (

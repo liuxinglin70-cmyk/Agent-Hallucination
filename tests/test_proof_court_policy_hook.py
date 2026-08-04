@@ -10,6 +10,10 @@ from __future__ import annotations
 import copy
 
 from src.sehd_v6.core.bccse.v6_contracts import PolicyItem
+from src.sehd_v6.core.bccse.signal_adapter import (
+    resolve_authoritative_state,
+    resolve_evolution_state,
+)
 from src.sehd_v6.core.paca_tcl import proof_contract
 
 
@@ -128,6 +132,25 @@ def test_downgrade_coverage_defense_flips_unresolved() -> None:
     evaluation = result["policy_evaluation"]
     assert evaluation["fired"][0]["item_id"] == "policy_downgrade_defense"
     assert evaluation["effective_defense_coverage"] == "incomplete"
+
+
+def test_policy_terminal_state_is_visible_to_evolution_not_occurrence_metrics() -> None:
+    policy = PolicyItem(
+        item_id="policy_downgrade_defense",
+        precondition="defense_coverage_complete_and_zero_certificates",
+        action="downgrade_coverage",
+        params={"side": "defense", "to_state": "incomplete"},
+    )
+    result = _adjudicate(policy_items=[policy])
+    row = {
+        "state": result["state"],
+        "occurrence_state": result["occurrence_state"],
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "proof_adjudication": result,
+    }
+    assert resolve_authoritative_state(row) == "verified_clean"
+    assert resolve_evolution_state(row) == "unresolved"
 
 
 def test_telemetry_only_policy_leaves_state_untouched() -> None:

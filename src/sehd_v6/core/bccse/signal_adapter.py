@@ -122,6 +122,30 @@ def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
     return legacy_state
 
 
+def resolve_evolution_state(row: Mapping[str, Any]) -> str:
+    """Resolve the terminal state consumed by the evolution loop.
+
+    The occurrence ledger is an append-only factual record and intentionally
+    remains unchanged when an L2 policy alters the court's terminal edge.  A
+    policy-aware result therefore needs its terminal ``state`` rather than
+    the occurrence-first state used by external occurrence metrics.
+    """
+    if decision_authority_invalid(row):
+        return "unresolved"
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    policy_evaluation = proof.get("policy_evaluation")
+    if isinstance(policy_evaluation, Mapping):
+        for value in (row.get("state"), proof.get("state")):
+            if value in (None, ""):
+                continue
+            normalized = str(value)
+            if normalized not in VALID_DETECTION_STATES:
+                raise ValueError(f"Invalid evolution terminal state: {value!r}")
+            return normalized
+    return resolve_authoritative_state(row)
+
+
 @dataclass(frozen=True)
 class CoverageReading:
     score: float | None
@@ -368,7 +392,7 @@ def _proof_projection(row: Mapping[str, Any]) -> CRSSignal:
     proof = row.get("proof_adjudication") or {}
     if not isinstance(proof, Mapping):
         proof = {}
-    state = resolve_authoritative_state(row)
+    state = resolve_evolution_state(row)
     certificates = _prosecution_certificates(row)
     quarantined = {
         str(value)

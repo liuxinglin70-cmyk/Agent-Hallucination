@@ -75,6 +75,13 @@ def _edit_payload() -> dict:
         "evidence_anchor": "uncited factual claim accepted without trajectory evidence",
         "rationale": "Require observable support.",
         "feature_description": "factual claim without cited trajectory evidence",
+        "expected_effect": "prosecution evidence coverage increases",
+        "expected_effect_contract": {
+            "observable_field": "prosecution_coverage",
+            "expected_direction": "increase",
+            "expected_scope": "all_cases",
+            "trigger_condition": "prosecution evidence is incomplete",
+        },
     }
 
 
@@ -340,7 +347,18 @@ def test_online_evolution_runs_independent_candidates_and_critic(
 
     def mutation(**kwargs):
         calls.append((kwargs["purpose"], kwargs["user"]))
-        return responses.pop(0), {"cache_hit": False}
+        response = responses.pop(0)
+        if response.get("operation") == "add_rule":
+            response.update({
+                "expected_effect": "prosecution evidence coverage increases",
+                "expected_effect_contract": {
+                    "observable_field": "prosecution_coverage",
+                    "expected_direction": "increase",
+                    "expected_scope": "all_cases",
+                    "trigger_condition": "prosecution evidence is incomplete",
+                },
+            })
+        return response, {"cache_hit": False}
 
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
     monkeypatch.setattr(
@@ -410,7 +428,18 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
 
     def mutation(**kwargs):
         calls.append((kwargs["purpose"], kwargs["user"]))
-        return responses.pop(0), {"cache_hit": False}
+        response = responses.pop(0)
+        if response.get("operation") == "add_rule":
+            response.update({
+                "expected_effect": "prosecution evidence coverage increases",
+                "expected_effect_contract": {
+                    "observable_field": "prosecution_coverage",
+                    "expected_direction": "increase",
+                    "expected_scope": "all_cases",
+                    "trigger_condition": "prosecution evidence is incomplete",
+                },
+            })
+        return response, {"cache_hit": False}
 
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
     monkeypatch.setattr(
@@ -602,6 +631,13 @@ def test_structural_repair_simplifies_condition_overload_and_proceeds(
             "action": "quarantine the stale certificate",
             "evidence_anchor": "multi-conjunction proposal",
             "feature_description": "multi-conjunction proposal",
+            "expected_effect": "prosecution evidence coverage increases",
+            "expected_effect_contract": {
+                "observable_field": "prosecution_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "prosecution evidence is incomplete",
+            },
         }, {"cache_hit": False}
 
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector)

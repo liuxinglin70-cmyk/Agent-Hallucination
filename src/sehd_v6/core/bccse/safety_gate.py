@@ -96,6 +96,26 @@ class GateCertificate:
             "prior_converged": self.prior_converged,
         }
 
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "GateCertificate":
+        return cls(
+            timestamp=float(data.get("timestamp") or 0.0),
+            case_id=str(data.get("case_id") or ""),
+            target_module=str(data.get("target_module") or ""),
+            operation=str(data.get("operation") or ""),
+            content_preview=str(data.get("content_preview") or ""),
+            decision=str(data.get("decision") or "reject"),
+            reject_reasons=[
+                str(value) for value in (data.get("reject_reasons") or ())
+            ],
+            edit_index=int(data.get("edit_index") or 0),
+            case_index=int(data.get("case_index") or 0),
+            prior_consecutive_no_edit=int(
+                data.get("prior_consecutive_no_edit") or 0
+            ),
+            prior_converged=bool(data.get("prior_converged", False)),
+        )
+
 
 # ============================================================
 # Structural Constraint Gate
@@ -144,6 +164,11 @@ class StructuralGate:
         self._consecutive_no_edit += 1
         if self._consecutive_no_edit >= self.config.convergence_window:
             self._converged = True
+
+    def reset_convergence(self) -> None:
+        """Clear a convergence marker when skipped work is being retried."""
+        self._consecutive_no_edit = 0
+        self._converged = False
 
     def _restore_last_edit_index(self, module: str) -> None:
         prior = [
@@ -561,12 +586,30 @@ class StructuralGate:
             "halt_reason": self._halt_reason,
             "convergence_signal": self._converged,
             "consecutive_no_edit": self._consecutive_no_edit,
+            "module_last_edit_idx": dict(self._module_last_edit_idx),
             "total_evaluations": len(self.certificates),
             "accepted": self.accepted_count,
             "rejected": self.rejected_count,
             "total_edits_applied": self._total_edits,
             "certificates": [c.to_dict() for c in self.certificates],
         }
+
+    def restore_summary(self, summary: Mapping[str, Any]) -> None:
+        """Restore gate state from an atomically persisted summary."""
+        self.certificates = [
+            GateCertificate.from_dict(value)
+            for value in (summary.get("certificates") or ())
+            if isinstance(value, Mapping)
+        ]
+        self._module_last_edit_idx = {
+            str(module): int(index)
+            for module, index in (summary.get("module_last_edit_idx") or {}).items()
+        }
+        self._total_edits = int(summary.get("total_edits_applied") or 0)
+        self._consecutive_no_edit = int(summary.get("consecutive_no_edit") or 0)
+        self._converged = bool(summary.get("convergence_signal", False))
+        self._halted = bool(summary.get("halted", False))
+        self._halt_reason = str(summary.get("halt_reason") or "")
 
 
 def create_structural_gate(
