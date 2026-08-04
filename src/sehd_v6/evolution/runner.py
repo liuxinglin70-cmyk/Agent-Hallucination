@@ -32,9 +32,15 @@ DEFAULT_REFLECTION_CANDIDATES = 1
 
 
 def default_mutation_route() -> dict[str, Any]:
-    """Resolve the mutation route from environment with official defaults."""
+    """Resolve the mutation route from environment with official defaults.
+
+    The 1024-token budget is too small for DeepSeek-V4-Flash reasoning:
+    the model spends most of it on reasoning_content and truncates the
+    final JSON (finish_reason=length, empty content), which fails the
+    provider empty-content gate and silently kills evolution edits.
+    """
     return resolve_provider_route(
-        {"temperature": 0.3, "max_tokens": 1024},
+        {"temperature": 0.3, "max_tokens": 8192},
         purpose="mutation",
         route_name="mutation",
     )

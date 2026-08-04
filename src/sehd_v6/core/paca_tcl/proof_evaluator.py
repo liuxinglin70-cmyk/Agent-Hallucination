@@ -28,6 +28,8 @@ from typing import Any, Mapping, Protocol, Sequence
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
+from .basic_runner import DIRECT_PROVIDER_OPENER
+
 from ...utils import ocse_packet as packet
 from . import proof_engine as v35
 from .skill_integration import (
@@ -202,7 +204,7 @@ def _json_object_provider_call(
                 method="POST",
             )
             started = time.time()
-            with urlrequest.urlopen(
+            with DIRECT_PROVIDER_OPENER.open(
                 request,
                 timeout=request_timeout,
             ) as response:

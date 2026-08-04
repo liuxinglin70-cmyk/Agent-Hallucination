@@ -3565,7 +3565,7 @@ def test_provider_transport_recovers_truncated_json_with_repair_call(
         "src.sehd_v6.provider_routes.load_local_env",
         lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     monkeypatch.setattr(
         basic_runner,

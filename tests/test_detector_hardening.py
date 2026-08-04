@@ -893,7 +893,12 @@ def test_initial_error_local_authority_requires_complete_closed_proof() -> None:
         RuntimeError("appeal transport failed"),
     )
     assert failed_closed["state"] == "unresolved"
-    assert failed_closed["decision_authority"] == "invalid"
+    # An incomplete appeal is an evidence-insufficient verdict, not a runtime
+    # failure: it must stay inside the authoritative three-state output so
+    # the evolution loop can consume the unresolved signal instead of
+    # skipping the case as invalid.
+    assert failed_closed["decision_authority"] == "authoritative"
+    assert failed_closed["verdict_authority_scope"] == "unresolved_appeal_incomplete"
     assert failed_closed["responsible_event_id"] is None
     assert failed_closed["surviving_error_certificate_ids"] == []
 

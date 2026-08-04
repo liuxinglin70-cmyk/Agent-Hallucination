@@ -1302,11 +1302,16 @@ def _resolve_incomplete_appeal(
         "winning_impact_kind": None,
         "winning_error_certificate_id": None,
         "surviving_error_certificate_ids": [],
-        "decision_authority": "invalid",
+        # An incomplete appeal means the evidence chain could not be closed;
+        # that is the unresolved verdict, not a runtime failure.  The invalid
+        # authority escape hatch leaked a fourth state into consumers (the
+        # evolution loop skips invalid cases entirely) for what is a normal
+        # evidence-insufficient outcome.
+        "decision_authority": "authoritative",
         "authority_failure_reasons": [failure],
         "appeal_incomplete": True,
-        "appeal_status": "incomplete_fail_closed",
-        "verdict_authority_scope": "invalid",
+        "appeal_status": "incomplete_fail_closed_unresolved",
+        "verdict_authority_scope": "unresolved_appeal_incomplete",
     }
 
 
@@ -1628,7 +1633,10 @@ def adjudicate_case(
             and construct_authoritative
             and (
                 "appeal_error" not in providers
-                or proof.get("verdict_authority_scope") == "initial_local_positive"
+                or proof.get("verdict_authority_scope") in {
+                    "initial_local_positive",
+                    "unresolved_appeal_incomplete",
+                }
             )
         )
     except Exception as exc:

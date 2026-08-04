@@ -173,7 +173,7 @@ def test_provider_transport_reuses_run_local_cache(monkeypatch, tmp_path: Path) 
         calls.append(request.full_url)
         return _FakeResponse()
 
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     # Global cache must be explicitly off for this run; an .env file may
     # otherwise re-inject a root through load_local_env.
     monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", "off")
@@ -211,7 +211,7 @@ def test_mutation_transport_reuses_run_local_cache(monkeypatch, tmp_path: Path) 
         calls.append(request.full_url)
         return _FakeResponse()
 
-    monkeypatch.setattr(proof_evaluator.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(proof_evaluator.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", "off")
 
     route = {
@@ -243,7 +243,7 @@ def test_local_cache_is_scoped_to_its_directory(monkeypatch, tmp_path: Path) -> 
         calls.append(request.full_url)
         return _FakeResponse()
 
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", "off")
 
     route = _resolved_route()

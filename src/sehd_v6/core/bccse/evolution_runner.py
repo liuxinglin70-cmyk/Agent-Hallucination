@@ -1277,35 +1277,72 @@ def _run_detection_with_genome(
     )
     if authority != "authoritative" or (
         proof_authority and proof_authority != "authoritative"
-    ):
-        raise RuntimeError(
-            "detector returned invalid decision authority: "
-            f"top_level={authority!r}, proof={proof_authority or 'absent'!r}"
+    ) or decision_authority_invalid(result):
+        # Fail closed with the full diagnostic on the exception: the
+        # runtime-failure record persists it verbatim, so a fail-closed case
+        # never needs an external replay to recover its root cause.
+        details = _authority_failure_details(result)
+        summaries = [
+            f"{row.get('component', '?')}/{row.get('code', '?')}: "
+            f"{row.get('error_type', '')} {str(row.get('error', ''))[:200]}"
+            for row in details["authority_failure_reasons"]
+        ]
+        summaries.extend(
+            f"provider[{row['name']}]: {row['error_type']} {row['error']}"
+            for row in details["provider_errors"]
         )
-    if decision_authority_invalid(result):
-        # 附加详细错误信息便于排查（appeal_error / proof_court_error 等）
-        reasons = result.get("authority_failure_reasons") or []
-        providers_data = result.get("providers") or {}
-        error_details = []
-        for r in reasons:
-            if isinstance(r, dict):
-                error_details.append(
-                    f"{r.get('component', '?')}/{r.get('code', '?')}: "
-                    f"{r.get('error_type', '')} {str(r.get('error', ''))[:200]}"
-                )
-        for k, v in providers_data.items():
-            if "error" in str(k).lower() or (isinstance(v, dict) and v.get("error_type")):
-                if isinstance(v, dict):
-                    error_details.append(
-                        f"provider[{k}]: {v.get('error_type', '')} {str(v.get('error', ''))[:200]}"
-                    )
-        detail = " | ".join(error_details) if error_details else "no details"
-        raise RuntimeError(f"detector returned invalid decision authority: {detail}")
+        detail = " | ".join(summaries) or "no details"
+        invalid = RuntimeError(
+            "detector returned invalid decision authority: "
+            f"top_level={authority or 'absent'!r}, "
+            f"proof={proof_authority or 'absent'!r}; {detail}"
+        )
+        invalid.failure_details = details  # type: ignore[attr-defined]
+        raise invalid
     try:
         resolve_authoritative_state(result)
     except ValueError as exc:
         raise RuntimeError(f"detector returned invalid state: {exc}") from exc
     return result
+
+
+def _authority_failure_details(result: dict[str, Any]) -> dict[str, Any]:
+    """Collect machine-readable failure diagnostics from a detector result.
+
+    The returned mapping carries the same reason rows the detector surfaced
+    plus per-provider error summaries, so a fail-closed case keeps its root
+    cause on disk instead of a bare exception string.
+    """
+    authority = str(result.get("decision_authority") or "").strip().lower()
+    proof = result.get("proof_adjudication")
+    proof_authority = ""
+    if isinstance(proof, Mapping):
+        proof_authority = str(proof.get("decision_authority") or "").strip().lower()
+    reasons: list[dict[str, Any]] = []
+    for scope, source in (("result", result), ("proof", proof)):
+        if not isinstance(source, Mapping):
+            continue
+        for row in source.get("authority_failure_reasons") or []:
+            if isinstance(row, Mapping):
+                reasons.append({"source": scope, **dict(row)})
+    provider_errors: list[dict[str, Any]] = []
+    providers = result.get("providers")
+    if isinstance(providers, Mapping):
+        for name, meta in providers.items():
+            if isinstance(meta, Mapping) and meta.get("error_type"):
+                provider_errors.append({
+                    "name": str(name),
+                    "error_type": str(meta.get("error_type") or ""),
+                    "error": str(meta.get("error") or "")[:300],
+                })
+    return {
+        "decision_authority": authority,
+        "proof_decision_authority": proof_authority,
+        "runtime_valid": result.get("runtime_valid"),
+        "state": result.get("state"),
+        "authority_failure_reasons": reasons,
+        "provider_errors": provider_errors,
+    }
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -2794,7 +2831,8 @@ def run_online_evolution(
         except Exception as exc:
             finish(
                 "skip_no_policy",
-                reason=f"reflection_call_failed:{type(exc).__name__}",
+                reason=f"reflection_call_failed:{type(exc).__name__}: "
+                f"{str(exc)[:300]}",
             )
             return
         proposed_edit, parse_reason = parse_policy_proposal(parsed)
@@ -3657,16 +3695,21 @@ def run_online_evolution(
             # run audit and the type-conditioned memory can still show which
             # genome failed to execute, and why, in bounded categories.
             invalid_signal = runtime_invalid_signal(error=runtime_error)
+            failure_details = getattr(exc, "failure_details", None)
             _atomic_write_json(
                 output_dir / "runtime_failures" / f"{idx:04d}.json",
                 {
-                    "schema_version": "agenthallu.bccse_v5_failure.v1",
+                    "schema_version": "agenthallu.bccse_v5_failure.v2",
                     "run_id": run_id,
                     "case_id": case_id,
                     "case_index": idx,
                     "genome_hash": current_genome.content_hash,
                     "error": runtime_error,
                     "error_category": invalid_signal.runtime_error_category,
+                    "failure_details": (
+                        failure_details if isinstance(failure_details, Mapping)
+                        else None
+                    ),
                     "action": "case_skipped",
                     "claim_scope": "diagnostic_only_not_evolution_evidence",
                 },

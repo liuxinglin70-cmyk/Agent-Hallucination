@@ -244,7 +244,7 @@ def test_config_route_purpose_is_not_overwritten_at_transport_boundary(
         return Response()
 
     monkeypatch.setenv("JUDGE_KEY", "test-only-placeholder")
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(
         basic_runner,
         "_global_cache_path",
@@ -285,7 +285,7 @@ def test_resolved_judge_route_uses_judge_thinking_control(tmp_path, monkeypatch)
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     basic_runner.provider_call_with_schema(
         route={
@@ -338,7 +338,7 @@ def test_provider_transport_retries_429_using_bounded_retry_after(
         return Response()
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(basic_runner.time, "sleep", sleeps.append)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     value, _meta = basic_runner.provider_call_with_schema(
@@ -385,7 +385,7 @@ def test_provider_transport_honors_route_generation_budget_and_total_timeout(
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
     _isolate_provider_env(monkeypatch)
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(
         basic_runner,
         "_global_cache_path",
@@ -440,7 +440,7 @@ def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, mo
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
     _isolate_provider_env(monkeypatch)
-    monkeypatch.setattr(proof_evaluator.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(proof_evaluator.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(
         proof_evaluator,
         "_global_cache_path",
@@ -489,7 +489,7 @@ def test_detector_transport_omits_pro_response_format(tmp_path, monkeypatch):
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
     _isolate_provider_env(monkeypatch)
-    monkeypatch.setattr(basic_runner.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
     basic_runner.provider_call_with_schema(
         route={

@@ -458,7 +458,13 @@ class StructuralGate:
                 break
 
         # Diagnostic signals are available to reflection but not to runtime
-        # detector prompts. Rules conditioned on them are semantically dead.
+        # detector prompts. A rule CONDITION on them is semantically dead: the
+        # provider cannot observe the signal when deciding whether to fire.
+        # The action slot may legitimately name the target module's own output
+        # surface (charter-owned, e.g. clean_defense_boundary emits a defense
+        # coverage declaration), so under the slot contract the marker check
+        # applies to the condition only; the free-text path keeps the whole
+        # text check as a conservative fallback.
         _diagnostic_only_markers = [
             "crs",
             "coverage_state",
@@ -467,8 +473,13 @@ class StructuralGate:
             "defense_coverage",
             "proof_projection",
         ]
+        diagnostic_scope = content_lower
+        if slot_contract_active and rule_slots is not None:
+            diagnostic_scope = str(
+                rule_slots.get("condition") or ""
+            ).lower()
         for marker in _diagnostic_only_markers:
-            if marker in content_lower:
+            if marker in diagnostic_scope:
                 reject_reasons.append(
                     f"diagnostic_only_condition: runtime cannot observe '{marker}'"
                 )

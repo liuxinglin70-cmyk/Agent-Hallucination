@@ -369,8 +369,22 @@ def normalize_type_confidence(value: Any) -> float:
     return max(0.0, min(1.0, confidence))
 
 
-def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
-    """Validate the non-negotiable runtime-observability rule contract."""
+def validate_runtime_rule(
+    content: str,
+    target_module: str,
+    *,
+    condition_scope: str | None = None,
+) -> tuple[bool, str]:
+    """Validate the non-negotiable runtime-observability rule contract.
+
+    ``condition_scope`` is the typed condition slot when the edit carries a
+    slot contract. Under the slot contract the diagnostic-field markers
+    (coverage/CRS/trigger/projection identifiers) are checked against the
+    condition only: they describe signals the provider cannot observe when
+    deciding whether to fire, while the action slot may legitimately name
+    the target module's own charter-owned output surface. State
+    manipulation and label-leakage markers stay whole-text in both modes.
+    """
     normalized = content.strip()
     lowered = normalized.lower()
     if len(normalized) < 10:
@@ -402,7 +416,12 @@ def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
     if any(token in action for token in ("；", ";", "然后", "同时还", "并随后")):
         return False, "multiple_actions"
 
-    forbidden_runtime_markers = (
+    # Diagnostic-field identifiers are unobservable to the firing provider;
+    # under the slot contract they are checked against the condition slot
+    # only, so an action that names the module's own output surface (e.g.
+    # clean_defense_boundary emitting a defense coverage declaration) is
+    # not rejected for mentioning the field it controls.
+    _diagnostic_markers = (
         "crs",
         "coverage_state",
         "trigger_source",
@@ -415,6 +434,14 @@ def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
         "触发源",
         "五维评分",
         "证明投影",
+    )
+    diagnostic_scope = lowered if condition_scope is None else condition_scope.lower()
+    for marker in _diagnostic_markers:
+        if marker in diagnostic_scope:
+            return False, f"forbidden_runtime_marker:{marker}"
+    # State manipulation, label leakage and priority declarations are never
+    # legal in any slot, so these stay whole-text in every mode.
+    _state_leak_markers = (
         "boundary_path_state",
         "candidate_path_state",
         "状态设为",
@@ -433,7 +460,7 @@ def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
         "最高优先级",
         "优先于任何其他",
     )
-    for marker in forbidden_runtime_markers:
+    for marker in _state_leak_markers:
         if marker in lowered:
             return False, f"forbidden_runtime_marker:{marker}"
     if re.search(r"\b[a-z][a-z_]+/\d+\b|https?://", lowered):
@@ -832,6 +859,10 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     module = genome.modules[edit.target_module]
 
     if operation_value in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}:
+        slots = _sanitize_rule_slots(edit.rule_slots)
+        slot_contract_active = bool(
+            slots and set(slots) == set(_RULE_SLOT_LIMITS)
+        )
         slots_valid, slots_reason = _validate_persisted_rule_slots(edit)
         if not slots_valid:
             return False, slots_reason
@@ -877,6 +908,9 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         valid_rule, rule_reason = validate_runtime_rule(
             edit.new_content,
             edit.target_module,
+            condition_scope=(
+                slots.get("condition") if slot_contract_active else None
+            ),
         )
         if not valid_rule:
             return False, rule_reason
@@ -915,6 +949,9 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         valid_rule, rule_reason = validate_runtime_rule(
             edit.new_content,
             edit.target_module,
+            condition_scope=(
+                slots.get("condition") if slot_contract_active else None
+            ),
         )
         if not valid_rule:
             return False, rule_reason

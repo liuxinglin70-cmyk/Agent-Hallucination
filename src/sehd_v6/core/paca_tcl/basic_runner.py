@@ -32,6 +32,13 @@ from ..provider_models import canonical_model_name
 load_local_env()
 
 
+# Provider transport is a direct HTTPS call to the AutoDL gateway.  System
+# proxies (environment variables or the Windows registry) add an extra
+# failure surface — connection resets, timeouts — with no benefit for a
+# China-direct endpoint, so every provider request bypasses them explicitly.
+DIRECT_PROVIDER_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+
+
 # ============================================================
 # 全局缓存基础设施（v3.5.1 效率优化）
 #
@@ -149,7 +156,7 @@ def _provider_repair_call(
     )
     try:
         repair_timeout = max(1, int(route.get("timeout_seconds", 120)))
-        with urlrequest.urlopen(req, timeout=repair_timeout) as response:
+        with DIRECT_PROVIDER_OPENER.open(req, timeout=repair_timeout) as response:
             raw = response.read()
         value = json.loads(raw.decode("utf-8"))
         content = value["choices"][0]["message"].get("content")
@@ -511,7 +518,7 @@ def provider_call_with_schema(
                 method="POST",
             )
             started = time.time()
-            with urlrequest.urlopen(req, timeout=request_timeout) as response:
+            with DIRECT_PROVIDER_OPENER.open(req, timeout=request_timeout) as response:
                 raw = response.read()
             value = json.loads(raw.decode("utf-8"))
             choice = value["choices"][0]
