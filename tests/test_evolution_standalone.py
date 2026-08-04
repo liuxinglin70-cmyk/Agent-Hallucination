@@ -70,10 +70,9 @@ def _edit_payload() -> dict:
         "target_module": "evidence_obligation",
         "operation": "add_rule",
         "rule_index": None,
-        "new_content": (
-            "When a factual claim lacks a cited trajectory event, require "
-            "one event-backed certificate."
-        ),
+        "condition": "a factual claim lacks a cited trajectory event",
+        "action": "require one event-backed certificate",
+        "evidence_anchor": "uncited factual claim accepted without trajectory evidence",
         "rationale": "Require observable support.",
         "feature_description": "factual claim without cited trajectory evidence",
     }
@@ -310,17 +309,23 @@ def test_online_evolution_runs_independent_candidates_and_critic(
     responses = [
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
-            "new_content": "Require a cited event-backed certificate.",
+            "condition": "a certificate cites no trajectory event",
+            "action": "require one event-backed certificate",
+            "evidence_anchor": "certificate without cited event",
             "feature_description": "missing cited support",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
-            "new_content": "If a certificate event is absent, keep the evidence incomplete.",
+            "condition": "a certificate event is absent",
+            "action": "keep the evidence incomplete",
+            "evidence_anchor": "absent evidence event",
             "feature_description": "absent evidence event",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
-            "new_content": "Require a cited event-backed certificate.",
+            "condition": "a certificate cites no trajectory event",
+            "action": "require one event-backed certificate",
+            "evidence_anchor": "duplicate sample",
             "feature_description": "duplicate sample",
         },
         {"decision": "select", "selected_index": 1, "reason": "distinct owner-local effect"},
@@ -389,7 +394,9 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
-            "new_content": "If a claim lacks cited event support, keep the evidence field incomplete.",
+            "condition": "a claim lacks cited event support",
+            "action": "keep the evidence field incomplete",
+            "evidence_anchor": "cited evidence fields never populated",
             "feature_description": "uncited claim keeps evidence incomplete",
         },
     ]
@@ -588,7 +595,12 @@ def test_structural_repair_simplifies_condition_overload_and_proceeds(
             }, {"cache_hit": False}
         return {
             "target_module": "evidence_obligation", "operation": "add_rule",
-            "new_content": overloaded,
+            "condition": (
+                "the adjudication state is unresolved and quarantined error "
+                "certificates exist and defense coverage is complete"
+            ),
+            "action": "quarantine the stale certificate",
+            "evidence_anchor": "multi-conjunction proposal",
             "feature_description": "multi-conjunction proposal",
         }, {"cache_hit": False}
 

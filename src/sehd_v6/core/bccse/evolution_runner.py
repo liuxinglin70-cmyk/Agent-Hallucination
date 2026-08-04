@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import re
 import time
 import uuid
 from collections import deque
@@ -61,6 +62,7 @@ from .genome import (
     create_baseline_genome,
     validate_edit,
     repair_rule_for_structural_reason,
+    _detect_rule_direction,
     MODULE_IDS,
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
@@ -70,6 +72,7 @@ from .genome import (
     EXPECTED_SCOPES,
     sanitize_expected_effect_contract,
 )
+from .rule_contract import RuleSpec, render_rule, validate_rule_spec
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
@@ -597,7 +600,7 @@ def _build_mutation_retry_feedback(
             "trigger, a distinct output action, and if possible a "
             "different owner module, with operation in "
             "{add_rule,modify_rule,remove_rule,no_edit} and "
-            "non-empty new_content"
+            "non-empty condition/action/evidence_anchor slots"
         )
         hard_constraints = _structural_retry_hard_constraints(prior_categories)
         if hard_constraints:
@@ -3152,6 +3155,11 @@ def run_online_evolution(
         # The LLM is the core engine of evolution — it reasons about WHY
         # the skill failed and GENERATES a novel edit.
         edit = None
+        # Typed rule slots of the current candidate (add/modify only). SkillEdit
+        # keeps only the rendered text, so the slots travel alongside the edit
+        # and hand the structural gate a slot-contract check instead of a
+        # free-text shape guess.
+        pending_rule_slots: dict[str, Any] | None = None
         no_edit_reason = ""
         invalid_mutation_reason = ""
         reflection_audit: dict[str, Any] = {
@@ -3433,7 +3441,73 @@ def run_online_evolution(
                     reflection_audit["validated_target_module"] = target_module
                 operation = str(parsed.get("operation") or "")
                 rule_index = parsed.get("rule_index")
-                new_content = str(parsed.get("new_content") or "")
+                # add/modify rules are slot contracts: the LLM supplies typed
+                # slots and the rule text is their deterministic render, so a
+                # shape or authority violation fails here as an invalid
+                # mutation instead of being re-guessed from free text.
+                new_content = ""
+                if operation in {"add_rule", "modify_rule"}:
+                    if not all(
+                        key in parsed
+                        for key in ("condition", "action", "evidence_anchor")
+                    ):
+                        invalid_mutation_reason = "rule_spec:missing_slots"
+                    else:
+                        condition = str(parsed.get("condition") or "")
+                        action = str(parsed.get("action") or "")
+                        evidence_anchor = str(parsed.get("evidence_anchor") or "")
+                        # Render before direction detection: direction is a
+                        # property of the text the provider will actually see.
+                        new_content = render_rule(RuleSpec(
+                            condition=condition,
+                            action=action,
+                            evidence_anchor=evidence_anchor,
+                            module_id=target_module,
+                            direction="process",
+                        ))
+                        spec = RuleSpec(
+                            condition=condition,
+                            action=action,
+                            evidence_anchor=evidence_anchor,
+                            module_id=target_module,
+                            direction=_detect_rule_direction(new_content),
+                        )
+                        spec_ok, spec_reason = validate_rule_spec(spec)
+                        if not spec_ok and spec_reason == "condition_overload":
+                            # Deterministic slot-level repair: reduce a
+                            # multi-conjunction condition to its first
+                            # conjunct and re-validate instead of burning a
+                            # retry on the grammar error. The repair never
+                            # bypasses validation and is audited on the step.
+                            simplified = re.split(
+                                r"(\s+\band\b|\s+\bor\b)",
+                                condition,
+                                flags=re.IGNORECASE,
+                            )
+                            if len(simplified) >= 3:
+                                condition = "".join(simplified[:3]).strip()
+                                spec = RuleSpec(
+                                    condition=condition,
+                                    action=action,
+                                    evidence_anchor=evidence_anchor,
+                                    module_id=target_module,
+                                    direction=spec.direction,
+                                )
+                                new_content = render_rule(spec)
+                                spec_ok, spec_reason = validate_rule_spec(spec)
+                                if spec_ok:
+                                    reflection_audit["structural_repair"] = (
+                                        "condition_simplification:accepted"
+                                    )
+                        if not spec_ok:
+                            new_content = ""
+                            invalid_mutation_reason = f"rule_spec:{spec_reason}"
+                        else:
+                            pending_rule_slots = {
+                                "condition": condition,
+                                "action": action,
+                                "evidence_anchor": evidence_anchor,
+                            }
                 rationale = str(
                     parsed.get("rationale") or parsed.get("reasoning") or ""
                 )
@@ -3546,11 +3620,7 @@ def run_online_evolution(
                         f"    LLM generated: {target_module}/{operation} "
                         f"index={rule_index}"
                     )
-                elif (
-                    operation in {"add_rule", "modify_rule"}
-                    and new_content
-                    and len(new_content) >= 10
-                ):
+                elif operation in {"add_rule", "modify_rule"} and new_content:
                     edit = SkillEdit(
                         edit_id=f"edit_{uuid.uuid4().hex[:8]}",
                         target_module=target_module,
@@ -3694,6 +3764,7 @@ def run_online_evolution(
             current_genome=current_genome,
             rule_index=edit.rule_index,
             expected_module=allowed_modules,
+            rule_slots=pending_rule_slots,
         )
 
         # v5.9e: deterministic repair for condition_overload. Prompt-level
@@ -3713,6 +3784,9 @@ def run_online_evolution(
             if repaired_content is not None:
                 gate.mark_repaired(cert, "condition_simplification")
                 edit = replace(edit, new_content=repaired_content)
+                # Repair only triggers on the free-text reject prefix, which a
+                # slot-validated candidate cannot produce; pending_rule_slots
+                # is therefore always None on this re-evaluation.
                 accepted, cert, reject_reasons = gate.evaluate(
                     case_id=case_id,
                     case_index=idx,
@@ -3723,6 +3797,7 @@ def run_online_evolution(
                     current_genome=current_genome,
                     rule_index=edit.rule_index,
                     expected_module=allowed_modules,
+                    rule_slots=pending_rule_slots,
                 )
                 reflection_audit["structural_repair"] = (
                     "condition_simplification:"

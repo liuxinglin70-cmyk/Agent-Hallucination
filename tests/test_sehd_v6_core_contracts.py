@@ -407,8 +407,20 @@ def test_runtime_observation_court_balance_locates_verdict_carrier() -> None:
 
 def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
     candidates = [
-        {"target_module": "evidence_obligation", "operation": "add_rule", "new_content": "one"},
-        {"target_module": "atomic_verifier_instruction", "operation": "add_rule", "new_content": "two"},
+        {
+            "target_module": "evidence_obligation",
+            "operation": "add_rule",
+            "condition": "a certificate lacks cited support",
+            "action": "require one support event",
+            "evidence_anchor": "certificate without cited support",
+        },
+        {
+            "target_module": "atomic_verifier_instruction",
+            "operation": "add_rule",
+            "condition": "a verifier instruction is under-specified",
+            "action": "require one executable check",
+            "evidence_anchor": "under-specified verifier instruction",
+        },
     ]
     normalized, reason = extract_intervention_candidates({"candidates": candidates})
     assert len(normalized) == 2
@@ -467,10 +479,10 @@ def test_failure_diagnosis_prompt_bounded_and_label_free() -> None:
     assert "gold" not in user.lower().replace("gold_mismatch", "")
 
 
-def test_failure_diagnosis_prompt_marks_uneditable_hints() -> None:
-    """v5.9c: attribution hints outside the editable set are annotated
-    instead of letting the model fixate on 'primary module not allowed'
-    (observed derailment on BFCL/160)."""
+def test_failure_diagnosis_prompt_hints_are_plain_module_names() -> None:
+    """Attribution hints are bare module names: the allowed set is a
+    structural constraint enforced downstream, so the prompt carries no
+    editability annotation for the model to relitigate."""
     _, user = build_failure_diagnosis_prompt(
         signal=_fn_clean_signal(),
         runtime_observation={"court_balance": {"defense_certificates": 2}},
@@ -478,8 +490,9 @@ def test_failure_diagnosis_prompt_marks_uneditable_hints() -> None:
         current_skill_text="rules",
         allowed_target_modules=("clean_defense_boundary",),
     )
-    assert "abstention_rule (NOT editable here" in user
-    assert "causal_link_test (NOT editable here" in user
+    assert "primary_module_hint=abstention_rule\n" in user
+    assert "secondary_module_hint=causal_link_test\n" in user
+    assert "NOT editable" not in user
 
 
 def test_detection_context_marks_inert_certificates() -> None:
@@ -644,7 +657,9 @@ def test_candidate_normalization_deduplicates_repeated_samples() -> None:
     candidate = {
         "target_module": "evidence_obligation",
         "operation": "add_rule",
-        "new_content": "Require one cited event-backed certificate.",
+        "condition": "a factual claim lacks cited support",
+        "action": "require one cited event-backed certificate",
+        "evidence_anchor": "factual claim without cited support",
     }
     values, _ = extract_intervention_candidates(
         {"candidates": [candidate, dict(candidate)]}, limit=3,
@@ -830,10 +845,9 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
             "target_module": "evidence_obligation",
             "operation": "add_rule",
             "rule_index": None,
-            "new_content": (
-                "When a factual claim lacks a cited trajectory event, require "
-                "one event-backed certificate."
-            ),
+            "condition": "a factual claim lacks a cited trajectory event",
+            "action": "require one event-backed certificate",
+            "evidence_anchor": "factual claim without cited trajectory event",
             "rationale": "Require observable support.",
             "feature_description": "factual claim without cited trajectory evidence",
         }, {}),
@@ -934,3 +948,99 @@ def test_abstention_rule_guidance_describes_indirect_channel_only() -> None:
     effects = MODULE_OBSERVABLE_EFFECTS["abstention_rule"]
     assert "NEUTRAL_EVIDENCE" in effects
     assert "authoritative state" not in effects
+
+
+# ============================================================
+# Wave2-H: slot-contract generation path
+# ============================================================
+
+
+def test_reflection_prompt_carries_charters_and_slot_schema() -> None:
+    """The primary prompt must state the render contract, embed the module
+    charters, and advertise the slot schema instead of free-text content."""
+    signal = _reflection_signal_for_test()
+    system, user = build_causal_reflection_prompt(
+        signal,
+        current_skill_text="rules",
+        detection_context="trace",
+        allowed_target_modules=("evidence_obligation",),
+    )
+    assert "RULE FORM CONTRACT" in system
+    assert 'When <condition>, <action>.' in system
+    assert "<module_charters>" in system
+    assert "MODULE: evidence_obligation" in system
+    assert "INFLUENCEABLE SURFACES:" in system
+    assert '"condition"' in system
+    assert '"action"' in system
+    assert '"evidence_anchor"' in system
+    assert "new_content" not in system
+    # The expected-effect vocabulary stays prompt-visible for the contract.
+    assert "allowed_observable_fields=" in user
+
+
+def test_runtime_observation_drops_editable_patch_fields() -> None:
+    signal = _reflection_signal_for_test()
+    observation = build_runtime_observation(
+        {"state": "unresolved", "runtime_valid": True},
+        signal,
+        allowed_modules=("evidence_obligation",),
+    )
+    gap = observation["diagnostic_gap"]
+    assert gap["primary_module"] == "evidence_obligation"
+    assert "primary_module_editable" not in gap
+    assert "secondary_module_editable" not in gap
+    assert "allowed module set is authoritative" in observation["instruction"]
+    assert "may be marked not editable" not in observation["instruction"]
+
+
+def test_invalid_slot_candidate_yields_no_edit_not_free_text(
+    tmp_path, monkeypatch,
+) -> None:
+    """An action carrying verdict semantics for a module without verdict
+    permission must fail the slot contract as an invalid mutation; the
+    runner must never degrade the payload into a free-text edit."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda *, genome, case_id, **kwargs: {
+            "state": "unresolved", "runtime_valid": True, "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _fn_clean_signal(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: ({
+            "target_module": "causal_link_test",
+            "operation": "add_rule",
+            "condition": "the proof court reaches the final adjudication edge",
+            "action": "return clean",
+            "evidence_anchor": "verdict semantics inside a non-verdict module",
+            "feature_description": "verdict emission attempted outside authority",
+            "rationale": "Force a decision.",
+        }, {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        max_mutation_attempts_per_case=1,
+        run_id="invalid_slot_candidate",
+    )
+
+    assert result.edits_accepted == 0
+    assert result.steps[0].gate_decision == "skip_invalid_mutation"
+    assert result.steps[0].fitness_check["mutation_error"].startswith(
+        "rule_spec:verdict_not_allowed"
+    )
+    assert result.champion_genome.edits_applied == []

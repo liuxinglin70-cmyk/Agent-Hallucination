@@ -99,6 +99,26 @@ def _typed_edit(**overrides: object) -> SkillEdit:
     return SkillEdit(**values)
 
 
+def _slots_response(**overrides: object) -> dict[str, object]:
+    """A mutation-provider response in the slot-contract schema.
+
+    The slots render to exactly _typed_edit().new_content, so genome-level
+    assertions stay comparable across the storage format (SkillEdit) and the
+    generation format (typed slots).
+    """
+    values: dict[str, object] = {
+        "target_module": "evidence_obligation",
+        "operation": "add_rule",
+        "condition": "a factual claim lacks cited trajectory support",
+        "action": "require one event-backed certificate",
+        "evidence_anchor": "factual claim without cited trajectory support",
+        "feature_description": "factual claim without cited trajectory support",
+        "rationale": "Tighten the evidence obligation for unsupported claims.",
+    }
+    values.update(overrides)
+    return values
+
+
 def test_rejected_experience_preserves_actionable_failure_feedback() -> None:
     entry = RejectedEditEntry(
         proposal=SimpleNamespace(
@@ -381,24 +401,17 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
         nonlocal mutation_calls
         mutation_calls += 1
         if mutation_calls == 1:
-            content = (
-                "When a certificate lacks support, consider the evidence "
-                "obligation again."
-            )
+            slots = {
+                "condition": "a certificate lacks support",
+                "action": "consider the evidence obligation again",
+            }
         else:
             assert "observable_changes=none" in kwargs["user"]
-            content = (
-                "When a certificate omits a cited support event, populate the "
-                "missing evidence reference."
-            )
-        return ({
-            "target_module": "evidence_obligation",
-            "operation": "add_rule",
-            "new_content": content,
-            "feature_description": "certificate missing a cited support event",
-            "expected_effect": "prosecution coverage gains a cited support reference",
-            "rationale": "Change an executable certificate field.",
-        }, {})
+            slots = {
+                "condition": "a certificate omits a cited support event",
+                "action": "populate the missing evidence reference",
+            }
+        return _slots_response(**slots), {}
 
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
     monkeypatch.setattr(
@@ -863,7 +876,7 @@ def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch)
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     result = runner.run_online_evolution(
@@ -915,7 +928,7 @@ def test_directional_evidence_is_provisional_with_stable_canary(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     result = runner.run_online_evolution(
@@ -969,10 +982,9 @@ def test_independent_registered_canary_unblocks_all_triggered_source_pool(
         runner,
         "json_object_provider_call",
         lambda **kwargs: (
-                _typed_edit(
-                    operation="add_rule",
-                    expected_effect="prosecution evidence coverage becomes complete",
-                ).to_dict(),
+            _slots_response(
+                expected_effect="prosecution evidence coverage becomes complete",
+            ),
             {},
         ),
     )
@@ -1006,7 +1018,7 @@ def test_label_free_run_fails_before_mutation_when_registered_canary_is_unstable
     def mutation(**kwargs):
         nonlocal mutation_calls
         mutation_calls += 1
-        return _typed_edit().to_dict(), {}
+        return _slots_response(), {}
 
     monkeypatch.setattr(
         runner,
@@ -1068,10 +1080,9 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
         lambda **kwargs: ({
             "target_module": "abstention_rule",
             "operation": "add_rule",
-            "new_content": (
-                "When proof participants leave a material claim untested, "
-                "request one additional certificate."
-            ),
+            "condition": "proof participants leave a material claim untested",
+            "action": "request one additional certificate",
+            "evidence_anchor": "material claim left untested",
             "feature_description": "material claim left untested",
             "rationale": "Improve proof completeness.",
         }, {}),
@@ -1120,7 +1131,7 @@ def test_runner_rejects_source_self_proof_and_counts_convergence(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     result = runner.run_online_evolution(
@@ -1173,7 +1184,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     first_output = tmp_path / "first"
@@ -1297,7 +1308,7 @@ def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     records = {
@@ -1369,7 +1380,7 @@ def test_no_gold_run_has_provisional_telemetry_but_no_accuracy_claim(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     result = runner.run_online_evolution(
@@ -1419,7 +1430,7 @@ def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     result = runner.run_online_evolution(
@@ -3428,7 +3439,7 @@ def _probe_certification_fixture(tmp_path, monkeypatch, **extra_kwargs):
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
-        lambda **kwargs: (_typed_edit(operation="add_rule").to_dict(), {}),
+        lambda **kwargs: (_slots_response(), {}),
     )
 
     records = {
@@ -4137,6 +4148,149 @@ def test_contrast_inversion_rules() -> None:
         after_state="verified_error",
         gold_label=True,
     )
+
+
+# ============================================================
+# Wave2-H — slot-contract generation path
+# ============================================================
+
+
+def test_valid_slots_persist_as_deterministic_render(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.rule_contract import RuleSpec, render_rule
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda *, genome, case_id, **kwargs: {
+            "state": (
+                "verified_clean"
+                if case_id == "stable" or genome.generation else "unresolved"
+            ),
+            "runtime_valid": True,
+            "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_slots_response(), {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("stable", "source"),
+        records={"stable": {}, "source": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        run_id="slot_render",
+    )
+
+    assert result.edits_accepted == 1
+    expected = render_rule(RuleSpec(
+        condition="a factual claim lacks cited trajectory support",
+        action="require one event-backed certificate",
+        evidence_anchor="factual claim without cited trajectory support",
+        module_id="evidence_obligation",
+        direction="process",
+    ))
+    edit = result.champion_genome.edits_applied[-1]
+    assert edit.new_content == expected
+    rules = result.champion_genome.modules[edit.target_module].rules
+    assert rules[-1] == expected
+
+
+def test_structural_gate_slot_contract_replaces_text_guess() -> None:
+    from src.sehd_v6.core.bccse.rule_contract import RuleSpec, render_rule
+
+    # 真值 is a forbidden runtime marker for the text path but outside the
+    # slot-contract firewall, so acceptance flips exactly when slots are
+    # supplied: the gate is checking the slots, not re-guessing the text.
+    gate = create_structural_gate(convergence_window=2)
+    slots = {
+        "condition": "a certificate omits the 真值 derivation record",
+        "action": "require the derivation record",
+        "evidence_anchor": "certificate without derivation record",
+    }
+    content = render_rule(RuleSpec(
+        condition=slots["condition"],
+        action=slots["action"],
+        evidence_anchor=slots["evidence_anchor"],
+        module_id="evidence_obligation",
+        direction="process",
+    ))
+
+    accepted_text, _, text_reasons = gate.evaluate(
+        case_id="source",
+        case_index=0,
+        target_module="evidence_obligation",
+        operation="add_rule",
+        content=content,
+        preconditions=(),
+        current_genome=create_baseline_genome(),
+        expected_module="evidence_obligation",
+    )
+    assert not accepted_text
+    assert any(
+        reason.startswith("runtime_rule_contract:forbidden_runtime_marker")
+        for reason in text_reasons
+    )
+
+    accepted_slots, _, slot_reasons = gate.evaluate(
+        case_id="source",
+        case_index=1,
+        target_module="evidence_obligation",
+        operation="add_rule",
+        content=content,
+        preconditions=(),
+        current_genome=create_baseline_genome(),
+        expected_module="evidence_obligation",
+        rule_slots=slots,
+    )
+    assert accepted_slots
+    assert slot_reasons == []
+
+    # Reverse direction: an oversized anchor violates the slot contract but
+    # never appears in the rendered text, so only the slot path rejects it.
+    gate = create_structural_gate(convergence_window=2)
+    anchor_slots = dict(_slots_response())
+    anchor_slots["evidence_anchor"] = "a" * 241
+    accepted_text, _, _ = gate.evaluate(
+        case_id="source",
+        case_index=0,
+        target_module="evidence_obligation",
+        operation="add_rule",
+        content=_typed_edit().new_content,
+        preconditions=(),
+        current_genome=create_baseline_genome(),
+        expected_module="evidence_obligation",
+    )
+    assert accepted_text
+    accepted_slots, _, slot_reasons = gate.evaluate(
+        case_id="source",
+        case_index=1,
+        target_module="evidence_obligation",
+        operation="add_rule",
+        content=_typed_edit().new_content,
+        preconditions=(),
+        current_genome=create_baseline_genome(),
+        expected_module="evidence_obligation",
+        rule_slots={
+            "condition": anchor_slots["condition"],
+            "action": anchor_slots["action"],
+            "evidence_anchor": anchor_slots["evidence_anchor"],
+        },
+    )
+    assert not accepted_slots
+    assert "rule_spec_contract:evidence_anchor_too_long" in slot_reasons
 
 
 

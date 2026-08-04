@@ -28,11 +28,13 @@ from .genome import (
     MODULE_IDS,
     SkillOp,
     SkillGenome,
+    _detect_rule_direction,
     semantic_overlap,
     validate_runtime_rule,
     DEDUP_LOW_THRESHOLD,
     DEDUP_HIGH_THRESHOLD,
 )
+from .rule_contract import RuleSpec, validate_rule_spec
 
 
 # ============================================================
@@ -216,6 +218,7 @@ class StructuralGate:
         current_genome: SkillGenome,
         rule_index: int | None = None,
         expected_module: str | Sequence[str] | None = None,
+        rule_slots: Mapping[str, Any] | None = None,
     ) -> tuple[bool, GateCertificate, list[str]]:
         """Evaluate whether a proposed edit passes structural constraints.
 
@@ -235,11 +238,34 @@ class StructuralGate:
         if operation not in allowed_operations:
             reject_reasons.append(f"invalid_operation: {operation}")
 
-        # --- Layer 1: concise if-then behavioral instruction ---
+        # --- Layer 1: rule shape/authority contract ---
+        # Two-path switch (migration window): add/modify arriving from the
+        # generation path carry typed slots, and the slot contract is the
+        # single shape check because the rendered text is a pure function of
+        # the slots (a construction guarantee, not a re-guess). The free-text
+        # path now serves only remove_rule callers that never reach this
+        # branch and historical checkpoint replay.
+        slot_contract_active = (
+            bool(rule_slots)
+            and operation in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}
+        )
         if operation in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}:
-            valid_rule, rule_reason = validate_runtime_rule(content, target_module)
-            if not valid_rule:
-                reject_reasons.append(f"runtime_rule_contract:{rule_reason}")
+            if slot_contract_active:
+                assert rule_slots is not None
+                spec = RuleSpec(
+                    condition=str(rule_slots.get("condition") or ""),
+                    action=str(rule_slots.get("action") or ""),
+                    evidence_anchor=str(rule_slots.get("evidence_anchor") or ""),
+                    module_id=target_module,
+                    direction=_detect_rule_direction(content),
+                )
+                spec_ok, spec_reason = validate_rule_spec(spec)
+                if not spec_ok:
+                    reject_reasons.append(f"rule_spec_contract:{spec_reason}")
+            else:
+                valid_rule, rule_reason = validate_runtime_rule(content, target_module)
+                if not valid_rule:
+                    reject_reasons.append(f"runtime_rule_contract:{rule_reason}")
             if not content or len(content.strip()) < self.config.min_content_length:
                 reject_reasons.append(
                     f"content_too_short: {len(content.strip())} < "
@@ -262,39 +288,44 @@ class StructuralGate:
                 )
 
         # --- Layer 3: Generalization filter ---
-        # Check forbidden content markers
+        # Suppressed under the slot contract: validate_rule_spec already ran
+        # the forbidden-content / pollution firewall on every slot and the
+        # authority checks on the rendered text, so re-reporting here would
+        # only duplicate the same rejection.
         content_lower = content.lower()
-        for marker in FORBIDDEN_CONTENT_MARKERS:
-            if marker in content_lower:
-                reject_reasons.append(f"forbidden_content: {marker}")
+        if not slot_contract_active:
+            # Check forbidden content markers
+            for marker in FORBIDDEN_CONTENT_MARKERS:
+                if marker in content_lower:
+                    reject_reasons.append(f"forbidden_content: {marker}")
 
-        # Check for case-specific patterns (IDs, specific names)
-        case_id_patterns = [
-            r'\bcase_\d+\b',
-            r'\bsource_\d+\b',
-            r'\bag_\w{8,}\b',  # agent IDs
-            r'\b0x[0-9a-f]{6,}\b',  # hex IDs
-            r'\b[a-z][a-z_]+/\d+\b',  # actual AgentHallu case IDs
-            r'https?://',
-        ]
-        for pattern in case_id_patterns:
-            if re.search(pattern, content_lower):
-                reject_reasons.append(f"case_specific_pattern: {pattern}")
-                break
-        leakage_markers = (
-            "gold",
-            "ground truth",
-            "golden label",
-            "真值",
-            "金标签",
-            "标注标签",
-            "本案例",
-            "这个案例",
-        )
-        for marker in leakage_markers:
-            if marker in content_lower:
-                reject_reasons.append(f"label_or_case_leakage: {marker}")
-                break
+            # Check for case-specific patterns (IDs, specific names)
+            case_id_patterns = [
+                r'\bcase_\d+\b',
+                r'\bsource_\d+\b',
+                r'\bag_\w{8,}\b',  # agent IDs
+                r'\b0x[0-9a-f]{6,}\b',  # hex IDs
+                r'\b[a-z][a-z_]+/\d+\b',  # actual AgentHallu case IDs
+                r'https?://',
+            ]
+            for pattern in case_id_patterns:
+                if re.search(pattern, content_lower):
+                    reject_reasons.append(f"case_specific_pattern: {pattern}")
+                    break
+            leakage_markers = (
+                "gold",
+                "ground truth",
+                "golden label",
+                "真值",
+                "金标签",
+                "标注标签",
+                "本案例",
+                "这个案例",
+            )
+            for marker in leakage_markers:
+                if marker in content_lower:
+                    reject_reasons.append(f"label_or_case_leakage: {marker}")
+                    break
 
         # --- Layer 4: Module capacity (anti-bloat) ---
         module = current_genome.modules.get(target_module)
