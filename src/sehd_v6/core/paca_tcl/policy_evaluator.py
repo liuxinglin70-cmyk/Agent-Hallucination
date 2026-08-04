@@ -71,7 +71,7 @@ def _recompute_terminal_state(
 ) -> str:
     # Simplified recomputation over court-addressable facts only: the
     # candidate-terminal coverage condition of the full court is not
-    # addressable here and is completed by the Wave2 court hook.
+    # addressable here; the proof-court policy hook applies the full rule.
     if surviving_error_count > 0:
         return "verified_error"
     if prosecution_coverage == "complete" and defense_coverage == "complete":

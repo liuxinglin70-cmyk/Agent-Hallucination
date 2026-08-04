@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from collections import Counter
 import math
-from typing import Any
+from typing import Any, Sequence
 
 from . import contract_v1 as v1
 from .proof_contract_v3 import _address_space, validate_error_certificate
@@ -325,6 +325,13 @@ def adjudicate_proof_court(
     apply_consensus_gate_flag: bool = True,
     counterfactual_rankings: dict[str, dict[str, Any]] | None = None,
     focused_prosecution_audits: list[dict[str, Any]] | None = None,
+    # L2 adjudication policy hook. The hook dependencies are resolved
+    # lazily inside the function body because importing
+    # ``..bccse.v6_contracts`` at module level would initialize the bccse
+    # package (and its evolution surface) for every detector-path import,
+    # breaking the stable-detector package isolation contract.
+    policy_items: Sequence["PolicyItem"] | None = None,
+    boundary_path_state: str = "",
 ) -> dict[str, Any]:
     """v3.5 proof court adjudication with consensus gate and counterfactual localization.
 
@@ -333,6 +340,10 @@ def adjudicate_proof_court(
     - apply_consensus_gate_flag: enable/disable consensus gate (H2)
     - counterfactual_rankings: pairwise comparison results (H3)
     - focused_prosecution_audits: per-candidate audit results with chain scores (H1)
+
+    policy_items optionally applies deterministic L2 coverage-validity
+    policies after adjudication; boundary_path_state supplies the engine-level
+    boundary fact that the court itself cannot address. Both default to inert.
     """
 
     event_order, _ = _address_space(packet)
@@ -537,7 +548,7 @@ def adjudicate_proof_court(
             if result.get("defense_type"):
                 all_defense_types.append(str(result["defense_type"]))
 
-    return {
+    result = {
         "state": state,
         "responsible_event_id": responsible,
         "occurrence_state": occurrence_state,
@@ -636,3 +647,38 @@ def adjudicate_proof_court(
             if focused_prosecution_audits else None
         ),
     }
+
+    # L2 policy hook: policies are structural coverage-validity
+    # interventions, so the evaluator's simplified terminal recomputation is
+    # ignored in favor of this court's own full rule (candidate_terminal /
+    # required / valid_errors are only addressable here). The boundary path
+    # state is an engine-level fact injected by the caller.
+    if policy_items:
+        from ..bccse.v6_contracts import build_adjudication_facts
+        from .policy_evaluator import evaluate_policies
+
+        facts = build_adjudication_facts(result, boundary_path_state=boundary_path_state)
+        evaluation = evaluate_policies(facts, policy_items)
+        eff_prosecution = evaluation.effective_prosecution_coverage
+        eff_defense = evaluation.effective_defense_coverage
+        coverage_shifted = eff_prosecution != p_coverage or eff_defense != d_coverage
+        if coverage_shifted:
+            eff_coverage_complete = (
+                eff_prosecution == eff_defense == "complete" and not invalid_count
+            )
+            if surviving:
+                recomputed_state = "verified_error"
+            elif eff_coverage_complete and candidate_terminal:
+                recomputed_state = "verified_clean"
+            elif eff_coverage_complete and not required and not valid_errors:
+                recomputed_state = "verified_clean"
+            else:
+                recomputed_state = "unresolved"
+        else:
+            recomputed_state = state
+        if coverage_shifted or recomputed_state != state:
+            result["pre_policy_state"] = state
+            result["state"] = recomputed_state
+        result["policy_evaluation"] = evaluation.to_dict()
+
+    return result
