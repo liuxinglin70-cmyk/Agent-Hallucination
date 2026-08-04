@@ -1,32 +1,31 @@
-# Experiment Protocols and Benchmarks
+# Experiment Protocols
 
-This directory is the workspace for experiment protocols and evaluation
-(benchmark) scripts that run on top of the standalone detector and
-self-evolution framework.
+This directory holds the tracked protocol records for experiments that run
+on top of the standalone detector and self-evolution framework.  The
+framework code (`src/sehd_v6/detector` and `src/sehd_v6/evolution`) is
+intentionally protocol-free; data partitioning, execution authorization and
+evaluation gates are layered here instead.
 
 ```text
 experiments/protocols/
-├── README.md            # this file (tracked)
-├── protocols/           # experiment protocol definitions (local-only)
-├── benchmarks/          # evaluation / benchmark scripts (local-only)
-└── runners/             # run orchestration for protocol executions (local-only)
+├── README.md              # this file
+└── used_case_ledger.txt   # used-case ledger
 ```
 
-The framework code (`src/sehd_v6/detector` and `src/sehd_v6/evolution`) is
-intentionally protocol-free.  Protocols, data partitioning, execution
-authorization and evaluation gates are layered here.
+These two files are the only tracked content of this directory.
 
-## Suggested layout for a protocol
+## Used-case ledger
 
-```text
-protocols/<name>/
-├── protocol.json        # protocol definition (routes, phases, authorization)
-├── run.py               # orchestration entry
-├── partition.py         # dataset split if required by the protocol
-└── results/             # outputs (git-ignored)
-```
+`used_case_ledger.txt` lists every `case_id` already consumed by past
+trials, evolution subsets and reserved holdouts.  **Any new experiment must
+exclude every `case_id` in the ledger.**  Before building a dataset or
+launching a run, subtract the full ledger from the candidate case pool; this
+is a handoff discipline, not a suggestion.
 
-Benchmarks follow the same pattern under `benchmarks/<name>/`.
+## Everything else is local-only
 
-Only this README is tracked by git.  All other content in this directory is
-local-only unless explicitly staged.
+Dataset builds, run scripts and output directories are local workspace
+artifacts, not tracked content: they are produced under the local
+`experiments/` workspace (git-ignored), recreated per run, and never
+required by the framework.  Nothing in this directory besides `README.md`
+and `used_case_ledger.txt` is tracked by git.

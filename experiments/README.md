@@ -1,51 +1,53 @@
 # Experiments
 
-Workspace for experiment plans, protocols, caches, progress, results and
-logs.  Experiment protocols are deliberately kept outside the framework code
+Workspace for experiment plans, protocol records and local run artifacts.
+Experiment protocols are deliberately kept outside the framework code
 (`src/sehd_v6/detector` and `src/sehd_v6/evolution`).
 
 ```text
 experiments/
-├── README.md            # this file
-├── plans/               # experiment plans and task lists (tracked)
-├── protocols/           # experiment protocol + benchmark workspace (README tracked)
-├── cache/               # experiment-run caches (git-ignored)
-│   └── provider/        #   global provider cache (PACA_GLOBAL_CACHE_ROOT)
-├── progress/            # reviews and progress notes (git-ignored)
-├── results/             # experiment outputs and archives (git-ignored)
-└── logs/                # run logs (git-ignored)
+├── README.md                # this file (tracked)
+├── plans/                   # experiment plans and task lists (tracked)
+└── protocols/               # protocol records (tracked)
+    ├── README.md            #   directory guide
+    └── used_case_ledger.txt #   used-case ledger
 ```
 
-Only `README.md`, `plans/` and `protocols/README.md` are tracked by git.
-`cache/`, `progress/`, `results/`, `logs/` and the content of `protocols/`
-are local-only workspaces.
+Only `README.md`, `plans/` and the two files under `protocols/` are tracked
+by git.  Everything else in this directory is a local-only, git-ignored
+workspace: run scripts, dataset builds, caches, outputs and logs are created
+by runs as needed and are never required by the framework.
+
+## Used-case ledger
+
+`protocols/used_case_ledger.txt` lists every `case_id` already consumed by
+past trials, evolution subsets and reserved holdouts.  Any new experiment
+must exclude every `case_id` in the ledger.  See `protocols/README.md`.
 
 ## Placement guide
 
 - Plans and task lists → `plans/`
-- Protocol definitions and benchmark scripts that will be run later →
-  `protocols/` (see `protocols/README.md`)
-- Reviews and progress notes → `progress/`
-- Outputs, artifacts and archives → `results/`
-- Run logs → `logs/`
+- Used-case tracking and protocol records → `protocols/`
+- Run scripts, dataset builds, caches, outputs and logs → local-only
+  locations under `experiments/` (git-ignored, created on demand)
 
 ## Caches and logs
 
 Experiment runs write their caches and logs under `experiments/` so the
-framework never depends on a fixed system path:
+framework never depends on a fixed system path.  Conventional locations:
 
 ```text
-experiments/
-├── cache/provider/     # global provider cache
-├── logs/               # run logs
-└── results/<run>/      # per-run artifacts, including shared_cache/
+experiments/cache/provider/     # global provider cache
+experiments/logs/               # run logs
+experiments/results/<run>/      # per-run artifacts, including shared_cache/
 ```
 
-To point the framework's global provider cache here:
+These directories are git-ignored, created on demand by runs, and safe to
+delete between runs.  To point the framework's global provider cache here:
 
 ```powershell
 $env:PACA_GLOBAL_CACHE_ROOT = "$PWD\experiments\cache\provider"
 ```
 
 Per-run caches (`shared_cache`, provider route caches) are written under the
-run's output directory inside `results/<run>/` by the framework itself.
+run's output directory by the framework itself.

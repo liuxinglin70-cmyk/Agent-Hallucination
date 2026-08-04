@@ -1,9 +1,13 @@
 # SEHD v6 — Hallucination Detector and Self-Evolution Framework
 
 SEHD v6 implements a court-style hallucination detector (PACA-TCL v3.5) and a
-self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning).  The
-detector and the evolution loop are standalone modules; experiment protocols,
-data partitioning and evaluation gates live outside the framework code.
+self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning).
+Self-evolution operates on a two-layer evolvable surface: an L1 provider-rule
+layer of eight controlled natural-language slot-rule modules, and an L2
+adjudication-policy genome of closed-vocabulary policy items evaluated
+deterministically by the proof court.  The detector and the evolution loop
+are standalone modules; experiment protocols, data partitioning and
+evaluation gates live outside the framework code.
 
 For framework design and flow documentation see
 [docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md) and
@@ -33,11 +37,8 @@ SEHD v6
 ├── datasets/             # ③ raw datasets (local-only, git-ignored)
 └── experiments/          # ④ experiment workspace
     ├── plans/            #   experiment plans (tracked)
-    ├── protocols/        #   experiment protocol + benchmark workspace
-    ├── cache/            #   experiment-run caches (local-only)
-    ├── progress/         #   local-only
-    ├── results/          #   local-only
-    └── logs/             #   local-only
+    └── protocols/        #   README + used-case ledger (tracked);
+                          #   all run artifacts local-only, git-ignored
 ```
 
 Experiment protocols (partitioning, manifests, execution authorization,
@@ -67,7 +68,7 @@ Module-level documentation lives beside the code:
 - `src/sehd_v6/evolution/README.md` — standalone self-evolution API
 - `datasets/README.md` — raw dataset layout and record format
 - `experiments/README.md` — experiment workspace guide
-- `experiments/protocols/README.md` — protocol/benchmark workspace guide
+- `experiments/protocols/README.md` — protocol records and used-case ledger
 
 ## Development Guidelines
 
@@ -80,10 +81,11 @@ follow these rules:
    Partitions, manifests, execution authorization, development probes,
    evaluation gates and dataset splits must not be added to
    `src/sehd_v6/detector`, `src/sehd_v6/evolution` or `src/sehd_v6/core`.
-2. **Experiments live in `experiments/`.**  Protocol definitions, benchmark
-   scripts and run orchestration are written under
-   `experiments/protocols/` (see its README) and consume the framework
-   modules through their public APIs:
+2. **Experiments live in `experiments/`.**  Protocol records and the
+   used-case ledger are tracked under `experiments/protocols/` (see its
+   README); run scripts, dataset builds and run orchestration are local-only
+   artifacts under `experiments/`, and consume the framework modules through
+   their public APIs:
    - `detect_record()` / `load_detector_config()` from `src/sehd_v6.detector`
    - `run_evolution()` / `load_records()` from `src/sehd_v6.evolution`
 3. **Keep the framework callable standalone.**  The framework must remain
@@ -97,7 +99,7 @@ follow these rules:
 ## Caches and Logs
 
 Experiment runs keep their caches and logs under `experiments/` so the
-framework never depends on a fixed system path:
+framework never depends on a fixed system path.  Conventional locations:
 
 - `experiments/cache/provider/` — global provider cache.  Point the framework
   at it with `PACA_GLOBAL_CACHE_ROOT=experiments/cache/provider`.
@@ -105,7 +107,8 @@ framework never depends on a fixed system path:
 - `experiments/results/<run>/` — per-run artifacts; the framework writes its
   `shared_cache/` and route caches inside each run's output directory.
 
-All of these directories are git-ignored and safe to delete between runs.
+These directories are git-ignored, created on demand by runs, and safe to
+delete between runs.
 
 ## Core Methodology
 
@@ -132,7 +135,14 @@ behavior must not be described as globally frozen.
 
 ### 2. BCCSE v5 — Self-Evolution Framework
 
-The 8-module natural-language rule genome:
+Self-evolution operates on a two-layer evolvable surface. Both layers share
+the same gate discipline: no detection threshold or CRS weight is ever
+hand-tuned, gold labels never enter rule content or reflection prompts, and
+provider routes are restricted to DeepSeek-V4-Flash / DeepSeek-V4-Pro.
+
+#### L1 provider-rule layer
+
+Eight skill modules own the provider-emitted surfaces:
 
 | Module | Stage | Role |
 |--------|-------|------|
@@ -145,23 +155,85 @@ The 8-module natural-language rule genome:
 | `earliest_origin_tiebreak` | Causal Court | How to resolve multi-origin localization ties |
 | `abstention_rule` | Causal Court | When to output `unresolved` |
 
-Each evolved `SkillEdit` stores a label-free `feature_description` alongside
-the runtime rule. The description records the reusable trajectory pattern
-(candidate kind/axis, tool or omission pattern, proof coverage and CRS
-provenance) that motivated the edit; it is metadata and never enters the final
-proof-court verdict directly.
+L1 rules are stored as typed slots (`condition` / `action` /
+`evidence_anchor`, English by contract) instead of free text
+(`rule_contract.py`). Prompt injection is a deterministic render: `render_rule()` emits
+exactly `When <condition>, <action>.`, so the structural gate validates the
+slot contract whenever slots are present; the free-text path only serves
+`remove_rule` and historical checkpoint replay. The `evidence_anchor` slot is
+failure-signature bookkeeping for evolution triage and is never rendered
+into runtime prompts.
 
-**Evolution loop** (per case):
-1. **Detect**: Run PACA-TCL v3.5 with current genome injected
-2. **Attribute**: Self-supervised trigger check (no gold required)
+Each module carries a charter (`module_charter.py`): its influenceable
+surfaces, forbidden surfaces, allowed verdicts, and in-scope vs out-of-scope
+failure examples (all in English). Charters are injected into the reflection
+prompt so proposals are constrained at generation time. Each evolved
+`SkillEdit` also stores a label-free `feature_description` recording the
+reusable trajectory pattern that motivated the edit; it is metadata and
+never enters the final proof-court verdict directly.
+
+#### L2 adjudication-policy layer
+
+The L2 genome (`policy_genome.py`) stores closed-vocabulary policy items:
+one precondition predicate (a pure function over the frozen
+`AdjudicationFacts` snapshot) paired with one enumerated action —
+`downgrade_coverage`, `invalidate_coverage_claim`,
+`reclassify_candidate_state`, `require_route_replay`,
+`emit_telemetry_only` — whose parameters draw from closed vocabularies. The
+single source of truth for every predicate, action and parameter token is
+`v6_contracts.py`. The LLM only proposes items; runtime semantics are owned
+by the deterministic evaluator (`policy_evaluator.py`), which the proof
+court executes mechanically through its policy hook:
+`adjudicate_proof_court(policy_items=..., boundary_path_state=...)`. The
+hook is inert by default — without policy items the detector output is
+byte-identical to the baseline — and the detection engine re-adjudicates
+with the same evidence bundle at the court's convergence point. The L2
+baseline is the empty policy set, so every behavior change must be earned.
+
+#### Deterministic attribution
+
+Attribution is a deterministic failure classifier (`failure_classifier.py`)
+that answers exactly one question: at which layer, on which artifact, did
+the failure happen — no LLM, no heuristics. An L1 owner hypothesis must
+pass the gold polarity gate (a false negative can only be owned by modules
+that tighten error detection, a false positive only by modules that relax
+or bound the error claim); hypotheses crossing the gold side are dropped.
+Non-L1 failures (adjudication-policy layer, detector-layer anomalies) have
+no L1 owner: they are recorded in `non_l1_failure_attributions` as audit
+telemetry and feed the L2 policy loop.
+
+#### L1 evolution loop (per case)
+
+1. **Detect**: Run PACA-TCL v3.5 with the current genomes injected
+2. **Attribute**: Deterministic failure classification; L1 owners pass the
+   gold polarity gate; non-L1 failures go to telemetry and the L2 loop
 3. **Reflect**: LLM reflection receives evaluator-field-stripped trajectory
-   evidence, attribution, executable module-output contracts, and bounded
-   negative experience
+   evidence, attribution, module charters, executable module-output
+   contracts, and bounded negative experience
 4. **Gate**: Structural constraint gate validates edit safety
 5. **Fitness**: Source replay plus rolling stable-case canaries; a budgeted probe can steer/rollback development, while only an authorized sealed final holdout can support a generalization claim
 6. **Repair**: A repairable structural or source-no-effect candidate may use
    one bounded same-source retry with its actual observable replay deltas
 7. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
+
+#### L2 closed loop
+
+1. **Propose**: One reflection call proposes a single closed-vocabulary
+   `PolicyEdit` (the vocabulary table in the prompt is generated from
+   `v6_contracts.py` at call time, never copied)
+2. **Gate**: The structural gate enforces the closed vocabulary, genome
+   capacity, deduplication, and baseline/fitness protection
+3. **Replay**: Source replay must show the policy fired and moved an
+   observable adjudication output
+4. **Gold polarity gate**: When the terminal state moves, `task_state_score`
+   must strictly improve (no consecutive-improvement threshold); state
+   movement without gold is rejected
+5. **Accept/Rollback**: Rejected candidates are only ever replayed as
+   copies, so the working genome rolls back inherently. Gate decisions are
+   `accept_policy` / `reject_policy_no_effect` / `reject_policy_fitness` /
+   `skip_no_policy`; the policy genome persists in the checkpoint and the
+   run can resume from it; every decision is audited in
+   `evolution_audit["l2_policy_audit"]`
 
 ### 3. HTC-TES v3 — Hallucination-Typed Conditioning
 
@@ -402,13 +474,15 @@ Each sub-package also exposes its own `__init__.py` for granular imports:
 
 ## Key Design Decisions
 
-1. **Natural language rules** (not typed DSL): LLM generates rules directly; no compilation step needed.
-2. **Self-supervised triggers**: Evolution can proceed without gold labels from unresolved, CRS contradiction, evidence-incomplete, and unavailable-signal conditions. It does not prescribe clean/error polarity without gold.
-3. **Incremental batch commit**: Each edit validated independently; failed edits don't discard successful ones.
-4. **Shared LLM cache**: Same genome+case replay reuses cache, eliminating CRS nondeterminism.
-5. **Layered edit checks**: Structural validation and stable-case canary replay cover different failure modes; neither establishes generalization.
-6. **Interface normalization**: HTC-TES modules accept both `AttributionSignal` dataclass and `Mapping[str, Any]` dict via a `_normalize_signal` helper, decoupling the type-conditioning layer from BCCSE's dataclass internals while maintaining a uniform access pattern.
-7. **Typed transition bookkeeping**: Direction and type are recorded separately from gold correctness and claim eligibility.
+1. **Controlled natural-language slot rules** (not a typed DSL, not free text): the LLM generates rule slots directly — no compilation step — and the runtime injection is a deterministic render (`When <condition>, <action>.`) that the structural gate can validate as a slot contract.
+2. **Closed-vocabulary L2 policies**: adjudication-policy items pair a closed precondition predicate with an enumerated action; runtime semantics are fixed by the deterministic proof-court evaluator, so the LLM proposes items but never interprets or executes them.
+3. **Deterministic attribution**: a heuristic-free failure classifier answers "which layer, which artifact"; L1 owners pass the gold polarity gate, non-L1 failures feed telemetry and the L2 policy loop.
+4. **Self-supervised triggers**: Evolution can proceed without gold labels from unresolved, CRS contradiction, evidence-incomplete, and unavailable-signal conditions. It does not prescribe clean/error polarity without gold.
+5. **Incremental batch commit**: Each edit validated independently; failed edits don't discard successful ones.
+6. **Shared LLM cache**: Same genome+case replay reuses cache, eliminating CRS nondeterminism.
+7. **Layered edit checks**: Structural validation and stable-case canary replay cover different failure modes; neither establishes generalization.
+8. **Interface normalization**: HTC-TES modules accept both `AttributionSignal` dataclass and `Mapping[str, Any]` dict via a `_normalize_signal` helper, decoupling the type-conditioning layer from BCCSE's dataclass internals while maintaining a uniform access pattern.
+9. **Typed transition bookkeeping**: Direction and type are recorded separately from gold correctness and claim eligibility.
 
 ## Module Dependencies
 
