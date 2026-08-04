@@ -1,4 +1,4 @@
-"""Wave2-F: L2 adjudication policy hook on the v3.5 proof court.
+"""L2 adjudication policy hook on the v3.5 proof court.
 
 Covers the contract that ``adjudicate_proof_court`` stays byte-identical for
 existing callers and that deterministic coverage-validity policies flip only
@@ -188,3 +188,43 @@ def test_boundary_path_state_enables_conflict_predicate_telemetry() -> None:
         **inputs, policy_items=[policy],
     )
     assert without_boundary["policy_evaluation"]["fired"] == []
+
+
+def _surviving_error_certificate() -> dict:
+    cert = _process_only_error_certificate()
+    cert.update({
+        "impact_kind": "final_answer",
+        "benchmark_causal_status": "causes_incorrect_result",
+        "benchmark_causal_evidence_refs": ["event_002"],
+    })
+    return cert
+
+
+def test_surviving_errors_keep_verified_error_under_coverage_downgrade() -> None:
+    inputs = {
+        "required_candidates": [_candidate()],
+        "prosecution": {
+            "coverage_state": "complete",
+            "candidates": [_surviving_error_certificate()],
+        },
+        "defense": {"coverage_state": "complete", "candidates": []},
+        "packet": _packet(),
+    }
+    baseline = proof_contract.adjudicate_proof_court(**inputs)
+    assert baseline["state"] == "verified_error"
+
+    policy = PolicyItem(
+        item_id="policy_downgrade_defense",
+        precondition="defense_coverage_complete_and_zero_certificates",
+        action="downgrade_coverage",
+        params={"side": "defense", "to_state": "incomplete"},
+    )
+    result = proof_contract.adjudicate_proof_court(**inputs, policy_items=[policy])
+
+    # The coverage shift is recorded, but surviving errors dominate the
+    # court's full terminal rule, so the verdict must not move.
+    assert result["state"] == "verified_error"
+    assert result["pre_policy_state"] == "verified_error"
+    evaluation = result["policy_evaluation"]
+    assert evaluation["effective_defense_coverage"] == "incomplete"
+    assert evaluation["terminal_state"] == "verified_error"

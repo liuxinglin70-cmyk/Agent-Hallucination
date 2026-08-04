@@ -27,6 +27,13 @@ def test_predicate_registry_is_closed_and_pure():
     assert contracts.L2_PREDICATES[
         "defense_coverage_complete_and_zero_certificates"
     ](facts)
+    hollow_prosecution = contracts.AdjudicationFacts(
+        prosecution_coverage="complete",
+        valid_error_certificate_count=0,
+    )
+    assert contracts.L2_PREDICATES[
+        "prosecution_coverage_complete_and_zero_certificates"
+    ](hollow_prosecution)
     assert contracts.L2_PREDICATES["boundary_state_conflicts_with_terminal"](facts)
     assert not contracts.L2_PREDICATES[
         "surviving_errors_nonempty_and_verdict_clean"

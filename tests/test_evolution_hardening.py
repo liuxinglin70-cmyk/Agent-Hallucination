@@ -3773,7 +3773,7 @@ def test_attribute_failure_fn_omission_clean_routes_candidate_trigger() -> None:
         detection_result={},
         primary_type=HallucinationType.OMISSION,
         case_id="case_fn_omission",
-        l2_failure_attributions=l2_telemetry,
+        non_l1_failure_attributions=l2_telemetry,
     )
     assert owner == "candidate_trigger"
     assert reason == "provider_artifact_missing"
@@ -3791,7 +3791,7 @@ def test_attribute_failure_fn_clean_quarantined_error_routes_evidence_obligation
         },
         primary_type=HallucinationType.FACTUAL,
         case_id="case_fn_quarantined",
-        l2_failure_attributions=[],
+        non_l1_failure_attributions=[],
     )
     assert owner == "evidence_obligation"
     assert reason == "provider_artifact_malformed"
@@ -3815,7 +3815,7 @@ def test_attribute_failure_hollow_complete_defense_records_l2_telemetry() -> Non
         },
         primary_type=HallucinationType.UNKNOWN,
         case_id="case_hollow_defense",
-        l2_failure_attributions=l2_telemetry,
+        non_l1_failure_attributions=l2_telemetry,
     )
     assert owner == ""
     assert reason == "hollow_complete_defense"
@@ -3842,7 +3842,7 @@ def test_attribute_failure_consensus_gate_blocked_records_l2_telemetry() -> None
         },
         primary_type=HallucinationType.UNKNOWN,
         case_id="case_consensus_blocked",
-        l2_failure_attributions=l2_telemetry,
+        non_l1_failure_attributions=l2_telemetry,
     )
     assert owner == ""
     assert reason == "consensus_gate_blocked"
@@ -3876,7 +3876,7 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
         detection_result={},
         primary_type=HallucinationType.UNKNOWN,
         case_id="case_fp_gate",
-        l2_failure_attributions=[],
+        non_l1_failure_attributions=[],
     )
     assert owner == ""
     _patch_classifier("clean_defense_boundary", "provider_artifact_malformed")
@@ -3885,7 +3885,7 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
         detection_result={},
         primary_type=HallucinationType.UNKNOWN,
         case_id="case_fp_gate",
-        l2_failure_attributions=[],
+        non_l1_failure_attributions=[],
     )
     assert owner == "clean_defense_boundary"
 
@@ -3903,7 +3903,7 @@ def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> Non
         },
         primary_type=HallucinationType.UNKNOWN,
         case_id="case_unresolved_l1",
-        l2_failure_attributions=[],
+        non_l1_failure_attributions=[],
     )
     assert owner == "evidence_obligation"
     assert reason == "provider_artifact_malformed"
@@ -3924,7 +3924,7 @@ def test_attribute_failure_no_failure_shape_returns_empty() -> None:
         },
         primary_type=HallucinationType.FACTUAL,
         case_id="case_no_shape",
-        l2_failure_attributions=l2_telemetry,
+        non_l1_failure_attributions=l2_telemetry,
     )
     assert owner == ""
     assert reason == "no_failure_shape"

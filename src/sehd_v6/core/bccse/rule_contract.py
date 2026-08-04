@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.sehd_v6.core.bccse.genome import (
+from .genome import (
     ALLOWED_VERDICTS,
     FORBIDDEN_CONTENT_MARKERS,
     LOCAL_NEGATION_MODULES,

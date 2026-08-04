@@ -117,7 +117,7 @@ class PolicyGenome:
     def content_hash(self) -> str:
         # Meta is post-commit bookkeeping (fitness outcomes, provenance);
         # including it would change genome identity after every commit and
-        # break lineage replay, mirroring the v5.4 L1 fix.
+        # break lineage replay and cache keys.
         state = {
             "items": [
                 {

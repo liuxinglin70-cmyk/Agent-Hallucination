@@ -88,7 +88,7 @@ from .signal_adapter import (
     decision_authority_invalid,
     resolve_authoritative_state,
 )
-from .v6_contracts import LAYER_L1, LAYER_L2
+from .v6_contracts import LAYER_DETECTOR, LAYER_L1, LAYER_L2
 from ..htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -646,18 +646,18 @@ def _attribute_failure(
     detection_result: Mapping[str, Any] | None,
     primary_type: Any,
     case_id: str,
-    l2_failure_attributions: list[dict[str, Any]],
+    non_l1_failure_attributions: list[dict[str, Any]],
 ) -> tuple[str, str]:
     """Attribute one triggered failure to an evolvable layer and artifact.
 
     Delegates to the deterministic failure classifier and translates the
     attribution into an L1 owner hypothesis for the bounded attribution
-    route. L1 owners must pass the gold polarity gate. L2
-    (adjudication-policy) failures have no L1 owner — guessing an L1 module
-    for a policy-layer failure is exactly the patch pattern this replaces —
-    and are recorded in ``l2_failure_attributions`` as audit telemetry
-    instead. Returns ``(owner, reason_code)``; empty owner when nothing is
-    actionable at L1.
+    route. L1 owners must pass the gold polarity gate. Non-L1 failures
+    (adjudication-policy layer, detector-layer anomalies) have no L1 owner
+    — guessing an L1 module for a failure outside the L1 editable surface
+    ends in no-edit steps or no-effect replays — and are recorded in
+    ``non_l1_failure_attributions`` as audit telemetry instead. Returns
+    ``(owner, reason_code)``; empty owner when nothing is actionable at L1.
     """
     detection_result = detection_result or {}
     adjudication = detection_result.get("proof_adjudication") or {}
@@ -729,14 +729,14 @@ def _attribute_failure(
         if pool is not None and owner not in pool:
             return "", attribution.reason_code
         return owner, attribution.reason_code
-    if attribution.layer == LAYER_L2:
-        l2_failure_attributions.append({
+    if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
+        non_l1_failure_attributions.append({
             "case_id": case_id,
             **attribution.to_dict(),
         })
         print(
-            f"    [L2] failure attribution: {attribution.artifact} "
-            f"({attribution.reason_code})"
+            f"    [non-L1] failure attribution: {attribution.layer} "
+            f"{attribution.artifact} ({attribution.reason_code})"
         )
     return "", attribution.reason_code
 
@@ -1810,9 +1810,10 @@ def run_online_evolution(
     # v5.8 fix 4: label-free localization-bias telemetry collected during the
     # run; audit output only, never feeds verdicts or fitness.
     localization_bias_signals: list[dict[str, str]] = []
-    # Deterministic L2 (adjudication-policy) failure attributions collected
-    # during the run; audit telemetry only, never feeds verdicts or fitness.
-    l2_failure_attributions: list[dict[str, Any]] = []
+    # Deterministic non-L1 failure attributions (adjudication-policy layer
+    # and detector-layer anomalies) collected during the run; audit
+    # telemetry only, never feeds verdicts or fitness.
+    non_l1_failure_attributions: list[dict[str, Any]] = []
     # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
     # the ladder at most once; advances are audit telemetry only.
     abstention_ladder_used: set[str] = set()
@@ -3050,7 +3051,7 @@ def run_online_evolution(
             detection_result=detection_result,
             primary_type=type_result.primary_type,
             case_id=case_id,
-            l2_failure_attributions=l2_failure_attributions,
+            non_l1_failure_attributions=non_l1_failure_attributions,
         )
         attribution_route = (signal.target_module, signal.secondary_module)
         if attribution_owner and attribution_owner not in attribution_route:
@@ -4568,7 +4569,7 @@ def run_online_evolution(
                 budget_usage["detector_calls"] + budget_usage["mutation_calls"]
             ),
             "localization_bias_signals": localization_bias_signals,
-            "l2_failure_attributions": l2_failure_attributions,
+            "non_l1_failure_attributions": non_l1_failure_attributions,
             "abstention_ladder_advances": abstention_ladder_advances,
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,

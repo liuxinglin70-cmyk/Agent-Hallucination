@@ -145,7 +145,8 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
 - [x] proof court 策略钩子：`adjudicate_proof_court(policy_items=, boundary_path_state=)`，
       默认惰性，按法庭完整终态规则重算。
 - [x] 失败分类器 `failure_classifier.py` + 归因集成：`_owner_arbitration` 4 通道
-      补丁栈已删除（净删 158 行），L2 失败进 `evolution_audit["l2_failure_attributions"]` 遥测。
+      补丁栈已删除（净删 158 行），非 L1 失败（L2 与检测器层异常）进
+      `evolution_audit["non_l1_failure_attributions"]` 遥测。
 - [x] 模块章程 `module_charter.py`（8 模块英文章程，含跨层引导）。
 - [x] L1 槽位规则契约 `rule_contract.py`（受控英文 if-then，槽位校验+确定性渲染）。
 - [x] 5.5 三项缺陷离线定性（结论见 5.5）。

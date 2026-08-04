@@ -130,12 +130,23 @@ def _pred_consensus_gate_blocked_nonempty(facts: AdjudicationFacts) -> bool:
     return facts.consensus_gate_applied and facts.consensus_gate_blocked_count > 0
 
 
+def _hollow_coverage(facts: AdjudicationFacts, coverage: str, count: int) -> bool:
+    return coverage == "complete" and count == 0
+
+
 def _pred_defense_coverage_complete_and_zero_certificates(
     facts: AdjudicationFacts,
 ) -> bool:
-    return (
-        facts.defense_coverage == "complete"
-        and facts.valid_defense_certificate_count == 0
+    return _hollow_coverage(
+        facts, facts.defense_coverage, facts.valid_defense_certificate_count
+    )
+
+
+def _pred_prosecution_coverage_complete_and_zero_certificates(
+    facts: AdjudicationFacts,
+) -> bool:
+    return _hollow_coverage(
+        facts, facts.prosecution_coverage, facts.valid_error_certificate_count
     )
 
 
@@ -160,6 +171,9 @@ L2_PREDICATES: dict[str, Any] = {
     "consensus_gate_blocked_nonempty": _pred_consensus_gate_blocked_nonempty,
     "defense_coverage_complete_and_zero_certificates": (
         _pred_defense_coverage_complete_and_zero_certificates
+    ),
+    "prosecution_coverage_complete_and_zero_certificates": (
+        _pred_prosecution_coverage_complete_and_zero_certificates
     ),
     "boundary_state_conflicts_with_terminal": _pred_boundary_state_conflicts_with_terminal,
     "surviving_errors_nonempty_and_verdict_clean": (

@@ -652,7 +652,10 @@ def adjudicate_proof_court(
     # interventions, so the evaluator's simplified terminal recomputation is
     # ignored in favor of this court's own full rule (candidate_terminal /
     # required / valid_errors are only addressable here). The boundary path
-    # state is an engine-level fact injected by the caller.
+    # state is an engine-level fact injected by the caller. Policies act on
+    # the terminal edge only: the occurrence ledger records what the
+    # evidence established before policy, so it is intentionally not
+    # recomputed here.
     if policy_items:
         from ..bccse.v6_contracts import build_adjudication_facts
         from .policy_evaluator import evaluate_policies

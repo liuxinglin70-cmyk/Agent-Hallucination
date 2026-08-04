@@ -1,11 +1,11 @@
-"""Deterministic failure classifier for SEHD v6 (replaces episodic owner
-arbitration).
+"""Deterministic failure classifier for SEHD v6.
 
-Six rounds of experiments showed the old 4-channel episodic owner
-arbitration inside the evolution main loop to be pure patch-entropy
-growth. The replacement answers exactly one question: *at which layer,
-on which artifact, did the failure happen?* There are only two
-evolvable surfaces:
+Attribution answers exactly one question: *at which layer, on which
+artifact, did the failure happen?* Routing an unownable failure to some
+module anyway ends in no-edit steps or no-effect replays, so classification
+is a pure deterministic function of the addressable failure shape of one
+detection record — no guessing, no LLM, no heuristics. The two evolvable
+surfaces are:
 
 - L1 = the 8 provider-rule modules (artifact = the provider-emitted
   candidate / certificate / evidence field),
@@ -187,9 +187,8 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             },
         )
 
-    # Rule 3 — hollow "complete" coverage. Defense side is checked via
-    # the registered predicate; the prosecution side is the mechanical
-    # symmetric mirror (prosecution certificates are error certificates).
+    # Rule 3 — hollow "complete" coverage: both sides go through the
+    # registered predicates, so the vocabulary stays single-sourced.
     if L2_PREDICATES["defense_coverage_complete_and_zero_certificates"](facts):
         return _attr(
             LAYER_L2,
@@ -200,10 +199,7 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
                 "valid_defense_certificate_count": facts.valid_defense_certificate_count,
             },
         )
-    if (
-        facts.prosecution_coverage == "complete"
-        and facts.valid_error_certificate_count == 0
-    ):
+    if L2_PREDICATES["prosecution_coverage_complete_and_zero_certificates"](facts):
         return _attr(
             LAYER_L2,
             L2_ARTIFACT_COVERAGE_VALIDITY,
