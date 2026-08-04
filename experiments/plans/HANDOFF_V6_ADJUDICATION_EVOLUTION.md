@@ -100,25 +100,31 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
   裁决输出）→ canary → gold fitness。门控层不变，只是工件类型扩展；
 - **可逆性**：策略项集合构成独立 genome 分区，回滚/champion 机制复用现有实现。
 
-### 5.4 补丁栈清理清单（重构时删除或吸收）
+### 5.4 补丁栈清理清单（已完成部分标注）
 
-- `_owner_arbitration` 的 4 个情景通道（process_channel / verdict_evidence_gap /
-  unresolved_balance 及其变体）→ 由 5.2 的统一失败分类取代；
-- `sanitize_diagnosis` 的空断言正则、ownership 重映射 → L1 归因直接来自工件，
-  诊断不再需要猜 owner；
-- 诊断 prompt 的 hint 可编辑性标注、editable flag → 归因输出即是允许集合；
-- `repair_rule_for_structural_reason` 机械修复 → 保留（它修的是生成语法，跨层有效）；
-- 诊断-干预二级管线 → 保留其"诊断与生成分离"结构，但诊断输出改为
-  （失败层, 工件, 证据引用）三元组，不再是"owner 猜测"。
+- `_owner_arbitration` 的 4 个情景通道 → [已删除] 由 `failure_classifier` 取代；
+- `sanitize_diagnosis` 的空断言正则、ownership 重映射 → [保留] 它是 LLM 诊断输出的
+  结构门而非 owner 猜测，归因已不再依赖它；
+- 诊断 prompt 的 hint 可编辑性标注、editable flag → [保留待 Wave2-H 一并清理]；
+- `repair_rule_for_structural_reason` 机械修复 → [保留]（修生成语法，跨层有效）；
+- 诊断-干预二级管线 → [保留] 诊断与生成分离结构，归因输出已是（层, 工件, 证据）。
 
-### 5.5 已知检测器层缺陷（C 类：修代码，不进进化）
+### 5.5 已知检测器层缺陷定性结论（已完成离线复现）
 
-1. boundary_path=verified_clean 但终态 unresolved 的聚合不一致；
-2. defense coverage=complete 且证书数为 0 的"空壳 complete"语义；
-3. consensus gate 在 appeal 后对 initial vs combined prosecution 的阻断条件过严
-   （多例 unresolved 的直接来源）。
-   这三项应先做缺陷确认（离线复现），确认是 bug 则直接修 proof court 代码；
-   它们是策略问题则归入 L2 进化面。逐项判定，不预设。
+1. boundary_path=verified_clean 但终态 unresolved（实例：BFCL/029，trial_10case_v59c）：
+   **结构性策略缺口，非 bug**。boundary finding 只进 provider prompt 上下文
+   （proof_engine.py 三处 case_boundary_finding），adjudicate_proof_court 的终态
+   聚合无 boundary 消费逻辑。硬修等于硬编码裁决优先级，故归入 L2
+   boundary_consumption_policy 进化面（谓词已就绪）。
+2. defense coverage=complete 且证书数为 0 的空壳 complete（实例：BFCL/025，
+   full50_v59_r2）：**策略问题**。coverage_complete 只看声明值与审计失败数，
+   不检查证书非零；归入 L2 coverage_validity_policy 进化面，proof court
+   策略钩子已可确定性处置（downgrade/invalidate coverage）。
+3. consensus gate 在 appeal 后的阻断：**证据不足以判定 bug**。偏离点已定位：
+   adjudicate_proof_court 把 initial 支持集构造为 surviving 中前缀 initial_ 的
+   证书，而 apply_consensus_gate 的文档语义是"initial 曾独立支持"（被 defense
+   击败的初始证书不再计入）。该收紧可能是有意的抗 FP 设计，语义取舍属策略
+   决策：不擅自改门语义，作为 consensus_gate_policy 首批进化候选待实验定夺。
 
 ## 6. 纪律与约束（必须延续）
 
@@ -128,14 +134,28 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
 - 模型仅限 DeepSeek-V4-Flash/Pro；mutation purpose 需纳入非思考模式集合。
 - 实验产物目录与脚本按现有惯例放 `experiments/`（gitignored）。
 
-## 7. 下一步清单（供下一会话排期）
+## 7. 下一步清单（v6 实施进度已更新）
 
-1. 与用户确认 5.1–5.3 的 L2 设计（策略词表的初版枚举）。
-2. 对 5.5 三项缺陷做离线复现与定性（bug vs 策略问题）。
-3. 实现 L2 最小闭环：策略 genome 分区 + proof court 求值钩子 + 失败分类归因。
-4. 拆除 5.4 补丁栈，归因路径单一化。
-5. 离线桩测试覆盖：失败分类、策略求值、门控复用。
-6. 全新 8 例小验证（含 unresolved 僵局形态），验收标准：裁决级触发案例
-   产出可 replay 验证的策略提案，且 no_edit 大类显著下降。
-7. 通过后重启 50 例正式实验（数据集构建器 `build_full50_dataset.py` 可复用，
-   注意重新排除账本）。
+已完成（全部测试绿，逐模块 git 提交，账本见 git log f78123e 起）：
+
+- [x] 共享契约 `src/sehd_v6/core/bccse/v6_contracts.py`：层/工件/谓词/动作封闭词表、
+      AdjudicationFacts、PolicyItem、FailureAttribution。
+- [x] L2 基因组分区 `policy_genome.py`（容量/去重/保护/champion 兼容）。
+- [x] 确定性求值器 `policy_evaluator.py`（fail-closed、coverage 只降不升）。
+- [x] proof court 策略钩子：`adjudicate_proof_court(policy_items=, boundary_path_state=)`，
+      默认惰性，按法庭完整终态规则重算。
+- [x] 失败分类器 `failure_classifier.py` + 归因集成：`_owner_arbitration` 4 通道
+      补丁栈已删除（净删 158 行），L2 失败进 `evolution_audit["l2_failure_attributions"]` 遥测。
+- [x] 模块章程 `module_charter.py`（8 模块英文章程，含跨层引导）。
+- [x] L1 槽位规则契约 `rule_contract.py`（受控英文 if-then，槽位校验+确定性渲染）。
+- [x] 5.5 三项缺陷离线定性（结论见 5.5）。
+
+待办：
+
+1. Wave2-H：Skill 槽位模板落地到生成路径（反思 prompt 产出槽位 JSON、
+   compile_edit_proposal 走 rule_contract 校验、结构 gate 切换），与 8 例验证
+   捆绑实施（需 LLM 生成行为验证）。
+2. 全新 8 例小验证（含 unresolved 僵局形态），验收标准：裁决级触发案例的
+   L2 归因遥测正确、L1 no_edit 大类显著下降；案例必须排除账本全部 case_id。
+3. L2 策略提案生成闭环：反思引擎对 L2 归因产出 PolicyEdit（目前 L2 失败只留遥测）。
+4. 通过后重启 50 例正式实验（`build_full50_dataset.py` 可复用，重新排除账本）。
