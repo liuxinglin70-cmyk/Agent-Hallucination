@@ -300,6 +300,64 @@ def sanitize_expected_effect_contract(content: Any) -> dict[str, Any]:
     return sanitized if valid else {}
 
 
+def _repair_condition_overload(content: str) -> str:
+    """Deterministically reduce a multi-conjunction condition to one.
+
+    Keeps the leading WHEN/如果 clause plus its first conjunct and drops the
+    trailing conjuncts, leaving the THEN action untouched.  Example:
+    "When A and B and C, do X" -> "When A, do X".
+    """
+    normalized = content.strip()
+    lowered = normalized.lower()
+    if lowered.startswith(("when ", "if ")):
+        head = normalized[:5]
+        rest = normalized[5:]
+        parts = re.split(r"[,，]", rest, maxsplit=1)
+        if len(parts) != 2:
+            return content
+        condition, action = parts
+        pieces = re.split(r"(\s+\band\b|\s+\bor\b)", condition, flags=re.IGNORECASE)
+        if len(pieces) < 3:
+            return content
+        new_condition = "".join(pieces[:3]).strip()
+        return f"{head}{new_condition}, {action.strip()}"
+    if normalized.startswith(("当", "如果")):
+        parts = re.split(r"[时，,]", normalized, maxsplit=1)
+        if len(parts) != 2:
+            return content
+        condition, action = parts
+        sep = "时" if "时" in normalized[:len(condition) + 2] else "，"
+        pieces = re.split(r"(且|并且|以及|或)", condition)
+        if len(pieces) < 3:
+            return content
+        new_condition = "".join(pieces[:3]).strip()
+        return f"当{new_condition}时，{action.strip()}" if sep == "时" else (
+            f"{normalized[:2]}{new_condition}，{action.strip()}"
+        )
+    return content
+
+
+def repair_rule_for_structural_reason(
+    content: str, reason: str,
+) -> str | None:
+    """Return a deterministic repair for a structural rejection, or None.
+
+    Only the condition_overload class is repaired mechanically: generation
+    discipline prompts failed to stop multi-conjunction rules on two
+    consecutive attempts (observed on OpenDeepSearch/012), so the gate's
+    reject is followed by one semantics-preserving simplification that the
+    structural gate then re-evaluates normally.
+    """
+    category = str(reason or "").split(":", 2)
+    key = category[1] if len(category) > 1 else category[0]
+    if key != "condition_overload":
+        return None
+    repaired = _repair_condition_overload(content)
+    if repaired.strip() == content.strip():
+        return None
+    return repaired
+
+
 def normalize_type_confidence(value: Any) -> float:
     """Bound untrusted serialized confidence without failing restoration."""
     try:

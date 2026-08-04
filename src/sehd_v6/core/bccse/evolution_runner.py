@@ -25,7 +25,7 @@ import os
 import time
 import uuid
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -60,6 +60,7 @@ from .genome import (
     apply_edit,
     create_baseline_genome,
     validate_edit,
+    repair_rule_for_structural_reason,
     MODULE_IDS,
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
@@ -3742,6 +3743,39 @@ def run_online_evolution(
             rule_index=edit.rule_index,
             expected_module=allowed_modules,
         )
+
+        # v5.9e: deterministic repair for condition_overload. Prompt-level
+        # discipline failed to stop multi-conjunction rules on two consecutive
+        # attempts (observed on OpenDeepSearch/012); instead of spending a
+        # full retry on the same grammar error, simplify the condition to its
+        # first conjunct and re-evaluate through the SAME gate stack. The
+        # repair never bypasses any layer and is audited on the step.
+        if not accepted and any(
+            str(reason).startswith("runtime_rule_contract:condition_overload")
+            for reason in reject_reasons
+        ):
+            repaired_content = repair_rule_for_structural_reason(
+                edit.new_content,
+                "runtime_rule_contract:condition_overload",
+            )
+            if repaired_content is not None:
+                gate.mark_repaired(cert, "condition_simplification")
+                edit = replace(edit, new_content=repaired_content)
+                accepted, cert, reject_reasons = gate.evaluate(
+                    case_id=case_id,
+                    case_index=idx,
+                    target_module=edit.target_module,
+                    operation=edit.operation,
+                    content=edit.new_content,
+                    preconditions=(),
+                    current_genome=current_genome,
+                    rule_index=edit.rule_index,
+                    expected_module=allowed_modules,
+                )
+                reflection_audit["structural_repair"] = (
+                    "condition_simplification:"
+                    + ("accepted" if accepted else "still_rejected")
+                )
 
         if not accepted:
             repairable_certificate = cert

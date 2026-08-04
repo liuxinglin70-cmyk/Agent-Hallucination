@@ -546,6 +546,74 @@ def test_stable_cases_do_not_advance_convergence_streak(
     assert decisions.count("skip_stable") == 1
 
 
+def test_structural_repair_simplifies_condition_overload_and_proceeds(
+    tmp_path, monkeypatch,
+) -> None:
+    """v5.9e: a multi-conjunction rule rejected as condition_overload is
+    deterministically simplified to one conjunction and re-evaluated through
+    the same gate stack instead of burning a retry on the grammar error."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.genome import (
+        repair_rule_for_structural_reason,
+        validate_runtime_rule,
+    )
+
+    overloaded = (
+        "When the adjudication state is unresolved and quarantined error "
+        "certificates exist and defense coverage is complete, quarantine "
+        "the stale certificate."
+    )
+    valid, reason = validate_runtime_rule(overloaded, "atomic_verifier_instruction")
+    assert not valid and reason == "condition_overload"
+    repaired = repair_rule_for_structural_reason(
+        overloaded, "runtime_rule_contract:condition_overload",
+    )
+    assert repaired is not None
+    valid, reason = validate_runtime_rule(repaired, "atomic_verifier_instruction")
+    assert valid, reason
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        if kwargs.get("purpose") == "reflection_diagnosis":
+            return {
+                "owner_executable": False, "owner_module": None,
+                "failure_field": "", "observed_gap": "",
+                "reasoning": "nothing executable",
+            }, {"cache_hit": False}
+        return {
+            "target_module": "evidence_obligation", "operation": "add_rule",
+            "new_content": overloaded,
+            "feature_description": "multi-conjunction proposal",
+        }, {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=1,
+        run_id="structural_repair",
+    )
+
+    reflection = result.steps[-1].fitness_check["reflection"]
+    assert reflection["structural_repair"] == "condition_simplification:accepted"
+    assert result.edits_accepted == 1
+
+
 def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
     """v5.9b: cases skipped by convergence were persisted as halted
     placeholders with the queue advanced past them, so a resume dropped them

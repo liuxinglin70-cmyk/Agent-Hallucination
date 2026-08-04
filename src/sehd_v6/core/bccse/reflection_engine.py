@@ -311,13 +311,17 @@ def build_runtime_observation(
             "trigger": signal.trigger_source.value,
             "error_type": signal.error_type.value,
             "primary_module": signal.target_module,
+            "primary_module_editable": signal.target_module in set(allowed_modules),
             "secondary_module": signal.secondary_module,
+            "secondary_module_editable": signal.secondary_module in set(allowed_modules),
             "confidence": signal.attribution_confidence,
         },
         "module_output_ownership": owner_fields,
         "instruction": (
             "Select one observed missing or malformed output field owned by the "
-            "target module. Do not claim an effect on fields outside its ownership."
+            "target module. Do not claim an effect on fields outside its ownership. "
+            "diagnostic_gap primary/secondary modules are attribution hints and may "
+            "be marked not editable; the allowed module set is authoritative."
         ),
     }
 
