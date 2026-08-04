@@ -5,11 +5,16 @@
 
 ## 1. 项目现状快照
 
-- 代码：`main` 分支，本地领先 origin/main 12 个 commit（含 v5.9a–e 系列），未 push。
-- 测试：301 个单元测试全部通过。
-- Champion genome：`af67ab00`（`experiments/protocols/trial_10case_v59c_output/champion_genome.json`），含 2 条被接受规则（candidate_trigger / evidence_obligation）。
+- 代码：`main` 分支，v5.9e 基线（commit 4b50e8a）之后为 v6 重构系列提交（自
+  f78123e 起），未 push。
+- 测试：402 个单元测试全部通过。
+- Champion genome：af67ab00（含 2 条被接受规则 candidate_trigger /
+  evidence_obligation；原产物文件已随仓库清理移除，内容可从 commit 4b50e8a
+  的 git 历史查看）。
 - 模型约束：仅允许 DeepSeek-V4-Flash / V4-Pro；不触碰任何检测阈值（导师明确要求）。
-- 已用案例账本（后续实验必须排除）：`experiments/protocols/` 下全部 `*.jsonl`（210 个 case_id，含 validation_100 预留集）。原始池 `datasets/raw/agenthallu/AgentHallu` 共 693 例。
+- 已用案例账本（后续实验必须排除）：`experiments/protocols/used_case_ledger.txt`
+  （226 个 case_id，含 validation_100 预留集，已从历史 jsonl 提取并纳入 git
+  跟踪）。原始池 `datasets/raw/agenthallu/AgentHallu` 共 693 例。
 
 ## 2. 数据证据：六轮运行全漏斗（R1–R6，约 50 步）
 
@@ -166,5 +171,7 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
 待办：
 
 1. 全新 8 例小验证（含 unresolved 僵局形态），验收标准：裁决级触发案例产出
-   可 replay 验证的策略提案、L1 no_edit 大类显著下降；案例必须排除账本全部 case_id。
-2. 通过后重启 50 例正式实验（`build_full50_dataset.py` 可复用，重新排除账本）。
+   可 replay 验证的策略提案、L1 no_edit 大类显著下降；案例必须排除
+   `used_case_ledger.txt` 全部 case_id（数据集构建脚本需重新编写，旧构建脚本
+   已随仓库清理移除）。
+2. 通过后重启 50 例正式实验（重新编写构建器，重新排除账本）。

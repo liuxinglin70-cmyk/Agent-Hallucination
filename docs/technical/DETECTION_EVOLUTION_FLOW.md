@@ -19,14 +19,18 @@ flowchart TD
     I --> K{authority/runtime gate}
     K -- valid --> L[verified_error / verified_clean / unresolved]
     K -- invalid --> M[阻断权威结论]
-    L --> N[attribute_failure]
-    N --> O[HTC-TES 类型与模块路由]
-    O --> P[DeepSeek v4 flash 反思]
+    L --> N[确定性失败分类器]
+    N -- L1 owner --> O[HTC-TES 类型与模块路由]
+    O --> P[DeepSeek v4 flash 反思：L1 槽位规则]
     P --> Q[结构/类型/安全 gate]
     Q --> R[shadow genome]
+    N -- L2 归因 --> P2[policy_reflection：封闭词表策略提案]
+    P2 --> Q2[validate_policy_edit]
+    Q2 --> R2[候选 policy genome]
     R --> S[source replay]
-    S --> T[fitness + canary]
-    T -- 通过 --> U[champion]
+    R2 --> S
+    S --> T[fitness + canary / gold 极性闸]
+    T -- 通过 --> U[champion / accept_policy]
     T -- 失败 --> V[rollback / reject]
 ```
 
@@ -119,13 +123,14 @@ defense 不是简单的“没有发现错误”，而是要提供可引用的支
 - generation；
 - 当前 module rules；
 - stable canary 集合；
-- 本轮 budget 和历史 rejected edits。
+- 本轮 budget 和历史 rejected edits；
+- 当前 L2 policy genome（空基线或有已接受策略项）。
 
 edit 先应用到 candidate/shadow genome，champion 暂时不变。
 
-### 3.2 self-supervised attribution
+### 3.2 确定性归因
 
-`attribute_failure()` 将 detector 输出变成 `AttributionSignal`，包括：
+`attribute_failure()` 先将 detector 输出汇总成 `AttributionSignal`，包括：
 
 - `error_type`；
 - `trigger_source`；
@@ -139,28 +144,47 @@ edit 先应用到 candidate/shadow genome，champion 暂时不变。
 - process diagnostics（`localization_status`、`appeal_status`、
   `focused_quarantined_candidate_count`）。
 
-默认 self-supervised 模式不使用 gold。只有显式启用 `use_gold` 或 `fitness_use_gold` 时，gold 才能进入对应的评估路径。
+signal 决定**是否触发**进化并提供遥测；**失败 owner 由确定性失败分类器
+单独判定**（`failure_classifier.classify_failure()`）。它是检测记录可寻址
+失败形状的纯确定性函数——不调用 LLM、不使用启发式；所有谓词测试都经过
+`v6_contracts.L2_PREDICATES` 注册表，归因词表全局单源。输出为三元组
+`layer / artifact / reason_code` 加可寻址证据。
 
-#### process diagnostics 与 gold 的优先级
+分类优先级（先查最上游）：
 
-detector 会输出一个 label-free 的 `diagnostics` 块，说明**哪个流水线阶段**出了问题
-（focused-prosecution quarantine、appeal 失败、localization 无法排歧）。
-它只用于确定**根因模块**，绝不改写极性：
-
-| 情况 | 极性来源 | primary module | secondary module |
+| 优先级 | 失败形状 | 层 | artifact |
 | --- | --- | --- | --- |
-| self-supervised + diagnostic | diagnostics | diagnostics | diagnostics |
-| gold FP/FN | **gold** | **gold** | diagnostics |
-| gold 判定正确 | **CORRECT，不触发** | — | — |
+| 1 | provider 工件缺失/畸形 | L1 | owner 模块（candidate→`candidate_trigger`，error_certificate→`evidence_obligation`，defense_certificate→`clean_defense_boundary`；注册过的 `module_hint` 优先） |
+| 2 | consensus gate 阻断非空候选 | L2 | `consensus_gate_policy` |
+| 3 | 任一侧 coverage=complete 但该侧有效证书为 0（空壳 complete） | L2 | `coverage_validity_policy` |
+| 4 | boundary 路径 verified_clean 而终态 unresolved | L2 | `boundary_consumption_policy` |
+| 5 | 兜底：终态 unresolved → `no_actionable`；终态与法庭自身证书记账矛盾 → `detector_layer_out_of_scope` | — | — |
 
-三条不变式：
+优先级 1 在最前面，是因为裁决层在输入工件损坏时根本无法正确观察事实；
+优先级 2-4 都以 provider 输出良形为前提。
 
-1. gold 建立的 FP/FN/localization 极性优先于任何 detector 内部信号；
-2. gold 确认正确的 case 不会因为“过程有瑕疵但结论没变”而被制造出 trigger；
-3. diagnostics 只能补充 secondary module——把 false positive 归因到
-   `earliest_origin_tiebreak` 会把修复送到一个无法纠正错误结论的模块。
+L1 owner 还要过 gold 极性闸：
 
-阶段优先级按 proof court 的实际执行顺序：appeal > quarantine > localization。
+- FN（gold=error、判决 clean）的 owner 必须在 `_FN_POLARITY_MODULES`（能
+  收紧错误检测的模块集合）内；
+- FP（gold=clean、判决 error）的 owner 必须在 `_FP_POLARITY_MODULES`（能
+  放松或约束错误断言的模块集合）内；
+- 跨极性的 owner 直接丢弃——归因永不站到 gold 的对面；
+- unresolved 终态无极性，按原样接受。
+
+非 L1 归因（L2 与 detector 层）不会被硬塞进任何 L1 模块：给不拥有失败的
+模块派 edit 只会得到 no-edit 步骤或 no-effect replay。它们写入
+`non_l1_failure_attributions` 遥测；其中 L2 归因把该案例直接路由到 L2
+策略提案路径（见 3.5），不再走 L1 变异。
+
+缺陷定性结论：boundary-终态矛盾与空壳 complete 属于裁决策略问题，归
+L2；consensus gate 阻断的语义存疑（它是抗 false-positive 的设计，也可能
+过严），因此不手工改动 gate 本身，`consensus_gate_policy` 是它的首批
+进化候选。
+
+默认 self-supervised 模式不使用 gold。只有显式启用 `use_gold` 或
+`fitness_use_gold` 时，gold 才进入对应的评估路径；gold 只用于选择极性与
+fitness 记帐，永不进入 skill 内容、策略内容或反思 prompt。
 
 #### runtime-invalid 只作为遥测
 
@@ -174,12 +198,12 @@ detector 运行崩溃时产生 `runtime_invalid_signal()`：`should_evolve` 恒�
 
 HTC-TES 根据 trace 将问题归为 factual、instructional、tool、reasoning、omission、adoption、contextual 或 unknown，并给出类型策略。
 
-路由有两个约束：
+类型路由只对 L1 路径生效（L2 归因案例的 owner 是策略工件，不经过模块交集）。路由有两个约束：
 
 1. 类型路由给出优先模块；
 2. causal attributor 给出的模块是硬边界。
 
-现在如果两者没有交集，不再静默丢弃候选，而是回退到已经由 causal attributor 限定的模块集合。这样能避免低置信度类型分类导致 `skip_route_conflict`，同时没有允许 edit 越过因果归因边界。
+两者没有交集时，回退到已经由 causal attributor 限定的模块集合：既避免低置信度类型分类造成 `skip_route_conflict` 死路，又不允许 edit 越过因果归因边界。
 
 ### 3.4 DeepSeek 反思
 
@@ -204,7 +228,7 @@ HTC-TES 根据 trace 将问题归为 factual、instructional、tool、reasoning�
 - HTC-TES type guidance；
 - experience memory。
 
-反思 prompt 现在还包含一个受限的 `structured_runtime_observation`。它明确列出
+反思 prompt 包含一个受限的 `structured_runtime_observation`。它明确列出
 当前运行实际产生的候选、控方/辩方证书、责任步骤、状态和各允许模块能够
 影响的输出字段。这个对象不是 verdict，也不是 gold 代理；它的作用是把
 “我认为哪里有问题”约束为“哪个可执行输出缺失或异常、由哪个模块拥有”。
@@ -251,7 +275,7 @@ replay/evaluator 仍负责验证二者是否一致。多个请求提供搜索多
 owner 和 provider cache 命中会写入 step 的 reflection audit。旧的单 edit JSON
 仍可被兼容解析。
 
-v5.9 在协作反思之上引入**诊断-干预二级结构化管线**，解决单一反思调用
+在协作反思之上还有**诊断-干预二级结构化管线**，解决单一反思调用
 同时承担诊断、owner 路由、规则生成与反事实预测造成的过载问题（观测到
 LLM 诊断正确却全部回退 no_edit 的失效模式）：
 
@@ -269,22 +293,60 @@ LLM 诊断正确却全部回退 no_edit 的失效模式）：
 该管线只在主反思失败时消耗 1-2 次额外 mutation 调用，仍受
 `max_mutation_calls` 硬上限约束。
 
-runtime observation 现在还包含 `court_balance`（裁决收支表）：幸存/被隔离
+runtime observation 包含 `court_balance`（裁决收支表）：幸存/被隔离
 的错误证书数、defense 证书数、clean defense 覆盖的候选数等。反思 prompt
 据此解读“谁支撑了判决”，把 edit 送到真正决定结果的模块，而不是下游症状。
-
-v5.9 同时修复了 `_owner_arbitration` 读取顶层 `defense_coverage` /
-`quarantined_error_certificate_count` 的字段错读（真实布局嵌套在
-`proof_adjudication` / `evidence_health` 下），该缺陷曾使
-verdict-evidence-gap 通道完全失效、FN-clean 案例死锁在 abstention_rule
-NO_EDIT；并补充仲裁 owner 不被 HTC-TES 类型交集静默丢弃的保险。
 
 所有 attribution、reflection、critic 和 conflict-gate provider 调用共享
 `max_mutation_calls` 硬上限。CLI 参数为 `--max-mutation-calls`，默认 100；
 耗尽后 fail-closed，并记录 `mutation_budget_exhausted`，避免候选数和 retry
 次数造成调用量乘法失控。
 
-### 3.5 structural/type gate
+### 3.5 L2 策略提案与策略 replay
+
+当确定性分类器把失败归到 L2（见 3.2），该案例不进入 L1 规则变异，而是走
+策略闭环。两条变异路径共用同一套门控纪律：结构验证 → source replay →
+gold 极性/fitness → 接受或回滚。
+
+1. **提案**：一次 `purpose=policy_reflection` 的反思调用。prompt 中的封闭
+   词表（前提谓词、枚举动作、参数词表）在调用时从 `v6_contracts`
+   （`L2_PREDICATES` / `L2_ACTIONS`）动态生成，不是复制的文本；输入还包含
+   归因三元组、可寻址事实计数、当前策略集和被拒提案历史。模型只提出一条
+   `precondition -> action(params)` 提案，或返回显式 no_proposal；gold 不
+   进入 prompt。
+2. **验证**：`parse_policy_proposal` 把响应解析成 `PolicyItem`（item_id 与
+   source_case_id 由进化循环生成，身份不属于模型输出）；包装成
+   `PolicyEdit(add_item)` 后，`validate_policy_edit` 检查封闭词表、容量上限
+   12、语义去重、baseline 不可变与 weak/strong fitness 保护。
+3. **应用**：`apply_policy_edit` 以不可变血统风格返回候选 `PolicyGenome`
+   （parent_hash 链接）；工作策略基因组在验证通过前不变。
+4. **source replay**：`_run_detection_with_genome(policy_genome=候选)` 对
+   同一 source case 重新检测，策略项经 `adjudicate_case(policy_items=...)`
+   转发到 proof court；引擎在所有 appeal/localization 阶段收敛之后，用产生
+   当前判决的同一套证据束（收敛点法庭参数）重裁一次，策略只作用于终局边。
+5. **效果门**：`policy_evaluation.fired` 必须非空，且终态改变或 effective
+   coverage 改变；没有推动终局边的提案以 `reject_policy_no_effect` 拒绝。
+6. **gold 极性门**：终态发生移动时，必须有 gold fitness 极性且
+   `task_state_score` 严格上升，否则拒绝（`reject_policy_fitness`）；仅
+   coverage 移动可无需 gold 接受。
+7. **决策值**：`accept_policy` / `reject_policy_no_effect` /
+   `reject_policy_fitness` / `skip_no_policy`（无 mutation route、反思调用
+   失败、响应不可解析或 edit 非法均记 `skip_no_policy`）。
+
+被拒候选只会以副本形式被 replay，拒绝即天然回滚。接受的策略进入工作
+`policy_genome`，由 checkpoint 持久化（`policy_checkpoint.json` 与
+`evolution_checkpoint.json` 的 `policy_genome` 字段）；每次提案决策连同归因、
+事实、提案、`policy_evaluation`、replay_state 与策略基因组 hash 写入
+`evolution_audit["l2_policy_audit"]`。
+
+proof court 钩子语义：`adjudicate_proof_court(policy_items=,
+boundary_path_state=)` 两个参数默认惰性，空策略集不改变默认裁决路径；
+downgrade 只降不升（coverage 排名只能下降，`invalidate_coverage_claim`
+置为 unresolved）；未知谓词/动作或非法参数 fail-closed 记入评估结果的
+`skipped`，绝不生效；occurrence ledger 记录的是策略之前证据所建立的事实，
+不随策略同步重算——这是设计语义，不是缺失的同步。
+
+### 3.6 structural/type gate
 
 结构 gate 检查：
 
@@ -301,7 +363,7 @@ NO_EDIT；并补充仲裁 owner 不被 HTC-TES 类型交集静默丢弃的保险
 
 这一层只回答“edit 是否可安全应用”，不回答“edit 是否有效”。
 
-### 3.6 shadow apply 与 source replay
+### 3.7 shadow apply 与 source replay
 
 通过结构 gate 后，edit 被应用到 shadow genome。随后必须对同一个 source case 再跑一次完整 detector：
 
@@ -341,7 +403,7 @@ fitness 检查包括：
 gold steps 时它同样是 `False`，直接当成“定位错误”会把所有 self-supervised
 的定位分数清零。
 
-### 3.7 canary、batch commit 与 rollback
+### 3.8 canary、batch commit 与 rollback
 
 source replay 通过后，若存在 stable canary，会对其做抽样 replay。canary 要求：
 
@@ -359,7 +421,7 @@ source replay 通过后，若存在 stable canary，会对其做抽样 replay。
 - `no_effect`、`worse`、runtime error、canary regression 都回滚；
 - label-free 运行永远不自动宣称最终 champion 或 accuracy gain。
 
-### 3.8 逐案例 Skill 继承与运行时激活
+### 3.9 逐案例 Skill 继承与运行时激活
 
 在线进化不是先收集所有 edit 再统一应用。`fitness_batch_size` 固定为 1，
 因此一个 source case 的 edit 只有在 source replay、必要的 canary/probe 流程
@@ -420,6 +482,17 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 - `authority_valid_rate` / `invalid_count`：post-hoc 指标只对显式 authority 且 runtime-valid 的输出计算；缺失 authority 的旧 artifact 记为 invalid，不计入 TP/TN/FP/FN。
 - `champion_generation`：只有 commit 后才增加；候选或 rejected edit 不增加。
 - `final_champion_claim`：本框架默认保持 false，最终 holdout 需要外部评估授权。
+- `gate_decision`：逐 step 决策值。L1 取 accept / reject / skip_stable /
+  skip_no_edit / halted；L2 策略步骤取 `accept_policy` /
+  `reject_policy_no_effect` / `reject_policy_fitness` / `skip_no_policy`。
+- `non_l1_failure_attributions`：非 L1（L2 与 detector 层）归因遥测，含
+  case_id、layer、artifact、reason_code 与可寻址证据；用于核对失败是否被
+  硬塞进不拥有它的 L1 模块。
+- `l2_policy_accepts`：被接受的 L2 策略项数量。
+- `l2_policy_audit`：逐条 L2 提案审计（决策值、原因、归因三元组、事实计数、
+  提案、`policy_evaluation`、replay_state、策略基因组 hash）。
+- `policy_genome`：运行结束时的工作 L2 策略基因组，同时持久化在
+  `policy_checkpoint.json` 与 evolution checkpoint 内。
 
 ## 6. 审查时应优先检查的证据
 
@@ -429,7 +502,10 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 4. source/canary 的 `genome_hash` 与 detector artifact 路径：排除 replay harness 固定返回 baseline 的假进化；
 5. provider route payload：确认 model、temperature、max_tokens 和 timeout 与配置一致；
 6. authority failure reasons：区分核心 proof 失败、必要 appeal 失败和辅助 provider 降级；
-7. `detector_calls`、`mutation_calls`、`mutation_errors`、
+7. `l2_policy_audit` 与 `policy_checkpoint.json`：确认 L2 决策值、
+   `policy_evaluation.fired` 与 replay 终态一致，被拒提案没有改变工作策略基因组；
+8. `non_l1_failure_attributions`：确认非 L1 失败没有被硬路由进 L1 模块；
+9. `detector_calls`、`mutation_calls`、`mutation_errors`、
    `mutation_budget_exhausted`：核对 detector replay、反思协作调用和预算阻断，
    不要把 detector replay 数误认为全部 API 调用数。
 

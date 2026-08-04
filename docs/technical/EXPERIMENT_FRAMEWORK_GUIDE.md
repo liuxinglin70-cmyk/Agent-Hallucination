@@ -68,6 +68,12 @@ Final holdout 仍要求真实、可加载的 `source/id` 形式 `case_id`，`cas
 
 当前仓库所指向的 PACA-TCL v3.5 配置是 `P0_diagnostic_only`，并且 `D_execution_authorized=false`。因此默认配置会主动拒绝正式 probe/final-holdout，也会拒绝包含 D cases 的 evolve。这是前置条件未满足，不是实验已经运行并失败。
 
+### 2.3 数据集构建与案例账本
+
+数据集构建脚本属于 `experiments/protocols` 的本地工作区，不是框架入口，也不随 `src/sehd_v6` 包发布；新实验的输入是按协议注册的 manifest（records 与角色 manifest），框架只消费显式提供的 records。
+
+案例账本 `experiments/protocols/used_case_ledger.txt` 登记已经用于实验的案例 id（共 226 个）。任何新实验的开发池、mutation source、canary 与 probe 都必须排除账本中的全部案例，防止已消费案例被重复用作进化材料或声明证据。
+
 ## 3. PACA-TCL：从轨迹到判决
 
 代码正式命名了 H1/H2/H3。为便于解释，本文把 `adjudicate_case()` 中进入 H1 前的基础阶段称为 H0；H0 是说明性名称，不是配置里的新增可调阶段。
@@ -156,9 +162,12 @@ top-level occurrence_state
 
 ```mermaid
 flowchart LR
-    A["当前 genome 检测一案"] --> B["attribute_failure"]
+    A["当前 genome 检测一案"] --> B["attribute_failure + 确定性失败分类器"]
     B -->|stable / 无触发| C["skip_stable"]
-    B -->|需要处理| D["HTC-TES 分类与路由交集"]
+    B -->|L2 归因| D2["policy_reflection 提案 → validate_policy_edit"]
+    D2 --> E2["候选 policy genome"]
+    E2 --> K["source replay"]
+    B -->|L1 owner| D["HTC-TES 分类与路由交集"]
     D -->|无合法交集| E["skip_route_conflict"]
     D --> F["一次 reflection / mutation proposal"]
     F -->|no_edit / invalid| G["审计后跳过"]
@@ -174,7 +183,7 @@ flowchart LR
 逐案步骤如下：
 
 1. 用当前 genome 运行 PACA-TCL。
-2. `attribute_failure()` 读取共享 occurrence-first 状态、证据覆盖和诊断信号，决定是否触发。
+2. `attribute_failure()` 读取共享 occurrence-first 状态、证据覆盖和诊断信号，决定是否触发；失败 owner 由确定性失败分类器判定（优先级：provider 工件缺失/畸形 → L1；consensus gate 阻断 → `consensus_gate_policy`；空壳 complete → `coverage_validity_policy`；boundary 与终态矛盾 → `boundary_consumption_policy`；兜底 `no_actionable` / `detector_layer_out_of_scope`）。L1 owner 过 gold 极性闸；非 L1 归因写入 `non_l1_failure_attributions` 遥测。
 3. HTC-TES 提取 trajectory features、分类类型，并将“类型允许模块”与“归因允许模块”求交集；交集为空时 `skip_route_conflict`。
 4. Reflection 生成零或一个编辑提案；无 mutation provider 时记录 template/no-edit 行为，不伪造 LLM 改进。
 5. `StructuralGate` 检查可观察的 if/when 条件、单一动作、模块权限、重复/泄漏/直接 verdict 等约束。
@@ -182,6 +191,16 @@ flowchart LR
 7. Source replay 在同一触发案例上比较 before/after。
 8. 若 source assessment 可进入下一层，则在滚动的 stable development cases 上跑 canary；按注册 interval/accepted-edit 阈值还可打开预算内 gold probe，final holdout 始终不在此路径。
 9. 只有 source replay 与 canary 通过，且没有 runtime/authority 回归时才进入下一层；否则 reject/rollback，并保存原因和 before/after hash。Gold 模式下，`strong_improvement` / `local_improvement` 可作为 development candidate 的选择证据，但仍不能替代 final holdout。无 Gold 模式下，`directional_evidence` 和 detector-local score 只能在 canary 非回归时进入 `provisional_label_free` working candidate；它保持 `fitness_status=none`、不可受 strong/weak 保护，也不能产生准确率或 champion 声明。周期 probe 只能继续或回滚，不能把 provisional 变成正式结论。
+
+L2 策略路径与 L1 并列，共用同一套门控纪律：分类器把失败归到 L2 后，该案例走 `policy_reflection`（封闭词表从 `v6_contracts` 的 `L2_PREDICATES` / `L2_ACTIONS` 动态生成）→ `PolicyEdit(add_item)` → `validate_policy_edit`（词表/容量 12/去重/baseline 与 weak-strong 保护）→ 候选 policy genome → source replay（`adjudicate_case(policy_items=)` 在法庭收敛点用同一套证据束重裁，策略只作用于终局边）→ 效果门（`policy_evaluation.fired` 非空且终态或 effective coverage 变化）→ gold 极性门（终态移动时 `task_state_score` 必须严格上升）→ 接受或天然回滚。
+
+L2 相关的结果字段与决策值：
+
+- `gate_decision` 的 L2 取值：`accept_policy` / `reject_policy_no_effect` / `reject_policy_fitness` / `skip_no_policy`；
+- `l2_policy_accepts`：被接受的策略项计数；
+- `l2_policy_audit`：逐条提案审计（归因三元组、事实计数、提案、`policy_evaluation`、replay_state、策略基因组 hash），同时写入 `evolution_audit["l2_policy_audit"]`；
+- `non_l1_failure_attributions`：非 L1 归因遥测；
+- `policy_genome`：运行结束的工作策略基因组，持久化在 `policy_checkpoint.json` 与 evolution checkpoint 内；occurrence ledger 不随策略同步重算，属设计语义。
 
 正式 CLI 强制 `fitness_batch_size=1`，因为多个编辑一起 replay 后无法把效果可靠归因给单条规则。`--no-fitness-check` 在正式 evolve 入口被拒绝。
 
@@ -314,6 +333,7 @@ Artifact 记录 total denominator、discordant denominator，以及“条件于�
 [ ] baseline/census/provider/config/case provenance 完整
 [ ] evolve 使用 source replay，fitness_batch_size=1
 [ ] probe 与 final_holdout 互斥，development pool 除 probe 外可作 evolution source
+[ ] 新实验的开发池/canary/probe 已排除 used_case_ledger.txt 全部案例
 [ ] run contract 记录 probe_interval/probe_budget，probe 只作方向/回滚门
 [ ] final holdout 使用真实 ID、哈希绑定 manifest、holdout_sealed=true 和 outer_execution_authorized=true
 [ ] champion claim 另有 outer_custody_verified=true 的外部治理依据
@@ -329,7 +349,11 @@ python -m src.sehd_v6.detector --config src/sehd_v6/configs/paca_tcl_detector_v3
 python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --output-dir evolution_output
 # 从上次结果继续
 python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --output-dir evolution_output_2 --initial-genome evolution_output/champion_genome.json --experience-memory evolution_output/htc_tes_experience_memory.json
+# 从 checkpoint 目录恢复中断的运行
+python -m src.sehd_v6.evolution --records records.jsonl --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json --output-dir evolution_output --resume-from evolution_output
 ```
+
+evolution CLI 的其他参数：`--mutation-route`（可选 mutation route JSON，缺省用 `SEHD_MUTATION_*` 环境变量）、`--use-gold` / `--fitness-use-gold` / `--use-gold-reflection`、`--module-cooldown`、`--max-edits`、`--convergence-window`、`--max-mutation-attempts`、`--reflection-candidates`（1..5，默认 3）、`--max-mutation-calls`（默认 100）、`--canary-limit`、`--census-root`、`--run-id`。
 
 这些命令不会绕过授权检查。角色 manifest、probe/外分层隔离和 final-holdout 授权属于实验协议层，位于 `experiments/` 而不是框架入口内；需要按协议先注册与目标阶段相符的冻结配置和角色 manifests。
 

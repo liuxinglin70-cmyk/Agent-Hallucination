@@ -135,6 +135,21 @@ authority to choose clean or error polarity. Decisive cases use
 
 ## Skill Structure
 
+L1 rules are stored as typed English slots instead of free text. Each rule is
+a `RuleSpec` with three slots:
+
+- `condition`: one trajectory-observable situation;
+- `action`: one module-local action within the owning module's charter;
+- `evidence_anchor`: failure-signature bookkeeping for evolution triage. The
+  anchor is never rendered into runtime prompts, so it cannot leak case
+  identity into detection.
+
+Prompt injection is a deterministic render: exactly one sentence of the form
+`When <condition>, <action>.`, a pure function of the slots, which is what
+identity and deduplication rely on. Slot capacity is bounded (300 characters
+per condition/action slot, 240 per anchor); a condition may not encode
+several situations and an action may not prescribe several steps.
+
 Every evolved `SkillEdit` contains:
 
 - `target_module`
@@ -155,13 +170,26 @@ It is serialized into genome lineage and type experience memory. It is
 metadata for generalization and auditability; it does not directly set the
 proof-court verdict.
 
-Runtime rules remain constrained by the structural gate:
+The structural gate validates `add_rule`/`modify_rule` through the slot
+contract whenever typed slots are present; the slot contract is the single
+shape check because the rendered text is a construction guarantee, not a
+re-guess. The free-text validation path serves only `remove_rule` callers
+and historical checkpoint replay. Runtime rules remain constrained by the
+gate:
 
 - observable `if/when -> one action` form;
 - no dataset labels, case-specific identifiers or internal diagnostic state;
 - no forbidden direct verdict outside the module permission;
 - no unsafe duplicate or cross-module reference;
 - no baseline mutation.
+
+Each of the eight modules additionally declares a charter (`module_charter`):
+its pipeline stage, the provider-output surfaces it may influence, the
+surfaces it must never touch, its allowed verdicts (sourced from the genome
+gate, the single owner of verdict permission), and in-scope versus
+out-of-scope failure examples. Charters are rendered into the reflection
+prompt so proposals are constrained at generation time instead of only
+rejected at the validation gate.
 
 ## Experience Memory
 
@@ -326,181 +354,181 @@ artifact/authorization audit.
   hash-bound real-ID Outer manifest remain Inner evidence and are not upgraded
   by this protocol.
 
-## v5.8 Restructuring Proposal: Contrastive Attribution and Abstention Ladder (Implemented)
+## Deterministic Failure Attribution
 
-Implementation status: mechanism 1 (implemented as a deterministic,
-provider-free dual-channel owner arbitration, including the FN
-complete-defense channel: a false-negative clean verdict carried by a
-complete clean defense widens the route to evidence_obligation, unlocking
-the abstention-rule NO_EDIT deadlock observed on Camel/006 and
-Magentic_One/019; the LLM cross-examination
-variant remains a possible later extension), mechanism 2 (contrastive replay
-acceptance: one nearest stable same-type neighbour replay gates every
-otherwise-accepted edit; polarity flips and gold-informed task-score
-regressions count as inversions), mechanism 3 (procedural abstention ladder:
-an accepted abstention_rule clean-to-unresolved demotion re-queues the source
-exactly once for the evidence_obligation rung), mechanism 4 (structuralized
-rejection feedback, including the same-category retry cooldown and binding
-hard constraints promoted into the retry system prompt), mechanism 5
-(base-layer failure surfacing) and mechanism 4-localization telemetry
-(`terminal_step_bias`, audit-only) are implemented and covered by regression
-tests.
+Attribution answers exactly one question: at which layer, on which artifact,
+did the failure happen? Routing an unownable failure to some module anyway
+ends in no-edit steps or no-effect replays, so the failure classifier is a
+pure deterministic function of the addressable failure shape of one detection
+record — no LLM, no heuristics. Every predicate test goes through the
+`L2_PREDICATES` registry in `v6_contracts`, so the attribution vocabulary has
+a single source of truth.
 
-This section records a design proposal produced from the 2026-08-03 five-case
-dry-run (`trial_5case_official_r1`) and a survey of current self-evolving
-agent work. It changes only the BCCSE evolution layer; the frozen PACA-TCL
-v3.5 base, CRS weights and proof-court decision rules are untouched.
+The classification rules run in priority order:
 
-### Dry-run evidence motivating the restructuring
+1. A provider artifact is missing or malformed. This is the most upstream
+   failure — the adjudication layer cannot observe facts correctly if its
+   inputs are broken, so artifact integrity is checked before any
+   adjudication-layer pattern. Layer L1; the owning module is resolved from
+   the artifact kind (candidate -> `candidate_trigger`, error certificate ->
+   `evidence_obligation`, defense certificate -> `clean_defense_boundary`);
+   a registered `module_hint` takes precedence over the default owner.
+2. The consensus gate blocked a non-empty candidate set. Layer L2, artifact
+   `consensus_gate_policy`.
+3. One side claims coverage `complete` while holding zero valid certificates
+   on that side (hollow complete). Layer L2, artifact
+   `coverage_validity_policy`.
+4. The boundary path returned `verified_clean` but the terminal state is
+   `unresolved`. Layer L2, artifact `boundary_consumption_policy`.
+5. Fall-through: an unresolved terminal carries no actionable shape
+   (`no_actionable`); a terminal verdict that contradicts the court's own
+   certificate bookkeeping is `detector_layer_out_of_scope`.
 
-Five gold-positive cases were evolved with `--use-gold --fitness-use-gold`
-against the official DeepSeek-V4-Flash endpoint:
+An L1 owner hypothesis additionally passes the gold polarity gate: a false
+negative (gold error, verdict clean) may only be owned by modules that can
+tighten error detection (`_FN_POLARITY_MODULES`), a false positive only by
+modules that can relax or bound the error claim (`_FP_POLARITY_MODULES`); an
+owner on the wrong polarity side is dropped. Unresolved terminals carry no
+polarity and are accepted as-is.
 
-- 3/5 authoritative verdicts were `verified_clean` (false negatives) and 1/5
-  `unresolved`; effective detection recall on the subset was 0/5.
-- All 4 triggered cases routed to a narrow module set (`abstention_rule`,
-  `causal_link_test`). For two FN cases the reflection LLM explicitly
-  diagnosed the true root cause as candidate-generation sensitivity but
-  returned `no_edit`, because the routed module set contained no module able
-  to express that fix. Result: 0 accepted edits, 3 rejected, 2 no-edit.
-- One forensic re-run of a runtime-invalid case later produced an
-  authoritative `verified_error`, showing the base detector can detect these
-  cases; the miss is a sensitivity/routing problem, not a capability ceiling.
-- One base-layer contract quarantine (propagation `impact_surfaces`) produced
-  `runtime_valid=false` with empty `authority_failure_reasons`: an
-  observability gap, not a verdict logic error.
-- Local proxy instability (`IncompleteRead`, SSL EOF) caused two transport
-  failures; this is environmental and outside the framework.
+Non-L1 attributions are never force-routed into an L1 module; they are
+recorded in `non_l1_failure_attributions` as audit telemetry. L2
+attributions route the case into the policy evolution loop instead.
 
-### Related-work positioning
+Defect characterization follows the same surface map: boundary/terminal
+conflicts and hollow-complete coverage are adjudication-policy problems and
+belong to L2. The consensus gate's blocking semantics are genuinely in
+question — the gate is an anti-false-positive mechanism that can also read as
+over-strict — so the gate itself is not hand-adjusted; `consensus_gate_policy`
+is its designated first evolution candidate.
 
-Skill-library optimizers such as SkillOpt (arXiv:2605.23904), SkillCAT
-(arXiv:2606.13317) and certificate-gated self-evolution such as SEA
-(arXiv:2607.00871) were already incorporated into earlier BCCSE versions
-(bounded edits, structural gate, source replay, canary, rejected buffer).
-The remaining gap is not gating but attribution and abstention, so this
-proposal draws on three fresher lines:
+## Two-Layer Evolvable Surface
 
-- AgentDebugX / DeepDebug (arXiv:2607.18754): multi-round root-cause
-  diagnosis for agent trajectories. Core insight: the step where a failure
-  surfaces is rarely the step where it was planted. Method: two independent
-  investigations produce candidate root steps, and a cross-examination
-  converts the needle-in-a-haystack search into an evidenced two-candidate
-  choice. The analogues here are the observed localization bias
-  (detector-localized step 12 versus gold step 1) and the static
-  error-type-to-module map that misroutes FN cases.
-- Prover-Verifier Deliberation, PVD (arXiv:2605.25133): selective prediction
-  where the confidence signal is procedural, not a thresholded scalar: a
-  prover defends and a verifier attacks, and the Accept/Challenge/Reject
-  dialogue outcome drives deferral. PACA-TCL already implements an
-  adversarial court; what is missing is treating the court's procedural
-  evidence (coverage states, quarantine counts, appeal balance) as a
-  first-class abstention signal instead of collapsing it into a verdict.
-- UniCR (arXiv:2509.01455) and the selective-prediction literature (Chow
-  reject option, risk-coverage curves, AURC): heterogeneous evidence fusion
-  into a calibrated correctness probability plus risk-controlled refusal.
-  This supplies the audit lens for abstention policy: coverage-conditioned
-  risk curves rather than full-coverage accuracy.
+The evolvable surface has exactly two layers, and they evolve on separate
+schedules without cross-layer coupling.
 
-None of these evolves a *detector* whose runtime is an adversarial,
-evidence-gated adjudication system, and none addresses the specific failure
-mode observed here: an internally coherent verdict that misses the label.
-The proposal below targets exactly that gap while preserving every
-architectural invariant.
+**L1 — provider-rule genome.** Eight registered provider-rule modules. Each
+rule is stored as typed English slots (`condition` / `action` /
+`evidence_anchor`) and rendered deterministically as
+`When <condition>, <action>.` for injection into provider prompts; see the
+Skill Structure section for the slot contract and the module charters. The
+structural gate validates add/modify edits through the slot contract; the
+free-text path serves only `remove_rule` and historical checkpoint replay.
 
-### Mechanism 1: Dual-pass cross-examination attribution (attribution v2, deterministic core implemented)
+**L2 — adjudication-policy genome.** Closed-vocabulary policy items of the
+form (precondition predicate, enumerated action with closed-vocabulary
+parameters) over the adjudication facts of one detection. Every predicate and
+action name is defined once in `v6_contracts` (`L2_PREDICATES` /
+`L2_ACTIONS`); the reflection prompt's vocabulary table is generated from that
+registry at call time, and every parsed proposal is re-validated against the
+same closed sets. `validate_policy_edit` enforces vocabulary membership,
+genome capacity (12 items), semantic deduplication, immutable baseline items
+and weak/strong fitness protection; `apply_policy_edit` returns a new genome
+with parent-hash lineage. The baseline is the empty policy set, so evolved
+items must earn every behaviour change and L2 evolution cannot silently
+inherit adjudication semantics.
 
-Adapted from AgentDebugX. Implemented form (v5.8 batch 2): a deterministic,
-provider-free owner arbitration adds ONE second owner hypothesis from
-label-free runtime evidence instead of calling a second LLM investigator:
+**Why policy artifacts are executed by a deterministic evaluator.** An L2
+policy item is mechanically coupled to court behaviour: once an item's
+precondition fires, its effect on coverage state and the terminal edge is
+exactly what the evaluator implements. If the proposing model also
+interpreted the item at runtime, the proof court's verdict would depend on an
+unrepeatable LLM reading of its own artifact — the artifact-to-behaviour
+coupling would run through a nondeterministic channel. The deterministic
+evaluator therefore owns all runtime semantics; the LLM only proposes, and a
+proposal outside the closed vocabulary is discarded without effect.
 
-```text
-h_process  = omission-typed FN with a clean verdict
-             -> candidate_trigger (process channel)
-h_counter  = quarantined error certificates on an FN verdict
-             -> evidence_obligation (verdict-vs-evidence gap channel)
-             FP verdict with complete defense -> clean_defense_boundary
-owner route = attribution route + arbitration hypothesis
-subject to: polarity(owner) == polarity(gold_mismatch)
-            attributor's owner keeps root-cause priority
-            structural gate and fitness unchanged
-```
+## L2 Policy Evolution Closed Loop
 
-The arbitration hypothesis widens the bounded route; it never replaces or
-reorders the attributor's owner and never crosses the gold polarity side.
-The LLM cross-examination variant (two independent investigations followed
-by an evidenced two-candidate choice) remains a possible later extension.
-The same batch adds localization telemetry: a verified_error localized by
-the temporal fallback records a `terminal_step_bias` audit signal (the
-detector-localized step disagreeing with earlier sufficient-evidence
-origins), routing visibility for `causal_link_test`/`earliest_origin_tiebreak`
-without changing any verdict. This unblocks modules such as
-`candidate_trigger` and `evidence_obligation` for FN cases whose coverage
-states prove the court, not the evidence budget, is the broken stage.
+A triggered case whose attribution lands on the L2 surface enters the policy
+loop instead of the L1 mutation path:
 
-### Mechanism 2: Contrastive replay acceptance (implemented)
+1. **Proposal.** One reflection call (`purpose=policy_reflection`) receives
+   the attribution triple, the addressable adjudication facts, the current
+   policy set and the rejected-proposal history. It returns either one
+   closed-vocabulary proposal or an explicit no-proposal response. No gold
+   label enters the prompt.
+2. **Validation.** The response is parsed into a `PolicyItem` (identity and
+   source-case bookkeeping are assigned by the evolution loop, not the
+   model), wrapped in a `PolicyEdit(add_item)` and validated against the
+   closed vocabulary, capacity, deduplication and protection rules.
+3. **Candidate application.** `apply_policy_edit` produces a candidate policy
+   genome in immutable-lineage style; the working genome is not touched yet.
+4. **Source replay.** The triggering case is re-detected with
+   `_run_detection_with_genome(policy_genome=candidate)`, which forwards the
+   items to `adjudicate_case(policy_items=...)`. The engine re-runs the
+   proof court at its convergence point with the identical evidence bundle
+   that produced the current verdict, so the policy re-adjudicates exactly
+   the facts the court committed to.
+5. **Effect gate.** Acceptance requires a non-empty `policy_evaluation.fired`
+   list plus either a terminal-state change or an effective-coverage change;
+   a policy that does not move the terminal edge is rejected as no-effect.
+6. **Gold polarity gate.** When the terminal state moves, the move must be
+   scorable against the gold label and `task_state_score` must strictly
+   improve; otherwise the candidate is rejected.
+7. **Accept or roll back.** Acceptance swaps in the candidate genome;
+   rejection rolls back inherently because every replay runs on a copy of
+   the policy genome.
 
-An edit candidate is replayed not only on the triggering case but also on one
-nearest stable neighbour of the same classified type. Acceptance additionally
-requires a target-aligned process delta on the source and no contrast
-inversion on the neighbour. This reduces single-trajectory overfitting
-without weakening canary non-regression.
+Gate decisions are recorded as `accept_policy`, `reject_policy_no_effect`,
+`reject_policy_fitness` or `skip_no_policy` (no mutation route, failed
+reflection call, unparseable response or invalid edit). The checkpoint
+persists `policy_genome`, and every proposal decision — attribution, facts,
+proposal, `policy_evaluation`, replay state and policy genome hash — is
+written into `evolution_audit["l2_policy_audit"]`.
 
-### Mechanism 3: Procedural abstention ladder for false-negative recovery (implemented)
+## Proof Court Policy Hook
 
-Grounded in PVD and UniCR: the abstention signal is procedural evidence, not
-a thresholded scalar, and abstention policy is expressed as evolved rules
-rather than tuned constants. FN cases whose prosecution evidence is thin
-become recoverable through two sequential, individually gated edits instead
-of one impossible edit:
+`adjudicate_proof_court(policy_items=..., boundary_path_state=...)` is the
+single entry point for L2 semantics, and both parameters default to inert:
+an empty policy set leaves the default adjudication path untouched.
 
-1. an `abstention_rule` edit demotes confident-but-thin-evidence clean
-   verdicts to `unresolved`. The rule conditions only on label-free
-   procedural evidence (coverage states, certificate balance, quarantine
-   counts), which is exactly the threshold-behaviour-as-skill requirement;
-2. the resulting `unresolved_should_error` trigger routes
-   `evidence_obligation` evolution on the same source.
+- Policies act on the terminal edge only. The occurrence ledger records what
+  the evidence established before policy application and is intentionally
+  not recomputed; that split is the design semantics, not a missing
+  synchronization.
+- Coverage downgrades are monotone: a policy can only lower a coverage rank
+  (`invalidate_coverage_claim` resolves the side to `unresolved`); it can
+  never upgrade one.
+- Unknown predicates, unknown actions and invalid parameters fail closed
+  into the evaluator's `skipped` list and are never applied.
+- `boundary_path_state` is an engine-level fact injected by the caller,
+  because the court itself cannot address the boundary path.
 
-Each rung passes the same structural gate, source replay and canary checks;
-no rung may be merged or credited together. The selective risk-coverage view
-(AURC-style audit of error versus abstention rate) is recorded as telemetry
-for the abstention module; it steers evolution direction but never enters
-the proof-court verdict and never promotes a candidate on its own.
+## Supporting Evolution Mechanisms
 
-### Mechanism 4: Structuralized rejection feedback (implemented)
+- Contrastive replay acceptance: an otherwise-accepted edit is additionally
+  replayed on one nearest stable same-type neighbour; polarity flips and
+  gold-informed task-score regressions count as inversions and reject the
+  edit.
+- Procedural abstention ladder: an accepted `abstention_rule`
+  clean-to-unresolved demotion re-queues the source exactly once for the
+  `evidence_obligation` rung; each rung passes the same structural gate,
+  source replay and canary checks and is credited individually.
+- Structuralized rejection feedback: retry prompts carry the exact structural
+  failure category as a hard constraint, and repeated rejection on the same
+  module and failure category engages the module cooldown.
+- Localization telemetry: a `verified_error` localized by the temporal
+  fallback onto the last audited step records a `terminal_step_bias` audit
+  signal; diagnostic only, never a verdict input.
+- Base-layer failure surfacing: base-layer quarantine outcomes are projected
+  into `authority_failure_reasons` so a `runtime_valid=false` run always
+  carries a machine-readable cause; observability only, never a verdict
+  input.
 
-Retry prompts must carry the exact structural failure category as a hard
-constraint (for example `condition_overload` implies "at most 2
-conditions"), and a repeated-rejection cycle on the same module and failure
-category engages the module cooldown. This converts the existing rejection
-buffer from context into contract.
+## Evolution Invariants
 
-### Mechanism 5: Base-layer failure surfacing (implemented)
-
-Base-layer quarantine outcomes (for example propagation `impact_surfaces`
-quarantine counts) must be projected into `authority_failure_reasons` so a
-`runtime_valid=false` run always carries a machine-readable cause. This is
-observability only and cannot change any verdict.
-
-### Invariant compliance
-
-- Frozen base: mechanisms 1-5 mutate only the genome, routing, retry contract
-  and audit projection; CRS weights, court rules and stage structure are
-  unchanged.
-- Gold isolation: gold continues to select polarity and fitness credit only;
-  it never enters skill content or reflection prompts.
-- No self-promotion: every mechanism still requires source replay plus canary
-  non-regression; directional evidence remains non-promotable.
-- Fail-closed: any proposal failing polarity, structural or fitness checks is
-  rejected and recorded as negative experience.
-
-### Validation plan
-
-1. Minimal reproduction tests for mechanisms 1, 3 and 5 before any code
-   change (mutant-style tests in `tests/`).
-2. Re-run the same five-case dry-run; success criterion: at least one
-   accepted edit with a target-aligned process delta and unchanged canary
-   states, with counters consistent.
-3. Only after a green dry-run, extend to the registered 50-case fast set at
-   the approved concurrency.
-
+- Frozen base: evolution mutates only the L1 rule genome and the L2 policy
+  genome; CRS weights, court decision rules and stage structure are
+  untouched, and no threshold or CRS weight is hand-tuned.
+- Gold isolation: gold selects polarity and fitness credit only; it never
+  enters skill content, policy content or reflection prompts.
+- Provider discipline: mutation, detection and judge calls use the
+  registered DeepSeek V4-Flash / V4-Pro routes only.
+- Case exclusion: every case id recorded in
+  `experiments/protocols/used_case_ledger.txt` is excluded from new
+  evolution runs.
+- No self-promotion: every accepted edit still requires source replay plus
+  non-regression evidence; directional evidence is not promotable, and any
+  proposal failing vocabulary, structural or fitness checks is rejected and
+  recorded as negative experience.
