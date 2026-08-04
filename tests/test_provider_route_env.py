@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 
 def _isolate_provider_env(monkeypatch):
     """Strip ambient SEHD_* route selectors and stop the repository ``.env``
@@ -355,6 +357,49 @@ def test_provider_transport_retries_429_using_bounded_retry_after(
     assert value == {}
     assert attempts == 2
     assert sleeps == [12.0]
+
+
+def test_provider_transport_default_total_budget_covers_every_retry(
+    tmp_path, monkeypatch,
+):
+    """When total_timeout_seconds is omitted the retry budget must cover
+    every attempt; otherwise a first-attempt timeout silently disables the
+    configured transport_retries (observed: 4/5 concurrent cases failed
+    despite transport_retries=3).
+    """
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    attempts: list[float] = []
+
+    def fake_urlopen(request, timeout=None):
+        attempts.append(float(timeout))
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    monkeypatch.setattr(basic_runner.time, "monotonic", lambda: 0.0)
+
+    with pytest.raises(TimeoutError):
+        basic_runner.provider_call_with_schema(
+            route={
+                "endpoint": "https://api.deepseek.com",
+                "model": "deepseek-v4-flash",
+                "api_key_environment": "DEEPSEEK_API_KEY",
+                "transport_retries": 3,
+                "timeout_seconds": 10,
+                # total_timeout_seconds deliberately omitted: default must be
+                # per-attempt * (retries + 1) so retries get real budget.
+            },
+            system="return json", user="{}", cache_dir=tmp_path,
+            require_candidates=False,
+        )
+    # 4 attempts with full per-attempt windows (10s each), not 1 attempt
+    # followed by dead-line skips.
+    assert len(attempts) == 4
+    assert all(value == 10.0 for value in attempts)
 
 
 def test_provider_transport_honors_route_generation_budget_and_total_timeout(

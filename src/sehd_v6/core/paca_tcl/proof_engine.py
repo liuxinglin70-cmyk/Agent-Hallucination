@@ -1350,10 +1350,30 @@ def adjudicate_case(
             # construct authority: a still-incomplete retry keeps the same
             # non-authoritative outcome.
             if construct_audit.get("status") != "complete":
-                repair_user = v2._provider_user(built) + (
-                    "\nCONSTRUCT_CENSUS_REPAIR=coverage_state must be \"complete\" "
-                    "and every supplied candidate must be returned. Return JSON only."
+                # Structured repair feedback: the generic "must be complete"
+                # instruction cannot repair a candidate whose dependency
+                # references a nonexistent event id — the model does not know
+                # WHICH candidate is invalid or WHAT the legal references
+                # are.  Feed the concrete validation failures and the legal
+                # event-id universe back so the repair can actually fix the
+                # references (observed: BFCL/143 failed 3x with
+                # construct_not_complete until the failures were surfaced).
+                repair_failures = construct_audit.get("failures") or []
+                legal_event_ids = [
+                    str(event["event_id"]) for event in built["events"]
+                ]
+                repair_hint = (
+                    "\nCONSTRUCT_CENSUS_REPAIR=coverage_state must be "
+                    "\"complete\" and every supplied candidate must pass "
+                    "validation. Validation failures to fix: "
+                    + json.dumps(repair_failures, ensure_ascii=False)
+                    + ". Legal event IDs for origin_hypothesis_event_id, "
+                    "trigger_event_id and dependency_event_ids: "
+                    + json.dumps(legal_event_ids, ensure_ascii=False)
+                    + ". Re-emit the FULL census with the repaired candidates "
+                    "(same candidate_ids). Return JSON only."
                 )
+                repair_user = v2._provider_user(built) + repair_hint
                 repair_value, repair_provider = provider_call(
                     route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
                     user=repair_user, cache_dir=output_dir / "construct_census_cache" / "repair_1",

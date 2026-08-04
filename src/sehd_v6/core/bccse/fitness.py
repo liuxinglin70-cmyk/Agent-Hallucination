@@ -35,8 +35,13 @@ CAUSAL_FIELDS = (
 # None = score direction is neutral.
 _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
     "candidate_trigger": None,
-    "candidate_to_verifier_route": None,
-    "atomic_verifier_instruction": None,
+    # Both modules score ``valid_error_certificate_count + prosecution``:
+    # a higher score means a stronger error prosecution.  On a gold-clean
+    # case, quarantining suspect certificates lowers that score — that is
+    # the false-positive fix, not a regression — so the direction must be
+    # True (score up is only good for gold-error).
+    "candidate_to_verifier_route": True,
+    "atomic_verifier_instruction": True,
     # v5.6 fix: this was ``True`` ("gap up = prosecution stronger"), an
     # annotation left over from when the score was ``_coverage_gap``. The
     # score has been ``min(prosecution, defense)`` since the one-sided-proof
@@ -552,7 +557,70 @@ def assess_source_fitness(
     local_before = module_local_score(target_module, before, before_result)
     local_after = module_local_score(target_module, after, after_result)
     delta = local_after - local_before
-    if delta > epsilon:
+    if abs(delta) <= epsilon:
+        return FitnessAssessment(
+            "no_effect",
+            ("no_measurable_target_local_change",),
+            task_before,
+            task_after,
+            local_before,
+            local_after,
+        )
+    if gold_label is not None and _MODULE_SCORE_GOLD_DIRECTION.get(target_module) is not None:
+        # Gold-aware direction: a module's local score is monotonic with one
+        # polarity.  On a gold-clean case, quarantining suspect certificates
+        # LOWERS ``valid_error_certificate_count`` — that is the fix, not a
+        # regression.  Movement matching the module's polarity is an
+        # improvement; movement against it is a regression.  Positive
+        # movement against polarity keeps the legacy ``no_effect`` contract
+        # (audited, never rewarded), so modules like ``causal_link_test``
+        # keep their established behavior.
+        direction = _MODULE_SCORE_GOLD_DIRECTION[target_module]
+        if delta > 0:
+            if direction == gold_label:
+                reasons.append(
+                    f"module_local_score_improved:{local_before:.3f}->{local_after:.3f}"
+                )
+                return FitnessAssessment(
+                    "local_improvement",
+                    tuple(reasons),
+                    task_before,
+                    task_after,
+                    local_before,
+                    local_after,
+                )
+            return FitnessAssessment(
+                "no_effect",
+                ("score_direction_mismatch_with_gold",),
+                task_before,
+                task_after,
+                local_before,
+                local_after,
+            )
+        if direction != gold_label:
+            reasons.append(
+                f"module_local_score_improved:{local_before:.3f}->{local_after:.3f}"
+            )
+            return FitnessAssessment(
+                "local_improvement",
+                tuple(reasons),
+                task_before,
+                task_after,
+                local_before,
+                local_after,
+            )
+        reasons.append(
+            f"module_local_score_regressed:{local_before:.3f}->{local_after:.3f}"
+        )
+        return FitnessAssessment(
+            "worse",
+            tuple(reasons),
+            task_before,
+            task_after,
+            local_before,
+            local_after,
+        )
+    if delta > 0:
         if gold_label is None:
             return FitnessAssessment(
                 "directional_evidence",
@@ -585,20 +653,10 @@ def assess_source_fitness(
             local_before,
             local_after,
         )
-    if delta < -epsilon:
-        reasons.append(f"module_local_score_regressed:{local_before:.3f}->{local_after:.3f}")
-        return FitnessAssessment(
-            "worse",
-            tuple(reasons),
-            task_before,
-            task_after,
-            local_before,
-            local_after,
-        )
-
+    reasons.append(f"module_local_score_regressed:{local_before:.3f}->{local_after:.3f}")
     return FitnessAssessment(
-        "no_effect",
-        ("no_measurable_target_local_change",),
+        "worse",
+        tuple(reasons),
         task_before,
         task_after,
         local_before,

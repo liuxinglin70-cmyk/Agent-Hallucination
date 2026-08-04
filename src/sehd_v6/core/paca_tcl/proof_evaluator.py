@@ -175,7 +175,13 @@ def _json_object_provider_call(
     api_key = resolve_provider_credential(route, purpose="mutation")
     retries = int(route.get("transport_retries", 2))
     per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
-    total_timeout = route.get("total_timeout_seconds", per_attempt_timeout)
+    # Same retry-budget contract as basic_runner.provider_call_with_schema:
+    # the total deadline must cover every configured attempt, otherwise a
+    # first-attempt timeout burns the whole budget and transport_retries is
+    # silently disabled.
+    total_timeout = route.get(
+        "total_timeout_seconds", per_attempt_timeout * (retries + 1)
+    )
     deadline = (
         time.monotonic() + max(1, int(total_timeout))
         if total_timeout is not None

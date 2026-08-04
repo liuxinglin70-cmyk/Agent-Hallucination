@@ -561,6 +561,72 @@ def test_no_gold_detector_local_score_gain_is_directional_only() -> None:
     assert not assessment.passed
 
 
+def test_gold_clean_local_score_decrease_is_false_positive_fix_not_regression() -> None:
+    """A gold-clean false positive is fixed by quarantining suspect
+    certificates, which LOWERS the atomic_verifier_instruction local score
+    (valid_error_certificate_count + prosecution).  That movement must be
+    an improvement under gold, never a regression.
+    """
+    before = _signal("verified_error")
+    after = _signal("verified_error")
+    # Monotone with polarity: score down on gold-clean = fix.
+    before = replace(before, prosecution_coverage=0.9, defense_coverage=0.5)
+    after = replace(after, prosecution_coverage=0.6, defense_coverage=0.5)
+
+    assessment = assess_source_fitness(
+        before,
+        after,
+        target_module="atomic_verifier_instruction",
+        gold_label=False,
+    )
+    assert assessment.decision == "local_improvement"
+    assert assessment.passed
+    assert any(
+        reason.startswith("module_local_score_improved")
+        for reason in assessment.reasons
+    )
+
+    # Same movement on a gold-error case is a genuine regression.
+    regressed = assess_source_fitness(
+        before,
+        after,
+        target_module="atomic_verifier_instruction",
+        gold_label=True,
+    )
+    assert regressed.decision == "worse"
+    assert regressed.worsened
+
+
+def test_gold_clean_prosecution_certificate_quarantine_is_improvement() -> None:
+    """End-to-end: quarantining suspect error certificates (the expected
+    effect of a false-positive repair) lowers valid_error_certificate_count;
+    under gold-clean this must count as an improvement.
+    """
+    def row(valid_errors: int) -> dict:
+        return {
+            "state": "verified_error",
+            "proof_adjudication": {
+                "valid_error_certificate_count": valid_errors,
+                "quarantined_error_certificate_ids": [],
+            },
+            "combined_prosecution": {
+                "candidates": [{"certificate_id": f"c{i}"} for i in range(valid_errors)],
+            },
+        }
+
+    before_signal = _signal("verified_error")
+    after_signal = _signal("verified_error")
+    assessment = assess_source_fitness(
+        before_signal,
+        after_signal,
+        target_module="atomic_verifier_instruction",
+        before_result=row(5),
+        after_result=row(2),
+        gold_label=False,
+    )
+    assert assessment.decision == "local_improvement"
+
+
 def test_occurrence_state_overrides_conflicting_legacy_state_everywhere() -> None:
     conflict = {
         "state": "verified_clean",
@@ -4711,11 +4777,28 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
         run_id="l2_no_effect",
     )
 
-    assert len(mutation_calls) == 1
+    # The L2 proposal was rejected at the replay gate (no terminal edge
+    # moved).  The case was genuinely triggered, so the runner falls through
+    # to the L1 skill path: policy rules only reclassify adjudication and
+    # cannot repair the broken detection.  The mock mutation always returns
+    # the L2 vocabulary, so both L1 attempts fail schema validation and end
+    # as NO_EDIT skips.
+    assert len(mutation_calls) == 3
     assert mutation_calls[0]["purpose"] == "policy_reflection"
+    # The L1 fall-through makes two mutation-family calls (reflection
+    # diagnosis + targeted mutation); their exact order is fixed by the
+    # reflection pipeline.
+    assert sum(
+        1 for call in mutation_calls if call["purpose"] != "policy_reflection"
+    ) == 2
+    assert all(
+        call["purpose"] in {"reflection_diagnosis", "mutation"}
+        for call in mutation_calls[1:]
+    )
     assert replay_states == ["policy_replay"]
     assert [step.gate_decision for step in result.steps] == [
         "reject_policy_no_effect",
+        "skip_no_edit",
     ]
     audit = result.evolution_audit
     assert audit["l2_policy_accepts"] == 0
@@ -4726,7 +4809,8 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
     assert [entry["layer"] for entry in audit["non_l1_failure_attributions"]] == [
         "l2_adjudication_policy",
     ]
-    # Nothing was accepted anywhere and no L1 skill edit was attempted.
+    # Nothing was accepted anywhere and the L1 fall-through produced only
+    # schema-invalid NO_EDIT skips (no skill edit, no wasted acceptance).
     assert result.edits_accepted == 0
     assert result.edits_rejected == 0
     assert result.champion_genome.generation == 0
@@ -4772,9 +4856,20 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
         run_id="l2_no_proposal",
     )
 
-    assert len(mutation_calls) == 1
+    # The L2 reflection skipped (no vocabulary item); the case was
+    # genuinely triggered, so the runner falls through to the L1 skill
+    # path.  The mock mutation always returns the L2 vocabulary, so the L1
+    # attempts fail schema validation and end as NO_EDIT skips.
+    assert len(mutation_calls) == 3
+    assert mutation_calls[0]["purpose"] == "policy_reflection"
+    assert sum(
+        1 for call in mutation_calls if call["purpose"] != "policy_reflection"
+    ) == 2
     assert policy_replays == []
-    assert [step.gate_decision for step in result.steps] == ["skip_no_policy"]
+    assert [step.gate_decision for step in result.steps] == [
+        "skip_no_policy",
+        "skip_no_edit",
+    ]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "skip_no_policy"
     assert "no vocabulary item justified" in entry["reason"]
@@ -4979,8 +5074,14 @@ def test_l2_state_change_against_gold_polarity_is_rejected(
         fitness_use_gold=True,
     )
 
+    # L2 fitness rejected the demotion (moved against gold polarity).  The
+    # case was genuinely triggered, so the runner falls through to the L1
+    # skill path; the mock mutation returns the L2 vocabulary, so the L1
+    # attempt fails schema validation and ends as a NO_EDIT skip.
+    assert len(result.steps) == 2
     assert [step.gate_decision for step in result.steps] == [
         "reject_policy_fitness",
+        "skip_no_edit",
     ]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "reject_policy_fitness"
@@ -5427,7 +5528,17 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
     )
 
     decisions = [step.gate_decision for step in result.steps]
-    assert decisions == ["accept_policy", "skip_no_policy"]
+    # L2 acceptance on source; the protected removal on source2 is rejected
+    # at the vocabulary gate.  The triggered source2 then falls through to
+    # the L1 skill path (policy cannot repair a broken detection), where
+    # the L2-vocabulary mock fails schema validation and retries within the
+    # bounded attempt budget.
+    assert decisions[0] == "accept_policy"
+    assert decisions.count("skip_no_policy") == 2
+    assert any(
+        decision in {"retry_invalid_mutation", "skip_invalid_mutation"}
+        for decision in decisions[1:]
+    )
     audit = result.evolution_audit
     assert audit["l2_policy_accepts"] == 1
     assert len(audit["policy_genome"]["items"]) == 1

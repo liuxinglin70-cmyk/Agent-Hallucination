@@ -486,10 +486,16 @@ def provider_call_with_schema(
     api_key = resolve_provider_credential(route, purpose=transport_purpose)
     retries = int(route.get("transport_retries", 2))
     per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
-    # A retry budget without a total deadline can turn one provider call into
-    # several full timeout windows.  Use the per-attempt timeout as the safe
-    # default total budget when no explicit route override is supplied.
-    total_timeout = route.get("total_timeout_seconds", per_attempt_timeout)
+    # The retry budget must cover every attempt: a total deadline equal to a
+    # single per-attempt window burns the whole budget on the first timeout
+    # and silently disables every configured transport retry (observed in
+    # 5x1 concurrent runs: 4/5 cases failed with read timeouts even though
+    # transport_retries=3).  Default the total budget to per-attempt times
+    # (retries + 1) so each attempt owns its own timeout window unless an
+    # explicit route override is supplied.
+    total_timeout = route.get(
+        "total_timeout_seconds", per_attempt_timeout * (retries + 1)
+    )
     deadline = (
         time.monotonic() + max(1, int(total_timeout))
         if total_timeout is not None

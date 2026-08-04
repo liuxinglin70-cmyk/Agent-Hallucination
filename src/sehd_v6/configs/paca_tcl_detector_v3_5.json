@@ -5,32 +5,39 @@
   "focused_prosecution_retries": 1,
   "candidate_fallback_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "construct_census_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 300,
+    "total_timeout_seconds": 1200
   },
   "qualification_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "propagation_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "boundary_route": {
     "thinking": {"type": "disabled"},
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "focused_prosecution_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "defense_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   },
   "appeal_prosecutor_route": {
     "thinking": {"type": "disabled"},
@@ -48,6 +55,7 @@
   },
   "counterfactual_route": {
     "transport_retries": 3,
-    "timeout_seconds": 120
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 480
   }
 }

@@ -3102,7 +3102,7 @@ def run_online_evolution(
         genome_before: str,
         l2_attribution: Mapping[str, Any],
         stable_source: bool = False,
-    ) -> None:
+    ) -> bool:
         """Close the L2 proposal loop for one adjudication-layer failure.
 
         One reflection call proposes a single closed-vocabulary policy edit
@@ -3116,8 +3116,16 @@ def run_online_evolution(
         (its L2 attribution opened independently): a fruitless L2 proposal
         on such a case is audited but never advances the convergence streak,
         preserving the v5.9b invariant that stable cases cannot halt a run.
+
+        Returns True when the policy edit was accepted.  A rejected L2
+        proposal on a genuinely triggered case means the adjudication layer
+        could not repair the failure; the caller then falls through to the
+        L1 skill path so a skill-level intervention still gets a chance
+        (policy rules cannot fix a broken detection, they only reclassify
+        its adjudication).
         """
         nonlocal policy_genome, l2_policy_accepts
+        accepted_outcome = False
 
         attribution = FailureAttribution(
             layer=str(l2_attribution.get("layer") or LAYER_L2),
@@ -3145,8 +3153,9 @@ def run_online_evolution(
             reason: str = "",
             replay: Mapping[str, Any] | None = None,
         ) -> None:
-            nonlocal policy_genome, l2_policy_accepts
+            nonlocal policy_genome, l2_policy_accepts, accepted_outcome
             accepted = decision == "accept_policy"
+            accepted_outcome = accepted
             if accepted:
                 l2_policy_accepts += 1
                 gate._consecutive_no_edit = 0
@@ -3365,6 +3374,7 @@ def run_online_evolution(
             candidate_genome.set_item_meta(protected_index, protected_meta)
         policy_genome = candidate_genome
         finish("accept_policy", replay=replay_result)
+        return accepted_outcome
 
     def run_development_probe(*, reason: str) -> tuple[bool, dict[str, Any]]:
         """Apply the independent development envelope as a veto-only gate."""
@@ -4288,7 +4298,16 @@ def run_online_evolution(
                 ), next_case_index=idx + 1)
                 print(f"  [{idx}] SKIP_MUTATION_BUDGET_EXHAUSTED {case_id}")
                 continue
-            run_l2_policy_case(
+            # A rejected L2 proposal on a genuinely triggered case falls
+            # through to the L1 skill path: the adjudication layer could not
+            # repair the failure, and policy rules only reclassify
+            # adjudication — they cannot fix a broken detection.  Without
+            # this fall-through an unresolved or mislabeled case with an L2
+            # attribution would never receive a skill-level intervention
+            # (observed: openmanus/091 stuck on reject_policy_no_effect with
+            # zero L1 attempts).  Stable-source L2 cases keep skipping L1:
+            # they were not triggers and must not spawn fruitless reflection.
+            l2_accepted = run_l2_policy_case(
                 idx=idx,
                 case_id=case_id,
                 detection_result=detection_result,
@@ -4297,7 +4316,8 @@ def run_online_evolution(
                 l2_attribution=l2_attribution,
                 stable_source=l2_stable_source,
             )
-            continue
+            if l2_accepted or l2_stable_source:
+                continue
 
         if not signal.should_evolve:
             # Stable success — no trigger

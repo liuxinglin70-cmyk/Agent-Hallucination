@@ -3,6 +3,8 @@
 # Future experiments MUST exclude all ids below (handoff discipline).
 BFCL/000
 BFCL/001
+BFCL/002
+BFCL/003
 BFCL/004
 BFCL/014
 BFCL/015
@@ -33,6 +35,7 @@ BFCL/119
 BFCL/122
 BFCL/131
 BFCL/137
+BFCL/143
 BFCL/144
 BFCL/145
 BFCL/147
@@ -43,6 +46,7 @@ BFCL/160
 Camel/000
 Camel/001
 Camel/004
+Camel/005
 Camel/006
 Camel/008
 Camel/013
@@ -72,15 +76,18 @@ Camel/072
 Camel/075
 Camel/080
 Camel/082
+Camel/087
 Camel/091
 Camel/092
 Magentic_One/000
+Magentic_One/003
 Magentic_One/006
 Magentic_One/007
 Magentic_One/010
 Magentic_One/015
 Magentic_One/019
 Magentic_One/027
+Magentic_One/028
 Magentic_One/029
 Magentic_One/032
 Magentic_One/034
@@ -110,6 +117,7 @@ Octotools/000
 Octotools/001
 Octotools/002
 Octotools/003
+Octotools/004
 Octotools/005
 Octotools/008
 Octotools/009
@@ -136,6 +144,7 @@ Octotools/046
 OpenDeepSearch/000
 OpenDeepSearch/001
 OpenDeepSearch/002
+OpenDeepSearch/004
 OpenDeepSearch/012
 OpenDeepSearch/014
 OpenDeepSearch/016
@@ -168,6 +177,7 @@ OpenDeepSearch/092
 OpenDeepSearch/097
 OpenManus/000
 OpenManus/001
+OpenManus/002
 OpenManus/006
 OpenManus/008
 OpenManus/012
@@ -194,15 +204,21 @@ OpenManus/069
 OpenManus/075
 OpenManus/080
 OpenManus/090
+OpenManus/091
 OpenManus/093
 OpenManus/098
 OpenManus/101
+SmolAgents/000
+SmolAgents/001
+SmolAgents/002
 SmolAgents/003
+SmolAgents/004
 SmolAgents/005
 SmolAgents/007
 SmolAgents/009
 SmolAgents/011
 SmolAgents/013
+SmolAgents/019
 SmolAgents/020
 SmolAgents/021
 SmolAgents/030
