@@ -1,0 +1,231 @@
+"""Slot-contract storage for L1 Skill rules (BCCSE).
+
+Why this module exists: the legacy form stored rules as free text and
+guessed their shape with regexes after the fact, which produced ambiguous
+rejections and silent shape drift. A slot template makes the if-then shape
+structurally guaranteed: rules persist as typed slots, and prompt injection
+is a deterministic render. All free-text slots are English by contract;
+permission and pollution checks below are semantic gates, not shape guesses.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Any
+
+from src.sehd_v6.core.bccse.genome import (
+    ALLOWED_VERDICTS,
+    FORBIDDEN_CONTENT_MARKERS,
+    LOCAL_NEGATION_MODULES,
+    MODULE_IDS,
+    semantic_overlap,
+    validate_feature_description,
+)
+
+# Direction vocabulary mirrors rule_meta["direction"] in genome so slot rules
+# and legacy rules stay comparable during the migration window.
+ALLOWED_DIRECTIONS: tuple[str, ...] = (
+    "clean",
+    "error",
+    "unresolved",
+    "deny_causal",
+    "process",
+)
+
+MAX_SLOT_CHARS = 300
+MAX_ANCHOR_CHARS = 240
+
+_TRAILING_PUNCT = ".,;:!?。，；：！？"
+
+# Condition overload: >1 coordinator means the trigger encodes several
+# situations, which breaks per-case attribution of fitness signal.
+_CONDITION_CONJUNCTION_RE = re.compile(r"\band\b|\bor\b|且|或", re.IGNORECASE)
+
+# Action splitters: any of these means the rule prescribes several actions,
+# which the evolution loop cannot credit/blame individually.
+_ACTION_SPLIT_RE = re.compile(r";|\bthen also\b|\band then\b", re.IGNORECASE)
+
+# Verdict permission is an authority check, not a shape guess, so it uses a
+# small closed set of English verdict-emission phrasings (why: only these
+# phrasings commit the detector to a final label; anything weaker is process
+# guidance and stays module-agnostic).
+_FINAL_VERDICT_RE = re.compile(
+    r"(?:return|output|classify as|label as)\s+(clean|error|unresolved)\b|"
+    r"(?:treat|regard|consider|deem)\s+[^,.;]{0,40}\s+as\s+"
+    r"(clean|error|unresolved)\b"
+)
+
+# Local negation weakens the prosecution without emitting a final verdict;
+# only causal_link_test owns that authority in the proof court.
+_LOCAL_NEGATION_RE = re.compile(
+    r"\b(?:does|do|did|will|would|can|could|should|may|might) not hold\b"
+)
+
+# Action-slot pollution patterns. Why a local copy instead of routing the
+# action through genome.validate_feature_description: that validator also
+# rejects text STARTING with an imperative verb (a prompt-injection
+# heuristic), which would falsely reject legitimate verdict actions such as
+# "return unresolved". Conditions and anchors never start with imperatives,
+# so they keep reusing the genome validator verbatim.
+_ACTION_POISON_RE = re.compile(
+    r"https?://|"
+    r"\b(?:case|source|agent|model)[-_ ]?id\b|"
+    r"\b(?:case|source)[_-]\d+\b|"
+    r"\bag_\w{8,}\b|"
+    r"\b0x[0-9a-f]{6,}\b|"
+    r"\b(?:gold|ground[ -]?truth|golden label)\b|"
+    r"(?:金标|答案|正确标签|真实标签|本案例|这个案例)|"
+    r"\b(?:ignore|disregard|override)\s+(?:all\s+)?"
+    r"(?:previous|prior|above|system|developer)\b.{0,40}"
+    r"\b(?:instruction|prompt|rule|message)s?\b|"
+    r"\b(?:system|developer|assistant)\s+(?:prompt|message)\b|"
+    r"\b[a-z][a-z_]+/\d+\b",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class RuleSpec:
+    """One L1 rule as typed slots instead of free text.
+
+    evidence_anchor is failure-signature bookkeeping: it drives evolution
+    triage but is never rendered into runtime prompts, so it cannot leak
+    case identity into detection.
+    """
+
+    condition: str
+    action: str
+    evidence_anchor: str
+    module_id: str
+    direction: str
+    provenance: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "condition": self.condition,
+            "action": self.action,
+            "evidence_anchor": self.evidence_anchor,
+            "module_id": self.module_id,
+            "direction": self.direction,
+            "provenance": dict(self.provenance),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RuleSpec":
+        provenance = data.get("provenance") or {}
+        if not isinstance(provenance, dict):
+            raise ValueError("provenance must be a dict")
+        return cls(
+            condition=str(data.get("condition") or ""),
+            action=str(data.get("action") or ""),
+            evidence_anchor=str(data.get("evidence_anchor") or ""),
+            module_id=str(data.get("module_id") or ""),
+            direction=str(data.get("direction") or ""),
+            provenance=dict(provenance),
+        )
+
+
+def _normalize_condition(raw: str) -> str:
+    cond = " ".join(str(raw).split())
+    # Drop a redundant leading conjunction so "when X" never renders as
+    # "When when X".
+    cond = re.sub(r"^(?:when|if)\s+", "", cond, flags=re.IGNORECASE)
+    cond = cond.rstrip(_TRAILING_PUNCT).strip()
+    # The template already supplies "When", so the slot reads as a clause:
+    # lowercase its first letter for a single grammatical sentence.
+    if cond:
+        cond = cond[0].lower() + cond[1:]
+    return cond
+
+
+def _normalize_action(raw: str) -> str:
+    action = " ".join(str(raw).split())
+    action = action.rstrip(_TRAILING_PUNCT).strip()
+    return action
+
+
+def render_rule(spec: RuleSpec) -> str:
+    """Deterministically render a spec as exactly one English if-then sentence.
+
+    Punctuation normalization (no trailing punctuation on the condition, a
+    single terminal period on the action) makes the rendered text a pure
+    function of the slots, which is what identity/dedup rely on.
+    """
+    condition = _normalize_condition(spec.condition)
+    action = _normalize_action(spec.action)
+    return f"When {condition}, {action}."
+
+
+def _pollution_reason(field_name: str, ok: bool, reason: str) -> str:
+    # Re-label genome validator reasons so rejections point at this contract
+    # instead of the feature-description contract.
+    if ok:
+        return ""
+    return f"{field_name}:{reason.replace('feature_', 'rule_', 1)}"
+
+
+def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
+    """Validate a RuleSpec; returns (ok, reason) with a stable reason token."""
+    if not spec.condition.strip():
+        return False, "empty_condition"
+    if not spec.action.strip():
+        return False, "empty_action"
+    if len(spec.condition) > MAX_SLOT_CHARS:
+        return False, "condition_too_long"
+    if len(spec.action) > MAX_SLOT_CHARS:
+        return False, "action_too_long"
+    if len(spec.evidence_anchor) > MAX_ANCHOR_CHARS:
+        return False, "evidence_anchor_too_long"
+    if spec.module_id not in MODULE_IDS:
+        return False, f"invalid_module_id:{spec.module_id}"
+    if spec.direction not in ALLOWED_DIRECTIONS:
+        return False, f"invalid_direction:{spec.direction}"
+
+    if len(_CONDITION_CONJUNCTION_RE.findall(spec.condition)) > 1:
+        return False, "condition_overload"
+    if _ACTION_SPLIT_RE.search(spec.action):
+        return False, "multiple_actions"
+
+    # Pollution firewall: conditions and anchors reuse the genome validator
+    # (markers + URL/case-id/gold/injection patterns); the action slot uses
+    # the imperative-tolerant local pattern set (see _ACTION_POISON_RE why).
+    ok, reason = validate_feature_description(spec.condition)
+    if not ok:
+        return False, _pollution_reason("condition", ok, reason)
+    if spec.evidence_anchor:
+        ok, reason = validate_feature_description(spec.evidence_anchor)
+        if not ok:
+            return False, _pollution_reason("evidence_anchor", ok, reason)
+    lowered_action = spec.action.lower()
+    for marker in FORBIDDEN_CONTENT_MARKERS:
+        if marker in lowered_action:
+            return False, f"action:rule_forbidden_content:{marker}"
+    if _ACTION_POISON_RE.search(lowered_action):
+        return False, "action:rule_prompt_or_case_pollution"
+
+    # Authority gates run on the rendered text because that is exactly what
+    # the provider will see.
+    rendered = render_rule(spec).lower()
+    verdict_match = _FINAL_VERDICT_RE.search(rendered)
+    if verdict_match:
+        verdict = next(g for g in verdict_match.groups() if g)
+        allowed = ALLOWED_VERDICTS.get(spec.module_id, frozenset())
+        if verdict not in allowed:
+            return False, f"verdict_not_allowed:{verdict}_for_{spec.module_id}"
+    elif _LOCAL_NEGATION_RE.search(rendered):
+        if spec.module_id not in LOCAL_NEGATION_MODULES:
+            return False, f"local_negation_not_allowed_for_{spec.module_id}"
+
+    return True, ""
+
+
+def rule_text_identity(spec: RuleSpec) -> str:
+    """Lowercased whitespace-normal render, the canonical key for dedup."""
+    return " ".join(render_rule(spec).lower().split())
+
+
+def rules_semantic_overlap(spec_a: RuleSpec, spec_b: RuleSpec) -> float:
+    """Dedup distance between two specs, delegating to genome's metric so
+    slot rules and legacy text rules share one duplicate scale."""
+    return semantic_overlap(rule_text_identity(spec_a), rule_text_identity(spec_b))
