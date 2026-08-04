@@ -1354,6 +1354,197 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
         )
 
 
+def test_resume_restores_pending_probe_commit_and_rolls_it_back(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    import json
+
+    interrupt = True
+    probe_bad = False
+
+    def detector(*, genome, case_id, **kwargs):
+        nonlocal interrupt
+        if case_id == "interrupt" and interrupt:
+            return {
+                "state": "not_a_detector_state",
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "census": [],
+            }
+        if case_id == "anchor":
+            state = "verified_clean"
+        elif case_id == "source":
+            state = "verified_error" if genome.generation else "unresolved"
+        elif case_id == "probe":
+            state = "unresolved" if probe_bad and genome.generation else "verified_error"
+        else:
+            state = "verified_clean"
+        return {
+            "state": state,
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_slots_response(), {}),
+    )
+
+    output_dir = tmp_path / "interrupted_pending_probe"
+    records = {
+        "source": {"gold_label": True},
+        "interrupt": {},
+        "anchor": {},
+        "probe": {"gold_label": True},
+    }
+    with pytest.raises(ValueError, match="Invalid detector state"):
+        runner.run_online_evolution(
+            evolution_case_ids=("source", "interrupt"),
+            records=records,
+            config={},
+            output_dir=output_dir,
+            census_root=tmp_path,
+            mutation_route={"model": "DeepSeek-V4-Flash"},
+            fitness_use_gold=True,
+            canary_case_ids=("anchor",),
+            validation_probe_every=100,
+            probe_ids=("probe",),
+            run_id="pending_probe_interrupt",
+        )
+
+    checkpoint = json.loads(
+        (output_dir / "evolution_checkpoint.json").read_text(encoding="utf-8")
+    )
+    assert checkpoint["next_case_index"] == 1
+    assert checkpoint["pending_probe_commits"]
+
+    interrupt = False
+    probe_bad = True
+    resumed = runner.run_online_evolution(
+        evolution_case_ids=("source", "interrupt"),
+        records=records,
+        config={},
+        output_dir=output_dir,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        canary_case_ids=("anchor",),
+        validation_probe_every=100,
+        probe_ids=("probe",),
+        resume_from=output_dir,
+    )
+
+    assert resumed.run_id == "pending_probe_interrupt"
+    assert resumed.edits_accepted == 0
+    assert resumed.edits_rejected == 1
+    assert resumed.champion_genome.generation == 0
+    assert any(step.gate_decision == "rollback_probe" for step in resumed.steps)
+
+
+def test_resume_restores_same_source_retry_attempt_and_feedback(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    interrupt = True
+    prompt_calls = 0
+    real_prompt = runner.build_causal_reflection_prompt
+
+    def prompt_with_interrupt(*args, **kwargs):
+        nonlocal prompt_calls
+        if prompt_calls > 0 and interrupt:
+            raise KeyboardInterrupt("simulated interruption after retry enqueue")
+        prompt_calls += 1
+        return real_prompt(*args, **kwargs)
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" else (
+            "verified_error" if genome.generation else "unresolved"
+        )
+        return {
+            "state": state,
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    mutation_calls = 0
+
+    def mutation(**kwargs):
+        nonlocal mutation_calls
+        mutation_calls += 1
+        if mutation_calls == 1:
+            return {
+                "target_module": "candidate_trigger",
+                "operation": "add_rule",
+                "condition": "a claim lacks cited trajectory support",
+                "action": "require one event-backed certificate",
+                "evidence_anchor": "wrong owner retry probe",
+            }, {}
+        return _slots_response(), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "build_causal_reflection_prompt", prompt_with_interrupt)
+    monkeypatch.setattr(runner, "attribute_failure", lambda result, **kwargs: _signal(
+        str(result["state"])
+    ))
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    output_dir = tmp_path / "interrupted_retry"
+    records = {"source": {"gold_label": True}, "anchor": {}}
+    with pytest.raises(KeyboardInterrupt):
+        runner.run_online_evolution(
+            evolution_case_ids=("source",),
+            records=records,
+            config={},
+            output_dir=output_dir,
+            census_root=tmp_path,
+            mutation_route={"model": "DeepSeek-V4-Flash"},
+            fitness_use_gold=True,
+            canary_case_ids=("anchor",),
+            max_mutation_attempts_per_case=2,
+            run_id="retry_interrupt",
+        )
+
+    interrupt = False
+    resumed = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records=records,
+        config={},
+        output_dir=output_dir,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        canary_case_ids=("anchor",),
+        max_mutation_attempts_per_case=2,
+        resume_from=output_dir,
+    )
+
+    retry_steps = [
+        step for step in resumed.steps
+        if step.gate_decision == "retry_invalid_mutation"
+    ]
+    accepted_steps = [
+        step for step in resumed.steps
+        if step.gate_decision == "accept_batch"
+    ]
+    assert retry_steps and retry_steps[0].attempt_index == 0
+    assert accepted_steps and accepted_steps[-1].attempt_index == 1
+    assert resumed.edits_accepted == 1
+    assert resumed.evolution_audit["mutation_retry_attempts"] == 1
+
+
 @pytest.mark.parametrize("probe_fails", [False, True])
 def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
     tmp_path, monkeypatch, probe_fails,

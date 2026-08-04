@@ -2219,6 +2219,15 @@ def run_online_evolution(
                 f"step(s); work queue restarts at case index "
                 f"{resume_next_case_index}"
             )
+        if (
+            steps
+            and resume_next_case_index == steps[-1].case_index
+            and steps[-1].gate_decision.startswith("retry_")
+        ):
+            active_attempt_index = max(
+                active_attempt_index,
+                steps[-1].attempt_index + 1,
+            )
         if not stable_memory_payload:
             stable_memory_payload = type_fitness.get_experience_memory().to_dict()
         if run_id is None:
