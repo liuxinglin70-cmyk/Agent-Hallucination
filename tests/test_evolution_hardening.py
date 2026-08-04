@@ -3718,21 +3718,18 @@ def test_retry_feedback_includes_rejected_source_attempts() -> None:
 
 
 # ---------------------------------------------------------------------------
-# v5.8 fix 1: dual-channel owner arbitration.  Gold polarity stays locked,
-# the attributor's owner stays first, but a second deterministic owner
-# hypothesis (process channel / verdict-vs-evidence gap channel) may widen
-# the allowed module set so FN cases are no longer locked into modules that
-# cannot express the true root cause.
+# Deterministic failure attribution. The failure classifier answers "which
+# layer, which artifact": L1 artifact failures yield a polarity-gated owner
+# hypothesis, L2 policy failures yield telemetry only, and no L1 owner is
+# ever guessed for a policy-layer failure.
 # ---------------------------------------------------------------------------
 
 
 def _fn_signal():
     from types import SimpleNamespace
-    from src.sehd_v6.core.bccse.step_attributor import ErrorType
 
     return SimpleNamespace(
         state="verified_clean",
-        error_type=ErrorType.FALSE_NEGATIVE_CLEAN,
         target_module="abstention_rule",
         secondary_module="causal_link_test",
         gold_label=True,
@@ -3740,119 +3737,23 @@ def _fn_signal():
     )
 
 
-def test_arbitration_omission_clean_routes_candidate_trigger() -> None:
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+def _fp_signal():
+    from types import SimpleNamespace
 
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "prosecution_coverage": "complete",
-            "quarantined_error_certificate_count": 0,
-        },
-        primary_type=HallucinationType.OMISSION,
+    return SimpleNamespace(
+        state="verified_error",
+        target_module="clean_defense_boundary",
+        secondary_module="abstention_rule",
+        gold_label=False,
+        has_gold=True,
     )
-    assert owner == "candidate_trigger"
-    assert channel == "process_channel"
-
-
-def test_arbitration_quarantined_error_certs_route_evidence_obligation() -> None:
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "proof_adjudication": {"prosecution_coverage": "incomplete"},
-            "evidence_health": {"quarantined_error_certificate_count": 2},
-        },
-        primary_type=HallucinationType.FACTUAL,
-    )
-    assert owner == "evidence_obligation"
-    assert channel == "verdict_evidence_gap"
-
-
-def test_arbitration_fn_complete_defense_routes_evidence_obligation() -> None:
-    """FN with a complete clean defense: the defense side over-persuaded.
-
-    The gold-locked route sends prosecution-complete FN cases to
-    abstention_rule/causal_link_test, but when the trace shows the clean
-    verdict was carried by a COMPLETE defense, the broken stage is the
-    defense-side evidence construction; the abstention module has no
-    observable failure to edit (observed NO_EDIT deadlock on Camel/006 and
-    Magentic_One/019).  The verdict-vs-evidence-gap channel must widen the
-    route to evidence_obligation.
-    """
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "complete",
-                "defense_coverage": "complete",
-            },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-        },
-        primary_type=HallucinationType.UNKNOWN,
-    )
-    assert owner == "evidence_obligation"
-    assert channel == "verdict_evidence_gap"
-
-
-def test_arbitration_fn_defense_rows_route_clean_defense_boundary() -> None:
-    """v5.9: when enumerable defense certificates carried the clean verdict,
-    the executable owner is clean_defense_boundary (its provider can tighten
-    emission conditions), which stays inside the FN polarity."""
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "complete",
-                "defense_coverage": "complete",
-            },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-            "combined_defense": {"certificates": [
-                {"target_candidate_id": "c1", "defense_type": "support"},
-            ]},
-        },
-        primary_type=HallucinationType.UNKNOWN,
-    )
-    assert owner == "clean_defense_boundary"
-    assert channel == "verdict_evidence_gap"
-
-
-def test_arbitration_ignores_flat_legacy_field_layout() -> None:
-    """v5.9 regression: the detector nests coverage under proof_adjudication
-    and the quarantined count under evidence_health. The old top-level reads
-    always returned None, which silently disabled the channel (observed
-    NO_EDIT deadlock). Top-level flat values must NOT fire the channel."""
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "defense_coverage": "complete",
-            "quarantined_error_certificate_count": 2,
-        },
-        primary_type=HallucinationType.UNKNOWN,
-    )
-    assert owner == ""
-    assert channel == ""
 
 
 def _unresolved_signal():
     from types import SimpleNamespace
-    from src.sehd_v6.core.bccse.step_attributor import ErrorType
 
     return SimpleNamespace(
         state="unresolved",
-        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
         target_module="abstention_rule",
         secondary_module="atomic_verifier_instruction",
         gold_label=None,
@@ -3860,185 +3761,174 @@ def _unresolved_signal():
     )
 
 
-def test_arbitration_unresolved_defense_rows_route_clean_defense_boundary() -> None:
-    """v5.9c: unresolved + complete defense WITH certificates + surviving
-    error certificates. The static route deadlocked these at abstention_rule
-    (10/14 no-edits across four runs); the executable owner is the defense
-    boundary, which must answer the surviving error evidence."""
+def test_attribute_failure_fn_omission_clean_routes_candidate_trigger() -> None:
+    """A missing error candidate is only observable against the gold label,
+    and maps to candidate_trigger via the classifier input contract."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
-    owner, channel = runner._owner_arbitration(
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=_fn_signal(),
+        detection_result={},
+        primary_type=HallucinationType.OMISSION,
+        case_id="case_fn_omission",
+        l2_failure_attributions=l2_telemetry,
+    )
+    assert owner == "candidate_trigger"
+    assert reason == "provider_artifact_missing"
+    assert l2_telemetry == []
+
+
+def test_attribute_failure_fn_clean_quarantined_error_routes_evidence_obligation() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    owner, reason = runner._attribute_failure(
+        signal=_fn_signal(),
+        detection_result={
+            "evidence_health": {"quarantined_error_certificate_count": 2},
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_fn_quarantined",
+        l2_failure_attributions=[],
+    )
+    assert owner == "evidence_obligation"
+    assert reason == "provider_artifact_malformed"
+
+
+def test_attribute_failure_hollow_complete_defense_records_l2_telemetry() -> None:
+    """A vacuous complete defense with an unresolved terminal is an L2
+    coverage-validity failure: no L1 owner is guessed, telemetry only."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
             "proof_adjudication": {
-                "prosecution_coverage": "incomplete",
+                "state": "unresolved",
                 "defense_coverage": "complete",
+                "valid_defense_certificate_count": 0,
             },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-            "combined_prosecution": {"candidates": [
-                {"candidate_id": "c1"}, {"candidate_id": "c2"},
-            ]},
-            "combined_defense": {"certificates": [
-                {"target_candidate_id": "c1"},
-            ]},
         },
         primary_type=HallucinationType.UNKNOWN,
+        case_id="case_hollow_defense",
+        l2_failure_attributions=l2_telemetry,
+    )
+    assert owner == ""
+    assert reason == "hollow_complete_defense"
+    assert len(l2_telemetry) == 1
+    entry = l2_telemetry[0]
+    assert entry["case_id"] == "case_hollow_defense"
+    assert entry["layer"] == "l2_adjudication_policy"
+    assert entry["artifact"] == "coverage_validity_policy"
+
+
+def test_attribute_failure_consensus_gate_blocked_records_l2_telemetry() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=_unresolved_signal(),
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "consensus_gate_applied": True,
+                "consensus_gate_blocked_ids": ["c1"],
+            },
+        },
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="case_consensus_blocked",
+        l2_failure_attributions=l2_telemetry,
+    )
+    assert owner == ""
+    assert reason == "consensus_gate_blocked"
+    assert [item["artifact"] for item in l2_telemetry] == [
+        "consensus_gate_policy",
+    ]
+
+
+def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
+    monkeypatch,
+) -> None:
+    """An L1 owner outside the FP polarity pool must be dropped even when
+    the classifier reports one; an in-pool owner passes the same gate."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import LAYER_L1, FailureAttribution
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    def _patch_classifier(artifact: str, reason: str) -> None:
+        monkeypatch.setattr(
+            runner,
+            "classify_failure",
+            lambda record: FailureAttribution(
+                layer=LAYER_L1, artifact=artifact,
+                reason_code=reason, evidence={},
+            ),
+        )
+
+    _patch_classifier("candidate_trigger", "provider_artifact_missing")
+    owner, _reason = runner._attribute_failure(
+        signal=_fp_signal(),
+        detection_result={},
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="case_fp_gate",
+        l2_failure_attributions=[],
+    )
+    assert owner == ""
+    _patch_classifier("clean_defense_boundary", "provider_artifact_malformed")
+    owner, _reason = runner._attribute_failure(
+        signal=_fp_signal(),
+        detection_result={},
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="case_fp_gate",
+        l2_failure_attributions=[],
     )
     assert owner == "clean_defense_boundary"
-    assert channel == "unresolved_balance"
 
 
-def test_arbitration_unresolved_vacuous_defense_routes_evidence_obligation() -> None:
-    """v5.9c: defense coverage complete with ZERO certificates is a vacuous
-    complete; defense-side evidence construction never ran."""
+def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> None:
+    """Unresolved terminals carry no gold polarity, so an L1 attribution is
+    accepted without a pool check."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
-    owner, channel = runner._owner_arbitration(
+    owner, reason = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "incomplete",
-                "defense_coverage": "complete",
-            },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-            "combined_prosecution": {"candidates": [{"candidate_id": "c1"}]},
-            "combined_defense": {"certificates": []},
-        },
-        primary_type=HallucinationType.UNKNOWN,
-    )
-    assert owner == "evidence_obligation"
-    assert channel == "unresolved_balance"
-
-
-def test_arbitration_unresolved_incomplete_defense_stays_silent() -> None:
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_unresolved_signal(),
-        detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "incomplete",
-                "defense_coverage": "incomplete",
-            },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-        },
-        primary_type=HallucinationType.UNKNOWN,
-    )
-    assert owner == ""
-    assert channel == ""
-
-
-def test_arbitration_fn_channel_priority_quarantine_beats_defense() -> None:
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    # With quarantined error certificates the built-error-evidence channel is
-    # more specific than the complete-defense channel.
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "complete",
-                "defense_coverage": "complete",
-            },
             "evidence_health": {"quarantined_error_certificate_count": 1},
-            "combined_defense": {"certificates": [{"target_candidate_id": "c1"}]},
         },
         primary_type=HallucinationType.UNKNOWN,
+        case_id="case_unresolved_l1",
+        l2_failure_attributions=[],
     )
     assert owner == "evidence_obligation"
-    assert channel == "verdict_evidence_gap"
+    assert reason == "provider_artifact_malformed"
 
 
-def test_arbitration_fn_no_channel_without_defense_evidence() -> None:
+def test_attribute_failure_no_failure_shape_returns_empty() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=_unresolved_signal(),
         detection_result={
             "proof_adjudication": {
-                "prosecution_coverage": "complete",
+                "state": "unresolved",
                 "defense_coverage": "incomplete",
             },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
         },
         primary_type=HallucinationType.FACTUAL,
+        case_id="case_no_shape",
+        l2_failure_attributions=l2_telemetry,
     )
     assert owner == ""
-    assert channel == ""
-
-
-def test_arbitration_respects_gold_polarity_lock() -> None:
-    from types import SimpleNamespace
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.bccse.step_attributor import ErrorType
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    fp_signal = SimpleNamespace(
-        state="verified_error",
-        error_type=ErrorType.FALSE_POSITIVE,
-        target_module="clean_defense_boundary",
-        secondary_module="abstention_rule",
-        gold_label=False,
-        has_gold=True,
-    )
-    # FP polarity must never surface an FN-side module such as
-    # candidate_trigger, even when the omission heuristic matches.
-    owner, _ = runner._owner_arbitration(
-        signal=fp_signal,
-        detection_result={
-            "proof_adjudication": {
-                "prosecution_coverage": "complete",
-                "defense_coverage": "complete",
-            },
-            "evidence_health": {"quarantined_error_certificate_count": 0},
-        },
-        primary_type=HallucinationType.OMISSION,
-    )
-    assert owner in {"", "clean_defense_boundary", "abstention_rule"}
-
-
-def test_arbitration_returns_empty_without_label_free_evidence() -> None:
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    owner, channel = runner._owner_arbitration(
-        signal=_fn_signal(),
-        detection_result={
-            "prosecution_coverage": "complete",
-            "quarantined_error_certificate_count": 0,
-        },
-        primary_type=HallucinationType.FACTUAL,
-    )
-    assert owner == ""
-    assert channel == ""
-
-
-def test_arbitration_skips_non_polarized_error_types() -> None:
-    from types import SimpleNamespace
-    from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.bccse.step_attributor import ErrorType
-    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
-
-    neutral = SimpleNamespace(
-        state="unresolved",
-        error_type=ErrorType.CORRECT,
-        target_module="",
-        secondary_module="",
-        gold_label=None,
-        has_gold=False,
-    )
-    owner, channel = runner._owner_arbitration(
-        signal=neutral,
-        detection_result={"prosecution_coverage": "complete"},
-        primary_type=HallucinationType.OMISSION,
-    )
-    assert owner == ""
-    assert channel == ""
+    assert reason == "no_failure_shape"
+    assert l2_telemetry == []
 
 
 # ---------------------------------------------------------------------------

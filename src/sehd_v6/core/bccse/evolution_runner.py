@@ -77,10 +77,9 @@ from .fitness import (
     task_state_score,
 )
 from .safety_gate import StructuralGate, create_structural_gate
-from .signal_adapter import parse_coverage
+from .failure_classifier import classify_failure
 from .step_attributor import (
     AttributionSignal,
-    ErrorType,
     TriggerSource,
     attribute_failure,
     runtime_invalid_signal,
@@ -89,6 +88,7 @@ from .signal_adapter import (
     decision_authority_invalid,
     resolve_authoritative_state,
 )
+from .v6_contracts import LAYER_L1, LAYER_L2
 from ..htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -623,13 +623,12 @@ def _build_mutation_retry_feedback(
     )
 
 
-# v5.8 fix 1: dual-channel owner arbitration.  FN cases with an internally
-# coherent clean verdict were previously locked into abstention_rule /
-# causal_link_test by the static attribution map, while the true root cause
-# (candidate-generation sensitivity or quarantined evidence) lives in other
-# genome modules.  Arbitration adds ONE deterministic second owner hypothesis
-# from label-free runtime evidence; it never reorders the attributor's owner,
-# never crosses the gold polarity side, and adds no provider call.
+# Gold polarity constraint for L1 owner hypotheses. A false negative (gold
+# says error, detector verdict clean) may only be owned by modules that can
+# tighten error detection; a false positive (gold says clean, detector
+# verdict error) may only be owned by modules that can relax or bound the
+# error claim. Structural invariant: failure attribution never crosses the
+# gold polarity side.
 _FN_POLARITY_MODULES = frozenset({
     "candidate_trigger", "evidence_obligation", "candidate_to_verifier_route",
     "atomic_verifier_instruction", "causal_link_test", "abstention_rule",
@@ -639,159 +638,107 @@ _FP_POLARITY_MODULES = frozenset({
     "clean_defense_boundary", "abstention_rule", "causal_link_test",
     "earliest_origin_tiebreak", "evidence_obligation",
 })
-_ARBITRATION_POLARIZED_ERROR_TYPES = frozenset({
-    ErrorType.FALSE_POSITIVE,
-    ErrorType.FALSE_NEGATIVE,
-    ErrorType.FALSE_NEGATIVE_UNRESOLVED,
-    ErrorType.FALSE_NEGATIVE_CLEAN,
-})
-# v5.9c: unresolved triggers enter arbitration too. Their channel is fully
-# label-free (coverage/certificate balance only), so admitting them crosses
-# no gold polarity. Without this gate the unresolved_balance channel was
-# unreachable and every unresolved+complete-defense case stayed deadlocked
-# at the static abstention_rule route.
-_ARBITRATION_UNRESOLVED_ERROR_TYPES = frozenset({
-    ErrorType.UNRESOLVED_SHOULD_ERROR,
-    ErrorType.UNRESOLVED_SHOULD_CLEAN,
-    ErrorType.UNRESOLVED_UNKNOWN,
-})
 
 
-def _certificate_rows(
-    detection_result: Mapping[str, Any], side: str,
-) -> list[Mapping[str, Any]]:
-    """Return enumerable prosecution/defense certificate rows."""
-    keys = (
-        ("combined_prosecution", "prosecution")
-        if side == "prosecution"
-        else ("combined_defense", "defense")
-    )
-    for key in keys:
-        payload = detection_result.get(key)
-        if not isinstance(payload, Mapping):
-            continue
-        rows = payload.get("candidates") or payload.get("certificates") or []
-        if isinstance(rows, list):
-            return [row for row in rows if isinstance(row, Mapping)]
-    return []
-
-
-def _owner_arbitration(
+def _attribute_failure(
     *,
     signal: Any,
     detection_result: Mapping[str, Any] | None,
     primary_type: Any,
+    case_id: str,
+    l2_failure_attributions: list[dict[str, Any]],
 ) -> tuple[str, str]:
-    """Return one deterministic owner hypothesis and its evidence channel.
+    """Attribute one triggered failure to an evolvable layer and artifact.
 
-    Channel A (process): an omission-typed false negative with a clean
-    verdict means the candidate-generation stage never surfaced the
-    missing-action candidate -> ``candidate_trigger``.
-    Channel B (verdict-vs-evidence gap): quarantined error certificates on a
-    false-negative verdict mean error evidence was built but failed
-    validation -> ``evidence_obligation``; a false-negative clean verdict
-    carried by a COMPLETE clean defense means the defense-side evidence
-    construction over-persuaded the court (the abstention module shows no
-    observable failure, the observed NO_EDIT deadlock) -> likewise
-    ``evidence_obligation``; on a false-positive verdict with a complete
-    defense the defense boundary is the gap owner.
-
-    Returns ``("", "")`` when no channel has label-free evidence.  Callers
-    append the hypothesis to the bounded attribution route; the attributor's
-    owner keeps root-cause priority and gold polarity is never crossed.
+    Delegates to the deterministic failure classifier and translates the
+    attribution into an L1 owner hypothesis for the bounded attribution
+    route. L1 owners must pass the gold polarity gate. L2
+    (adjudication-policy) failures have no L1 owner — guessing an L1 module
+    for a policy-layer failure is exactly the patch pattern this replaces —
+    and are recorded in ``l2_failure_attributions`` as audit telemetry
+    instead. Returns ``(owner, reason_code)``; empty owner when nothing is
+    actionable at L1.
     """
-    if getattr(signal, "error_type", None) not in (
-        _ARBITRATION_POLARIZED_ERROR_TYPES | _ARBITRATION_UNRESOLVED_ERROR_TYPES
-    ):
-        return "", ""
     detection_result = detection_result or {}
+    adjudication = detection_result.get("proof_adjudication") or {}
+    if not isinstance(adjudication, Mapping):
+        adjudication = {}
+    boundary_path = detection_result.get("boundary_path")
+    boundary_path_state = (
+        str(boundary_path.get("state") or "")
+        if isinstance(boundary_path, Mapping) else ""
+    )
+    gold_label = getattr(signal, "gold_label", None)
     state = str(
         getattr(signal, "state", "") or detection_result.get("state") or ""
     )
-    # v5.9c: label-free arbitration for unresolved triggers. The funnel
-    # analysis showed every unresolved case with a complete defense was
-    # statically routed to abstention_rule, whose contract cannot rewrite
-    # the deterministic verdict, so diagnosis+generation correctly produced
-    # only NO_EDIT (10/14 no-edits across four runs). The real owner is
-    # decided by who carried the stalemate:
-    # - complete defense WITH certificates + surviving error certificates:
-    #   the defense boundary must answer the surviving error evidence ->
-    #   clean_defense_boundary;
-    # - complete defense with ZERO certificates (vacuous complete):
-    #   defense-side evidence construction never ran -> evidence_obligation.
-    if state == "unresolved":
-        health_u = detection_result.get("evidence_health") or {}
-        quarantined_u = int(
-            health_u.get("quarantined_error_certificate_count") or 0
-        ) if isinstance(health_u, Mapping) else 0
-        proof_u = detection_result.get("proof_adjudication") or {}
-        defense_complete_u = parse_coverage(
-            proof_u.get("defense_coverage") if isinstance(proof_u, Mapping) else None
-        ).state == "complete"
-        if not defense_complete_u:
-            return "", ""
-        defense_rows_u = _certificate_rows(detection_result, "defense")
-        prosecution_rows_u = _certificate_rows(detection_result, "prosecution")
-        surviving_error = max(len(prosecution_rows_u) - quarantined_u, 0)
-        if defense_rows_u and surviving_error > 0:
-            return "clean_defense_boundary", "unresolved_balance"
-        if not defense_rows_u:
-            return "evidence_obligation", "unresolved_balance"
-        return "", ""
-    gold_label = getattr(signal, "gold_label", None)
     fn_side = bool(gold_label) and state == "verified_clean"
     fp_side = gold_label is False and state == "verified_error"
-    if fn_side:
-        pool = _FN_POLARITY_MODULES
-    elif fp_side:
-        pool = _FP_POLARITY_MODULES
-    else:
-        return "", ""
+    provider_artifacts: list[dict[str, Any]] = []
     type_value = str(getattr(primary_type, "value", primary_type) or "")
     if fn_side and type_value == "omission":
-        return "candidate_trigger", "process_channel"
-    # v5.9 fix: the quarantined count lives under evidence_health and the
-    # defense coverage under proof_adjudication. Reading top-level keys
-    # silently returned None/"" for every case, which disabled this channel
-    # entirely and left FN-clean cases deadlocked at abstention_rule NO_EDIT.
+        # A missing error candidate is only observable against the gold
+        # label (the detector itself reports a coherent clean verdict), so
+        # this is the single gold-informed provider-artifact signal. It
+        # keeps the only genuinely valid behaviour of the replaced process
+        # channel, expressed as classifier input instead of a special case.
+        provider_artifacts.append({
+            "kind": "candidate",
+            "module_hint": "",
+            "malformed": False,
+            "missing_fields": ["candidate"],
+        })
     health = detection_result.get("evidence_health") or {}
-    quarantined_raw = (
-        health.get("quarantined_error_certificate_count")
-        if isinstance(health, Mapping) else None
-    )
-    try:
-        quarantined = int(quarantined_raw or 0)
-    except (TypeError, ValueError):
-        quarantined = 0
-    proof = detection_result.get("proof_adjudication") or {}
-    defense_reading = parse_coverage(
-        proof.get("defense_coverage") if isinstance(proof, Mapping) else None
-    )
-    defense_complete = (
-        defense_reading.state == "complete"
-        or defense_reading.score == 1.0
-    )
-    if fn_side and quarantined > 0:
-        return "evidence_obligation", "verdict_evidence_gap"
-    if fn_side and defense_complete:
-        # v5.9: prefer the most specific executable owner. When defense
-        # certificates exist, the clean verdict was carried by the defense
-        # side; a rule tightening when a defense/boundary record may be
-        # emitted is an action clean_defense_boundary's provider can execute,
-        # and it stays inside the FN polarity (gold=error). The previous
-        # evidence_obligation-only channel asked the prosecution-side module
-        # to fix a defense-side construction, which source replay can score
-        # but which the trace rarely justifies.
-        if _certificate_rows(detection_result, "defense"):
-            return "clean_defense_boundary", "verdict_evidence_gap"
-        # FN carried by a complete clean defense without enumerable rows:
-        # evidence_obligation owns the defense-side evidence standard and
-        # stays inside the FN polarity.
-        return "evidence_obligation", "verdict_evidence_gap"
-    if fp_side:
-        if defense_complete:
-            return "clean_defense_boundary", "verdict_evidence_gap"
-    return "", ""
+    if not isinstance(health, Mapping):
+        health = {}
+    for health_key, artifact_kind in (
+        ("quarantined_error_certificate_count", "error_certificate"),
+        ("quarantined_defense_certificate_count", "defense_certificate"),
+    ):
+        try:
+            quarantined = int(health.get(health_key) or 0)
+        except (TypeError, ValueError):
+            quarantined = 0
+        if quarantined > 0:
+            # A quarantined certificate is provider output the court could
+            # not validate, i.e. a malformed provider artifact.
+            provider_artifacts.append({
+                "kind": artifact_kind,
+                "module_hint": "",
+                "malformed": True,
+                "missing_fields": [],
+            })
+    attribution = classify_failure({
+        "adjudication": dict(adjudication),
+        "boundary_path_state": boundary_path_state,
+        "provider_artifacts": provider_artifacts,
+    })
+    if attribution.layer == LAYER_L1:
+        owner = attribution.artifact
+        # Polarity gate: a hypothesis that crosses the gold side would
+        # evolve the detector against the ground truth, so it is dropped.
+        # Unresolved terminals carry no polarity and are accepted as-is.
+        if fn_side:
+            pool: frozenset[str] | None = _FN_POLARITY_MODULES
+        elif fp_side:
+            pool = _FP_POLARITY_MODULES
+        elif state == "unresolved":
+            pool = None
+        else:
+            pool = frozenset()
+        if pool is not None and owner not in pool:
+            return "", attribution.reason_code
+        return owner, attribution.reason_code
+    if attribution.layer == LAYER_L2:
+        l2_failure_attributions.append({
+            "case_id": case_id,
+            **attribution.to_dict(),
+        })
+        print(
+            f"    [L2] failure attribution: {attribution.artifact} "
+            f"({attribution.reason_code})"
+        )
+    return "", attribution.reason_code
 
 
 def _localization_bias_signal(
@@ -1863,6 +1810,9 @@ def run_online_evolution(
     # v5.8 fix 4: label-free localization-bias telemetry collected during the
     # run; audit output only, never feeds verdicts or fitness.
     localization_bias_signals: list[dict[str, str]] = []
+    # Deterministic L2 (adjudication-policy) failure attributions collected
+    # during the run; audit telemetry only, never feeds verdicts or fitness.
+    l2_failure_attributions: list[dict[str, Any]] = []
     # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
     # the ladder at most once; advances are audit telemetry only.
     abstention_ladder_used: set[str] = set()
@@ -3091,21 +3041,23 @@ def run_online_evolution(
         evolution_direction = type_evolution._infer_evolution_direction(
             signal.state, signal.gold_label,
         )
-        # v5.8 fix 1: dual-channel owner arbitration. The hypothesis widens
-        # the bounded attribution route; the attributor's owner keeps
-        # root-cause priority (re-enforced below) and gold polarity is
-        # enforced inside the arbitration itself.
-        arbitration_owner, arbitration_channel = _owner_arbitration(
+        # Deterministic failure attribution may widen the bounded
+        # attribution route with one label-free L1 owner hypothesis; the
+        # attributor's owner keeps root-cause priority (re-enforced below)
+        # and gold polarity is enforced inside the attribution itself.
+        attribution_owner, attribution_reason = _attribute_failure(
             signal=signal,
             detection_result=detection_result,
             primary_type=type_result.primary_type,
+            case_id=case_id,
+            l2_failure_attributions=l2_failure_attributions,
         )
         attribution_route = (signal.target_module, signal.secondary_module)
-        if arbitration_owner and arbitration_owner not in attribution_route:
-            attribution_route = (*attribution_route, arbitration_owner)
+        if attribution_owner and attribution_owner not in attribution_route:
+            attribution_route = (*attribution_route, attribution_owner)
             print(
-                f"    [ARB] owner hypothesis: {arbitration_owner} via "
-                f"{arbitration_channel}"
+                f"    [ATTR] owner hypothesis: {attribution_owner} via "
+                f"{attribution_reason}"
             )
         bias_signal = _localization_bias_signal(detection_result)
         if bias_signal:
@@ -3133,18 +3085,17 @@ def run_online_evolution(
                     if module != signal.target_module
                 ),
             )
-        # v5.9: the arbitration owner is derived from label-free runtime
-        # evidence (who carried the verdict) and is already polarity-bounded.
-        # A partial typed intersection can silently drop it (e.g. type=TOOL
-        # filters out clean_defense_boundary), which reintroduces the exact
-        # NO_EDIT deadlock the arbitration exists to break. Keep it as the
-        # lowest-priority fallback so reflection always has an executable
-        # owner; the attributor's owner keeps root-cause priority.
+        # The attribution owner is derived from label-free runtime evidence
+        # and is already polarity-bounded. A partial typed intersection can
+        # silently drop it, which reintroduces the exact NO_EDIT deadlock
+        # the attribution exists to break. Keep it as the lowest-priority
+        # fallback so reflection always has an executable owner; the
+        # attributor's owner keeps root-cause priority.
         if (
-            arbitration_owner
-            and arbitration_owner not in type_allowed_modules
+            attribution_owner
+            and attribution_owner not in type_allowed_modules
         ):
-            type_allowed_modules = (*type_allowed_modules, arbitration_owner)
+            type_allowed_modules = (*type_allowed_modules, attribution_owner)
         # v5.6 owner escalation: on a retry, move owners that already produced
         # source_no_effect to the end of the allowed-module order. The model is
         # then nudged toward a different attributed owner; the hard duplicate
@@ -4617,6 +4568,7 @@ def run_online_evolution(
                 budget_usage["detector_calls"] + budget_usage["mutation_calls"]
             ),
             "localization_bias_signals": localization_bias_signals,
+            "l2_failure_attributions": l2_failure_attributions,
             "abstention_ladder_advances": abstention_ladder_advances,
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,
