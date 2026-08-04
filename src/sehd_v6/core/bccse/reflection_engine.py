@@ -982,6 +982,19 @@ def build_failure_diagnosis_prompt(
     execute a repair.  It never writes a rule and never sees gold labels.
     """
     allowed = [str(module) for module in allowed_target_modules]
+    allowed_set = set(allowed)
+
+    def _hint(module: str) -> str:
+        module = str(module or "")
+        if not module:
+            return "(none)"
+        if module in allowed_set:
+            return module
+        # v5.9c: an attribution hint outside the editable set used to derail
+        # the diagnosis ("the primary module is not in the allowed list").
+        # Annotate editability instead of letting the model fixate on it.
+        return f"{module} (NOT editable here; choose from ALLOWED_MODULES)"
+
     contracts = "\n".join(
         f"- {module}: action={MODULE_RUNTIME_CONTRACTS.get(module, 'module-local output')}; "
         f"allowed_observable_fields={','.join(MODULE_OBSERVABLE_FIELDS.get(module, ()))}"
@@ -999,8 +1012,8 @@ def build_failure_diagnosis_prompt(
         f"trigger={signal.trigger_source.value}\n"
         f"error_type={signal.error_type.value}\n"
         f"state={signal.state}\n"
-        f"primary_module_hint={signal.target_module}\n"
-        f"secondary_module_hint={signal.secondary_module}\n"
+        f"primary_module_hint={_hint(signal.target_module)}\n"
+        f"secondary_module_hint={_hint(signal.secondary_module)}\n"
         "</diagnostic_signal>\n"
         "<structured_runtime_observation>\n"
         + json.dumps(runtime_observation, ensure_ascii=False, sort_keys=True)
@@ -1289,6 +1302,22 @@ def format_detection_context_for_llm(
         parts.append(f"  - {summary or 'certificate has no executable fields'}")
     if not prosecution_rows:
         parts.append("  控方未提出有效论点")
+    elif all(
+        not selected_fields(row, (
+            "source_candidate_id", "candidate_id", "violation_state",
+            "actor_state", "boundary_state", "propagation_state",
+            "benchmark_causal_status", "norm_evidence_refs",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "impact_evidence_refs", "recovery_evidence_refs",
+        ))
+        for row in prosecution_rows[:5]
+    ):
+        # v5.9c: certificates can exist yet carry no executable fields; the
+        # previous rendering was indistinguishable from "no argument at all",
+        # which made reflection misread the court balance.
+        parts.append(
+            f"  注意: 存在 {len(prosecution_rows)} 个控方证书但全部缺少可执行字段"
+        )
     parts.append("  </prosecution>")
 
     # 3. Defense arguments
@@ -1310,6 +1339,18 @@ def format_detection_context_for_llm(
         parts.append(f"  - {summary or 'defense has no executable fields'}")
     if not defense_rows:
         parts.append("  辩方未提出有效论点")
+    elif all(
+        not selected_fields(row, (
+            "target_candidate_id", "candidate_id", "defense_type",
+            "boundary_state", "support_state", "evidence_refs",
+            "positive_evidence_refs", "boundary_evidence_refs",
+            "recovery_evidence_refs", "rationale",
+        ))
+        for row in defense_rows[:5]
+    ):
+        parts.append(
+            f"  注意: 存在 {len(defense_rows)} 个辩方证书但全部缺少可执行字段"
+        )
     parts.append("  </defense>")
 
     # 4. Adjudication reasoning

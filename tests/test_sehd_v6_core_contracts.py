@@ -467,6 +467,39 @@ def test_failure_diagnosis_prompt_bounded_and_label_free() -> None:
     assert "gold" not in user.lower().replace("gold_mismatch", "")
 
 
+def test_failure_diagnosis_prompt_marks_uneditable_hints() -> None:
+    """v5.9c: attribution hints outside the editable set are annotated
+    instead of letting the model fixate on 'primary module not allowed'
+    (observed derailment on BFCL/160)."""
+    _, user = build_failure_diagnosis_prompt(
+        signal=_fn_clean_signal(),
+        runtime_observation={"court_balance": {"defense_certificates": 2}},
+        detection_context="trace",
+        current_skill_text="rules",
+        allowed_target_modules=("clean_defense_boundary",),
+    )
+    assert "abstention_rule (NOT editable here" in user
+    assert "causal_link_test (NOT editable here" in user
+
+
+def test_detection_context_marks_inert_certificates() -> None:
+    """Certificates that exist but carry no executable fields must be
+    distinguishable from 'no argument at all' in the reflection trace."""
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        format_detection_context_for_llm,
+    )
+
+    result = {
+        "state": "unresolved",
+        "combined_defense": {"certificates": [{}, {}, {}]},
+        "combined_prosecution": {"candidates": [{"candidate_id": "c1", "violation_state": "established"}]},
+        "proof_adjudication": {},
+    }
+    text = format_detection_context_for_llm(result)
+    assert "辩方证书但全部缺少可执行字段" in text
+    assert "控方证书但全部缺少可执行字段" not in text
+
+
 def test_sanitize_diagnosis_downgrades_illegal_owner() -> None:
     bounded = sanitize_diagnosis(
         {
