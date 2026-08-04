@@ -114,6 +114,8 @@ def _write_records(tmp_path, *, jsonl: bool) -> object:
 def offline_evolution(monkeypatch, tmp_path):
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+
     @contextmanager
     def provider_context(*, genome, config):
         yield None
@@ -183,6 +185,63 @@ def test_standalone_evolution_accepts_mapping_input(tmp_path, offline_evolution)
 
     assert result.total_cases == 2
     assert (tmp_path / "out2" / "champion_genome.json").is_file()
+
+
+def test_standalone_evolution_without_credential_skips_mutation_provider(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls = 0
+
+    def detector(*, genome, case_id, **kwargs):
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    def mutation(**kwargs):
+        nonlocal calls
+        calls += 1
+        raise AssertionError("mutation provider must not be called")
+
+    for key in (
+        "SEHD_MUTATION_API_KEY_ENV",
+        "SEHD_PROVIDER_API_KEY_ENV",
+        "SEHD_API_KEY_ENV",
+        "DEEPSEEK_API_KEY",
+        "SEHD_TEST_MISSING_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv(
+        "SEHD_ROUTE_MUTATION_API_KEY_ENV", "SEHD_TEST_MISSING_KEY"
+    )
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = run_evolution(
+        records={"source": {}},
+        detector_config=_write_config(tmp_path),
+        output_dir=tmp_path / "no_credential",
+        mutation_route={
+            "model": "DeepSeek-V4-Flash",
+            "api_key_environment": "SEHD_TEST_MISSING_KEY",
+        },
+        run_id="no_credential",
+    )
+
+    assert calls == 0
+    assert result.steps[0].gate_decision == "skip_no_edit"
+    assert result.evolution_audit["mutation_calls"] == 0
 
 
 def test_standalone_evolution_rejects_empty_records(tmp_path) -> None:

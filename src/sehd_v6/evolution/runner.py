@@ -23,7 +23,7 @@ from ..core.bccse.evolution_runner import (
 )
 from ..core.bccse.genome import SkillGenome
 from ..core.paca_tcl.detector import resolve_detector_config
-from ..provider_routes import resolve_provider_route
+from ..provider_routes import has_provider_credential, resolve_provider_route
 
 
 def default_mutation_route() -> dict[str, Any]:
@@ -190,6 +190,10 @@ def run_evolution(
     else:
         config = resolve_detector_config(dict(detector_config))
 
+    resolved_mutation_route = _resolve_mutation_route(mutation_route)
+    if not has_provider_credential(resolved_mutation_route):
+        resolved_mutation_route = None
+
     return run_online_evolution(
         evolution_case_ids=list(records),
         records=records,
@@ -197,7 +201,7 @@ def run_evolution(
         output_dir=Path(output_dir),
         census_root=Path(census_root) if census_root is not None else None,
         use_gold=use_gold,
-        mutation_route=_resolve_mutation_route(mutation_route),
+        mutation_route=resolved_mutation_route,
         module_cooldown=module_cooldown,
         max_total_edits=max_total_edits,
         convergence_window=convergence_window,

@@ -3787,13 +3787,13 @@ def run_online_evolution(
             "proposed_target_module": None,
             "validated_target_module": None,
         }
+        allowed_modules = type_allowed_modules
 
         if mutation_route is not None:
             mutation_cache = output_dir / "mutation_cache"
             mutation_cache.mkdir(parents=True, exist_ok=True)
 
             # Prepare rich context for LLM
-            allowed_modules = type_allowed_modules
             skill_context = "\n\n".join(
                 format_skill_context_for_llm(
                     current_genome.modules,
@@ -4299,6 +4299,9 @@ def run_online_evolution(
                         f"{type(exc).__name__}:{exc}"
                     )
                     parsed = {}
+
+        if mutation_route is None:
+            no_edit_reason = "mutation_route_unavailable"
 
         if edit is None and no_edit_reason:
             type_fitness.get_experience_memory().add_experience(
