@@ -21,7 +21,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
 
 
 # ============================================================
@@ -471,6 +471,22 @@ def validate_runtime_rule(content: str, target_module: str) -> tuple[bool, str]:
 # Core Data Structures
 # ============================================================
 
+_RULE_SLOT_LIMITS = {
+    "condition": 300,
+    "action": 300,
+    "evidence_anchor": 240,
+}
+
+
+def _sanitize_rule_slots(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        key: " ".join(str(value.get(key) or "").split())[:limit]
+        for key, limit in _RULE_SLOT_LIMITS.items()
+        if str(value.get(key) or "").strip()
+    }
+
 @dataclass
 class SkillModule:
     """A skill module containing natural language behavioral rules.
@@ -500,6 +516,8 @@ class SkillModule:
                 meta["type_confidence"] = normalize_type_confidence(
                     meta.get("type_confidence")
                 )
+            if "rule_slots" in meta:
+                meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
 
     @property
     def capacity(self) -> int:
@@ -526,6 +544,10 @@ class SkillModule:
             normalized["type_confidence"] = normalize_type_confidence(
                 normalized.get("type_confidence")
             )
+        if "rule_slots" in normalized:
+            normalized["rule_slots"] = _sanitize_rule_slots(
+                normalized.get("rule_slots")
+            )
         self.rule_meta[index] = normalized
 
     def is_rule_protected(self, index: int) -> bool:
@@ -547,6 +569,8 @@ class SkillModule:
                 meta["type_confidence"] = normalize_type_confidence(
                     meta.get("type_confidence")
                 )
+            if "rule_slots" in meta:
+                meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
             safe_meta.append(meta)
         return {
             "module_id": self.module_id,
@@ -596,6 +620,7 @@ class SkillEdit:
     # function compares this against the source-replay delta token-by-token
     # instead of doing substring matching on `expected_effect`.
     expected_effect_contract: dict[str, Any] = field(default_factory=dict)
+    rule_slots: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -627,6 +652,7 @@ class SkillEdit:
             "expected_effect_contract": sanitize_expected_effect_contract(
                 self.expected_effect_contract
             ),
+            "rule_slots": _sanitize_rule_slots(self.rule_slots),
         }
 
     @classmethod
@@ -664,6 +690,7 @@ class SkillEdit:
             expected_effect_contract=sanitize_expected_effect_contract(
                 data.get("expected_effect_contract")
             ),
+            rule_slots=_sanitize_rule_slots(data.get("rule_slots")),
         )
 
 
@@ -764,6 +791,30 @@ class SkillGenome:
 # Edit Application
 # ============================================================
 
+def _validate_persisted_rule_slots(
+    edit: SkillEdit,
+) -> tuple[bool, str]:
+    slots = _sanitize_rule_slots(edit.rule_slots)
+    if not slots:
+        return True, ""
+    if set(slots) != set(_RULE_SLOT_LIMITS):
+        return False, "rule_slots_incomplete"
+    from .rule_contract import RuleSpec, render_rule, validate_rule_spec
+
+    spec = RuleSpec(
+        condition=slots["condition"],
+        action=slots["action"],
+        evidence_anchor=slots["evidence_anchor"],
+        module_id=edit.target_module,
+        direction=_detect_rule_direction(edit.new_content),
+    )
+    valid, reason = validate_rule_spec(spec)
+    if not valid:
+        return False, f"rule_slots:{reason}"
+    if render_rule(spec) != edit.new_content:
+        return False, "rule_slots_render_mismatch"
+    return True, ""
+
 def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     """Validate an edit against structural constraints."""
     if edit.target_module not in MODULE_IDS:
@@ -779,6 +830,11 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     edit.operation = operation_value
 
     module = genome.modules[edit.target_module]
+
+    if operation_value in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}:
+        slots_valid, slots_reason = _validate_persisted_rule_slots(edit)
+        if not slots_valid:
+            return False, slots_reason
 
     feature_valid, feature_reason = validate_feature_description(
         edit.feature_description
@@ -958,6 +1014,7 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "type_confidence": normalize_type_confidence(edit.type_confidence),
         "routing_allowed_modules": list(edit.routing_allowed_modules),
         "created_at_generation": new_generation,
+        "rule_slots": _sanitize_rule_slots(edit.rule_slots),
     }
 
     if edit.operation == SkillOp.ADD_RULE:

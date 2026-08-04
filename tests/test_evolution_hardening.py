@@ -4472,8 +4472,21 @@ def test_valid_slots_persist_as_deterministic_render(
     ))
     edit = result.champion_genome.edits_applied[-1]
     assert edit.new_content == expected
+    expected_slots = {
+        "condition": "a factual claim lacks cited trajectory support",
+        "action": "require one event-backed certificate",
+        "evidence_anchor": "factual claim without cited trajectory support",
+    }
+    assert edit.rule_slots == expected_slots
     rules = result.champion_genome.modules[edit.target_module].rules
     assert rules[-1] == expected
+    assert result.champion_genome.modules[edit.target_module].get_rule_meta(
+        len(rules) - 1
+    )["rule_slots"] == expected_slots
+    restored = SkillGenome.from_dict(result.champion_genome.to_dict())
+    assert restored.modules[edit.target_module].get_rule_meta(
+        len(rules) - 1
+    )["rule_slots"] == expected_slots
 
 
 def test_structural_gate_slot_contract_replaces_text_guess() -> None:
@@ -4559,6 +4572,17 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
     )
     assert not accepted_slots
     assert "rule_spec_contract:evidence_anchor_too_long" in slot_reasons
+
+
+def test_persisted_rule_slots_must_match_rendered_rule() -> None:
+    edit = _typed_edit(rule_slots={
+        "condition": "a factual claim lacks cited trajectory support",
+        "action": "require a different certificate",
+        "evidence_anchor": "different certificate requirement",
+    })
+    valid, reason = validate_edit(edit, create_baseline_genome())
+    assert not valid
+    assert reason == "rule_slots_render_mismatch"
 
 
 # ---------------------------------------------------------------------------

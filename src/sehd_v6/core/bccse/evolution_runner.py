@@ -4273,6 +4273,7 @@ def run_online_evolution(
                         routing_allowed_modules=tuple(allowed_modules),
                         expected_effect=expected_effect,
                         expected_effect_contract=expected_effect_contract,
+                        rule_slots=pending_rule_slots or {},
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
