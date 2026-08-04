@@ -105,7 +105,7 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
 - `_owner_arbitration` 的 4 个情景通道 → [已删除] 由 `failure_classifier` 取代；
 - `sanitize_diagnosis` 的空断言正则、ownership 重映射 → [保留] 它是 LLM 诊断输出的
   结构门而非 owner 猜测，归因已不再依赖它；
-- 诊断 prompt 的 hint 可编辑性标注、editable flag → [保留待 Wave2-H 一并清理]；
+- 诊断 prompt 的 hint 可编辑性标注、editable flag → [已删除] 归因输出即允许集合；
 - `repair_rule_for_structural_reason` 机械修复 → [保留]（修生成语法，跨层有效）；
 - 诊断-干预二级管线 → [保留] 诊断与生成分离结构，归因输出已是（层, 工件, 证据）。
 
@@ -150,13 +150,21 @@ prompt 文本），"工件 → 行为"耦合是机械保证的，直接解决根
 - [x] 模块章程 `module_charter.py`（8 模块英文章程，含跨层引导）。
 - [x] L1 槽位规则契约 `rule_contract.py`（受控英文 if-then，槽位校验+确定性渲染）。
 - [x] 5.5 三项缺陷离线定性（结论见 5.5）。
+- [x] 槽位模板落地生成路径：反思 prompt 产出 condition/action/evidence_anchor 槽位，
+      规则文本由 render_rule 确定性渲染；结构 gate 切到槽位契约（文本路径仅服务
+      remove_rule 与历史 checkpoint 回放）；editable 标注补丁栈已删；章程全文注入
+      反思 prompt（取代逐模块 contract 行）。
+- [x] L2 策略提案闭环：`policy_reflection.py`（词表动态生成的反思 prompt + 解析）；
+      主循环对 L2 归因产出 PolicyEdit → validate/apply → source replay（必须 fired
+      且移动可观察输出）→ gold 极性门（分数严格上升，无连续阈值）→ 接受/回滚；
+      L2 案例不再进入 L1 变异路径；checkpoint 持久化 policy_genome 可 resume；
+      gate_decision 新增 accept_policy / reject_policy_no_effect /
+      reject_policy_fitness / skip_no_policy；审计进 evolution_audit["l2_policy_audit"]。
+- [x] 检测路径透传：adjudicate_case(policy_items=) 在法庭收敛点用同一证据束
+      重裁（final_court_kwargs 单一来源），默认惰性。
 
 待办：
 
-1. Wave2-H：Skill 槽位模板落地到生成路径（反思 prompt 产出槽位 JSON、
-   compile_edit_proposal 走 rule_contract 校验、结构 gate 切换），与 8 例验证
-   捆绑实施（需 LLM 生成行为验证）。
-2. 全新 8 例小验证（含 unresolved 僵局形态），验收标准：裁决级触发案例的
-   L2 归因遥测正确、L1 no_edit 大类显著下降；案例必须排除账本全部 case_id。
-3. L2 策略提案生成闭环：反思引擎对 L2 归因产出 PolicyEdit（目前 L2 失败只留遥测）。
-4. 通过后重启 50 例正式实验（`build_full50_dataset.py` 可复用，重新排除账本）。
+1. 全新 8 例小验证（含 unresolved 僵局形态），验收标准：裁决级触发案例产出
+   可 replay 验证的策略提案、L1 no_edit 大类显著下降；案例必须排除账本全部 case_id。
+2. 通过后重启 50 例正式实验（`build_full50_dataset.py` 可复用，重新排除账本）。
