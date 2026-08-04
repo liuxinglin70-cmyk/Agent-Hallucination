@@ -4,6 +4,12 @@ Workspace for experiment plans, protocol records and local run artifacts.
 Experiment protocols are deliberately kept outside the framework code
 (`src/sehd_v6/detector` and `src/sehd_v6/evolution`).
 
+**Before designing or running any experiment here, read and comply with the
+"Core Objective and Design Discipline" section of the repository-root
+[README](../README.md)** (核心目标、设计理念、导师要求). Every plan under
+`plans/` must state how it complies; reviews check compliance before
+results are accepted.
+
 ```text
 experiments/
 ├── README.md                # this file (tracked)

@@ -103,9 +103,11 @@ from .v6_contracts import (
     build_adjudication_facts,
 )
 from .policy_genome import (
+    FITNESS_STATUS_STRONG,
     PolicyEdit,
     PolicyGenome,
     PolicyOp,
+    _validate_item_contract,
     apply_policy_edit,
     create_baseline_policy_genome,
     validate_policy_edit,
@@ -1475,6 +1477,28 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         ),
         "rejected_buffer": list(checkpoint.get("rejected_buffer") or []),
         "counters": dict(checkpoint.get("counters") or {}),
+        "policy_genome": dict(checkpoint.get("policy_genome") or {}),
+        "l2_policy_accepts": int(checkpoint.get("l2_policy_accepts") or 0),
+        "l2_policy_audit": list(checkpoint.get("l2_policy_audit") or []),
+        "stable_policy_genome_payload": dict(
+            checkpoint.get("stable_policy_genome_payload") or {}
+        ),
+        "stable_l2_policy_accepts": int(
+            checkpoint.get("stable_l2_policy_accepts") or 0
+        ),
+        "abstention_ladder_used": list(
+            checkpoint.get("abstention_ladder_used") or []
+        ),
+        "contrast_registry": dict(checkpoint.get("contrast_registry") or {}),
+        "rejected_policy_summaries": list(
+            checkpoint.get("rejected_policy_summaries") or []
+        ),
+        "localization_bias_signals": list(
+            checkpoint.get("localization_bias_signals") or []
+        ),
+        "non_l1_failure_attributions": list(
+            checkpoint.get("non_l1_failure_attributions") or []
+        ),
         "updated_at": float(checkpoint.get("updated_at") or 0.0),
         "checkpoint_dir": str(output_dir),
     }
@@ -1680,7 +1704,7 @@ def _llm_no_conflict_gate(
                 budget_usage["mutation_budget_exhausted"] = (
                     budget_usage.get("mutation_budget_exhausted", 0) + 1
                 )
-                return False, "mutation_call_budget_exhausted", [], True
+                return False, "conflict_gate_budget_exhausted", [], True
             budget_usage["mutation_calls"] += 1
         result, _meta = json_object_provider_call(
             route=mutation_route,
@@ -1701,14 +1725,18 @@ def _llm_no_conflict_gate(
             budget_usage.get("mutation_cache_hits", 0) + 1
         )
     if budget_usage is not None and isinstance(_meta, Mapping):
-        budget_usage["mutation_transport_attempts"] = (
-            budget_usage.get("mutation_transport_attempts", 0)
-            + int(_meta.get("transport_attempts") or 0)
-        )
-        budget_usage["mutation_repairs"] = (
-            budget_usage.get("mutation_repairs", 0)
-            + int(bool(_meta.get("repair_used")))
-        )
+        # A cache hit served zero network traffic: the cached record carries
+        # the ORIGINAL transport attempts/repair flag, so accumulating them
+        # here would inflate the counters once per replay of the same entry.
+        if not _meta.get("cache_hit"):
+            budget_usage["mutation_transport_attempts"] = (
+                budget_usage.get("mutation_transport_attempts", 0)
+                + int(_meta.get("transport_attempts") or 0)
+            )
+            budget_usage["mutation_repairs"] = (
+                budget_usage.get("mutation_repairs", 0)
+                + int(bool(_meta.get("repair_used")))
+            )
     if not isinstance(result, dict):
         return False, "parse_failure", [], True
     decision = str(result.get("decision", "")).strip().lower()
@@ -1944,6 +1972,7 @@ def run_online_evolution(
         "source_replays": 0,
         "canary_cases": 0,
         "contrast_replays": 0,
+        "policy_replays": 0,
         "probe_cases": 0,
         # ``provider_calls`` is retained as the historical detector-call
         # counter. Explicit fields avoid conflating detector replays with
@@ -1981,6 +2010,11 @@ def run_online_evolution(
     # is only ever replayed as a copy, so rollback is inherent.
     policy_genome = create_baseline_policy_genome()
     l2_policy_accepts = 0
+    # Probe rollback anchors for the L2 surface, symmetric with stable_genome:
+    # a failed development probe restores the policy genome accepted before
+    # the last passing probe, so L1 and L2 roll back under one authority.
+    stable_policy_genome = policy_genome.clone()
+    stable_l2_policy_accepts = 0
     l2_policy_audit: list[dict[str, Any]] = []
     rejected_policy_summaries: list[str] = []
     # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
@@ -2189,7 +2223,76 @@ def run_online_evolution(
             and restored_policy_payload.get("items")
         ):
             policy_genome = PolicyGenome.from_dict(dict(restored_policy_payload))
+            # Restored policy items re-enter the deterministic evaluator on
+            # the next detection, so a corrupt or vocabulary-drifted payload
+            # fails closed here instead of silently skewing adjudication.
+            persisted_policy_hash = str(
+                restored_policy_payload.get("content_hash") or ""
+            )
+            if (
+                persisted_policy_hash
+                and persisted_policy_hash != policy_genome.content_hash
+            ):
+                raise ValueError(
+                    "checkpoint policy genome hash does not match its content"
+                )
+            for restored_item in policy_genome.items:
+                item_ok, item_reason = _validate_item_contract(restored_item)
+                if not item_ok:
+                    raise ValueError(
+                        "checkpoint policy item "
+                        f"{restored_item.item_id!r} failed the closed "
+                        f"vocabulary contract: {item_reason}"
+                    )
         l2_policy_accepts = int(checkpoint.get("l2_policy_accepts") or 0)
+        # The probe rollback anchor resumes from the last probe-stable policy
+        # snapshot; checkpoints predating the snapshot field treat the
+        # restored policy genome itself as the stable point.
+        restored_stable_policy_payload = checkpoint.get(
+            "stable_policy_genome_payload"
+        )
+        if (
+            isinstance(restored_stable_policy_payload, Mapping)
+            and restored_stable_policy_payload.get("items") is not None
+        ):
+            stable_policy_genome = PolicyGenome.from_dict(
+                dict(restored_stable_policy_payload)
+            )
+            stable_l2_policy_accepts = int(
+                checkpoint.get("stable_l2_policy_accepts") or 0
+            )
+        else:
+            stable_policy_genome = policy_genome.clone()
+            stable_l2_policy_accepts = l2_policy_accepts
+        abstention_ladder_used = {
+            str(value)
+            for value in (checkpoint.get("abstention_ladder_used") or ())
+        }
+        restored_contrast_registry = checkpoint.get("contrast_registry") or {}
+        contrast_registry = {
+            str(hallucination_type): [
+                dict(row)
+                for row in (rows or ())
+                if isinstance(row, Mapping)
+            ]
+            for hallucination_type, rows in restored_contrast_registry.items()
+        }
+        rejected_policy_summaries = [
+            str(value)
+            for value in (checkpoint.get("rejected_policy_summaries") or ())
+        ][-20:]
+        localization_bias_signals = [
+            dict(value)
+            for value in (checkpoint.get("localization_bias_signals") or ())
+            if isinstance(value, Mapping)
+        ]
+        non_l1_failure_attributions = [
+            dict(value)
+            for value in (
+                checkpoint.get("non_l1_failure_attributions") or ()
+            )
+            if isinstance(value, Mapping)
+        ]
         restored_policy_audit = checkpoint.get("l2_policy_audit")
         if isinstance(restored_policy_audit, list):
             l2_policy_audit = [
@@ -2219,6 +2322,13 @@ def run_online_evolution(
                 f"step(s); work queue restarts at case index "
                 f"{resume_next_case_index}"
             )
+        # A step still marked provisional at checkpoint time lost its shadow
+        # edit above (uncommitted shadows are never restored), so finalize
+        # the audit record instead of leaving it open forever.
+        for step in steps:
+            if step.gate_decision == "provisional":
+                step.gate_decision = "rollback_resume"
+                step.mutation_applied = None
         if (
             steps
             and resume_next_case_index == steps[-1].case_index
@@ -2314,6 +2424,7 @@ def run_online_evolution(
             "source": "source_replays",
             "canary": "canary_cases",
             "contrast": "contrast_replays",
+            "policy": "policy_replays",
             "probe": "probe_cases",
         }.get(budget_kind)
         if budget_field is not None:
@@ -2348,12 +2459,16 @@ def run_online_evolution(
         if isinstance(meta, Mapping) and meta.get("cache_hit"):
             budget_usage["mutation_cache_hits"] += 1
         if isinstance(meta, Mapping):
-            budget_usage["mutation_transport_attempts"] += int(
-                meta.get("transport_attempts") or 0
-            )
-            budget_usage["mutation_repairs"] += int(
-                bool(meta.get("repair_used"))
-            )
+            # Cache hits served zero network traffic; their recorded
+            # transport attempts/repair flag belong to the original call and
+            # must not be re-counted on every replay of the cached entry.
+            if not meta.get("cache_hit"):
+                budget_usage["mutation_transport_attempts"] += int(
+                    meta.get("transport_attempts") or 0
+                )
+                budget_usage["mutation_repairs"] += int(
+                    bool(meta.get("repair_used"))
+                )
         return parsed, meta
 
     def attribution_for(
@@ -2474,10 +2589,6 @@ def run_online_evolution(
             current_genome.to_dict(),
         )
         _atomic_write_json(
-            output_dir / "policy_checkpoint.json",
-            policy_genome.to_dict(),
-        )
-        _atomic_write_json(
             output_dir / "evolution_checkpoint.json",
             {
                 "schema_version": "agenthallu.bccse_v5_checkpoint.v3",
@@ -2529,6 +2640,20 @@ def run_online_evolution(
                 "policy_genome": policy_genome.to_dict(),
                 "l2_policy_accepts": l2_policy_accepts,
                 "l2_policy_audit": list(l2_policy_audit),
+                # Probe rollback anchors and the in-memory evolution context
+                # that a resume must reproduce exactly (behavior invariants
+                # like the once-per-source abstention ladder, plus the
+                # audit telemetry of the processed prefix).
+                "stable_policy_genome_payload": stable_policy_genome.to_dict(),
+                "stable_l2_policy_accepts": stable_l2_policy_accepts,
+                "abstention_ladder_used": sorted(abstention_ladder_used),
+                "contrast_registry": {
+                    str(hallucination_type): list(rows)
+                    for hallucination_type, rows in contrast_registry.items()
+                },
+                "rejected_policy_summaries": list(rejected_policy_summaries),
+                "localization_bias_signals": list(localization_bias_signals),
+                "non_l1_failure_attributions": list(non_l1_failure_attributions),
                 "updated_at": time.time(),
             },
         )
@@ -2558,12 +2683,12 @@ def run_online_evolution(
     ) -> None:
         """Close the L2 proposal loop for one adjudication-layer failure.
 
-        One reflection call proposes a single closed-vocabulary policy
-        item; the candidate genome must then show an observable effect in
-        a source replay and, whenever the terminal state moves, move it
-        toward the gold polarity under the same discipline as L1 edits.
-        Rejected candidates are only ever replayed as copies, so the
-        working genome rolls back inherently.
+        One reflection call proposes a single closed-vocabulary policy edit
+        (add_item / modify_item / remove_item); the candidate genome must
+        then show an observable effect in a source replay and, whenever the
+        terminal state moves, move it toward the gold polarity under the
+        same discipline as L1 edits. Rejected candidates are only ever
+        replayed as copies, so the working genome rolls back inherently.
         """
         nonlocal policy_genome, l2_policy_accepts
 
@@ -2672,28 +2797,27 @@ def run_online_evolution(
                 reason=f"reflection_call_failed:{type(exc).__name__}",
             )
             return
-        proposed_item, parse_reason = parse_policy_proposal(parsed)
-        if proposed_item is None:
+        proposed_edit, parse_reason = parse_policy_proposal(parsed)
+        if proposed_edit is None:
             finish("skip_no_policy", reason=parse_reason or "no_proposal")
             return
-        if proposed_item.action in ENGINE_LEVEL_ACTIONS:
+        if (
+            proposed_edit.new_item is not None
+            and proposed_edit.new_item.action in ENGINE_LEVEL_ACTIONS
+        ):
             finish(
                 "skip_no_policy",
                 reason="engine_level_policy_requires_unimplemented_replay",
             )
             return
-        proposed_item = replace(
-            proposed_item,
-            item_id=f"policy_{uuid.uuid4().hex[:8]}",
-            source_case_id=case_id,
-        )
-        proposal_edit = PolicyEdit(
-            edit_id=f"policy_edit_{uuid.uuid4().hex[:8]}",
-            operation=PolicyOp.ADD_ITEM.value,
-            new_item=proposed_item,
-            rationale=proposed_item.rationale,
-            source_case_id=case_id,
-        )
+        if proposed_edit.new_item is not None:
+            proposed_edit.new_item = replace(
+                proposed_edit.new_item,
+                item_id=f"policy_{uuid.uuid4().hex[:8]}",
+                source_case_id=case_id,
+            )
+        proposed_edit.source_case_id = case_id
+        proposal_edit = proposed_edit
         valid, validate_reason = validate_policy_edit(
             proposal_edit, policy_genome,
         )
@@ -2706,7 +2830,7 @@ def run_online_evolution(
         candidate_genome = apply_policy_edit(policy_genome, proposal_edit)
         try:
             replay_result = run_detection(
-                budget_kind="source",
+                budget_kind="policy",
                 genome=current_genome,
                 case_id=case_id,
                 output_path=(
@@ -2736,10 +2860,36 @@ def run_online_evolution(
             or evaluation.get("effective_defense_coverage")
             != facts.defense_coverage
         )
-        if not fired or not (state_changed or coverage_changed):
+        operation = str(proposal_edit.operation)
+        if operation == PolicyOp.REMOVE_ITEM.value:
+            # A removal is justified only by evidence: the targeted item must
+            # have fired on the source detection, and removing it must move
+            # the terminal edge or the effective coverage observably.
+            source_evaluation = (
+                detection_result.get("proof_adjudication") or {}
+            ).get("policy_evaluation")
+            source_evaluation = (
+                source_evaluation
+                if isinstance(source_evaluation, Mapping) else {}
+            )
+            original_fired_ids = {
+                str(row.get("item_id") or "")
+                for row in (source_evaluation.get("fired") or [])
+                if isinstance(row, Mapping)
+            }
+            removed_item = policy_genome.items[proposal_edit.item_index]
+            effect_ok = (
+                removed_item.item_id in original_fired_ids
+                and (state_changed or coverage_changed)
+            )
+            no_effect_reason = "removed_item_did_not_move_the_terminal_edge"
+        else:
+            effect_ok = bool(fired) and (state_changed or coverage_changed)
+            no_effect_reason = "policy_did_not_move_the_terminal_edge"
+        if not effect_ok:
             finish(
                 "reject_policy_no_effect",
-                reason="policy_did_not_move_the_terminal_edge",
+                reason=no_effect_reason,
                 replay=replay_result,
             )
             return
@@ -2769,12 +2919,30 @@ def run_online_evolution(
                     replay=replay_result,
                 )
                 return
+        if (
+            state_changed
+            and operation != PolicyOp.REMOVE_ITEM.value
+        ):
+            # A gold-verified terminal move is the strongest evidence an
+            # item can earn in this loop; lock it against later
+            # modify/remove so a subsequent reflection cannot erode a
+            # verified win. Coverage-only accepts stay correctable.
+            protected_index = (
+                proposal_edit.item_index
+                if operation == PolicyOp.MODIFY_ITEM.value
+                else len(candidate_genome.items) - 1
+            )
+            protected_meta = candidate_genome.get_item_meta(protected_index)
+            protected_meta["fitness_status"] = FITNESS_STATUS_STRONG
+            candidate_genome.set_item_meta(protected_index, protected_meta)
         policy_genome = candidate_genome
         finish("accept_policy", replay=replay_result)
 
     def run_development_probe(*, reason: str) -> tuple[bool, dict[str, Any]]:
         """Apply the independent development envelope as a veto-only gate."""
         nonlocal champion_genome, current_genome, stable_genome
+        nonlocal policy_genome, l2_policy_accepts
+        nonlocal stable_policy_genome, stable_l2_policy_accepts
         nonlocal edits_accepted, edits_rejected, rollback_reason
         nonlocal last_probe_accepted_count, last_probe_triggered_count
         nonlocal stable_history_length
@@ -2804,6 +2972,10 @@ def run_online_evolution(
                         / f"probe_{len(probe_history):03d}"
                         / probe_id.replace("/", "_")
                     ),
+                    # The probe must measure the detector that subsequent
+                    # cases actually run: champion genome plus the accepted
+                    # L2 policy surface.
+                    policy_genome=policy_genome if policy_genome.items else None,
                 )
                 state = resolve_evolution_state(result)
                 runtime_valid = result.get("runtime_valid") is True
@@ -2864,6 +3036,8 @@ def run_online_evolution(
             audit["rolled_back_edits"] = rolled_back
             champion_genome = stable_genome.clone()
             current_genome = stable_genome.clone()
+            policy_genome = stable_policy_genome.clone()
+            l2_policy_accepts = stable_l2_policy_accepts
             type_fitness.get_experience_memory().from_dict(stable_memory_payload)
             stable_canaries.clear()
             stable_canaries.update(stable_canaries_checkpoint)
@@ -2888,6 +3062,8 @@ def run_online_evolution(
             rollback_reason = ""
             audit["rolled_back_edits"] = 0
             stable_genome = champion_genome.clone()
+            stable_policy_genome = policy_genome.clone()
+            stable_l2_policy_accepts = l2_policy_accepts
             stable_history_length = len(accepted_edits_history)
             # v5.8: fail-closed probe certification. Compared against the
             # previous probe baseline; the first probe has no baseline and
@@ -2984,12 +3160,15 @@ def run_online_evolution(
         # no-effect edit is retained as telemetry, not silently committed.
         accepted_indices: list[int] = []
         rejected_indices: list[int] = []
-        provisional_accept_indices: list[int] = []
         for i, dec in enumerate(decisions):
             # Label-free directional evidence may advance the reversible
             # working genome only when an independent sampled canary proves
-            # process non-regression. It remains explicitly provisional and
-            # cannot acquire protected fitness status or an accuracy claim.
+            # process non-regression. It remains explicitly provisional: the
+            # commit never grants it protected fitness status (protection is
+            # reserved for gold-assisted edits) and the run result keeps
+            # final_champion_claim=False until an external authority scores
+            # it. Independent canaries protect known behavior; they do not
+            # establish that a newly decisive verdict is correct.
             label_free_provisional = (
                 not fitness_use_gold
                 and dec == "directional_evidence"
@@ -2999,13 +3178,6 @@ def run_online_evolution(
                     for audit in provisional_edits[i].canary_audits
                 )
             )
-            # Self-supervised directional evidence is not correctness evidence.
-            # It may be retained as telemetry, but it must not enter the
-            # champion. Independent canaries protect known behavior; they do
-            # not establish that a newly decisive verdict is correct.
-            provisional_accept = False
-            if provisional_accept:
-                provisional_accept_indices.append(i)
             if (
                 dec in {"strong_improvement", "local_improvement"}
                 or label_free_provisional
@@ -3039,7 +3211,6 @@ def run_online_evolution(
             "worse_count": worse_count,
             "accepted_indices": accepted_indices,
             "rejected_indices": rejected_indices,
-            "provisional_accept_indices": provisional_accept_indices,
             "fitness_use_gold": fitness_use_gold,
             "commit_validation": "single_source_replay_plus_sampled_canaries",
             "source_replays": len(source_audits),
@@ -3094,19 +3265,20 @@ def run_online_evolution(
                     source_audits[idx]["assessment"]["decision"]
                     if idx < len(source_audits) else ""
                 )
-                # Gold-assisted edits are the only edits that receive fitness
-                # status in the protected champion. Label-free replay remains
-                # explicitly non-promotable telemetry.
+                # Fitness protection is earned only by gold-assisted replay
+                # evidence. A label-free provisional accept commits to the
+                # development champion as telemetry but stays unprotected
+                # (fitness_status=none): without an external correctness
+                # authority it must remain modifiable and removable by later
+                # evolution, and the promotion_status marker alone records
+                # whether a live conflict gate vouched for it.
                 _is_provisional_accept = (
                     not fitness_use_gold
                     and assessment_decision == "directional_evidence"
                     and bool(item.conflict_gate_passed)
                 )
                 if not fitness_use_gold:
-                    if _is_provisional_accept:
-                        fitness_status = FITNESS_STATUS_WEAK
-                    else:
-                        fitness_status = FITNESS_STATUS_NONE
+                    fitness_status = FITNESS_STATUS_NONE
                 else:
                     fitness_status = (
                         FITNESS_STATUS_STRONG
@@ -3635,6 +3807,33 @@ def run_online_evolution(
               f"→ {signal.error_type.value} → {signal.target_module} "
               f"(attempt {active_attempt_index + 1}/"
               f"{max_mutation_attempts_per_case})")
+
+        # Deterministic short-circuit: once the mutation budget is exhausted
+        # no reflection-family call can run again this run, so spending the
+        # full reflection stack (type classification, attribution LLM,
+        # candidate generation, conflict gate) only to fail closed at every
+        # call site is pure waste. The detection above still feeds the
+        # stable-canary pool and the audit trail.
+        if budget_usage["mutation_calls"] >= max_mutation_calls:
+            gate.record_no_edit()
+            record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source=signal.trigger_source.value,
+                attribution=signal.to_dict(),
+                edit_proposal={
+                    "operation": "no_edit",
+                    "reason": "mutation_call_budget_exhausted",
+                },
+                mutation_applied=None,
+                gate_decision="skip_mutation_budget_exhausted",
+                genome_hash_before=genome_before,
+                genome_hash_after=current_genome.content_hash,
+                detection_state=detection_state,
+                timestamp=time.time(),
+            ), next_case_index=idx + 1)
+            print(f"  [{idx}] SKIP_MUTATION_BUDGET_EXHAUSTED {case_id}")
+            continue
 
         # --- HTC-TES v3: Classify hallucination type ---
         type_result = type_classifier.classify(detection_result, signal)
@@ -4951,6 +5150,11 @@ def run_online_evolution(
                             "runtime_error": f"{type(exc).__name__}:{exc}",
                         }
                     fitness_audit["contrast_replay"] = contrast_audit
+                    # The neighbour replay is a real detector call owned by
+                    # this fitness envelope; keep the per-edit call accounting
+                    # consistent with the global budget counters.
+                    fitness_audit["provider_calls"] += 1
+                    fitness_audit["contrast_replays"] = 1
                     if inverted:
                         assessment = FitnessAssessment(
                             "worse",

@@ -13,6 +13,65 @@ For framework design and flow documentation see
 [docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md) and
 [docs/technical/DETECTION_EVOLUTION_FLOW.md](docs/technical/DETECTION_EVOLUTION_FLOW.md).
 
+## Core Objective and Design Discipline (必读 / Mandatory)
+
+Every agent working in this repository — on framework code, experiments, or
+documentation — must read this section first and comply with it. It is the
+single source of truth for why this project exists and how decisions are
+made; downstream documents only reference it, never restate it.
+
+### Core objective (核心目标)
+
+Produce **effective self-evolving detection skills** that measurably improve
+agent-hallucination detection quality. The detector base (PACA-TCL v3.5) is
+frozen; all improvement must come from the two evolvable surfaces (L1
+provider rules, L2 adjudication policies) and must be demonstrated by
+independent holdout measurement, not by framework-internal signals alone.
+Every framework change is justified by its contribution to this objective;
+correctness, auditability and call-efficiency work are enablers, never ends
+in themselves.
+
+### Design philosophy (设计理念)
+
+1. **Systemic over patch-style.** Fix root causes with structural, bottom-up
+   redesign; never accumulate special-case `if`s, hand-tuned knobs, or
+   scenario mappings (see the First-Time Principle: single source of truth,
+   no residue, local/deployed parity).
+2. **Evidence-driven gates, no hand-tuned thresholds.** Acceptance decisions
+   rest on observable replay effects, closed-vocabulary contracts and gold
+   polarity — never on a manually adjusted numeric threshold or CRS weight
+   (weights are frozen at 0.35/0.15/0.20/0.20/0.10).
+3. **Fail-closed discipline.** Missing authority, unparseable output, or
+   vocabulary violations always reject; uncertainty never passes as a
+   verdict or an accepted edit.
+4. **Evolvable surfaces are closed under correction.** Every layer that can
+   produce a defective artifact must also be able to repair or remove it
+   (L1: add/modify/remove rules; L2: add_item/modify_item/remove_item).
+5. **Gold isolation.** Gold labels select polarity and fitness credit only;
+   they never enter skill content, policy content or reflection prompts.
+6. **Provider discipline.** Only DeepSeek-V4-Flash / DeepSeek-V4-Pro routes
+   are allowed; credential values never enter code or artifacts.
+
+### Advisor requirements (导师要求, 2026-08 discussion)
+
+1. **Never hard-tune thresholds.** A single hand-adjusted threshold is always
+   wrong in the end; prefer experiential judgment expressed as evolved
+   skills (the agent decides from accumulated experience, not from a
+   hand-picked number).
+2. **Alternatives to a single threshold are encouraged.** Multiple
+   thresholds / multiple outputs with best-of-N selection (test-time
+   scaling) is a legitimate direction; broaden the option space instead of
+   tuning one value.
+3. **Regression-style validation (e.g. canary regression) is an optimizable
+   mechanism**, adopted selectively where it earns its cost; it is a guard,
+   not a correctness authority.
+4. **Skill effects must be validated on an independent validation set.**
+   Progress reports must show concrete intermediate experiment outputs, not
+   only framework descriptions.
+
+Experiment plans under `experiments/plans/` must state how they comply with
+this section; reviews check compliance before results are accepted.
+
 ## Layout
 
 ```text
@@ -218,21 +277,35 @@ telemetry and feed the L2 policy loop.
 
 #### L2 closed loop
 
+The L2 surface is closed under correction: proposals use three operations —
+`add_item` (new item), `modify_item` (replace the item at `item_index`),
+`remove_item` (delete the item at `item_index`) — so a wrong or dead policy
+can be repaired or eliminated instead of accumulating.
+
 1. **Propose**: One reflection call proposes a single closed-vocabulary
-   `PolicyEdit` (the vocabulary table in the prompt is generated from
-   `v6_contracts.py` at call time, never copied)
+   `PolicyEdit` (the vocabulary table and the `[index]`-addressed current
+   policy set in the prompt are generated from `v6_contracts.py` / the live
+   genome at call time, never copied)
 2. **Gate**: The structural gate enforces the closed vocabulary, genome
-   capacity, deduplication, and baseline/fitness protection
-3. **Replay**: Source replay must show the policy fired and moved an
-   observable adjudication output
+   capacity, deduplication, index bounds, and baseline/fitness protection
+3. **Replay**: Source replay (counted separately as `policy_replays`) must
+   show an observable adjudication movement: add/modify require the policy
+   to fire and move the terminal state or effective coverage; remove
+   requires the targeted item to have actually fired on the source
+   detection and its removal to move an observable output
 4. **Gold polarity gate**: When the terminal state moves, `task_state_score`
    must strictly improve (no consecutive-improvement threshold); state
    movement without gold is rejected
 5. **Accept/Rollback**: Rejected candidates are only ever replayed as
-   copies, so the working genome rolls back inherently. Gate decisions are
+   copies, so the working genome rolls back inherently. A gold-verified
+   terminal-moving accept (add/modify) earns `strong` protection against
+   later modify/remove; coverage-only accepts stay correctable (good
+   policies lock in, bad policies are eliminable). Gate decisions are
    `accept_policy` / `reject_policy_no_effect` / `reject_policy_fitness` /
-   `skip_no_policy`; the policy genome persists in the checkpoint and the
-   run can resume from it; every decision is audited in
+   `skip_no_policy`; the policy genome persists in the checkpoint (single
+   persistence point, vocabulary + hash validated on resume), a failed
+   development probe rolls the policy surface back together with the L1
+   champion, and every decision is audited in
    `evolution_audit["l2_policy_audit"]`
 
 ### 3. HTC-TES v3 — Hallucination-Typed Conditioning
@@ -475,7 +548,7 @@ Each sub-package also exposes its own `__init__.py` for granular imports:
 ## Key Design Decisions
 
 1. **Controlled natural-language slot rules** (not a typed DSL, not free text): the LLM generates rule slots directly — no compilation step — and the runtime injection is a deterministic render (`When <condition>, <action>.`) that the structural gate can validate as a slot contract.
-2. **Closed-vocabulary L2 policies**: adjudication-policy items pair a closed precondition predicate with an enumerated action; runtime semantics are fixed by the deterministic proof-court evaluator, so the LLM proposes items but never interprets or executes them.
+2. **Closed-vocabulary L2 policies, closed under correction**: adjudication-policy items pair a closed precondition predicate with an enumerated action; runtime semantics are fixed by the deterministic proof-court evaluator, and the evolution loop supports add/modify/remove so defective policies are repairable instead of permanent.
 3. **Deterministic attribution**: a heuristic-free failure classifier answers "which layer, which artifact"; L1 owners pass the gold polarity gate, non-L1 failures feed telemetry and the L2 policy loop.
 4. **Self-supervised triggers**: Evolution can proceed without gold labels from unresolved, CRS contradiction, evidence-incomplete, and unavailable-signal conditions. It does not prescribe clean/error polarity without gold.
 5. **Incremental batch commit**: Each edit validated independently; failed edits don't discard successful ones.

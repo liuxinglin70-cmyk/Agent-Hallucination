@@ -782,3 +782,53 @@ def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
     assert "halted" not in resumed_decisions
     assert resumed_decisions.count("skip_no_edit") == 3
     assert len(resumed.steps) == 3
+
+
+def test_mutation_budget_exhausted_short_circuits_reflection(
+    tmp_path, monkeypatch,
+) -> None:
+    """Once the mutation call budget is exhausted, a triggered case must
+    short-circuit deterministically before spending the reflection stack:
+    no further mutation call happens and the step records the budget skip
+    instead of cycling through fail-closed call sites and retries."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    mutation_calls: list[str] = []
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs.get("purpose"))
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(str(result["state"])),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("s1", "s2"),
+        records={"s1": {}, "s2": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=1,
+        max_mutation_calls=1,
+        run_id="budget_short_circuit",
+    )
+
+    decisions = [step.gate_decision for step in result.steps]
+    assert decisions == ["skip_no_edit", "skip_mutation_budget_exhausted"]
+    # Exactly one reflection call consumed the budget; the second triggered
+    # case never entered the reflection stack.
+    assert mutation_calls == ["mutation"]
+    assert result.evolution_audit["mutation_calls"] == 1

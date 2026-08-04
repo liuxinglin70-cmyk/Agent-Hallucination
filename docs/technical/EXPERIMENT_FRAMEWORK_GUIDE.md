@@ -192,7 +192,7 @@ flowchart LR
 8. 若 source assessment 可进入下一层，则在滚动的 stable development cases 上跑 canary；按注册 interval/accepted-edit 阈值还可打开预算内 gold probe，final holdout 始终不在此路径。
 9. 只有 source replay 与 canary 通过，且没有 runtime/authority 回归时才进入下一层；否则 reject/rollback，并保存原因和 before/after hash。Gold 模式下，`strong_improvement` / `local_improvement` 可作为 development candidate 的选择证据，但仍不能替代 final holdout。无 Gold 模式下，`directional_evidence` 和 detector-local score 只能在 canary 非回归时进入 `provisional_label_free` working candidate；它保持 `fitness_status=none`、不可受 strong/weak 保护，也不能产生准确率或 champion 声明。周期 probe 只能继续或回滚，不能把 provisional 变成正式结论。
 
-L2 策略路径与 L1 并列，共用同一套门控纪律：分类器把失败归到 L2 后，该案例走 `policy_reflection`（封闭词表从 `v6_contracts` 的 `L2_PREDICATES` / `L2_ACTIONS` 动态生成）→ `PolicyEdit(add_item)` → `validate_policy_edit`（词表/容量 12/去重/baseline 与 weak-strong 保护）→ 候选 policy genome → source replay（`adjudicate_case(policy_items=)` 在法庭收敛点用同一套证据束重裁，策略只作用于终局边）→ 效果门（`policy_evaluation.fired` 非空且终态或 effective coverage 变化）→ gold 极性门（终态移动时 `task_state_score` 必须严格上升）→ 接受或天然回滚。
+L2 策略路径与 L1 并列，共用同一套门控纪律：分类器把失败归到 L2 后，该案例走 `policy_reflection`（封闭词表从 `v6_contracts` 的 `L2_PREDICATES` / `L2_ACTIONS` 动态生成，当前策略集带 `[index]` 编辑寻址）→ `PolicyEdit(add_item/modify_item/remove_item)` → `validate_policy_edit`（词表/容量 12/去重/索引边界/baseline 与 weak-strong 保护）→ 候选 policy genome → source replay（`adjudicate_case(policy_items=)` 在法庭收敛点用同一套证据束重裁，策略只作用于终局边；remove 另要求目标项在 source 检测中确实 firing）→ 效果门（终态或 effective coverage 可观测移动）→ gold 极性门（终态移动时 `task_state_score` 必须严格上升）→ 接受或天然回滚；经 gold 验证的终态移动接受记 strong 保护，后续不可 modify/remove，仅 coverage 移动的接受保持可修正。
 
 L2 相关的结果字段与决策值：
 
@@ -200,7 +200,7 @@ L2 相关的结果字段与决策值：
 - `l2_policy_accepts`：被接受的策略项计数；
 - `l2_policy_audit`：逐条提案审计（归因三元组、事实计数、提案、`policy_evaluation`、replay_state、策略基因组 hash），同时写入 `evolution_audit["l2_policy_audit"]`；
 - `non_l1_failure_attributions`：非 L1 归因遥测；
-- `policy_genome`：运行结束的工作策略基因组，持久化在 `policy_checkpoint.json` 与 evolution checkpoint 内；occurrence ledger 不随策略同步重算，属设计语义。
+- `policy_genome`：运行结束的工作策略基因组，持久化在 evolution checkpoint 的 `policy_genome` 字段（单一持久化点；resume 时按闭词表契约与 content hash 双重校验）；probe 稳定点另存于 `stable_policy_genome_payload`，probe 失败时 L2 与 L1 同步回滚。occurrence ledger 不随策略同步重算，属设计语义。
 
 正式 CLI 强制 `fitness_batch_size=1`，因为多个编辑一起 replay 后无法把效果可靠归因给单条规则。`--no-fitness-check` 在正式 evolve 入口被拒绝。
 

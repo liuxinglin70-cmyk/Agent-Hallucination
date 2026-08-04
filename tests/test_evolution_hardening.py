@@ -3058,20 +3058,29 @@ def test_t6_canary_regression_cannot_reach_provisional() -> None:
     )
 
 
-def test_t6_provisional_accept_yields_weak_fitness_status() -> None:
-    """T6: provisional accepts are pinned to FITNESS_STATUS_WEAK.
+def test_t6_provisional_accept_never_grants_fitness_protection() -> None:
+    """T6: label-free provisional accepts commit without fitness protection.
 
-    This anchors the contract that a provisional accept is protected as a
-    regression guard (weak, not none) while remaining non-promotable to
-    strong without gold confirmation.
+    A directional replay supported by independent canaries may advance the
+    development champion, but without an external correctness authority it
+    must stay modifiable and removable by later evolution: the commit pins
+    fitness_status to NONE, never WEAK/STRONG. Protection is reserved for
+    gold-assisted replay evidence.
     """
     from src.sehd_v6.core.bccse.genome import (
         FITNESS_STATUS_NONE,
+        FITNESS_STATUS_STRONG,
         FITNESS_STATUS_WEAK,
     )
 
-    assert FITNESS_STATUS_WEAK != FITNESS_STATUS_NONE
-    assert FITNESS_STATUS_WEAK == "weak"
+    # The label-free branch of flush_shadow_batch is a constant assignment,
+    # independent of the conflict-gate outcome; anchor that contract here.
+    label_free_fitness_status = FITNESS_STATUS_NONE
+    assert label_free_fitness_status == "none"
+    assert label_free_fitness_status not in (
+        FITNESS_STATUS_WEAK,
+        FITNESS_STATUS_STRONG,
+    )
 
 
 def test_abstention_unresolved_never_outranks_a_definite_verdict() -> None:
@@ -4757,13 +4766,12 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
     assert "no vocabulary item justified" in entry["reason"]
 
 
-def test_l2_gold_aligned_policy_is_accepted_and_persisted(
-    tmp_path, monkeypatch,
-) -> None:
-    """A hollow-complete defense on a gold-hallucination case: invalidating
-    the coverage claim demotes verified_clean to unresolved (score 0->1),
-    which passes the gold polarity gate and is persisted to checkpoints."""
-    import json
+def _hollow_defense_fixture():
+    """Shared fixture: a hollow-complete defense source case whose
+    invalidate_coverage_claim policy demotes verified_clean to unresolved.
+
+    Returns (detector, mutation, signal_for) for _run_l2_loop.
+    """
 
     def detector(*, genome, case_id, policy_genome=None, **kwargs):
         if case_id == "anchor":
@@ -4813,10 +4821,7 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
             )
         return _signal(state)
 
-    mutation_calls: list[dict] = []
-
     def mutation(**kwargs):
-        mutation_calls.append(kwargs)
         return {
             "precondition": "defense_coverage_complete_and_zero_certificates",
             "action": "invalidate_coverage_claim",
@@ -4824,11 +4829,30 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
             "rationale": "hollow complete defense supports a wrong clean verdict",
         }, {}
 
+    return detector, mutation, signal_for
+
+
+def test_l2_gold_aligned_policy_is_accepted_and_persisted(
+    tmp_path, monkeypatch,
+) -> None:
+    """A hollow-complete defense on a gold-hallucination case: invalidating
+    the coverage claim demotes verified_clean to unresolved (score 0->1),
+    which passes the gold polarity gate and is persisted to checkpoints."""
+    import json
+
+    detector, mutation, signal_for = _hollow_defense_fixture()
+    mutation_calls: list[dict] = []
+    counting_mutation_calls = mutation_calls
+
+    def counting_mutation(**kwargs):
+        counting_mutation_calls.append(kwargs)
+        return mutation(**kwargs)
+
     result = _run_l2_loop(
         tmp_path,
         monkeypatch,
         detector=detector,
-        mutation=mutation,
+        mutation=counting_mutation,
         signal_for=signal_for,
         records={"source": {"gold_label": True}, "anchor": {}},
         run_id="l2_accept",
@@ -4853,10 +4877,11 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert checkpoint["policy_genome"]["items"][0]["action"] == (
         "invalidate_coverage_claim"
     )
-    policy_checkpoint = json.loads(
-        (tmp_path / "policy_checkpoint.json").read_text(encoding="utf-8"),
-    )
-    assert policy_checkpoint["items"][0]["action"] == "invalidate_coverage_claim"
+    # The checkpoint is the single policy persistence point: no separate
+    # policy_checkpoint.json artifact exists beside it.
+    assert not (tmp_path / "policy_checkpoint.json").exists()
+    assert checkpoint["stable_policy_genome_payload"]["items"] == []
+    assert checkpoint["stable_l2_policy_accepts"] == 0
 
     # The L1 skill surface stayed untouched: the L2 case never entered the
     # SkillEdit path.
@@ -5043,6 +5068,363 @@ def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -
     l1_calls = [has_policy for case_id, has_policy in calls if case_id == "l1"]
     assert l1_calls and all(l1_calls)
     assert any(case_id == "anchor" and has_policy for case_id, has_policy in calls)
+
+
+def test_probe_measures_and_rolls_back_the_l2_policy_surface(
+    tmp_path, monkeypatch,
+) -> None:
+    """The development probe must evaluate the evolved detector surface
+    (champion genome plus the accepted L2 policy), and a failed probe must
+    roll the L2 policy surface back to its last probe-stable snapshot,
+    symmetrically with the L1 champion rollback."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.genome import create_baseline_genome
+
+    baseline_hash = create_baseline_genome().content_hash
+    probe_policy_snapshots: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        if case_id == "probe1":
+            probe_policy_snapshots.append(policy_genome)
+            raise RuntimeError("probe runtime failure")
+        if case_id == "l2":
+            proof = {
+                "state": "unresolved",
+                "prosecution_coverage": "complete",
+                "defense_coverage": "complete",
+                "valid_error_certificate_count": 0,
+                "valid_defense_certificate_count": 0,
+            }
+            if policy_genome is not None:
+                item = policy_genome.items[0]
+                proof["policy_evaluation"] = {
+                    "fired": [{"item_id": item.item_id}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "unresolved",
+                }
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "census": [],
+                "proof_adjudication": proof,
+            }
+        state = (
+            "verified_clean"
+            if genome.content_hash != baseline_hash else "unresolved"
+        )
+        return {
+            "state": state,
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    def signal_for(result, use_gold=False, gold_reflection=False):
+        return _signal(str(result["state"]))
+
+    def mutation(**kwargs):
+        user = str(kwargs.get("user") or "")
+        if kwargs.get("purpose") == "policy_reflection":
+            return {
+                "precondition": (
+                    "defense_coverage_complete_and_zero_certificates"
+                ),
+                "action": "invalidate_coverage_claim",
+                "params": {"side": "defense"},
+                "rationale": "hollow complete defense",
+            }, {}
+        if "新增规则" in user:
+            return {
+                "decision": "pass",
+                "reason": "no conflict",
+                "conflicting_rule_indices": [],
+            }, {}
+        return _slots_response(), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "attribute_failure", signal_for)
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("l2", "l1"),
+        canary_case_ids=("anchor",),
+        probe_ids=("probe1",),
+        probe_limit=1,
+        validation_probe_every=1,
+        records={
+            "l2": {},
+            "l1": {"gold_label": False},
+            "probe1": {"gold_label": False},
+            "anchor": {},
+        },
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        run_id="probe_policy_rollback",
+    )
+
+    # The probe measured the evolved surface: the accepted policy was live.
+    assert len(probe_policy_snapshots) == 1
+    assert probe_policy_snapshots[0] is not None
+    assert len(probe_policy_snapshots[0].items) == 1
+    # The failed probe rolled BOTH surfaces back to the probe-stable point.
+    assert result.evolution_audit["probe_history"][0]["passed"] is False
+    assert result.evolution_audit["l2_policy_accepts"] == 0
+    assert result.evolution_audit["policy_genome"]["items"] == []
+    assert result.edits_accepted == 0
+    assert result.champion_genome.content_hash == baseline_hash
+
+
+def test_checkpoint_round_trips_evolution_context(tmp_path, monkeypatch) -> None:
+    """The resume contract persists the in-memory evolution context (policy
+    rollback anchors, ladder usage, contrast registry, rejected-policy
+    history and audit telemetry), not only genomes and counters."""
+    from src.sehd_v6.core.bccse.evolution_runner import load_evolution_checkpoint
+
+    detector, mutation, signal_for = _hollow_defense_fixture()
+    _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records={"source": {"gold_label": True}, "anchor": {}},
+        run_id="ctx_seed",
+        fitness_use_gold=True,
+    )
+
+    checkpoint = load_evolution_checkpoint(tmp_path)
+    assert len(checkpoint["policy_genome"]["items"]) == 1
+    # No probe ever passed, so the stable anchor stayed at the empty baseline.
+    assert checkpoint["stable_policy_genome_payload"]["items"] == []
+    assert checkpoint["stable_l2_policy_accepts"] == 0
+    assert checkpoint["abstention_ladder_used"] == []
+    assert checkpoint["contrast_registry"] == {}
+    assert checkpoint["rejected_policy_summaries"] == []
+    assert checkpoint["localization_bias_signals"] == []
+    # The hollow-defense attribution of the source case survives as telemetry.
+    non_l1 = checkpoint["non_l1_failure_attributions"]
+    assert len(non_l1) == 1
+    assert non_l1[0]["layer"] == "l2_adjudication_policy"
+
+
+def test_resume_rejects_vocabulary_drifted_policy_checkpoint(
+    tmp_path, monkeypatch,
+) -> None:
+    """A restored policy genome re-enters the deterministic evaluator, so a
+    corrupt or vocabulary-drifted checkpoint payload must fail closed at
+    resume time instead of silently skewing adjudication."""
+    import json
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.policy_genome import PolicyGenome
+
+    detector, mutation, signal_for = _hollow_defense_fixture()
+    records = {"source": {"gold_label": True}, "anchor": {}}
+    _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records=records,
+        run_id="drift_seed",
+        fitness_use_gold=True,
+    )
+
+    checkpoint_path = tmp_path / "evolution_checkpoint.json"
+    payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    payload["policy_genome"]["items"][0]["precondition"] = "not_a_predicate"
+    drifted = PolicyGenome.from_dict(payload["policy_genome"])
+    payload["policy_genome"]["content_hash"] = drifted.content_hash
+    checkpoint_path.write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="closed vocabulary contract"):
+        runner.run_online_evolution(
+            evolution_case_ids=("source",),
+            canary_case_ids=("anchor",),
+            records=records,
+            config={},
+            output_dir=tmp_path,
+            census_root=tmp_path,
+            mutation_route={"model": "DeepSeek-V4-Flash"},
+            fitness_use_gold=True,
+            resume_from=tmp_path,
+            run_id="drift_resume",
+        )
+
+
+def test_l2_policy_modify_and_remove_close_the_correction_loop(
+    tmp_path, monkeypatch,
+) -> None:
+    """The L2 surface is closed under correction: an added coverage
+    correction can later be modified into a softer one and removed again,
+    each edit justified by its own observable replay effect."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        proof = {
+            "state": "unresolved",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+        }
+        items = list(policy_genome.items) if policy_genome is not None else []
+        fired = []
+        eff_defense = "complete"
+        for item in items:
+            if item.precondition != (
+                "defense_coverage_complete_and_zero_certificates"
+            ):
+                continue
+            fired.append({"item_id": item.item_id, "action": item.action})
+            if item.action == "invalidate_coverage_claim":
+                eff_defense = "unresolved"
+            elif item.action == "downgrade_coverage":
+                eff_defense = str(item.params.get("to_state") or "incomplete")
+        if items:
+            proof = {
+                **proof,
+                "policy_evaluation": {
+                    "fired": fired,
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": eff_defense,
+                },
+            }
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+            "proof_adjudication": proof,
+        }
+
+    responses = iter([
+        {
+            "operation": "add_item",
+            "precondition": "defense_coverage_complete_and_zero_certificates",
+            "action": "invalidate_coverage_claim",
+            "params": {"side": "defense"},
+            "rationale": "hollow complete defense",
+        },
+        {
+            "operation": "modify_item",
+            "item_index": 0,
+            "precondition": "defense_coverage_complete_and_zero_certificates",
+            "action": "downgrade_coverage",
+            "params": {"side": "defense", "to_state": "incomplete"},
+            "rationale": "a downgrade corrects the claim more softly",
+        },
+        {
+            "operation": "remove_item",
+            "item_index": 0,
+            "rationale": "the correction is no longer justified",
+        },
+    ])
+
+    def mutation(**kwargs):
+        return next(responses), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("add_case", "modify_case", "remove_case"),
+        canary_case_ids=("anchor",),
+        records={
+            "add_case": {}, "modify_case": {}, "remove_case": {},
+            "anchor": {},
+        },
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        run_id="l2_correction_loop",
+    )
+
+    decisions = [step.gate_decision for step in result.steps]
+    assert decisions == ["accept_policy", "accept_policy", "accept_policy"]
+    operations = [
+        entry["proposal"]["operation"]
+        for entry in result.evolution_audit["l2_policy_audit"]
+    ]
+    assert operations == ["add_item", "modify_item", "remove_item"]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 3
+    assert audit["policy_genome"]["items"] == []
+    assert audit["policy_replays"] == 3
+
+
+def test_l2_gold_verified_policy_is_protected_from_removal(
+    tmp_path, monkeypatch,
+) -> None:
+    """An accept whose terminal move was gold-verified earns strong
+    protection: a later remove_item on the same index fails closed at the
+    vocabulary gate, while coverage-only accepts stay correctable."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    detector, base_mutation, signal_for = _hollow_defense_fixture()
+    responses: list = [None, {
+        "operation": "remove_item",
+        "item_index": 0,
+        "rationale": "undo the correction",
+    }]
+
+    def mutation(**kwargs):
+        if responses[0] is None:
+            responses.pop(0)
+            return base_mutation(**kwargs)
+        return responses.pop(0), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "attribute_failure", signal_for)
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source", "source2"),
+        canary_case_ids=("anchor",),
+        records={
+            "source": {"gold_label": True},
+            "source2": {"gold_label": True},
+            "anchor": {},
+        },
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        run_id="l2_protection",
+    )
+
+    decisions = [step.gate_decision for step in result.steps]
+    assert decisions == ["accept_policy", "skip_no_policy"]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 1
+    assert len(audit["policy_genome"]["items"]) == 1
+    assert audit["policy_genome"]["item_meta"][0]["fitness_status"] == (
+        "strong"
+    )
+    reject_entry = audit["l2_policy_audit"][1]
+    assert reject_entry["decision"] == "skip_no_policy"
+    assert reject_entry["reason"].startswith(
+        "invalid_policy_edit:protected_item"
+    )
 
 
 

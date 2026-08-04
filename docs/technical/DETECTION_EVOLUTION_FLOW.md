@@ -299,33 +299,39 @@ runtime observation 包含 `court_balance`（裁决收支表）：幸存/被隔�
 
 所有 attribution、reflection、critic 和 conflict-gate provider 调用共享
 `max_mutation_calls` 硬上限。CLI 参数为 `--max-mutation-calls`，默认 100；
-耗尽后 fail-closed，并记录 `mutation_budget_exhausted`，避免候选数和 retry
+耗尽后 triggered case 以 `skip_mutation_budget_exhausted` 确定性短路（不再
+进入反思栈），并记录 `mutation_budget_exhausted`，避免候选数和 retry
 次数造成调用量乘法失控。
 
 ### 3.5 L2 策略提案与策略 replay
 
 当确定性分类器把失败归到 L2（见 3.2），该案例不进入 L1 规则变异，而是走
-策略闭环。两条变异路径共用同一套门控纪律：结构验证 → source replay →
+策略闭环。L2 可进化面对修正闭合：`add_item` / `modify_item` /
+`remove_item` 三操作共用同一套门控纪律：结构验证 → source replay →
 gold 极性/fitness → 接受或回滚。
 
 1. **提案**：一次 `purpose=policy_reflection` 的反思调用。prompt 中的封闭
    词表（前提谓词、枚举动作、参数词表）在调用时从 `v6_contracts`
    （`L2_PREDICATES` / `L2_ACTIONS`）动态生成，不是复制的文本；输入还包含
-   归因三元组、可寻址事实计数、当前策略集和被拒提案历史。模型只提出一条
-   `precondition -> action(params)` 提案，或返回显式 no_proposal；gold 不
-   进入 prompt。
-2. **验证**：`parse_policy_proposal` 把响应解析成 `PolicyItem`（item_id 与
-   source_case_id 由进化循环生成，身份不属于模型输出）；包装成
-   `PolicyEdit(add_item)` 后，`validate_policy_edit` 检查封闭词表、容量上限
-   12、语义去重、baseline 不可变与 weak/strong fitness 保护。
+   归因三元组、可寻址事实计数、当前策略集（带 `[index]` 编辑寻址）和被拒
+   提案历史。模型只提出一条 edit（add_item 新项 / modify_item 按 item_index
+   替换 / remove_item 按 item_index 删除），或返回显式 no_proposal；gold 不
+   进入 prompt。modify/remove 只应针对观察效果错误、有害或已死的既有项。
+2. **验证**：`parse_policy_proposal` 把响应解析成 `PolicyEdit`（item_id 与
+   source_case_id 由进化循环生成，身份不属于模型输出；无 operation 字段的
+   旧式响应兼容为 add_item）；`validate_policy_edit` 检查封闭词表、容量上限
+   12、语义去重、索引越界、baseline 不可变与 weak/strong fitness 保护。
 3. **应用**：`apply_policy_edit` 以不可变血统风格返回候选 `PolicyGenome`
    （parent_hash 链接）；工作策略基因组在验证通过前不变。
 4. **source replay**：`_run_detection_with_genome(policy_genome=候选)` 对
-   同一 source case 重新检测，策略项经 `adjudicate_case(policy_items=...)`
-   转发到 proof court；引擎在所有 appeal/localization 阶段收敛之后，用产生
-   当前判决的同一套证据束（收敛点法庭参数）重裁一次，策略只作用于终局边。
-5. **效果门**：`policy_evaluation.fired` 必须非空，且终态改变或 effective
-   coverage 改变；没有推动终局边的提案以 `reject_policy_no_effect` 拒绝。
+   同一 source case 重新检测（独立计为 `policy_replays`），策略项经
+   `adjudicate_case(policy_items=...)` 转发到 proof court；引擎在所有
+   appeal/localization 阶段收敛之后，用产生当前判决的同一套证据束（收敛点
+   法庭参数）重裁一次，策略只作用于终局边。
+5. **效果门**：add/modify 要求 `policy_evaluation.fired` 非空且终态改变或
+   effective coverage 改变；remove 要求目标项在 source 检测中确实 firing，
+   且删除后终态或 effective coverage 可观测移动；没有推动终局边的提案以
+   `reject_policy_no_effect` 拒绝。
 6. **gold 极性门**：终态发生移动时，必须有 gold fitness 极性且
    `task_state_score` 严格上升，否则拒绝（`reject_policy_fitness`）；仅
    coverage 移动可无需 gold 接受。
@@ -334,8 +340,13 @@ gold 极性/fitness → 接受或回滚。
    失败、响应不可解析或 edit 非法均记 `skip_no_policy`）。
 
 被拒候选只会以副本形式被 replay，拒绝即天然回滚。接受的策略进入工作
-`policy_genome`，由 checkpoint 持久化（`policy_checkpoint.json` 与
-`evolution_checkpoint.json` 的 `policy_genome` 字段）；每次提案决策连同归因、
+`policy_genome`，由 checkpoint 持久化（`evolution_checkpoint.json` 的
+`policy_genome` 字段，单一持久化点；resume 时按闭词表契约与 content hash
+双重校验）；probe 稳定点另存于 `stable_policy_genome_payload`，development
+probe 失败时 L2 策略与 L1 champion 同步回滚。保护语义：经 gold 验证的
+终态移动接受（add/modify）在 `item_meta.fitness_status` 记 strong，后续
+modify/remove 该项会被 `validate_policy_edit` fail-closed 拒绝；仅 coverage
+移动的接受保持可修正（好策略锁住、坏策略可淘汰）。每次提案决策连同归因、
 事实、提案、`policy_evaluation`、replay_state 与策略基因组 hash 写入
 `evolution_audit["l2_policy_audit"]`。
 
@@ -491,8 +502,8 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 - `l2_policy_accepts`：被接受的 L2 策略项数量。
 - `l2_policy_audit`：逐条 L2 提案审计（决策值、原因、归因三元组、事实计数、
   提案、`policy_evaluation`、replay_state、策略基因组 hash）。
-- `policy_genome`：运行结束时的工作 L2 策略基因组，同时持久化在
-  `policy_checkpoint.json` 与 evolution checkpoint 内。
+- `policy_genome`：运行结束时的工作 L2 策略基因组，持久化在
+  evolution checkpoint 内（单一持久化点，无旁路副本）。
 
 ## 6. 审查时应优先检查的证据
 
@@ -502,11 +513,14 @@ artifact 未经审计就静默改变生产检测。batch completion、prediction
 4. source/canary 的 `genome_hash` 与 detector artifact 路径：排除 replay harness 固定返回 baseline 的假进化；
 5. provider route payload：确认 model、temperature、max_tokens 和 timeout 与配置一致；
 6. authority failure reasons：区分核心 proof 失败、必要 appeal 失败和辅助 provider 降级；
-7. `l2_policy_audit` 与 `policy_checkpoint.json`：确认 L2 决策值、
+7. `l2_policy_audit` 与 checkpoint 的 `policy_genome` 字段：确认 L2 决策值、
    `policy_evaluation.fired` 与 replay 终态一致，被拒提案没有改变工作策略基因组；
 8. `non_l1_failure_attributions`：确认非 L1 失败没有被硬路由进 L1 模块；
 9. `detector_calls`、`mutation_calls`、`mutation_errors`、
    `mutation_budget_exhausted`：核对 detector replay、反思协作调用和预算阻断，
-   不要把 detector replay 数误认为全部 API 调用数。
+   不要把 detector replay 数误认为全部 API 调用数；L2 policy replay 记在
+   独立的 `policy_replays` 计数，不混入 `source_replays`。预算耗尽后的
+   triggered case 以 `skip_mutation_budget_exhausted` 确定性短路，不再
+   进入反思栈。
 
 实验 harness 的 replay 模式也有明确边界：默认 live 模式会重新运行真实 detector 和 child genome；固定 prediction artifact 只能通过 `FIVE_CASE_REPLAY_MODE=stored_compat` 进入兼容审计，而且缺失显式 authority 时会被阻断。

@@ -18,6 +18,7 @@ from ..core.bccse.genome import (
     create_baseline_genome,
 )
 from .runner import (
+    DEFAULT_REFLECTION_CANDIDATES,
     default_mutation_route,
     load_records,
     run_evolution,
@@ -28,6 +29,7 @@ __all__ = [
     "run_online_evolution",
     "load_records",
     "default_mutation_route",
+    "DEFAULT_REFLECTION_CANDIDATES",
     "OnlineEvolutionResult",
     "EvolutionStep",
     "SkillGenome",

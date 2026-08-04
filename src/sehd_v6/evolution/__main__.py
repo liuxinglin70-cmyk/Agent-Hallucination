@@ -14,7 +14,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .runner import run_evolution
+from .runner import DEFAULT_REFLECTION_CANDIDATES, run_evolution
 
 
 def main() -> int:
@@ -57,7 +57,8 @@ def main() -> int:
     parser.add_argument("--convergence-window", type=int, default=20)
     parser.add_argument("--max-mutation-attempts", type=int, default=2)
     parser.add_argument(
-        "--reflection-candidates", type=int, default=3,
+        "--reflection-candidates", type=int,
+        default=DEFAULT_REFLECTION_CANDIDATES,
         help="independent reflection samples per triggered case (1..5)",
     )
     parser.add_argument("--max-mutation-calls", type=int, default=100)

@@ -288,8 +288,12 @@ def build_runtime_observation(
             if isinstance(health.get("quarantined_error_certificate_count"), int)
             else _id_count("quarantined_error_certificate_ids")
         ),
+        # Valid-count semantics everywhere: the fallback subtracts quarantined
+        # rows so a court result missing the explicit counter can never be
+        # read as "raw certificates are valid certificates".
         "defense_certificates": _proof_count(
-            "valid_defense_certificate_count", len(defense),
+            "valid_defense_certificate_count",
+            max(len(defense) - _id_count("quarantined_defense_certificate_ids"), 0),
         ),
         "candidates_covered_by_clean_defense": _id_count(
             "clean_covered_candidate_ids"

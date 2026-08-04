@@ -593,6 +593,13 @@ def provider_call_with_schema(
             }
         except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
+            if isinstance(exc, ValueError):
+                # A contract failure (empty content, non-object response,
+                # missing ledger schema) is deterministic for a fixed request
+                # body: retransmitting it only multiplies cost, and the
+                # bounded JSON repair already had its single chance on this
+                # attempt. Fail closed immediately.
+                break
             retryable = not isinstance(exc, urlerror.HTTPError) or exc.code in {
                 408, 425, 429, 500, 502, 503, 504,
             }

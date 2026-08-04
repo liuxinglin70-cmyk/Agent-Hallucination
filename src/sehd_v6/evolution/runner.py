@@ -25,6 +25,11 @@ from ..core.bccse.genome import SkillGenome
 from ..core.paca_tcl.detector import resolve_detector_config
 from ..provider_routes import has_provider_credential, resolve_provider_route
 
+# Single source of truth for the independent reflection sample count: the
+# public API and the CLI share this default so one knob cannot drift into
+# two different "default" run costs.
+DEFAULT_REFLECTION_CANDIDATES = 1
+
 
 def default_mutation_route() -> dict[str, Any]:
     """Resolve the mutation route from environment with official defaults."""
@@ -127,7 +132,7 @@ def run_evolution(
     max_total_edits: int = 200,
     convergence_window: int = 20,
     max_mutation_attempts_per_case: int = 2,
-    reflection_candidate_count: int = 1,
+    reflection_candidate_count: int = DEFAULT_REFLECTION_CANDIDATES,
     max_mutation_calls: int = 100,
     canary_limit: int = 2,
     resume_from: Path | None = None,

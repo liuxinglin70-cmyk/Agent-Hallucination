@@ -79,27 +79,73 @@ def test_prompt_carries_attribution_triple_and_context() -> None:
 
 
 def test_parse_policy_proposal_valid_item_leaves_identity_to_caller() -> None:
-    item, reason = parse_policy_proposal({
+    edit, reason = parse_policy_proposal({
         "precondition": "defense_coverage_complete_and_zero_certificates",
         "action": "invalidate_coverage_claim",
         "params": {"side": "defense"},
         "rationale": "hollow complete defense",
     })
     assert reason == ""
-    assert item is not None
-    assert item.item_id == ""
-    assert item.precondition == "defense_coverage_complete_and_zero_certificates"
-    assert item.action == "invalidate_coverage_claim"
-    assert item.params == {"side": "defense"}
+    assert edit is not None
+    # Legacy responses without an operation field stay add_item.
+    assert edit.operation == PolicyOp.ADD_ITEM.value
+    assert edit.item_index is None
+    assert edit.new_item is not None
+    assert edit.new_item.item_id == ""
+    assert edit.new_item.precondition == (
+        "defense_coverage_complete_and_zero_certificates"
+    )
+    assert edit.new_item.action == "invalidate_coverage_claim"
+    assert edit.new_item.params == {"side": "defense"}
 
-    telemetry_item, telemetry_reason = parse_policy_proposal({
+    telemetry_edit, telemetry_reason = parse_policy_proposal({
+        "operation": "add_item",
         "precondition": "consensus_gate_blocked_nonempty",
         "action": "emit_telemetry_only",
         "params": {},
         "rationale": "observe",
     })
     assert telemetry_reason == ""
-    assert telemetry_item is not None
+    assert telemetry_edit is not None
+    assert telemetry_edit.operation == PolicyOp.ADD_ITEM.value
+
+
+def test_parse_policy_proposal_modify_and_remove_address_items() -> None:
+    modify_edit, modify_reason = parse_policy_proposal({
+        "operation": "modify_item",
+        "item_index": 2,
+        "precondition": "defense_coverage_complete_and_zero_certificates",
+        "action": "downgrade_coverage",
+        "params": {"side": "defense", "to_state": "incomplete"},
+        "rationale": "softer correction",
+    })
+    assert modify_reason == ""
+    assert modify_edit is not None
+    assert modify_edit.operation == PolicyOp.MODIFY_ITEM.value
+    assert modify_edit.item_index == 2
+    assert modify_edit.new_item is not None
+
+    remove_edit, remove_reason = parse_policy_proposal({
+        "operation": "remove_item",
+        "item_index": 0,
+        "rationale": "the item is dead",
+    })
+    assert remove_reason == ""
+    assert remove_edit is not None
+    assert remove_edit.operation == PolicyOp.REMOVE_ITEM.value
+    assert remove_edit.item_index == 0
+    assert remove_edit.new_item is None
+
+    for broken in (
+        {"operation": "modify_item"},
+        {"operation": "remove_item"},
+        {"operation": "modify_item", "item_index": -1},
+        {"operation": "remove_item", "item_index": "0"},
+        {"operation": "rewrite_policy"},
+    ):
+        edit, reason = parse_policy_proposal(broken)
+        assert edit is None, broken
+        assert reason, broken
 
 
 def test_parse_policy_proposal_rejects_out_of_vocabulary_responses() -> None:
@@ -131,20 +177,20 @@ def test_parse_policy_proposal_rejects_out_of_vocabulary_responses() -> None:
         },
     )
     for response in cases:
-        item, reason = parse_policy_proposal(response)
-        assert item is None, response
+        edit, reason = parse_policy_proposal(response)
+        assert edit is None, response
         assert reason, response
 
 
 def test_parse_policy_proposal_no_proposal_and_empty() -> None:
-    item, reason = parse_policy_proposal(
+    edit, reason = parse_policy_proposal(
         {"no_proposal": True, "reason": "no vocabulary item is justified"},
     )
-    assert item is None
+    assert edit is None
     assert reason == "no vocabulary item is justified"
 
-    item, reason = parse_policy_proposal({})
-    assert item is None
+    edit, reason = parse_policy_proposal({})
+    assert edit is None
     assert reason == "empty_response"
 
 
@@ -186,8 +232,8 @@ def test_current_policy_text_renders_baseline_and_items() -> None:
     ))
     lines = current_policy_text(genome).splitlines()
     assert lines == [
-        "consensus_gate_blocked_nonempty -> emit_telemetry_only()",
-        "defense_coverage_complete_and_zero_certificates -> "
+        "[0] consensus_gate_blocked_nonempty -> emit_telemetry_only()",
+        "[1] defense_coverage_complete_and_zero_certificates -> "
         "downgrade_coverage(side=defense, to_state=unresolved)",
     ]
 

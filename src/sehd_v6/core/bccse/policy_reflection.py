@@ -3,14 +3,16 @@
 L2 policy evolution closes the adjudication-layer proposal loop: when the
 deterministic failure classifier attributes a failure to the L2 policy
 surface, one reflection call proposes a single closed-vocabulary policy
-item. The LLM only *proposes*; runtime semantics are owned by
-``policy_evaluator`` and the proof-court policy hook, so every vocabulary
-token shown to the model is generated from ``v6_contracts`` at call time
-and every parse result is re-validated against the same closed sets.
+edit (add_item / modify_item / remove_item). The LLM only *proposes*;
+runtime semantics are owned by ``policy_evaluator`` and the proof-court
+policy hook, so every vocabulary token shown to the model is generated
+from ``v6_contracts`` at call time and every parse result is re-validated
+against the same closed sets.
 """
 
 from __future__ import annotations
 
+import uuid
 from typing import Any, Mapping
 
 from .v6_contracts import (
@@ -24,7 +26,7 @@ from .v6_contracts import (
     PolicyItem,
     validate_policy_params,
 )
-from .policy_genome import PolicyGenome
+from .policy_genome import PolicyEdit, PolicyGenome, PolicyOp
 
 
 def _sanitize_rejected_summary(value: str) -> str:
@@ -43,17 +45,23 @@ def _sanitize_rejected_summary(value: str) -> str:
 
 
 def current_policy_text(genome: PolicyGenome) -> str:
-    """Render the policy genome as one ``precondition -> action(params)``
-    line per item; the empty baseline renders an explicit placeholder so
-    the reflection prompt never carries a blank context block."""
+    """Render the policy genome as one addressable line per item.
+
+    The bracketed index is the edit address for modify_item/remove_item,
+    matching the ``item_index`` contract of ``validate_policy_edit``; the
+    empty baseline renders an explicit placeholder so the reflection prompt
+    never carries a blank context block.
+    """
     if not genome.items:
         return "(empty policy set)"
     lines = []
-    for item in genome.items:
+    for index, item in enumerate(genome.items):
         params = ", ".join(
             f"{key}={value}" for key, value in sorted(item.params.items())
         )
-        lines.append(f"{item.precondition} -> {item.action}({params})")
+        lines.append(
+            f"[{index}] {item.precondition} -> {item.action}({params})"
+        )
     return "\n".join(lines)
 
 
@@ -78,23 +86,31 @@ def _vocabulary_text() -> str:
 
 
 _SYSTEM_PROMPT = (
-    "You propose exactly ONE L2 adjudication policy item for the PACA-TCL "
-    "proof court. An L2 policy item is a pair (closed precondition "
-    "predicate, enumerated action with closed-vocabulary parameters) over "
-    "the adjudication facts of one detection. Its runtime semantics are "
-    "fixed by a deterministic evaluator inside the proof court: you only "
-    "propose the item, you never interpret or execute it, and an item "
-    "outside the closed vocabulary is discarded without effect.\n"
-    "Propose an item only when the attribution triple and the fact counts "
-    "show an adjudication-layer failure that one vocabulary item can "
-    "address (hollow complete coverage, consensus-gate blocking, boundary "
-    "conflict). Prefer conservative actions that weaken an unsupported "
-    "coverage claim over actions that rewrite verdicts. If no vocabulary "
-    "item is justified, return a no_proposal response instead.\n\n"
+    "You propose exactly ONE L2 adjudication policy edit for the PACA-TCL "
+    "proof court. A policy item is a pair (closed precondition predicate, "
+    "enumerated action with closed-vocabulary parameters) over the "
+    "adjudication facts of one detection. Its runtime semantics are fixed "
+    "by a deterministic evaluator inside the proof court: you only propose "
+    "the edit, you never interpret or execute it, and anything outside the "
+    "closed vocabulary is discarded without effect.\n"
+    "Operations: add_item proposes a new item; modify_item replaces the "
+    "item at item_index with a corrected item; remove_item deletes the item "
+    "at item_index. Use modify_item or remove_item only on an item from the "
+    "CURRENT POLICY SET whose observed effect is wrong, harmful, or dead; "
+    "otherwise propose add_item for a newly observed adjudication-layer "
+    "failure, or no_proposal when no vocabulary edit is justified. Prefer "
+    "conservative actions that weaken an unsupported coverage claim over "
+    "actions that rewrite verdicts.\n\n"
     "{vocabulary}\n\n"
     "RESPONSE CONTRACT (single JSON object):\n"
-    '{{"precondition": "<predicate name>", "action": "<action name>", '
+    '{{"operation":"add_item","precondition": "<predicate name>", '
+    '"action": "<action name>", "params": {{"<key>": "<closed value>"}}, '
+    '"rationale": "<one sentence>"}}\n'
+    'or {{"operation":"modify_item","item_index": <int>, '
+    '"precondition": "<predicate name>", "action": "<action name>", '
     '"params": {{"<key>": "<closed value>"}}, "rationale": "<one sentence>"}}\n'
+    'or {{"operation":"remove_item","item_index": <int>, '
+    '"rationale": "<one sentence>"}}\n'
     'or {{"no_proposal": true, "reason": "<one sentence>"}}'
 )
 
@@ -136,36 +152,64 @@ def build_policy_reflection_prompt(
 
 def parse_policy_proposal(
     response: Mapping[str, Any],
-) -> tuple[PolicyItem | None, str]:
-    """Parse one reflection response into a PolicyItem.
+) -> tuple[PolicyEdit | None, str]:
+    """Parse one reflection response into a closed-vocabulary PolicyEdit.
 
-    Returns ``(None, reason)`` for no_proposal, unknown vocabulary tokens
-    and invalid parameters; the caller generates ``item_id`` (and
-    ``source_case_id``) because identity belongs to the evolution loop,
-    not to the model output.
+    Returns ``(None, reason)`` for no_proposal, unknown operations,
+    unaddressable targets and vocabulary violations. The caller assigns
+    item identity (``item_id`` / ``source_case_id``) because identity
+    belongs to the evolution loop, not to the model output. Legacy
+    add-only responses without an ``operation`` field stay addressable.
     """
     if not isinstance(response, Mapping) or not response:
         return None, "empty_response"
     if response.get("no_proposal"):
         return None, str(response.get("reason") or "no_proposal")
-    precondition = str(response.get("precondition") or "")
-    if precondition not in L2_PREDICATE_NAMES:
-        return None, f"unknown_precondition:{precondition}"
-    action = str(response.get("action") or "")
-    if action not in L2_ACTIONS:
-        return None, f"unknown_action:{action}"
-    raw_params = response.get("params") or {}
-    if not isinstance(raw_params, Mapping):
-        return None, "invalid_params_type"
-    params = {str(key): value for key, value in raw_params.items()}
-    params_valid, params_reason = validate_policy_params(action, params)
-    if not params_valid:
-        return None, params_reason
-    item = PolicyItem(
-        item_id="",
-        precondition=precondition,
-        action=action,
-        params=dict(params),
-        rationale=str(response.get("rationale") or "")[:500],
-    )
-    return item, ""
+    operation = str(response.get("operation") or "").strip()
+    if not operation:
+        operation = PolicyOp.ADD_ITEM.value
+    if operation not in {op.value for op in PolicyOp}:
+        return None, f"unknown_operation:{operation}"
+    rationale = str(response.get("rationale") or "")[:500]
+
+    item_index = response.get("item_index")
+    if operation in {PolicyOp.MODIFY_ITEM.value, PolicyOp.REMOVE_ITEM.value}:
+        if (
+            not isinstance(item_index, int)
+            or isinstance(item_index, bool)
+            or item_index < 0
+        ):
+            return None, "missing_item_index"
+
+    new_item: PolicyItem | None = None
+    if operation in {PolicyOp.ADD_ITEM.value, PolicyOp.MODIFY_ITEM.value}:
+        precondition = str(response.get("precondition") or "")
+        if precondition not in L2_PREDICATE_NAMES:
+            return None, f"unknown_precondition:{precondition}"
+        action = str(response.get("action") or "")
+        if action not in L2_ACTIONS:
+            return None, f"unknown_action:{action}"
+        raw_params = response.get("params") or {}
+        if not isinstance(raw_params, Mapping):
+            return None, "invalid_params_type"
+        params = {str(key): value for key, value in raw_params.items()}
+        params_valid, params_reason = validate_policy_params(action, params)
+        if not params_valid:
+            return None, params_reason
+        new_item = PolicyItem(
+            item_id="",
+            precondition=precondition,
+            action=action,
+            params=dict(params),
+            rationale=rationale,
+        )
+
+    return PolicyEdit(
+        edit_id=f"policy_edit_{uuid.uuid4().hex[:8]}",
+        operation=operation,
+        item_index=(
+            item_index if operation != PolicyOp.ADD_ITEM.value else None
+        ),
+        new_item=new_item,
+        rationale=rationale,
+    ), ""

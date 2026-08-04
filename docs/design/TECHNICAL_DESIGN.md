@@ -9,8 +9,12 @@ execution, while the injected strategy genome is intentionally mutable. The
 design follows a two-step research protocol:
 
 The reader-oriented companion guide
-[EXPERIMENT_FRAMEWORK_GUIDE.md](EXPERIMENT_FRAMEWORK_GUIDE.md) connects this
-design to the concrete CLI, result fields, dataset roles and claim boundaries.
+[EXPERIMENT_FRAMEWORK_GUIDE.md](../technical/EXPERIMENT_FRAMEWORK_GUIDE.md)
+connects this design to the concrete CLI, result fields, dataset roles and
+claim boundaries. The normative project charter — core objective, design
+philosophy and advisor requirements that every agent must comply with — is
+the "Core Objective and Design Discipline" section of the repository
+[README](../../README.md); this design document only implements it.
 
 1. Extract reusable trajectory features and classify the failure before editing.
 2. Evolve only the skill route supported by both the failure attribution and
@@ -441,41 +445,56 @@ proposal outside the closed vocabulary is discarded without effect.
 ## L2 Policy Evolution Closed Loop
 
 A triggered case whose attribution lands on the L2 surface enters the policy
-loop instead of the L1 mutation path:
+loop instead of the L1 mutation path. The surface is closed under
+correction: proposals use `add_item` / `modify_item` / `remove_item`, so a
+wrong or dead policy is repairable or eliminable instead of permanent.
 
 1. **Proposal.** One reflection call (`purpose=policy_reflection`) receives
    the attribution triple, the addressable adjudication facts, the current
-   policy set and the rejected-proposal history. It returns either one
-   closed-vocabulary proposal or an explicit no-proposal response. No gold
-   label enters the prompt.
-2. **Validation.** The response is parsed into a `PolicyItem` (identity and
+   policy set rendered with `[index]` edit addresses, and the
+   rejected-proposal history. It returns one closed-vocabulary edit (a new
+   item, a replacement for the item at `item_index`, or the deletion of the
+   item at `item_index`) or an explicit no-proposal response. No gold label
+   enters the prompt.
+2. **Validation.** The response is parsed into a `PolicyEdit` (identity and
    source-case bookkeeping are assigned by the evolution loop, not the
-   model), wrapped in a `PolicyEdit(add_item)` and validated against the
-   closed vocabulary, capacity, deduplication and protection rules.
+   model; legacy responses without an `operation` field stay `add_item`)
+   and validated against the closed vocabulary, capacity, deduplication,
+   index bounds and protection rules.
 3. **Candidate application.** `apply_policy_edit` produces a candidate policy
    genome in immutable-lineage style; the working genome is not touched yet.
 4. **Source replay.** The triggering case is re-detected with
-   `_run_detection_with_genome(policy_genome=candidate)`, which forwards the
-   items to `adjudicate_case(policy_items=...)`. The engine re-runs the
-   proof court at its convergence point with the identical evidence bundle
-   that produced the current verdict, so the policy re-adjudicates exactly
-   the facts the court committed to.
-5. **Effect gate.** Acceptance requires a non-empty `policy_evaluation.fired`
-   list plus either a terminal-state change or an effective-coverage change;
-   a policy that does not move the terminal edge is rejected as no-effect.
+   `_run_detection_with_genome(policy_genome=candidate)` — counted
+   separately as `policy_replays` — which forwards the items to
+   `adjudicate_case(policy_items=...)`. The engine re-runs the proof court
+   at its convergence point with the identical evidence bundle that produced
+   the current verdict, so the policy re-adjudicates exactly the facts the
+   court committed to.
+5. **Effect gate.** Add/modify acceptance requires a non-empty
+   `policy_evaluation.fired` list plus either a terminal-state change or an
+   effective-coverage change; remove additionally requires that the
+   targeted item actually fired on the source detection and that its
+   removal moves an observable output. An edit that does not move the
+   terminal edge is rejected as no-effect.
 6. **Gold polarity gate.** When the terminal state moves, the move must be
    scorable against the gold label and `task_state_score` must strictly
    improve; otherwise the candidate is rejected.
 7. **Accept or roll back.** Acceptance swaps in the candidate genome;
    rejection rolls back inherently because every replay runs on a copy of
-   the policy genome.
+   the policy genome. A gold-verified terminal-moving accept (add/modify)
+   marks the item `strong` in `item_meta.fitness_status`, locking it
+   against later modify/remove; coverage-only accepts stay correctable.
 
 Gate decisions are recorded as `accept_policy`, `reject_policy_no_effect`,
 `reject_policy_fitness` or `skip_no_policy` (no mutation route, failed
 reflection call, unparseable response or invalid edit). The checkpoint
-persists `policy_genome`, and every proposal decision — attribution, facts,
-proposal, `policy_evaluation`, replay state and policy genome hash — is
-written into `evolution_audit["l2_policy_audit"]`.
+persists `policy_genome` as the single persistence point (resume re-validates
+the closed vocabulary and the content hash fail-closed), keeps the probe
+rollback anchor in `stable_policy_genome_payload` — a failed development
+probe rolls the policy surface back together with the L1 champion — and
+every proposal decision — attribution, facts, proposal, `policy_evaluation`,
+replay state and policy genome hash — is written into
+`evolution_audit["l2_policy_audit"]`.
 
 ## Proof Court Policy Hook
 
@@ -532,3 +551,9 @@ an empty policy set leaves the default adjudication path untouched.
   non-regression evidence; directional evidence is not promotable, and any
   proposal failing vocabulary, structural or fitness checks is rejected and
   recorded as negative experience.
+- Closed under correction: every evolvable surface can repair and remove its
+  own artifacts (L1 add/modify/remove rules; L2 add_item/modify_item/
+  remove_item), while gold-verified wins stay protected against erosion.
+- Evidence-driven gates: acceptance rests on observable replay effects,
+  closed-vocabulary contracts and gold polarity; no numeric threshold is
+  ever hand-tuned into a gate.
