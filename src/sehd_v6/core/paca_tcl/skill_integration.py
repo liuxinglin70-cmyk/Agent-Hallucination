@@ -151,11 +151,28 @@ class CompiledPacaSkill:
     genome_hash: str
     stages: Mapping[PacaStage, CompiledStageSkill]
     module_texts: Mapping[str, str]
+    delta_rule_ids: Mapping[str, tuple[str, ...]]
     frozen_crs_weights: tuple[float, ...] = (0.35, 0.15, 0.20, 0.20, 0.10)
     schema_version: str = "agenthallu.paca_tcl_skill_integration.v4"
 
     def for_stage(self, stage: PacaStage) -> CompiledStageSkill:
         return self.stages[stage]
+
+    def rule_trace(self) -> dict[str, list[dict[str, str]]]:
+        """Return the stable rule-level execution trace for audit.
+
+        Every evolved (delta) rule gets one stable rule id (content hash
+        prefix) with its module, so the evolution loop can attribute an
+        observable no-effect to the injected rule surface instead of
+        guessing from the whole genome.
+        """
+        return {
+            module_id: [
+                {"rule_id": rule_id, "rule": rule}
+                for rule_id, rule in self.delta_rule_ids.get(module_id, ())
+            ]
+            for module_id in sorted(self.delta_rule_ids)
+        }
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -163,6 +180,13 @@ class CompiledPacaSkill:
             "genome_hash": self.genome_hash,
             "frozen_crs_weights": list(self.frozen_crs_weights),
             "module_texts": dict(self.module_texts),
+            "delta_rule_ids": {
+                module_id: [
+                    {"rule_id": rule_id, "rule": rule}
+                    for rule_id, rule in rule_ids
+                ]
+                for module_id, rule_ids in self.delta_rule_ids.items()
+            },
             "stages": {
                 stage.value: compiled.to_dict()
                 for stage, compiled in self.stages.items()
@@ -266,6 +290,49 @@ def _compile_module_delta(
     return [f"【{display_name}】{rule}" for rule in delta_rules]
 
 
+def _rule_stable_id(module_id: str, rule: str) -> str:
+    """Stable rule id from module + normalized condition clause.
+
+    A wording-level retry that keeps the same condition but rewrites the
+    action must keep the same rule identity, so the id survives text drift
+    and the evolution loop can attribute repeated no-effect replays to one
+    logical rule. Changing the condition (a real semantic change) yields a
+    new id.
+    """
+    text = " ".join(str(rule).split())
+    condition = text
+    lowered = text.lower()
+    if lowered.startswith("when "):
+        head, _, _tail = text.partition(",")
+        condition = head[len("when "):].strip()
+    normalized = " ".join(condition.lower().split())
+    return _stable_hash(f"{module_id}|{normalized}")[:12]
+
+
+def _delta_rule_ids(
+    module: SkillModule,
+    baseline_module: SkillModule,
+) -> tuple[tuple[str, str], ...]:
+    """Return (stable_rule_id, rule_text) for every evolved delta rule.
+
+    The id is derived from module + normalized condition (see
+    ``_rule_stable_id``), so it is stable across runs, checkpoints and
+    wording-level retries of the same logical rule.
+    """
+    if not module.active:
+        return ()
+    unmatched_baseline = list(baseline_module.rules)
+    delta: list[tuple[str, str]] = []
+    for rule in module.rules:
+        if rule in unmatched_baseline:
+            unmatched_baseline.remove(rule)
+        else:
+            delta.append(
+                (_rule_stable_id(module.module_id, rule), rule)
+            )
+    return tuple(delta)
+
+
 def compile_genome_for_paca(
     genome: SkillGenome,
     *,
@@ -281,12 +348,17 @@ def compile_genome_for_paca(
     baseline = baseline or create_baseline_genome()
 
     module_texts: dict[str, str] = {}
+    delta_rule_ids: dict[str, tuple[tuple[str, str], ...]] = {}
     for module_id in MODULE_IDS:
         delta_lines = _compile_module_delta(
             genome.modules[module_id],
             baseline.modules[module_id],
         )
         module_texts[module_id] = "\n".join(delta_lines)
+        delta_rule_ids[module_id] = _delta_rule_ids(
+            genome.modules[module_id],
+            baseline.modules[module_id],
+        )
 
     stages: dict[PacaStage, CompiledStageSkill] = {}
     for stage in PacaStage:
@@ -318,6 +390,7 @@ def compile_genome_for_paca(
         genome_hash=genome.content_hash,
         stages=stages,
         module_texts=module_texts,
+        delta_rule_ids=delta_rule_ids,
     )
 
 

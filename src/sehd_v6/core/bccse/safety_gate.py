@@ -214,13 +214,6 @@ class StructuralGate:
         self._consecutive_no_edit = certificate.prior_consecutive_no_edit
         self._converged = certificate.prior_converged
 
-    def mark_repaired(self, certificate: GateCertificate, repair: str) -> None:
-        """Mark a repairable structural proposal as superseded, not rejected."""
-        if certificate.decision != "reject":
-            return
-        certificate.decision = "superseded"
-        certificate.reject_reasons.append(f"repaired_by:{repair}")
-
     def get_allowed_operations(self, module: str) -> list[str]:
         """All operations are always allowed — trust the LLM's judgment.
 

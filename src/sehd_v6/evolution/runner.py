@@ -22,6 +22,10 @@ from ..core.bccse.evolution_runner import (
     run_online_evolution,
 )
 from ..core.bccse.genome import SkillGenome
+from ..core.bccse.policy_genome import (
+    PolicyGenome,
+    validate_policy_genome_items,
+)
 from ..core.paca_tcl.detector import resolve_detector_config
 from ..provider_routes import has_provider_credential, resolve_provider_route
 
@@ -95,6 +99,8 @@ def load_checkpoint(output_dir: Path) -> dict[str, Any]:
 
 def _resolve_mutation_route(
     route: Path | Mapping[str, Any] | None,
+    *,
+    purpose: str = "mutation",
 ) -> dict[str, Any]:
     if route is None:
         return default_mutation_route()
@@ -104,7 +110,7 @@ def _resolve_mutation_route(
             raise ValueError("mutation route file must contain an object")
         route = value
     return resolve_provider_route(
-        dict(route), purpose="mutation", route_name="mutation",
+        dict(route), purpose=purpose, route_name=purpose,
     )
 
 
@@ -121,6 +127,32 @@ def _load_initial_genome(
     return SkillGenome.from_dict(payload)
 
 
+def _load_initial_policy_genome(
+    path: Path | PolicyGenome | None,
+) -> PolicyGenome | None:
+    if path is None:
+        return None
+    if isinstance(path, PolicyGenome):
+        items_ok, items_reason = validate_policy_genome_items(path)
+        if not items_ok:
+            raise ValueError(
+                "initial policy genome failed the closed vocabulary "
+                f"contract: {items_reason}"
+            )
+        return path
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("policy genome file must contain an object")
+    genome = PolicyGenome.from_dict(payload)
+    items_ok, items_reason = validate_policy_genome_items(genome)
+    if not items_ok:
+        raise ValueError(
+            "initial policy genome failed the closed vocabulary "
+            f"contract: {items_reason}"
+        )
+    return genome
+
+
 def run_evolution(
     *,
     records: Mapping[str, Mapping[str, Any]] | Path,
@@ -128,7 +160,9 @@ def run_evolution(
     output_dir: Path,
     census_root: Path | None = None,
     mutation_route: Path | Mapping[str, Any] | None = None,
+    pro_mutation_route: Path | Mapping[str, Any] | None = None,
     initial_genome: Path | SkillGenome | None = None,
+    initial_policy_genome: Path | PolicyGenome | None = None,
     experience_memory_path: Path | None = None,
     use_gold: bool = False,
     fitness_use_gold: bool = False,
@@ -158,7 +192,18 @@ def run_evolution(
             the detector falls back to its provider census route.
         mutation_route: Optional reflection/mutation route.  When omitted the
             official default (``SEHD_MUTATION_*``) is used.
+        pro_mutation_route: Optional deeper-diagnosis route, used only when
+            a source exhausts its bounded Flash attempts with a categorical
+            no-edit outcome; one Pro attempt is then allowed on the same
+            source. It must be passed explicitly to enable escalation — when
+            omitted no Pro escalation happens.
         initial_genome: Optional audited genome to continue evolving.
+        initial_policy_genome: Optional audited L2 adjudication-policy genome
+            (a persisted ``policy_genome.json`` path or a PolicyGenome
+            instance) to continue evolving alongside the skill genome. When
+            omitted the run starts from the empty baseline policy set, so
+            this is the inheritance path that carries L2 skills into a fresh
+            run.
         experience_memory_path: Optional HTC-TES experience memory artifact to
             seed this run.  The closed loop writes an updated memory back to
             ``output_dir`` for the next run.
@@ -233,6 +278,10 @@ def run_evolution(
         reflection_candidate_count=reflection_candidate_count,
         max_mutation_calls=max_mutation_calls,
         initial_genome=_load_initial_genome(initial_genome),
+        initial_policy_genome=_load_initial_policy_genome(initial_policy_genome),
+        pro_mutation_route=_resolve_mutation_route(
+            pro_mutation_route, purpose="pro"
+        ) if pro_mutation_route is not None else None,
         run_id=run_id,
         resume_from=Path(resume_from) if resume_from is not None else None,
         gold_reflection=gold_reflection,

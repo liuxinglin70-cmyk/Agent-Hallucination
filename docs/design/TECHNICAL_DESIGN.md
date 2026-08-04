@@ -122,15 +122,19 @@ does not override informative trajectory features.
 
 ## Type-Conditioned Evolution
 
-The type route is a hard safety constraint, not only prompt guidance:
+The type route is advisory, not a hard safety constraint: the causal
+attributor owns root-cause priority, and type classification may only
+filter implausible modules from the already bounded attribution route.
 
 ```text
-editable_modules = type_route(type) ∩ attribution_route(signal)
+editable_modules = filter(type_route(type), attribution_route(signal))
 ```
 
-If the intersection is empty, the case is recorded as `skip_route_conflict`
-and no mutation is generated. This prevents an LLM from using a generic type
-prompt to edit an unrelated module.
+If the intersection is empty, the bounded attribution route is used as-is
+instead of discarding the case: a low-confidence type mismatch must not
+silently lose an otherwise auditable edit candidate. HTC-TES therefore
+functions as an experience-organisation label, a retrieval/diversity tag,
+and an experiment telemetry dimension — it never decides the owner.
 
 The self-supervised direction for unresolved cases is
 `unresolved_to_decisive`, not `unresolved_to_error`. Without gold there is no

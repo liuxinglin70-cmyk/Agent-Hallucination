@@ -85,11 +85,18 @@ def test_policy_params_validation_enforces_closed_vocabularies():
     ok, reason = contracts.validate_policy_params("tune_threshold", {})
     assert not ok and "unknown_action" in reason
 
+    # Reserved engine-level actions are not proposable: they fail as
+    # unknown_action even with well-formed parameters.
     ok, reason = contracts.validate_policy_params(
         contracts.ACTION_RECLASSIFY_CANDIDATE_STATE,
         {"candidate_ref": "c1", "state": "verified_clean"},
     )
-    assert ok
+    assert not ok and "unknown_action" in reason
+    ok, reason = contracts.validate_policy_params(
+        contracts.ACTION_REQUIRE_ROUTE_REPLAY,
+        {"route_key": "route.alpha"},
+    )
+    assert not ok and "unknown_action" in reason
 
 
 def test_policy_item_roundtrip():
@@ -117,10 +124,15 @@ def test_failure_attribution_actionable_only_for_evolvable_layers():
 
 
 def test_actions_split_court_local_and_engine_level():
-    assert contracts.COURT_LOCAL_ACTIONS.isdisjoint(contracts.ENGINE_LEVEL_ACTIONS)
-    assert contracts.L2_ACTIONS == (
-        contracts.COURT_LOCAL_ACTIONS | contracts.ENGINE_LEVEL_ACTIONS
-    )
+    # L2_ACTIONS is the proposable AND executable vocabulary: it contains
+    # exactly the court-local actions. Engine-level actions are reserved
+    # but excluded until the runtime engine implements them.
+    assert contracts.COURT_LOCAL_ACTIONS == contracts.L2_ACTIONS
+    assert contracts.ENGINE_LEVEL_ACTIONS.isdisjoint(contracts.L2_ACTIONS)
+    assert contracts.ENGINE_LEVEL_ACTIONS == {
+        "reclassify_candidate_state",
+        "require_route_replay",
+    }
     for action, params in contracts.ACTION_PARAMS.items():
         assert action in contracts.L2_ACTIONS
         assert isinstance(params, tuple)

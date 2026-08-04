@@ -216,63 +216,102 @@ Eight skill modules own the provider-emitted surfaces:
 
 L1 rules are stored as typed slots (`condition` / `action` /
 `evidence_anchor`, English by contract) instead of free text
-(`rule_contract.py`). Prompt injection is a deterministic render: `render_rule()` emits
-exactly `When <condition>, <action>.`, so the structural gate validates the
-slot contract whenever slots are present; the free-text path only serves
-`remove_rule` and historical checkpoint replay. The `evidence_anchor` slot is
-failure-signature bookkeeping for evolution triage and is never rendered
-into runtime prompts.
+(`rule_contract.py`). The `action` slot is a **closed opcode** of the
+selected module (`module_charter.py::MODULE_ACTION_OPCODES`), optionally
+`"<opcode>: <target>"` naming the exact output field it acts on; free-text
+actions are rejected as `action_opcode_unowned`. Prompt injection is a
+deterministic render: `render_rule()` expands the opcode into its English
+template and emits exactly `When <condition>, <action>.`, so the structural
+gate validates the slot contract whenever slots are present; the free-text
+path only serves `remove_rule` and historical checkpoint replay. The
+`evidence_anchor` slot is failure-signature bookkeeping for evolution triage
+and is never rendered into runtime prompts.
 
 Each module carries a charter (`module_charter.py`): its influenceable
 surfaces, forbidden surfaces, allowed verdicts, and in-scope vs out-of-scope
-failure examples (all in English). Charters are injected into the reflection
-prompt so proposals are constrained at generation time. Each evolved
-`SkillEdit` also stores a label-free `feature_description` recording the
-reusable trajectory pattern that motivated the edit; it is metadata and
-never enters the final proof-court verdict directly.
+failure examples (all in English). Only the allowed target modules'
+charters and opcode lists are injected into the reflection prompt, so
+proposals are constrained at generation time without relitigating the full
+architecture. Each evolved `SkillEdit` also stores a label-free
+`feature_description` recording the reusable trajectory pattern that
+motivated the edit; it is metadata and never enters the final proof-court
+verdict directly.
 
 #### L2 adjudication-policy layer
 
 The L2 genome (`policy_genome.py`) stores closed-vocabulary policy items:
 one precondition predicate (a pure function over the frozen
 `AdjudicationFacts` snapshot) paired with one enumerated action —
-`downgrade_coverage`, `invalidate_coverage_claim`,
-`reclassify_candidate_state`, `require_route_replay`,
-`emit_telemetry_only` — whose parameters draw from closed vocabularies. The
-single source of truth for every predicate, action and parameter token is
-`v6_contracts.py`. The LLM only proposes items; runtime semantics are owned
-by the deterministic evaluator (`policy_evaluator.py`), which the proof
-court executes mechanically through its policy hook:
+`downgrade_coverage`, `invalidate_coverage_claim`, `emit_telemetry_only` —
+whose parameters draw from closed vocabularies. The single source of truth
+for every predicate, action and parameter token is `v6_contracts.py`, and
+`L2_ACTIONS` contains exactly the actions the runtime can execute: the
+engine-level actions (`reclassify_candidate_state`, `require_route_replay`)
+are reserved in `ENGINE_LEVEL_ACTIONS` but excluded until a provider
+re-execution engine implements them, so a proposal for one fails at parse
+time instead of reaching a runtime rejection. The LLM only proposes items;
+runtime semantics are owned by the deterministic evaluator
+(`policy_evaluator.py`), which the proof court executes mechanically through
+its policy hook:
 `adjudicate_proof_court(policy_items=..., boundary_path_state=...)`. The
 hook is inert by default — without policy items the detector output is
 byte-identical to the baseline — and the detection engine re-adjudicates
 with the same evidence bundle at the court's convergence point. The L2
 baseline is the empty policy set, so every behavior change must be earned.
 
+The L2 genome is a first-class capability alongside the L1 skill genome:
+a fresh run can inherit both via `initial_genome` + `initial_policy_genome`
+(`run_evolution` / `run_online_evolution`), checkpoints restore both, the
+run persists `policy_genome.json`, and the standalone detector CLI accepts
+`--policy-genome` (or `detect_record(policy_genome=...)`) so an evolved
+two-layer capability can be deployed and validated independently.
+
 #### Deterministic attribution
 
 Attribution is a deterministic failure classifier (`failure_classifier.py`)
 that answers exactly one question: at which layer, on which artifact, did
-the failure happen — no LLM, no heuristics. An L1 owner hypothesis must
-pass the gold polarity gate (a false negative can only be owned by modules
-that tighten error detection, a false positive only by modules that relax
-or bound the error claim); hypotheses crossing the gold side are dropped.
-Non-L1 failures (adjudication-policy layer, detector-layer anomalies) have
-no L1 owner: they are recorded in `non_l1_failure_attributions` as audit
-telemetry and feed the L2 policy loop.
+the failure happen — no LLM, no heuristics. The classifier input is the
+complete provider-artifact integrity projection of one detection
+(construct-stage candidate counts, court audit failed-checks, quarantine
+tallies, appeal provider status, and the single gold-informed FN+omission
+signal). It runs on every detection: an L2 attribution opens the L2 loop
+independently of the self-supervised trigger, and an L1 attribution carries
+an evidence-based owner that outranks the process-heuristic secondary
+module. An L1 owner hypothesis must pass the gold polarity gate (a false
+negative can only be owned by modules that tighten error detection, a false
+positive only by modules that relax or bound the error claim); hypotheses
+crossing the gold side are dropped. Non-L1 failures (adjudication-policy
+layer, detector-layer anomalies) have no L1 owner: they are recorded in
+`non_l1_failure_attributions` as audit telemetry and feed the L2 policy
+loop.
 
 #### L1 evolution loop (per case)
 
 1. **Detect**: Run PACA-TCL v3.5 with the current genomes injected
-2. **Attribute**: Deterministic failure classification; L1 owners pass the
-   gold polarity gate; non-L1 failures go to telemetry and the L2 loop
+2. **Attribute**: Deterministic failure classification on the full
+   provider-artifact projection; L1 owners pass the gold polarity gate;
+   non-L1 failures go to telemetry and the L2 loop
 3. **Reflect**: LLM reflection receives evaluator-field-stripped trajectory
-   evidence, attribution, module charters, executable module-output
-   contracts, and bounded negative experience
-4. **Gate**: Structural constraint gate validates edit safety
-5. **Fitness**: Source replay plus rolling stable-case canaries; a budgeted probe can steer/rollback development, while only an authorized sealed final holdout can support a generalization claim
+   evidence, attribution, module charters and closed action opcodes,
+   executable module-output contracts, bounded negative experience, and
+   (when available) a supporting case + stable counter-case contrast block
+   that bounds the condition to the separating discriminator
+4. **Gate**: Deterministic pre-validation (ownership/opcode/slot/contract
+   shape) before the critic, then the structural constraint gate validates
+   edit safety; a structurally invalid pick can fall through to the next
+   ranked legal candidate
+5. **Fitness**: Source replay plus rolling stable-case canaries; every
+   replay records the injected rule ids (`rule_trace`) and a deterministic
+   no-effect class (`output_changed_then_quarantined` /
+   `provider_output_changed_but_court_invariant` /
+   `no_observable_change_any_layer`) so a no-effect is no longer guessed;
+   a budgeted probe can steer/rollback development, while only an
+authorized sealed final holdout can support a generalization claim
 6. **Repair**: A repairable structural or source-no-effect candidate may use
-   one bounded same-source retry with its actual observable replay deltas
+   one bounded same-source retry with its actual observable replay deltas;
+   when a source exhausts its Flash attempts with a categorical no-edit
+   outcome, an optional `pro_mutation_route` gets one deeper diagnosis
+   attempt
 7. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
 
 #### L2 closed loop
@@ -341,6 +380,14 @@ can be repaired or eliminated instead of accumulating.
 - ADOPTION → evidence_obligation, clean_defense
 - CONTEXTUAL → abstention, clean_defense
 
+**Advisory routing**: the type route is advisory, not a hard safety
+constraint — the causal attributor owns root-cause priority and the type
+classifier only filters implausible modules from the already bounded
+attribution route (empty intersection falls back to the attribution
+route). HTC-TES functions as an experience-organisation label, a
+retrieval/diversity tag, and an experiment telemetry dimension; it never
+decides the owner.
+
 **Type→Editing Strategy** mapping:
 - FACTUAL → strict_verification
 - INSTRUCTIONAL → boundary_enforcement
@@ -359,6 +406,14 @@ been successfully optimized.
 - Without gold, decisive outcomes are not called correct; the metric records whether a typed process edit reached its declared direction
 - Type-experience coverage is reported separately from detector accuracy
 - A dry-run rule application is not counted as detection improvement unless source replay changes the authoritative detector outcome
+
+**Artifact-first experience memory**: experience deduplication keys on the
+deterministic attribution signature (`layer` + `artifact` + `reason_code` +
+`operation`) plus feature/direction/success, so the same intervention on
+the same failure signature is one experience; repeated observations merge
+into an outcome distribution (`outcome_counts`) instead of overwriting the
+first snapshot. Reflection summaries aggregate artifact and reason-code
+counts alongside the type label.
 
 ## Usage
 

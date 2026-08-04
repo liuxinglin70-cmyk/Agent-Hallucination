@@ -16,8 +16,6 @@ from ..bccse.v6_contracts import (
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_EMIT_TELEMETRY_ONLY,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
-    ACTION_RECLASSIFY_CANDIDATE_STATE,
-    ACTION_REQUIRE_ROUTE_REPLAY,
     AdjudicationFacts,
     L2_ACTIONS,
     L2_PREDICATES,
@@ -45,8 +43,6 @@ class PolicyEvaluationResult:
     skipped: tuple
     effective_prosecution_coverage: str
     effective_defense_coverage: str
-    candidate_reclassifications: dict
-    route_replay_requests: tuple
     telemetry: tuple
     terminal_state: str
 
@@ -57,8 +53,6 @@ class PolicyEvaluationResult:
             "skipped": [dict(row) for row in self.skipped],
             "effective_prosecution_coverage": self.effective_prosecution_coverage,
             "effective_defense_coverage": self.effective_defense_coverage,
-            "candidate_reclassifications": dict(self.candidate_reclassifications),
-            "route_replay_requests": list(self.route_replay_requests),
             "telemetry": [dict(row) for row in self.telemetry],
             "terminal_state": self.terminal_state,
         }
@@ -87,8 +81,9 @@ def evaluate_policies(
 
     Items are evaluated in list order (genome order = deterministic
     priority). Unresolvable preconditions and invalid actions fail closed:
-    they are recorded in ``skipped`` and never applied. Engine-level actions
-    are surfaced as effects without touching court-local state.
+    they are recorded in ``skipped`` and never applied. Actions outside
+    ``L2_ACTIONS`` (including the reserved engine-level actions, which the
+    runtime does not implement) fail closed as ``unknown_action``.
     """
     eff_prosecution = facts.prosecution_coverage
     eff_defense = facts.defense_coverage
@@ -96,8 +91,6 @@ def evaluate_policies(
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     telemetry: list[dict[str, Any]] = []
-    reclassifications: dict[str, str] = {}
-    replay_requests: list[str] = []
 
     for item in items:
         predicate = L2_PREDICATES.get(item.precondition)
@@ -154,17 +147,6 @@ def evaluate_policies(
                 "item_id": item.item_id,
                 "rationale": item.rationale,
             })
-        elif item.action == ACTION_RECLASSIFY_CANDIDATE_STATE:
-            # Last write wins; every write is traced so overrides are auditable.
-            reclassifications[params["candidate_ref"]] = params["state"]
-            telemetry.append({
-                "kind": "candidate_reclassification",
-                "item_id": item.item_id,
-                "candidate_ref": params["candidate_ref"],
-                "state": params["state"],
-            })
-        elif item.action == ACTION_REQUIRE_ROUTE_REPLAY:
-            replay_requests.append(params["route_key"])
 
     return PolicyEvaluationResult(
         applied_item_ids=tuple(applied_item_ids),
@@ -172,8 +154,6 @@ def evaluate_policies(
         skipped=tuple(skipped),
         effective_prosecution_coverage=eff_prosecution,
         effective_defense_coverage=eff_defense,
-        candidate_reclassifications=reclassifications,
-        route_replay_requests=tuple(replay_requests),
         telemetry=tuple(telemetry),
         terminal_state=_recompute_terminal_state(
             facts.surviving_error_count, eff_prosecution, eff_defense,

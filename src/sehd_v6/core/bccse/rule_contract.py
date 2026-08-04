@@ -22,7 +22,10 @@ from .genome import (
     semantic_overlap,
     validate_feature_description,
 )
-from .module_charter import validate_action_surface
+from .module_charter import (
+    MODULE_ACTION_OPCODES,
+    validate_action_surface,
+)
 
 # Direction vocabulary mirrors rule_meta["direction"] in genome so slot rules
 # and legacy rules stay comparable during the migration window.
@@ -151,15 +154,39 @@ def _normalize_action(raw: str) -> str:
     return action
 
 
+def _render_action(raw_action: str, module_id: str) -> str:
+    """Expand a closed opcode slot into the English template the provider
+    sees: ``"<opcode>"`` or ``"<opcode>: <target>"`` maps to the module's
+    template (``"; <target>"`` appended when present). Unknown texts render
+    verbatim, so legacy free-text rules keep their original wording.
+    """
+    action = _normalize_action(raw_action)
+    opcode, sep, target = action.partition(":")
+    opcode = opcode.strip()
+    # Case-insensitive like validate_action_surface, so a differently-cased
+    # opcode still renders through the deterministic template instead of
+    # falling back to verbatim (which would break dedup identity).
+    opcode_lower = opcode.lower()
+    for code, template in MODULE_ACTION_OPCODES.get(module_id, ()):
+        if opcode_lower == code:
+            target_part = target.strip() if sep else ""
+            return f"{template}: {target_part}" if target_part else template
+    return action
+
+
 def render_rule(spec: RuleSpec) -> str:
     """Deterministically render a spec as exactly one English if-then sentence.
 
-    Punctuation normalization (no trailing punctuation on the condition, a
-    single terminal period on the action) makes the rendered text a pure
-    function of the slots, which is what identity/dedup rely on.
+    The action slot is a closed opcode (``"<opcode>"`` or
+    ``"<opcode>: <target>"``); rendering expands it into the module's
+    English template so the provider reads natural language while the slot
+    stays enumerable and validatable. Punctuation normalization (no trailing
+    punctuation on the condition, a single terminal period on the action)
+    makes the rendered text a pure function of the slots, which is what
+    identity/dedup rely on.
     """
     condition = _normalize_condition(spec.condition)
-    action = _normalize_action(spec.action)
+    action = _render_action(spec.action, spec.module_id)
     return f"When {condition}, {action}."
 
 

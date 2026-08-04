@@ -171,8 +171,9 @@ def provider_thinking_control(
     DeepSeek V4 defaults to thinking mode. Small mutation requests can spend
     their entire output budget in ``reasoning_content`` and return an empty
     final ``content``, which the JSON transport previously misclassified as a
-    malformed skill. Mutation/reflection calls therefore default to the
-    official non-thinking mode; an explicit route setting still wins.
+    malformed skill. Mutation/reflection-family calls (including the L2
+    closed-vocabulary policy reflection) therefore default to the official
+    non-thinking mode; an explicit route setting still wins.
     """
     configured = route.get("thinking")
     if isinstance(configured, Mapping):
@@ -186,7 +187,14 @@ def provider_thinking_control(
     endpoint = str(route.get("endpoint") or "").rstrip("/")
     model = str(route.get("model") or "").lower()
     if (
-        purpose in {"mutation", "reflection_critic", "reflection_diagnosis"}
+        purpose
+        in {
+            "mutation",
+            "reflection_critic",
+            "reflection_diagnosis",
+            "policy_reflection",
+            "reflection_pro",
+        }
         and endpoint == OFFICIAL_ENDPOINT
         and model.startswith("deepseek-v4-")
     ):

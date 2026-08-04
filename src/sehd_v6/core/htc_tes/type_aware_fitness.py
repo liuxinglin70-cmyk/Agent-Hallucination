@@ -77,6 +77,17 @@ class TypeConditionedExperience:
         }
 
 
+def _signatures_mergeable(
+    a: tuple[str, str, str, str],
+    b: tuple[str, str, str, str],
+) -> bool:
+    """Two artifact-first attribution signatures merge when either side is
+    empty (legacy records predate the schema) or they are identical."""
+    if not any(a) or not any(b):
+        return True
+    return a == b
+
+
 @dataclass
 class TypeExperienceMemory:
     """Persistent memory of type-conditioned detection experiences.
@@ -116,6 +127,17 @@ class TypeExperienceMemory:
         """
         feature_description = sanitize_feature_description(feature_description)
         normalized_feature = " ".join(feature_description.lower().split())
+        metadata = dict(metadata or {})
+        # Artifact-first identity: the same intervention on the same failure
+        # signature is one experience even when wording drifts. The
+        # attribution triple defaults empty so legacy records (recorded
+        # before the artifact-first schema) stay comparable.
+        attribution_signature = (
+            str(metadata.get("layer") or ""),
+            str(metadata.get("artifact") or ""),
+            str(metadata.get("reason_code") or ""),
+            str(metadata.get("operation") or ""),
+        )
         entries = self._experiences[hallucination_type]
         duplicate = next(
             (
@@ -124,6 +146,15 @@ class TypeExperienceMemory:
                 and entry.module_targeted == module_targeted
                 and " ".join(entry.feature_description.lower().split()) == normalized_feature
                 and entry.detection_improved == detection_improved
+                and _signatures_mergeable(
+                    (
+                        str(entry.metadata.get("layer") or ""),
+                        str(entry.metadata.get("artifact") or ""),
+                        str(entry.metadata.get("reason_code") or ""),
+                        str(entry.metadata.get("operation") or ""),
+                    ),
+                    attribution_signature,
+                )
             ),
             None,
         )
@@ -131,6 +162,18 @@ class TypeExperienceMemory:
             duplicate.metadata["observation_count"] = int(
                 duplicate.metadata.get("observation_count", 1)
             ) + 1
+            # Merge the outcome distribution instead of keeping only the
+            # first snapshot: a repeated signature with a different outcome
+            # must update the success/failure evidence.
+            outcome = metadata.get("outcome")
+            if outcome:
+                outcome_counts = dict(
+                    duplicate.metadata.get("outcome_counts") or {}
+                )
+                outcome_counts[str(outcome)] = (
+                    outcome_counts.get(str(outcome), 0) + 1
+                )
+                duplicate.metadata["outcome_counts"] = outcome_counts
             duplicate.timestamp = time.time()
             duplicate.type_confidence = max(
                 duplicate.type_confidence,
@@ -145,10 +188,19 @@ class TypeExperienceMemory:
             strategy_used=strategy_used,
             detection_improved=detection_improved,
             source_case_id=source_case_id,
-            metadata={**(metadata or {}), "observation_count": 1},
+            metadata={**metadata, "observation_count": 1},
             feature_description=feature_description,
             type_confidence=normalize_type_confidence(type_confidence),
         )
+        # Seed the outcome distribution on first sight so a later duplicate
+        # merge counts every observation, including this first one.
+        outcome = metadata.get("outcome")
+        if outcome:
+            outcome_counts = dict(metadata.get("outcome_counts") or {})
+            outcome_counts[str(outcome)] = (
+                outcome_counts.get(str(outcome), 0) + 1
+            )
+            experience.metadata["outcome_counts"] = outcome_counts
         entries.append(experience)
 
         # Trim to max per type
@@ -231,6 +283,8 @@ class TypeExperienceMemory:
         # WHERE attempts keep failing, not just that they failed.
         outcome_counts: Counter[str] = Counter()
         stage_counts: Counter[str] = Counter()
+        artifact_counts: Counter[str] = Counter()
+        reason_counts: Counter[str] = Counter()
         for entry in all_entries:
             outcome = _safe_category(entry.metadata.get("outcome"))
             if outcome:
@@ -238,6 +292,12 @@ class TypeExperienceMemory:
             stage = _safe_category(entry.metadata.get("outcome_stage"))
             if stage:
                 stage_counts[stage] += 1
+            artifact = _safe_category(entry.metadata.get("artifact"))
+            if artifact:
+                artifact_counts[artifact] += 1
+            reason = _safe_category(entry.metadata.get("reason_code"))
+            if reason:
+                reason_counts[reason] += 1
         return {
             "type": hallucination_type.value,
             "direction": direction,
@@ -245,6 +305,8 @@ class TypeExperienceMemory:
             "successes": sum(bool(e.detection_improved) for e in entries),
             "outcome_counts": dict(outcome_counts),
             "outcome_stage_counts": dict(stage_counts),
+            "artifact_counts": dict(artifact_counts),
+            "reason_code_counts": dict(reason_counts),
             "promotable_evidence_count": sum(
                 bool(e.metadata.get("promotable_evidence")) for e in all_entries
             ),
@@ -259,6 +321,11 @@ class TypeExperienceMemory:
                     "process_state": e.metadata.get("process_state"),
                     "operation": _safe_category(e.metadata.get("operation")),
                     "outcome": _safe_category(e.metadata.get("outcome")),
+                    "layer": _safe_category(e.metadata.get("layer")),
+                    "artifact": _safe_category(e.metadata.get("artifact")),
+                    "reason_code": _safe_category(
+                        e.metadata.get("reason_code")
+                    ),
                     # v5.5 structured outcome: the stage an attempt stopped at
                     # and whether it may be cited as real improvement.
                     "outcome_stage": _safe_category(

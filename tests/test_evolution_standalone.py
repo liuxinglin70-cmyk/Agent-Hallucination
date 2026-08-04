@@ -71,7 +71,7 @@ def _edit_payload() -> dict:
         "operation": "add_rule",
         "rule_index": None,
         "condition": "a factual claim lacks a cited trajectory event",
-        "action": "require one event-backed certificate",
+        "action": "require_evidence_field: event_backed_certificate",
         "evidence_anchor": "uncited factual claim accepted without trajectory evidence",
         "rationale": "Require observable support.",
         "feature_description": "factual claim without cited trajectory evidence",
@@ -376,21 +376,21 @@ def test_online_evolution_runs_independent_candidates_and_critic(
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate cites no trajectory event",
-            "action": "require one event-backed certificate",
+            "action": "require_evidence_field: event_backed_certificate",
             "evidence_anchor": "certificate without cited event",
             "feature_description": "missing cited support",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate event is absent",
-            "action": "keep the evidence incomplete",
+            "action": "keep_coverage_incomplete",
             "evidence_anchor": "absent evidence event",
             "feature_description": "absent evidence event",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate cites no trajectory event",
-            "action": "require one event-backed certificate",
+            "action": "require_evidence_field: event_backed_certificate",
             "evidence_anchor": "duplicate sample",
             "feature_description": "duplicate sample",
         },
@@ -442,7 +442,10 @@ def test_online_evolution_runs_independent_candidates_and_critic(
     ]
     assert len({user for _, user in calls[:3]}) == 3
     reflection = result.steps[-1].fitness_check["reflection"]
-    assert reflection["generated_candidates"] == 2
+    # generated_candidates counts the raw generation attempts; the third
+    # sample was deduplicated against the first before the critic.
+    assert reflection["generated_candidates"] == 3
+    assert reflection["prevalidated_candidates"] == 2
     assert reflection["critic"]["selected_index"] == 1
 
 
@@ -465,14 +468,14 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
             "observed_gap": "cited evidence fields never populated",
             "intervention_hint": {
                 "condition": "a claim lacks cited event support",
-                "action": "keep the evidence field incomplete",
+                "action": "keep_coverage_incomplete",
             },
             "reasoning": "evidence construction owns the gap",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a claim lacks cited event support",
-            "action": "keep the evidence field incomplete",
+            "action": "keep_coverage_incomplete",
             "evidence_anchor": "cited evidence fields never populated",
             "feature_description": "uncited claim keeps evidence incomplete",
         },
@@ -641,31 +644,13 @@ def test_stable_cases_do_not_advance_convergence_streak(
     assert decisions.count("skip_stable") == 1
 
 
-def test_structural_repair_simplifies_condition_overload_and_proceeds(
+def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
     tmp_path, monkeypatch,
 ) -> None:
-    """v5.9e: a multi-conjunction rule rejected as condition_overload is
-    deterministically simplified to one conjunction and re-evaluated through
-    the same gate stack instead of burning a retry on the grammar error."""
+    """A multi-conjunction rule is rejected as condition_overload instead of
+    being mechanically simplified: deleting conjuncts would change the rule's
+    semantics, so the rejection is fed back and the model must rewrite it."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.bccse.genome import (
-        repair_rule_for_structural_reason,
-        validate_runtime_rule,
-    )
-
-    overloaded = (
-        "When the adjudication state is unresolved and quarantined error "
-        "certificates exist and defense coverage is complete, quarantine "
-        "the stale certificate."
-    )
-    valid, reason = validate_runtime_rule(overloaded, "atomic_verifier_instruction")
-    assert not valid and reason == "condition_overload"
-    repaired = repair_rule_for_structural_reason(
-        overloaded, "runtime_rule_contract:condition_overload",
-    )
-    assert repaired is not None
-    valid, reason = validate_runtime_rule(repaired, "atomic_verifier_instruction")
-    assert valid, reason
 
     def detector(*, genome, case_id, **kwargs):
         state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
@@ -687,7 +672,7 @@ def test_structural_repair_simplifies_condition_overload_and_proceeds(
                 "the adjudication state is unresolved and quarantined error "
                 "certificates exist and defense coverage is complete"
             ),
-            "action": "quarantine the stale certificate",
+            "action": "require_evidence_field: certificate",
             "evidence_anchor": "multi-conjunction proposal",
             "feature_description": "multi-conjunction proposal",
             "expected_effect": "prosecution evidence coverage increases",
@@ -713,12 +698,28 @@ def test_structural_repair_simplifies_condition_overload_and_proceeds(
         mutation_route={"model": "DeepSeek-V4-Flash"},
         canary_case_ids=("anchor",),
         reflection_candidate_count=1,
-        run_id="structural_repair",
+        run_id="condition_overload_reject",
     )
 
-    reflection = result.steps[-1].fitness_check["reflection"]
-    assert reflection["structural_repair"] == "condition_simplification:accepted"
-    assert result.edits_accepted == 1
+    # Both attempts are rejected at the slot gate: no mechanical
+    # simplification, no accepted edit.
+    assert result.edits_accepted == 0
+    rejected_steps = [
+        step for step in result.steps
+        if step.gate_decision in ("retry_invalid_mutation", "skip_invalid_mutation")
+    ]
+    assert len(rejected_steps) == 2
+    assert all(
+        str(step.fitness_check.get("mutation_error") or "").startswith(
+            "rule_spec:condition_overload"
+        )
+        for step in rejected_steps
+    )
+    # The first attempt schedules a bounded retry with structured feedback
+    # so the next call can rewrite the condition instead of losing it.
+    assert rejected_steps[0].fitness_check.get("retry_scheduled") is True
+    assert rejected_steps[0].fitness_check.get("retry_failure_category")
+    assert rejected_steps[1].fitness_check.get("retry_scheduled") is False
 
 
 def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
@@ -832,3 +833,328 @@ def test_mutation_budget_exhausted_short_circuits_reflection(
     # case never entered the reflection stack.
     assert mutation_calls == ["mutation"]
     assert result.evolution_audit["mutation_calls"] == 1
+
+
+def test_evolution_carries_initial_policy_genome_into_detector(
+    tmp_path, monkeypatch,
+) -> None:
+    """A supplied L2 policy genome seeds the working policy set and reaches
+    every detector call: this is the inheritance path that carries L2 skills
+    into a fresh run without a checkpoint."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyEdit,
+        PolicyItem,
+        PolicyOp,
+        apply_policy_edit,
+        create_baseline_policy_genome,
+    )
+
+    inherited = create_baseline_policy_genome()
+    inherited = apply_policy_edit(inherited, PolicyEdit(
+        edit_id="e1",
+        operation=PolicyOp.ADD_ITEM,
+        item_index=None,
+        new_item=PolicyItem(
+            item_id="inherited_1",
+            precondition="defense_coverage_complete_and_zero_certificates",
+            action="downgrade_coverage",
+            params={"side": "defense", "to_state": "incomplete"},
+            rationale="inherited from a previous run",
+        ),
+        rationale="r",
+    ))
+    seen_policy: list[list] = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        seen_policy.append(
+            list(policy_genome.items) if policy_genome is not None else None
+        )
+        return {
+            "state": "unresolved", "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        return {"no_proposal": True, "reason": "nothing to change"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        initial_policy_genome=inherited,
+        run_id="policy_inheritance",
+    )
+
+    assert seen_policy
+    assert all(
+        row and [item.item_id for item in row] == ["inherited_1"]
+        for row in seen_policy
+    )
+    assert result.policy_genome.content_hash == inherited.content_hash
+    assert result.policy_genome.items[0].item_id == "inherited_1"
+
+    # The working genome is a copy: mutating the caller's genome afterwards
+    # cannot change the run's champion.
+    assert result.policy_genome is not inherited
+
+
+def test_pro_route_escalates_when_flash_diagnosis_cannot_find_owner(
+    tmp_path, monkeypatch,
+) -> None:
+    """v6 phase 3: when every primary candidate retreats to no_edit and the
+    Flash diagnosis cannot find an executable owner, the Pro route gets one
+    deeper attempt on the same categorical outcome."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls: list[str] = []
+    call_count = 0
+    pro_call_count = 0
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        purpose = kwargs.get("purpose")
+        calls.append(purpose)
+        if purpose == "mutation" and call_count <= 2:
+            # The two independent candidate generations retreat to no_edit.
+            return {"operation": "no_edit", "rationale": "declined"}, {
+                "cache_hit": False,
+            }
+        if purpose == "reflection_diagnosis":
+            # Flash: cannot locate an executable owner.
+            return {
+                "owner_executable": False, "owner_module": None,
+                "failure_field": "", "observed_gap": "",
+                "reasoning": "flash cannot locate the gap",
+            }, {"cache_hit": False}
+        if purpose == "reflection_pro":
+            nonlocal pro_call_count
+            pro_call_count += 1
+            if pro_call_count == 1:
+                # Pro diagnosis: locates the owner.
+                return {
+                    "owner_executable": True,
+                    "owner_module": "evidence_obligation",
+                    "failure_field": "prosecution_coverage",
+                    "observed_gap": "cited evidence fields never populated",
+                    "intervention_hint": {
+                        "condition": "a claim lacks cited event support",
+                        "action": "keep_coverage_incomplete",
+                    },
+                    "reasoning": "pro diagnosis",
+                }, {"cache_hit": False}
+            # Pro targeted generation.
+            return {
+                "target_module": "evidence_obligation", "operation": "add_rule",
+                "condition": "a claim lacks cited event support",
+                "action": "keep_coverage_incomplete",
+                "evidence_anchor": "cited evidence fields never populated",
+                "feature_description": "uncited claim keeps evidence incomplete",
+                "expected_effect": "prosecution evidence coverage increases",
+                "expected_effect_contract": {
+                    "observable_field": "prosecution_coverage",
+                    "expected_direction": "increase",
+                    "expected_scope": "all_cases",
+                    "trigger_condition": "prosecution evidence is incomplete",
+                },
+            }, {"cache_hit": False}
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        pro_mutation_route={"model": "DeepSeek-V4-Pro"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=2,
+        run_id="pro_escalation",
+    )
+
+    # Flash diagnosis failed -> exactly one Pro diagnosis + Pro targeted
+    # generation, and the edit was accepted.
+    assert calls.count("reflection_pro") == 2
+    assert calls[0] == "mutation" and calls[1] == "mutation"
+    assert "reflection_diagnosis" in calls
+    assert result.edits_accepted == 1
+    reflection = result.steps[-1].fitness_check["reflection"]
+    assert reflection.get("diagnosis_route") == "reflection_pro"
+
+
+def test_pro_route_survives_flash_targeted_no_edit_residue(
+    tmp_path, monkeypatch,
+) -> None:
+    """A no_edit recorded by the Flash diagnosis route must not discard the
+    candidate the Pro route later generates (stale-reason regression)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    calls: list[str] = []
+    call_count = 0
+
+    def detector(*, genome, case_id, **kwargs):
+        state = "verified_clean" if case_id == "anchor" or genome.generation else "unresolved"
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        purpose = kwargs.get("purpose")
+        calls.append(purpose)
+        if purpose == "mutation" and call_count <= 2:
+            return {"operation": "no_edit", "rationale": "declined"}, {
+                "cache_hit": False,
+            }
+        if purpose == "reflection_diagnosis":
+            # Flash: diagnosis succeeds but the targeted generation no_edits.
+            if call_count == 3:
+                return {
+                    "owner_executable": True,
+                    "owner_module": "evidence_obligation",
+                    "failure_field": "prosecution_coverage",
+                    "observed_gap": "g",
+                    "intervention_hint": {
+                        "condition": "c", "action": "keep_coverage_incomplete",
+                    },
+                    "reasoning": "flash diagnosis",
+                }, {"cache_hit": False}
+            return {"operation": "no_edit", "rationale": "flash targeted declined"}, {
+                "cache_hit": False,
+            }
+        if purpose == "reflection_pro":
+            if call_count == 5:
+                return {
+                    "owner_executable": True,
+                    "owner_module": "evidence_obligation",
+                    "failure_field": "prosecution_coverage",
+                    "observed_gap": "g",
+                    "intervention_hint": {
+                        "condition": "c", "action": "keep_coverage_incomplete",
+                    },
+                    "reasoning": "pro diagnosis",
+                }, {"cache_hit": False}
+            return {
+                "target_module": "evidence_obligation", "operation": "add_rule",
+                "condition": "a claim lacks cited event support",
+                "action": "keep_coverage_incomplete",
+                "evidence_anchor": "a",
+                "feature_description": "f",
+                "expected_effect": "prosecution evidence coverage increases",
+                "expected_effect_contract": {
+                    "observable_field": "prosecution_coverage",
+                    "expected_direction": "increase",
+                    "expected_scope": "all_cases",
+                    "trigger_condition": "prosecution evidence is incomplete",
+                },
+            }, {"cache_hit": False}
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}, "anchor": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        pro_mutation_route={"model": "DeepSeek-V4-Pro"},
+        canary_case_ids=("anchor",),
+        reflection_candidate_count=2,
+        run_id="pro_residue",
+    )
+
+    # The Pro-generated candidate was accepted despite the Flash-round
+    # no_edit that would previously have discarded it.
+    assert result.edits_accepted == 1
+    assert calls.count("reflection_pro") == 2
+
+
+def test_comparison_cases_registered_and_injected(tmp_path, monkeypatch) -> None:
+    """v6 phase 3: triggered cases register attribution signatures and stable
+    cases register as counter-case anchors; the reflection prompt receives
+    the contrast block when both exist."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    prompts: list[str] = []
+
+    def detector(*, genome, case_id, **kwargs):
+        state = (
+            "verified_clean"
+            if case_id == "stable" or genome.generation > 0
+            else "unresolved"
+        )
+        return {
+            "state": state, "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        prompts.append(kwargs.get("user") or "")
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    runner.run_online_evolution(
+        evolution_case_ids=("stable", "source"),
+        records={"stable": {}, "source": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        run_id="contrast_cases",
+    )
+
+    # The stable case was processed first, so the triggered source sees the
+    # counter-case anchor in its prompt (the contrast block is rendered).
+    assert any("<contrast_cases>" in user for user in prompts)
+    assert any("stable counter-case" in user for user in prompts)

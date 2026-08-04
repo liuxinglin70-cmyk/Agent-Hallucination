@@ -27,7 +27,11 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .module_charter import render_all_charters
+from .module_charter import (
+    MODULE_OBSERVABLE_FIELDS,
+    render_action_opcode_text,
+    render_charter_text,
+)
 from .step_attributor import (
     AttributionSignal,
     TriggerSource,
@@ -197,34 +201,9 @@ MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
     ),
 }
 
-# Machine-readable source-of-truth for reflection contracts. Keeping this next
-# to the human descriptions prevents the mutator from selecting an observable
-# that the target module cannot control and the fitness function cannot score.
-MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
-    "candidate_trigger": ("candidate_count",),
-    "evidence_obligation": (
-        "prosecution_coverage", "prosecution_certificates",
-        "causal_field_coverage", "target_local_score",
-    ),
-    "candidate_to_verifier_route": (
-        "prosecution_coverage", "prosecution_certificates",
-        "target_local_score",
-    ),
-    "atomic_verifier_instruction": (
-        "quarantined_certificates", "causal_field_coverage",
-        "target_local_score",
-    ),
-    "clean_defense_boundary": (
-        "defense_coverage", "defense_certificates", "target_local_score",
-    ),
-    "causal_link_test": (
-        "causal_field_coverage", "localization_status", "target_local_score",
-    ),
-    "earliest_origin_tiebreak": (
-        "responsible_step", "localization_status", "target_local_score",
-    ),
-    "abstention_rule": ("state", "trigger", "target_local_score"),
-}
+# Machine-readable observable-field contract lives in module_charter as
+# the single source of truth (shared with action-opcode target validation);
+# MODULE_OBSERVABLE_FIELDS is re-exported from there above.
 
 
 def build_runtime_observation(
@@ -357,6 +336,7 @@ def build_causal_reflection_prompt(
     runtime_observation: Mapping[str, Any] | None = None,
     candidate_count: int = 1,
     targeted_diagnosis: Mapping[str, Any] | None = None,
+    comparison_cases: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -371,6 +351,10 @@ def build_causal_reflection_prompt(
         template_hint: Optional template suggestion (weak hint, not answer).
         accepted_edits_summary: Summary of already-accepted edits (diversity guidance).
         capacity_guidance: Capacity conflict guidance when target module is full.
+        comparison_cases: Optional {"positive": ..., "negative": ...} rows of
+            case-agnostic summaries (state/artifact/reason) that bound the
+            condition to the discriminator the supporting case shares with
+            the source but the stable counter-case lacks.
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -387,11 +371,14 @@ def build_causal_reflection_prompt(
     allowed_modules_text = ", ".join(allowed_modules)
     if candidate_count < 1 or candidate_count > 5:
         raise ValueError("candidate_count must be in 1..5")
-    # Charters own the action-surface contract, so only the expected-effect
-    # vocabulary (which no charter covers) stays on the per-module lines.
+    # Charters own the action-opcode contract, so only the expected-effect
+    # vocabulary (which no charter covers) stays on the per-module lines;
+    # the closed action opcodes are rendered per allowed module.
     runtime_contract_text = "\n".join(
         f"- {module}: expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}; "
-        f"allowed_observable_fields={','.join(MODULE_OBSERVABLE_FIELDS.get(module, ()))}"
+        f"allowed_observable_fields={','.join(MODULE_OBSERVABLE_FIELDS.get(module, ()))}\n"
+        f"  closed_action_opcodes:\n"
+        f"    {render_action_opcode_text(module)}"
         for module in allowed_modules
     )
 
@@ -457,17 +444,22 @@ A legal rule:
   (and/or/且/并且/以及/或). More than one conjunction is rejected by the
   structural gate as condition_overload; prefer one decisive observable
   pattern over a compound enumeration;
-- has exactly one module-local action;
+- has exactly one module-local action; the action slot MUST be a closed
+  opcode of the selected module, either "<opcode>" or "<opcode>: <target>"
+  where <target> names the exact output field or object the opcode acts on
+  (see closed_action_opcodes in runtime_output_contracts). Free-text
+  actions are rejected by the structural gate as action_opcode_unowned;
 - stays as short and decisive as the observable condition permits;
 - uses no case identity, concrete case fact, internal state manipulation,
   priority declaration, pseudocode, or cross-module reference;
 - does not directly force clean/error/unresolved outside abstention_rule.
 
-Most importantly, the action must change an output field that the target
-module's provider can actually emit. Abstract actions such as "improve the
-analysis", "treat the obligation as satisfied", or "consider the evidence"
-are inert unless they say which candidate/certificate/evidence/boundary/causal
-or verdict output must be emitted, suppressed, populated, or kept incomplete.
+Most importantly, the action must be one closed opcode of the target module
+and must change an output field that the target module's provider can
+actually emit. Abstract actions such as "improve the analysis", "treat the
+obligation as satisfied", or "consider the evidence" are inert unless they
+name a candidate/certificate/evidence/boundary/causal output and one of the
+module's opcodes that emits, suppresses, populates, or keeps it incomplete.
 
 An applicable broad baseline rule does not by itself justify no_edit when the
 runtime trace proves the receiving provider failed to execute it. In that
@@ -545,18 +537,25 @@ predicts another field is not a usable intervention plan.
 
 RULE FORM CONTRACT: add_rule and modify_rule edits are typed slots, not free
 text. You supply "condition" (English, one provider-runtime-observable
-condition), "action" (English, one module-local action), and
-"evidence_anchor" (failure-signature anchor used only for evolution
-telemetry). The persisted rule text is the deterministic render
-"When <condition>, <action>." — you never write the sentence yourself, and a
-slot payload that fails the slot contract is discarded as an invalid mutation,
-never rewritten into free text. The condition must describe a situation the
-target module's provider can observe at runtime, and the action must fall
-inside the influenceable surfaces of the target module's charter below.
+condition), "action" (a closed opcode of the selected module, optionally
+"<opcode>: <target>"), and "evidence_anchor" (failure-signature anchor
+used only for evolution telemetry). The persisted rule text is the
+deterministic render "When <condition>, <action>." — you never write the
+sentence yourself, and a slot payload that fails the slot contract is
+discarded as an invalid mutation, never rewritten into free text. The
+condition must describe a situation the target module's provider can
+observe at runtime, and the action must be one of the closed_action_opcodes
+listed for the target module in runtime_output_contracts.
 
 <module_charters>
 """
-    system += render_all_charters()
+    # Only the allowed target modules' charters are injected: the model's
+    # job is to edit one owned surface, not to re-derive the routing from
+    # eight charters, and a shorter prompt lowers schema drift on
+    # DeepSeek-V4-Flash non-thinking strict-JSON calls.
+    system += "\n\n".join(
+        render_charter_text(module) for module in allowed_modules
+    )
     system += """
 </module_charters>
 """
@@ -573,8 +572,10 @@ inside the influenceable surfaces of the target module's charter below.
             "\"rationale\":\"...\"}. An edit object must contain "
             '"target_module", "operation", "rule_index", "condition", '
             '"action", "evidence_anchor", "feature_description", '
-            '"expected_effect", "expected_effect_contract", "diagnosis", '
-            'and "rationale".\n'
+            '"expected_effect", "expected_effect_contract", and "rationale". '
+            "You may optionally include \"diagnosis\" as a nested object "
+            'with "failed_output", "owner_module" and "existing_rule_gap"; '
+            "it is audit metadata only and never changes admission.\n"
         )
 
     # Build rejected edits section
@@ -703,6 +704,39 @@ inside the influenceable surfaces of the target module's charter below.
                 "</gold_diagnostic_reference>\n\n"
             )
 
+    # Contrast-condition generation (v6 phase 3): a supporting case with the
+    # same failure signature and a stable counter-case bound the condition to
+    # the discriminator that separates them. Only case-agnostic summaries
+    # are injected; no case identity or raw trajectory is repeated.
+    comparison_section = ""
+    if comparison_cases:
+        lines: list[str] = []
+        positive = comparison_cases.get("positive")
+        negative = comparison_cases.get("negative")
+        if isinstance(positive, Mapping) and positive:
+            lines.append(
+                "- supporting case: same failure signature, "
+                f"state={str(positive.get('state') or '')}, "
+                f"artifact={str(positive.get('artifact') or '')}, "
+                f"reason={str(positive.get('reason') or '')}"
+            )
+        if isinstance(negative, Mapping) and negative:
+            lines.append(
+                "- stable counter-case: same type bucket, "
+                f"state={str(negative.get('state') or '')}; "
+                "the action must NOT fire here"
+            )
+        if lines:
+            comparison_section = (
+                "<contrast_cases>\n"
+                + "\n".join(lines)
+                + "\nThe rule condition must capture the trajectory-observable "
+                "discriminator the supporting case shares with the source but "
+                "the stable counter-case lacks; a condition that also fires on "
+                "the counter-case is over-broad and will be rejected.\n"
+                "</contrast_cases>\n\n"
+            )
+
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
         f"trigger={signal.trigger_source.value}\n"
@@ -720,6 +754,7 @@ inside the influenceable surfaces of the target module's charter below.
         f"{observation_section}"
         f"{diagnosis_section}"
         f"{gold_section}"
+        f"{comparison_section}"
         "<detection_trace>\n"
         f"{detection_context}\n"
         "</detection_trace>\n\n"
@@ -749,7 +784,7 @@ inside the influenceable surfaces of the target module's charter below.
             '"rule_index":null,"condition":"...","action":"...",'
             '"evidence_anchor":"...","feature_description":"...",'
             '"expected_effect":"...","expected_effect_contract":{},'
-            '"diagnosis":{},"rationale":"..."}],"no_edit_rationale":"..."}\n'
+            '"rationale":"..."}],"no_edit_rationale":"..."}\n'
         )
         + "</task>"
     )

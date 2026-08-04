@@ -331,7 +331,7 @@ def test_checkpoint_without_run_identity_is_rejected(tmp_path: Path) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     payload = {
-        "schema_version": "agenthallu.bccse_v5_checkpoint.v3",
+        "schema_version": "agenthallu.bccse_v5_checkpoint.v4",
         "next_case_index": 0,
         "evolution_case_ids": ["source"],
         "steps": [],

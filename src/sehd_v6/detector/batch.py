@@ -107,7 +107,7 @@ def _atomic_json(path: Path, value: Any) -> None:
 
 def _completed_prediction(
     case_dir: Path, *, case_id: str, input_hash: str, config_hash: str,
-    genome_hash: str | None,
+    genome_hash: str | None, policy_genome_hash: str | None = None,
 ) -> dict[str, Any] | None:
     completion_path = case_dir / "completion.json"
     prediction_path = case_dir / "prediction.json"
@@ -127,8 +127,11 @@ def _completed_prediction(
         "input_hash": input_hash,
         "config_hash": config_hash,
         "genome_hash": genome_hash,
+        "policy_genome_hash": policy_genome_hash,
         "prediction_hash": stable_hash(prediction),
     }
+    if policy_genome_hash is not None:
+        expected["policy_genome_hash"] = policy_genome_hash
     if any(completion.get(key) != value for key, value in expected.items()):
         return None
     if prediction.get("runtime_valid") is not True:
@@ -140,6 +143,7 @@ def run_batch(
     *, records: Mapping[str, Mapping[str, Any]], config: dict[str, Any],
     output_dir: Path, max_parallel: int = 10, resume: bool = True,
     genome: Any | None = None, genome_source: str | None = None,
+    policy_genome: Any | None = None,
 ) -> dict[str, Any]:
     """Detect independent trajectories concurrently with hash-bound resume."""
     if max_parallel < 1:
@@ -148,6 +152,7 @@ def run_batch(
     output_dir.mkdir(parents=True, exist_ok=True)
     config_hash = stable_hash(config)
     genome_hash = getattr(genome, "content_hash", None)
+    policy_genome_hash = getattr(policy_genome, "content_hash", None)
     started = time.time()
     results: dict[str, dict[str, Any]] = {}
     statuses: dict[str, dict[str, Any]] = {}
@@ -160,6 +165,7 @@ def run_batch(
         resumed = _completed_prediction(
             case_dir, case_id=str(case_id), input_hash=input_hash,
             config_hash=config_hash, genome_hash=genome_hash,
+            policy_genome_hash=policy_genome_hash,
         ) if resume else None
         if resumed is not None:
             results[str(case_id)] = resumed
@@ -181,6 +187,8 @@ def run_batch(
             if genome is not None:
                 detect_kwargs["genome"] = genome
                 detect_kwargs["genome_source"] = genome_source
+            if policy_genome is not None:
+                detect_kwargs["policy_genome"] = policy_genome
             prediction = detect_record(**detect_kwargs)
             if genome is not None:
                 provenance = prediction.get("provenance")
@@ -207,6 +215,7 @@ def run_batch(
                 "input_hash": input_hash,
                 "config_hash": config_hash,
                 "genome_hash": genome_hash,
+                "policy_genome_hash": policy_genome_hash,
                 "prediction_hash": stable_hash(prediction),
                 "duration_seconds": round(time.time() - case_started, 3),
             }
@@ -248,9 +257,11 @@ def run_batch(
         "schema_version": BATCH_SCHEMA_VERSION,
         "config_hash": config_hash,
         "genome_hash": genome_hash,
+        "policy_genome_hash": policy_genome_hash,
         "provenance": ({
             "genome_hash": genome_hash, "genome_source": genome_source,
-        } if genome is not None else None),
+            "policy_genome_hash": policy_genome_hash,
+        } if (genome is not None or policy_genome is not None) else None),
         "requested_case_count": len(records),
         "completed_case_count": len(predictions),
         "failed_case_count": sum(
@@ -323,6 +334,7 @@ def run_replicated_batch(
     max_parallel: int = 10,
     resume: bool = True,
     genome: Any | None = None, genome_source: str | None = None,
+    policy_genome: Any | None = None,
 ) -> dict[str, Any]:
     """Run the detector k times per case and aggregate fail-closed.
 
@@ -376,6 +388,8 @@ def run_replicated_batch(
             if genome is not None:
                 batch_kwargs["genome"] = genome
                 batch_kwargs["genome_source"] = genome_source
+            if policy_genome is not None:
+                batch_kwargs["policy_genome"] = policy_genome
             run_batch(**batch_kwargs)
             replica_roots.append(replica_root)
     finally:
@@ -414,10 +428,12 @@ def run_replicated_batch(
         "schema_version": REPLICA_REPORT_SCHEMA_VERSION,
         "config_hash": stable_hash(config),
         "genome_hash": getattr(genome, "content_hash", None),
+        "policy_genome_hash": getattr(policy_genome, "content_hash", None),
         "provenance": ({
             "genome_hash": getattr(genome, "content_hash", None),
+            "policy_genome_hash": getattr(policy_genome, "content_hash", None),
             "genome_source": genome_source,
-        } if genome is not None else None),
+        } if (genome is not None or policy_genome is not None) else None),
         "k": replicas,
         "replicas_effective": effective_replicas,
         "replica_degradation": replica_degradation,

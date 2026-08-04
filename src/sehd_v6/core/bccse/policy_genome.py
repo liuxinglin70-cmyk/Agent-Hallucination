@@ -205,6 +205,20 @@ def _validate_item_contract(item: PolicyItem) -> tuple[bool, str]:
     return True, ""
 
 
+def validate_policy_genome_items(genome: PolicyGenome) -> tuple[bool, str]:
+    """Validate every item of a loaded genome against the closed vocabulary.
+
+    Loading is fail-closed: a payload that drifted from the current
+    ``L2_ACTIONS`` / predicate vocabulary is rejected here instead of being
+    silently skipped by the evaluator at runtime.
+    """
+    for item in genome.items:
+        item_ok, item_reason = _validate_item_contract(item)
+        if not item_ok:
+            return False, f"{item.item_id}:{item_reason}"
+    return True, ""
+
+
 def validate_policy_edit(
     edit: PolicyEdit, genome: PolicyGenome,
 ) -> tuple[bool, str]:

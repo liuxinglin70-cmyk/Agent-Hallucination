@@ -118,7 +118,7 @@ def _slots_response(**overrides: object) -> dict[str, object]:
         "target_module": "evidence_obligation",
         "operation": "add_rule",
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require one event-backed certificate",
+        "action": "require_evidence_field: event_backed_certificate",
         "evidence_anchor": "factual claim without cited trajectory support",
         "feature_description": "factual claim without cited trajectory support",
         "expected_effect": "prosecution evidence coverage increases",
@@ -433,7 +433,7 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
             state = "verified_clean"
         else:
             rules = genome.modules["evidence_obligation"].rules
-            effective = any("populate the missing evidence reference" in rule for rule in rules)
+            effective = any("populate the cited evidence field" in rule for rule in rules)
             state = "verified_clean" if effective else "unresolved"
         return {"state": state, "runtime_valid": True, "census": []}
 
@@ -443,13 +443,13 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
         if mutation_calls == 1:
             slots = {
                 "condition": "a certificate lacks support",
-                "action": "consider the evidence obligation again",
+                "action": "require_evidence_field: event_backed_certificate",
             }
         else:
             assert "observable_changes=none" in kwargs["user"]
             slots = {
                 "condition": "a certificate omits a cited support event",
-                "action": "populate the missing evidence reference",
+                "action": "populate_evidence_field: evidence_refs",
             }
         return _slots_response(**slots), {}
 
@@ -1152,7 +1152,7 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
             "target_module": "abstention_rule",
             "operation": "add_rule",
             "condition": "proof participants leave a material claim untested",
-                "action": "record the boundary finding as decisive",
+                "action": "emit_boundary_finding",
             "evidence_anchor": "material claim left untested",
             "feature_description": "material claim left untested",
             "expected_effect": "terminal state becomes decisive",
@@ -1283,7 +1283,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
     # Public load API: returns a populated dict with the expected fields.
     checkpoint = runner.load_evolution_checkpoint(first_output)
     assert checkpoint
-    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v3"
+    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v4"
     assert checkpoint["next_case_index"] == 1
     assert checkpoint["evolution_case_ids"] == ["source"]
     assert checkpoint["champion_genome_payload"]
@@ -1490,7 +1490,7 @@ def test_resume_restores_same_source_retry_attempt_and_feedback(
                 "target_module": "candidate_trigger",
                 "operation": "add_rule",
                 "condition": "a claim lacks cited trajectory support",
-                "action": "require one event-backed certificate",
+                "action": "require_evidence_field: event_backed_certificate",
                 "evidence_anchor": "wrong owner retry probe",
             }, {}
         return _slots_response(), {}
@@ -2239,10 +2239,14 @@ def test_online_evolution_result_exposes_runtime_invalid_counter() -> None:
     ``total_cases == triggered + stable`` would see a phantom mismatch.
     """
     from src.sehd_v6.core.bccse.evolution_runner import OnlineEvolutionResult
+    from src.sehd_v6.core.bccse.policy_genome import (
+        create_baseline_policy_genome,
+    )
 
     result = OnlineEvolutionResult(
         run_id="audit",
         champion_genome=create_baseline_genome(),
+        policy_genome=create_baseline_policy_genome(),
         steps=[],
         gate_summary={},
         total_cases=5,
@@ -4484,7 +4488,7 @@ def test_valid_slots_persist_as_deterministic_render(
     assert result.edits_accepted == 1
     expected = render_rule(RuleSpec(
         condition="a factual claim lacks cited trajectory support",
-        action="require one event-backed certificate",
+        action="require_evidence_field: event_backed_certificate",
         evidence_anchor="factual claim without cited trajectory support",
         module_id="evidence_obligation",
         direction="process",
@@ -4493,7 +4497,7 @@ def test_valid_slots_persist_as_deterministic_render(
     assert edit.new_content == expected
     expected_slots = {
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require one event-backed certificate",
+        "action": "require_evidence_field: event_backed_certificate",
         "evidence_anchor": "factual claim without cited trajectory support",
     }
     assert edit.rule_slots == expected_slots
@@ -4517,7 +4521,7 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
     gate = create_structural_gate(convergence_window=2)
     slots = {
         "condition": "a certificate omits the 真值 derivation record",
-        "action": "require the derivation record",
+        "action": "require_evidence_field: derivation_record",
         "evidence_anchor": "certificate without derivation record",
     }
     content = render_rule(RuleSpec(
@@ -4596,7 +4600,7 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
 def test_persisted_rule_slots_must_match_rendered_rule() -> None:
     edit = _typed_edit(rule_slots={
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require a different certificate",
+        "action": "require_evidence_field: certificate",
         "evidence_anchor": "different certificate requirement",
     })
     valid, reason = validate_edit(edit, create_baseline_genome())

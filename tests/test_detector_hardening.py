@@ -1502,3 +1502,153 @@ def test_failure_reasons_keep_proof_reasons_first():
     )
     assert reasons[0]["code"] == "proof_court_exception"
     assert any(r["code"] == "boundary_error" for r in reasons)
+
+
+def test_load_policy_genome_roundtrip_and_fail_closed(tmp_path: Path) -> None:
+    """A persisted L2 policy genome loads explicitly and fail-closed: a
+    tampered payload (hash mismatch) or an empty object is rejected."""
+    import json
+
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyEdit,
+        PolicyItem,
+        PolicyOp,
+        apply_policy_edit,
+        create_baseline_policy_genome,
+    )
+    from src.sehd_v6.core.paca_tcl.detector import load_policy_genome
+
+    genome = create_baseline_policy_genome()
+    genome = apply_policy_edit(genome, PolicyEdit(
+        edit_id="e1",
+        operation=PolicyOp.ADD_ITEM,
+        item_index=None,
+        new_item=PolicyItem(
+            item_id="p1",
+            precondition="defense_coverage_complete_and_zero_certificates",
+            action="downgrade_coverage",
+            params={"side": "defense", "to_state": "incomplete"},
+            rationale="hollow defense coverage must not stay complete",
+        ),
+        rationale="r",
+    ))
+    path = tmp_path / "policy_genome.json"
+    path.write_text(
+        json.dumps(genome.to_dict(), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    loaded = load_policy_genome(path)
+    assert loaded.content_hash == genome.content_hash
+    assert loaded.items[0].action == "downgrade_coverage"
+
+    tampered = dict(genome.to_dict())
+    tampered["content_hash"] = "deadbeef"
+    tampered_path = tmp_path / "tampered.json"
+    tampered_path.write_text(
+        json.dumps(tampered, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        load_policy_genome(tampered_path)
+    except ValueError as exc:
+        assert "content_hash" in str(exc)
+    else:
+        raise AssertionError("tampered policy genome must fail closed")
+
+    empty_path = tmp_path / "empty.json"
+    empty_path.write_text("[]\n", encoding="utf-8")
+    try:
+        load_policy_genome(empty_path)
+    except ValueError as exc:
+        assert "object" in str(exc)
+    else:
+        raise AssertionError("non-object policy genome must fail closed")
+
+
+def test_detect_record_forwards_policy_genome(tmp_path: Path, monkeypatch) -> None:
+    """detect_record forwards L2 policy items into the adjudicator and
+    records the policy genome hash in provenance."""
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyEdit,
+        PolicyItem,
+        PolicyOp,
+        apply_policy_edit,
+        create_baseline_policy_genome,
+    )
+    from src.sehd_v6.core.paca_tcl import detector as detector_module
+
+    received: dict = {}
+
+    def fake_adjudicate_case(**kwargs):
+        received.update(kwargs)
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+        }
+
+    monkeypatch.setattr(detector_module, "adjudicate_case", fake_adjudicate_case)
+
+    genome = create_baseline_policy_genome()
+    genome = apply_policy_edit(genome, PolicyEdit(
+        edit_id="e1",
+        operation=PolicyOp.ADD_ITEM,
+        item_index=None,
+        new_item=PolicyItem(
+            item_id="p1",
+            precondition="defense_coverage_complete_and_zero_certificates",
+            action="downgrade_coverage",
+            params={"side": "defense", "to_state": "incomplete"},
+            rationale="r",
+        ),
+        rationale="r",
+    ))
+
+    result = detect_record(
+        record={"history": [{"role": "assistant", "content": "answer"}]},
+        config={},
+        output_dir=tmp_path,
+        policy_genome=genome,
+    )
+    assert received["policy_items"] == list(genome.items)
+    assert result["provenance"]["policy_genome_hash"] == genome.content_hash
+    assert "genome_hash" not in result["provenance"]
+
+
+def test_load_policy_genome_rejects_vocabulary_drift(tmp_path: Path) -> None:
+    """A persisted policy genome whose item drifted from the current closed
+    vocabulary (e.g. a reserved engine-level action) fails closed at load
+    time instead of being silently skipped by the evaluator (W8)."""
+    import json
+
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyItem,
+        create_baseline_policy_genome,
+    )
+    from src.sehd_v6.core.paca_tcl.detector import load_policy_genome
+
+    drifted = create_baseline_policy_genome()
+    drifted.items.append(PolicyItem(
+        item_id="drifted_1",
+        precondition="boundary_state_conflicts_with_terminal",
+        action="reclassify_candidate_state",
+        params={"candidate_ref": "c1", "state": "verified_clean"},
+        rationale="reserved engine-level action",
+    ))
+    payload = drifted.to_dict()
+    # Recompute the hash over the drifted payload so only the vocabulary
+    # contract (not the hash check) can reject it.
+    payload["content_hash"] = drifted.content_hash
+    path = tmp_path / "drifted_policy_genome.json"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        load_policy_genome(path)
+    except ValueError as exc:
+        assert "closed vocabulary contract" in str(exc)
+    else:
+        raise AssertionError(
+            "vocabulary-drifted policy genome must fail closed at load"
+        )

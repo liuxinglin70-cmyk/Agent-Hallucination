@@ -196,14 +196,17 @@ L2_PREDICATE_NAMES = tuple(L2_PREDICATES)
 # ============================================================
 # L2 actions (closed vocabulary)
 # ============================================================
-# Court-local actions are applied by the deterministic evaluator inside
-# adjudication. Engine-level actions are surfaced as effects for the
-# runtime engine to interpret (they require provider re-execution and
-# therefore cannot be evaluated inside the court).
+# ``L2_ACTIONS`` is the single source of truth for what the reflection
+# prompt may propose AND what the runtime can execute: every listed action
+# is applied deterministically by the policy evaluator inside the proof
+# court. Actions that would require provider re-execution
+# (``reclassify_candidate_state``, ``require_route_replay``) are reserved in
+# ``ENGINE_LEVEL_ACTIONS`` but excluded from ``L2_ACTIONS`` until the
+# runtime engine implements them, so a proposal for one fails at parse time
+# as ``unknown_action`` instead of reaching a runtime rejection.
 
 POLICY_SIDES = frozenset({"prosecution", "defense"})
 COVERAGE_DOWNGRADE_STATES = frozenset({"incomplete", "unresolved"})
-CANDIDATE_TRI_STATES = frozenset({"verified_clean", "verified_error", "unresolved"})
 
 ACTION_DOWNGRADE_COVERAGE = "downgrade_coverage"
 ACTION_INVALIDATE_COVERAGE_CLAIM = "invalidate_coverage_claim"
@@ -216,19 +219,19 @@ COURT_LOCAL_ACTIONS = frozenset({
     ACTION_INVALIDATE_COVERAGE_CLAIM,
     ACTION_EMIT_TELEMETRY_ONLY,
 })
+# Reserved for a future engine that can re-execute providers; not part of
+# the proposable/executable vocabulary until implemented.
 ENGINE_LEVEL_ACTIONS = frozenset({
     ACTION_RECLASSIFY_CANDIDATE_STATE,
     ACTION_REQUIRE_ROUTE_REPLAY,
 })
-L2_ACTIONS = COURT_LOCAL_ACTIONS | ENGINE_LEVEL_ACTIONS
+L2_ACTIONS = COURT_LOCAL_ACTIONS
 
 # Required parameter keys per action; values are validated against the
 # vocabularies below the table.
 ACTION_PARAMS: dict[str, tuple[str, ...]] = {
     ACTION_DOWNGRADE_COVERAGE: ("side", "to_state"),
     ACTION_INVALIDATE_COVERAGE_CLAIM: ("side",),
-    ACTION_RECLASSIFY_CANDIDATE_STATE: ("candidate_ref", "state"),
-    ACTION_REQUIRE_ROUTE_REPLAY: ("route_key",),
     ACTION_EMIT_TELEMETRY_ONLY: (),
 }
 
@@ -247,17 +250,6 @@ def validate_policy_params(action: str, params: dict[str, Any]) -> tuple[bool, s
     to_state = params.get("to_state")
     if action == ACTION_DOWNGRADE_COVERAGE and to_state not in COVERAGE_DOWNGRADE_STATES:
         return False, f"invalid_downgrade_state:{to_state}"
-    state = params.get("state")
-    if action == ACTION_RECLASSIFY_CANDIDATE_STATE and state not in CANDIDATE_TRI_STATES:
-        return False, f"invalid_candidate_state:{state}"
-    if action == ACTION_RECLASSIFY_CANDIDATE_STATE and not str(
-        params.get("candidate_ref") or ""
-    ).strip():
-        return False, "missing_param:candidate_ref"
-    if action == ACTION_REQUIRE_ROUTE_REPLAY and not str(
-        params.get("route_key") or ""
-    ).strip():
-        return False, "missing_param:route_key"
     return True, ""
 
 

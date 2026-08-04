@@ -35,6 +35,10 @@ fields (all defensively read; missing fields never raise):
 - ``record["provider_artifacts"]``: optional list; each item has
   ``{"kind": "candidate" | "error_certificate" | "defense_certificate",
   "module_hint": str, "malformed": bool, "missing_fields": [str]}``.
+  The evolution runner builds this list as the complete integrity
+  projection of one detection (construct-stage candidate counts, court
+  audit failed-checks, quarantine tallies, appeal provider status, and the
+  single gold-informed FN+omission signal).
 
 Classification rules (priority order)
 -------------------------------------

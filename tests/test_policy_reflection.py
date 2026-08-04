@@ -41,7 +41,7 @@ def _attribution() -> FailureAttribution:
     )
 
 
-def test_prompt_carries_full_closed_vocabulary() -> None:
+def test_prompt_carries_full_executable_closed_vocabulary() -> None:
     system, _user = build_policy_reflection_prompt(
         attribution=_attribution(),
         facts_summary={"defense_coverage": "complete"},
@@ -53,6 +53,10 @@ def test_prompt_carries_full_closed_vocabulary() -> None:
         assert action in system
         for param in ACTION_PARAMS[action]:
             assert param in system
+    # Engine-level actions are reserved but not proposable: the prompt must
+    # not surface vocabulary the runtime cannot execute.
+    assert "reclassify_candidate_state" not in system
+    assert "require_route_replay" not in system
     assert "no_proposal" in system
 
 

@@ -17,7 +17,6 @@ from typing import Any, Mapping
 
 from .v6_contracts import (
     ACTION_PARAMS,
-    CANDIDATE_TRI_STATES,
     COVERAGE_DOWNGRADE_STATES,
     L2_ACTIONS,
     L2_PREDICATE_NAMES,
@@ -79,9 +78,7 @@ def _vocabulary_text() -> str:
         "ENUMERATED ACTIONS (exactly one):\n"
         f"{action_lines}\n"
         f"PARAM VOCABULARY: side in {sorted(POLICY_SIDES)}; "
-        f"downgrade_coverage.to_state in {sorted(COVERAGE_DOWNGRADE_STATES)}; "
-        f"reclassify_candidate_state.state in {sorted(CANDIDATE_TRI_STATES)}; "
-        "candidate_ref and route_key are non-empty strings."
+        f"downgrade_coverage.to_state in {sorted(COVERAGE_DOWNGRADE_STATES)}."
     )
 
 

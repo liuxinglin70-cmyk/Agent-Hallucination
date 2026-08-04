@@ -145,20 +145,67 @@ def load_skill_genome(path: Path, *, expected_hash: str | None = None) -> Any:
     return genome
 
 
+def load_policy_genome(path: Path, *, expected_hash: str | None = None) -> Any:
+    """Explicitly load and validate one persisted L2 adjudication-policy genome.
+
+    Loading is intentionally opt-in and fail-closed, mirroring
+    ``load_skill_genome``; a malformed or vocabulary-drifted payload is
+    rejected instead of silently changing adjudication.
+    """
+    from ..bccse.policy_genome import (
+        PolicyGenome,
+        validate_policy_genome_items,
+    )
+
+    path = Path(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("policy genome file must contain an object")
+    genome = PolicyGenome.from_dict(payload)
+    items_ok, items_reason = validate_policy_genome_items(genome)
+    if not items_ok:
+        raise ValueError(
+            f"policy genome failed the closed vocabulary contract: "
+            f"{items_reason}"
+        )
+    persisted_hash = str(payload.get("content_hash") or "")
+    if persisted_hash and persisted_hash != genome.content_hash:
+        raise ValueError(
+            "persisted policy genome content_hash does not match content"
+        )
+    if expected_hash is not None and genome.content_hash != expected_hash:
+        raise ValueError("loaded policy genome hash does not match expected_hash")
+    return genome
+
+
 def detect_record(
     *, record: dict[str, Any], config: dict[str, Any], case_id: str = "case",
     output_dir: Path | None = None, census_root: Path | None = None,
     genome: Any | None = None, genome_source: str | None = None,
+    policy_genome: Any | None = None,
     adjudicator: Any | None = None,
 ) -> dict[str, Any]:
-    """Detect one trajectory and return a label-free result."""
+    """Detect one trajectory and return a label-free result.
+
+    ``genome`` injects the evolved L1 provider-rule skill; ``policy_genome``
+    supplies the evolved L2 adjudication-policy items to the proof court.
+    Either may be supplied independently, so a deployed detector can carry
+    the complete two-layer capability.
+    """
     validate_record(record)
     output_dir = Path(output_dir or Path.cwd() / "detector_output")
+    policy_items = (
+        list(policy_genome.items) if policy_genome is not None else None
+    )
     if genome is None:
         run_adjudication = adjudicator or adjudicate_case
         result = run_adjudication(
             case_id=case_id, record=record, config=config,
             output_dir=output_dir, census_root=census_root,
+            **(
+                {"policy_items": policy_items}
+                if policy_items is not None else {}
+            ),
         )
     else:
         from .skill_integration import integrated_v35_provider
@@ -166,6 +213,7 @@ def detect_record(
             result = proof_engine.adjudicate_case(
                 case_id=case_id, record=record, config=config,
                 output_dir=output_dir, census_root=census_root,
+                policy_items=policy_items,
             )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
@@ -195,11 +243,14 @@ def detect_record(
         result["occurrence_impact_status"] = None
         result["occurrence_impact_kind"] = None
         result["occurrence_recovery_state"] = None
-    if genome is not None:
-        result["provenance"] = {
-            "genome_hash": genome.content_hash,
-            "genome_source": genome_source,
-        }
+    if genome is not None or policy_genome is not None:
+        provenance: dict[str, Any] = {}
+        if genome is not None:
+            provenance["genome_hash"] = genome.content_hash
+            provenance["genome_source"] = genome_source
+        if policy_genome is not None:
+            provenance["policy_genome_hash"] = policy_genome.content_hash
+        result["provenance"] = provenance
     return result
 
 
@@ -225,10 +276,18 @@ def main() -> int:
         "--genome", type=Path, default=None,
         help="optional persisted SkillGenome JSON; loading is explicit and fail-closed",
     )
+    parser.add_argument(
+        "--policy-genome", type=Path, default=None,
+        help="optional persisted L2 PolicyGenome JSON; loading is explicit and fail-closed",
+    )
     args = parser.parse_args()
     config = load_detector_config(args.config)
     genome = load_skill_genome(args.genome) if args.genome is not None else None
     genome_source = str(args.genome.resolve()) if args.genome is not None else None
+    policy_genome = (
+        load_policy_genome(args.policy_genome)
+        if args.policy_genome is not None else None
+    )
     if args.records is not None:
         from ...detector.batch import load_batch_records, run_batch
         records = load_batch_records(args.records)
@@ -240,6 +299,7 @@ def main() -> int:
             records=records, config=config, output_dir=args.output_dir,
             max_parallel=args.max_parallel, resume=not args.no_resume,
             genome=genome, genome_source=genome_source,
+            policy_genome=policy_genome,
         )
         print(args.output_dir / "summary.json")
         return 0 if summary["failed_case_count"] == 0 else 2
@@ -248,6 +308,7 @@ def main() -> int:
         record=record, config=config, case_id=args.case_id,
         output_dir=args.output_dir, census_root=args.census_root,
         genome=genome, genome_source=genome_source,
+        policy_genome=policy_genome,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = args.output_dir / "prediction.json"

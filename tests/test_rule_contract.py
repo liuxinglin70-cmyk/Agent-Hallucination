@@ -17,7 +17,7 @@ from src.sehd_v6.core.bccse.rule_contract import (
 def _spec(**overrides) -> RuleSpec:
     base = dict(
         condition="a causal-chain field is missing",
-        action="treat the evidence as incomplete",
+        action="keep_coverage_incomplete",
         evidence_anchor="missing_causal_field_signature",
         module_id="evidence_obligation",
         direction="process",
@@ -35,7 +35,7 @@ def test_render_deterministic_single_sentence():
     assert render_rule(spec) == first
     assert first == (
         "When a causal-chain field is missing, "
-        "treat the evidence as incomplete."
+        "keep the coverage incomplete."
     )
     # exactly one terminal period, no sentence splits inside
     assert first.endswith(".")
@@ -130,6 +130,52 @@ def test_cross_module_action_surface_is_rejected():
     assert reason == "forbidden_action_surface:defense certificate"
 
 
+# --- closed action-opcode contract ---
+
+def test_action_opcode_closed_vocabulary():
+    # bare opcode and opcode-with-target are both legal
+    ok, reason = validate_rule_spec(_spec(action="keep_coverage_incomplete"))
+    assert ok, reason
+    ok, reason = validate_rule_spec(
+        _spec(action="require_evidence_field: impact_evidence_refs")
+    )
+    assert ok, reason
+    # an opcode owned by another module is unowned here
+    ok, reason = validate_rule_spec(_spec(action="emit_boundary_finding"))
+    assert not ok
+    assert reason.startswith("action_opcode_unowned")
+    # free text is no longer a legal action
+    ok, reason = validate_rule_spec(_spec(action="treat the evidence as incomplete"))
+    assert not ok
+    assert reason.startswith("action_opcode_unowned")
+
+
+def test_render_expands_opcode_into_english_template():
+    rendered = render_rule(
+        _spec(action="require_evidence_field: impact_evidence_refs")
+    )
+    assert rendered == (
+        "When a causal-chain field is missing, "
+        "require the cited evidence field: impact_evidence_refs."
+    )
+    # legacy free-text actions still render verbatim (checkpoint compat)
+    legacy = render_rule(_spec(action="mark the evidence incomplete"))
+    assert legacy.endswith("mark the evidence incomplete.")
+    # case-insensitive opcode matching keeps the deterministic render
+    upper = render_rule(
+        _spec(action="REQUIRE_EVIDENCE_FIELD: impact_evidence_refs")
+    )
+    assert upper == rendered
+
+
+def test_action_opcode_target_must_not_be_empty():
+    ok, reason = validate_rule_spec(
+        _spec(action="require_evidence_field:")
+    )
+    assert not ok
+    assert reason == "action_target_unowned:empty"
+
+
 # --- pollution firewall ---
 
 def test_case_id_pollution_rejected():
@@ -156,22 +202,43 @@ def test_prompt_injection_rejected():
 # --- verdict authority ---
 
 def test_verdict_requires_module_permission():
-    unauthorized = _spec(module_id="candidate_trigger", action="treat the claim as clean")
+    # The verdict authority check runs on the rendered text, so a verdict
+    # commitment in the condition is still gated by the module's allowed
+    # verdicts before the action-opcode check.
+    unauthorized = _spec(
+        module_id="candidate_trigger",
+        condition="the decisive bar should treat the claim as clean",
+        action="emit_candidate",
+    )
     ok, reason = validate_rule_spec(unauthorized)
     assert not ok
     assert reason == "verdict_not_allowed:clean_for_candidate_trigger"
 
-    authorized = _spec(module_id="clean_defense_boundary", action="treat the claim as clean")
+    authorized = _spec(
+        module_id="clean_defense_boundary",
+        condition="the decisive bar should treat the claim as clean",
+        action="emit_boundary_finding",
+    )
     ok, reason = validate_rule_spec(authorized)
     assert ok, reason
 
 
 def test_local_negation_only_in_causal_link_test():
-    action = "conclude that the causal link does not hold"
-    ok, reason = validate_rule_spec(_spec(module_id="causal_link_test", action=action))
+    # Local negation lives in the free-text condition slot; the authority
+    # check still runs on the rendered sentence.
+    action = "reject_non_causal_origin"
+    ok, reason = validate_rule_spec(_spec(
+        module_id="causal_link_test",
+        condition="the causal link does not hold",
+        action=action,
+    ))
     assert ok, reason
 
-    ok, reason = validate_rule_spec(_spec(module_id="evidence_obligation", action=action))
+    ok, reason = validate_rule_spec(_spec(
+        module_id="evidence_obligation",
+        condition="the causal link does not hold",
+        action=action,
+    ))
     assert not ok
     assert reason == "local_negation_not_allowed_for_evidence_obligation"
 

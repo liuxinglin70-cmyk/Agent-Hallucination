@@ -125,6 +125,61 @@ def test_experience_memory_deduplicates_repeated_observation() -> None:
     assert entries[0].metadata["observation_count"] == 2
 
 
+def test_experience_memory_merges_outcome_counts_across_duplicates() -> None:
+    """Repeated observations of one artifact signature merge into an outcome
+    distribution that includes the first observation (W1 regression)."""
+    memory = TypeExperienceMemory()
+    first = {
+        "layer": "l1_provider_rule",
+        "artifact": "evidence_obligation",
+        "reason_code": "source_no_effect",
+        "operation": "add_rule",
+        "outcome": "rejected",
+    }
+    second = dict(first, outcome="accepted")
+    for metadata in (first, second):
+        memory.add_experience(
+            HallucinationType.FACTUAL,
+            "unresolved_to_error",
+            "evidence_obligation",
+            "strict_verification",
+            True,
+            "case",
+            metadata=metadata,
+            feature_description="same signature",
+        )
+    entries = memory.get_type_experiences(HallucinationType.FACTUAL)
+    assert len(entries) == 1
+    counts = entries[0].metadata["outcome_counts"]
+    # Both the first (rejected) and the second (accepted) observation count.
+    assert counts == {"rejected": 1, "accepted": 1}
+
+
+def test_experience_memory_artifact_signature_splits_duplicates() -> None:
+    """Different artifact/reason signatures stay separate even when module,
+    feature and direction are identical (artifact-first identity)."""
+    memory = TypeExperienceMemory()
+    for reason_code in ("rule_spec:condition_overload", "source_no_effect"):
+        memory.add_experience(
+            HallucinationType.FACTUAL,
+            "unresolved_to_error",
+            "evidence_obligation",
+            "strict_verification",
+            False,
+            "case",
+            metadata={
+                "layer": "l1_provider_rule",
+                "artifact": "evidence_obligation",
+                "reason_code": reason_code,
+                "operation": "add_rule",
+                "outcome": "rejected",
+            },
+            feature_description="same feature pattern",
+        )
+    entries = memory.get_type_experiences(HallucinationType.FACTUAL)
+    assert len(entries) == 2
+
+
 def test_evolution_experience_is_gold_free_by_default() -> None:
     record = experience_record_from_row(
         {
@@ -413,14 +468,14 @@ def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
             "target_module": "evidence_obligation",
             "operation": "add_rule",
             "condition": "a certificate lacks cited support",
-            "action": "require one support event",
+            "action": "require_evidence_field: support_event",
             "evidence_anchor": "certificate without cited support",
         },
         {
             "target_module": "atomic_verifier_instruction",
             "operation": "add_rule",
             "condition": "a verifier instruction is under-specified",
-            "action": "require one executable check",
+            "action": "require_evidence_field: executable_check",
             "evidence_anchor": "under-specified verifier instruction",
         },
     ]
@@ -672,7 +727,7 @@ def test_candidate_normalization_deduplicates_repeated_samples() -> None:
         "target_module": "evidence_obligation",
         "operation": "add_rule",
         "condition": "a factual claim lacks cited support",
-        "action": "require one cited event-backed certificate",
+        "action": "require_evidence_field: event_backed_certificate",
         "evidence_anchor": "factual claim without cited support",
     }
     values, _ = extract_intervention_candidates(
@@ -860,7 +915,7 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
             "operation": "add_rule",
             "rule_index": None,
             "condition": "a factual claim lacks a cited trajectory event",
-            "action": "require one event-backed certificate",
+            "action": "require_evidence_field: event_backed_certificate",
             "evidence_anchor": "factual claim without cited trajectory event",
             "expected_effect": "prosecution evidence coverage increases",
             "expected_effect_contract": {
@@ -1061,7 +1116,12 @@ def test_invalid_slot_candidate_yields_no_edit_not_free_text(
 
     assert result.edits_accepted == 0
     assert result.steps[0].gate_decision == "skip_invalid_mutation"
-    assert result.steps[0].fitness_check["mutation_error"].startswith(
-        "rule_spec:verdict_not_allowed"
+    # The verdict commitment is rejected either by the deterministic
+    # pre-validation (forbidden surface term) or by the full rule spec
+    # gate (verdict authority); both must name the rejection.
+    mutation_error = result.steps[0].fitness_check["mutation_error"]
+    assert (
+        mutation_error.startswith("rule_spec:verdict_not_allowed")
+        or "forbidden_action_surface" in mutation_error
     )
     assert result.champion_genome.edits_applied == []

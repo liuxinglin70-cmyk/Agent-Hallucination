@@ -266,8 +266,13 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
         module_id="abstention_rule",
         stage=MODULE_STAGE["abstention_rule"],
         influenceable_surfaces=(
-            "final adjudication edge: emitting clean, error, or unresolved "
-            "from the balance of complete proofs and complete defenses",
+            "the boundary-route finding (state and rationale): a conditional "
+            "evidence standard — when the decisive-verdict bar should lower "
+            "or raise based on trajectory-observable facts — reaches the "
+            "proof court as the case_boundary_finding inside NEUTRAL_EVIDENCE "
+            "and constrains evidence construction; the final verdict stays "
+            "with the deterministic proof court and can never be overwritten "
+            "by this rule",
         ),
         forbidden_surfaces=(
             "re-verification of evidence or re-issuing certificates",
@@ -292,34 +297,52 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
 }
 
 
-MODULE_ACTION_SURFACE_TERMS: dict[str, tuple[str, ...]] = {
+# Closed action-opcode vocabulary per module. Each opcode carries the
+# English template the provider actually sees (rendered by ``render_rule``),
+# so an action is enumerable, validatable and traceable instead of free
+# text; the optional ``"; <target>"`` suffix names the exact output field or
+# object the opcode acts on. The action slot contract is
+# ``"<opcode>"`` or ``"<opcode>: <target>"``.
+MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     "candidate_trigger": (
-        "candidate", "origin", "event", "census", "create", "suppress",
+        ("emit_candidate", "emit a candidate"),
+        ("suppress_candidate", "suppress the candidate"),
+        ("emit_origin_census", "emit the origin census entry"),
     ),
     "evidence_obligation": (
-        "evidence", "certificate", "causal", "support", "obligation",
-        "prosecution", "field", "record", "require",
+        ("require_evidence_field", "require the cited evidence field"),
+        ("populate_evidence_field", "populate the cited evidence field"),
+        ("emit_error_certificate", "emit an error certificate"),
+        ("keep_coverage_incomplete", "keep the coverage incomplete"),
     ),
     "candidate_to_verifier_route": (
-        "candidate", "route", "verifier", "qualification", "matching",
+        ("route_candidate_to_verifier", "route the candidate to the verifier"),
+        ("qualify_candidate", "qualify the candidate for verification"),
+        ("hold_candidate_qualification", "hold the candidate qualification"),
     ),
     "atomic_verifier_instruction": (
-        "certificate", "verify", "violation", "actor", "boundary",
-        "propagation", "evidence", "quarantine", "test",
+        ("verify_violation", "verify the violation against the norm"),
+        ("quarantine_certificate", "quarantine the certificate"),
+        ("emit_certificate", "emit the certificate"),
+        ("require_evidence_field", "require the cited evidence field"),
     ),
     "clean_defense_boundary": (
-        "defense", "boundary", "support", "authorize", "repair", "clean",
-        "recovery",
+        ("emit_defense_certificate", "emit a defense certificate"),
+        ("emit_boundary_finding", "emit the boundary finding"),
+        ("require_evidence_field", "require the cited evidence field"),
     ),
     "causal_link_test": (
-        "causal", "propagation", "impact", "recovery", "origin", "link",
+        ("test_causal_link", "test the causal link"),
+        ("reject_non_causal_origin", "reject the non-causal origin"),
+        ("populate_impact_chain", "populate the impact and recovery chain"),
     ),
     "earliest_origin_tiebreak": (
-        "origin", "earliest", "responsible", "event", "select",
+        ("select_earliest_origin", "select the earliest responsible origin"),
+        ("suppress_later_origin", "suppress the later origin"),
     ),
     "abstention_rule": (
-        "boundary", "clean", "error", "unresolved", "verdict", "decisive",
-        "abstain", "evidence",
+        ("emit_boundary_finding", "emit the boundary finding"),
+        ("shape_decisive_standard", "shape the decisive-verdict standard"),
     ),
 }
 
@@ -359,15 +382,73 @@ MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Per-module runtime-observable output fields. Single source of truth for
+# both the action-opcode ``<target>`` validation and the reflection
+# prompt's expected-effect contract (``observable_field`` must belong to the
+# selected module).
+MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
+    "candidate_trigger": ("candidate_count",),
+    "evidence_obligation": (
+        "prosecution_coverage", "prosecution_certificates",
+        "causal_field_coverage", "target_local_score",
+    ),
+    "candidate_to_verifier_route": (
+        "prosecution_coverage", "prosecution_certificates",
+        "target_local_score",
+    ),
+    "atomic_verifier_instruction": (
+        "quarantined_certificates", "causal_field_coverage",
+        "target_local_score",
+    ),
+    "clean_defense_boundary": (
+        "defense_coverage", "defense_certificates", "target_local_score",
+    ),
+    "causal_link_test": (
+        "causal_field_coverage", "localization_status", "target_local_score",
+    ),
+    "earliest_origin_tiebreak": (
+        "responsible_step", "localization_status", "target_local_score",
+    ),
+    "abstention_rule": ("state", "trigger", "target_local_score"),
+}
+
+
 def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
-    """Check that a slot action names the target module's output surface."""
+    """Check that a slot action names a closed opcode of the target module.
+
+    The action must be ``"<opcode>"`` or ``"<opcode>: <target>"`` where the
+    opcode belongs to the module's ``MODULE_ACTION_OPCODES`` and, when a
+    target is present, it is non-empty and never names another module's
+    forbidden output surface. Forbidden surface terms still fail first.
+    """
     lowered = " ".join(str(action or "").lower().split())
     for marker in MODULE_FORBIDDEN_ACTION_TERMS.get(module_id, ()):
         if marker in lowered:
             return False, f"forbidden_action_surface:{marker}"
-    if not any(term in lowered for term in MODULE_ACTION_SURFACE_TERMS.get(module_id, ())):
-        return False, "action_surface_unowned"
+    opcodes = MODULE_ACTION_OPCODES.get(module_id, ())
+    opcode_part, sep, target_part = lowered.partition(":")
+    opcode_part = opcode_part.strip()
+    if not any(opcode_part == opcode for opcode, _template in opcodes):
+        return False, f"action_opcode_unowned:{opcode_part or 'missing'}"
+    target = target_part.strip()
+    if sep and not target:
+        return False, "action_target_unowned:empty"
     return True, ""
+
+
+def render_action_opcode_text(module_id: str) -> str:
+    """Render one module's closed action-opcode list for prompt injection.
+
+    Lists ``<opcode>`` with its English template so the model can compose
+    the exact ``"<opcode>: <target>"`` action slot the gate validates.
+    """
+    opcodes = MODULE_ACTION_OPCODES.get(module_id, ())
+    if not opcodes:
+        return "(no executable actions)"
+    return "\n".join(
+        f"- {opcode} — {template}"
+        for opcode, template in opcodes
+    )
 
 
 def charter_for(module_id: str) -> ModuleCharter:

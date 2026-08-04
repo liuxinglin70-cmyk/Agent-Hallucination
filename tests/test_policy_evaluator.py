@@ -4,8 +4,6 @@ from src.sehd_v6.core.bccse.v6_contracts import (
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_EMIT_TELEMETRY_ONLY,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
-    ACTION_RECLASSIFY_CANDIDATE_STATE,
-    ACTION_REQUIRE_ROUTE_REPLAY,
     AdjudicationFacts,
     PolicyItem,
 )
@@ -48,8 +46,6 @@ def test_empty_items_keeps_facts_and_recomputes_terminal():
     assert result.telemetry == ()
     assert result.effective_prosecution_coverage == "complete"
     assert result.effective_defense_coverage == "complete"
-    assert result.candidate_reclassifications == {}
-    assert result.route_replay_requests == ()
     assert result.terminal_state == "verified_clean"
 
 
@@ -169,7 +165,10 @@ def test_false_precondition_neither_fires_nor_skips():
     assert result.telemetry == ()
 
 
-def test_engine_level_actions_do_not_touch_court_state():
+def test_reserved_engine_level_actions_fail_closed():
+    """Engine-level actions are reserved, not proposable or executable:
+    a policy item naming one is skipped with unknown_action and must not
+    touch court-local state."""
     facts = _facts(
         boundary_path_state="verified_clean",
         terminal_state="unresolved",
@@ -179,49 +178,27 @@ def test_engine_level_actions_do_not_touch_court_state():
         PolicyItem(
             item_id="p1",
             precondition="boundary_state_conflicts_with_terminal",
-            action=ACTION_RECLASSIFY_CANDIDATE_STATE,
+            action="reclassify_candidate_state",
             params={"candidate_ref": "cand-1", "state": "verified_clean"},
         ),
         PolicyItem(
             item_id="p2",
             precondition="boundary_state_conflicts_with_terminal",
-            action=ACTION_REQUIRE_ROUTE_REPLAY,
+            action="require_route_replay",
             params={"route_key": "route.alpha"},
         ),
     ]
     result = evaluate_policies(facts, items)
-    assert result.applied_item_ids == ("p1", "p2")
-    assert result.candidate_reclassifications == {"cand-1": "verified_clean"}
-    assert result.route_replay_requests == ("route.alpha",)
+    assert result.applied_item_ids == ()
+    assert result.fired == ()
+    assert [row["reason"] for row in result.skipped] == [
+        "unknown_action:reclassify_candidate_state",
+        "unknown_action:require_route_replay",
+    ]
     # court-local coverage and terminal recomputation remain untouched
     assert result.effective_prosecution_coverage == "incomplete"
     assert result.effective_defense_coverage == "complete"
     assert result.terminal_state == "unresolved"
-
-
-def test_reclassify_last_write_wins_and_is_traced():
-    facts = _facts(fully_quarantined=True, required_candidate_count=1,
-                   quarantined_error_count=1)
-    items = [
-        PolicyItem(
-            item_id="p1",
-            precondition="all_candidates_quarantined",
-            action=ACTION_RECLASSIFY_CANDIDATE_STATE,
-            params={"candidate_ref": "cand-1", "state": "unresolved"},
-        ),
-        PolicyItem(
-            item_id="p2",
-            precondition="all_candidates_quarantined",
-            action=ACTION_RECLASSIFY_CANDIDATE_STATE,
-            params={"candidate_ref": "cand-1", "state": "verified_error"},
-        ),
-    ]
-    result = evaluate_policies(facts, items)
-    assert result.candidate_reclassifications == {"cand-1": "verified_error"}
-    traced = [row for row in result.telemetry
-              if row["kind"] == "candidate_reclassification"]
-    assert [row["item_id"] for row in traced] == ["p1", "p2"]
-    assert [row["state"] for row in traced] == ["unresolved", "verified_error"]
 
 
 def test_evaluation_is_deterministic():
@@ -286,7 +263,6 @@ def test_to_dict_roundtrip_shape():
     assert set(payload) == {
         "applied_item_ids", "fired", "skipped",
         "effective_prosecution_coverage", "effective_defense_coverage",
-        "candidate_reclassifications", "route_replay_requests",
         "telemetry", "terminal_state",
     }
     assert payload["applied_item_ids"] == ["p1"]
