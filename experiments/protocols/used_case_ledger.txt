@@ -41,6 +41,7 @@ BFCL/145
 BFCL/147
 BFCL/150
 BFCL/152
+BFCL/157
 BFCL/159
 BFCL/160
 Camel/000
@@ -65,6 +66,7 @@ Camel/050
 Camel/051
 Camel/052
 Camel/054
+Camel/055
 Camel/056
 Camel/057
 Camel/061
@@ -90,6 +92,7 @@ Magentic_One/027
 Magentic_One/028
 Magentic_One/029
 Magentic_One/032
+Magentic_One/033
 Magentic_One/034
 Magentic_One/035
 Magentic_One/037
@@ -178,6 +181,7 @@ OpenDeepSearch/097
 OpenManus/000
 OpenManus/001
 OpenManus/002
+OpenManus/003
 OpenManus/006
 OpenManus/008
 OpenManus/012
@@ -218,9 +222,11 @@ SmolAgents/007
 SmolAgents/009
 SmolAgents/011
 SmolAgents/013
+SmolAgents/017
 SmolAgents/019
 SmolAgents/020
 SmolAgents/021
+SmolAgents/024
 SmolAgents/030
 SmolAgents/032
 SmolAgents/034

@@ -108,6 +108,65 @@ def test_override_cannot_turn_typed_regression_into_success() -> None:
     assert assessment.overall_improved is False
 
 
+def test_wrong_verdict_retreat_to_unresolved_is_partial_progress_not_regression() -> None:
+    """A missed error (gold=true, before=verified_clean) retreating to
+    unresolved is partial progress toward the correct pole, not a
+    regression: BCCSE task_state_score rates wrong=0 < unresolved=1, and the
+    batch-commit decision (local_improvement) must not contradict the typed
+    experience record (observed: smolagents/017 outcome="improved" paired
+    with process_state="regression").
+    """
+    fitness = TypeAwareFitness()
+    assessment = fitness.assess_edit(
+        source_case_id="case",
+        hallucination_type=HallucinationType.FACTUAL,
+        evolution_direction="clean_to_error",
+        detection_before={"state": "verified_clean"},
+        detection_after={"state": "unresolved"},
+        type_result=_type_result(),
+        target_module="candidate_trigger",
+        override_success=True,
+    )
+    entry = fitness.get_experience_memory().get_type_experiences(
+        HallucinationType.FACTUAL
+    )[0]
+    assert assessment.overall_improved is True
+    assert entry.metadata["process_state"] == "directional_improvement"
+
+    # Mirror case: a false positive (gold=false, before=verified_error)
+    # retreating to unresolved is also partial progress.
+    fp_fitness = TypeAwareFitness()
+    fp_assessment = fp_fitness.assess_edit(
+        source_case_id="case",
+        hallucination_type=HallucinationType.FACTUAL,
+        evolution_direction="error_to_clean",
+        detection_before={"state": "verified_error"},
+        detection_after={"state": "unresolved"},
+        type_result=_type_result(),
+        target_module="candidate_trigger",
+        override_success=True,
+    )
+    assert fp_assessment.overall_improved is True
+
+    # A CORRECT verdict retreating to unresolved stays a regression.
+    correct_fitness = TypeAwareFitness()
+    correct_assessment = correct_fitness.assess_edit(
+        source_case_id="case",
+        hallucination_type=HallucinationType.FACTUAL,
+        evolution_direction="unresolved_to_error",
+        detection_before={"state": "verified_error"},
+        detection_after={"state": "unresolved"},
+        type_result=_type_result(),
+        target_module="candidate_trigger",
+        override_success=True,
+    )
+    assert correct_assessment.overall_improved is False
+    correct_entry = correct_fitness.get_experience_memory().get_type_experiences(
+        HallucinationType.FACTUAL
+    )[0]
+    assert correct_entry.metadata["process_state"] == "regression"
+
+
 def test_experience_memory_deduplicates_repeated_observation() -> None:
     memory = TypeExperienceMemory()
     for _ in range(2):

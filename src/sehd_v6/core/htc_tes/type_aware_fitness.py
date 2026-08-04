@@ -596,6 +596,7 @@ class TypeAwareFitness:
         #    evolution loop to allow no_effect add_rules into shadow)
         # 2. regression requires active worsening, not just "not improvement"
         # 3. The fitness level integrates the process state holistically
+        before_wrong = self._check_before_wrong(before_state, evolution_direction)
         if direction_correct and decisive_correct is True:
             process_state = "improvement"
         elif direction_correct and decisive_correct is None:
@@ -603,7 +604,19 @@ class TypeAwareFitness:
             # it is not correctness evidence and must not inflate accuracy.
             process_state = "directional_improvement"
         elif after_state == "unresolved" and before_state != "unresolved":
-            process_state = "regression"  # decisive → indecisive
+            # Moving decisive -> unresolved is a regression ONLY when the
+            # decisive verdict was CORRECT.  On a missed error (gold=true,
+            # before=verified_clean) or a false positive (gold=false,
+            # before=verified_error) the verdict was WRONG, so moving to
+            # unresolved is partial progress toward the correct pole — the
+            # same semantics as BCCSE task_state_score (wrong=0,
+            # unresolved=1, correct=2).  Treating a wrong verdict's retreat
+            # to unresolved as regression produced experience records that
+            # contradicted the BCCSE batch-commit decision (observed:
+            # smolagents/017 outcome="improved" + process_state="regression").
+            process_state = (
+                "directional_improvement" if before_wrong else "regression"
+            )
         elif after_state != before_state and not decisive_correct:
             process_state = "regression"  # wrong direction
         elif after_state == before_state:
@@ -739,6 +752,24 @@ class TypeAwareFitness:
             f"crs_source={features.crs_source}",
         ]
         return " | ".join(parts)
+
+    def _check_before_wrong(
+        self, before_state: str, direction: str
+    ) -> bool:
+        """Whether the pre-edit verdict was WRONG relative to the intended
+        direction (a missed error or a false positive).
+
+        A decisive verdict that was wrong is not something an edit can
+        regress from: moving it to unresolved is partial progress.  Only a
+        CORRECT decisive verdict retreating to unresolved is a regression.
+        ``clean_to_error`` implies the clean verdict missed an error;
+        ``error_to_clean`` implies the error verdict was a false positive.
+        """
+        if direction == "error_to_clean":
+            return before_state == "verified_error"
+        if direction == "clean_to_error":
+            return before_state == "verified_clean"
+        return False
 
     def _check_direction_improvement(
         self, before_state: str, after_state: str, direction: str
