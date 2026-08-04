@@ -15,6 +15,7 @@ experiments/logs/
 experiments/*.py
 experiments/protocols/*
 !experiments/protocols/README.md
+!experiments/protocols/used_case_ledger.txt
 
 # Documentation workspace (local-only)
 docs/papers/raw/
