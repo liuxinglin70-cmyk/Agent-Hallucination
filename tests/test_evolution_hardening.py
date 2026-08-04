@@ -4293,4 +4293,367 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
     assert "rule_spec_contract:evidence_anchor_too_long" in slot_reasons
 
 
+# ---------------------------------------------------------------------------
+# L2 adjudication-policy proposal loop. An L2-attributed failure must never
+# enter the L1 mutation path: one policy reflection proposes a closed-
+# vocabulary item, a source replay must show an observable adjudication
+# effect, and a terminal-state change must move toward the gold polarity.
+# ---------------------------------------------------------------------------
+
+
+def _anchor_clean_result() -> dict:
+    return {"state": "verified_clean", "runtime_valid": True, "census": []}
+
+
+def _run_l2_loop(
+    tmp_path,
+    monkeypatch,
+    *,
+    detector,
+    mutation,
+    signal_for,
+    records,
+    run_id,
+    fitness_use_gold: bool = False,
+):
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "attribute_failure", signal_for)
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+    return runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        canary_case_ids=("anchor",),
+        records=records,
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=fitness_use_gold,
+        run_id=run_id,
+    )
+
+
+def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
+    tmp_path, monkeypatch,
+) -> None:
+    """A consensus-gate L2 failure whose proposal fires but moves nothing is
+    rejected at the replay gate, keeps the non-L1 telemetry, and never
+    produces a SkillEdit."""
+    replay_states: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "unresolved",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "none",
+            "valid_error_certificate_count": 1,
+            "consensus_gate_applied": True,
+            "consensus_gate_blocked_ids": ["cert_blocked"],
+        }
+        if policy_genome is not None:
+            replay_states.append("policy_replay")
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "policy_evaluation": {
+                    "fired": [{"item_id": item.item_id, "action": item.action}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "none",
+                },
+            }
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {
+            "precondition": "consensus_gate_blocked_nonempty",
+            "action": "emit_telemetry_only",
+            "params": {},
+            "rationale": "observe gate blocking",
+        }, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_no_effect",
+    )
+
+    assert len(mutation_calls) == 1
+    assert mutation_calls[0]["purpose"] == "policy_reflection"
+    assert replay_states == ["policy_replay"]
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_no_effect",
+    ]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 0
+    assert [entry["decision"] for entry in audit["l2_policy_audit"]] == [
+        "reject_policy_no_effect",
+    ]
+    # The deterministic non-L1 attribution telemetry is preserved.
+    assert [entry["layer"] for entry in audit["non_l1_failure_attributions"]] == [
+        "l2_adjudication_policy",
+    ]
+    # Nothing was accepted anywhere and no L1 skill edit was attempted.
+    assert result.edits_accepted == 0
+    assert result.edits_rejected == 0
+    assert result.champion_genome.generation == 0
+    assert audit["policy_genome"]["items"] == []
+
+
+def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
+    policy_replays: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        if policy_genome is not None:
+            policy_replays.append(case_id)
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": {
+                "state": "unresolved",
+                "consensus_gate_applied": True,
+                "consensus_gate_blocked_ids": ["cert_blocked"],
+            },
+        }
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {"no_proposal": True, "reason": "no vocabulary item justified"}, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_no_proposal",
+    )
+
+    assert len(mutation_calls) == 1
+    assert policy_replays == []
+    assert [step.gate_decision for step in result.steps] == ["skip_no_policy"]
+    entry = result.evolution_audit["l2_policy_audit"][0]
+    assert entry["decision"] == "skip_no_policy"
+    assert "no vocabulary item justified" in entry["reason"]
+
+
+def test_l2_gold_aligned_policy_is_accepted_and_persisted(
+    tmp_path, monkeypatch,
+) -> None:
+    """A hollow-complete defense on a gold-hallucination case: invalidating
+    the coverage claim demotes verified_clean to unresolved (score 0->1),
+    which passes the gold polarity gate and is persisted to checkpoints."""
+    import json
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "verified_clean",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+        }
+        if policy_genome is not None:
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "pre_policy_state": "verified_clean",
+                "state": "unresolved",
+                "policy_evaluation": {
+                    "fired": [{"item_id": item.item_id, "action": item.action}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "unresolved",
+                },
+            }
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "census": [],
+                "proof_adjudication": adjudication,
+            }
+        return {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    def signal_for(result, use_gold=False, gold_reflection=False):
+        state = str(result["state"])
+        if state == "verified_clean" and result.get("proof_adjudication"):
+            return replace(
+                _signal("unresolved"),
+                state="verified_clean",
+                gold_label=True,
+                has_gold=True,
+            )
+        return _signal(state)
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {
+            "precondition": "defense_coverage_complete_and_zero_certificates",
+            "action": "invalidate_coverage_claim",
+            "params": {"side": "defense"},
+            "rationale": "hollow complete defense supports a wrong clean verdict",
+        }, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records={"source": {"gold_label": True}, "anchor": {}},
+        run_id="l2_accept",
+        fitness_use_gold=True,
+    )
+
+    assert len(mutation_calls) == 1
+    assert [step.gate_decision for step in result.steps] == ["accept_policy"]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 1
+    items = audit["policy_genome"]["items"]
+    assert len(items) == 1
+    assert items[0]["action"] == "invalidate_coverage_claim"
+    assert items[0]["params"] == {"side": "defense"}
+    assert items[0]["source_case_id"] == "source"
+    assert items[0]["item_id"]
+
+    checkpoint = json.loads(
+        (tmp_path / "evolution_checkpoint.json").read_text(encoding="utf-8"),
+    )
+    assert checkpoint["l2_policy_accepts"] == 1
+    assert checkpoint["policy_genome"]["items"][0]["action"] == (
+        "invalidate_coverage_claim"
+    )
+    policy_checkpoint = json.loads(
+        (tmp_path / "policy_checkpoint.json").read_text(encoding="utf-8"),
+    )
+    assert policy_checkpoint["items"][0]["action"] == "invalidate_coverage_claim"
+
+    # The L1 skill surface stayed untouched: the L2 case never entered the
+    # SkillEdit path.
+    assert result.edits_accepted == 0
+    assert result.champion_genome.generation == 0
+    assert all(
+        step.trigger_source == "l2_policy_reflection" for step in result.steps
+    )
+
+
+def test_l2_state_change_against_gold_polarity_is_rejected(
+    tmp_path, monkeypatch,
+) -> None:
+    """Direction discipline: the same hollow-defense demotion is rejected
+    when gold says the clean verdict was correct (score 2->1)."""
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "verified_clean",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+        }
+        if policy_genome is not None:
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "pre_policy_state": "verified_clean",
+                "state": "unresolved",
+                "policy_evaluation": {
+                    "fired": [{"item_id": item.item_id, "action": item.action}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "unresolved",
+                },
+            }
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "census": [],
+                "proof_adjudication": adjudication,
+            }
+        return {
+            "state": "verified_clean",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    def signal_for(result, use_gold=False, gold_reflection=False):
+        state = str(result["state"])
+        if state == "verified_clean" and result.get("proof_adjudication"):
+            return replace(
+                _signal("unresolved"),
+                state="verified_clean",
+                gold_label=True,
+                has_gold=True,
+            )
+        return _signal(state)
+
+    def mutation(**kwargs):
+        return {
+            "precondition": "defense_coverage_complete_and_zero_certificates",
+            "action": "invalidate_coverage_claim",
+            "params": {"side": "defense"},
+            "rationale": "demote the clean verdict",
+        }, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        # Gold says no hallucination: the clean verdict was correct, so the
+        # demotion to unresolved moves against the gold polarity.
+        records={"source": {"gold_label": False}, "anchor": {}},
+        run_id="l2_wrong_polarity",
+        fitness_use_gold=True,
+    )
+
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_fitness",
+    ]
+    entry = result.evolution_audit["l2_policy_audit"][0]
+    assert entry["decision"] == "reject_policy_fitness"
+    assert entry["reason"] == "state_change_against_gold_polarity"
+    assert result.evolution_audit["l2_policy_accepts"] == 0
+    assert result.evolution_audit["policy_genome"]["items"] == []
+
+
 

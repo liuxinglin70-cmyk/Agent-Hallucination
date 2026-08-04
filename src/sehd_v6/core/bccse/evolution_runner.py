@@ -26,7 +26,7 @@ import re
 import time
 import uuid
 from collections import deque
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -91,7 +91,26 @@ from .signal_adapter import (
     decision_authority_invalid,
     resolve_authoritative_state,
 )
-from .v6_contracts import LAYER_DETECTOR, LAYER_L1, LAYER_L2
+from .v6_contracts import (
+    LAYER_DETECTOR,
+    LAYER_L1,
+    LAYER_L2,
+    FailureAttribution,
+    build_adjudication_facts,
+)
+from .policy_genome import (
+    PolicyEdit,
+    PolicyGenome,
+    PolicyOp,
+    apply_policy_edit,
+    create_baseline_policy_genome,
+    validate_policy_edit,
+)
+from .policy_reflection import (
+    build_policy_reflection_prompt,
+    current_policy_text,
+    parse_policy_proposal,
+)
 from ..htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -1135,8 +1154,14 @@ def _run_detection_with_genome(
     baseline_cache_root: Path | None = None,
     shared_cache_root: Path | None = None,
     provider_already_patched: bool = False,
+    policy_genome: PolicyGenome | None = None,
 ) -> dict[str, Any]:
     """Run PACA-TCL v3.5 with global skill injection.
+
+    v6: ``policy_genome`` forwards the accepted L2 adjudication-policy
+    items to the proof court. Items are closed vocabulary and evaluated
+    deterministically inside the court, so the detector envelope itself is
+    unchanged when no genome (or an empty one) is supplied.
 
     v5: Global injection for ALL cases (not conditional on unresolved).
     If genome == baseline, runs plain v3.5 without injection overhead.
@@ -1196,6 +1221,12 @@ def _run_detection_with_genome(
                     shutil.copytree(source, genome_dir / name, dirs_exist_ok=True)
             marker.write_text("seeded\n", encoding="utf-8")
 
+    policy_items = (
+        list(policy_genome.items)
+        if policy_genome is not None and policy_genome.items
+        else None
+    )
+
     def invoke() -> dict[str, Any]:
         if genome.content_hash == baseline.content_hash:
             return v35.adjudicate_case(
@@ -1204,6 +1235,7 @@ def _run_detection_with_genome(
                 config=config,
                 output_dir=genome_dir,
                 census_root=census_root,
+                policy_items=policy_items,
             )
         if provider_already_patched:
             # v3.5.1: provider already patched by caller (batch flush parallel mode)
@@ -1213,6 +1245,7 @@ def _run_detection_with_genome(
                 config=config,
                 output_dir=genome_dir,
                 census_root=census_root,
+                policy_items=policy_items,
             )
         with integrated_v35_provider(genome=genome, config=config):
             return v35.adjudicate_case(
@@ -1221,6 +1254,7 @@ def _run_detection_with_genome(
                 config=config,
                 output_dir=genome_dir,
                 census_root=census_root,
+                policy_items=policy_items,
             )
 
     result = invoke()
@@ -1817,6 +1851,15 @@ def run_online_evolution(
     # and detector-layer anomalies) collected during the run; audit
     # telemetry only, never feeds verdicts or fitness.
     non_l1_failure_attributions: list[dict[str, Any]] = []
+    # L2 adjudication-policy surface: closed-vocabulary policy items evolve
+    # in parallel with the skill genome. Acceptance is gated by a source
+    # replay that must show an observable adjudication effect, then by the
+    # same gold polarity discipline used for L1 edits; a rejected candidate
+    # is only ever replayed as a copy, so rollback is inherent.
+    policy_genome = create_baseline_policy_genome()
+    l2_policy_accepts = 0
+    l2_policy_audit: list[dict[str, Any]] = []
+    rejected_policy_summaries: list[str] = []
     # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
     # the ladder at most once; advances are audit telemetry only.
     abstention_ladder_used: set[str] = set()
@@ -1927,6 +1970,19 @@ def run_online_evolution(
         triggered_cases = int(restored_counters.get("triggered_cases") or 0)
         edits_accepted = int(restored_counters.get("edits_accepted") or 0)
         edits_rejected = int(restored_counters.get("edits_rejected") or 0)
+        restored_policy_payload = checkpoint.get("policy_genome")
+        if (
+            isinstance(restored_policy_payload, Mapping)
+            and restored_policy_payload.get("items")
+        ):
+            policy_genome = PolicyGenome.from_dict(dict(restored_policy_payload))
+        l2_policy_accepts = int(checkpoint.get("l2_policy_accepts") or 0)
+        restored_policy_audit = checkpoint.get("l2_policy_audit")
+        if isinstance(restored_policy_audit, list):
+            l2_policy_audit = [
+                dict(entry) for entry in restored_policy_audit
+                if isinstance(entry, Mapping)
+            ]
         resume_next_case_index = int(restored.get("next_case_index") or 0)
         # v5.9b: cases skipped by a halt/convergence were persisted as
         # "halted" placeholder steps with next_case_index advanced past
@@ -2022,6 +2078,7 @@ def run_online_evolution(
         genome: SkillGenome,
         case_id: str,
         output_path: Path,
+        policy_genome: PolicyGenome | None = None,
     ) -> dict[str, Any]:
         """Run one detector call in a counted, label-free envelope."""
         budget_usage["provider_calls"] += 1
@@ -2035,6 +2092,9 @@ def run_online_evolution(
         if budget_field is not None:
             # Debit before dispatch so runtime-invalid attempts are auditable.
             budget_usage[budget_field] += 1
+        replay_kwargs: dict[str, Any] = {}
+        if policy_genome is not None:
+            replay_kwargs["policy_genome"] = policy_genome
         return _run_detection_with_genome(
             genome=genome,
             case_id=case_id,
@@ -2044,6 +2104,7 @@ def run_online_evolution(
             census_root=census_root,
             baseline_cache_root=baseline_cache_root,
             shared_cache_root=shared_cache_root,
+            **replay_kwargs,
         )
 
     def run_mutation_call(**kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2140,6 +2201,10 @@ def run_online_evolution(
             current_genome.to_dict(),
         )
         _atomic_write_json(
+            output_dir / "policy_checkpoint.json",
+            policy_genome.to_dict(),
+        )
+        _atomic_write_json(
             output_dir / "evolution_checkpoint.json",
             {
                 "schema_version": "agenthallu.bccse_v5_checkpoint.v3",
@@ -2173,6 +2238,9 @@ def run_online_evolution(
                     "edits_accepted": edits_accepted,
                     "edits_rejected": edits_rejected,
                 },
+                "policy_genome": policy_genome.to_dict(),
+                "l2_policy_accepts": l2_policy_accepts,
+                "l2_policy_audit": list(l2_policy_audit),
                 "updated_at": time.time(),
             },
         )
@@ -2192,6 +2260,225 @@ def run_online_evolution(
         if not fitness_use_gold:
             return None
         return _evaluator_gold(records[case_id])
+
+    def run_l2_policy_case(
+        *,
+        idx: int,
+        case_id: str,
+        detection_result: Mapping[str, Any],
+        detection_state: str,
+        genome_before: str,
+        l2_attribution: Mapping[str, Any],
+    ) -> None:
+        """Close the L2 proposal loop for one adjudication-layer failure.
+
+        One reflection call proposes a single closed-vocabulary policy
+        item; the candidate genome must then show an observable effect in
+        a source replay and, whenever the terminal state moves, move it
+        toward the gold polarity under the same discipline as L1 edits.
+        Rejected candidates are only ever replayed as copies, so the
+        working genome rolls back inherently.
+        """
+        nonlocal policy_genome, l2_policy_accepts
+
+        attribution = FailureAttribution(
+            layer=str(l2_attribution.get("layer") or LAYER_L2),
+            artifact=str(l2_attribution.get("artifact") or ""),
+            reason_code=str(l2_attribution.get("reason_code") or ""),
+            evidence=dict(l2_attribution.get("evidence") or {}),
+        )
+        adjudication = detection_result.get("proof_adjudication") or {}
+        if not isinstance(adjudication, Mapping):
+            adjudication = {}
+        boundary_path = detection_result.get("boundary_path")
+        boundary_path_state = (
+            str(boundary_path.get("state") or "")
+            if isinstance(boundary_path, Mapping) else ""
+        )
+        facts = build_adjudication_facts(
+            dict(adjudication), boundary_path_state=boundary_path_state,
+        )
+        facts_summary = asdict(facts)
+        proposal_edit: PolicyEdit | None = None
+
+        def finish(
+            decision: str,
+            *,
+            reason: str = "",
+            replay: Mapping[str, Any] | None = None,
+        ) -> None:
+            nonlocal policy_genome, l2_policy_accepts
+            accepted = decision == "accept_policy"
+            if accepted:
+                l2_policy_accepts += 1
+                gate._consecutive_no_edit = 0
+                gate._converged = False
+            else:
+                # A fruitless or vetoed policy reflection advances the
+                # convergence streak exactly like a fruitless L1 reflection.
+                gate.record_no_edit()
+                rejected_policy_summaries.append(
+                    f"{case_id}: {decision} ({reason})"
+                )
+                del rejected_policy_summaries[:-20]
+            audit_entry: dict[str, Any] = {
+                "case_id": case_id,
+                "decision": decision,
+                "reason": reason,
+                "attribution": attribution.to_dict(),
+                "facts": facts_summary,
+                "proposal": proposal_edit.to_dict() if proposal_edit else None,
+                "policy_genome_hash": policy_genome.content_hash,
+            }
+            if isinstance(replay, Mapping):
+                replay_adjudication = replay.get("proof_adjudication") or {}
+                if not isinstance(replay_adjudication, Mapping):
+                    replay_adjudication = {}
+                audit_entry["policy_evaluation"] = dict(
+                    replay_adjudication.get("policy_evaluation") or {}
+                )
+                audit_entry["replay_state"] = resolve_authoritative_state(replay)
+            l2_policy_audit.append(audit_entry)
+            record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source="l2_policy_reflection",
+                attribution=dict(l2_attribution),
+                edit_proposal=(
+                    proposal_edit.to_dict() if proposal_edit else None
+                ),
+                mutation_applied=(
+                    proposal_edit.to_dict() if accepted else None
+                ),
+                gate_decision=decision,
+                genome_hash_before=genome_before,
+                genome_hash_after=current_genome.content_hash,
+                detection_state=detection_state,
+                timestamp=time.time(),
+                fitness_check={"l2_policy": audit_entry},
+            ), next_case_index=idx + 1)
+            print(
+                f"  [{idx}] L2_POLICY {case_id}: {decision}"
+                + (f" ({reason})" if reason else "")
+            )
+
+        if mutation_route is None:
+            finish("skip_no_policy", reason="no_mutation_route")
+            return
+
+        system_prompt, user_prompt = build_policy_reflection_prompt(
+            attribution=attribution,
+            facts_summary=facts_summary,
+            current_policy_text=current_policy_text(policy_genome),
+            rejected_summary="; ".join(rejected_policy_summaries[-8:]),
+        )
+        try:
+            parsed, _meta = run_mutation_call(
+                route=mutation_route,
+                purpose="policy_reflection",
+                system=system_prompt,
+                user=user_prompt,
+                cache_dir=output_dir / "mutation_cache" / "policy_reflection",
+            )
+        except Exception as exc:
+            finish(
+                "skip_no_policy",
+                reason=f"reflection_call_failed:{type(exc).__name__}",
+            )
+            return
+        proposed_item, parse_reason = parse_policy_proposal(parsed)
+        if proposed_item is None:
+            finish("skip_no_policy", reason=parse_reason or "no_proposal")
+            return
+        proposed_item = replace(
+            proposed_item,
+            item_id=f"policy_{uuid.uuid4().hex[:8]}",
+            source_case_id=case_id,
+        )
+        proposal_edit = PolicyEdit(
+            edit_id=f"policy_edit_{uuid.uuid4().hex[:8]}",
+            operation=PolicyOp.ADD_ITEM.value,
+            new_item=proposed_item,
+            rationale=proposed_item.rationale,
+            source_case_id=case_id,
+        )
+        valid, validate_reason = validate_policy_edit(
+            proposal_edit, policy_genome,
+        )
+        if not valid:
+            finish(
+                "skip_no_policy",
+                reason=f"invalid_policy_edit:{validate_reason}",
+            )
+            return
+        candidate_genome = apply_policy_edit(policy_genome, proposal_edit)
+        try:
+            replay_result = run_detection(
+                budget_kind="source",
+                genome=current_genome,
+                case_id=case_id,
+                output_path=(
+                    output_dir / "policy_replays"
+                    / f"{idx:04d}_{case_id.replace('/', '_')}"
+                ),
+                policy_genome=candidate_genome,
+            )
+        except Exception as exc:
+            finish(
+                "reject_policy_fitness",
+                reason=f"replay_runtime_invalid:{type(exc).__name__}",
+            )
+            return
+        replay_state = resolve_authoritative_state(replay_result)
+        replay_adjudication = replay_result.get("proof_adjudication") or {}
+        if not isinstance(replay_adjudication, Mapping):
+            replay_adjudication = {}
+        evaluation = replay_adjudication.get("policy_evaluation") or {}
+        if not isinstance(evaluation, Mapping):
+            evaluation = {}
+        fired = evaluation.get("fired") or []
+        state_changed = replay_state != detection_state
+        coverage_changed = (
+            evaluation.get("effective_prosecution_coverage")
+            != facts.prosecution_coverage
+            or evaluation.get("effective_defense_coverage")
+            != facts.defense_coverage
+        )
+        if not fired or not (state_changed or coverage_changed):
+            finish(
+                "reject_policy_no_effect",
+                reason="policy_did_not_move_the_terminal_edge",
+                replay=replay_result,
+            )
+            return
+        gold_label = fitness_gold(case_id)
+        if state_changed:
+            if gold_label is None:
+                finish(
+                    "reject_policy_fitness",
+                    reason="state_change_without_gold_polarity",
+                    replay=replay_result,
+                )
+                return
+            try:
+                score_before = task_state_score(detection_state, gold_label)
+                score_after = task_state_score(replay_state, gold_label)
+            except ValueError:
+                finish(
+                    "reject_policy_fitness",
+                    reason="unscorable_state",
+                    replay=replay_result,
+                )
+                return
+            if score_after <= score_before:
+                finish(
+                    "reject_policy_fitness",
+                    reason="state_change_against_gold_polarity",
+                    replay=replay_result,
+                )
+                return
+        policy_genome = candidate_genome
+        finish("accept_policy", replay=replay_result)
 
     def run_development_probe(*, reason: str) -> tuple[bool, dict[str, Any]]:
         """Apply the independent development envelope as a veto-only gate."""
@@ -2885,6 +3172,7 @@ def run_online_evolution(
                 genome=current_genome,
                 case_id=case_id,
                 output_path=output_dir,
+                policy_genome=policy_genome if policy_genome.items else None,
             )
         except Exception as exc:
             runtime_error = f"{type(exc).__name__}: {exc}"
@@ -3063,6 +3351,28 @@ def run_online_evolution(
                 f"    [ATTR] owner hypothesis: {attribution_owner} via "
                 f"{attribution_reason}"
             )
+        l2_attribution = next(
+            (
+                entry for entry in reversed(non_l1_failure_attributions)
+                if str(entry.get("case_id")) == case_id
+                and entry.get("layer") == LAYER_L2
+            ),
+            None,
+        )
+        if l2_attribution is not None:
+            # Adjudication-layer failures are owned by the L2 policy
+            # surface; guessing an L1 module for them only produces
+            # no-edit steps and no-effect replays, which this loop exists
+            # to eliminate.
+            run_l2_policy_case(
+                idx=idx,
+                case_id=case_id,
+                detection_result=detection_result,
+                detection_state=detection_state,
+                genome_before=genome_before,
+                l2_attribution=l2_attribution,
+            )
+            continue
         bias_signal = _localization_bias_signal(detection_result)
         if bias_signal:
             localization_bias_signals.append({
@@ -4645,6 +4955,9 @@ def run_online_evolution(
             ),
             "localization_bias_signals": localization_bias_signals,
             "non_l1_failure_attributions": non_l1_failure_attributions,
+            "l2_policy_audit": l2_policy_audit,
+            "l2_policy_accepts": l2_policy_accepts,
+            "policy_genome": policy_genome.to_dict(),
             "abstention_ladder_advances": abstention_ladder_advances,
             "rollback_reason": rollback_reason,
             "probe_history": probe_history,
@@ -4676,6 +4989,7 @@ def run_online_evolution(
     # Save results
     write_json(output_dir / "evolution_result.json", result.to_dict())
     write_json(output_dir / "champion_genome.json", champion_genome.to_dict())
+    write_json(output_dir / "policy_genome.json", policy_genome.to_dict())
     # HTC-TES v3: Save type-conditioned experience summary
     type_coverage = type_fitness.get_experience_memory().get_type_coverage()
     write_json(output_dir / "htc_tes_coverage.json", type_coverage)

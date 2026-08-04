@@ -1317,6 +1317,7 @@ def _resolve_incomplete_appeal(
 def adjudicate_case(
     *, case_id: str, record: dict[str, Any], config: dict[str, Any],
     output_dir: Path, census_root: Path | None = None,
+    policy_items: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     built = packet.build_packet(record)
 
@@ -1405,15 +1406,27 @@ def adjudicate_case(
         providers["focused_prosecution"] = focused_metas
         prosecution = focused_prosecution  # v3.5: focused prosecution IS the initial prosecution
 
-        # Initial adjudication with v3.5 contract
-        initial_proof = contract.adjudicate_proof_court(
-            required_candidates=_required_candidates(base),
-            prosecution=prosecution, defense=defense, packet=built,
-            apply_materiality_check=True, apply_commitment_check=True,
-            apply_consensus_gate_flag=False,  # No consensus gate on initial
-            focused_prosecution_audits=focused_audits,
-        )
+        # Initial adjudication with v3.5 contract. The kwargs dict is kept
+        # as a literal exactly once: the appeal re-adjudication, the
+        # counterfactual re-adjudication and the L2 policy re-adjudication
+        # all derive from it, so no court call can silently drift onto a
+        # different evidence bundle.
+        initial_court_kwargs = {
+            "required_candidates": _required_candidates(base),
+            "prosecution": prosecution,
+            "defense": defense,
+            "packet": built,
+            "apply_materiality_check": True,
+            "apply_commitment_check": True,
+            "apply_consensus_gate_flag": False,  # No consensus gate on initial
+            "focused_prosecution_audits": focused_audits,
+        }
+        initial_proof = contract.adjudicate_proof_court(**initial_court_kwargs)
         proof = initial_proof
+        # Tracks the exact evidence bundle of whichever court call produced
+        # the current proof, so the L2 policy re-adjudication replays the
+        # identical inputs at the convergence point.
+        final_court_kwargs = dict(initial_court_kwargs)
 
         # H2: Tightened trigger calibrator (priority 0-1 only)
         appeal_candidates = _appeal_trigger_calibrator_v35(
@@ -1530,15 +1543,15 @@ def adjudicate_case(
                 )
 
                 # v3.5: adjudicate with consensus gate + appeal defense
-                proof = contract.adjudicate_proof_court(
-                    required_candidates=_required_candidates(base),
-                    prosecution=combined_prosecution, defense=defense, packet=built,
-                    apply_materiality_check=True, apply_commitment_check=True,
-                    appeal_defense=appeal_defense_certs,
-                    initial_prosecution=prosecution,  # H2: for consensus gate
-                    apply_consensus_gate_flag=True,   # H2: enable consensus gate
-                    focused_prosecution_audits=focused_audits,
-                )
+                appeal_court_kwargs = {
+                    **initial_court_kwargs,
+                    "prosecution": combined_prosecution,
+                    "appeal_defense": appeal_defense_certs,
+                    "initial_prosecution": prosecution,  # H2: for consensus gate
+                    "apply_consensus_gate_flag": True,   # H2: enable consensus gate
+                }
+                proof = contract.adjudicate_proof_court(**appeal_court_kwargs)
+                final_court_kwargs = dict(appeal_court_kwargs)
             except Exception as exc:
                 providers["appeal_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
                 proof = _resolve_incomplete_appeal(initial_proof, exc)
@@ -1558,18 +1571,45 @@ def adjudicate_case(
                     config=config, output_dir=output_dir,
                 )
                 if counterfactual_rankings:
-                    # Re-adjudicate with counterfactual rankings
+                    # Re-adjudicate with counterfactual rankings. The H3
+                    # re-adjudication always runs the consensus-gate court
+                    # shape, even when the appeal stage itself never
+                    # executed (initial proof with multiple survivors), so
+                    # the gate shape is applied unconditionally here.
+                    counterfactual_court_kwargs = {
+                        **final_court_kwargs,
+                        "prosecution": combined_prosecution or prosecution,
+                        "initial_prosecution": prosecution,
+                        "appeal_defense": appeal_defense_certs,
+                        "apply_consensus_gate_flag": True,
+                        "counterfactual_rankings": counterfactual_rankings,
+                    }
                     proof = contract.adjudicate_proof_court(
-                        required_candidates=_required_candidates(base),
-                        prosecution=combined_prosecution or prosecution,
-                        defense=defense, packet=built,
-                        apply_materiality_check=True, apply_commitment_check=True,
-                        appeal_defense=appeal_defense_certs,
-                        initial_prosecution=prosecution,
-                        apply_consensus_gate_flag=True,
-                        counterfactual_rankings=counterfactual_rankings,
-                        focused_prosecution_audits=focused_audits,
+                        **counterfactual_court_kwargs,
                     )
+                    final_court_kwargs = counterfactual_court_kwargs
+
+        # L2 adjudication-policy passthrough: policies act on the terminal
+        # edge only, after every appeal/localization stage has settled. The
+        # re-adjudication replays the exact evidence bundle that produced
+        # the current proof, so the deterministic policy evaluator sees the
+        # same facts the court committed to. Empty policy input leaves the
+        # default path untouched.
+        if policy_items:
+            from ..bccse.v6_contracts import PolicyItem as _PolicyItem
+
+            normalized_policy_items = [
+                item if isinstance(item, _PolicyItem)
+                else _PolicyItem.from_dict(dict(item))
+                for item in policy_items
+            ]
+            proof = contract.adjudicate_proof_court(
+                **final_court_kwargs,
+                policy_items=normalized_policy_items,
+                boundary_path_state=str(
+                    (base.get("boundary_path") or {}).get("state") or ""
+                ),
+            )
 
         proof, construct_authoritative, construct_authority_reasons = (
             _apply_construct_authority(proof, construct_audit)
