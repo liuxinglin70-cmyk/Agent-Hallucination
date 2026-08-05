@@ -17,15 +17,18 @@ experiments/
 ├── protocols/                 # protocol records (tracked)
 │   ├── README.md              #   directory guide
 │   └── used_case_ledger.txt   #   used-case ledger
+├── select_batch_cases.py      # stratified 10-case selector (tracked)
+├── run_batch_concurrent.py    # isolated 10x1 runner (tracked)
+├── analyze_batch.py           # per-case trajectory reader (tracked)
+├── select_50_cases.py         # stratified 50-case selector (tracked)
 ├── analyze_decision_profile.py  # offline decision-profile analysis (tracked)
 └── run_decision_replicas.py     # test-time-scaling replica experiment (tracked)
 ```
 
-Only `README.md`, `plans/`, the two files under `protocols/`, and the two
-decision-profile/replica scripts above are tracked by git.  Everything else
-in this directory is a local-only, git-ignored workspace: run scripts,
-dataset builds, caches, outputs and logs are created by runs as needed and
-are never required by the framework.
+The selectors, concurrent runner, and trajectory analyzer are tracked because
+they define the reproducible experiment protocol. Dataset builds, caches,
+outputs, logs, and ad-hoc analysis remain local-only and git-ignored; none is
+required by the framework runtime.
 
 ## Used-case ledger
 
@@ -37,8 +40,9 @@ must exclude every `case_id` in the ledger.  See `protocols/README.md`.
 
 - Plans and task lists → `plans/`
 - Used-case tracking and protocol records → `protocols/`
-- Run scripts, dataset builds, caches, outputs and logs → local-only
-  locations under `experiments/` (git-ignored, created on demand)
+- Reusable experiment orchestration → tracked scripts under `experiments/`
+- Dataset builds, caches, outputs and logs → local-only locations under
+  `experiments/` (git-ignored, created on demand)
 
 ## Caches and logs
 

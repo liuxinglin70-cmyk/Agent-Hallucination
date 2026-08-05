@@ -787,3 +787,99 @@ changes, FailureEpisode attempts, and experience-memory representatives agree
 with one another. No new framework defect was found, so no additional code
 change or same-batch rerun was required. Repository verification at this
 commit is 535 tests passed.
+
+## Batch 7: addressable-origin normalization and truthful batch gates
+
+Batch 7 used ten records disjoint from the used-case ledger. The six
+hallucinated records covered planning, reasoning, retrieval, tool use, and
+human interaction; the four clean records came from four different agent
+families. An initial selector defect had placed all clean records in one
+family because it sorted records by family novelty without rotating families.
+The selector now performs family round-robin selection, and the reusable
+selectors, runner, and analyzer are tracked as protocol code.
+
+### First run and root-cause diagnosis
+
+The first 10x1 concurrent run finished all child processes, but the batch gate
+failed because `Magentic_One/040` was runtime-invalid. Its construct census
+repair returned six candidates with `coverage_state=complete`; candidate 3
+used the valid tool-interaction reference `event_003_tool_01` as its origin.
+The validator accepted interaction references for trigger and dependency but
+required origin to be an event id, so the otherwise complete census lost
+decision authority.
+
+Adding retries or weakening census completeness would not resolve that
+contract mismatch. Every tool interaction belongs to exactly one packet
+event, and origin ordering plus source-step localization use that parent event.
+The census input boundary now deterministically maps an addressable
+interaction-origin to its parent event before producing the canonical census.
+The audit records `normalized_interaction_origin_count`; a foreign interaction
+still fails the origin check. The captured failing response now validates as
+6/6 candidates, maps the origin to `event_003`, and preserves source step 3.
+
+The experiment runner also incorrectly returned exit status 0 for a batch
+containing runtime-invalid results and read obsolete flat fields, leaving
+fitness and attribution empty in its summary. The tracked runner now fails the
+batch gate for child-process failure, missing results, or any runtime-invalid
+case, and reads attribution from `episode.attribution` plus fitness from
+`fitness_check.assessment`. A summarize-only mode rebuilds and validates
+existing artifacts without rerunning providers.
+
+### Authoritative same-manifest rerun
+
+The exact same ten-case manifest was rerun concurrently after the code fix.
+All ten children exited 0, all detector results were authoritative, and there
+were zero runtime-invalid cases. Wall-clock duration was 960.5 seconds.
+
+| case_id | gold | seconds | accepted | rejected | terminal decisions |
+|---|---:|---:|---:|---:|---|
+| BFCL/096 | false | 930.4 | 1 | 0 | accept_batch |
+| BFCL/130 | true | 37.5 | 0 | 0 | skip_stable |
+| Camel/035 | false | 0.2 | 0 | 0 | reject_policy_fitness |
+| Magentic_One/024 | true | 0.2 | 0 | 0 | skip_no_policy |
+| Magentic_One/040 | false | 167.2 | 1 | 0 | accept_batch |
+| Magentic_One/090 | true | 0.2 | 0 | 0 | skip_stable |
+| OpenDeepSearch/050 | false | 503.2 | 0 | 1 | reject_fitness |
+| OpenDeepSearch/081 | true | 43.7 | 1 | 1 | retry_fitness_no_effect, accept_batch |
+| OpenManus/065 | true | 0.2 | 0 | 0 | skip_no_policy |
+| SmolAgents/039 | true | 117.6 | 0 | 2 | retry_fitness_no_effect, reject_fitness_no_effect |
+
+### Accepted skill trajectories
+
+- `BFCL/096`: the baseline false positive triggered `error_to_clean` evolution.
+  Rule `1bd92c2e83a7` compiled and executed
+  `require_evidence_field(evidence_refs)` in
+  `atomic_verifier_instruction`. The same id appeared in compiled, applied,
+  effect, and executed traces. It improved the owned local observable
+  (9.3 -> 7.3) and reduced prosecution certificates. The final court state did
+  not yet change, so this is a causally executed local skill improvement, not
+  a claim that the case was fully corrected.
+- `Magentic_One/040`: the repaired census audit records one normalized
+  interaction-origin. The authoritative baseline was unresolved rather than
+  runtime-invalid. Rule `eb2f894eaa03` executed
+  `require_evidence_field(evidence_refs)` in `clean_defense_boundary`; all four
+  execution-id sets agree, the defense local score improved 4.0 -> 7.0, and
+  the effective FailureEpisode representative was persisted. The court stayed
+  unresolved, so the evidence supports local capability improvement only.
+- `OpenDeepSearch/081`: attempt 1 was retained as non-promotable
+  `intervention_not_executed`. Attempt 2 kept the same episode id and executed
+  `emit_origin_census(trigger_event_id)` as rule `8affc7258e2a`; compiled,
+  applied, effect, and executed traces agree. The court moved from the
+  gold-wrong clean state to unresolved in the correct direction, but did not
+  yet reach verified-error. Memory contains both the no-effect and effective
+  representatives.
+
+The rejected `OpenDeepSearch/050` edit moved a clean case toward error and was
+correctly rejected as gold-direction regression. Both `SmolAgents/039`
+attempts retained their executed/no-effect evidence without promotion. L2
+policy rejection/abstention trajectories for the otherwise correct
+`Camel/035`, `Magentic_One/024`, and `OpenManus/065` were persisted without
+manufacturing skill success.
+
+### Gate decision
+
+Batch 7 passes only on the authoritative rerun. The census contract, detector
+authority, accepted skill execution traces, rejection outcomes, champion
+genomes, and experience-memory representatives are mutually consistent.
+Verification: 536 tests passed; tracked experiment scripts compile; the
+rebuilt batch summary reports `batch gate passed`.

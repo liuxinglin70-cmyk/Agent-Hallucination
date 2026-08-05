@@ -1858,7 +1858,7 @@ def test_provider_census_accepts_tool_interaction_trigger() -> None:
     assert len(census) == 1
 
 
-def test_provider_census_rejects_interaction_origin() -> None:
+def test_provider_census_normalizes_interaction_origin_to_parent_event() -> None:
     from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
 
     value = {
@@ -1873,7 +1873,34 @@ def test_provider_census_rejects_interaction_origin() -> None:
                 "claim_or_commitment": "the agent skipped a required step",
                 "dependency_event_ids": [],
                 "module_tag": "Planning",
-                "observation": "interaction as origin is invalid",
+                "observation": "the tool interaction is the causal origin",
+                "is_decision_point": True,
+            }
+        ],
+    }
+    census, audit = validate_provider_census(value, _built_with_interaction())
+    assert audit["status"] == "complete"
+    assert audit["normalized_interaction_origin_count"] == 1
+    assert census[0]["origin_hypothesis_event_id"] == "event_001"
+    assert census[0]["source_step_id"] == 1
+
+
+def test_provider_census_rejects_foreign_interaction_origin() -> None:
+    from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
+
+    value = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "candidate_id": "construct_candidate_001",
+                "origin_hypothesis_event_id": "event_999_tool_01",
+                "trigger_event_id": "event_002",
+                "axes": ["P"],
+                "candidate_kind": "omission",
+                "claim_or_commitment": "the agent skipped a required step",
+                "dependency_event_ids": [],
+                "module_tag": "Planning",
+                "observation": "foreign interaction is not addressable",
                 "is_decision_point": True,
             }
         ],

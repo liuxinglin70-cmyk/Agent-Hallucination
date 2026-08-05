@@ -681,12 +681,18 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
     # must remain an event id: it is the ordering anchor for earliest-origin
     # localization and the source-step mapping.
     event_ids = {str(event["event_id"]) for event in built["events"]}
+    interaction_origins = {
+        str(interaction["interaction_id"]): str(event["event_id"])
+        for event in built["events"]
+        for interaction in event.get("tool_interactions") or []
+    }
     addressable = set(_addressable_refs(built))
     if coverage not in contract.COVERAGE_STATES or not isinstance(rows, list) or len(rows) > 8:
         return [], {"status": "invalid_top_level", "coverage_state": coverage}
     valid: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     seen: set[str] = set()
+    normalized_interaction_origins = 0
     required = {
         "candidate_id", "origin_hypothesis_event_id", "trigger_event_id", "axes",
         "candidate_kind", "claim_or_commitment", "dependency_event_ids", "module_tag",
@@ -699,10 +705,16 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
         candidate_id = str(row.get("candidate_id") or "")
         axes = row.get("axes")
         dependencies = row.get("dependency_event_ids")
+        raw_origin = str(row.get("origin_hypothesis_event_id") or "")
+        origin = (
+            raw_origin
+            if raw_origin in event_ids
+            else interaction_origins.get(raw_origin, "")
+        )
         checks = {
             "required": required <= set(row),
             "candidate_id": bool(candidate_id) and candidate_id not in seen,
-            "origin": str(row.get("origin_hypothesis_event_id") or "") in event_ids,
+            "origin": bool(origin),
             "trigger": str(row.get("trigger_event_id") or "") in addressable,
             "axes": isinstance(axes, list) and bool(axes) and set(map(str, axes)) <= contract.AXES,
             "dependencies": isinstance(dependencies, list) and all(str(ref) in addressable for ref in dependencies),
@@ -713,7 +725,9 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
         }
         if all(checks.values()):
             normalized_row = dict(row)
-            origin = str(row.get("origin_hypothesis_event_id") or "")
+            normalized_row["origin_hypothesis_event_id"] = origin
+            if origin != raw_origin:
+                normalized_interaction_origins += 1
             normalized_row["source_step_id"] = next(
                 (
                     event.get("source_step_id")
@@ -732,6 +746,7 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
         "coverage_state": coverage,
         "raw_candidate_count": len(rows),
         "converted_candidate_count": len(valid),
+        "normalized_interaction_origin_count": normalized_interaction_origins,
         "failures": failures,
         "source_hash": packet.stable_hash(rows),
     }

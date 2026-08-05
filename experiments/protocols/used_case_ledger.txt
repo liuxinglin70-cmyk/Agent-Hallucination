@@ -342,3 +342,14 @@ OpenDeepSearch/009
 OpenDeepSearch/066
 OpenDeepSearch/068
 OpenDeepSearch/093
+# --- 10-case concurrent batch7 (2026-08-06) ---
+Magentic_One/090
+SmolAgents/039
+OpenDeepSearch/081
+BFCL/130
+OpenManus/065
+Magentic_One/024
+Camel/035
+BFCL/096
+Magentic_One/040
+OpenDeepSearch/050
