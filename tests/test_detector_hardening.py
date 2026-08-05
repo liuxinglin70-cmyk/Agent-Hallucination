@@ -1723,3 +1723,162 @@ def test_load_policy_genome_rejects_vocabulary_drift(tmp_path: Path) -> None:
         raise AssertionError(
             "vocabulary-drifted policy genome must fail closed at load"
         )
+
+def _built_with_interaction() -> dict:
+    return {
+        "events": [
+            {
+                "event_id": "event_001",
+                "source_step_id": 1,
+                "position": 1,
+                "tool_interactions": [
+                    {
+                        "interaction_id": "event_001_tool_01",
+                        "tool_name": "lookup",
+                        "arguments": {},
+                        "observation": "result",
+                    }
+                ],
+            },
+            {
+                "event_id": "event_002",
+                "source_step_id": 2,
+                "position": 2,
+                "tool_interactions": [],
+            },
+        ]
+    }
+
+
+def test_provider_census_accepts_tool_interaction_dependency() -> None:
+    from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
+
+    value = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "candidate_id": "construct_candidate_001",
+                "origin_hypothesis_event_id": "event_002",
+                "trigger_event_id": "event_002",
+                "axes": ["P"],
+                "candidate_kind": "omission",
+                "claim_or_commitment": "the agent skipped a required step",
+                "dependency_event_ids": ["event_001_tool_01"],
+                "module_tag": "Planning",
+                "observation": "the tool result was the dependency",
+                "is_decision_point": True,
+            }
+        ],
+    }
+    census, audit = validate_provider_census(value, _built_with_interaction())
+    assert audit["status"] == "complete"
+    assert len(census) == 1
+
+
+def test_provider_census_rejects_foreign_dependency_reference() -> None:
+    from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
+
+    value = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "candidate_id": "construct_candidate_001",
+                "origin_hypothesis_event_id": "event_002",
+                "trigger_event_id": "event_002",
+                "axes": ["P"],
+                "candidate_kind": "omission",
+                "claim_or_commitment": "the agent skipped a required step",
+                "dependency_event_ids": ["event_999"],
+                "module_tag": "Planning",
+                "observation": "invented reference",
+                "is_decision_point": True,
+            }
+        ],
+    }
+    census, audit = validate_provider_census(value, _built_with_interaction())
+    assert audit["status"] == "partial"
+    assert audit["failures"][0]["failed_checks"] == ["dependencies"]
+    assert census == []
+
+
+def test_candidate_validation_accepts_tool_interaction_dependency() -> None:
+    from src.sehd_v6.core.paca_tcl import contract_v1
+
+    candidate = {
+        "candidate_id": "candidate_001",
+        "origin_event_id": "event_001",
+        "trigger_event_id": "event_001",
+        "axes": ["P"],
+        "candidate_kind": "omission",
+        "claim_or_commitment": "the agent skipped a required step",
+        "dependency_event_ids": ["event_001_tool_01"],
+        "violation_state": "unresolved",
+        "actor_state": "unresolved",
+        "boundary_state": "unresolved",
+        "propagation_state": "no_consumption",
+        "residual_impact": False,
+        "impact_surfaces": [],
+        "positive_evidence_refs": [],
+        "actor_evidence_refs": [],
+        "boundary_evidence_refs": [],
+        "consumption_event_ids": [],
+        "consumption_evidence_refs": [],
+        "impact_event_ids": [],
+        "impact_evidence_refs": [],
+        "recovery_event_id": None,
+        "recovery_evidence_refs": [],
+        "rationale": "dependency is a tool result",
+    }
+    validation = contract_v1.validate_candidate(candidate, _built_with_interaction())
+    assert validation["decision"] == "pass", validation["failed_checks"]
+
+
+def test_provider_census_accepts_tool_interaction_trigger() -> None:
+    from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
+
+    value = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "candidate_id": "construct_candidate_001",
+                "origin_hypothesis_event_id": "event_001",
+                "trigger_event_id": "event_001_tool_01",
+                "axes": ["P"],
+                "candidate_kind": "invalid_tool_argument",
+                "claim_or_commitment": "the tool call was invalid",
+                "dependency_event_ids": ["event_001_tool_01"],
+                "module_tag": "Tool-Use",
+                "observation": "the tool call itself is the trigger",
+                "is_decision_point": True,
+            }
+        ],
+    }
+    census, audit = validate_provider_census(value, _built_with_interaction())
+    assert audit["status"] == "complete"
+    assert len(census) == 1
+
+
+def test_provider_census_rejects_interaction_origin() -> None:
+    from src.sehd_v6.core.paca_tcl.basic_runner import validate_provider_census
+
+    value = {
+        "coverage_state": "complete",
+        "candidates": [
+            {
+                "candidate_id": "construct_candidate_001",
+                "origin_hypothesis_event_id": "event_001_tool_01",
+                "trigger_event_id": "event_002",
+                "axes": ["P"],
+                "candidate_kind": "omission",
+                "claim_or_commitment": "the agent skipped a required step",
+                "dependency_event_ids": [],
+                "module_tag": "Planning",
+                "observation": "interaction as origin is invalid",
+                "is_decision_point": True,
+            }
+        ],
+    }
+    census, audit = validate_provider_census(value, _built_with_interaction())
+    assert audit["status"] == "partial"
+    assert audit["failures"][0]["failed_checks"] == ["origin"]
+    assert census == []

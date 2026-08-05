@@ -673,7 +673,15 @@ def json_object_provider_call(
 def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     coverage = str(value.get("coverage_state") or "")
     rows = value.get("candidates")
+    # The dependency and trigger reference universes are the framework-wide
+    # addressable surface (event ids + tool interaction ids, see
+    # ``_addressable_refs``), not the event-only set: a candidate
+    # legitimately depends on the result of a tool call, and the triggering
+    # unit can be the specific tool interaction. Only the origin hypothesis
+    # must remain an event id: it is the ordering anchor for earliest-origin
+    # localization and the source-step mapping.
     event_ids = {str(event["event_id"]) for event in built["events"]}
+    addressable = set(_addressable_refs(built))
     if coverage not in contract.COVERAGE_STATES or not isinstance(rows, list) or len(rows) > 8:
         return [], {"status": "invalid_top_level", "coverage_state": coverage}
     valid: list[dict[str, Any]] = []
@@ -695,9 +703,9 @@ def validate_provider_census(value: dict[str, Any], built: dict[str, Any]) -> tu
             "required": required <= set(row),
             "candidate_id": bool(candidate_id) and candidate_id not in seen,
             "origin": str(row.get("origin_hypothesis_event_id") or "") in event_ids,
-            "trigger": str(row.get("trigger_event_id") or "") in event_ids,
+            "trigger": str(row.get("trigger_event_id") or "") in addressable,
             "axes": isinstance(axes, list) and bool(axes) and set(map(str, axes)) <= contract.AXES,
-            "dependencies": isinstance(dependencies, list) and all(str(ref) in event_ids for ref in dependencies),
+            "dependencies": isinstance(dependencies, list) and all(str(ref) in addressable for ref in dependencies),
             "candidate_kind": bool(str(row.get("candidate_kind") or "").strip()),
             "claim": bool(str(row.get("claim_or_commitment") or "").strip()),
             "observation": bool(str(row.get("observation") or "").strip()),

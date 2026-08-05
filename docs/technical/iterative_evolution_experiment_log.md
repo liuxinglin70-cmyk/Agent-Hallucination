@@ -14,6 +14,7 @@
 | 批次2 | 5 | 3 | 2 | planning/reasoning/retrieval | Camel/OpenManus/SmolAgents/Magentic_One/BFCL |
 | 50例 | 50 | 35 | 15 | tool6/reasoning11/retrieval6/planning6/interaction6 | 全部7框架 |
 | 批次3 | 10 | 6 | 4 | interaction/planning/reasoning/retrieval/tool | Camel/SmolAgents/Magentic_One/OpenManus/BFCL/OpenDeepSearch |
+| 批次4 | 10 | 6 | 4 | retrieval/tool/interaction/planning/reasoning | OpenManus/BFCL/Camel/Magentic_One/SmolAgents/OpenDeepSearch |
 
 ## 批次1（batch1_gold）
 _首轮4/5失败后经4项底层修复重跑；下表为修复后最终结果_
@@ -460,4 +461,120 @@ _2026-08-05 首轮运行：10/10 成功，0 runtime_invalid，0 provider 错误�
 - 经验记忆覆盖：factual×2（improved/regressed）、contextual×2（rejected），
   每个决策类型（accept/regress/no_effect/structural_reject）均有对应 typed entry
 - 未发现框架缺陷，无需代码修复；门控全部按契约工作
+
+## 批次4（batch4_gold，10例并发系列第二批次）
+
+_首轮 1/10 runtime_invalid（BFCL/043）+ 修复后二轮 1/10（OpenManus/073），根因均为 census
+引用域契约缺陷；修复后终轮 10/10 成功、0 runtime_invalid、6 条 L1 技能接受。_
+
+### 批次4 缺陷：census 引用域与框架 addressable 契约不一致
+
+**现象**：construct census 阶段 provider 合法引用 tool interaction id（如
+`event_003_tool_01`、`event_001_tool_03`）作为 `dependency_event_ids` /
+`trigger_event_id`，validator 只接受 event id，repair 提示也只列出 event id
+（模型无法修复），案例被判定 construct_not_complete → runtime_invalid（BFCL/043、
+OpenManus/073 两次复现）。
+
+**根因**（源码核验）：框架单一事实来源 `basic_runner._addressable_refs` /
+`contract_v1._address_space` 将 event id + tool interaction id 定义为可寻址引用域
+（下游全部 evidence_refs 均按此校验），而 census validator（basic_runner.py）、
+候选校验（contract_v1.py dependency_refs/trigger_addressable）、repair 提示
+（proof_engine.py）三处却各自用 event-only 域，且 CONSTRUCT_CENSUS_SYSTEM prompt
+明文 "Use event IDs only" 与模型对"依赖=工具结果"的自然语义相矛盾。
+
+**修复**（根因统一，非打补丁）：
+- `basic_runner.validate_provider_census`：`trigger_event_id` / `dependency_event_ids`
+  改用 `_addressable_refs`（events + interactions）；`origin_hypothesis_event_id`
+  保持 event-only（earliest-origin 排序与 source_step 映射的锚点）
+- `contract_v1.validate_candidate`：`trigger_addressable`、`dependency_refs` 对齐
+  addressable 域
+- `proof_engine` repair 提示：分别列出合法 origin event ids 与合法
+  trigger/dependency addressable refs
+- `CONSTRUCT_CENSUS_SYSTEM` prompt：明确 origin 必须为 event id、trigger/dependency
+  可为 event 或 interaction id（prompt 与契约一致）
+- 新增 5 条回归测试（458 passed）
+
+### 批次4 终轮结果
+
+| case_id | gold | 类别 | 耗时(s) | 触发 | 接受 | 拒绝 | stable | runtime_invalid |
+|---|---|---|---|---|---|---|---|---|
+| BFCL/043 | True | Tool-Use Hallucination | 550.2 | 1 | 1 | 0 | 0 | 0 |
+| Camel/053 | True | Human-Interaction Hallucination | 266.1 | 0 | 0 | 0 | 1 | 0 |
+| Magentic_One/016 | True | Retrieval Hallucination | 335.7 | 0 | 0 | 0 | 1 | 0 |
+| Magentic_One/084 | True | Planning Hallucination | 507.0 | 2 | 1 | 0 | 0 | 0 |
+| OpenDeepSearch/022 | False | clean | 1048.0 | 1 | 1 | 0 | 0 | 0 |
+| OpenDeepSearch/038 | False | clean | 229.6 | 1 | 0 | 0 | 0 | 0 |
+| OpenDeepSearch/051 | False | clean | 170.1 | 1 | 0 | 0 | 0 | 0 |
+| OpenDeepSearch/055 | False | clean | 742.9 | 1 | 0 | 1 | 0 | 0 |
+| OpenManus/073 | True | Retrieval Hallucination | 701.9 | 1 | 1 | 1 | 0 | 0 |
+| SmolAgents/025 | True | Reasoning Hallucination | 608.8 | 2 | 1 | 0 | 0 | 0 |
+
+### BFCL/043 (gold=True, Tool-Use Hallucination)
+
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=strong_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When defense coverage is complete and the defense has no valid arguments, emit the boundary finding.
+  - 修复前此案例因 census dependency 引用 event_003_tool_01 被错误判为 runtime_invalid；
+    修复后 census 通过并产出 gold 验证的技能经验
+
+### Camel/053 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> downgrade_coverage(defense → incomplete)`
+
+### Magentic_One/016 (gold=True, Retrieval Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none（检测已与 gold 一致）
+
+### Magentic_One/084 (gold=True, Planning Hallucination)
+
+- step[0] | reject_policy_no_effect | det=unresolved | trigger=l2_policy_reflection | att=boundary_consumption_policy(boundary_terminal_conflict)
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=clean_defense_boundary/add_rule | fitness=local_improvement | reasons=module_local_score_improved:15.000->14.300
+  - 编辑内容: When defense certificates are issued but no prosecution candidate is covered by a defense certificate, emit the boundary finding: coverage_state.
+  - L2 被拒后正确回落 L1 并产出技能接受（fall-through 契约验证）
+
+### OpenDeepSearch/022 (gold=False, clean)
+
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule | fitness=local_improvement | reasons=module_local_score_improved:9.300->6.300
+  - 编辑内容: When a certificate is emitted without a target_candidate_id field, require the cited evidence field: target_candidate_id.
+
+### OpenDeepSearch/038 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | att=boundary_consumption_policy(boundary_terminal_conflict)
+  - L2: add_item `boundary_state_conflicts_with_terminal -> downgrade_coverage(defense → incomplete)`
+
+### OpenDeepSearch/051 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> invalidate_coverage_claim(defense)`
+
+### OpenDeepSearch/055 (gold=False, clean)
+
+- step[0] | reject_fitness | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=worse | reasons=gold_assisted_task_score_regressed
+  - 编辑内容: When defense coverage is complete and no error certificates survive, emit the boundary finding: state.
+  - 正确拒绝：gold-clean 上终局向反极性移动
+
+### OpenManus/073 (gold=True, Retrieval Hallucination)
+
+- step[0] | retry_fitness_no_effect | det=verified_clean | trigger=gold_mismatch | edit=causal_link_test/add_rule | fitness=no_effect
+- step[1] | accept_batch | det=verified_clean | trigger=gold_mismatch | edit=abstention_rule/add_rule | fitness=strong_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When the defense coverage is complete but the defense contains no valid arguments, emit the boundary finding: state.
+  - 修复前此案例因 census trigger 引用 event_003_tool_01 被错误判为 runtime_invalid；
+    修复后 gold_mismatch 触发进化并把 verified_clean 纠偏为 verified_error（gold=True）
+
+### SmolAgents/025 (gold=True, Reasoning Hallucination)
+
+- step[0] | reject_policy_no_effect | det=unresolved | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=local_improvement | reasons=module_local_score_improved:0.000->0.300
+  - 编辑内容: When the prosecution evidence includes impact_evidence_refs but does not include counterfactual_evidence_refs, populate the cited evidence field: counterfactual_evidence_refs.
+  - L2 被拒后正确回落 L1 并产出技能接受（fall-through 契约二次验证）
+
+### 批次4 小结
+
+- 修复验证：BFCL/043 与 OpenManus/073 两个 runtime_invalid 案例修复后全部正常处理，
+  终轮 10/10 成功、0 runtime_invalid、0 provider 错误
+- 技能经验轨迹：6 条 L1 接受（4 条 gold-verified strong_improvement：BFCL/043、
+  OpenManus/073 纠偏、另 2 条 local_improvement），全部落盘 champion genome +
+  typed experience memory（improved/decisive_correct 元数据齐全）
+- L2→L1 fall-through 在 Magentic_One/084、SmolAgents/025 两次实际验证
+- 门控正确性：OpenDeepSearch/055 gold-clean 反极性被拒、L2 no-effect/边界冲突被拒
 

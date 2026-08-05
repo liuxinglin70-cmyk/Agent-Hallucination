@@ -171,9 +171,12 @@ def validate_candidate(candidate: dict[str, Any], packet: dict[str, Any]) -> dic
         "axes": isinstance(axes, list) and bool(axes) and set(map(str, axes)) <= AXES,
         "candidate_kind": bool(str(candidate.get("candidate_kind") or "").strip()),
         "claim_or_commitment": bool(str(candidate.get("claim_or_commitment") or "").strip()),
-        "trigger_addressable": _event_ref(candidate.get("trigger_event_id"), event_order),
+        "trigger_addressable": (
+            isinstance(candidate.get("trigger_event_id"), str)
+            and candidate.get("trigger_event_id") in addressable
+        ),
         "origin_addressable": _event_ref(candidate.get("origin_event_id"), event_order),
-        "dependency_refs": _event_refs(candidate.get("dependency_event_ids"), event_order),
+        "dependency_refs": _evidence_refs(candidate.get("dependency_event_ids"), addressable),
         "violation_state": violation in VIOLATION_STATES,
         "actor_state": actor in ACTOR_STATES,
         "boundary_state": boundary in BOUNDARY_STATES,

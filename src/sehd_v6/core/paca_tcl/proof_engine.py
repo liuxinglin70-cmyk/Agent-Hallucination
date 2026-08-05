@@ -23,7 +23,7 @@ from . import proof_contract as contract
 from . import layered_engine as v2
 from .basic_runner import (
     _responsible_step, provider_call, validate_provider_census,
-    json_object_provider_call,
+    json_object_provider_call, _addressable_refs,
 )
 from .proof_engine_v3_4 import (
     CONSTRUCT_CENSUS_SYSTEM, CONSTRUCT_AXIS_ALIASES,
@@ -1367,9 +1367,12 @@ def adjudicate_case(
                     "\"complete\" and every supplied candidate must pass "
                     "validation. Validation failures to fix: "
                     + json.dumps(repair_failures, ensure_ascii=False)
-                    + ". Legal event IDs for origin_hypothesis_event_id, "
-                    "trigger_event_id and dependency_event_ids: "
+                    + ". Legal event IDs for origin_hypothesis_event_id: "
                     + json.dumps(legal_event_ids, ensure_ascii=False)
+                    + ". Legal trigger_event_id and dependency_event_ids "
+                    "(event IDs or tool interaction IDs copied exactly from "
+                    "TRAJECTORY_PACKET): "
+                    + json.dumps(_addressable_refs(built), ensure_ascii=False)
                     + ". Re-emit the FULL census with the repaired candidates "
                     "(same candidate_ids). Return JSON only."
                 )
