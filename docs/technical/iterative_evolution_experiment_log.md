@@ -1,0 +1,376 @@
+# 迭代式自进化实验详细日志
+
+> 覆盖: 批次1（batch1_gold）、批次2（batch2_gold）、50例规模实验（evolve_50_20260806）。
+> 全部使用 gold 标签（--use-gold --fitness-use-gold），每批次 5 例并发、每例单条数据；50例逐案例顺序进化。
+> 案例与 used_case_ledger.txt 全不重叠。
+
+## 数据集规划
+
+| 实验 | 案例数 | 幻觉 | clean | 类别覆盖 | 框架覆盖 |
+|---|---|---|---|---|---|
+| 批次1 | 5 | 3 | 2 | interaction/planning/reasoning | Camel/Magentic_One/OpenManus/SmolAgents/BFCL |
+| 批次2 | 5 | 3 | 2 | planning/reasoning/retrieval | Camel/OpenManus/SmolAgents/Magentic_One/BFCL |
+| 50例 | 50 | 35 | 15 | tool6/reasoning11/retrieval6/planning6/interaction6 | 全部7框架 |
+
+## 批次1（batch1_gold）
+_首轮4/5失败后经4项底层修复重跑；下表为修复后最终结果_
+
+| case_id | gold | 类别 | 耗时(s) | 触发 | 接受 | 拒绝 | stable | runtime_invalid |
+|---|---|---|---|---|---|---|---|---|
+| Camel/087 | True | Human-Interaction Hallucination | 39.7 | 0 | 0 | 0 | 1 | 0 |
+| Magentic_One/028 | True | Planning Hallucination | 14.8 | 0 | 0 | 0 | 1 | 0 |
+| OpenManus/091 | True | Reasoning Hallucination | 220.2 | 2 | 1 | 0 | 0 | 0 |
+| SmolAgents/019 | False | clean | 37.9 | 1 | 1 | 0 | 0 | 0 |
+| BFCL/143 | False | clean | 137.4 | 1 | 1 | 1 | 0 | 0 |
+
+### Camel/087 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+### Magentic_One/028 (gold=True, Planning Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+### OpenManus/091 (gold=True, Reasoning Hallucination)
+
+- step[0] | reject_policy_no_effect | det=unresolved | trigger=l2_policy_reflection | L2=reject_policy_no_effect | L2reason=policy_did_not_move_the_terminal_edge | att=consensus_gate_policy(consensus_gate_blocked)
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=clean_defense_boundary/add_rule | fitness=strong_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When the defense evidence contains no cited arguments, require the cited evidence field: defense_argument.
+
+### SmolAgents/019 (gold=False, clean)
+
+- step[0] | accept_batch | det=verified_error | trigger=gold_mismatch | edit=atomic_verifier_instruction/add_rule | fitness=local_improvement | reasons=module_local_score_improved:11.300->10.300
+  - 编辑内容: When the cited evidence for a candidate is identical to the cited evidence for another candidate, quarantine the certificate.
+
+### BFCL/143 (gold=False, clean)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When the cited evidence includes norm, violation, agent control, and impact references but lacks a counterfactual link reference, require the cited evidence field: counterfactual_evidence_refs.
+- step[1] | accept_batch | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule | fitness=local_improvement | reasons=module_local_score_improved:7.300->2.300
+  - 编辑内容: When a defense certificate lacks any cited trajectory events, quarantine the certificate.
+
+## 批次2（batch2_gold）
+_SmolAgents/024 因 provider content_filter 被替换为 SmolAgents/017；下表为修复后最终结果_
+
+| case_id | gold | 类别 | 耗时(s) | 触发 | 接受 | 拒绝 | stable | runtime_invalid |
+|---|---|---|---|---|---|---|---|---|
+| Camel/055 | True | Planning Hallucination | 258.4 | 0 | 0 | 0 | 1 | 0 |
+| OpenManus/003 | True | Reasoning Hallucination | 571.7 | 1 | 0 | 1 | 0 | 0 |
+| SmolAgents/017 | True | Retrieval Hallucination | 0.1 | 1 | 1 | 0 | 0 | 0 |
+| Magentic_One/033 | False | clean | 179.8 | 0 | 0 | 0 | 1 | 0 |
+| BFCL/157 | False | clean | 766.3 | 1 | 0 | 2 | 0 | 0 |
+
+### Camel/055 (gold=True, Planning Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+### OpenManus/003 (gold=True, Reasoning Hallucination)
+
+- step[0] | reject_conflict | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule
+  - 编辑内容: When the counterfactual link evidence is absent from the certificate, quarantine the certificate.
+
+### SmolAgents/017 (gold=True, Retrieval Hallucination)
+
+- step[0] | accept_batch | det=verified_clean | trigger=evidence_incomplete | edit=candidate_trigger/add_rule | fitness=local_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When the agent uses a tool call result to support a later calculation and does not cite the source, emit a candidate.
+
+### Magentic_One/033 (gold=False, clean)
+
+- step[0] | reject_policy_fitness | det=verified_clean | trigger=l2_policy_reflection | L2=reject_policy_fitness | L2reason=state_change_against_gold_polarity | att=coverage_validity_policy(hollow_complete_prosecution)
+
+### BFCL/157 (gold=False, clean)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When defense coverage is complete and no error certificates survive, shape the decisive-verdict standard.
+- step[1] | reject_fitness_no_effect | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When defense coverage is complete and no candidate is covered by the clean defense, shape the decisive-verdict standard: defense_evidence_standard.
+
+## 50例规模实验（evolve_50_20260806）
+
+**运行摘要**: total=50 triggered=36 accepted=1 rejected=16 stable=8 runtime_invalid=6 halted=False duration=21816s
+
+| case_id | gold | 类别 | 子类 | 检测状态 | 门控决策链 |
+|---|---|---|---|---|---|
+| BFCL/021 | True | Tool-Use Hallucination | Incorrect Tool Arguments | unresolved | skip_no_edit |
+| BFCL/024 | True | Tool-Use Hallucination | Incorrect Tool Arguments | unresolved→unresolved | retry_fitness_no_effect→reject_conflict |
+| BFCL/054 | True | Tool-Use Hallucination | Incorrect Tool Arguments | unresolved→unresolved | retry_invalid_mutation→reject_conflict |
+| BFCL/073 | False | clean | - | unresolved→unresolved | retry_fitness_no_effect→reject_conflict |
+| BFCL/088 | False | clean | - | verified_error | reject_fitness |
+| BFCL/089 | True | Tool-Use Hallucination | Unnecessary Tool Call | unresolved→unresolved | retry_invalid_mutation→accept_batch |
+| BFCL/138 | True | Tool-Use Hallucination | Incorrect Tool Arguments | verified_error | skip_stable |
+| BFCL/140 | True | Tool-Use Hallucination | Incorrect Tool Arguments | unresolved→unresolved | retry_invalid_mutation→reject_fitness |
+| Camel/003 | True | Reasoning Hallucination | Math Reasoning | unresolved | accept_policy |
+| Camel/019 | True | Reasoning Hallucination | General Reasoning | unresolved | accept_policy |
+| Camel/033 | False | clean | - | verified_error | accept_policy |
+| Camel/064 | False | clean | - | unresolved | reject_fitness |
+| Magentic_One/008 | True | Retrieval Hallucination | Context Misalign | verified_error | accept_policy |
+| Magentic_One/013 | True | Retrieval Hallucination | Context Misalign | unresolved | accept_policy |
+| Magentic_One/021 | True | Retrieval Hallucination | Context Misalign | unresolved | accept_policy |
+| Magentic_One/061 | True | Planning Hallucination | Fact Derive | runtime_invalid | skip_runtime_invalid |
+| Magentic_One/069 | True | Retrieval Hallucination | Context Misalign | unresolved | accept_policy |
+| Magentic_One/071 | True | Retrieval Hallucination | Context Misalign | runtime_invalid | skip_runtime_invalid |
+| Magentic_One/072 | False | clean | - | verified_error→verified_error | retry_invalid_mutation→reject_fitness_no_effect |
+| Magentic_One/079 | True | Planning Hallucination | Fact Derive | unresolved | accept_policy |
+| Magentic_One/080 | False | clean | - | unresolved | accept_policy |
+| Octotools/011 | True | Reasoning Hallucination | General Reasoning | verified_error | skip_stable |
+| Octotools/015 | True | Reasoning Hallucination | Factual Reasoning | verified_error | skip_stable |
+| Octotools/022 | True | Reasoning Hallucination | Math Reasoning | verified_error | accept_policy |
+| Octotools/023 | True | Reasoning Hallucination | Factual Reasoning | runtime_invalid | skip_runtime_invalid |
+| Octotools/024 | True | Reasoning Hallucination | Factual Reasoning | runtime_invalid | skip_runtime_invalid |
+| Octotools/028 | False | clean | - | verified_error→verified_error | retry_structural→reject |
+| Octotools/031 | True | Reasoning Hallucination | Math Reasoning | verified_error | accept_policy |
+| Octotools/039 | True | Reasoning Hallucination | Factual Reasoning | unresolved | accept_policy |
+| Octotools/040 | False | clean | - | unresolved | accept_policy |
+| Octotools/044 | True | Reasoning Hallucination | Math Reasoning | unresolved | accept_policy |
+| OpenDeepSearch/017 | True | Planning Hallucination | Fact Derive | unresolved | accept_policy |
+| OpenDeepSearch/056 | False | clean | - | unresolved→unresolved | retry_invalid_mutation→skip_invalid_mutation |
+| OpenDeepSearch/060 | False | clean | - | unresolved | accept_policy |
+| OpenDeepSearch/096 | True | Planning Hallucination | Fact Derive | unresolved | accept_policy |
+| OpenDeepSearch/099 | False | clean | - | unresolved | reject_conflict |
+| OpenManus/053 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | unresolved→unresolved | retry_invalid_mutation→reject_fitness_runtime |
+| OpenManus/058 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | unresolved | accept_policy |
+| OpenManus/061 | False | clean | - | unresolved | accept_policy |
+| OpenManus/064 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | unresolved | accept_policy |
+| OpenManus/074 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | unresolved→unresolved | retry_invalid_mutation→skip_invalid_mutation |
+| OpenManus/088 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | unresolved→unresolved | retry_invalid_mutation→reject_fitness |
+| OpenManus/089 | True | Human-Interaction Hallucination | Human-Interaction Hallucination | runtime_invalid | skip_runtime_invalid |
+| OpenManus/095 | False | clean | - | unresolved→unresolved | retry_fitness_no_effect→skip_invalid_mutation |
+| SmolAgents/014 | True | Planning Hallucination | Fact Derive | unresolved→unresolved | retry_fitness_no_effect→skip_invalid_mutation |
+| SmolAgents/026 | True | Retrieval Hallucination | Context Misalign | verified_error | skip_stable |
+| SmolAgents/044 | False | clean | - | unresolved | accept_policy |
+| SmolAgents/067 | False | clean | - | unresolved | accept_policy |
+| SmolAgents/072 | True | Planning Hallucination | Fact Derive | verified_error | skip_stable |
+| SmolAgents/076 | True | Reasoning Hallucination | Science Reasoning | runtime_invalid | skip_runtime_invalid |
+
+### 各案例步骤详情
+
+#### BFCL/021 (gold=True, Tool-Use Hallucination)
+
+- step[0] | skip_no_edit | det=unresolved | trigger=unresolved
+
+#### BFCL/024 (gold=True, Tool-Use Hallucination)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When a prosecution certificate is emitted without citing counterfactual evidence, require the cited evidence field: counterfactual.
+- step[1] | reject_conflict | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule
+  - 编辑内容: When the certificate does not cite counterfactual evidence that the agent could have avoided the outcome, quarantine the certificate.
+
+#### BFCL/054 (gold=True, Tool-Use Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | reject_conflict | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule
+  - 编辑内容: When a defense certificate cites no trajectory events that establish the clean defense, quarantine the certificate.
+
+#### BFCL/073 (gold=False, clean)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When the defense coverage is complete and the prosecution coverage is incomplete, shape the decisive-verdict standard.
+- step[1] | reject_conflict | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule
+  - 编辑内容: When a prosecution certificate is emitted without citing counterfactual evidence, quarantine the certificate.
+
+#### BFCL/088 (gold=False, clean)
+
+- step[0] | reject_fitness | det=verified_error | trigger=gold_mismatch | edit=clean_defense_boundary/add_rule | fitness=worse | reasons=responsible_step_lost
+  - 编辑内容: When the agent's tool call produces an error and the agent retries with corrected parameters that succeed, emit a defense certificate.
+
+#### BFCL/089 (gold=True, Tool-Use Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | accept_batch | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule | fitness=strong_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When the cited evidence for a candidate includes norm, breach, agent control, and impact trajectory events but lacks counterfactual trajectory events, require the cited evidence field: counterfactual_
+
+#### BFCL/138 (gold=True, Tool-Use Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+#### BFCL/140 (gold=True, Tool-Use Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | reject_fitness | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=worse | reasons=module_local_score_regressed:1.000->0.300
+  - 编辑内容: When the cited evidence for a candidate lacks counterfactual trajectory evidence, keep the coverage incomplete.
+
+#### Camel/003 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Camel/019 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Camel/033 (gold=False, clean)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Camel/064 (gold=False, clean)
+
+- step[0] | reject_fitness | det=unresolved | trigger=unresolved | edit=clean_defense_boundary/add_rule | fitness=worse | reasons=required_diagnostic_signal_lost
+  - 编辑内容: When a defense certificate is emitted without citing a trajectory event that establishes the clean defense, require the evidence field, require the cited evidence field.
+
+#### Magentic_One/008 (gold=True, Retrieval Hallucination)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Magentic_One/013 (gold=True, Retrieval Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Magentic_One/021 (gold=True, Retrieval Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Magentic_One/061 (gold=True, Planning Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+#### Magentic_One/069 (gold=True, Retrieval Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### Magentic_One/071 (gold=True, Retrieval Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+#### Magentic_One/072 (gold=False, clean)
+
+- step[0] | retry_invalid_mutation | det=verified_error | trigger=gold_mismatch
+- step[1] | reject_fitness_no_effect | det=verified_error | trigger=gold_mismatch | edit=clean_defense_boundary/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When the defense coverage is complete and all defense certificates lack citations to trajectory events, require the cited evidence field: trajectory_event_reference.
+
+#### Magentic_One/079 (gold=True, Planning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### Magentic_One/080 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### Octotools/011 (gold=True, Reasoning Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+#### Octotools/015 (gold=True, Reasoning Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+#### Octotools/022 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Octotools/023 (gold=True, Reasoning Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+#### Octotools/024 (gold=True, Reasoning Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+#### Octotools/028 (gold=False, clean)
+
+- step[0] | retry_structural | det=verified_error | trigger=gold_mismatch | edit=clean_defense_boundary/add_rule
+  - 编辑内容: When the defense did not present valid arguments but defense_coverage is complete, emit the boundary finding: defense_coverage.
+- step[1] | reject | det=verified_error | trigger=gold_mismatch | edit=clean_defense_boundary/add_rule
+  - 编辑内容: When the defense evidence contains no cited trajectory events that establish a clean defense for any candidate and defense_coverage is 'complete', emit the boundary finding.
+
+#### Octotools/031 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Octotools/039 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Octotools/040 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### Octotools/044 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### OpenDeepSearch/017 (gold=True, Planning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### OpenDeepSearch/056 (gold=False, clean)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | skip_invalid_mutation | det=unresolved | trigger=unresolved
+
+#### OpenDeepSearch/060 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### OpenDeepSearch/096 (gold=True, Planning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=consensus_gate_policy(consensus_gate_blocked)
+
+#### OpenDeepSearch/099 (gold=False, clean)
+
+- step[0] | reject_conflict | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule
+  - 编辑内容: When the defense coverage is complete and no surviving error certificates remain, shape the decisive-verdict standard.
+
+#### OpenManus/053 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | reject_fitness_runtime | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule
+  - 编辑内容: When the cited evidence for a candidate references the same trajectory event for norm, violation, agent control, and impact, require the cited evidence field: counterfactual_evidence_refs.
+
+#### OpenManus/058 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### OpenManus/061 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### OpenManus/064 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### OpenManus/074 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | skip_invalid_mutation | det=unresolved | trigger=unresolved
+
+#### OpenManus/088 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | retry_invalid_mutation | det=unresolved | trigger=unresolved
+- step[1] | reject_fitness | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=worse | reasons=stable_canary_regression:Octotools/011
+  - 编辑内容: When the cited evidence covers norm, breach, agent control, impact trajectory events directly produced by the agent control tool events, emit an error certificate.
+
+#### OpenManus/089 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+#### OpenManus/095 (gold=False, clean)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When defense coverage is complete and no error certificates remain, shape the decisive-verdict standard.
+- step[1] | skip_invalid_mutation | det=unresolved | trigger=unresolved
+
+#### SmolAgents/014 (gold=True, Planning Hallucination)
+
+- step[0] | retry_fitness_no_effect | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | fitness=no_effect | reasons=no_measurable_target_local_change
+  - 编辑内容: When defense coverage is complete and surviving error certificates is 0, shape the decisive-verdict standard.
+- step[1] | skip_invalid_mutation | det=unresolved | trigger=unresolved
+
+#### SmolAgents/026 (gold=True, Retrieval Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+#### SmolAgents/044 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### SmolAgents/067 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | L2=accept_policy | att=boundary_consumption_policy(boundary_terminal_conflict)
+
+#### SmolAgents/072 (gold=True, Planning Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none
+
+#### SmolAgents/076 (gold=True, Reasoning Hallucination)
+
+- step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
