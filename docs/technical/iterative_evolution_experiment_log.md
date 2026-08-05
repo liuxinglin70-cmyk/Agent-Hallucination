@@ -659,3 +659,59 @@ mislabelled as rejected.
 
 Verification: 469 tests passed.
 
+## 批次6（batch6_gold，2026-08-06）
+
+因果经验闭环（SELF_EVOLUTION_FRAMEWORK_REVIEW）实施后的首轮真实 gold 验证。
+10 例并发、每例单条数据，全部与 used_case_ledger 不重叠。10/10 达到明确终态，
+0 runtime_invalid，0 provider 失败，无静默挂起。
+
+| case_id | gold | 耗时(s) | 触发 | 接受 | 拒绝 | stable | runtime_invalid | 决策 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| BFCL/136 | true | 348 | 0 | 0 | 0 | 1 | 0 | skip_stable |
+| Camel/021 | true | 1096 | 1 | 0 | 1 | 0 | 0 | reject_fitness |
+| Magentic_One/088 | true | 483 | 0 | 0 | 0 | 1 | 0 | skip_stable |
+| OpenDeepSearch/009 | false | 528 | 2 | 0 | 2 | 0 | 0 | L2 skip, retry_structural, L2 skip, reject_fitness_no_effect |
+| OpenDeepSearch/066 | false | 791 | 1 | 0 | 2 | 0 | 0 | retry_fitness_no_effect, reject_fitness |
+| OpenDeepSearch/068 | false | 556 | 1 | 0 | 1 | 0 | 0 | retry_fitness_no_effect, skip_invalid_mutation |
+| OpenDeepSearch/093 | false | 734 | 1 | 0 | 2 | 0 | 0 | retry_structural, reject_fitness_no_effect |
+| OpenManus/032 | true | 630 | 1 | 0 | 1 | 0 | 0 | reject_fitness |
+| OpenManus/056 | true | 370 | 1 | 1 | 0 | 0 | 0 | accept_batch |
+| SmolAgents/047 | true | 414 | 0 | 0 | 0 | 1 | 0 | skip_stable |
+
+### 验收漏斗（7 个触发案例）
+
+should_evolve=7 -> episode_created=7 -> failure_edge_complete=7 ->
+proposal_generated=7 -> action_compiled=7 -> action_injected=7 ->
+action_applied=2 -> observable_changed=7 -> local_source_improved=1 ->
+skill_accepted=1
+
+history_retrieved=0 符合预期：本批次是单案例并发隔离实验，每个进程从空记忆开始，
+不验证在线跨案例继承（该能力由两案例顺序集成测试覆盖）。
+
+### OpenManus/056（gold=True，唯一接受案例）
+
+- 归因: l1_provider_rule / atomic_verifier_instruction / provider_artifact_malformed
+- failure edge: malformed -> well_formed
+- episode completeness: complete；episode_id 在两次 attempt 间保持稳定
+- attempt: add_rule，compiled=True injected=True applied=True
+- observable delta: state:unresolved->verified_error, trigger:closed,
+  responsible_step:added, localization_status:not_applicable->failed_temporal_fallback
+- downstream court delta: state:unresolved->verified_error（gold=True 方向正确）
+- no_effect_reason=expected_delta_observed；memory 记录 effective 代表
+
+### 其他触发案例的漏斗定位
+
+- Camel/021、OpenManus/032: 编辑被 provider 应用（applied=True）但目标局部分数下降
+  （target_local_score:decreased），reject_fitness 是方向性拒绝而非执行失败。
+- OpenDeepSearch/009: L2 boundary_consumption_policy 无计划候选（skip_no_policy），
+  L1 提案 structural retry 后 no-effect（provider_output_changed_but_downstream_invariant）。
+- OpenDeepSearch/066、/068、/093: no-effect 或方向性回归，均保留为
+  no_effect/structural_reject 代表。
+- BFCL/136、Magentic_One/088、SmolAgents/047: gold=True 且检测 verified_error，
+  正确检测，不触发进化。
+
+所有 10 个进程输出 evolution_result.json + htc_tes_experience_memory.json
+（sehd.evolution_experience_memory.v1）+ evolution_state_manifest.json 完整。
+无框架缺陷需要修复，无需重跑。
+
+Verification: 525 tests passed。

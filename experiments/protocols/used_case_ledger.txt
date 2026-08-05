@@ -331,3 +331,14 @@ OpenManus/042
 Octotools/007
 OpenManus/099
 OpenManus/051
+# --- 10-case concurrent batch6 (2026-08-06) ---
+OpenManus/056
+Magentic_One/088
+SmolAgents/047
+Camel/021
+BFCL/136
+OpenManus/032
+OpenDeepSearch/009
+OpenDeepSearch/066
+OpenDeepSearch/068
+OpenDeepSearch/093
