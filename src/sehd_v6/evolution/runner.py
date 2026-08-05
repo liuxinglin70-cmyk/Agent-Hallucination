@@ -28,6 +28,10 @@ from ..core.bccse.policy_genome import (
 )
 from ..core.paca_tcl.detector import resolve_detector_config
 from ..provider_routes import has_provider_credential, resolve_provider_route
+from .state_manifest import (
+    load_state_manifest,
+    write_state_manifest,
+)
 
 # Single source of truth for the independent reflection sample count: the
 # public API and the CLI share this default so one knob cannot drift into
@@ -176,6 +180,7 @@ def run_evolution(
     max_mutation_calls: int = 100,
     canary_limit: int = 2,
     resume_from: Path | None = None,
+    inherit_from: Path | None = None,
 ) -> OnlineEvolutionResult:
     """Run the label-free detector -> evolution -> experience closed loop.
 
@@ -187,7 +192,8 @@ def run_evolution(
         detector_config: Detector config path or resolved route mapping.
         output_dir: Artifact directory.  The runner writes
             ``evolution_result.json``, ``champion_genome.json`` and
-            ``htc_tes_experience_memory.json`` here.
+            ``htc_tes_experience_memory.json`` here, and the run finalizes
+            with ``evolution_state_manifest.json`` binding those artifacts.
         census_root: Optional precomputed census cache.  Omitted by default;
             the detector falls back to its provider census route.
         mutation_route: Optional reflection/mutation route.  When omitted the
@@ -224,6 +230,13 @@ def run_evolution(
             ``experience_memory_path`` are ignored when resuming (the
             checkpoint's champion genome and experience memory take
             precedence).  Use ``load_evolution_checkpoint`` for inspection.
+        inherit_from: Optional directory of a completed run holding
+            ``evolution_state_manifest.json``.  The run starts a NEW case
+            stream carrying the previous run's complete genome, policy
+            genome and experience memory (validated by the manifest hashes).
+            Explicit ``initial_genome`` / ``initial_policy_genome`` /
+            ``experience_memory_path`` arguments that conflict with the
+            manifest are rejected.  Mutually exclusive with ``resume_from``.
 
     Returns:
         OnlineEvolutionResult with the champion genome and audit trail.
@@ -250,7 +263,54 @@ def run_evolution(
     if not has_provider_credential(resolved_mutation_route):
         resolved_mutation_route = None
 
-    return run_online_evolution(
+    lineage: list[dict[str, str]] = []
+    if inherit_from is not None:
+        if resume_from is not None:
+            raise ValueError(
+                "resume_from and inherit_from are mutually exclusive"
+            )
+        inherited = load_state_manifest(Path(inherit_from))
+        inherited_genome = Path(inherited["provider_rule_genome"]["path"])
+        inherited_policy = Path(
+            inherited["adjudication_policy_genome"]["path"]
+        )
+        inherited_memory = Path(inherited["experience_memory"]["path"])
+        for label, explicit, inherited_path in (
+            ("initial_genome", initial_genome, inherited_genome),
+            ("initial_policy_genome", initial_policy_genome, inherited_policy),
+            ("experience_memory_path", experience_memory_path, inherited_memory),
+        ):
+            if explicit is None:
+                continue
+            explicit_path = (
+                Path(explicit)
+                if isinstance(explicit, (str, Path))
+                else None
+            )
+            if explicit_path != inherited_path:
+                raise ValueError(
+                    f"{label} conflicts with the inherited state manifest; "
+                    f"inheritance is the single complete state source"
+                )
+        lineage = [
+            {
+                "run_id": str(inherited.get("source_run_id") or ""),
+                "dir": str(Path(inherit_from)),
+            },
+            *[
+                {
+                    "run_id": str(entry.get("run_id") or ""),
+                    "dir": str(entry.get("dir") or ""),
+                }
+                for entry in (inherited.get("lineage") or ())
+                if isinstance(entry, Mapping)
+            ],
+        ]
+        initial_genome = inherited_genome
+        initial_policy_genome = inherited_policy
+        experience_memory_path = inherited_memory
+
+    result = run_online_evolution(
         evolution_case_ids=list(records),
         records=records,
         config=config,
@@ -286,3 +346,9 @@ def run_evolution(
         resume_from=Path(resume_from) if resume_from is not None else None,
         gold_reflection=gold_reflection,
     )
+    write_state_manifest(
+        Path(output_dir),
+        run_id=result.run_id,
+        lineage=lineage,
+    )
+    return result

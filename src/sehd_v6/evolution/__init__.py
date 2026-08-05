@@ -23,6 +23,10 @@ from .runner import (
     load_records,
     run_evolution,
 )
+from .state_manifest import (
+    load_state_manifest,
+    write_state_manifest,
+)
 
 __all__ = [
     "run_evolution",
@@ -30,6 +34,8 @@ __all__ = [
     "load_records",
     "default_mutation_route",
     "DEFAULT_REFLECTION_CANDIDATES",
+    "load_state_manifest",
+    "write_state_manifest",
     "OnlineEvolutionResult",
     "EvolutionStep",
     "SkillGenome",

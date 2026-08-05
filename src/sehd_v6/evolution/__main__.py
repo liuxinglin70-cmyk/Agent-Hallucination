@@ -44,6 +44,12 @@ def main() -> int:
         "--resume-from", type=Path, default=None,
         help="resume an interrupted run from its checkpoint directory",
     )
+    parser.add_argument(
+        "--inherit-from", type=Path, default=None,
+        help="start a new case stream inheriting a completed run's full "
+        "state (genome, policy genome, experience memory) from its "
+        "evolution_state_manifest.json",
+    )
     parser.add_argument("--use-gold", action="store_true")
     parser.add_argument("--fitness-use-gold", action="store_true")
     parser.add_argument(
@@ -78,6 +84,7 @@ def main() -> int:
         gold_reflection=args.use_gold_reflection,
         run_id=args.run_id,
         resume_from=args.resume_from,
+        inherit_from=args.inherit_from,
         module_cooldown=args.module_cooldown,
         max_total_edits=args.max_edits,
         convergence_window=args.convergence_window,
