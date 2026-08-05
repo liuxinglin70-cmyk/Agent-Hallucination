@@ -383,7 +383,7 @@ def test_online_evolution_runs_independent_candidates_and_critic(
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate event is absent",
-            "action": "keep_coverage_incomplete",
+            "action": "keep_coverage_incomplete: coverage_state",
             "evidence_anchor": "absent evidence event",
             "feature_description": "absent evidence event",
         },
@@ -468,14 +468,14 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
             "observed_gap": "cited evidence fields never populated",
             "intervention_hint": {
                 "condition": "a claim lacks cited event support",
-                "action": "keep_coverage_incomplete",
+                "action": "keep_coverage_incomplete: coverage_state",
             },
             "reasoning": "evidence construction owns the gap",
         },
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a claim lacks cited event support",
-            "action": "keep_coverage_incomplete",
+            "action": "keep_coverage_incomplete: coverage_state",
             "evidence_anchor": "cited evidence fields never populated",
             "feature_description": "uncited claim keeps evidence incomplete",
         },
@@ -960,7 +960,7 @@ def test_pro_route_escalates_when_flash_diagnosis_cannot_find_owner(
                     "observed_gap": "cited evidence fields never populated",
                     "intervention_hint": {
                         "condition": "a claim lacks cited event support",
-                        "action": "keep_coverage_incomplete",
+                        "action": "keep_coverage_incomplete: coverage_state",
                     },
                     "reasoning": "pro diagnosis",
                 }, {"cache_hit": False}
@@ -968,7 +968,7 @@ def test_pro_route_escalates_when_flash_diagnosis_cannot_find_owner(
             return {
                 "target_module": "evidence_obligation", "operation": "add_rule",
                 "condition": "a claim lacks cited event support",
-                "action": "keep_coverage_incomplete",
+                "action": "keep_coverage_incomplete: coverage_state",
                 "evidence_anchor": "cited evidence fields never populated",
                 "feature_description": "uncited claim keeps evidence incomplete",
                 "expected_effect": "prosecution evidence coverage increases",
@@ -1048,7 +1048,7 @@ def test_pro_route_survives_flash_targeted_no_edit_residue(
                     "failure_field": "prosecution_coverage",
                     "observed_gap": "g",
                     "intervention_hint": {
-                        "condition": "c", "action": "keep_coverage_incomplete",
+                            "condition": "c", "action": "keep_coverage_incomplete: coverage_state",
                     },
                     "reasoning": "flash diagnosis",
                 }, {"cache_hit": False}
@@ -1063,14 +1063,14 @@ def test_pro_route_survives_flash_targeted_no_edit_residue(
                     "failure_field": "prosecution_coverage",
                     "observed_gap": "g",
                     "intervention_hint": {
-                        "condition": "c", "action": "keep_coverage_incomplete",
+                            "condition": "c", "action": "keep_coverage_incomplete: coverage_state",
                     },
                     "reasoning": "pro diagnosis",
                 }, {"cache_hit": False}
             return {
                 "target_module": "evidence_obligation", "operation": "add_rule",
                 "condition": "a claim lacks cited event support",
-                "action": "keep_coverage_incomplete",
+                "action": "keep_coverage_incomplete: coverage_state",
                 "evidence_anchor": "a",
                 "feature_description": "f",
                 "expected_effect": "prosecution evidence coverage increases",

@@ -165,9 +165,10 @@ def _normalize_action(raw: str) -> str:
 
 def _render_action(raw_action: str, module_id: str) -> str:
     """Expand a closed opcode slot into the English template the provider
-    sees: ``"<opcode>"`` or ``"<opcode>: <target>"`` maps to the module's
-    template (``"; <target>"`` appended when present). Unknown texts render
-    verbatim, so legacy free-text rules keep their original wording.
+    sees: ``"<opcode>: <target>"`` maps to the module's template. Unknown
+    texts and historical bare opcodes still render verbatim or by template so
+    legacy checkpoints keep their original wording; validation requires the
+    explicit target for every new rule.
     """
     action = _normalize_action(raw_action)
     opcode, sep, target = action.partition(":")
@@ -186,8 +187,7 @@ def _render_action(raw_action: str, module_id: str) -> str:
 def render_rule(spec: RuleSpec) -> str:
     """Deterministically render a spec as exactly one English if-then sentence.
 
-    The action slot is a closed opcode (``"<opcode>"`` or
-    ``"<opcode>: <target>"``); rendering expands it into the module's
+    The action slot is ``"<opcode>: <target>"``; rendering expands it into the module's
     English template so the provider reads natural language while the slot
     stays enumerable and validatable. Punctuation normalization (no trailing
     punctuation on the condition, a single terminal period on the action)

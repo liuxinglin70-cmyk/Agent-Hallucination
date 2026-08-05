@@ -29,6 +29,7 @@ from ..bccse.genome import (
     SkillModule,
     create_baseline_genome,
 )
+from ..bccse.action_spec import MODULE_ROUTE_IDS, sanitize_action_spec
 
 
 FROZEN_CRS_CLAUSE = (
@@ -69,44 +70,14 @@ ROUTE_STAGE_KEYS: Mapping[PacaStage, tuple[str, ...]] = {
 # Route-level reachability prevents a rule from being injected into a provider
 # whose output schema cannot execute that rule.
 ROUTE_MODULE_IDS: Mapping[str, tuple[str, ...]] = {
-    "candidate_fallback_route": ("candidate_trigger",),
-    "construct_census_route": ("candidate_trigger",),
-    "qualification_route": (
-        "candidate_to_verifier_route",
-        "atomic_verifier_instruction",
-    ),
-    "propagation_route": (
-        "evidence_obligation",
-        "causal_link_test",
-    ),
-    "focused_prosecution_route": (
-        "evidence_obligation",
-        "atomic_verifier_instruction",
-        "causal_link_test",
-    ),
-    "defense_route": (
-        "atomic_verifier_instruction",
-        "clean_defense_boundary",
-    ),
-    "appeal_prosecutor_route": (
-        "evidence_obligation",
-        "atomic_verifier_instruction",
-        "causal_link_test",
-    ),
-    "appeal_defender_route": (
-        "atomic_verifier_instruction",
-        "clean_defense_boundary",
-    ),
-    "boundary_route": (
-        "clean_defense_boundary",
-        "causal_link_test",
-        "earliest_origin_tiebreak",
-        "abstention_rule",
-    ),
-    "counterfactual_route": (
-        "causal_link_test",
-        "earliest_origin_tiebreak",
-    ),
+    route_id: tuple(
+        module_id
+        for module_id, route_ids in MODULE_ROUTE_IDS.items()
+        if route_id in route_ids
+    )
+    for route_id in ROUTE_STAGE_KEYS[PacaStage.STAGE_1_CENSUS]
+    + ROUTE_STAGE_KEYS[PacaStage.STAGE_2_VERIFICATION]
+    + ROUTE_STAGE_KEYS[PacaStage.STAGE_3_CAUSAL_COURT]
 }
 
 
@@ -151,9 +122,10 @@ class CompiledPacaSkill:
     genome_hash: str
     stages: Mapping[PacaStage, CompiledStageSkill]
     module_texts: Mapping[str, str]
-    delta_rule_ids: Mapping[str, tuple[str, ...]]
+    delta_rule_ids: Mapping[str, tuple[tuple[str, str], ...]]
+    action_specs: Mapping[str, Mapping[str, Any]]
     frozen_crs_weights: tuple[float, ...] = (0.35, 0.15, 0.20, 0.20, 0.10)
-    schema_version: str = "agenthallu.paca_tcl_skill_integration.v4"
+    schema_version: str = "agenthallu.paca_tcl_skill_integration.v5"
 
     def for_stage(self, stage: PacaStage) -> CompiledStageSkill:
         return self.stages[stage]
@@ -186,6 +158,10 @@ class CompiledPacaSkill:
                     for rule_id, rule in rule_ids
                 ]
                 for module_id, rule_ids in self.delta_rule_ids.items()
+            },
+            "action_specs": {
+                rule_id: dict(spec)
+                for rule_id, spec in self.action_specs.items()
             },
             "stages": {
                 stage.value: compiled.to_dict()
@@ -342,6 +318,25 @@ def _delta_rule_ids(
     return tuple(delta)
 
 
+def _delta_action_specs(
+    module: SkillModule,
+    baseline_module: SkillModule,
+) -> dict[str, dict[str, Any]]:
+    """Return canonical ActionSpecs for evolved rules, keyed by stable id."""
+    if not module.active:
+        return {}
+    unmatched_baseline = list(baseline_module.rules)
+    specs: dict[str, dict[str, Any]] = {}
+    for index, rule in enumerate(module.rules):
+        if rule in unmatched_baseline:
+            unmatched_baseline.remove(rule)
+            continue
+        value = sanitize_action_spec(module.get_rule_meta(index).get("action_spec"))
+        if value:
+            specs[_rule_stable_id(module.module_id, rule)] = value
+    return specs
+
+
 def compile_genome_for_paca(
     genome: SkillGenome,
     *,
@@ -358,6 +353,7 @@ def compile_genome_for_paca(
 
     module_texts: dict[str, str] = {}
     delta_rule_ids: dict[str, tuple[tuple[str, str], ...]] = {}
+    action_specs: dict[str, dict[str, Any]] = {}
     for module_id in MODULE_IDS:
         delta_lines = _compile_module_delta(
             genome.modules[module_id],
@@ -368,6 +364,9 @@ def compile_genome_for_paca(
             genome.modules[module_id],
             baseline.modules[module_id],
         )
+        action_specs.update(_delta_action_specs(
+            genome.modules[module_id], baseline.modules[module_id],
+        ))
 
     stages: dict[PacaStage, CompiledStageSkill] = {}
     for stage in PacaStage:
@@ -400,6 +399,7 @@ def compile_genome_for_paca(
         stages=stages,
         module_texts=module_texts,
         delta_rule_ids=delta_rule_ids,
+        action_specs=action_specs,
     )
 
 
@@ -484,7 +484,27 @@ def make_skill_aware_provider(
                 "",
             ])
             for module_id in injected_modules:
-                lines.extend(compiled.module_texts[module_id].splitlines())
+                for rule_id, rule in compiled.delta_rule_ids.get(module_id, ()):
+                    action_spec = compiled.action_specs.get(rule_id)
+                    if action_spec and route_key in action_spec.get("route_ids", ()):
+                        condition = rule
+                        if rule.lower().startswith("when "):
+                            condition = rule[5:].partition(",")[0].strip()
+                        lines.append(json.dumps({
+                            "rule_id": rule_id,
+                            "condition": condition,
+                            "action_spec": dict(action_spec),
+                        }, ensure_ascii=False, sort_keys=True))
+                    else:
+                        lines.append(
+                            f"[{rule_id}] {rule}"
+                        )
+            lines.extend([
+                "",
+                "For each applicable action_spec, enforce its operation on the "
+                "named output_object/output_field before returning JSON. The "
+                "postcondition is an output obligation, not explanatory text.",
+            ])
             lines.extend([
                 "",
                 "如果本输出实际应用了上述某条进化规则（方括号中的规则 id），"

@@ -578,3 +578,84 @@ OpenManus/073 两次复现）。
 - L2→L1 fall-through 在 Magentic_One/084、SmolAgents/025 两次实际验证
 - 门控正确性：OpenDeepSearch/055 gold-clean 反极性被拒、L2 no-effect/边界冲突被拒
 
+## Batch 5: executable skill-source and causal trajectory iteration
+
+Batch 5 used ten new, mutually distinct gold-labelled records and launched
+ten independent one-record evolution processes concurrently. Every code
+change was followed by a rerun of the identical manifest. Earlier runs are
+preserved outside the repository under the system temporary directory.
+
+### Defects found from case-level evidence
+
+1. L1 reflection invented natural-language expected effects independently
+   from the action it generated. Rules such as
+   `quarantine_certificate: evidence_refs` could pass module ownership while
+   naming an operand the operation cannot execute.
+2. L2 reflection composed arbitrary predicate/action pairs. This admitted
+   coverage-only policies for attribution classes the L2 runtime could not
+   actually repair, and L2 attempts produced no experience trajectory.
+3. A replay could change because provider output varied even when the evolved
+   rule had no applied-rule/effect trace. Aggregate fitness could therefore
+   assign improvement credit to an intervention that did not execute.
+
+### Root design
+
+- Added ActionSpec as the single source for module routes, output object,
+  output field, operation, postcondition, and observable effect. Reflection
+  selects a condition plus a closed operation/target pair; expected-effect
+  text and contract are compiled from ActionSpec, not generated separately.
+- Added an opcode-specific provider-field grammar. Every new operation must
+  name an owned output field; module-wide target membership is insufficient.
+- Persisted ActionSpec with each evolved rule and injected the structured
+  specification into every owned provider route. Skill integration schema is
+  now `agenthallu.paca_tcl_skill_integration.v5`.
+- Replaced free-form L2 policy generation with deterministic repair planning.
+  The model may select a precomputed executable candidate or abstain. An
+  attribution with no L2 repair falls through to L1 and records an L2 failure
+  experience instead of fabricating a policy. Planned edit IDs are content
+  addressed, so identical attribution/genome inputs produce identical prompts,
+  cache keys, and trajectory identities.
+- Added causal fitness attribution. For an instrumented ActionSpec rule, a
+  replay improvement belongs to the skill only when the same stable rule id
+  is injected, reported as applied, and bound to the ActionSpec output field.
+  Otherwise the replay is `intervention_not_executed/no_effect` regardless of
+  aggregate score movement. This is a structural causal fact, not a numeric
+  admission threshold.
+- Experience outcome v2 stores the canonical ActionSpec and reduced execution
+  trajectory (`applied_rule_ids`, `routes`, `output_fields`).
+
+### Final authoritative rerun
+
+| case_id | gold | seconds | accepted | rejected | decisions |
+|---|---:|---:|---:|---:|---|
+| BFCL/085 | true | 71.6 | 1 | 0 | accept_batch |
+| Camel/058 | true | 0.1 | 0 | 0 | skip_stable |
+| Magentic_One/002 | true | 0.2 | 0 | 0 | skip_no_policy |
+| Magentic_One/092 | true | 23.0 | 0 | 0 | skip_stable |
+| Octotools/007 | false | 87.6 | 0 | 1 | retry_invalid_mutation, reject_fitness |
+| OpenDeepSearch/069 | true | 27.6 | 0 | 1 | reject_fitness |
+| OpenManus/042 | false | 6.1 | 0 | 0 | reject_policy_fitness |
+| OpenManus/051 | false | 0.4 | 0 | 2 | L2 skip, retry no-effect, L2 skip, reject |
+| OpenManus/099 | false | 0.3 | 0 | 2 | retry_fitness_no_effect, reject_fitness_no_effect |
+| SmolAgents/046 | true | 32.0 | 0 | 0 | skip_stable |
+
+The final rerun completed 10/10 baseline detections with zero runtime-invalid
+cases. Exactly one skill was promoted. `BFCL/085` moved from unresolved to the
+gold-correct verified-error state through rule `edeb5cb4eff3`; the same id was
+applied on `focused_prosecution_route`, and its effect named
+`benchmark_causal_status`, matching the ActionSpec output field. Its promotable
+experience is schema v2 and contains that full causal trajectory.
+
+No other experience was promotable. Stable cases emitted no skill experience;
+L2 abstentions/rejections and L1 structural, no-effect, or runtime failures
+were retained only as non-promotable learning trajectories. In particular,
+the earlier result-only improvements for `OpenDeepSearch/069` and
+`OpenManus/099` became `intervention_not_executed/no_effect` rather than being
+written to a champion.
+
+L2 experiences now retain `outcome_stage=l2_policy_replay`; policy candidates
+with coverage-only effects use the directional outcome class rather than being
+mislabelled as rejected.
+
+Verification: 469 tests passed.
+

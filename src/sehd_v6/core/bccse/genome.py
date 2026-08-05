@@ -484,6 +484,12 @@ def _sanitize_rule_slots(value: Any) -> dict[str, str]:
         if str(value.get(key) or "").strip()
     }
 
+
+def _sanitize_action_spec(value: Any) -> dict[str, Any]:
+    from .action_spec import sanitize_action_spec
+
+    return sanitize_action_spec(value)
+
 @dataclass
 class SkillModule:
     """A skill module containing natural language behavioral rules.
@@ -515,6 +521,8 @@ class SkillModule:
                 )
             if "rule_slots" in meta:
                 meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
+            if "action_spec" in meta:
+                meta["action_spec"] = _sanitize_action_spec(meta.get("action_spec"))
 
     @property
     def capacity(self) -> int:
@@ -545,6 +553,10 @@ class SkillModule:
             normalized["rule_slots"] = _sanitize_rule_slots(
                 normalized.get("rule_slots")
             )
+        if "action_spec" in normalized:
+            normalized["action_spec"] = _sanitize_action_spec(
+                normalized.get("action_spec")
+            )
         self.rule_meta[index] = normalized
 
     def is_rule_protected(self, index: int) -> bool:
@@ -568,6 +580,8 @@ class SkillModule:
                 )
             if "rule_slots" in meta:
                 meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
+            if "action_spec" in meta:
+                meta["action_spec"] = _sanitize_action_spec(meta.get("action_spec"))
             safe_meta.append(meta)
         return {
             "module_id": self.module_id,
@@ -618,6 +632,7 @@ class SkillEdit:
     # instead of doing substring matching on `expected_effect`.
     expected_effect_contract: dict[str, Any] = field(default_factory=dict)
     rule_slots: dict[str, str] = field(default_factory=dict)
+    action_spec: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -650,6 +665,7 @@ class SkillEdit:
                 self.expected_effect_contract
             ),
             "rule_slots": _sanitize_rule_slots(self.rule_slots),
+            "action_spec": _sanitize_action_spec(self.action_spec),
         }
 
     @classmethod
@@ -688,6 +704,7 @@ class SkillEdit:
                 data.get("expected_effect_contract")
             ),
             rule_slots=_sanitize_rule_slots(data.get("rule_slots")),
+            action_spec=_sanitize_action_spec(data.get("action_spec")),
         )
 
 
@@ -810,6 +827,16 @@ def _validate_persisted_rule_slots(
         return False, f"rule_slots:{reason}"
     if render_rule(spec) != edit.new_content:
         return False, "rule_slots_render_mismatch"
+    from .action_spec import compile_action_spec, sanitize_action_spec
+
+    persisted_action_spec = sanitize_action_spec(edit.action_spec)
+    if not persisted_action_spec:
+        return False, "action_spec_missing"
+    expected_action_spec = compile_action_spec(
+        edit.target_module, slots["action"],
+    ).to_dict()
+    if persisted_action_spec != expected_action_spec:
+        return False, "action_spec_rule_slots_mismatch"
     return True, ""
 
 def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
@@ -1022,6 +1049,7 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "routing_allowed_modules": list(edit.routing_allowed_modules),
         "created_at_generation": new_generation,
         "rule_slots": _sanitize_rule_slots(edit.rule_slots),
+        "action_spec": _sanitize_action_spec(edit.action_spec),
     }
 
     if edit.operation == SkillOp.ADD_RULE:

@@ -17,7 +17,7 @@ from src.sehd_v6.core.bccse.rule_contract import (
 def _spec(**overrides) -> RuleSpec:
     base = dict(
         condition="a causal-chain field is missing",
-        action="keep_coverage_incomplete",
+        action="keep_coverage_incomplete: coverage_state",
         evidence_anchor="missing_causal_field_signature",
         module_id="evidence_obligation",
         direction="process",
@@ -35,7 +35,7 @@ def test_render_deterministic_single_sentence():
     assert render_rule(spec) == first
     assert first == (
         "When a causal-chain field is missing, "
-        "keep the coverage incomplete."
+        "keep the coverage incomplete: coverage_state."
     )
     # exactly one terminal period, no sentence splits inside
     assert first.endswith(".")
@@ -133,9 +133,10 @@ def test_cross_module_action_surface_is_rejected():
 # --- closed action-opcode contract ---
 
 def test_action_opcode_closed_vocabulary():
-    # bare opcode and opcode-with-target are both legal
+    # Every generated opcode names the exact provider output it operates on.
     ok, reason = validate_rule_spec(_spec(action="keep_coverage_incomplete"))
-    assert ok, reason
+    assert not ok
+    assert reason == "action_target_required:keep_coverage_incomplete"
     ok, reason = validate_rule_spec(
         _spec(action="require_evidence_field: impact_evidence_refs")
     )
@@ -185,7 +186,7 @@ def test_action_opcode_target_must_be_a_provider_schema_field():
         _spec(action="require_evidence_field: trajectory_event_reference")
     )
     assert not ok
-    assert reason.startswith("action_target_outside_schema")
+    assert reason.startswith("action_target_not_owned_by_operation")
     # A registered field on the module's own routes passes.
     ok, reason = validate_rule_spec(
         _spec(action="require_evidence_field: impact_evidence_refs")
@@ -254,7 +255,7 @@ def test_verdict_requires_module_permission():
     authorized = _spec(
         module_id="clean_defense_boundary",
         condition="the decisive bar should treat the claim as clean",
-        action="emit_boundary_finding",
+        action="emit_boundary_finding: state",
     )
     ok, reason = validate_rule_spec(authorized)
     assert ok, reason
@@ -263,7 +264,7 @@ def test_verdict_requires_module_permission():
 def test_local_negation_only_in_causal_link_test():
     # Local negation lives in the free-text condition slot; the authority
     # check still runs on the rendered sentence.
-    action = "reject_non_causal_origin"
+    action = "reject_non_causal_origin: responsible_event_id"
     ok, reason = validate_rule_spec(_spec(
         module_id="causal_link_test",
         condition="the causal link does not hold",

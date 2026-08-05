@@ -29,9 +29,9 @@ from typing import Any, Mapping, Sequence
 
 from .module_charter import (
     MODULE_OBSERVABLE_FIELDS,
-    render_action_opcode_text,
     render_charter_text,
 )
+from .action_spec import render_action_spec_contract
 from .step_attributor import (
     AttributionSignal,
     TriggerSource,
@@ -377,8 +377,8 @@ def build_causal_reflection_prompt(
     runtime_contract_text = "\n".join(
         f"- {module}: expected_effect={MODULE_OBSERVABLE_EFFECTS.get(module, 'module-local output changes')}; "
         f"allowed_observable_fields={','.join(MODULE_OBSERVABLE_FIELDS.get(module, ()))}\n"
-        f"  closed_action_opcodes:\n"
-        f"    {render_action_opcode_text(module)}"
+        f"  executable_action_specs:\n"
+        f"    {render_action_spec_contract(module)}"
         for module in allowed_modules
     )
 
@@ -444,9 +444,9 @@ A legal rule:
   (and/or/且/并且/以及/或). More than one conjunction is rejected by the
   structural gate as condition_overload; prefer one decisive observable
   pattern over a compound enumeration;
-- has exactly one module-local action; the action slot MUST be a closed
-  opcode of the selected module, either "<opcode>" or "<opcode>: <target>"
-  where <target> names the exact output field or object the opcode acts on
+- has exactly one module-local action; the action slot MUST be
+  "<opcode>: <target>", where the closed opcode belongs to the selected
+  module and <target> belongs to that exact operation
   (see closed_action_opcodes in runtime_output_contracts). Free-text
   actions are rejected by the structural gate as action_opcode_unowned;
 - stays as short and decisive as the observable condition permits;
@@ -509,31 +509,10 @@ must be descriptive rather than imperative and must not contain a case/source
 identifier, gold/answer information, URL, quoted instruction, prompt text, or
 request to change model behavior.
 
-expected_effect is a counterfactual prediction for source replay, not a final
-verdict. State exactly one observable change allowed by the selected target
-module's runtime output contract. For example, evidence_obligation may predict
-prosecution evidence-field coverage, but it must not predict defense coverage
-because that module is not injected into a defense provider. If no single
-target-aligned observable change can be predicted from the trace, return
-no_edit instead.
-
-expected_effect_contract is the STRUCTURED form of that same prediction and is
-the authoritative contract used by the source-replay audit. It MUST be filled
-whenever expected_effect is filled. Allowed values:
-- observable_field: one of candidate_count | prosecution_coverage |
-  defense_coverage | prosecution_certificates | defense_certificates |
-  quarantined_certificates | causal_field_coverage | responsible_step |
-  localization_status | target_local_score | state | trigger
-- expected_direction: one of increase | decrease | added | removed | shift |
-  opened | closed
-- expected_scope: one of all_cases | positive_cases | negative_cases |
-  quarantined_cases | unresolved_cases
-- trigger_condition: a short, case-agnostic description of when the new rule
-  fires (no case ids, no gold/answer info, no URLs, no prompt text).
-
-The observable_field MUST occur in the selected module's
-allowed_observable_fields list in runtime_output_contracts. A contract that
-predicts another field is not a usable intervention plan.
+Do not invent an expected effect. The framework compiles the selected module,
+closed action opcode and target field into one ActionSpec containing its exact
+provider routes, schema object, postcondition and observable effect. This is
+the single execution contract used by provider injection and source replay.
 
 RULE FORM CONTRACT: add_rule and modify_rule edits are typed slots, not free
 text. You supply "condition" (English, one provider-runtime-observable
@@ -571,8 +550,8 @@ listed for the target module in runtime_output_contracts.
             "Return one edit object or {\"operation\":\"no_edit\","
             "\"rationale\":\"...\"}. An edit object must contain "
             '"target_module", "operation", "rule_index", "condition", '
-            '"action", "evidence_anchor", "feature_description", '
-            '"expected_effect", "expected_effect_contract", and "rationale". '
+            '"action", "evidence_anchor", "feature_description", and '
+            '"rationale". '
             "You may optionally include \"diagnosis\" as a nested object "
             'with "failed_output", "owner_module" and "existing_rule_gap"; '
             "it is audit metadata only and never changes admission.\n"
@@ -783,7 +762,6 @@ listed for the target module in runtime_output_contracts.
             '{"candidates":[{"target_module":"...","operation":"add_rule",'
             '"rule_index":null,"condition":"...","action":"...",'
             '"evidence_anchor":"...","feature_description":"...",'
-            '"expected_effect":"...","expected_effect_contract":{},'
             '"rationale":"..."}],"no_edit_rationale":"..."}\n'
         )
         + "</task>"

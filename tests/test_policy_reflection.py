@@ -21,6 +21,8 @@ from src.sehd_v6.core.bccse.policy_reflection import (
     build_policy_reflection_prompt,
     current_policy_text,
     parse_policy_proposal,
+    plan_policy_candidates,
+    select_policy_candidate,
 )
 from src.sehd_v6.core.bccse.v6_contracts import (
     ACTION_PARAMS,
@@ -196,6 +198,66 @@ def test_parse_policy_proposal_no_proposal_and_empty() -> None:
     edit, reason = parse_policy_proposal({})
     assert edit is None
     assert reason == "empty_response"
+
+
+def test_policy_planner_has_no_fake_boundary_consumption_repair() -> None:
+    attribution = FailureAttribution(
+        layer="l2_adjudication_policy",
+        artifact="boundary_consumption_policy",
+        reason_code="boundary_terminal_conflict",
+        evidence={"boundary_path_state": "verified_clean", "terminal_state": "unresolved"},
+    )
+
+    candidates = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+
+    assert candidates == ()
+
+
+def test_policy_planner_owns_predicate_action_pairing() -> None:
+    attribution = FailureAttribution(
+        layer="l2_adjudication_policy",
+        artifact="coverage_validity_policy",
+        reason_code="hollow_complete_prosecution",
+        evidence={},
+    )
+    candidates = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+
+    assert len(candidates) == 1
+    item = candidates[0].new_item
+    assert item is not None
+    assert item.precondition == "prosecution_coverage_complete_and_zero_certificates"
+    assert item.action == "invalidate_coverage_claim"
+    assert item.params == {"side": "prosecution"}
+    selected, reason = select_policy_candidate({"candidate_index": 0}, candidates)
+    assert reason == ""
+    assert selected is candidates[0]
+
+
+def test_policy_planner_identity_is_content_addressed() -> None:
+    attribution = FailureAttribution(
+        layer=LAYER_L2,
+        artifact="coverage_validity_policy",
+        reason_code="hollow_complete_defense",
+        evidence={},
+    )
+
+    first = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+    second = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+
+    assert first[0].edit_id == second[0].edit_id
+    assert first[0].to_dict() == second[0].to_dict()
 
 
 def _genome_with_telemetry_item():

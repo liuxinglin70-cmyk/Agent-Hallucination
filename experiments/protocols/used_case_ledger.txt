@@ -321,3 +321,13 @@ SmolAgents/086
 SmolAgents/087
 SmolAgents/088
 SmolAgents/090
+BFCL/085
+Camel/058
+Magentic_One/092
+SmolAgents/046
+OpenDeepSearch/069
+Magentic_One/002
+OpenManus/042
+Octotools/007
+OpenManus/099
+OpenManus/051

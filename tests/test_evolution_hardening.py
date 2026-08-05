@@ -1285,7 +1285,7 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
             "target_module": "abstention_rule",
             "operation": "add_rule",
             "condition": "proof participants leave a material claim untested",
-                "action": "emit_boundary_finding",
+                "action": "emit_boundary_finding: state",
             "evidence_anchor": "material claim left untested",
             "feature_description": "material claim left untested",
             "expected_effect": "terminal state becomes decisive",
@@ -5156,9 +5156,11 @@ def _run_l2_loop(
 def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
     tmp_path, monkeypatch,
 ) -> None:
-    """A consensus-gate L2 failure whose proposal fires but moves nothing is
-    rejected at the replay gate, keeps the non-L1 telemetry, and never
-    produces a SkillEdit."""
+    """A consensus-gate attribution has no executable L2 repair.
+
+    The planner must not ask the model to invent a telemetry-only policy or
+    replay one.  The unresolved detection still falls through to L1.
+    """
     replay_states: list = []
 
     def detector(*, genome, case_id, policy_genome=None, **kwargs):
@@ -5215,34 +5217,24 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
         run_id="l2_no_effect",
     )
 
-    # The L2 proposal was rejected at the replay gate (no terminal edge
-    # moved).  The case was genuinely triggered, so the runner falls through
-    # to the L1 skill path: policy rules only reclassify adjudication and
-    # cannot repair the broken detection.  The mock mutation always returns
-    # the L2 vocabulary, so both L1 attempts fail schema validation and end
-    # as NO_EDIT skips.
-    assert len(mutation_calls) == 3
-    assert mutation_calls[0]["purpose"] == "policy_reflection"
-    # The L1 fall-through makes two mutation-family calls (reflection
-    # diagnosis + targeted mutation); their exact order is fixed by the
-    # reflection pipeline.
-    assert sum(
-        1 for call in mutation_calls if call["purpose"] != "policy_reflection"
-    ) == 2
+    assert len(mutation_calls) == 2
     assert all(
         call["purpose"] in {"reflection_diagnosis", "mutation"}
-        for call in mutation_calls[1:]
+        for call in mutation_calls
     )
-    assert replay_states == ["policy_replay"]
+    assert replay_states == []
     assert [step.gate_decision for step in result.steps] == [
-        "reject_policy_no_effect",
+        "skip_no_policy",
         "skip_no_edit",
     ]
     audit = result.evolution_audit
     assert audit["l2_policy_accepts"] == 0
     assert [entry["decision"] for entry in audit["l2_policy_audit"]] == [
-        "reject_policy_no_effect",
+        "skip_no_policy",
     ]
+    assert audit["l2_policy_audit"][0]["reason"] == (
+        "no_executable_policy_for_attribution"
+    )
     # The deterministic non-L1 attribution telemetry is preserved.
     assert [entry["layer"] for entry in audit["non_l1_failure_attributions"]] == [
         "l2_adjudication_policy",
@@ -5294,15 +5286,14 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
         run_id="l2_no_proposal",
     )
 
-    # The L2 reflection skipped (no vocabulary item); the case was
-    # genuinely triggered, so the runner falls through to the L1 skill
-    # path.  The mock mutation always returns the L2 vocabulary, so the L1
-    # attempts fail schema validation and end as NO_EDIT skips.
-    assert len(mutation_calls) == 3
-    assert mutation_calls[0]["purpose"] == "policy_reflection"
-    assert sum(
-        1 for call in mutation_calls if call["purpose"] != "policy_reflection"
-    ) == 2
+    # The deterministic planner proves that this attribution has no runtime
+    # repair before any L2 model call is made.  Only the L1 fall-through uses
+    # the provider.
+    assert len(mutation_calls) == 2
+    assert all(
+        call["purpose"] in {"reflection_diagnosis", "mutation"}
+        for call in mutation_calls
+    )
     assert policy_replays == []
     assert [step.gate_decision for step in result.steps] == [
         "skip_no_policy",
@@ -5310,7 +5301,7 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
     ]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "skip_no_policy"
-    assert "no vocabulary item justified" in entry["reason"]
+    assert entry["reason"] == "no_executable_policy_for_attribution"
 
 
 def _hollow_defense_fixture():
@@ -5437,6 +5428,14 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert all(
         step.trigger_source == "l2_policy_reflection" for step in result.steps
     )
+    memory = json.loads(
+        (tmp_path / "htc_tes_experience_memory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    experience = memory["types"]["unknown"][0]
+    assert experience["metadata"]["outcome_stage"] == "l2_policy_replay"
+    assert experience["metadata"]["outcome"] == "improved"
 
 
 def test_l2_state_change_against_gold_polarity_is_rejected(
@@ -5548,18 +5547,15 @@ def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -
                 "state": "unresolved",
                 "prosecution_coverage": "complete",
                 "defense_coverage": "complete",
-                "valid_error_certificate_count": 1,
+                "valid_error_certificate_count": 0,
                 "valid_defense_certificate_count": 1,
-                "required_candidate_count": 1,
-                "consensus_gate_applied": True,
-                "consensus_gate_blocked_ids": ["blocked"],
             }
             if policy_genome is not None:
                 item = policy_genome.items[0]
                 proof["policy_evaluation"] = {
                     "fired": [{"item_id": item.item_id}],
-                    "effective_prosecution_coverage": "complete",
-                    "effective_defense_coverage": "unresolved",
+                    "effective_prosecution_coverage": "unresolved",
+                    "effective_defense_coverage": "complete",
                 }
             return {
                 "state": "unresolved",
@@ -5587,10 +5583,12 @@ def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -
     def mutation(**kwargs):
         if kwargs["purpose"] == "policy_reflection":
             return {
-                "precondition": "consensus_gate_blocked_nonempty",
-                "action": "emit_telemetry_only",
-                "params": {},
-                "rationale": "observe blocked consensus",
+                "precondition": (
+                    "prosecution_coverage_complete_and_zero_certificates"
+                ),
+                "action": "invalidate_coverage_claim",
+                "params": {"side": "prosecution"},
+                "rationale": "invalidate hollow prosecution coverage",
             }, {}
         return _slots_response(
             expected_effect="prosecution evidence coverage increases",

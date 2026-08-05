@@ -1,17 +1,20 @@
 """SEHD v6 — L2 adjudication-policy reflection prompt and parsing.
 
-L2 policy evolution closes the adjudication-layer proposal loop: when the
-deterministic failure classifier attributes a failure to the L2 policy
-surface, one reflection call proposes a single closed-vocabulary policy
-edit (add_item / modify_item / remove_item). The LLM only *proposes*;
-runtime semantics are owned by ``policy_evaluator`` and the proof-court
-policy hook, so every vocabulary token shown to the model is generated
-from ``v6_contracts`` at call time and every parse result is re-validated
-against the same closed sets.
+The deterministic failure classifier first maps an attributed failure to
+the executable repairs owned by the current policy runtime. A model may
+select one precomputed edit or abstain, but it cannot compose predicates,
+actions, parameters, or semantics. Candidate execution remains owned by
+``policy_evaluator`` and the proof-court policy hook.
+
+The legacy free-form prompt/parser remain available only for reading older
+artifacts and exact candidate matching; the online evolution runner does not
+use them as a policy source.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from typing import Any, Mapping
 
@@ -26,6 +29,203 @@ from .v6_contracts import (
     validate_policy_params,
 )
 from .policy_genome import PolicyEdit, PolicyGenome, PolicyOp
+
+
+def _planned_edit_id(
+    *,
+    operation: str,
+    item_index: int | None,
+    precondition: str = "",
+    action: str = "",
+    params: Mapping[str, Any] | None = None,
+) -> str:
+    payload = json.dumps({
+        "operation": operation,
+        "item_index": item_index,
+        "precondition": precondition,
+        "action": action,
+        "params": dict(params or {}),
+    }, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+    return f"policy_edit_{digest}"
+
+
+def plan_policy_candidates(
+    *,
+    attribution: FailureAttribution,
+    genome: PolicyGenome,
+) -> tuple[PolicyEdit, ...]:
+    """Enumerate executable policy repairs owned by one attribution.
+
+    The model may rank these candidates but cannot compose predicate/action
+    pairs.  An empty result means the current L2 runtime has no action capable
+    of repairing the attributed artifact; the caller can fall through to L1.
+    """
+    reason = attribution.reason_code
+    templates: list[tuple[str, str, dict[str, Any], str]] = []
+    if reason == "hollow_complete_prosecution":
+        templates.append((
+            "prosecution_coverage_complete_and_zero_certificates",
+            "invalidate_coverage_claim",
+            {"side": "prosecution"},
+            "Invalidate a prosecution coverage claim with no valid certificate.",
+        ))
+    elif reason == "hollow_complete_defense":
+        templates.append((
+            "defense_coverage_complete_and_zero_certificates",
+            "invalidate_coverage_claim",
+            {"side": "defense"},
+            "Invalidate a defense coverage claim with no valid certificate.",
+        ))
+    elif reason == "all_candidates_quarantined":
+        templates.append((
+            "all_candidates_quarantined",
+            "downgrade_coverage",
+            {"side": "prosecution", "to_state": "unresolved"},
+            "Keep prosecution coverage unresolved when all candidates are quarantined.",
+        ))
+
+    existing = {
+        (item.precondition, item.action, tuple(sorted(item.params.items())))
+        for item in genome.items
+    }
+    candidates: list[PolicyEdit] = []
+    for precondition, action, params, rationale in templates:
+        identity = (precondition, action, tuple(sorted(params.items())))
+        if identity in existing:
+            continue
+        candidates.append(PolicyEdit(
+            edit_id=_planned_edit_id(
+                operation=PolicyOp.ADD_ITEM.value,
+                item_index=None,
+                precondition=precondition,
+                action=action,
+                params=params,
+            ),
+            operation=PolicyOp.ADD_ITEM.value,
+            new_item=PolicyItem(
+                item_id="",
+                precondition=precondition,
+                action=action,
+                params=params,
+                rationale=rationale,
+            ),
+            rationale=rationale,
+        ))
+    for index, item in enumerate(genome.items):
+        if item.is_baseline or item.precondition not in {
+            template[0] for template in templates
+        }:
+            continue
+        alternatives = (
+            ("invalidate_coverage_claim", {"side": item.params.get("side")}),
+            (
+                "downgrade_coverage",
+                {"side": item.params.get("side"), "to_state": "incomplete"},
+            ),
+            (
+                "downgrade_coverage",
+                {"side": item.params.get("side"), "to_state": "unresolved"},
+            ),
+        )
+        for action, params in alternatives:
+            if not params.get("side"):
+                continue
+            identity = (item.precondition, action, tuple(sorted(params.items())))
+            current_identity = (
+                item.precondition, item.action, tuple(sorted(item.params.items()))
+            )
+            if identity == current_identity:
+                continue
+            rationale = "Replace the existing correction with this executable alternative."
+            candidates.append(PolicyEdit(
+                edit_id=_planned_edit_id(
+                    operation=PolicyOp.MODIFY_ITEM.value,
+                    item_index=index,
+                    precondition=item.precondition,
+                    action=action,
+                    params=params,
+                ),
+                operation=PolicyOp.MODIFY_ITEM.value,
+                item_index=index,
+                new_item=PolicyItem(
+                    item_id="",
+                    precondition=item.precondition,
+                    action=action,
+                    params=params,
+                    rationale=rationale,
+                ),
+                rationale=rationale,
+            ))
+        candidates.append(PolicyEdit(
+            edit_id=_planned_edit_id(
+                operation=PolicyOp.REMOVE_ITEM.value,
+                item_index=index,
+                precondition=item.precondition,
+                action=item.action,
+                params=item.params,
+            ),
+            operation=PolicyOp.REMOVE_ITEM.value,
+            item_index=index,
+            rationale="Remove the existing correction if it no longer repairs the attribution.",
+        ))
+    return tuple(candidates)
+
+
+def build_policy_selection_prompt(
+    *,
+    attribution: FailureAttribution,
+    facts_summary: Mapping[str, Any],
+    candidates: tuple[PolicyEdit, ...],
+) -> tuple[str, str]:
+    """Ask the model only to select a deterministic candidate or abstain."""
+    import json
+
+    system = (
+        "Select at most one precomputed L2 intervention. Runtime semantics, "
+        "predicate/action pairing and parameters are fixed by the framework. "
+        "Return JSON only: {\"candidate_index\": <int>, \"reason\": \"...\"} "
+        "or {\"no_proposal\": true, \"reason\": \"...\"}."
+    )
+    payload = {
+        "attribution": attribution.to_dict(),
+        "facts": dict(facts_summary),
+        "candidates": [candidate.to_dict() for candidate in candidates],
+    }
+    return system, json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+
+def select_policy_candidate(
+    response: Mapping[str, Any],
+    candidates: tuple[PolicyEdit, ...],
+) -> tuple[PolicyEdit | None, str]:
+    if response.get("no_proposal"):
+        return None, str(response.get("reason") or "no_proposal")
+    index = response.get("candidate_index")
+    if isinstance(index, int) and not isinstance(index, bool):
+        if not 0 <= index < len(candidates):
+            return None, "candidate_index_out_of_range"
+        return candidates[index], ""
+
+    legacy, reason = parse_policy_proposal(response)
+    if legacy is None:
+        return None, reason or "missing_candidate_index"
+
+    def signature(edit: PolicyEdit) -> tuple[Any, ...]:
+        item = edit.new_item
+        return (
+            str(edit.operation),
+            edit.item_index,
+            str(item.precondition) if item else "",
+            str(item.action) if item else "",
+            tuple(sorted(item.params.items())) if item else (),
+        )
+
+    legacy_signature = signature(legacy)
+    for candidate in candidates:
+        if signature(candidate) == legacy_signature:
+            return candidate, ""
+    return None, "response_not_in_planned_candidates"
 
 
 def _sanitize_rejected_summary(value: str) -> str:

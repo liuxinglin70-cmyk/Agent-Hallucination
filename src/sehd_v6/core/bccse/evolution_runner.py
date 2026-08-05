@@ -73,6 +73,7 @@ from .genome import (
     validate_expected_effect_contract,
 )
 from .rule_contract import RuleSpec, render_rule, validate_rule_spec
+from .action_spec import ActionSpec, compile_action_spec, sanitize_action_spec
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
@@ -111,9 +112,9 @@ from .policy_genome import (
     validate_policy_edit,
 )
 from .policy_reflection import (
-    build_policy_reflection_prompt,
-    current_policy_text,
-    parse_policy_proposal,
+    build_policy_selection_prompt,
+    plan_policy_candidates,
+    select_policy_candidate,
 )
 from ..htc_tes import (
     HallucinationType,
@@ -1397,6 +1398,7 @@ OUTCOME_STAGES = frozenset({
     "source_replay",       # the edit was replayed on its own source case
     "batch_commit",        # the edit was evaluated in the shadow batch
     "detection_runtime",   # the detector never produced a verdict
+    "l2_policy_replay",    # an adjudication-policy candidate was replayed
 })
 
 # Whether the attempt produced usable evidence, and of what strength.
@@ -1442,6 +1444,8 @@ def _structured_outcome(
     layer: str = "",
     artifact: str = "",
     reason_code: str = "",
+    action_spec: Mapping[str, Any] | None = None,
+    intervention_trace: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the structured outcome payload stored in experience memory.
 
@@ -1455,7 +1459,7 @@ def _structured_outcome(
     outcome_class = outcome if outcome in OUTCOME_CLASSES else "rejected"
     if promotable is None:
         promotable = outcome_class in _PROMOTABLE_OUTCOME_CLASSES
-    return {
+    payload = {
         "outcome": outcome_class,
         "outcome_stage": stage if stage in OUTCOME_STAGES else "mutation",
         "outcome_decision": str(decision or outcome_class),
@@ -1472,8 +1476,140 @@ def _structured_outcome(
         # read back as proof that an edit improved detection.
         "promotable_evidence": bool(promotable) and not diagnostic_only,
         "diagnostic_only": bool(diagnostic_only),
-        "schema_version": "agenthallu.bccse_experience_outcome.v1",
+        "schema_version": "agenthallu.bccse_experience_outcome.v2",
     }
+    canonical_action_spec = sanitize_action_spec(action_spec)
+    if canonical_action_spec:
+        payload["action_spec"] = canonical_action_spec
+    if intervention_trace:
+        applied_rule_ids = sorted({
+            str(rule_id)
+            for rule_id in intervention_trace.get("applied_rule_ids", ())
+            if str(rule_id)
+        })
+        output_fields = sorted({
+            str(field)
+            for field in intervention_trace.get("output_fields", ())
+            if str(field)
+        })
+        routes = sorted({
+            str(route)
+            for route in intervention_trace.get("routes", ())
+            if str(route)
+        })
+        payload["intervention_trace"] = {
+            "applied_rule_ids": applied_rule_ids,
+            "output_fields": output_fields,
+            "routes": routes,
+        }
+    return payload
+
+
+def _experience_intervention_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    """Reduce provider self-reports to a reusable execution trajectory."""
+    applied_ids: list[str] = []
+    output_fields: list[str] = []
+    routes: list[str] = []
+    applied = result.get("applied_rule_trace")
+    if isinstance(applied, Mapping):
+        for route, rule_ids in applied.items():
+            if isinstance(rule_ids, Sequence) and not isinstance(rule_ids, str):
+                routes.append(str(route))
+                applied_ids.extend(str(rule_id) for rule_id in rule_ids)
+    effects = result.get("rule_effects_trace")
+    if isinstance(effects, Mapping):
+        for route, entries in effects.items():
+            if not isinstance(entries, Sequence) or isinstance(entries, str):
+                continue
+            routes.append(str(route))
+            for entry in entries:
+                if not isinstance(entry, Mapping):
+                    continue
+                applied_ids.append(str(entry.get("rule_id") or ""))
+                fields = entry.get("output_fields")
+                if isinstance(fields, Sequence) and not isinstance(fields, str):
+                    output_fields.extend(str(field) for field in fields)
+    return {
+        "applied_rule_ids": applied_ids,
+        "output_fields": output_fields,
+        "routes": routes,
+    }
+
+
+def _attribute_intervention_fitness(
+    assessment: FitnessAssessment,
+    *,
+    edit: SkillEdit,
+    result: Mapping[str, Any],
+) -> tuple[FitnessAssessment, dict[str, Any]]:
+    """Bind a replay improvement to the compiled intervention that ran.
+
+    Aggregate detector movement is not causal evidence by itself because a
+    provider replay may vary even when it ignores the evolved instruction.
+    New ActionSpec-backed rules therefore earn fitness only when their stable
+    rule id is injected, reported as applied, and bound to the ActionSpec's
+    output field. Older uninstrumented detector adapters remain readable.
+    """
+    action_spec = sanitize_action_spec(edit.action_spec)
+    compiled = result.get("compiled_rule_trace")
+    operation = (
+        edit.operation.value
+        if isinstance(edit.operation, SkillOp)
+        else str(edit.operation)
+    )
+    if (
+        not action_spec
+        or operation == SkillOp.REMOVE_RULE.value
+        or not isinstance(compiled, Mapping)
+    ):
+        return assessment, {"status": "not_instrumented"}
+
+    target_entries = compiled.get(edit.target_module)
+    rule_ids = {
+        str(entry.get("rule_id") or "")
+        for entry in target_entries or ()
+        if isinstance(entry, Mapping) and str(entry.get("rule_id") or "")
+    }
+    trace = _experience_intervention_trace(result)
+    applied_ids = set(trace["applied_rule_ids"])
+    expected_field = str(action_spec.get("output_field") or "")
+    effect_ids: set[str] = set()
+    effects = result.get("rule_effects_trace")
+    if isinstance(effects, Mapping):
+        for entries in effects.values():
+            if not isinstance(entries, Sequence) or isinstance(entries, str):
+                continue
+            for entry in entries:
+                if not isinstance(entry, Mapping):
+                    continue
+                fields = entry.get("output_fields")
+                if (
+                    isinstance(fields, Sequence)
+                    and not isinstance(fields, str)
+                    and expected_field in {str(field) for field in fields}
+                ):
+                    effect_ids.add(str(entry.get("rule_id") or ""))
+    executed_ids = sorted(rule_ids & applied_ids & effect_ids)
+    audit = {
+        "status": "executed" if executed_ids else "not_executed",
+        "compiled_rule_ids": sorted(rule_ids),
+        "applied_rule_ids": sorted(rule_ids & applied_ids),
+        "effect_rule_ids": sorted(rule_ids & effect_ids),
+        "expected_output_field": expected_field,
+        "executed_rule_ids": executed_ids,
+    }
+    if executed_ids or not (assessment.passed or assessment.evidence_only):
+        return assessment, audit
+    return FitnessAssessment(
+        "no_effect",
+        ("intervention_not_executed",),
+        assessment.task_score_before,
+        assessment.task_score_after,
+        assessment.local_score_before,
+        assessment.local_score_after,
+    ), audit
 
 
 @dataclass
@@ -3367,6 +3503,57 @@ def run_online_evolution(
                 )
                 audit_entry["replay_state"] = resolve_evolution_state(replay)
             l2_policy_audit.append(audit_entry)
+            replay_state_value = str(
+                audit_entry.get("replay_state") or detection_state
+            )
+            state_improved = accepted and replay_state_value != detection_state
+            policy_operation = (
+                str(proposal_edit.operation) if proposal_edit else "no_proposal"
+            )
+            policy_action = (
+                str(proposal_edit.new_item.action)
+                if proposal_edit and proposal_edit.new_item else "none"
+            )
+            type_fitness.get_experience_memory().add_experience(
+                hallucination_type=HallucinationType.UNKNOWN,
+                evolution_direction=(
+                    f"{detection_state}_to_{replay_state_value}"
+                    if replay_state_value != detection_state
+                    else "l2_process_repair"
+                ),
+                module_targeted=attribution.artifact,
+                strategy_used=(
+                    f"policy:{policy_operation}:{policy_action}"
+                ),
+                detection_improved=state_improved,
+                source_case_id=case_id,
+                metadata=_structured_outcome(
+                    outcome=(
+                        "improved" if state_improved
+                        else ("directional" if accepted else "rejected")
+                    ),
+                    stage="l2_policy_replay",
+                    operation=policy_operation,
+                    expected_effect_status=(
+                        "terminal_state_changed" if state_improved
+                        else (
+                            "coverage_effect_only" if accepted
+                            else "not_committed"
+                        )
+                    ),
+                    reason_categories=[reason or decision],
+                    decision=decision,
+                    layer=LAYER_L2,
+                    artifact=attribution.artifact,
+                    reason_code=attribution.reason_code,
+                    promotable=(state_improved and fitness_gold(case_id) is not None),
+                    diagnostic_only=False,
+                ),
+                feature_description=(
+                    f"{attribution.artifact}:{attribution.reason_code}"
+                ),
+                type_confidence=0.0,
+            )
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -3394,11 +3581,20 @@ def run_online_evolution(
             finish("skip_no_policy", reason="no_mutation_route")
             return
 
-        system_prompt, user_prompt = build_policy_reflection_prompt(
+        planned_candidates = plan_policy_candidates(
+            attribution=attribution,
+            genome=policy_genome,
+        )
+        if not planned_candidates:
+            finish(
+                "skip_no_policy",
+                reason="no_executable_policy_for_attribution",
+            )
+            return accepted_outcome
+        system_prompt, user_prompt = build_policy_selection_prompt(
             attribution=attribution,
             facts_summary=facts_summary,
-            current_policy_text=current_policy_text(policy_genome),
-            rejected_summary="; ".join(rejected_policy_summaries[-8:]),
+            candidates=planned_candidates,
         )
         try:
             parsed, _meta = run_mutation_call(
@@ -3415,7 +3611,9 @@ def run_online_evolution(
                 f"{str(exc)[:300]}",
             )
             return
-        proposed_edit, parse_reason = parse_policy_proposal(parsed)
+        proposed_edit, parse_reason = select_policy_candidate(
+            parsed, planned_candidates,
+        )
         if proposed_edit is None:
             finish("skip_no_policy", reason=parse_reason or "no_proposal")
             return
@@ -3930,18 +4128,14 @@ def run_online_evolution(
                     step_index=item.step_index,
                 ))
                 pending_probe_step_indexes.append(item.step_index)
-                # HTC-TES v3: Record type-conditioned experience
-                # FIX: pass gold_label (was None) and target_module (was missing)
-                # to ensure experience memory records correct direction and module.
+                # Record the committed type-conditioned experience from the
+                # authoritative source result and its shadow replay.
                 _type_result = type_classifier.classify(
                     item.source_result, item.source_signal
                 )
                 _direction = type_evolution._infer_evolution_direction(
                     item.source_signal.state, item.source_signal.gold_label,
                 )
-                # FIX (C1): 使用BCCSE的assessment决策作为成功标志，并传入
-                # 真正的检测结果dict（shadow_result），而非AttributionSignal
-                # 的序列化结果，避免HTC-TES内部误判before/after状态。
                 _htc_success = assessment_decision in {
                     "strong_improvement", "local_improvement",
                 }
@@ -3984,9 +4178,9 @@ def run_online_evolution(
                             for value in item.individual_assessment.reasons
                         ],
                         observable_deltas=_effect_audit["observable_deltas"],
-                            # Only independent gold-assisted fitness may claim
-                            # that the edited detector improved correctness.
-                            promotable=(_htc_success and fitness_use_gold),
+                        # Only independent gold-assisted fitness may claim
+                        # that the edited detector improved correctness.
+                        promotable=(_htc_success and fitness_use_gold),
                         diagnostic_only=(
                             not fitness_use_gold
                             and not _provisional_accept_edit
@@ -3997,6 +4191,10 @@ def run_online_evolution(
                         reason_code=(
                             str(item.individual_assessment.reasons[0]).split(":", 1)[0]
                             if item.individual_assessment.reasons else ""
+                        ),
+                        action_spec=item.edit.action_spec,
+                        intervention_trace=_experience_intervention_trace(
+                            _shadow_result
                         ),
                     ),
                 )
@@ -5115,14 +5313,55 @@ def run_online_evolution(
                 )
                 feature_description = str(parsed.get("feature_description") or "")[:500]
                 expected_effect = str(parsed.get("expected_effect") or "")[:240]
-                expected_effect_contract_raw = parsed.get("expected_effect_contract")
-                if not isinstance(expected_effect_contract_raw, dict):
-                    expected_effect_contract_raw = None
-                expected_effect_contract = (
-                    expected_effect_contract_raw
-                    if expected_effect_contract_raw is not None
-                    else {}
-                )
+                expected_effect_contract = {}
+                pending_action_spec: dict[str, Any] = {}
+                if pending_rule_slots:
+                    try:
+                        compiled_action = compile_action_spec(
+                            target_module, pending_rule_slots["action"],
+                        )
+                    except (KeyError, ValueError) as exc:
+                        invalid_mutation_reason = f"action_spec:{exc}"
+                    else:
+                        pending_action_spec = compiled_action.to_dict()
+                        expected_effect = compiled_action.expected_effect_text()
+                        expected_effect_contract = compiled_action.effect_contract(
+                            pending_rule_slots["condition"]
+                        )
+                elif operation == "remove_rule" and rule_index is not None:
+                    try:
+                        removed_rule_index = int(rule_index)
+                        removed_meta = champion.modules[
+                            target_module
+                        ].get_rule_meta(removed_rule_index)
+                    except (KeyError, TypeError, ValueError):
+                        removed_meta = {}
+                    removed_action_payload = sanitize_action_spec(
+                        removed_meta.get("action_spec")
+                    )
+                    if removed_action_payload:
+                        removed_action = ActionSpec.from_dict(
+                            removed_action_payload
+                        )
+                        removed_slots = removed_meta.get("rule_slots")
+                        removed_condition = (
+                            str(removed_slots.get("condition") or "")
+                            if isinstance(removed_slots, Mapping) else ""
+                        )
+                        expected_effect = removed_action.removal_effect_text()
+                        expected_effect_contract = (
+                            removed_action.removal_effect_contract(
+                                removed_condition or "removed rule condition"
+                            )
+                        )
+                    else:
+                        invalid_mutation_reason = (
+                            "action_spec:removed_rule_has_no_executable_spec"
+                        )
+                else:
+                    raw_contract = parsed.get("expected_effect_contract")
+                    if isinstance(raw_contract, dict):
+                        expected_effect_contract = raw_contract
                 diagnosis = parsed.get("diagnosis")
                 diagnosis_present = isinstance(diagnosis, Mapping)
                 diagnosis_valid = (
@@ -5262,6 +5501,7 @@ def run_online_evolution(
                         expected_effect=expected_effect,
                         expected_effect_contract=expected_effect_contract,
                         rule_slots=pending_rule_slots or {},
+                        action_spec=pending_action_spec,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
@@ -5712,6 +5952,11 @@ def run_online_evolution(
                 after_result=candidate_result,
                 gold_label=fitness_gold(case_id),
             )
+            assessment, causal_execution_audit = _attribute_intervention_fitness(
+                assessment,
+                edit=edit,
+                result=candidate_result,
+            )
 
             canary_audit: list[dict[str, Any]] = []
             canary_regressions: list[str] = []
@@ -5744,6 +5989,7 @@ def run_online_evolution(
                 "source_before": signal.to_dict(),
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),
+                "causal_execution": causal_execution_audit,
                 "source_stable_after": not candidate_signal.should_evolve,
                 # Rule traces for no-effect attribution: ``compiled_rule_trace``
                 # lists the evolved rules present in this genome;

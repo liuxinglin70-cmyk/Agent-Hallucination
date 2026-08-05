@@ -300,9 +300,8 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
 # Closed action-opcode vocabulary per module. Each opcode carries the
 # English template the provider actually sees (rendered by ``render_rule``),
 # so an action is enumerable, validatable and traceable instead of free
-# text; the optional ``"; <target>"`` suffix names the exact output field or
-# object the opcode acts on. The action slot contract is
-# ``"<opcode>"`` or ``"<opcode>: <target>"``.
+# text. Every generated action uses ``"<opcode>: <target>"`` so the exact
+# provider output field operated on is explicit and traceable.
 MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     "candidate_trigger": (
         ("emit_candidate", "emit a candidate"),
@@ -474,14 +473,99 @@ MODULE_ACTION_TARGETS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Executable opcode/field grammar.  Module ownership alone is insufficient:
+# an output field can be present in a route schema while still being the wrong
+# operand for a particular operation (for example, a certificate quarantine
+# operates on certificate_id, never on evidence_refs).
+MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
+    "candidate_trigger": {
+        "emit_candidate": ("candidate",),
+        "suppress_candidate": ("candidate", "candidate_id"),
+        "emit_origin_census": (
+            "origin_hypothesis_event_id", "trigger_event_id", "observation",
+        ),
+    },
+    "evidence_obligation": {
+        "require_evidence_field": (
+            "consumption_evidence_refs", "impact_evidence_refs",
+            "recovery_evidence_refs", "norm_evidence_refs",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+        ),
+        "populate_evidence_field": (
+            "consumption_evidence_refs", "impact_evidence_refs",
+            "recovery_evidence_refs", "norm_evidence_refs",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+        ),
+        "emit_error_certificate": ("certificate_id",),
+        "keep_coverage_incomplete": ("coverage_state",),
+    },
+    "candidate_to_verifier_route": {
+        "route_candidate_to_verifier": (
+            "violation_state", "actor_state", "boundary_state",
+        ),
+        "qualify_candidate": (
+            "violation_state", "actor_state", "boundary_state",
+        ),
+        "hold_candidate_qualification": (
+            "violation_state", "actor_state", "boundary_state",
+        ),
+    },
+    "atomic_verifier_instruction": {
+        "verify_violation": (
+            "coverage_state", "breach_type", "benchmark_causal_status",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+        ),
+        "quarantine_certificate": ("certificate_id",),
+        "emit_certificate": ("certificate_id",),
+        "require_evidence_field": (
+            "positive_evidence_refs", "actor_evidence_refs",
+            "boundary_evidence_refs", "norm_evidence_refs",
+            "violation_evidence_refs", "agent_control_evidence_refs",
+            "impact_evidence_refs", "recovery_evidence_refs",
+            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+            "evidence_refs",
+        ),
+    },
+    "clean_defense_boundary": {
+        "emit_defense_certificate": ("certificate_id",),
+        "emit_boundary_finding": ("state", "responsible_event_id"),
+        "require_evidence_field": (
+            "evidence_refs", "target_candidate_id", "target_origin_event_id",
+        ),
+    },
+    "causal_link_test": {
+        "test_causal_link": (
+            "benchmark_causal_evidence_refs", "causal_sufficiency_score",
+            "is_root_cause",
+        ),
+        "reject_non_causal_origin": ("responsible_event_id", "is_root_cause"),
+        "populate_impact_chain": (
+            "consumption_evidence_refs", "impact_evidence_refs",
+            "recovery_evidence_refs", "benchmark_causal_evidence_refs",
+        ),
+    },
+    "earliest_origin_tiebreak": {
+        "select_earliest_origin": ("responsible_event_id",),
+        "suppress_later_origin": ("responsible_event_id",),
+    },
+    "abstention_rule": {
+        "emit_boundary_finding": (
+            "state", "responsible_event_id", "evidence_refs",
+        ),
+    },
+}
+
+
 def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
     """Check that a slot action names a closed opcode of the target module.
 
-    The action must be ``"<opcode>"`` or ``"<opcode>: <target>"`` where the
-    opcode belongs to the module's ``MODULE_ACTION_OPCODES`` and, when a
-    target is present, it is a registered provider-schema field of the
-    module (see ``MODULE_ACTION_TARGETS``) and never names another module's
-    forbidden output surface. Forbidden surface terms still fail first.
+    The action must be ``"<opcode>: <target>"``. The opcode belongs to the
+    module's ``MODULE_ACTION_OPCODES`` and the target belongs to that exact
+    operation in ``MODULE_OPERATION_TARGETS``. Module-level schema ownership
+    alone is not enough. Forbidden surface terms still fail first.
     """
     lowered = " ".join(str(action or "").lower().split())
     for marker in MODULE_FORBIDDEN_ACTION_TERMS.get(module_id, ()):
@@ -493,12 +577,18 @@ def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
     if not any(opcode_part == opcode for opcode, _template in opcodes):
         return False, f"action_opcode_unowned:{opcode_part or 'missing'}"
     target = target_part.strip()
+    operation_targets = MODULE_OPERATION_TARGETS.get(module_id, {}).get(
+        opcode_part, (),
+    )
+    if not sep and operation_targets:
+        return False, f"action_target_required:{opcode_part}"
     if sep and not target:
         return False, "action_target_unowned:empty"
     if sep:
-        targets = MODULE_ACTION_TARGETS.get(module_id, ())
-        if target not in targets:
-            return False, f"action_target_outside_schema:{target}"
+        if target not in operation_targets:
+            return False, (
+                f"action_target_not_owned_by_operation:{opcode_part}:{target}"
+            )
     return True, ""
 
 
@@ -516,12 +606,11 @@ def render_action_opcode_text(module_id: str) -> str:
         f"- {opcode} — {template}"
         for opcode, template in opcodes
     ]
-    targets = MODULE_ACTION_TARGETS.get(module_id, ())
-    if targets:
-        lines.append(
-            "valid output-field targets: "
-            + ", ".join(targets)
-        )
+    operation_targets = MODULE_OPERATION_TARGETS.get(module_id, {})
+    for opcode, _template in opcodes:
+        targets = operation_targets.get(opcode, ())
+        if targets:
+            lines.append(f"{opcode} valid targets: " + ", ".join(targets))
     return "\n".join(lines)
 
 
