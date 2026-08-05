@@ -55,7 +55,7 @@ from ..provider_models import canonical_model_name
 from ..bccse.types import (
     EvaluationOutcome,
     ExperienceRecord,
-    FailureEpisode,
+    ReplayEpisode,
     anonymous_ref,
 )
 from ..bccse.step_attributor import ErrorType
@@ -876,7 +876,7 @@ class PacaTclV35EvolutionEvaluator:
         parent: SkillGenome,
         child: SkillGenome,
         case_keys: Sequence[str],
-        episodes: Sequence[FailureEpisode],
+        episodes: Sequence[ReplayEpisode],
     ) -> ReplayEvidence:
         parent_rows = self._get_rows(parent, case_keys)
         child_rows = self._get_rows(child, case_keys)

@@ -4273,7 +4273,7 @@ def test_attribute_failure_fn_omission_clean_routes_candidate_trigger() -> None:
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_fn_signal(),
         detection_result={},
         primary_type=HallucinationType.OMISSION,
@@ -4289,7 +4289,7 @@ def test_attribute_failure_fn_clean_quarantined_error_routes_verifier_instructio
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_fn_signal(),
         detection_result={
             "evidence_health": {"quarantined_error_certificate_count": 2},
@@ -4309,7 +4309,7 @@ def test_attribute_failure_hollow_complete_defense_records_l2_telemetry() -> Non
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
             "proof_adjudication": {
@@ -4336,7 +4336,7 @@ def test_attribute_failure_consensus_gate_blocked_records_l2_telemetry() -> None
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
             "proof_adjudication": {
@@ -4376,7 +4376,7 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
         )
 
     _patch_classifier("candidate_trigger", "provider_artifact_missing")
-    owner, _reason = runner._attribute_failure(
+    owner, _reason, _attribution = runner._attribute_failure(
         signal=_fp_signal(),
         detection_result={},
         primary_type=HallucinationType.UNKNOWN,
@@ -4385,7 +4385,7 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
     )
     assert owner == ""
     _patch_classifier("clean_defense_boundary", "provider_artifact_malformed")
-    owner, _reason = runner._attribute_failure(
+    owner, _reason, _attribution = runner._attribute_failure(
         signal=_fp_signal(),
         detection_result={},
         primary_type=HallucinationType.UNKNOWN,
@@ -4402,7 +4402,7 @@ def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> Non
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
             "evidence_health": {"quarantined_error_certificate_count": 1},
@@ -4420,7 +4420,7 @@ def test_attribute_failure_no_failure_shape_returns_empty() -> None:
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=_unresolved_signal(),
         detection_result={
             "proof_adjudication": {
@@ -4458,7 +4458,7 @@ def test_attribute_failure_prosecution_gap_routes_evidence_obligation() -> None:
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=signal,
         detection_result={
             "proof_adjudication": {
@@ -4499,7 +4499,7 @@ def test_attribute_failure_prosecution_gap_skipped_with_hollow_defense() -> None
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=signal,
         detection_result={
             "proof_adjudication": {
@@ -4540,7 +4540,7 @@ def test_attribute_failure_prosecution_gap_skipped_with_surviving_errors() -> No
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=signal,
         detection_result={
             "proof_adjudication": {
@@ -4580,7 +4580,7 @@ def test_attribute_failure_defense_gap_routes_clean_defense_boundary() -> None:
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=signal,
         detection_result={
             "proof_adjudication": {
@@ -4621,7 +4621,7 @@ def test_attribute_failure_defense_gap_skipped_with_hollow_prosecution() -> None
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
-    owner, reason = runner._attribute_failure(
+    owner, reason, _attribution = runner._attribute_failure(
         signal=signal,
         detection_result={
             "proof_adjudication": {

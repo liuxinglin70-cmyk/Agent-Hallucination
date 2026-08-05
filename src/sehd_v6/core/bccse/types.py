@@ -84,8 +84,8 @@ class ExperienceRecord:
 
 
 @dataclass
-class FailureEpisode:
-    """A single failure episode for paired replay evaluation."""
+class ReplayEpisode:
+    """A single paired-replay evaluation input (anonymous)."""
 
     record_key: str
     error_type: str

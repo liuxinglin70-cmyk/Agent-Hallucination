@@ -19,7 +19,7 @@ from typing import Any
 from .types import (
     EvaluationOutcome,
     ExperienceRecord,
-    FailureEpisode,
+    ReplayEpisode,
     anonymous_ref,
 )
 from .genome import (
@@ -57,7 +57,7 @@ __all__ = [
     # Types
     "EvaluationOutcome",
     "ExperienceRecord",
-    "FailureEpisode",
+    "ReplayEpisode",
     "anonymous_ref",
     # Genome
     "MODULE_IDS",

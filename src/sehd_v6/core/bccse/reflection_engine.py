@@ -212,116 +212,18 @@ def build_runtime_observation(
     *,
     allowed_modules: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """Build a bounded, structured observation for reflection.
+    """Delegate to the single artifact/court projection owner.
 
-    The reflection model must reason about executable outputs, not only a
-    prose summary.  This is deliberately derived from detector output and
-    contains no labels or case identity.  It is an observation, not a verdict
-    or a correctness claim.
+    The structured observation is defined only in failure_episode.py; this
+    name is kept as the public reflection entry point.
     """
-    def rows(name: str) -> list[Mapping[str, Any]]:
-        payload = detection_result.get(name) or {}
-        if not isinstance(payload, Mapping):
-            return []
-        value = payload.get("candidates") or payload.get("certificates") or []
-        return [item for item in value if isinstance(item, Mapping)] if isinstance(value, list) else []
+    from .failure_episode import build_runtime_observation as _build
 
-    prosecution = rows("combined_prosecution") or rows("prosecution")
-    defense = rows("combined_defense") or rows("defense")
-    proof = detection_result.get("proof_adjudication") or {}
-    if not isinstance(proof, Mapping):
-        proof = {}
-    health = detection_result.get("evidence_health") or {}
-    if not isinstance(health, Mapping):
-        health = {}
-
-    def _id_count(key: str) -> int:
-        value = proof.get(key)
-        return len(value) if isinstance(value, (list, tuple)) else 0
-
-    def _proof_count(key: str, fallback: int) -> int:
-        if key not in proof:
-            return fallback
-        try:
-            return max(0, int(proof.get(key) or 0))
-        except (TypeError, ValueError):
-            return 0
-
-    surviving_ids = proof.get("surviving_error_certificate_ids")
-    surviving_error_certificates = (
-        len(surviving_ids)
-        if isinstance(surviving_ids, (list, tuple))
-        else max(len(prosecution) - _id_count("quarantined_error_certificate_ids"), 0)
+    return _build(
+        detection_result,
+        signal,
+        allowed_modules=allowed_modules,
     )
-
-    # Court balance: who carried the verdict. Reflection must target the
-    # stage that actually decided the outcome, not a stage whose output was
-    # consumed downstream without effect.
-    court_balance = {
-        "surviving_error_certificates": max(
-            surviving_error_certificates,
-            0,
-        ),
-        "quarantined_error_certificates": (
-            int(health.get("quarantined_error_certificate_count"))
-            if isinstance(health.get("quarantined_error_certificate_count"), int)
-            else _id_count("quarantined_error_certificate_ids")
-        ),
-        # Valid-count semantics everywhere: the fallback subtracts quarantined
-        # rows so a court result missing the explicit counter can never be
-        # read as "raw certificates are valid certificates".
-        "defense_certificates": _proof_count(
-            "valid_defense_certificate_count",
-            max(len(defense) - _id_count("quarantined_defense_certificate_ids"), 0),
-        ),
-        "candidates_covered_by_clean_defense": _id_count(
-            "clean_covered_candidate_ids"
-        ),
-        "positive_candidates": _id_count("positive_candidate_ids"),
-        "consensus_gate_blocked": _id_count("consensus_gate_blocked_ids"),
-        "verdict_state": detection_result.get("state"),
-    }
-    field_presence = {
-        "candidate_count": len(detection_result.get("census") or []),
-        "prosecution_certificates": len(prosecution),
-        "defense_certificates": len(defense),
-        "responsible_step": detection_result.get("responsible_step") is not None,
-        "prosecution_coverage": proof.get("prosecution_coverage"),
-        "defense_coverage": proof.get("defense_coverage"),
-        "state": detection_result.get("state"),
-        "trigger": signal.trigger_source.value,
-    }
-    owner_fields = {
-        module: list(MODULE_OBSERVABLE_FIELDS.get(module, ()))
-        for module in allowed_modules
-    }
-    return {
-        "authority": {
-            "runtime_valid": detection_result.get("runtime_valid") is True,
-            "decision_authority": detection_result.get("decision_authority"),
-        },
-        "observed_fields": field_presence,
-        "court_balance": court_balance,
-        "non_empty_evidence": {
-            "census": field_presence["candidate_count"] > 0,
-            "prosecution": bool(prosecution),
-            "defense": bool(defense),
-        },
-        "diagnostic_gap": {
-            "trigger": signal.trigger_source.value,
-            "error_type": signal.error_type.value,
-            "primary_module": signal.target_module,
-            "secondary_module": signal.secondary_module,
-            "confidence": signal.attribution_confidence,
-        },
-        "module_output_ownership": owner_fields,
-        "instruction": (
-            "Select one observed missing or malformed output field owned by the "
-            "target module. Do not claim an effect on fields outside its ownership. "
-            "diagnostic_gap primary/secondary modules are attribution hints; the "
-            "allowed module set is authoritative."
-        ),
-    }
 
 
 def build_causal_reflection_prompt(

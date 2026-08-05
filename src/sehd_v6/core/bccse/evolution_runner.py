@@ -100,6 +100,11 @@ from .v6_contracts import (
     FailureAttribution,
     build_adjudication_facts,
 )
+from .failure_episode import (
+    UnaddressableFailure,
+    build_failure_episode,
+    project_provider_artifacts,
+)
 from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
@@ -147,6 +152,7 @@ class EvolutionStep:
     timestamp: float
     fitness_check: dict[str, Any] | None = None
     attempt_index: int = 0
+    episode: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -163,6 +169,7 @@ class EvolutionStep:
             "timestamp": self.timestamp,
             "fitness_check": self.fitness_check,
             "attempt_index": self.attempt_index,
+            "episode": self.episode,
         }
 
     @classmethod
@@ -190,6 +197,9 @@ class EvolutionStep:
             if data.get("fitness_check") is not None
             else None,
             attempt_index=int(data.get("attempt_index") or 0),
+            episode=dict(data.get("episode") or {})
+            if data.get("episode") is not None
+            else None,
         )
 
 
@@ -855,191 +865,6 @@ def _prevalidate_candidate(
     return None
 
 
-def _build_provider_artifact_projection(
-    *,
-    detection_result: Mapping[str, Any],
-    signal: Any,
-    primary_type: Any,
-) -> list[dict[str, Any]]:
-    """Project every addressable provider-artifact integrity signal into
-    the classifier's input contract.
-
-    Kinds: ``candidate`` / ``error_certificate`` / ``defense_certificate``,
-    each with ``malformed`` and ``missing_fields`` so ``classify_failure``
-    resolves the owning L1 module deterministically. The projection reads
-    only label-free runtime evidence (construct counts, court audits,
-    quarantine tallies); the single gold-informed signal is the FN+omission
-    candidate absence, which only a label can expose.
-    """
-    artifacts: list[dict[str, Any]] = []
-    adjudication = detection_result.get("proof_adjudication") or {}
-    if not isinstance(adjudication, Mapping):
-        adjudication = {}
-    health = detection_result.get("evidence_health") or {}
-    if not isinstance(health, Mapping):
-        health = {}
-
-    def add(kind: str, *, malformed: bool, missing: list[str]) -> None:
-        artifacts.append({
-            "kind": kind,
-            "module_hint": "",
-            "malformed": malformed,
-            "missing_fields": missing,
-        })
-
-    # 1. Gold-informed omission: the detector reports a coherent clean
-    # verdict, so the missing error candidate is observable only against
-    # the gold label. Kept as the single gold-informed signal.
-    gold_label = getattr(signal, "gold_label", None)
-    state = str(
-        getattr(signal, "state", "") or detection_result.get("state") or ""
-    )
-    type_value = str(getattr(primary_type, "value", primary_type) or "")
-    if bool(gold_label) and state == "verified_clean" and type_value == "omission":
-        add("candidate", malformed=False, missing=["candidate"])
-
-    # 2. Quarantined certificates: provider output the court could not
-    # validate, i.e. malformed provider artifacts.
-    for health_key, kind in (
-        ("quarantined_error_certificate_count", "error_certificate"),
-        ("quarantined_defense_certificate_count", "defense_certificate"),
-    ):
-        try:
-            quarantined = int(health.get(health_key) or 0)
-        except (TypeError, ValueError):
-            quarantined = 0
-        if quarantined > 0:
-            add(kind, malformed=True, missing=[])
-
-    # 3. Construct-stage candidate loss: the court required candidates the
-    # provider never produced (missing) or that failed conversion from raw
-    # (malformed).
-    try:
-        required = int(health.get("required_candidate_count") or 0)
-        accepted = int(health.get("construct_accepted_candidate_count") or 0)
-        raw = int(health.get("construct_raw_candidate_count") or 0)
-    except (TypeError, ValueError):
-        required = accepted = raw = 0
-    if required > 0 and accepted == 0:
-        if raw > 0:
-            add("candidate", malformed=True, missing=[])
-        else:
-            add("candidate", malformed=False, missing=["candidate"])
-
-    # 4. Construct authority failure: the census stage lost authority over
-    # its own candidate pipeline (malformed candidate surface).
-    authority_reasons = health.get("construct_authority_failure_reasons")
-    if isinstance(authority_reasons, list) and authority_reasons:
-        add("candidate", malformed=True, missing=[])
-
-    # 5. Focused-prosecution candidates whose certificates were all
-    # quarantined: candidates reached the court but their evidence failed
-    # validation (malformed error-certificate surface).
-    try:
-        fully_quarantined = int(
-            health.get("focused_prosecution_quarantined_candidate_count") or 0
-        )
-    except (TypeError, ValueError):
-        fully_quarantined = 0
-    if fully_quarantined > 0:
-        add("error_certificate", malformed=True, missing=[])
-
-    # 6. Audit-level missing fields on quarantined certificates: the failed
-    # checks name the exact fields the provider omitted or malformed. The
-    # certificate was emitted but failed validation, i.e. it is malformed;
-    # the specific failed fields stay in ``missing_fields`` for evidence.
-    for audit_key, kind in (
-        ("error_audits", "error_certificate"),
-        ("defense_audits", "defense_certificate"),
-    ):
-        audits = adjudication.get(audit_key)
-        if not isinstance(audits, list):
-            continue
-        missing_fields: list[str] = []
-        for audit in audits:
-            if not isinstance(audit, Mapping):
-                continue
-            if str(audit.get("decision") or "") == "pass":
-                continue
-            failed = audit.get("failed_checks")
-            if isinstance(failed, list):
-                missing_fields.extend(
-                    str(name) for name in failed
-                    if name != "required_fields"
-                )
-        if missing_fields:
-            add(kind, malformed=True, missing=sorted(set(missing_fields)))
-
-    # 7. Appeal-stage provider failure: the appeal routes crashed, so the
-    # error/defense certificate surface those routes would have produced is
-    # malformed.
-    if str(health.get("appeal_status") or "") == "provider_error":
-        add("error_certificate", malformed=True, missing=[])
-
-    # 8. Prosecution evidence gap: an unresolved terminal whose prosecution
-    # coverage is incomplete with zero surviving error certificates means the
-    # evidence obligation was never established for any generated candidate.
-    # The actionable owner is evidence_obligation (evidence sufficiency), not
-    # abstention_rule (boundary-standard shaping) — the evolve_50 abstention
-    # cluster was routed to abstention_rule only because no artifact exposed
-    # this gap.  A hollow complete defense (complete coverage, zero valid
-    # certificates) is left to the L2 coverage-validity policy so this rule
-    # never shadows the established hollow-defense routing.
-    try:
-        court_required = int(adjudication.get("required_candidate_count") or 0)
-    except (TypeError, ValueError):
-        court_required = 0
-    try:
-        valid_error = int(adjudication.get("valid_error_certificate_count") or 0)
-    except (TypeError, ValueError):
-        valid_error = 0
-    try:
-        valid_defense = int(adjudication.get("valid_defense_certificate_count") or 0)
-    except (TypeError, ValueError):
-        valid_defense = 0
-    surviving_ids = adjudication.get("surviving_error_certificate_ids")
-    surviving_count = len(surviving_ids) if isinstance(surviving_ids, list) else 0
-    prosecution_state = str(
-        getattr(signal, "prosecution_coverage_state", "")
-        or adjudication.get("prosecution_coverage") or ""
-    )
-    defense_state = str(
-        getattr(signal, "defense_coverage_state", "")
-        or adjudication.get("defense_coverage") or ""
-    )
-    hollow_defense = defense_state == "complete" and valid_defense == 0
-    hollow_prosecution = prosecution_state == "complete" and valid_error == 0
-    if (
-        state == "unresolved"
-        and prosecution_state == "incomplete"
-        and valid_error == 0
-        and surviving_count == 0
-        and court_required > 0
-        and int(getattr(signal, "candidate_count", 0) or 0) > 0
-        and not hollow_defense
-    ):
-        add("error_certificate", malformed=False, missing=["certificate"])
-
-    # 9. Defense evidence gap: mirror of item 8 on the defense side. An
-    # unresolved terminal with incomplete defense coverage and zero valid
-    # defense certificates means the clean-boundary evidence was never
-    # established for any candidate; the actionable owner is
-    # clean_defense_boundary (defense certificate issuance and coverage).
-    # A hollow complete prosecution is left to the L2 coverage-validity
-    # policy, symmetric with item 8's hollow-defense guard.
-    if (
-        state == "unresolved"
-        and defense_state == "incomplete"
-        and valid_defense == 0
-        and court_required > 0
-        and int(getattr(signal, "candidate_count", 0) or 0) > 0
-        and not hollow_prosecution
-    ):
-        add("defense_certificate", malformed=False, missing=["certificate"])
-
-    return artifacts
-
-
 def _attribute_failure(
     *,
     signal: Any,
@@ -1047,7 +872,7 @@ def _attribute_failure(
     primary_type: Any,
     case_id: str,
     non_l1_failure_attributions: list[dict[str, Any]],
-) -> tuple[str, str]:
+) -> tuple[str, str, FailureAttribution]:
     """Attribute one triggered failure to an evolvable layer and artifact.
 
     Delegates to the deterministic failure classifier and translates the
@@ -1057,7 +882,8 @@ def _attribute_failure(
     — guessing an L1 module for a failure outside the L1 editable surface
     ends in no-edit steps or no-effect replays — and are recorded in
     ``non_l1_failure_attributions`` as audit telemetry instead. Returns
-    ``(owner, reason_code)``; empty owner when nothing is actionable at L1.
+    ``(owner, reason_code, attribution)``; empty owner when nothing is
+    actionable at L1.
     """
     detection_result = detection_result or {}
     adjudication = detection_result.get("proof_adjudication") or {}
@@ -1074,7 +900,7 @@ def _attribute_failure(
     )
     fn_side = bool(gold_label) and state == "verified_clean"
     fp_side = gold_label is False and state == "verified_error"
-    provider_artifacts = _build_provider_artifact_projection(
+    provider_artifacts = project_provider_artifacts(
         detection_result=detection_result,
         signal=signal,
         primary_type=primary_type,
@@ -1098,8 +924,8 @@ def _attribute_failure(
         else:
             pool = frozenset()
         if pool is not None and owner not in pool:
-            return "", attribution.reason_code
-        return owner, attribution.reason_code
+            return "", attribution.reason_code, attribution
+        return owner, attribution.reason_code, attribution
     if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
         non_l1_failure_attributions.append({
             "case_id": case_id,
@@ -1109,7 +935,7 @@ def _attribute_failure(
             f"    [non-L1] failure attribution: {attribution.layer} "
             f"{attribution.artifact} ({attribution.reason_code})"
         )
-    return "", attribution.reason_code
+    return "", attribution.reason_code, attribution
 
 
 def _localization_bias_signal(
@@ -2780,6 +2606,10 @@ def run_online_evolution(
             memory_payload = json.load(handle)
         type_fitness.get_experience_memory().from_dict(memory_payload)
     stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+    # The causal episode payload attached to every step of the current
+    # case; reset per iteration so a stale episode never leaks to the next
+    # case's audit trail.
+    active_episode_payload: dict[str, Any] | None = None
 
     # A rolling set of label-free, previously stable cases protects decisive
     # behavior from catastrophic forgetting. These are evolution cases only;
@@ -3393,6 +3223,7 @@ def run_online_evolution(
 
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         step.attempt_index = active_attempt_index
+        step.episode = active_episode_payload
         steps.append(step)
         persist_progress(next_case_index)
 
@@ -4439,6 +4270,7 @@ def run_online_evolution(
         )
     while source_work_queue:
         idx, case_id, active_attempt_index = source_work_queue.popleft()
+        active_episode_payload = None
         if active_attempt_index > 0:
             budget_usage["mutation_retry_attempts"] += 1
         # --- Check halt (including convergence) ---
@@ -4602,13 +4434,43 @@ def run_online_evolution(
         evolution_direction = type_evolution._infer_evolution_direction(
             signal.state, signal.gold_label,
         )
-        attribution_owner, attribution_reason = _attribute_failure(
-            signal=signal,
-            detection_result=detection_result,
-            primary_type=type_result.primary_type,
-            case_id=case_id,
-            non_l1_failure_attributions=non_l1_failure_attributions,
+        attribution_owner, attribution_reason, classifier_attribution = (
+            _attribute_failure(
+                signal=signal,
+                detection_result=detection_result,
+                primary_type=type_result.primary_type,
+                case_id=case_id,
+                non_l1_failure_attributions=non_l1_failure_attributions,
+            )
         )
+        # The causal episode is the audit identity of this triggered case.
+        # It is built once from the authoritative attribution and travels
+        # with every step of this case; the reflection proposal is not yet
+        # influenced by it (Phase 1 wiring only).
+        episode_payload: dict[str, Any] | None = None
+        if signal.should_evolve and classifier_attribution.layer == LAYER_L1:
+            route = (
+                attribution_owner,
+                *(
+                    module for module in (signal.target_module,)
+                    if module != attribution_owner
+                ),
+            )
+            if signal.secondary_module and signal.secondary_module not in route:
+                route = (*route, signal.secondary_module)
+            try:
+                episode_payload = build_failure_episode(
+                    detection_result=detection_result,
+                    signal=signal,
+                    attribution=classifier_attribution,
+                    evolution_direction=evolution_direction,
+                    record_key=case_id,
+                    allowed_modules=route,
+                ).to_dict()
+            except UnaddressableFailure as exc:
+                episode_payload = {"unaddressable": str(exc)}
+        if episode_payload is not None:
+            active_episode_payload = episode_payload
         l2_attribution = next(
             (
                 entry for entry in reversed(non_l1_failure_attributions)
@@ -4631,6 +4493,24 @@ def run_online_evolution(
                     stable_cases += 1
                 else:
                     triggered_cases += 1
+            l2_episode_payload: dict[str, Any] | None = None
+            try:
+                l2_episode_payload = build_failure_episode(
+                    detection_result=detection_result,
+                    signal=signal,
+                    attribution=FailureAttribution(
+                        layer=str(l2_attribution.get("layer") or LAYER_L2),
+                        artifact=str(l2_attribution.get("artifact") or ""),
+                        reason_code=str(l2_attribution.get("reason_code") or ""),
+                        evidence=dict(l2_attribution.get("evidence") or {}),
+                    ),
+                    evolution_direction=evolution_direction,
+                    record_key=case_id,
+                    allowed_modules=(),
+                ).to_dict()
+            except UnaddressableFailure as exc:
+                l2_episode_payload = {"unaddressable": str(exc)}
+            active_episode_payload = l2_episode_payload
             if l2_stable_source:
                 # A stable-source L2 case skips the regular stable branch, so
                 # register its counter-case anchor here to keep the contrast

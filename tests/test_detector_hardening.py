@@ -4,7 +4,7 @@ from pathlib import Path
 from types import MethodType
 
 from src.sehd_v6.core.bccse.step_attributor import ErrorType
-from src.sehd_v6.core.bccse.types import FailureEpisode
+from src.sehd_v6.core.bccse.types import ReplayEpisode
 from src.sehd_v6.core.paca_tcl import proof_contract
 from src.sehd_v6.core.paca_tcl import proof_contract_v3_4
 from src.sehd_v6.core.paca_tcl import proof_engine
@@ -411,7 +411,7 @@ def test_invalid_occurrence_cannot_count_as_replay_correction() -> None:
         parent="parent",
         child="child",
         case_keys=("source",),
-        episodes=(FailureEpisode(
+        episodes=(ReplayEpisode(
             record_key="source",
             error_type=ErrorType.FALSE_POSITIVE,
             support_refs=("source",),

@@ -20,7 +20,7 @@ from src.sehd_v6.core.htc_tes.type_conditioned_evolution import (
     TypeConditionedEvolution,
 )
 from src.sehd_v6.core.bccse.genome import create_baseline_genome
-from src.sehd_v6.core.bccse.types import FailureEpisode
+from src.sehd_v6.core.bccse.types import ReplayEpisode
 from src.sehd_v6.core.paca_tcl.proof_evaluator import (
     MetricSnapshot,
     PacaTclV35EvolutionEvaluator,
@@ -306,7 +306,7 @@ def test_paired_replay_uses_boundary_refs_contract(monkeypatch) -> None:
         child=child,
         case_keys=("source", "boundary"),
         episodes=(
-            FailureEpisode(
+            ReplayEpisode(
                 record_key="source",
                 error_type="false_positive",
                 support_refs=("source",),
