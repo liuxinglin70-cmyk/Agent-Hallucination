@@ -7,7 +7,9 @@ baseline 差异极小、检测底座失效、覆盖率损失。每条结论都�
 
 ## 1. 证据基线
 
-`experiments/results/evolve_50/run/evolution_result.json`：
+证据来源：`experiments/results/evolve_50/run/evolution_result.json`（该运行由
+修复前的旧代码产生，产物已随仓库清理删除；本报告与
+`EVOLUTION_FIXES_SUMMARY.md` 保留全部关键计数与分布，作为唯一事实来源）：
 
 ```text
 total=50  triggered=36  accepted=1  rejected=16  stable=8  runtime_invalid=6

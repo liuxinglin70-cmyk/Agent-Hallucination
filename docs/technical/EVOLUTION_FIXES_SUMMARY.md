@@ -227,10 +227,40 @@ schema 落点的动作）、以及错误 owner 编辑改变错误模块输出面
   归因可区分：未注入 / 已注入但未应用 / 已应用但影响的字段与
   `observable_process_delta` 不一致 / 已影响但下游 court 不敏感。
 
-## 遗留方向（本报告未改动）
+## 后续优化方向
 
-- 无结构性遗留。`rule_effects` 仍是 provider 自报的 best-effort 证据
-  （fail-open，不参与判定）；当 provider 未上报时 `rule_effects_trace` 为
-  空，回落到 `injected_rule_trace` + observable delta 推断。若需更强的
-  客观证据，需要把规则执行下沉为确定性电路（而非 LLM 自报），目前不属于
-  L1 skill 层的能力边界。
+### D1：ActionSpec 确定性执行架构（唯一敞着的结构性缺口）
+
+**触发条件**：先用小批量验证实验证实 F1–F13 确实提升 L1 接受率，再投入
+此架构改造（否则可能基于未被验证的假设返工）。
+
+**现状**：L1 action 仍是「闭 opcode + 目标字段」的**自然语言注入**；执行
+证据依赖 provider 自报（`applied_rule_ids` / `rule_effects`，fail-open，
+不参与判定）。`rule_effects` 只能做归因提示，不能证明 condition 匹配或
+字段级确定性执行——self-report 的不可靠是残留不确定性的根源。
+
+**目标**：把 L1 action 从自然语言 + LLM 自报，升级为可确定性执行的
+ActionSpec：
+
+```text
+ActionSpec = {
+  module_id, route_id,          # 注入哪条 provider route
+  output_object, output_field,  # 作用在 schema 的哪个对象/字段
+  operation,                    # require_nonempty / emit / suppress / ...
+  postcondition,                # source replay 可确定性读取的字段级断言
+}
+```
+
+**落地要点**：
+1. 每个 ActionSpec 必须绑定真实 provider schema 字段——`MODULE_ACTION_TARGETS`
+   已是唯一词表源，继续作为 spec 的字段白名单。
+2. 变异端生成 ActionSpec；provider 侧把 spec 编译为确定性执行指令（而非
+   整段自然语言规则注入），消除「provider 是否理解自然语言规则」的不确定性。
+3. source replay 用 `postcondition` 做确定性校验：目标字段是否按 operation
+   改变了，替代 LLM 自报作为执行证据。
+4. 无 schema 落点的动作彻底移除或迁至 L2 policy（`shape_decisive_standard`
+   已先例）。
+5. 八模块的 opcode 表逐步替换为 spec 模板；自然语言规则仅作回溯兼容。
+
+**验收**：no_effect 归因不再依赖 provider 自报，即可区分「未注入 /
+已注入未触发 / 已触发但 postcondition 不满足 / 已满足但 court 不敏感」。

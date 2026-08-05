@@ -12,17 +12,20 @@ results are accepted.
 
 ```text
 experiments/
-├── README.md                # this file (tracked)
-├── plans/                   # experiment plans and task lists (tracked)
-└── protocols/               # protocol records (tracked)
-    ├── README.md            #   directory guide
-    └── used_case_ledger.txt #   used-case ledger
+├── README.md                  # this file (tracked)
+├── plans/                     # experiment plans and task lists (tracked)
+├── protocols/                 # protocol records (tracked)
+│   ├── README.md              #   directory guide
+│   └── used_case_ledger.txt   #   used-case ledger
+├── analyze_decision_profile.py  # offline decision-profile analysis (tracked)
+└── run_decision_replicas.py     # test-time-scaling replica experiment (tracked)
 ```
 
-Only `README.md`, `plans/` and the two files under `protocols/` are tracked
-by git.  Everything else in this directory is a local-only, git-ignored
-workspace: run scripts, dataset builds, caches, outputs and logs are created
-by runs as needed and are never required by the framework.
+Only `README.md`, `plans/`, the two files under `protocols/`, and the two
+decision-profile/replica scripts above are tracked by git.  Everything else
+in this directory is a local-only, git-ignored workspace: run scripts,
+dataset builds, caches, outputs and logs are created by runs as needed and
+are never required by the framework.
 
 ## Used-case ledger
 
