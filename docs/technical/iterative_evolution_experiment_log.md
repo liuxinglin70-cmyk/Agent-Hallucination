@@ -715,3 +715,75 @@ history_retrieved=0 符合预期：本批次是单案例并发隔离实验，每
 无框架缺陷需要修复，无需重跑。
 
 Verification: 525 tests passed。
+
+## Batch 6 post-review authoritative rerun (commit 2155710, 2026-08-06)
+
+The causal-loop review fixes in commit `2155710` changed framework code after
+the first batch 6 run. The batch gate was therefore reopened and the exact
+same ten-case manifest was rerun before selecting any new data. The original
+artifacts remain locally labelled `batch6_gold_before_2155710_review_fixes`;
+the current `batch6_gold` directory is the authoritative post-review run.
+
+### Execution result
+
+- Ten independent one-record processes launched concurrently against the
+  AutoDL `DeepSeek-V4-Flash` route. All ten exited with status 0.
+- Wall-clock duration was 1,380.5 seconds. Per-case durations ranged from
+  122.5 to 1,367.8 seconds.
+- All ten baseline detections reached a framework terminal state. There were
+  zero runtime-invalid records and no provider transport failures.
+- Three gold-positive records were already correct (`verified_error`) and
+  correctly produced `skip_stable` without manufacturing failure experience:
+  `BFCL/136`, `Magentic_One/088`, and `SmolAgents/047`.
+- Seven records entered evolution. Two L1 skills were accepted, seven L1
+  attempts were rejected or retried, and two L2 attributions recorded
+  `skip_no_policy` before falling through to L1.
+
+| case_id | gold | seconds | accepted | rejected | terminal decisions |
+|---|---:|---:|---:|---:|---|
+| BFCL/136 | true | 316.0 | 0 | 0 | skip_stable |
+| Camel/021 | true | 1022.2 | 1 | 1 | retry_fitness_no_effect, accept_batch |
+| Magentic_One/088 | true | 122.5 | 0 | 0 | skip_stable |
+| OpenDeepSearch/009 | false | 290.8 | 0 | 2 | L2 skip_no_policy, retry_structural, reject |
+| OpenDeepSearch/066 | false | 315.0 | 0 | 1 | retry_invalid_mutation, reject_fitness |
+| OpenDeepSearch/068 | false | 241.4 | 0 | 2 | L2 skip_no_policy, retry_structural, reject_fitness_no_effect |
+| OpenDeepSearch/093 | false | 221.1 | 0 | 1 | retry_invalid_mutation, reject_fitness_no_effect |
+| OpenManus/032 | true | 473.4 | 0 | 1 | reject_fitness |
+| OpenManus/056 | true | 1367.8 | 1 | 1 | retry_fitness_no_effect, accept_batch |
+| SmolAgents/047 | true | 162.8 | 0 | 0 | skip_stable |
+
+### Skill-trajectory acceptance evidence
+
+`Camel/021` kept a stable episode id across both attempts. The first rule was
+compiled, injected, and reported as applied, but had no matching effect trace;
+it was correctly retained as non-promotable `intervention_not_executed`. The
+second rule, owned by `atomic_verifier_instruction`, compiled the
+`verify_violation(benchmark_causal_status)` ActionSpec. Rule id
+`c5950dbcbb8c` appeared in the compiled, applied, effect, and executed traces.
+The episode recorded `compiled=true`, `injected=true`, `applied=true`,
+`no_effect_reason=expected_delta_observed`, and a court delta of
+`unresolved -> verified_error`, matching `gold=true`. Its failure-mechanism
+memory contains both the no-effect attempt and the effective representative.
+
+`OpenManus/056` also kept one episode id across its attempts. Its first
+quarantine rule was injected but did not execute and was retained only as
+non-promotable no-effect experience. The accepted
+`require_evidence_field(evidence_refs)` rule used id `38d4499e05d0` in all four
+compiled/applied/effect/executed traces. The episode recorded all execution
+booleans as true, `expected_delta_observed`, and the gold-correct court delta
+`unresolved -> verified_error`. The champion genome and effective mechanism
+representative contain this causal trajectory.
+
+Every other evolved record persisted a complete FailureEpisode and a
+non-promotable outcome appropriate to what actually happened: structural
+rejection, invalid mutation, intervention not executed, no measurable local
+change, or gold-direction regression. The two L2 failures persisted
+`no_executable_policy_for_attribution` and did not fabricate a policy edit.
+
+### Gate decision
+
+The post-review code satisfies the batch 6 gate: result artifacts, genome
+changes, FailureEpisode attempts, and experience-memory representatives agree
+with one another. No new framework defect was found, so no additional code
+change or same-batch rerun was required. Repository verification at this
+commit is 535 tests passed.
