@@ -230,6 +230,7 @@ class FailureAttempt:
     downstream_court_delta: tuple[str, ...]
     no_effect_reason: str
     decision: str
+    proposal_content: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -246,6 +247,7 @@ class FailureAttempt:
             "downstream_court_delta": list(self.downstream_court_delta),
             "no_effect_reason": self.no_effect_reason,
             "decision": self.decision,
+            "proposal_content": self.proposal_content,
         }
 
     @classmethod
@@ -268,6 +270,7 @@ class FailureAttempt:
             ),
             no_effect_reason=str(value.get("no_effect_reason") or ""),
             decision=str(value.get("decision") or ""),
+            proposal_content=str(value.get("proposal_content") or ""),
         )
 
 
@@ -1153,4 +1156,20 @@ def attempt_id_for(
         "episode_id": episode_id,
         "proposal_signature": proposal_signature,
         "logical_attempt_index": int(logical_attempt_index),
+    })
+
+
+def proposal_signature_for(
+    *,
+    operation: str,
+    target_module: str,
+    action_spec: Mapping[str, Any] | None = None,
+    proposal_content: str = "",
+) -> str:
+    """Stable identity of one proposal within an episode."""
+    return _stable_identity({
+        "operation": str(operation or ""),
+        "target_module": str(target_module or ""),
+        "action_spec": dict(action_spec or {}),
+        "proposal_content": " ".join(str(proposal_content or "").split())[:240],
     })

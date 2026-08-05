@@ -98,6 +98,7 @@ class Representative:
     causal_slice: dict[str, Any]
     action_spec: dict[str, Any]
     outcome: dict[str, Any]
+    rule_text: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +109,7 @@ class Representative:
             "causal_slice": dict(self.causal_slice),
             "action_spec": dict(self.action_spec),
             "outcome": dict(self.outcome),
+            "rule_text": self.rule_text,
         }
 
     @classmethod
@@ -120,6 +122,7 @@ class Representative:
             causal_slice=dict(value.get("causal_slice") or {}),
             action_spec=dict(value.get("action_spec") or {}),
             outcome=dict(value.get("outcome") or {}),
+            rule_text=str(value.get("rule_text") or ""),
         )
 
 
@@ -259,6 +262,7 @@ class EvolutionExperienceMemory:
                 "observable_delta": list(attempt.observable_delta),
                 "downstream_court_delta": list(attempt.downstream_court_delta),
             },
+            rule_text=" ".join(str(attempt.proposal_content or "").split())[:240],
         )
         if _better(candidate, entry.representatives.get(slot)):
             entry.representatives[slot] = candidate

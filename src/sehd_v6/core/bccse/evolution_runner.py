@@ -101,11 +101,14 @@ from .v6_contracts import (
     build_adjudication_facts,
 )
 from .failure_episode import (
+    FailureAttempt,
     FailureEpisode,
     UnaddressableFailure,
+    attempt_id_for,
     build_failure_episode,
     project_failure_episode_for_prompt,
     project_provider_artifacts,
+    proposal_signature_for,
 )
 from .evolution_experience_memory import EvolutionExperienceMemory
 from .module_charter import validate_action_surface
@@ -465,6 +468,103 @@ def _classify_replay_no_effect(
     if valid_moved:
         return "provider_output_changed_but_court_invariant"
     return "output_changed_then_quarantined"
+
+
+def _rule_in_trace(rule_id: str, trace: Any) -> bool:
+    """Whether a stable rule id appears in an injected/applied rule trace."""
+    if not rule_id:
+        return False
+    if not isinstance(trace, Mapping):
+        return False
+    return any(
+        str(value) == rule_id
+        for bucket in trace.values()
+        if isinstance(bucket, (list, tuple))
+        for value in bucket
+    )
+
+
+def _injected_applied_flags(
+    edit: SkillEdit,
+    candidate_result: Mapping[str, Any] | None,
+) -> tuple[bool, bool]:
+    """Execution evidence for one edit on its source replay.
+
+    The rule id is derived from module + normalized condition (same stable
+    id the provider traces use), so injected/applied are read from the
+    provider's own self-report, never guessed from the final state.
+    """
+    candidate_result = candidate_result or {}
+    from ..paca_tcl.skill_integration import _rule_stable_id
+
+    rule_id = _rule_stable_id(edit.target_module, edit.new_content)
+    injected = _rule_in_trace(
+        rule_id, candidate_result.get("injected_rule_trace")
+    )
+    applied = _rule_in_trace(
+        rule_id, candidate_result.get("applied_rule_trace")
+    )
+    return injected, applied
+
+
+def _no_effect_reason_for(
+    classification: str,
+    injected: bool,
+    applied: bool,
+) -> str:
+    """Map the replay evidence to the closed no-effect vocabulary.
+
+    The semantic split (condition vs provider obedience) is only decided
+    when the execution traces show where the rule stopped; otherwise the
+    reason stays ``unresolved_no_effect``.
+    """
+    if classification == "output_changed_then_quarantined":
+        return "output_changed_then_removed_or_quarantined"
+    if classification == "provider_output_changed_but_court_invariant":
+        return "provider_output_changed_but_downstream_invariant"
+    if not injected:
+        return "condition_not_matched"
+    if not applied:
+        return "provider_did_not_apply_action"
+    return "unresolved_no_effect"
+
+
+def _cross_case_no_effect_duplicate(
+    *,
+    target_module: str,
+    new_content: str,
+    entries: Sequence[Any],
+    exclude_episode_id: str,
+) -> bool:
+    """Whether the same mechanism already confirmed this proposal no-effect.
+
+    Reuses the existing semantic-overlap duplicate check across the causal
+    memory's no-effect representatives, so a later same-mechanism case does
+    not replay a proposal the framework already executed without effect.
+    """
+    if not new_content or not entries:
+        return False
+    from .genome import semantic_overlap
+
+    for entry in entries:
+        representative = entry.representatives.get("no_effect")
+        if representative is None:
+            continue
+        if representative.episode_id == exclude_episode_id:
+            continue
+        if str(
+            (representative.outcome or {}).get("decision") or ""
+        ).startswith("accept"):
+            continue
+        prior_text = str(representative.rule_text or "")
+        if not prior_text:
+            continue
+        try:
+            if semantic_overlap(prior_text, new_content) >= 0.85:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _build_rejection_summary(
@@ -3170,6 +3270,59 @@ def run_online_evolution(
         steps.append(step)
         persist_progress(next_case_index)
 
+    def record_attempt(
+        *,
+        decision: str,
+        operation: str = "",
+        target_module: str = "",
+        action_spec: Mapping[str, Any] | None = None,
+        structural_result: str = "accepted",
+        compiled: bool = False,
+        injected: bool = False,
+        applied: bool = False,
+        observable_delta: Sequence[str] = (),
+        downstream_court_delta: Sequence[str] = (),
+        no_effect_reason: str = "",
+        proposal_content: str = "",
+    ) -> None:
+        """Append one execution outcome to the current episode."""
+        nonlocal active_episode_payload
+        if (
+            active_episode_payload is None
+            or "episode_id" not in active_episode_payload
+        ):
+            return
+        episode = FailureEpisode.from_dict(active_episode_payload)
+        proposal = proposal_signature_for(
+            operation=operation,
+            target_module=target_module,
+            action_spec=action_spec,
+            proposal_content=proposal_content,
+        )
+        attempt = FailureAttempt(
+            attempt_id=attempt_id_for(
+                episode.episode_id, proposal, len(episode.attempts),
+            ),
+            proposal_signature=proposal,
+            operation=operation,
+            target_module=target_module,
+            action_spec=dict(action_spec or {}),
+            structural_result=structural_result,
+            compiled=compiled,
+            injected=injected,
+            applied=applied,
+            observable_delta=tuple(str(value) for value in observable_delta),
+            downstream_court_delta=tuple(
+                str(value) for value in downstream_court_delta
+            ),
+            no_effect_reason=no_effect_reason,
+            decision=decision,
+            proposal_content=" ".join(str(proposal_content).split())[:240],
+        )
+        updated = replace(episode, attempts=(*episode.attempts, attempt))
+        causal_memory.upsert_attempt(updated, attempt)
+        active_episode_payload = updated.to_dict()
+
     def fitness_gold(case_id: str) -> bool | None:
         if not fitness_use_gold:
             return None
@@ -3997,6 +4150,49 @@ def run_online_evolution(
                     **(step.fitness_check or {}),
                     "batch": batch_audit,
                 }
+                injected_flag, applied_flag = _injected_applied_flags(
+                    item.edit, _shadow_result,
+                )
+                state_after = str(
+                    getattr(item.source_after_signal, "state", "")
+                )
+                accepted_deltas = tuple(
+                    _expected_effect_audit(
+                        item.edit,
+                        item.individual_assessment,
+                        before=item.source_signal,
+                        after=item.source_after_signal,
+                        before_result=item.source_result,
+                        after_result=_shadow_result,
+                    )["observable_deltas"]
+                )
+                record_attempt(
+                    decision="accept_batch",
+                    operation=(
+                        item.edit.operation.value
+                        if isinstance(item.edit.operation, SkillOp)
+                        else str(item.edit.operation)
+                    ),
+                    target_module=item.edit.target_module,
+                    action_spec=item.edit.action_spec,
+                    structural_result="accepted",
+                    compiled=bool(item.edit.action_spec),
+                    injected=injected_flag,
+                    applied=applied_flag,
+                    observable_delta=accepted_deltas,
+                    downstream_court_delta=(
+                        (
+                            f"state:{item.source_signal.state}->{state_after}",
+                        )
+                        if state_after and state_after != item.source_signal.state
+                        else ()
+                    ),
+                    no_effect_reason=(
+                        "expected_delta_observed" if accepted_deltas else ""
+                    ),
+                    proposal_content=item.edit.new_content,
+                )
+                step.episode = active_episode_payload
 
             # Snapshot only after fitness metadata and experience have been
             # attached, so artifacts with the same hash have identical audit
@@ -4137,6 +4333,39 @@ def run_online_evolution(
                     **(step.fitness_check or {}),
                     "batch": batch_audit,
                 }
+                rejected_flags = _injected_applied_flags(
+                    item.edit, item.source_after_result,
+                )
+                record_attempt(
+                    decision="rollback_batch",
+                    operation=(
+                        item.edit.operation.value
+                        if isinstance(item.edit.operation, SkillOp)
+                        else str(item.edit.operation)
+                    ),
+                    target_module=item.edit.target_module,
+                    action_spec=item.edit.action_spec,
+                    structural_result="accepted",
+                    compiled=bool(item.edit.action_spec),
+                    injected=rejected_flags[0],
+                    applied=rejected_flags[1],
+                    observable_delta=tuple(
+                        batch_effect["observable_deltas"]
+                    ),
+                    no_effect_reason=(
+                        _no_effect_reason_for(
+                            _classify_replay_no_effect(
+                                item.source_result, item.source_after_result,
+                            ),
+                            rejected_flags[0],
+                            rejected_flags[1],
+                        )
+                        if item.individual_assessment.decision == "no_effect"
+                        else ""
+                    ),
+                    proposal_content=item.edit.new_content,
+                )
+                step.episode = active_episode_payload
 
         probe_due_reason = ""
         if accepted_indices and registered_probe_ids:
@@ -5297,6 +5526,22 @@ def run_online_evolution(
                         "retry_duplicate_proposal:"
                         f"module={target_module}"
                     )
+                elif _cross_case_no_effect_duplicate(
+                    target_module=target_module,
+                    new_content=new_content,
+                    entries=causal_memory.entries(),
+                    exclude_episode_id=(
+                        active_episode_payload.get("episode_id", "")
+                        if active_episode_payload is not None else ""
+                    ),
+                ):
+                    # Phase 4: a later same-mechanism case must not replay a
+                    # proposal the framework already executed without effect;
+                    # the reflection retries with a distinct discriminator.
+                    invalid_mutation_reason = (
+                        "cross_case_no_effect_duplicate:"
+                        f"module={target_module}"
+                    )
                 elif operation == "remove_rule" and rule_index is not None:
                     edit = SkillEdit(
                         edit_id=f"edit_{uuid.uuid4().hex[:8]}",
@@ -5402,6 +5647,11 @@ def run_online_evolution(
                 feature_description="",
                 type_confidence=type_result.confidence,
             )
+            record_attempt(
+                decision="no_edit",
+                structural_result="no_proposal",
+                no_effect_reason="",
+            )
             gate.record_no_edit()
             record_step(EvolutionStep(
                 case_id=case_id,
@@ -5444,6 +5694,13 @@ def run_online_evolution(
                 )
             else:
                 gate.record_no_edit()
+            record_attempt(
+                decision=(
+                    "retry_invalid_mutation"
+                    if retry_scheduled else "skip_invalid_mutation"
+                ),
+                structural_result="invalid_mutation",
+            )
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -5519,6 +5776,19 @@ def run_online_evolution(
                     gate.defer_structural_reject(cert)
                     source_work_queue.appendleft(
                         (idx, case_id, active_attempt_index + 1)
+                    )
+                    record_attempt(
+                        decision="retry_structural",
+                        operation=(
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        ),
+                        target_module=edit.target_module,
+                        action_spec=edit.action_spec or pending_action_spec,
+                        structural_result="rejected",
+                        compiled=bool(edit.action_spec or pending_action_spec),
+                        proposal_content=edit.new_content,
                     )
                     record_step(EvolutionStep(
                         case_id=case_id,
@@ -5623,6 +5893,21 @@ def run_online_evolution(
                     source_work_queue.appendleft(
                         (idx, case_id, active_attempt_index + 1)
                     )
+                record_attempt(
+                    decision=(
+                        "retry_structural" if retry_scheduled else "reject"
+                    ),
+                    operation=(
+                        edit.operation.value
+                        if isinstance(edit.operation, SkillOp)
+                        else str(edit.operation)
+                    ),
+                    target_module=edit.target_module,
+                    action_spec=edit.action_spec or pending_action_spec,
+                    structural_result="rejected",
+                    compiled=bool(edit.action_spec or pending_action_spec),
+                    proposal_content=edit.new_content,
+                )
                 record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -5725,6 +6010,19 @@ def run_online_evolution(
             gate.revoke_structural_accept(cert, [f"apply_edit_failed:{e}"])
             gate.record_no_edit()
             edits_rejected += 1
+            record_attempt(
+                decision="reject_apply",
+                operation=(
+                    edit.operation.value
+                    if isinstance(edit.operation, SkillOp)
+                    else str(edit.operation)
+                ),
+                target_module=edit.target_module,
+                action_spec=edit.action_spec or pending_action_spec,
+                structural_result="accepted",
+                compiled=bool(edit.action_spec or pending_action_spec),
+                proposal_content=edit.new_content,
+            )
             record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -5770,6 +6068,20 @@ def run_online_evolution(
                 gate.revoke_structural_accept(cert, [reason])
                 gate.record_no_edit()
                 edits_rejected += 1
+                record_attempt(
+                    decision="reject_fitness_runtime",
+                    operation=(
+                        edit.operation.value
+                        if isinstance(edit.operation, SkillOp)
+                        else str(edit.operation)
+                    ),
+                    target_module=edit.target_module,
+                    action_spec=edit.action_spec or pending_action_spec,
+                    structural_result="accepted",
+                    compiled=bool(edit.action_spec or pending_action_spec),
+                    no_effect_reason="unresolved_no_effect",
+                    proposal_content=edit.new_content,
+                )
                 record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -6065,6 +6377,35 @@ def run_online_evolution(
                     gate.revoke_structural_accept(cert, reasons)
                     gate.record_no_edit()
                     edits_rejected += 1
+                    injected_flag, applied_flag = _injected_applied_flags(
+                        edit, candidate_result
+                    )
+                    state_after = str(
+                        getattr(candidate_signal, "state", "")
+                    )
+                    record_attempt(
+                        decision="reject_fitness",
+                        operation=(
+                            edit.operation.value
+                            if isinstance(edit.operation, SkillOp)
+                            else str(edit.operation)
+                        ),
+                        target_module=edit.target_module,
+                        action_spec=edit.action_spec or pending_action_spec,
+                        structural_result="accepted",
+                        compiled=bool(edit.action_spec or pending_action_spec),
+                        injected=injected_flag,
+                        applied=applied_flag,
+                        observable_delta=effect_audit["observable_deltas"],
+                        downstream_court_delta=(
+                            (
+                                f"state:{signal.state}->{state_after}",
+                            )
+                            if state_after and state_after != signal.state
+                            else ()
+                        ),
+                        proposal_content=edit.new_content,
+                    )
                     rejected_buffer.append(RejectedEditEntry(
                         proposal=type(
                             "P",
@@ -6160,6 +6501,34 @@ def run_online_evolution(
                     )
                 else:
                     gate.record_no_edit()
+                injected_flag, applied_flag = _injected_applied_flags(
+                    edit, candidate_result
+                )
+                classification = str(
+                    fitness_audit.get("no_effect_classification") or ""
+                )
+                record_attempt(
+                    decision=(
+                        "retry_fitness_no_effect"
+                        if retry_scheduled else "reject_fitness_no_effect"
+                    ),
+                    operation=(
+                        edit.operation.value
+                        if isinstance(edit.operation, SkillOp)
+                        else str(edit.operation)
+                    ),
+                    target_module=edit.target_module,
+                    action_spec=edit.action_spec or pending_action_spec,
+                    structural_result="accepted",
+                    compiled=bool(edit.action_spec or pending_action_spec),
+                    injected=injected_flag,
+                    applied=applied_flag,
+                    observable_delta=effect_audit["observable_deltas"],
+                    no_effect_reason=_no_effect_reason_for(
+                        classification, injected_flag, applied_flag,
+                    ),
+                    proposal_content=edit.new_content,
+                )
                 fitness_audit["retry_scheduled"] = retry_scheduled
                 fitness_audit["retry_reason"] = rejected_entry.feedback_summary()
                 record_step(EvolutionStep(
