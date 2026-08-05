@@ -210,22 +210,27 @@ schema 落点的动作）、以及错误 owner 编辑改变错误模块输出面
   `clean_defense_boundary`。Hollow complete prosecution 保持归 L2，与
   F7 的 hollow-defense 守卫对称。
 
-**F12：provider 执行效果分层（applied_rule_ids 闭环）**
+**F12：provider 执行效果分层（rule_effects 字段级绑定闭环）**
 （`skill_integration.py` + `evolution_runner.py`）
 - `_compile_module_delta` 在每条注入规则文本内联稳定 rule id
   （`【module】[id] rule`），并在注入 fragment 末尾指示 provider：若实际
-  应用了某条进化规则，在 JSON 顶层输出 `applied_rule_ids`。
-- `make_skill_aware_provider` 把 `applied_rule_ids` 从 provider 输出中剥离
-  进 meta（`bccse_applied_rule_ids`），下游 schema 校验只看到基础契约。
-- 检测结果新增 `applied_rule_trace`（route → provider 自报应用的规则 id），
-  与 `compiled_rule_trace` / `injected_rule_trace` 三层闭环。no_effect 归因
-  现可区分：未注入 / 已注入但未应用 / 已应用但无 observable 变化。
+  应用了某条进化规则，在 JSON 顶层输出 `rule_effects` 数组，每项
+  `{"rule_id":"<id>","output_fields":["<影响的输出字段>"]}`。
+- `make_skill_aware_provider` 归一化 `rule_effects`（丢弃空 rule_id / 非
+  Mapping 项），从 provider 输出中剥离进 meta
+  （`bccse_rule_effects`），并派生 `bccse_applied_rule_ids`；兼容旧扁平
+  `applied_rule_ids` 自报（合成无字段绑定的 effects）。下游 schema 校验
+  只看到基础契约。
+- 检测结果新增四层 rule trace：`compiled_rule_trace` →
+  `injected_rule_trace` → `applied_rule_trace` →
+  `rule_effects_trace`（route → 每条应用规则影响到的输出字段）。no_effect
+  归因可区分：未注入 / 已注入但未应用 / 已应用但影响的字段与
+  `observable_process_delta` 不一致 / 已影响但下游 court 不敏感。
 
 ## 遗留方向（本报告未改动）
 
-- **provider 条件匹配的最终确认**：`applied_rule_ids` 是 provider 自报的
-  best-effort 证据（fail-open，不参与判定）。当 provider 未上报时，
-  `applied_rule_trace` 为空，只能回到 `injected_rule_trace` + observable
-  delta 推断。若需强闭合，需要 provider 在输出中增加每个
-  certificate/candidate 与所应用规则的字段级绑定（rule-level execution
-  effect），目前通过 `applied_rule_ids` 提供了最小闭环。
+- 无结构性遗留。`rule_effects` 仍是 provider 自报的 best-effort 证据
+  （fail-open，不参与判定）；当 provider 未上报时 `rule_effects_trace` 为
+  空，回落到 `injected_rule_trace` + observable delta 推断。若需更强的
+  客观证据，需要把规则执行下沉为确定性电路（而非 LLM 自报），目前不属于
+  L1 skill 层的能力边界。

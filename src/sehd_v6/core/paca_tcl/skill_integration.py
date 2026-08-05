@@ -488,7 +488,9 @@ def make_skill_aware_provider(
             lines.extend([
                 "",
                 "如果本输出实际应用了上述某条进化规则（方括号中的规则 id），"
-                "请在 JSON 顶层添加 applied_rule_ids 数组列出对应 id；未应用则省略该字段。",
+                "请在 JSON 顶层添加 rule_effects 数组，每项为 "
+                '{"rule_id":"<id>","output_fields":["<该规则影响的输出字段>"]}；'
+                "未应用则省略该字段。",
             ])
         fragment_text = "\n".join(lines)
         fragment_hash = hashlib.sha256(fragment_text.encode("utf-8")).hexdigest()
@@ -501,14 +503,42 @@ def make_skill_aware_provider(
             user=user,
             cache_dir=cache_dir,
         )
-        applied_rule_ids: list[str] = []
+        rule_effects: list[dict[str, Any]] = []
         if isinstance(value, Mapping):
-            raw_applied = value.get("applied_rule_ids")
-            if isinstance(raw_applied, list):
-                applied_rule_ids = [str(item) for item in raw_applied]
-            # The self-report field is telemetry, not provider output; strip
-            # it so downstream schema validation sees only the base contract.
+            raw_effects = value.get("rule_effects")
+            if isinstance(raw_effects, list):
+                for effect in raw_effects:
+                    if not isinstance(effect, Mapping):
+                        continue
+                    rule_id = str(effect.get("rule_id") or "").strip()
+                    if not rule_id:
+                        continue
+                    fields = effect.get("output_fields")
+                    field_list = (
+                        [str(field) for field in fields]
+                        if isinstance(fields, list) else []
+                    )
+                    rule_effects.append({
+                        "rule_id": rule_id,
+                        "output_fields": field_list,
+                    })
+            if not rule_effects:
+                # Legacy flat self-report (id list) still synthesizes effects
+                # with no field binding; rule_effects is the field-level
+                # contract.
+                raw_applied = value.get("applied_rule_ids")
+                if isinstance(raw_applied, list):
+                    rule_effects = [
+                        {"rule_id": str(item), "output_fields": []}
+                        for item in raw_applied if str(item).strip()
+                    ]
+            applied_rule_ids = list(dict.fromkeys(
+                str(effect["rule_id"]) for effect in rule_effects
+            ))
+            # Self-report fields are telemetry, not provider output; strip
+            # them so downstream schema validation sees only the base contract.
             value = dict(value)
+            value.pop("rule_effects", None)
             value.pop("applied_rule_ids", None)
         return value, {
             **meta,
@@ -518,6 +548,7 @@ def make_skill_aware_provider(
             "bccse_injected_modules": list(injected_modules),
             "bccse_injected_rule_ids": injected_rule_ids,
             "bccse_applied_rule_ids": applied_rule_ids,
+            "bccse_rule_effects": rule_effects,
             "bccse_stage_skill_hash": fragment_hash,
             "bccse_route_skill_hash": fragment_hash,
         }

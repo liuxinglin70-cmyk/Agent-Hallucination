@@ -4702,6 +4702,41 @@ def test_collect_applied_rule_trace_walks_provider_metas() -> None:
     assert runner._collect_applied_rule_trace({}) == {}
 
 
+def test_collect_rule_effects_trace_binds_rules_to_fields() -> None:
+    """rule_effects_trace binds each applied rule to the output fields it
+    affected per provider route, deduplicated."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    result = {
+        "providers": {
+            "focused_prosecution": [
+                {
+                    "bccse_route": "focused_prosecution_route",
+                    "bccse_rule_effects": [
+                        {"rule_id": "f1", "output_fields": ["norm_evidence_refs"]},
+                        {"rule_id": "f1", "output_fields": ["norm_evidence_refs"]},
+                    ],
+                },
+                {
+                    "bccse_route": "focused_prosecution_route",
+                    "bccse_rule_effects": [
+                        {"rule_id": "f2", "output_fields": ["impact_evidence_refs"]},
+                    ],
+                },
+            ],
+            "defense_route": {"bccse_route": "defense_route", "bccse_rule_effects": []},
+            "boundary_route": {"outcome": "failed_closed"},
+        },
+    }
+    assert runner._collect_rule_effects_trace(result) == {
+        "focused_prosecution_route": [
+            {"rule_id": "f1", "output_fields": ["norm_evidence_refs"]},
+            {"rule_id": "f2", "output_fields": ["impact_evidence_refs"]},
+        ],
+    }
+    assert runner._collect_rule_effects_trace({}) == {}
+
+
 # ---------------------------------------------------------------------------
 # v5.8 fix 4: localization-bias telemetry.  Diagnostic only; never feeds
 # verdicts or fitness.

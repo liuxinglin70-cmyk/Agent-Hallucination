@@ -1645,6 +1645,46 @@ def _collect_applied_rule_trace(
     return _collect_rule_trace(result, "bccse_applied_rule_ids")
 
 
+def _collect_rule_effects_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    """Field-level binding: which output fields each applied rule affected,
+    per provider route, from the provider's ``rule_effects`` self-report."""
+    providers = result.get("providers")
+    if not isinstance(providers, Mapping):
+        return {}
+    trace: dict[str, list[dict[str, Any]]] = {}
+
+    def walk(node: Any) -> None:
+        if isinstance(node, Mapping):
+            effects = node.get("bccse_rule_effects")
+            if isinstance(effects, list) and effects:
+                route_key = str(node.get("bccse_route") or "unknown_route")
+                bucket = trace.setdefault(route_key, [])
+                for effect in effects:
+                    if not isinstance(effect, Mapping):
+                        continue
+                    rule_id = str(effect.get("rule_id") or "").strip()
+                    if not rule_id:
+                        continue
+                    fields = effect.get("output_fields")
+                    field_list = (
+                        [str(field) for field in fields]
+                        if isinstance(fields, list) else []
+                    )
+                    entry = {"rule_id": rule_id, "output_fields": field_list}
+                    if entry not in bucket:
+                        bucket.append(entry)
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(providers)
+    return trace
+
+
 def _run_detection_with_genome(
     genome: SkillGenome,
     case_id: str,
@@ -1756,10 +1796,12 @@ def _run_detection_with_genome(
     if compiled_rule_trace:
         # Compiled rule trace: which evolved rules exist in this genome.
         # Audit telemetry only; it never participates in a verdict. The
-        # per-route injected/applied traces live in the result too.
+        # per-route injected/applied/field-effect traces live in the result
+        # too.
         result["compiled_rule_trace"] = compiled_rule_trace
         result["injected_rule_trace"] = _collect_injected_rule_trace(result)
         result["applied_rule_trace"] = _collect_applied_rule_trace(result)
+        result["rule_effects_trace"] = _collect_rule_effects_trace(result)
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
     # but they cannot enter source fitness or champion promotion.
@@ -5707,8 +5749,10 @@ def run_online_evolution(
                 # lists the evolved rules present in this genome;
                 # ``injected_rule_trace`` lists which rules each provider route
                 # received; ``applied_rule_trace`` lists which ones the provider
-                # self-reported applying — so a no-effect replay can distinguish
-                # a rule that was never injected from one the provider ignored.
+                # self-reported applying; ``rule_effects_trace`` binds each
+                # applied rule to the output fields it affected — so a
+                # no-effect replay can distinguish a rule that was never
+                # injected from one the provider ignored.
                 "compiled_rule_trace": (
                     candidate_result.get("compiled_rule_trace")
                     if isinstance(candidate_result, Mapping) else None
@@ -5719,6 +5763,10 @@ def run_online_evolution(
                 ),
                 "applied_rule_trace": (
                     candidate_result.get("applied_rule_trace")
+                    if isinstance(candidate_result, Mapping) else None
+                ),
+                "rule_effects_trace": (
+                    candidate_result.get("rule_effects_trace")
                     if isinstance(candidate_result, Mapping) else None
                 ),
                 "no_effect_classification": (

@@ -352,7 +352,14 @@ def test_abstention_rule_reaches_boundary_provider() -> None:
 
     def provider(*, route, system, user, cache_dir):
         captured["system"] = system
-        return {"state": "verified_clean", "applied_rule_ids": ["abc123"]}, {}
+        return {
+            "state": "verified_clean",
+            "rule_effects": [
+                {"rule_id": "abc123", "output_fields": ["evidence_refs"]},
+                {"rule_id": "  ", "output_fields": ["dropped"]},
+                {"output_fields": ["dropped"]},
+            ],
+        }, {}
 
     compiled = compile_genome_for_paca(evolved)
     wrapped = make_skill_aware_provider(
@@ -367,14 +374,18 @@ def test_abstention_rule_reaches_boundary_provider() -> None:
         cache_dir=None,
     )
     assert "return clean" in captured["system"]
-    assert "applied_rule_ids" in captured["system"]
+    assert "rule_effects" in captured["system"]
     assert "abstention_rule" in meta["bccse_injected_modules"]
     assert meta["bccse_injected_rule_ids"] == [
         rule_id for rule_id, _rule in compiled.delta_rule_ids["abstention_rule"]
     ]
-    # The provider's self-report is telemetry: carried in the meta and
+    # The provider's self-report is telemetry: normalized in the meta and
     # stripped from the output value so schema validation stays clean.
+    assert meta["bccse_rule_effects"] == [
+        {"rule_id": "abc123", "output_fields": ["evidence_refs"]},
+    ]
     assert meta["bccse_applied_rule_ids"] == ["abc123"]
+    assert "rule_effects" not in value
     assert "applied_rule_ids" not in value
     assert value["state"] == "verified_clean"
     assert meta["bccse_route"] == "boundary_route"
