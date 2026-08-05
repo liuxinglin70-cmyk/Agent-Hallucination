@@ -1,6 +1,17 @@
 # SEHD used-case ledger: every case_id consumed by trials, evolution
 # subsets, full-50 streams and the reserved validation_100 holdout.
 # Future experiments MUST exclude all ids below (handoff discipline).
+# --- 10-case concurrent batch3 (2026-08-05) ---
+BFCL/042
+Camel/039
+Magentic_One/001
+OpenDeepSearch/052
+OpenDeepSearch/062
+OpenDeepSearch/083
+OpenDeepSearch/085
+OpenManus/072
+OpenManus/083
+SmolAgents/078
 BFCL/000
 BFCL/001
 BFCL/002

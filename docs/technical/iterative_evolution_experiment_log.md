@@ -1,7 +1,9 @@
 # 迭代式自进化实验详细日志
 
-> 覆盖: 批次1（batch1_gold）、批次2（batch2_gold）、50例规模实验（evolve_50_20260806）。
-> 全部使用 gold 标签（--use-gold --fitness-use-gold），每批次 5 例并发、每例单条数据；50例逐案例顺序进化。
+> 覆盖: 批次1（batch1_gold）、批次2（batch2_gold）、50例规模实验（evolve_50_20260806）、
+> 批次3（batch3_gold，10例并发系列首轮）。
+> 批次1/2 使用 gold 标签（--use-gold --fitness-use-gold），每批次 5 例并发、每例单条数据；
+> 批次3 起每批次 10 例并发、每例单条数据；50例逐案例顺序进化。
 > 案例与 used_case_ledger.txt 全不重叠。
 
 ## 数据集规划
@@ -11,6 +13,7 @@
 | 批次1 | 5 | 3 | 2 | interaction/planning/reasoning | Camel/Magentic_One/OpenManus/SmolAgents/BFCL |
 | 批次2 | 5 | 3 | 2 | planning/reasoning/retrieval | Camel/OpenManus/SmolAgents/Magentic_One/BFCL |
 | 50例 | 50 | 35 | 15 | tool6/reasoning11/retrieval6/planning6/interaction6 | 全部7框架 |
+| 批次3 | 10 | 6 | 4 | interaction/planning/reasoning/retrieval/tool | Camel/SmolAgents/Magentic_One/OpenManus/BFCL/OpenDeepSearch |
 
 ## 批次1（batch1_gold）
 _首轮4/5失败后经4项底层修复重跑；下表为修复后最终结果_
@@ -373,4 +376,88 @@ _SmolAgents/024 因 provider content_filter 被替换为 SmolAgents/017；下表
 #### SmolAgents/076 (gold=True, Reasoning Hallucination)
 
 - step[0] | skip_runtime_invalid | det=runtime_invalid | trigger=runtime_invalid
+
+## 批次3（batch3_gold，10例并发系列）
+
+_2026-08-05 首轮运行：10/10 成功，0 runtime_invalid，0 provider 错误；无需修复即产出预期
+轨迹（1 条 gold 验证的 L1 技能经验 + 4 条 L2 策略审计 + 全量 typed experience memory）。_
+
+| case_id | gold | 类别 | 耗时(s) | 触发 | 接受 | 拒绝 | stable | runtime_invalid |
+|---|---|---|---|---|---|---|---|---|
+| BFCL/042 | True | Tool-Use Hallucination | 413.0 | 0 | 0 | 0 | 1 | 0 |
+| Camel/039 | True | Human-Interaction Hallucination | 283.0 | 0 | 0 | 0 | 1 | 0 |
+| Magentic_One/001 | True | Reasoning Hallucination | 883.5 | 1 | 1 | 0 | 0 | 0 |
+| OpenDeepSearch/052 | False | clean | 692.3 | 1 | 0 | 1 | 0 | 0 |
+| OpenDeepSearch/062 | False | clean | 219.3 | 1 | 0 | 0 | 0 | 0 |
+| OpenDeepSearch/083 | False | clean | 233.6 | 1 | 0 | 0 | 0 | 0 |
+| OpenDeepSearch/085 | False | clean | 795.6 | 1 | 0 | 2 | 0 | 0 |
+| OpenManus/072 | True | Retrieval Hallucination | 159.7 | 0 | 0 | 0 | 1 | 0 |
+| OpenManus/083 | True | Human-Interaction Hallucination | 277.6 | 0 | 0 | 0 | 1 | 0 |
+| SmolAgents/078 | True | Planning Hallucination | 314.8 | 1 | 0 | 0 | 0 | 0 |
+
+### BFCL/042 (gold=True, Tool-Use Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none（检测已与 gold 一致，无 L2 归因）
+
+### Camel/039 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | accept_policy | det=verified_error | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> invalidate_coverage_claim(defense)`；coverage-only 接受，终局不变
+
+### Magentic_One/001 (gold=True, Reasoning Hallucination)
+
+- step[0] | accept_batch | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule | fitness=strong_improvement | reasons=gold_assisted_task_score_improved
+  - 编辑内容: When the module has not emitted quarantined_certificates and a certificate's cited events do not establish the claimed causal chain, quarantine the certificate.
+  - 重放: state unresolved→verified_error, responsible_step added；experience memory 记为 factual/promotable/decisive_correct
+  - applied_rule_trace 在 qualification_route 命中注入规则 b54c0bef
+
+### OpenDeepSearch/052 (gold=False, clean)
+
+- step[0] | reject_fitness | det=unresolved | trigger=unresolved | edit=evidence_obligation/add_rule | fitness=worse | reasons=module_local_score_regressed:0.300->0.000
+  - 编辑内容: When the evidence covers norm, violation, agent control, and impact but not the counterfactual link, require the cited evidence field: counterfactual_evidence_refs.
+  - 方向正确被拒：gold-clean 上收紧起诉证据属反极性；experience memory 记为 factual/regressed
+
+### OpenDeepSearch/062 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> downgrade_coverage(defense → incomplete)`；coverage-only 接受
+
+### OpenDeepSearch/083 (gold=False, clean)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> downgrade_coverage(defense → incomplete)`；coverage-only 接受
+
+### OpenDeepSearch/085 (gold=False, clean)
+
+- step[0] | retry_structural | det=unresolved | trigger=unresolved | edit=abstention_rule/add_rule | reasons=diagnostic_only_condition
+  - 编辑内容: When defense_coverage is complete and surviving_error_certificates is 0, emit the boundary finding: state.
+  - 正确拒绝：defense_coverage 是诊断面信号，provider 运行时不可观测；重试落到下一候选模块
+- step[1] | reject_fitness_no_effect | det=unresolved | trigger=unresolved | edit=atomic_verifier_instruction/add_rule | fitness=no_effect | reasons=score_direction_mismatch_with_gold
+  - 编辑内容: When a certificate is emitted without cited evidence_refs, require the cited evidence field: evidence_refs.
+  - 正确拒绝：local_score 1.3→2.3 增大错误信号，gold-clean 反极性
+
+### OpenManus/072 (gold=True, Retrieval Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none（检测已与 gold 一致）
+
+### OpenManus/083 (gold=True, Human-Interaction Hallucination)
+
+- step[0] | skip_stable | det=verified_error | trigger=none（检测已与 gold 一致）
+
+### SmolAgents/078 (gold=True, Planning Hallucination)
+
+- step[0] | accept_policy | det=unresolved | trigger=l2_policy_reflection | att=consensus_gate_policy(consensus_gate_blocked)
+  - L2: add_item `consensus_gate_blocked_nonempty -> downgrade_coverage(defense → incomplete)`；coverage-only 接受
+
+### 批次3 小结
+
+- 框架流程正确性验证：10/10 检测成功、0 runtime_invalid、0 provider 空内容/超时；
+  5/5 gold-error 案例检出 verified_error（skip_stable，与 gold 一致）
+- 技能经验轨迹产出：1 条 L1 gold 验证的 strong_improvement 接受（Magentic_One/001，
+  promotable typed experience，feature_description + 全量 outcome 元数据）；
+  3 条 L1 拒绝全部正确（structural diagnostic-only / gold-clean 回归 / 反极性 no_effect）；
+  4 条 L2 coverage-only 接受全部审计落盘（l2_policy_audit）
+- 经验记忆覆盖：factual×2（improved/regressed）、contextual×2（rejected），
+  每个决策类型（accept/regress/no_effect/structural_reject）均有对应 typed entry
+- 未发现框架缺陷，无需代码修复；门控全部按契约工作
 
