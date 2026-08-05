@@ -354,18 +354,24 @@ def test_abstention_rule_reaches_boundary_provider() -> None:
         captured["system"] = system
         return {}, {}
 
+    compiled = compile_genome_for_paca(evolved)
     wrapped = make_skill_aware_provider(
         provider,
-        compiled=compile_genome_for_paca(evolved),
+        compiled=compiled,
         config=config,
     )
-    wrapped(
+    value, meta = wrapped(
         route=boundary_route,
         system="base",
         user="trace",
         cache_dir=None,
     )
     assert "return clean" in captured["system"]
+    assert "abstention_rule" in meta["bccse_injected_modules"]
+    assert meta["bccse_injected_rule_ids"] == [
+        rule_id for rule_id, _rule in compiled.delta_rule_ids["abstention_rule"]
+    ]
+    assert meta["bccse_route"] == "boundary_route"
 
 
 def test_formal_evolution_rejects_multi_edit_credit_assignment(tmp_path) -> None:
@@ -527,14 +533,14 @@ def test_collaborative_reflection_normalizes_and_critics_candidates() -> None:
             "target_module": "evidence_obligation",
             "operation": "add_rule",
             "condition": "a certificate lacks cited support",
-            "action": "require_evidence_field: support_event",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "certificate without cited support",
         },
         {
             "target_module": "atomic_verifier_instruction",
             "operation": "add_rule",
             "condition": "a verifier instruction is under-specified",
-            "action": "require_evidence_field: executable_check",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "under-specified verifier instruction",
         },
     ]
@@ -786,7 +792,7 @@ def test_candidate_normalization_deduplicates_repeated_samples() -> None:
         "target_module": "evidence_obligation",
         "operation": "add_rule",
         "condition": "a factual claim lacks cited support",
-        "action": "require_evidence_field: event_backed_certificate",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "factual claim without cited support",
     }
     values, _ = extract_intervention_candidates(
@@ -974,7 +980,7 @@ def test_online_evolution_keeps_label_free_directional_edit_provisional(
             "operation": "add_rule",
             "rule_index": None,
             "condition": "a factual claim lacks a cited trajectory event",
-            "action": "require_evidence_field: event_backed_certificate",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "factual claim without cited trajectory event",
             "expected_effect": "prosecution evidence coverage increases",
             "expected_effect_contract": {

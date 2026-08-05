@@ -492,11 +492,13 @@ def _build_rejection_summary(
 
 _REPAIRABLE_STRUCTURAL_REASONS = frozenset({
     "runtime_rule_contract",
+    "rule_spec_contract",
     "content_too_short",
     "not_if_then_instruction",
     "multi_step_pseudocode",
     "condition_overload",
     "multiple_actions",
+    "action_target_outside_schema",
     "cross_module_near_duplicate",
     "cross_module_merge_required",
     "merge_required",
@@ -576,6 +578,11 @@ _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT: dict[str, str] = {
         "the previous edit produced no observable target change; propose an"
         " intervention with a concrete observable effect contract"
     ),
+    "action_target_outside_schema": (
+        "the action target must be one of the module's registered"
+        " provider-schema output fields (see the valid output-field targets"
+        " list); a target the provider has no schema slot for is inert"
+    ),
     "case_specific_pattern": (
         "the rule must be general: no case-specific identifiers or dataset"
         " labels"
@@ -604,7 +611,10 @@ def _structural_reject_category(reason: str) -> str:
     key = detail.strip().split(" ", 1)[0].strip(":").strip()
     if not key:
         return prefix
-    if prefix == "runtime_rule_contract" and key in _RUNTIME_RULE_CONSTRAINT_TEXT:
+    if (
+        prefix in ("runtime_rule_contract", "rule_spec_contract")
+        and key in _RUNTIME_RULE_CONSTRAINT_TEXT
+    ):
         return f"{prefix}:{key}"
     if key in _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT:
         return f"{prefix}:{key}" if prefix else key
@@ -615,10 +625,13 @@ def _structural_hard_constraint(category: str) -> str | None:
     """Map a stable structural category to its retry hard-constraint text."""
     value = str(category or "")
     prefix, _, detail = value.partition(":")
-    if prefix == "runtime_rule_contract":
-        return _RUNTIME_RULE_CONSTRAINT_TEXT.get(detail)
+    if prefix in ("runtime_rule_contract", "rule_spec_contract"):
+        runtime_text = _RUNTIME_RULE_CONSTRAINT_TEXT.get(detail)
+        if runtime_text:
+            return runtime_text
     return (
         _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT.get(value)
+        or _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT.get(detail)
         or _STRUCTURAL_CATEGORY_CONSTRAINT_TEXT.get(prefix)
     )
 
@@ -931,7 +944,9 @@ def _build_provider_artifact_projection(
         add("error_certificate", malformed=True, missing=[])
 
     # 6. Audit-level missing fields on quarantined certificates: the failed
-    # checks name the exact fields the provider omitted or malformed.
+    # checks name the exact fields the provider omitted or malformed. The
+    # certificate was emitted but failed validation, i.e. it is malformed;
+    # the specific failed fields stay in ``missing_fields`` for evidence.
     for audit_key, kind in (
         ("error_audits", "error_certificate"),
         ("defense_audits", "defense_certificate"),
@@ -952,13 +967,56 @@ def _build_provider_artifact_projection(
                     if name != "required_fields"
                 )
         if missing_fields:
-            add(kind, malformed=False, missing=sorted(set(missing_fields)))
+            add(kind, malformed=True, missing=sorted(set(missing_fields)))
 
     # 7. Appeal-stage provider failure: the appeal routes crashed, so the
     # error/defense certificate surface those routes would have produced is
     # malformed.
     if str(health.get("appeal_status") or "") == "provider_error":
         add("error_certificate", malformed=True, missing=[])
+
+    # 8. Prosecution evidence gap: an unresolved terminal whose prosecution
+    # coverage is incomplete with zero surviving error certificates means the
+    # evidence obligation was never established for any generated candidate.
+    # The actionable owner is evidence_obligation (evidence sufficiency), not
+    # abstention_rule (boundary-standard shaping) — the evolve_50 abstention
+    # cluster was routed to abstention_rule only because no artifact exposed
+    # this gap.  A hollow complete defense (complete coverage, zero valid
+    # certificates) is left to the L2 coverage-validity policy so this rule
+    # never shadows the established hollow-defense routing.
+    try:
+        court_required = int(adjudication.get("required_candidate_count") or 0)
+    except (TypeError, ValueError):
+        court_required = 0
+    try:
+        valid_error = int(adjudication.get("valid_error_certificate_count") or 0)
+    except (TypeError, ValueError):
+        valid_error = 0
+    try:
+        valid_defense = int(adjudication.get("valid_defense_certificate_count") or 0)
+    except (TypeError, ValueError):
+        valid_defense = 0
+    surviving_ids = adjudication.get("surviving_error_certificate_ids")
+    surviving_count = len(surviving_ids) if isinstance(surviving_ids, list) else 0
+    prosecution_state = str(
+        getattr(signal, "prosecution_coverage_state", "")
+        or adjudication.get("prosecution_coverage") or ""
+    )
+    defense_state = str(
+        getattr(signal, "defense_coverage_state", "")
+        or adjudication.get("defense_coverage") or ""
+    )
+    hollow_defense = defense_state == "complete" and valid_defense == 0
+    if (
+        state == "unresolved"
+        and prosecution_state == "incomplete"
+        and valid_error == 0
+        and surviving_count == 0
+        and court_required > 0
+        and int(getattr(signal, "candidate_count", 0) or 0) > 0
+        and not hollow_defense
+    ):
+        add("error_certificate", malformed=False, missing=["certificate"])
 
     return artifacts
 
@@ -1517,6 +1575,42 @@ def _probe_certification_label(
 # Detection with skill injection
 # ============================================================
 
+def _collect_injected_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    """Aggregate which evolved rule ids each provider route actually received.
+
+    The skill-aware provider wrapper records the rule ids it injected into
+    every call's meta; this walks the detection result's provider bookkeeping
+    and returns route -> rule ids (order-preserving, deduplicated). Distinct
+    from the compiled trace: a route that never ran contributes nothing, so a
+    no-effect replay can distinguish "rule not injected" from "injected but
+    ignored".
+    """
+    providers = result.get("providers")
+    if not isinstance(providers, Mapping):
+        return {}
+    trace: dict[str, list[str]] = {}
+
+    def walk(node: Any) -> None:
+        if isinstance(node, Mapping):
+            rule_ids = node.get("bccse_injected_rule_ids")
+            if isinstance(rule_ids, list) and rule_ids:
+                route_key = str(node.get("bccse_route") or "unknown_route")
+                bucket = trace.setdefault(route_key, [])
+                for rule_id in rule_ids:
+                    if str(rule_id) not in bucket:
+                        bucket.append(str(rule_id))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(providers)
+    return trace
+
+
 def _run_detection_with_genome(
     genome: SkillGenome,
     case_id: str,
@@ -1597,10 +1691,10 @@ def _run_detection_with_genome(
         else None
     )
 
-    rule_trace: dict[str, list[dict[str, str]]] = {}
+    compiled_rule_trace: dict[str, list[dict[str, str]]] = {}
 
     def invoke() -> dict[str, Any]:
-        nonlocal rule_trace
+        nonlocal compiled_rule_trace
         if genome.content_hash == baseline.content_hash:
             return v35.adjudicate_case(
                 case_id=case_id,
@@ -1612,7 +1706,7 @@ def _run_detection_with_genome(
             )
         with integrated_v35_provider(genome=genome, config=config) as compiled:
             if compiled is not None:
-                rule_trace = compiled.rule_trace()
+                compiled_rule_trace = compiled.rule_trace()
             return v35.adjudicate_case(
                 case_id=case_id,
                 record=record,
@@ -1625,11 +1719,12 @@ def _run_detection_with_genome(
     result = invoke()
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
-    if rule_trace:
-        # Rule-level execution trace: which evolved rule ids were injected
-        # into this detection, for no-effect attribution. Audit telemetry
-        # only; it never participates in a verdict.
-        result["rule_trace"] = rule_trace
+    if compiled_rule_trace:
+        # Compiled rule trace: which evolved rules exist in this genome.
+        # Audit telemetry only; it never participates in a verdict. The
+        # per-route injected trace lives in ``injected_rule_trace``.
+        result["compiled_rule_trace"] = compiled_rule_trace
+        result["injected_rule_trace"] = _collect_injected_rule_trace(result)
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
     # but they cannot enter source fitness or champion promotion.
@@ -4400,16 +4495,23 @@ def run_online_evolution(
 
         # Deterministic classifier authority: an L1 attribution carries
         # concrete provider-artifact evidence (missing/malformed candidate
-        # or certificate), so its owner outranks the process-heuristic
-        # secondary module but never replaces the attributor's primary
-        # root cause.
-        attribution_route = (signal.target_module,)
-        if attribution_owner and attribution_owner != signal.target_module:
-            attribution_route += (attribution_owner,)
+        # or certificate), so its owner leads the route and outranks the
+        # process-heuristic primary; the heuristic owner stays as a bounded
+        # fallback rather than a replacement.
+        if attribution_owner:
+            attribution_route = (
+                attribution_owner,
+                *(
+                    module for module in (signal.target_module,)
+                    if module != attribution_owner
+                ),
+            )
             print(
                 f"    [ATTR] owner hypothesis: {attribution_owner} via "
                 f"{attribution_reason}"
             )
+        else:
+            attribution_route = (signal.target_module,)
         if (
             signal.secondary_module
             and signal.secondary_module not in attribution_route
@@ -4429,24 +4531,26 @@ def run_online_evolution(
             attribution_route,
             secondary_type=type_result.secondary_type,
         )
-        # Keep the causal attributor's owner first. Type classification may
-        # bound the route but cannot promote a secondary module over the
-        # diagnosed root cause. This is repeated here as an execution-boundary
+        # The classifier's artifact owner leads the allowed route when one
+        # exists (label-free provider-artifact evidence); otherwise the
+        # heuristic attributor's primary keeps root-cause priority. Type
+        # classification may bound the route but cannot promote a module over
+        # the diagnosed artifact. Repeated here as an execution-boundary
         # invariant so future classifier refactors cannot silently reorder it.
-        if signal.target_module in type_allowed_modules:
+        _lead_owner = attribution_owner or signal.target_module
+        if _lead_owner in type_allowed_modules:
             type_allowed_modules = (
-                signal.target_module,
+                _lead_owner,
                 *(
                     module for module in type_allowed_modules
-                    if module != signal.target_module
+                    if module != _lead_owner
                 ),
             )
         # The attribution owner is derived from label-free runtime evidence
         # and is already polarity-bounded. A partial typed intersection can
         # silently drop it, which reintroduces the exact NO_EDIT deadlock
-        # the attribution exists to break. Keep it as the lowest-priority
-        # fallback so reflection always has an executable owner; the
-        # attributor's owner keeps root-cause priority.
+        # the attribution exists to break. Keep it reachable as a fallback so
+        # reflection always has an executable owner.
         if (
             attribution_owner
             and attribution_owner not in type_allowed_modules
@@ -5385,13 +5489,22 @@ def run_online_evolution(
         # Runs only after structural dedup passes (Jaccard < 0.70 against
         # every existing rule). Structural dedup failures
         # (merge_required / near_duplicate) never reach this gate. The gate
-        # is fail-closed: a provider exception or parse failure is treated
-        # as a conflict and the edit is rejected before any source replay.
+        # is advisory: a flagged conflict is recorded and blocks the T6
+        # self-supervised provisional path (``conflict_gate_passed`` stays
+        # False), but the edit still goes through source replay so the
+        # evidence-based guards — gold task score, canary regression,
+        # module-local fitness — decide admission.  The LLM's own definition
+        # ("complementarity is NOT a conflict") is routinely violated for
+        # ADD refinements of a general rule, so a hard veto before replay
+        # discarded 4/17 gated proposals in evolve_50 without any evidence.
         # ``conflict_gate_passed`` is True only when the LLM was actually
         # consulted and returned "pass"; a skipped gate (no live route)
         # stays False so the T6 provisional path cannot fire.
         conflict_gate_passed = False
         conflict_gate_ran = False
+        _conflict_flag: dict[str, Any] = {
+            "passed": False, "ran": False,
+        }
         if edit.operation in (SkillOp.ADD_RULE, SkillOp.MODIFY_RULE):
             _existing_rules = list(
                 current_genome.modules[edit.target_module].rules
@@ -5416,98 +5529,25 @@ def run_online_evolution(
                 mutation_call_limit=max_mutation_calls,
             )
             conflict_gate_ran = _cg_ran
+            _conflict_flag = {
+                "passed": _cg_ran and _cg_passed,
+                "ran": _cg_ran,
+                **(
+                    {
+                        "reason": _cg_reason,
+                        "conflicting_rule_indices": _cg_indices,
+                    }
+                    if _cg_ran and not _cg_passed else {}
+                ),
+            }
             if _cg_ran and _cg_passed:
                 conflict_gate_passed = True
             elif _cg_ran and not _cg_passed:
-                gate.revoke_structural_accept(
-                    cert,
-                    [
-                        f"llm_conflict:{_cg_reason}",
-                        f"conflicting_rule_indices:{_cg_indices}",
-                    ],
-                )
-                gate.record_no_edit()
-                edits_rejected += 1
-                _conflict_reasons = [
-                    f"llm_conflict:{_cg_reason}",
-                    f"conflicting_rule_indices:{_cg_indices}",
-                ]
-                rejected_buffer.append(RejectedEditEntry(
-                    proposal=type(
-                        "P",
-                        (),
-                        {
-                            "target_module": edit.target_module,
-                            "operation": edit.operation,
-                            "content": edit.new_content[:80],
-                        },
-                    )(),
-                    regressed_cases=[],
-                    budget_consumed=0,
-                    reject_reasons=_conflict_reasons,
-                    rejection_stage="llm_conflict",
-                ))
-                type_fitness.get_experience_memory().add_experience(
-                    hallucination_type=type_result.primary_type,
-                    evolution_direction=evolution_direction,
-                    module_targeted=edit.target_module,
-                    strategy_used=(
-                        "operation:"
-                        + (
-                            edit.operation.value
-                            if isinstance(edit.operation, SkillOp)
-                            else str(edit.operation)
-                        )
-                    ),
-                    detection_improved=False,
-                    source_case_id=case_id,
-                    metadata=_structured_outcome(
-                        outcome="rejected",
-                        stage="structural_gate",
-                        operation=(
-                            edit.operation.value
-                            if isinstance(edit.operation, SkillOp)
-                            else str(edit.operation)
-                        ),
-                        expected_effect_status="not_replayed",
-                        reason_categories=["llm_conflict"],
-                        observable_deltas=[],
-                        promotable=False,
-                        decision="reject_conflict",
-                        layer="l1_provider_rule",
-                        artifact=edit.target_module,
-                        reason_code="llm_conflict",
-                    ),
-                    feature_description=edit.feature_description,
-                    type_confidence=type_result.confidence,
-                )
-                record_step(EvolutionStep(
-                    case_id=case_id,
-                    case_index=idx,
-                    trigger_source=signal.trigger_source.value,
-                    attribution=signal.to_dict(),
-                    edit_proposal=edit.to_dict(),
-                    mutation_applied=None,
-                    gate_decision="reject_conflict",
-                    genome_hash_before=genome_before,
-                    genome_hash_after=current_genome.content_hash,
-                    detection_state=detection_state,
-                    timestamp=time.time(),
-                    fitness_check={
-                        "reflection": reflection_audit,
-                        "llm_conflict_gate": {
-                            "passed": False,
-                            "ran": True,
-                            "reason": _cg_reason,
-                            "conflicting_rule_indices": _cg_indices,
-                        },
-                    },
-                ), next_case_index=idx + 1)
                 print(
-                    f"  [{idx}] REJECT_CONFLICT {case_id}: "
+                    f"  [{idx}] CONFLICT_FLAGGED {case_id}: "
                     f"{_cg_reason} indices={_cg_indices}"
                 )
-                continue
+        reflection_audit["llm_conflict_gate"] = _conflict_flag
 
         # --- [5] Apply edit ---
         try:
@@ -5628,10 +5668,17 @@ def run_online_evolution(
                 "source_after": candidate_signal.to_dict(),
                 "assessment": assessment.to_dict(),
                 "source_stable_after": not candidate_signal.should_evolve,
-                # Rule-level execution trace: the evolved rule ids injected
-                # into this replay, for no-effect attribution.
-                "rule_trace": (
-                    candidate_result.get("rule_trace")
+                # Rule traces for no-effect attribution: ``compiled_rule_trace``
+                # lists the evolved rules present in this genome;
+                # ``injected_rule_trace`` lists which rules each provider route
+                # actually received, so a no-effect replay can distinguish a
+                # rule that was never injected from one the provider ignored.
+                "compiled_rule_trace": (
+                    candidate_result.get("compiled_rule_trace")
+                    if isinstance(candidate_result, Mapping) else None
+                ),
+                "injected_rule_trace": (
+                    candidate_result.get("injected_rule_trace")
                     if isinstance(candidate_result, Mapping) else None
                 ),
                 "no_effect_classification": (
@@ -5773,10 +5820,16 @@ def run_online_evolution(
                             f"{neighbor_before_state}->"
                             f"{neighbor_after_state}"
                         )
-            fitness_audit["llm_conflict_gate"] = {
-                "passed": conflict_gate_passed,
-                "ran": conflict_gate_ran,
-            }
+            fitness_audit["llm_conflict_gate"] = (
+                dict(reflection_audit["llm_conflict_gate"])
+                if isinstance(
+                    reflection_audit.get("llm_conflict_gate"), Mapping
+                )
+                else {
+                    "passed": conflict_gate_passed,
+                    "ran": conflict_gate_ran,
+                }
+            )
             if provisional_accept_eligible:
                 fitness_audit["provisional_accept"] = True
                 fitness_audit["shadow_admissible"] = True

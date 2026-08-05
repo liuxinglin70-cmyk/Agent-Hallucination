@@ -483,17 +483,6 @@ def assess_source_fitness(
         return FitnessAssessment("worse", ("diagnostic_only_signal_not_promotable",))
     if after.state not in VALID_STATES:
         return FitnessAssessment("worse", ("invalid_after_state",))
-    if before.crs_complete and not after.crs_complete:
-        return FitnessAssessment("worse", ("required_diagnostic_signal_lost",))
-    # A verdict-preserving edit that degrades the origin is still a
-    # regression: downstream repair depends on the responsible step, and
-    # the module_local_score below only sees it when the edit happened to
-    # target earliest_origin_tiebreak.
-    if (
-        _responsible_step_present(before_result or {})
-        and not _responsible_step_present(after_result or {})
-    ):
-        return FitnessAssessment("worse", ("responsible_step_lost",))
 
     task_before: int | None = None
     task_after: int | None = None
@@ -519,6 +508,21 @@ def assess_source_fitness(
                 task_before,
                 task_after,
             )
+
+    # A verdict-preserving edit that degrades the origin is still a
+    # regression: downstream repair depends on the responsible step, and
+    # the module_local_score below only sees it when the edit happened to
+    # target earliest_origin_tiebreak.  Under gold supervision the task score
+    # above already decided the direction, so this guard applies only when the
+    # verdict did not move (a wrong verdict retreating to unresolved must not
+    # be rejected for losing an origin that the retreat invalidates).
+    if (
+        _responsible_step_present(before_result or {})
+        and not _responsible_step_present(after_result or {})
+    ):
+        return FitnessAssessment("worse", ("responsible_step_lost",))
+    if before.crs_complete and not after.crs_complete:
+        return FitnessAssessment("worse", ("required_diagnostic_signal_lost",))
 
     if before.should_evolve and not after.should_evolve:
         if gold_label is None:

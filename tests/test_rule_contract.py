@@ -176,6 +176,43 @@ def test_action_opcode_target_must_not_be_empty():
     assert reason == "action_target_unowned:empty"
 
 
+def test_action_opcode_target_must_be_a_provider_schema_field():
+    """An action target that names no provider-schema output field is inert:
+    the receiving provider has no slot to apply it to, so the contract
+    rejects it before a source replay is spent (observed Magentic_One/072
+    ``trajectory_event_reference`` and BFCL/024 ``counterfactual``)."""
+    ok, reason = validate_rule_spec(
+        _spec(action="require_evidence_field: trajectory_event_reference")
+    )
+    assert not ok
+    assert reason.startswith("action_target_outside_schema")
+    # A registered field on the module's own routes passes.
+    ok, reason = validate_rule_spec(
+        _spec(action="require_evidence_field: impact_evidence_refs")
+    )
+    assert ok, reason
+
+
+def test_shape_decisive_standard_removed_no_schema_landing():
+    """abstention_rule's boundary-route schema has no decisive-standard field
+    to execute against; the opcode was removed so reflection cannot propose a
+    non-executable standard-shaping rule (3/5 no-effect replays in evolve_50
+    targeted exactly this opcode)."""
+    ok, reason = validate_rule_spec(_spec(
+        module_id="abstention_rule",
+        condition="defense coverage is complete and prosecution coverage is incomplete",
+        action="shape_decisive_standard",
+    ))
+    assert not ok
+    assert reason.startswith("action_opcode_unowned")
+    ok, reason = validate_rule_spec(_spec(
+        module_id="abstention_rule",
+        condition="defense coverage is complete and prosecution coverage is incomplete",
+        action="emit_boundary_finding: state",
+    ))
+    assert ok, reason
+
+
 # --- pollution firewall ---
 
 def test_case_id_pollution_rejected():

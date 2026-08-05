@@ -101,6 +101,24 @@ def test_rule1_unregistered_hint_falls_back_to_owner_table():
     assert classify_failure(record).artifact == "clean_defense_boundary"
 
 
+def test_rule1_malformed_error_cert_is_verifier_quality_gap():
+    """A certificate that was emitted but failed field validation is a
+    certificate-quality gap owned by atomic_verifier_instruction; a missing
+    certificate is an evidence-obligation gap owned by evidence_obligation."""
+    record = _record(provider_artifacts=[
+        {
+            "kind": "error_certificate",
+            "module_hint": "",
+            "malformed": True,
+            "missing_fields": ["norm_evidence_refs"],
+        },
+    ])
+    result = classify_failure(record)
+    assert result.artifact == "atomic_verifier_instruction"
+    assert result.reason_code == "provider_artifact_malformed"
+    assert result.evidence["missing_fields"] == ["norm_evidence_refs"]
+
+
 def test_artifact_owner_table_covers_all_kinds():
     assert set(ARTIFACT_OWNER) == {
         "candidate", "error_certificate", "defense_certificate",

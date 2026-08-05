@@ -71,7 +71,7 @@ def _edit_payload() -> dict:
         "operation": "add_rule",
         "rule_index": None,
         "condition": "a factual claim lacks a cited trajectory event",
-        "action": "require_evidence_field: event_backed_certificate",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "uncited factual claim accepted without trajectory evidence",
         "rationale": "Require observable support.",
         "feature_description": "factual claim without cited trajectory evidence",
@@ -376,7 +376,7 @@ def test_online_evolution_runs_independent_candidates_and_critic(
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate cites no trajectory event",
-            "action": "require_evidence_field: event_backed_certificate",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "certificate without cited event",
             "feature_description": "missing cited support",
         },
@@ -390,7 +390,7 @@ def test_online_evolution_runs_independent_candidates_and_critic(
         {
             "target_module": "evidence_obligation", "operation": "add_rule",
             "condition": "a certificate cites no trajectory event",
-            "action": "require_evidence_field: event_backed_certificate",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "duplicate sample",
             "feature_description": "duplicate sample",
         },
@@ -672,7 +672,7 @@ def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
                 "the adjudication state is unresolved and quarantined error "
                 "certificates exist and defense coverage is complete"
             ),
-            "action": "require_evidence_field: certificate",
+            "action": "require_evidence_field: impact_evidence_refs",
             "evidence_anchor": "multi-conjunction proposal",
             "feature_description": "multi-conjunction proposal",
             "expected_effect": "prosecution evidence coverage increases",

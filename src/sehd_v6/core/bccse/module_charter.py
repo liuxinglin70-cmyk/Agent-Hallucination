@@ -342,7 +342,6 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "abstention_rule": (
         ("emit_boundary_finding", "emit the boundary finding"),
-        ("shape_decisive_standard", "shape the decisive-verdict standard"),
     ),
 }
 
@@ -413,12 +412,75 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Action-target vocabulary: the provider-schema output fields the module's
+# injected routes can actually emit.  An action target that names anything
+# outside this set is inert — the receiving provider has no schema slot to
+# apply it to — so the structural gate rejects it instead of spending a
+# source replay on a rule that cannot execute.  Single source of truth for
+# both ``validate_action_surface`` and the reflection prompt's target list.
+# ``counterfactual_evidence_refs`` is the counterfactual-link evidence field
+# the focused-prosecution schema expresses as ``benchmark_causal_evidence_refs``
+# (the accepted champion rule targets it); it is registered alongside so the
+# known-good intervention stays expressible.
+MODULE_ACTION_TARGETS: dict[str, tuple[str, ...]] = {
+    "candidate_trigger": (
+        "candidate", "candidate_id", "origin_hypothesis_event_id",
+        "trigger_event_id", "candidate_kind", "claim_or_commitment",
+        "dependency_event_ids", "module_tag", "observation",
+    ),
+    "evidence_obligation": (
+        "consumption_evidence_refs", "impact_evidence_refs",
+        "recovery_evidence_refs", "norm_evidence_refs",
+        "violation_evidence_refs", "agent_control_evidence_refs",
+        "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+        "coverage_state", "certificate_id", "breach_type", "impact_kind",
+        "benchmark_causal_status",
+    ),
+    "candidate_to_verifier_route": (
+        "violation_state", "actor_state", "boundary_state",
+        "positive_evidence_refs", "actor_evidence_refs",
+        "boundary_evidence_refs",
+    ),
+    "atomic_verifier_instruction": (
+        "coverage_state", "certificate_id", "defense_type",
+        "breach_type", "benchmark_causal_status",
+        "positive_evidence_refs", "actor_evidence_refs",
+        "boundary_evidence_refs", "norm_evidence_refs",
+        "violation_evidence_refs", "agent_control_evidence_refs",
+        "impact_evidence_refs", "recovery_evidence_refs",
+        "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
+        "evidence_refs", "target_candidate_id", "target_origin_event_id",
+    ),
+    "clean_defense_boundary": (
+        "coverage_state", "evidence_refs", "certificate_id",
+        "target_candidate_id", "target_origin_event_id",
+        "defense_type", "state", "responsible_event_id",
+    ),
+    "causal_link_test": (
+        "coverage_state", "consumption_evidence_refs",
+        "impact_evidence_refs", "recovery_evidence_refs",
+        "norm_evidence_refs", "violation_evidence_refs",
+        "agent_control_evidence_refs", "benchmark_causal_evidence_refs",
+        "state", "responsible_event_id", "evidence_refs",
+        "causal_sufficiency_score", "is_root_cause",
+    ),
+    "earliest_origin_tiebreak": (
+        "state", "responsible_event_id", "evidence_refs",
+        "causal_sufficiency_score", "is_root_cause",
+    ),
+    "abstention_rule": (
+        "state", "responsible_event_id", "evidence_refs",
+    ),
+}
+
+
 def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
     """Check that a slot action names a closed opcode of the target module.
 
     The action must be ``"<opcode>"`` or ``"<opcode>: <target>"`` where the
     opcode belongs to the module's ``MODULE_ACTION_OPCODES`` and, when a
-    target is present, it is non-empty and never names another module's
+    target is present, it is a registered provider-schema field of the
+    module (see ``MODULE_ACTION_TARGETS``) and never names another module's
     forbidden output surface. Forbidden surface terms still fail first.
     """
     lowered = " ".join(str(action or "").lower().split())
@@ -433,6 +495,10 @@ def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
     target = target_part.strip()
     if sep and not target:
         return False, "action_target_unowned:empty"
+    if sep:
+        targets = MODULE_ACTION_TARGETS.get(module_id, ())
+        if target not in targets:
+            return False, f"action_target_outside_schema:{target}"
     return True, ""
 
 
@@ -440,15 +506,23 @@ def render_action_opcode_text(module_id: str) -> str:
     """Render one module's closed action-opcode list for prompt injection.
 
     Lists ``<opcode>`` with its English template so the model can compose
-    the exact ``"<opcode>: <target>"`` action slot the gate validates.
+    the exact ``"<opcode>: <target>"`` action slot the gate validates, and
+    the registered provider-schema target fields the target must name.
     """
     opcodes = MODULE_ACTION_OPCODES.get(module_id, ())
     if not opcodes:
         return "(no executable actions)"
-    return "\n".join(
+    lines = [
         f"- {opcode} — {template}"
         for opcode, template in opcodes
-    )
+    ]
+    targets = MODULE_ACTION_TARGETS.get(module_id, ())
+    if targets:
+        lines.append(
+            "valid output-field targets: "
+            + ", ".join(targets)
+        )
+    return "\n".join(lines)
 
 
 def charter_for(module_id: str) -> ModuleCharter:

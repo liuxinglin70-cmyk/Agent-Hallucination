@@ -134,12 +134,22 @@ def _find_first_bad_artifact(
     return None
 
 
-def _resolve_l1_module(artifact: dict[str, Any]) -> str:
+def _resolve_l1_module(artifact: dict[str, Any], reason: str) -> str:
     """Deterministic artifact-kind -> module mapping; a registered
-    ``module_hint`` takes precedence over the default owner."""
+    ``module_hint`` takes precedence over the default owner.
+
+    A certificate that was emitted but failed field validation is a
+    certificate-quality gap owned by the verifier instruction; a certificate
+    that should exist but was never emitted is an evidence-obligation gap.
+    """
     hint = str(artifact.get("module_hint") or "")
     if hint in MODULE_IDS:
         return hint
+    if (
+        str(artifact.get("kind") or "") == "error_certificate"
+        and reason == REASON_PROVIDER_MALFORMED
+    ):
+        return "atomic_verifier_instruction"
     return ARTIFACT_OWNER[str(artifact["kind"])]
 
 
@@ -175,7 +185,7 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
         artifact, reason = bad
         return _attr(
             LAYER_L1,
-            _resolve_l1_module(artifact),
+            _resolve_l1_module(artifact, reason),
             reason,
             {
                 "kind": str(artifact.get("kind") or ""),

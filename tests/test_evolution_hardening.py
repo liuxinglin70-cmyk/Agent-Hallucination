@@ -118,7 +118,7 @@ def _slots_response(**overrides: object) -> dict[str, object]:
         "target_module": "evidence_obligation",
         "operation": "add_rule",
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require_evidence_field: event_backed_certificate",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "factual claim without cited trajectory support",
         "feature_description": "factual claim without cited trajectory support",
         "expected_effect": "prosecution evidence coverage increases",
@@ -443,13 +443,13 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
         if mutation_calls == 1:
             slots = {
                 "condition": "a certificate lacks support",
-                "action": "require_evidence_field: event_backed_certificate",
+                "action": "require_evidence_field: impact_evidence_refs",
             }
         else:
             assert "observable_changes=none" in kwargs["user"]
             slots = {
                 "condition": "a certificate omits a cited support event",
-                "action": "populate_evidence_field: evidence_refs",
+                "action": "populate_evidence_field: impact_evidence_refs",
             }
         return _slots_response(**slots), {}
 
@@ -484,6 +484,73 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
     assert [step.attempt_index for step in result.steps] == [0, 1]
     assert result.champion_genome.generation == 1
     assert result.evolution_audit["mutation_retry_attempts"] == 1
+
+
+def test_conflict_gate_flag_is_advisory_not_a_veto(tmp_path, monkeypatch) -> None:
+    """A complementarity flag from the LLM conflict gate no longer discards
+    the edit before replay: it is recorded and blocks only the T6
+    self-supervised provisional path, while gold-assisted fitness decides on
+    evidence.  Observed: 4/17 gated proposals in evolve_50 were vetoed as
+    reject_conflict although they refined a general existing rule."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        rules = genome.modules["evidence_obligation"].rules
+        effective = any(
+            "populate the cited evidence field" in rule for rule in rules
+        )
+        state = "verified_error" if effective else "unresolved"
+        return {"state": state, "runtime_valid": True, "census": []}
+
+    def mutation(**kwargs):
+        user = str(kwargs.get("user") or "")
+        if "新增规则" in user:
+            return {
+                "decision": "conflict",
+                "reason": "the quarantine contradicts rule 1's reject",
+                "conflicting_rule_indices": [1],
+            }, {}
+        return _slots_response(**{
+            "condition": "a certificate lacks cited support",
+            "action": "populate_evidence_field: impact_evidence_refs",
+        }), {}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+    monkeypatch.setattr(runner, "has_provider_credential", lambda _route: True)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        canary_case_ids=("anchor",),
+        records={"source": {"gold_label": True}, "anchor": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        run_id="conflict_advisory",
+    )
+
+    assert result.edits_accepted == 1
+    assert result.edits_rejected == 0
+    flagged = [
+        step.fitness_check.get("reflection", {}).get("llm_conflict_gate")
+        for step in result.steps
+        if step.fitness_check
+    ]
+    assert any(
+        flag and flag.get("passed") is False and flag.get("ran")
+        for flag in flagged
+    )
 
 
 def test_self_replay_closure_is_directional_not_promotable() -> None:
@@ -1556,7 +1623,7 @@ def test_resume_restores_same_source_retry_attempt_and_feedback(
                 "target_module": "candidate_trigger",
                 "operation": "add_rule",
                 "condition": "a claim lacks cited trajectory support",
-                "action": "require_evidence_field: event_backed_certificate",
+                "action": "require_evidence_field: impact_evidence_refs",
                 "evidence_anchor": "wrong owner retry probe",
             }, {}
         return _slots_response(), {}
@@ -2588,6 +2655,53 @@ def test_losing_responsible_step_is_a_regression_for_any_module() -> None:
     assert assessment.decision == "worse"
     assert "responsible_step_lost" in assessment.reasons
     assert assessment.worsened
+
+
+def test_gold_task_score_decides_before_diagnostic_guards() -> None:
+    """Under gold supervision the task score is the primary signal: a wrong
+    verdict retreating to unresolved is partial progress toward the correct
+    pole, and losing the origin it invalidates (or the CRS diagnostic signal)
+    must not turn that improvement into a regression.  Observed on BFCL/088,
+    where verified_error -> unresolved on a gold-clean case was rejected as
+    worse(responsible_step_lost) before the task score was consulted."""
+    before = _signal("verified_error")
+    after = replace(_signal("unresolved"), crs_complete=False)
+    before_row = {
+        "responsible_step": 3,
+        "state": "verified_error",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+    }
+    after_row = {
+        "state": "unresolved",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+    }
+    assessment = assess_source_fitness(
+        before,
+        after,
+        target_module="clean_defense_boundary",
+        before_result=before_row,
+        after_result=after_row,
+        gold_label=False,
+    )
+    assert assessment.decision == "local_improvement"
+    assert assessment.passed
+    assert "responsible_step_lost" not in assessment.reasons
+    assert "required_diagnostic_signal_lost" not in assessment.reasons
+
+    # A gold-regressing retreat is still rejected before any guard runs.
+    regressed = assess_source_fitness(
+        before,
+        after,
+        target_module="clean_defense_boundary",
+        before_result=before_row,
+        after_result=after_row,
+        gold_label=True,
+    )
+    assert regressed.decision == "worse"
+    assert "gold_assisted_task_score_regressed" in regressed.reasons
+    assert "responsible_step_lost" not in regressed.reasons
 
 
 # ============================================================
@@ -4021,6 +4135,29 @@ def test_structural_reject_category_is_case_agnostic() -> None:
     assert runner._structural_reject_category("") == ""
 
 
+def test_slot_contract_rejections_are_retryable_with_constraints() -> None:
+    """Slot-contract rejections (rule_spec_contract:...) must be retryable
+    and carry the same hard-constraint text as the free-text path; a
+    schema-target miss gets the registered-field guidance."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    assert runner._structural_reject_category(
+        "rule_spec_contract:condition_overload"
+    ) == "rule_spec_contract:condition_overload"
+    assert runner._structural_rejection_retryable(
+        ["rule_spec_contract:condition_overload"]
+    )
+    assert runner._structural_hard_constraint(
+        "rule_spec_contract:condition_overload"
+    ) == runner._RUNTIME_RULE_CONSTRAINT_TEXT["condition_overload"]
+    assert runner._structural_rejection_retryable([
+        "rule_spec_contract:action_target_outside_schema:impact_evidence_refs"
+    ])
+    assert "provider-schema output fields" in runner._structural_hard_constraint(
+        "rule_spec_contract:action_target_outside_schema"
+    )
+
+
 def test_retry_feedback_carries_structural_hard_constraints() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -4148,7 +4285,7 @@ def test_attribute_failure_fn_omission_clean_routes_candidate_trigger() -> None:
     assert l2_telemetry == []
 
 
-def test_attribute_failure_fn_clean_quarantined_error_routes_evidence_obligation() -> None:
+def test_attribute_failure_fn_clean_quarantined_error_routes_verifier_instruction() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
@@ -4161,7 +4298,7 @@ def test_attribute_failure_fn_clean_quarantined_error_routes_evidence_obligation
         case_id="case_fn_quarantined",
         non_l1_failure_attributions=[],
     )
-    assert owner == "evidence_obligation"
+    assert owner == "atomic_verifier_instruction"
     assert reason == "provider_artifact_malformed"
 
 
@@ -4260,7 +4397,8 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
 
 def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> None:
     """Unresolved terminals carry no gold polarity, so an L1 attribution is
-    accepted without a pool check."""
+    accepted without a pool check. A quarantined error certificate is a
+    certificate-quality gap owned by the verifier instruction."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
@@ -4273,7 +4411,7 @@ def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> Non
         case_id="case_unresolved_l1",
         non_l1_failure_attributions=[],
     )
-    assert owner == "evidence_obligation"
+    assert owner == "atomic_verifier_instruction"
     assert reason == "provider_artifact_malformed"
 
 
@@ -4297,6 +4435,158 @@ def test_attribute_failure_no_failure_shape_returns_empty() -> None:
     assert owner == ""
     assert reason == "no_failure_shape"
     assert l2_telemetry == []
+
+
+def test_attribute_failure_prosecution_gap_routes_evidence_obligation() -> None:
+    """An unresolved terminal with incomplete prosecution coverage, zero
+    surviving error certificates and candidates present is a prosecution
+    evidence gap: the classifier routes it to evidence_obligation, breaking
+    the unresolved -> abstention_rule default that drove 3/5 no-effect
+    replays in evolve_50."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+        prosecution_coverage_state="incomplete",
+        candidate_count=3,
+    )
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "prosecution_coverage": "incomplete",
+                "required_candidate_count": 4,
+                "valid_error_certificate_count": 0,
+                "surviving_error_certificate_ids": [],
+            },
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_prosecution_gap",
+        non_l1_failure_attributions=l2_telemetry,
+    )
+    assert owner == "evidence_obligation"
+    assert reason == "provider_artifact_missing"
+    assert l2_telemetry == []
+
+
+def test_attribute_failure_prosecution_gap_skipped_with_hollow_defense() -> None:
+    """A prosecution gap overlapping a hollow complete defense must not
+    shadow the established L2 hollow-defense routing: the projection stays
+    silent and the classifier keeps returning the L2 coverage-validity
+    attribution."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete",
+        candidate_count=3,
+    )
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "prosecution_coverage": "incomplete",
+                "defense_coverage": "complete",
+                "required_candidate_count": 4,
+                "valid_error_certificate_count": 0,
+                "valid_defense_certificate_count": 0,
+                "surviving_error_certificate_ids": [],
+            },
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_hollow_defense_with_gap",
+        non_l1_failure_attributions=l2_telemetry,
+    )
+    assert owner == ""
+    assert reason == "hollow_complete_defense"
+    assert len(l2_telemetry) == 1
+    assert l2_telemetry[0]["artifact"] == "coverage_validity_policy"
+
+
+def test_attribute_failure_prosecution_gap_skipped_with_surviving_errors() -> None:
+    """The prosecution-gap projection stays silent when error certificates
+    survive: a non-empty evidence surface is not a missing-artifact gap."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+        prosecution_coverage_state="incomplete",
+        candidate_count=3,
+    )
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "prosecution_coverage": "incomplete",
+                "required_candidate_count": 4,
+                "valid_error_certificate_count": 1,
+                "surviving_error_certificate_ids": ["e1"],
+            },
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_surviving_error",
+        non_l1_failure_attributions=l2_telemetry,
+    )
+    assert owner == ""
+    assert reason == "no_failure_shape"
+
+
+def test_collect_injected_rule_trace_walks_provider_metas() -> None:
+    """injected_rule_trace reflects only the provider calls that actually
+    carried evolved rules, distinct from the compiled snapshot: a route that
+    never ran (or carried no rules) contributes nothing, and ids dedupe."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    result = {
+        "providers": {
+            "construct_census": {
+                "bccse_route": "construct_census_route",
+                "bccse_injected_rule_ids": [],
+            },
+            "focused_prosecution": [
+                {
+                    "bccse_route": "focused_prosecution_route",
+                    "bccse_injected_rule_ids": ["r1", "r2", "r1"],
+                },
+                {
+                    "bccse_route": "focused_prosecution_route",
+                    "bccse_injected_rule_ids": ["r3"],
+                },
+            ],
+            "defense_route": {"outcome": "failed_closed", "error": "no credential"},
+        },
+    }
+    trace = runner._collect_injected_rule_trace(result)
+    assert trace == {"focused_prosecution_route": ["r1", "r2", "r3"]}
+    assert runner._collect_injected_rule_trace({}) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -4554,7 +4844,7 @@ def test_valid_slots_persist_as_deterministic_render(
     assert result.edits_accepted == 1
     expected = render_rule(RuleSpec(
         condition="a factual claim lacks cited trajectory support",
-        action="require_evidence_field: event_backed_certificate",
+        action="require_evidence_field: impact_evidence_refs",
         evidence_anchor="factual claim without cited trajectory support",
         module_id="evidence_obligation",
         direction="process",
@@ -4563,7 +4853,7 @@ def test_valid_slots_persist_as_deterministic_render(
     assert edit.new_content == expected
     expected_slots = {
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require_evidence_field: event_backed_certificate",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "factual claim without cited trajectory support",
     }
     assert edit.rule_slots == expected_slots
@@ -4587,7 +4877,7 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
     gate = create_structural_gate(convergence_window=2)
     slots = {
         "condition": "a certificate omits the 真值 derivation record",
-        "action": "require_evidence_field: derivation_record",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "certificate without derivation record",
     }
     content = render_rule(RuleSpec(
@@ -4666,7 +4956,7 @@ def test_structural_gate_slot_contract_replaces_text_guess() -> None:
 def test_persisted_rule_slots_must_match_rendered_rule() -> None:
     edit = _typed_edit(rule_slots={
         "condition": "a factual claim lacks cited trajectory support",
-        "action": "require_evidence_field: certificate",
+        "action": "require_evidence_field: impact_evidence_refs",
         "evidence_anchor": "different certificate requirement",
     })
     valid, reason = validate_edit(edit, create_baseline_genome())

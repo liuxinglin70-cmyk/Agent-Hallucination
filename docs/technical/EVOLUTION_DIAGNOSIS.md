@@ -171,6 +171,13 @@ EVOLUTION_FIXES_SUMMARY.md 的 R2）。
 | F1 | expected_direction 词表归一 | 落地 | 修 3 次机械损耗 |
 | F2 | 空正文走修复路径 | 落地 | 修 6 次 finish_reason=length |
 | F3 | condition_overload 判定单一来源 | 落地 | 行为不变的重构 |
+| F4 | gold task score 先于诊断守卫判定 | 落地 | 修 BFCL/088 误拒 |
+| F5 | action target 绑定 provider schema | 落地 | 修 3/5 no_effect 的动作无落点 |
+| F6 | LLM conflict gate 降级为 advisory | 落地 | 修 4/17 gate 前误杀 |
+| F7 | artifact owner 路由首位 + 起诉证据缺口投影 | 落地 | 破 unresolved→abstention 默认 |
+| F8 | error cert 畸形→verifier / 缺失→obligation | 落地 | 证书质量 vs 证据义务面拆分 |
+| F9 | rule_trace 拆分 compiled/injected | 落地 | no_effect 归因可分辨注入与否 |
+| F10 | slot-contract 拒绝重试归一 | 落地 | rule_spec_contract 可重试且有约束文本 |
 | R1 | L2 accept 后回落 L1 | 回退 | L1 已在 20 例上跑过，瓶颈是接受率非预算 |
 | R2 | module_local_score 对齐输出面 | 回退 | 破坏 13 条契约测试，且未修好观测案例 |
 | R3 | L2 降级需 L1 支撑 | 回退 | 阻断合法的 hollow-defense 纠正 |
@@ -183,8 +190,17 @@ EVOLUTION_FIXES_SUMMARY.md 的 R2）。
 **缺陷三修正**：5 个 no_effect 案例的观测 delta 多在
 `prosecution_certificates`（abstention_rule charter 禁止触碰的字段），
 `BFCL/024` 与 `SmolAgents/014` 的 delta 为空。这些 no_effect 判定本身
-正确 —— 编辑要么无效果，要么改变的是错误模块的输出。问题指向**反思路由
-质量**（为何编辑落在本模块禁触的字段上），而非打分失明。
+正确 —— 编辑要么无效果，要么改变的是错误模块的输出。
+
+**深层根因（后续审查已定位并修复）**：
+- 3 个 no_effect（`BFCL/073`、`OpenManus/095`、`SmolAgents/014`）都指向
+  `abstention_rule/shape_decisive_standard` —— 该 opcode 在 boundary
+  route 的 provider schema 中**没有输出字段落点**，规则注入后无可执行
+  动作，属 F5 修复范围。
+- `BFCL/088` 的 `verified_error → unresolved` 纠偏被 `responsible_step_lost`
+  误拒，属 F4 修复范围（gold task score 判定顺序）。
+- 4 个被 `reject_conflict` 丢弃的提案多为"一般规则的更具体细化"，在
+  source replay 之前被弱 LLM 误杀，属 F6 修复范围。
 
 ## 7. 已证伪的假设
 

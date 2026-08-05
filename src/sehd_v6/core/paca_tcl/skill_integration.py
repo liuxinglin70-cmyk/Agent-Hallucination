@@ -463,6 +463,11 @@ def make_skill_aware_provider(
             for module_id in module_ids
             if compiled.module_texts.get(module_id)
         )
+        injected_rule_ids: list[str] = []
+        for module_id in injected_modules:
+            injected_rule_ids.extend(
+                rule_id for rule_id, _rule in compiled.delta_rule_ids.get(module_id, ())
+            )
         lines: list[str] = []
         if injected_modules:
             lines.extend([
@@ -488,6 +493,7 @@ def make_skill_aware_provider(
             "bccse_stage": stage.value,
             "bccse_route": route_key,
             "bccse_injected_modules": list(injected_modules),
+            "bccse_injected_rule_ids": injected_rule_ids,
             "bccse_stage_skill_hash": fragment_hash,
             "bccse_route_skill_hash": fragment_hash,
         }

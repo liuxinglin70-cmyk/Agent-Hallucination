@@ -35,6 +35,69 @@ reasoning_content_present=True` —— 推理耗尽输出预算、正文为空�
 **修复**：抽出 `condition_is_overloaded` 谓词，`validate_rule_spec` 经它
 判定。这是单一事实来源重构，不改行为。
 
+### F4: gold 监督下 task score 先于诊断守卫判定（`fitness.py`）
+
+**问题**：`assess_source_fitness` 先无条件检查 `responsible_step_lost` 与
+`required_diagnostic_signal_lost`，之后才计算 gold task score。对
+`verified_error → unresolved` 这类"错误定罪退让"的纠偏，会先以
+`responsible_step_lost` 拒绝——即使它把任务分从 0 提到 1。`BFCL/088`
+正是因此被误拒，且与 HTC-TES 已确立的 "wrong verdict → unresolved 是
+partial progress"（commit `b7bbcac`）语义分叉。
+
+**修复**：gold 可用时先算 task score：`task_after < task_before` 直接拒，
+`task_after > task_before` 直接接受为 improvement，`task_after ==
+task_before` 才继续跑 `responsible_step_lost` / CRS 丢失 / module-local
+检查。self-supervised（gold 为 None）路径顺序不变。
+
+**验证**：`verified_error → unresolved`（gold=clean）判为
+`local_improvement` 且不再带 `responsible_step_lost`；gold=error 的同迁移
+仍判 `worse(gold_assisted_task_score_regressed)`；"verdict 不变且丢失
+responsible step" 仍判 `worse(responsible_step_lost)`。
+
+### F5: action target 必须是 provider schema 注册字段（`module_charter.py`）
+
+**问题**：所谓"闭 opcode"只约束变异端 JSON（opcode 名 + 非空 target），
+target 不校验是否落在 provider 实际 schema 上。`abstention_rule` 的
+`shape_decisive_standard` 在 boundary schema 中无任何落点；`Magentic_One/072`
+用 `trajectory_event_reference`、`BFCL/024` 用 `counterfactual` 这类
+schema 外字段，provider 没有可执行槽位。5 个 no_effect 中 3 个（`BFCL/073`、
+`OpenManus/095`、`SmolAgents/014`）都是 `abstention_rule/shape_decisive_standard`。
+
+**修复**：
+- 新增 `MODULE_ACTION_TARGETS` 注册表：module → 其注入 route 的
+  provider-schema 输出字段集合，作为 target 词表唯一事实来源。
+- `validate_action_surface` 拒绝注册表外 target
+  （`action_target_outside_schema:<target>`）。
+- 删除无 schema 落点的 `shape_decisive_standard` opcode，abstention_rule
+  只剩 `emit_boundary_finding`。
+- `render_action_opcode_text` 把每模块的合法 target 字段注入反思 prompt，
+  引导模型产出 schema 真实的字段名。
+- `counterfactual_evidence_refs` 注册为合法 target：它是对焦控方 schema 中
+  `benchmark_causal_evidence_refs`（counterfactual 因果链证据）的命名，
+  已接受的 champion 规则依赖它，保持已知有效的干预路径可表达。
+
+**验证**：`require_evidence_field: impact_evidence_refs` 通过，
+`require_evidence_field: trajectory_event_reference` 以
+`action_target_outside_schema` 拒绝，`shape_decisive_standard` 以
+`action_opcode_unowned` 拒绝。
+
+### F6: LLM conflict gate 从 hard veto 降级为 advisory（`evolution_runner.py`）
+
+**问题**：conflict gate 是 fail-closed 的 LLM 调用，且 prompt 自述
+"complementarity 不是 conflict"，但对"在一般规则上做更具体细化"的 ADD
+规则频繁误判为冲突。`evolve_50` 中 17 次 gate 评估 4 次（23.5%）在
+source replay 之前被丢弃，且多为"要求 counterfactual 证据/隔离证书"这类
+与基线动作方向一致的细化。
+
+**修复**：conflict 不再硬拒。冲突结果记入
+`reflection_audit["llm_conflict_gate"]`（随所有 fitness_check 落盘），
+`conflict_gate_passed` 保持 False 从而继续阻断 T6 self-supervised
+provisional 接受；编辑照常走 source replay，由 gold task score、canary
+regression、module-local fitness 这些证据型守卫判定是否接受。
+
+**验证**：冲突被标记（`CONFLICT_FLAGGED`）时编辑仍可被 gold fitness 接受；
+T6 provisional 仍需 conflict gate pass 才能成立。
+
 ## 审查后回退的改动（未落地）
 
 以下改动在实施后经详细审查与全量测试（438 通过）被判定为**误诊**并回退，
@@ -87,9 +150,63 @@ reject_fitness 4 + retry_fitness_no_effect 4 + reject_conflict 4），只产出
 
 本轮审查的核心教训：`evolve_50` 的瓶颈是 **L1 进化接受率低**（20 次 L1
 尝试仅 1 次接受），根因在反思质量与 fitness 判定，而不在 L2 预算占用或
-coverage 语义。三个尝试从 L2 侧"开闸"或加约束的改动均基于未完全验证的
-前提，逐一被测试与日志数据证伪并回退。真正落地的修复只处理了三处纯
-机械损耗（词表、空正文、判定复用）。
+coverage 语义。三个从 L2 侧"开闸"或加约束的改动均基于未完全验证的前提，
+逐一被测试与日志数据证伪并回退。
 
-L1 接受率低的深层根因（为何 5 个 no_effect 案例的编辑改变的是本模块禁止
-触碰的字段）指向反思路由质量，属于下一步待调查方向，本报告不臆断。
+L1 接受率低的深层根因已定位为三段契约未闭合：
+
+1. **fitness 判定顺序**：gold task score 的计算晚于
+   `responsible_step_lost` / CRS 丢失守卫，导致真实的方向改善被误拒
+   （F4）。
+2. **action 契约无执行落点**：target 词表不绑定 provider schema，
+   `shape_decisive_standard` 等 opcode 在 provider 输出中没有对应字段，
+   规则注入后无可执行动作（F5）。
+3. **conflict gate 在证据前误杀**：弱 LLM 把互补细化判为冲突，把本应
+   replay 验证的提案提前丢弃（F6）。
+4. **owner 路由不精确**：`unresolved → abstention_rule` 占启发式主导位，
+   且 error certificate 一律映射 evidence_obligation（F7/F8）。
+5. **rule_trace 语义失真**：静态编译列表被当作执行证据（F9）。
+
+前两项叠加解释了 5 个 no_effect 案例中 3 个（abstention_rule 指向无
+schema 落点的动作）、以及错误 owner 编辑改变错误模块输出面的现象。
+
+### 本轮后续修复（F7-F9，均已落地）
+
+**F7：确定性 artifact owner 提到 allowed 路由首位 + 起诉证据缺口投影**
+（`evolution_runner.py`）
+- `attribution_owner` 存在时置于 `attribution_route` 首位，启发式 primary
+  降为受约束 fallback；type intersection 后同样提升 artifact owner。
+- 新增投影规则：unresolved + prosecution coverage incomplete + 零存活
+  error certificate + 有候选 → `error_certificate missing` →
+  evidence_obligation，打破 unresolved→abstention 默认。Hollow complete
+  defense 保持归 L2，避免遮蔽既有 L2 路由。
+
+**F8：error certificate 畸形/缺失拆分 owner**（`failure_classifier.py`）
+- 已生成但字段畸形（malformed）的 error certificate → 
+  `atomic_verifier_instruction`（证书质量面）；未生成（missing）→
+  `evidence_obligation`（证据义务面）。
+- 投影第 6 条 audit 失败证书标记为 malformed，保留 failed fields 作证据。
+
+**F9：rule_trace 拆分 compiled / injected**（`skill_integration.py` +
+`evolution_runner.py`）
+- provider wrapper 在 meta 中记录 `bccse_injected_rule_ids`（该 route
+  实际注入的规则 id）。
+- 检测结果新增 `compiled_rule_trace`（genome 静态列表）与
+  `injected_rule_trace`（按 provider call 聚合、去重）。no_effect 归因可
+  区分"规则从未注入"与"注入但 provider 忽略"。
+
+**F10：slot-contract 结构化拒绝重试归一**（`evolution_runner.py`）
+- `_structural_rejection_retryable` / `_structural_reject_category` /
+  `_structural_hard_constraint` 此前只认 `runtime_rule_contract:` 前缀，
+  `rule_spec_contract:condition_overload` 这类槽位契约拒绝既不可重试也
+  拿不到硬约束文本。统一两个前缀，并把
+  `action_target_outside_schema` 加入可重试类别与约束词表。
+
+## 遗留方向（本报告未改动）
+
+- **防御侧证据缺口投影**：`clean_defense_boundary` 侧尚无与起诉侧对称的
+  "incomplete defense + 零有效防御证书"投影，hollow-defense 走既有 L2
+  覆盖有效性 policy。
+- **provider 执行效果分层**：`injected_rule_trace` 只证明规则进入了
+  provider prompt，尚不能证明 condition 匹配 / provider 实际按规则改动了
+  哪个字段；需要 provider schema 增加 `applied_rule_ids` 字段才能闭环。
