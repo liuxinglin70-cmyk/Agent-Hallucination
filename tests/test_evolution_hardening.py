@@ -5970,9 +5970,11 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
     # at the vocabulary gate.  The triggered source2 then falls through to
     # the L1 skill path (policy cannot repair a broken detection), where
     # the L2-vocabulary mock fails schema validation and retries within the
-    # bounded attempt budget.
+    # bounded attempt budget.  The retry re-enters the queue past the L2
+    # loop (it already had its chance on attempt 0), so only one
+    # skip_no_policy is recorded for source2.
     assert decisions[0] == "accept_policy"
-    assert decisions.count("skip_no_policy") == 2
+    assert decisions.count("skip_no_policy") == 1
     assert any(
         decision in {"retry_invalid_mutation", "skip_invalid_mutation"}
         for decision in decisions[1:]

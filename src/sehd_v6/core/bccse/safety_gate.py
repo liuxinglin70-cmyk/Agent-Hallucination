@@ -264,9 +264,20 @@ class StructuralGate:
         # path now serves only remove_rule callers that never reach this
         # branch and historical checkpoint replay.
         slot_contract_active = (
-            bool(rule_slots)
+            isinstance(rule_slots, Mapping)
+            and set(rule_slots) == {"condition", "action", "evidence_anchor"}
             and operation in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}
         )
+        if (
+            rule_slots is not None
+            and not slot_contract_active
+            and operation in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}
+        ):
+            # A partial slot dict is a corrupt artifact, not a free-text
+            # caller: the persisted-slot contract in genome.py requires the
+            # exact three keys, and accepting a partial dict here would
+            # admit an edit that apply_edit later rejects.
+            reject_reasons.append("rule_slots_incomplete")
         if operation in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}:
             if slot_contract_active:
                 assert rule_slots is not None

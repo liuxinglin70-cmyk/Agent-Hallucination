@@ -918,10 +918,11 @@ class PacaTclV35EvolutionEvaluator:
             elif error == ErrorType.UNRESOLVED_ERROR:
                 fixed = _prediction_state(child_row) is not None
             else:
-                fixed = (
-                    len(tuple(_walk_provider_meta(child_row.get("providers") or {})))
-                    <= len(tuple(_walk_provider_meta(parent_row.get("providers") or {})))
-                )
+                # An unhandled error class carries no defined fix predicate;
+                # counting fewer provider calls as "fixed" inflates the
+                # corrected total with a cost heuristic that is not a
+                # correctness signal.  Fail closed instead.
+                fixed = False
             corrected += int(fixed)
 
         boundary_refs = {

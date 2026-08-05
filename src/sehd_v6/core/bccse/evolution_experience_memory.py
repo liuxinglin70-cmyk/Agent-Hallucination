@@ -46,7 +46,12 @@ NO_EFFECT_REASONS = frozenset({
 })
 
 _SLOT_KEYS = ("effective", "no_effect", "structural_reject", "no_proposal")
-_DEDUP_LEDGER_LIMIT = 128
+# Bounded dedup ledger: opaque episode-id prefixes keep resume idempotent
+# without persisting full episode lists.  A 64-bit prefix collision is
+# negligible for episode ids (sha256 hex); the window covers any realistic
+# resume point and long same-mechanism runs.
+_DEDUP_LEDGER_LIMIT = 1024
+_DEDUP_ID_PREFIX = 16
 
 
 def _episode_signature(episode: FailureEpisode) -> tuple[str, ...]:
@@ -65,12 +70,17 @@ def _episode_signature(episode: FailureEpisode) -> tuple[str, ...]:
 
 def _slot_for(attempt: FailureAttempt) -> str | None:
     decision = str(attempt.decision or "")
-    if decision.startswith("accept") or attempt.no_effect_reason == "expected_delta_observed":
+    if decision.startswith("accept"):
         return "effective"
-    if attempt.structural_result in ("rejected", "reject") or decision == "structural_reject":
-        return "structural_reject"
-    if decision in ("no_edit", "unaddressable", "no_proposal"):
+    if decision in ("no_edit", "unaddressable", "no_proposal",
+                    "skip_no_policy", "skip_no_edit") or (
+        attempt.structural_result == "no_proposal"
+    ):
         return "no_proposal"
+    if attempt.structural_result in ("rejected", "reject") or decision in (
+        "structural_reject", "retry_invalid_mutation", "skip_invalid_mutation",
+    ) or attempt.structural_result == "invalid_mutation":
+        return "structural_reject"
     if attempt.no_effect_reason in NO_EFFECT_REASONS:
         return "no_effect"
     if decision.startswith("reject"):
@@ -156,9 +166,10 @@ class MechanismEntry:
 
     def upsert_observation(self, episode_id: str) -> bool:
         """Count one observation idempotently; returns True when new."""
-        if episode_id in self.counted_episode_ids:
+        ledger_key = episode_id[:_DEDUP_ID_PREFIX]
+        if ledger_key in self.counted_episode_ids:
             return False
-        self.counted_episode_ids.insert(0, episode_id)
+        self.counted_episode_ids.insert(0, ledger_key)
         del self.counted_episode_ids[_DEDUP_LEDGER_LIMIT:]
         self.observation_count += 1
         return True
@@ -197,8 +208,8 @@ class MechanismEntry:
             if isinstance(rep, Mapping):
                 entry.representatives[key] = Representative.from_dict(rep)
         entry.counted_episode_ids = [
-            str(item)
-            for item in (value.get("counted_episode_ids") or ())[: _DEDUP_LEDGER_LIMIT]
+            str(item)[:_DEDUP_ID_PREFIX]
+            for item in (value.get("counted_episode_ids") or ())[:_DEDUP_LEDGER_LIMIT]
         ]
         return entry
 
@@ -262,7 +273,7 @@ class EvolutionExperienceMemory:
                 "observable_delta": list(attempt.observable_delta),
                 "downstream_court_delta": list(attempt.downstream_court_delta),
             },
-            rule_text=" ".join(str(attempt.proposal_content or "").split())[:240],
+            rule_text=" ".join(str(attempt.proposal_content or "").split()),
         )
         if _better(candidate, entry.representatives.get(slot)):
             entry.representatives[slot] = candidate
@@ -272,6 +283,7 @@ class EvolutionExperienceMemory:
         entry: MechanismEntry,
         current: FailureEpisode,
         representative: Representative,
+        level: Sequence[int] | None = None,
     ) -> HistoricalEpisodeReference:
         slice_payload = current.causal_slice
         current_fields = sorted(set(
@@ -290,20 +302,33 @@ class EvolutionExperienceMemory:
                 ),
             ]
         ))
-        shared = sorted(set(current_fields).intersection(history_fields))
+        shared_fields = sorted(set(current_fields).intersection(history_fields))
+        # Only the facts that participated in the matched retrieval level are
+        # presented as shared; a fallback level (e.g. reason_code excluded)
+        # must not claim agreement it never checked.
+        signature_facts = (
+            ("layer", current.attribution.get("layer", "")),
+            ("artifact", current.attribution.get("artifact", "")),
+            ("reason_code", current.attribution.get("reason_code", "")),
+            (
+                "evolution_direction",
+                current.detection.get("evolution_direction", ""),
+            ),
+            ("candidate_kind", slice_payload.candidate_kind),
+            ("consumer", slice_payload.consumer),
+        )
+        matched = set(range(6)) if level is None else set(level)
+        shared_facts = {
+            label: value
+            for index, (label, value) in enumerate(signature_facts)
+            if index in matched
+        }
+        if level is None:
+            shared_facts["normalized_fields"] = shared_fields
         return HistoricalEpisodeReference(
             episode_id=representative.episode_id,
             mechanism_signature=entry.signature,
-            shared_facts={
-                "layer": current.attribution.get("layer", ""),
-                "artifact": current.attribution.get("artifact", ""),
-                "reason_code": current.attribution.get("reason_code", ""),
-                "evolution_direction": current.detection.get(
-                    "evolution_direction", ""
-                ),
-                "consumer": slice_payload.consumer,
-                "normalized_fields": shared,
-            },
+            shared_facts=shared_facts,
             current_only_facts={
                 "normalized_fields": sorted(
                     set(current_fields).difference(history_fields)
@@ -329,24 +354,27 @@ class EvolutionExperienceMemory:
         entry: MechanismEntry,
         current: FailureEpisode,
         exclude_episode_id: str,
+        level: Sequence[int] | None = None,
     ) -> list[HistoricalEpisodeReference]:
         reps = entry.representatives
         effective = reps.get("effective")
         negative = reps.get("no_effect") or reps.get("structural_reject")
         refs: list[HistoricalEpisodeReference] = []
+        effective_added = False
         if effective is not None and effective.episode_id != exclude_episode_id:
-            refs.append(self._reference_for(entry, current, effective))
+            refs.append(self._reference_for(entry, current, effective, level))
+            effective_added = True
         if negative is not None and negative.episode_id != exclude_episode_id:
-            refs.append(self._reference_for(entry, current, negative))
-        if not refs:
-            if negative is not None and negative.episode_id != exclude_episode_id:
-                refs.append(self._reference_for(entry, current, negative))
+            refs.append(self._reference_for(entry, current, negative, level))
+        if not effective_added and len(refs) < 2:
+            # Without a local-effective representative, the second slot is
+            # filled by the most relevant no-proposal representative.
             no_proposal = reps.get("no_proposal")
             if (
                 no_proposal is not None
                 and no_proposal.episode_id != exclude_episode_id
             ):
-                refs.append(self._reference_for(entry, current, no_proposal))
+                refs.append(self._reference_for(entry, current, no_proposal, level))
         return refs[:2]
 
     @staticmethod
@@ -370,7 +398,8 @@ class EvolutionExperienceMemory:
 
         Falls back level by level: exact mechanism signature, then
         layer+artifact+direction+consumer, then layer+artifact+direction,
-        then no history.
+        then no history.  Within a level the candidates are consulted in
+        deterministic order until one yields usable references.
         """
         signature = _episode_signature(episode)
         exact = self._entries.get(signature)
@@ -378,9 +407,7 @@ class EvolutionExperienceMemory:
             refs = self._refs_for_entry(exact, episode, exclude_episode_id)
             if refs:
                 return refs
-        level_two_indices = (0, 1, 3, 5)
-        level_three_indices = (0, 1, 3)
-        for indices in (level_two_indices, level_three_indices):
+        for indices in ((0, 1, 3, 5), (0, 1, 3)):
             candidates = [
                 entry
                 for entry in self._entries.values()
@@ -390,19 +417,20 @@ class EvolutionExperienceMemory:
                     tuple(signature[index] for index in indices),
                 )
             ]
-            if not candidates:
-                continue
-            best = sorted(
+            ordered = sorted(
                 candidates,
                 key=lambda entry: (
                     -entry.observation_count,
                     -entry.last_sequence,
                     entry.signature,
                 ),
-            )[0]
-            refs = self._refs_for_entry(best, episode, exclude_episode_id)
-            if refs:
-                return refs
+            )
+            for best in ordered:
+                refs = self._refs_for_entry(
+                    best, episode, exclude_episode_id, indices,
+                )
+                if refs:
+                    return refs
         return []
 
     def entries(self) -> Sequence[MechanismEntry]:
@@ -420,10 +448,13 @@ class EvolutionExperienceMemory:
     def from_dict(self, data: Mapping[str, Any] | None) -> None:
         """Load the current schema, or migrate a legacy type-only artifact."""
         data = data or {}
-        if (
-            str(data.get("schema_version") or "") == SCHEMA_VERSION
-            and isinstance(data.get("type_experience_memory"), Mapping)
-        ):
+        if str(data.get("schema_version") or "") == SCHEMA_VERSION:
+            if not isinstance(data.get("type_experience_memory"), Mapping):
+                raise ValueError(
+                    "current-schema experience memory artifact is missing "
+                    "type_experience_memory; refusing to treat a partial "
+                    "write as a legacy artifact"
+                )
             self._entries = {
                 entry.signature: entry
                 for entry in (

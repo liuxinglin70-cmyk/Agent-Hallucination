@@ -278,7 +278,8 @@ class TypeExperienceMemory:
         only previously observed edits and their replay metadata are exposed.
         """
         all_entries = self.get_type_experiences(hallucination_type, direction)
-        entries = all_entries[-max(0, int(limit)):]
+        limit = max(1, int(limit))
+        entries = all_entries[-limit:]
         # Aggregate over the closed outcome vocabulary so reflection can see
         # WHERE attempts keep failing, not just that they failed.
         outcome_counts: Counter[str] = Counter()
@@ -302,7 +303,7 @@ class TypeExperienceMemory:
             "type": hallucination_type.value,
             "direction": direction,
             "total": len(all_entries),
-            "successes": sum(bool(e.detection_improved) for e in entries),
+            "successes": sum(bool(e.detection_improved) for e in all_entries),
             "outcome_counts": dict(outcome_counts),
             "outcome_stage_counts": dict(stage_counts),
             "artifact_counts": dict(artifact_counts),
@@ -469,7 +470,10 @@ class TypeExperienceMemory:
                     evolution_direction=str(entry_data.get("evolution_direction") or ""),
                     module_targeted=str(entry_data.get("module_targeted") or "unknown"),
                     strategy_used=str(entry_data.get("strategy_used") or "generic"),
-                    detection_improved=bool(entry_data.get("detection_improved", False)),
+                    detection_improved=(
+                        str(entry_data.get("detection_improved", False)).strip().lower()
+                        in ("true", "1")
+                    ),
                     source_case_id=str(entry_data.get("source_case_id") or ""),
                     timestamp=float(entry_data.get("timestamp", 0.0)),
                     metadata=dict(entry_data.get("metadata") or {}),

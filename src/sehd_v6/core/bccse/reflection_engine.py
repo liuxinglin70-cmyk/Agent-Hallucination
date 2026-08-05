@@ -32,6 +32,7 @@ from .module_charter import (
     render_charter_text,
 )
 from .action_spec import render_action_spec_contract
+from .failure_episode import EVALUATOR_ONLY_KEYS
 from .step_attributor import (
     AttributionSignal,
     TriggerSource,
@@ -42,12 +43,8 @@ from .signal_adapter import resolve_evolution_state
 # preferred_keys 路径直接序列化整个子树，若 events/messages 等键的值内部
 # 嵌套了这些字段，它们会随 JSON 进入 prompt。fallback 路径已显式排除顶层
 # 字段；此常量为 preferred_keys 路径的递归剥离提供单一来源。
-_EVALUATOR_TRAJECTORY_KEYS = frozenset({
-    "case_id", "source_id", "gold_label", "gold_explanation",
-    "is_hallucination", "hallucination_step", "hallucination_reason",
-    "hallucination_category", "hallucination_subcategory",
-    "outer_feedback", "gold_steps",
-})
+# The canonical firewall set lives in failure_episode.py (single owner).
+_EVALUATOR_TRAJECTORY_KEYS = EVALUATOR_ONLY_KEYS
 
 
 def _strip_evaluator_fields(value: Any) -> Any:
@@ -349,7 +346,7 @@ A legal rule:
 - has exactly one module-local action; the action slot MUST be
   "<opcode>: <target>", where the closed opcode belongs to the selected
   module and <target> belongs to that exact operation
-  (see closed_action_opcodes in runtime_output_contracts). Free-text
+  (see executable_action_specs in runtime_output_contracts). Free-text
   actions are rejected by the structural gate as action_opcode_unowned;
 - stays as short and decisive as the observable condition permits;
 - uses no case identity, concrete case fact, internal state manipulation,
@@ -432,7 +429,7 @@ deterministic render "When <condition>, <action>." — you never write the
 sentence yourself, and a slot payload that fails the slot contract is
 discarded as an invalid mutation, never rewritten into free text. The
 condition must describe a situation the target module's provider can
-observe at runtime, and the action must be one of the closed_action_opcodes
+observe at runtime, and the action must be one of the executable_action_specs
 listed for the target module in runtime_output_contracts.
 
 <module_charters>
@@ -659,6 +656,8 @@ def extract_intervention_candidates(
     """
     if limit < 1 or limit > 5:
         raise ValueError("limit must be in 1..5")
+    if not isinstance(response, Mapping):
+        return [], "mutation response is not an object"
     raw = response.get("candidates")
     if isinstance(raw, list):
         candidates = [

@@ -465,7 +465,7 @@ def _classify_replay_no_effect(
     valid_moved = valid_counts(after) != valid_counts(before)
     if not health_moved and not valid_moved:
         return "no_observable_change_any_layer"
-    if valid_moved:
+    if health_moved and not valid_moved:
         return "provider_output_changed_but_court_invariant"
     return "output_changed_then_quarantined"
 
@@ -541,12 +541,16 @@ def _cross_case_no_effect_duplicate(
     Reuses the existing semantic-overlap duplicate check across the causal
     memory's no-effect representatives, so a later same-mechanism case does
     not replay a proposal the framework already executed without effect.
+    Only representatives of the same owning module are consulted: the
+    mechanism signature's artifact slot is the L1 module id.
     """
     if not new_content or not entries:
         return False
     from .genome import semantic_overlap
 
     for entry in entries:
+        if len(entry.signature) < 2 or entry.signature[1] != target_module:
+            continue
         representative = entry.representatives.get("no_effect")
         if representative is None:
             continue
@@ -949,22 +953,25 @@ def _prevalidate_candidate(
         )
         if not action_ok:
             return f"rule_spec:{action_reason}"
-    contract = candidate.get("expected_effect_contract")
-    if isinstance(contract, Mapping) and contract:
-        shape_ok, shape_reason = validate_expected_effect_contract(contract)
-        if not shape_ok:
-            return f"invalid_intervention_contract:{shape_reason}"
-        contract_field = str(contract.get("observable_field") or "")
-        if contract_field and contract_field not in MODULE_OBSERVABLE_FIELDS.get(
-            target_module, ()
-        ):
-            return f"invalid_intervention_contract:field_not_owned:{contract_field}"
-        if (
-            str(contract.get("expected_direction") or "") not in EXPECTED_DIRECTIONS
-            or str(contract.get("expected_scope") or "") not in EXPECTED_SCOPES
-            or not str(contract.get("trigger_condition") or "").strip()
-        ):
-            return "invalid_intervention_contract:field_shape_mismatch"
+    if operation == "remove_rule":
+        # Only the free-form remove path keeps a volunteered contract; slot
+        # rules compile their contract from the action slot downstream.
+        contract = candidate.get("expected_effect_contract")
+        if isinstance(contract, Mapping) and contract:
+            shape_ok, shape_reason = validate_expected_effect_contract(contract)
+            if not shape_ok:
+                return f"invalid_intervention_contract:{shape_reason}"
+            contract_field = str(contract.get("observable_field") or "")
+            if contract_field and contract_field not in MODULE_OBSERVABLE_FIELDS.get(
+                target_module, ()
+            ):
+                return f"invalid_intervention_contract:field_not_owned:{contract_field}"
+            if (
+                str(contract.get("expected_direction") or "") not in EXPECTED_DIRECTIONS
+                or str(contract.get("expected_scope") or "") not in EXPECTED_SCOPES
+                or not str(contract.get("trigger_condition") or "").strip()
+            ):
+                return "invalid_intervention_contract:field_shape_mismatch"
     return None
 
 
@@ -2279,7 +2286,7 @@ def _llm_no_conflict_gate(
                 budget_usage["mutation_budget_exhausted"] = (
                     budget_usage.get("mutation_budget_exhausted", 0) + 1
                 )
-                return False, "conflict_gate_budget_exhausted", [], True
+                return False, "conflict_gate_budget_exhausted", [], False
             budget_usage["mutation_calls"] += 1
         result, _meta = json_object_provider_call(
             route=mutation_route,
@@ -3317,7 +3324,7 @@ def run_online_evolution(
             ),
             no_effect_reason=no_effect_reason,
             decision=decision,
-            proposal_content=" ".join(str(proposal_content).split())[:240],
+            proposal_content=" ".join(str(proposal_content).split()),
         )
         updated = replace(episode, attempts=(*episode.attempts, attempt))
         causal_memory.upsert_attempt(updated, attempt)
@@ -3440,6 +3447,51 @@ def run_online_evolution(
             policy_action = (
                 str(proposal_edit.new_item.action)
                 if proposal_edit and proposal_edit.new_item else "none"
+            )
+            record_attempt(
+                decision=decision,
+                operation=f"policy:{policy_operation}:{policy_action}",
+                target_module=attribution.artifact,
+                action_spec=(
+                    {
+                        "policy_item_id": str(proposal_edit.new_item.item_id),
+                        "action": policy_action,
+                    }
+                    if proposal_edit and proposal_edit.new_item
+                    else {}
+                ),
+                structural_result=(
+                    "no_proposal"
+                    if decision == "skip_no_policy"
+                    else (
+                        "accepted"
+                        if accepted or decision.startswith("reject")
+                        else "rejected"
+                    )
+                ),
+                compiled=bool(proposal_edit),
+                injected=isinstance(replay, Mapping),
+                applied=bool(
+                    isinstance(replay, Mapping)
+                    and isinstance(replay.get("proof_adjudication"), Mapping)
+                    and bool(
+                        (replay["proof_adjudication"].get("policy_evaluation") or {})
+                        .get("fired")
+                    )
+                ),
+                observable_delta=(
+                    (f"state:{detection_state}->{replay_state_value}",)
+                    if replay_state_value != detection_state else ()
+                ),
+                no_effect_reason=(
+                    "expected_delta_observed"
+                    if state_improved
+                    else (
+                        str(reason or "")[:80]
+                        if not accepted
+                        else "provider_output_changed_but_downstream_invariant"
+                    )
+                ),
             )
             type_fitness.get_experience_memory().add_experience(
                 hallucination_type=HallucinationType.UNKNOWN,
@@ -3951,7 +4003,20 @@ def run_online_evolution(
             "source_replays": len(source_audits),
             "canary_cases": len(batch_canary_audits),
             "probe_cases": 0,
-            "provider_calls": len(source_audits) + len(batch_canary_audits),
+            "provider_calls": (
+                len(source_audits)
+                + len(batch_canary_audits)
+                + sum(
+                    int(
+                        bool(
+                            (steps[item.step_index].fitness_check or {}).get(
+                                "contrast_replays"
+                            )
+                        )
+                    )
+                    for item in provisional_edits
+                )
+            ),
             "rollback_reason": "",
             "promotion_eligible": bool(fitness_use_gold),
             "claim_scope": (
@@ -4737,17 +4802,62 @@ def run_online_evolution(
             # (observed: openmanus/091 stuck on reject_policy_no_effect with
             # zero L1 attempts).  Stable-source L2 cases keep skipping L1:
             # they were not triggers and must not spawn fruitless reflection.
-            l2_accepted = run_l2_policy_case(
-                idx=idx,
-                case_id=case_id,
-                detection_result=detection_result,
-                detection_state=detection_state,
-                genome_before=genome_before,
-                l2_attribution=l2_attribution,
-                stable_source=l2_stable_source,
-            )
+            if active_attempt_index > 0:
+                # An L1 retry re-enters the queue with the same detection and
+                # genome, so the L2 loop would repeat the identical policy
+                # reflection and replay; it already had its chance on the
+                # first attempt and its outcome is retry-independent.
+                l2_accepted = False
+            else:
+                l2_accepted = run_l2_policy_case(
+                    idx=idx,
+                    case_id=case_id,
+                    detection_result=detection_result,
+                    detection_state=detection_state,
+                    genome_before=genome_before,
+                    l2_attribution=l2_attribution,
+                    stable_source=l2_stable_source,
+                )
             if l2_accepted or l2_stable_source:
                 continue
+            if episode_payload is None and active_episode_payload is not None:
+                # L2 fall-through: the L1 skill path must be grounded on an
+                # L1 mechanism episode (owned by the step attributor's
+                # authoritative primary), not on the L2 episode whose policy
+                # evaluator has no L1 legal surface.  The L2 episode stays on
+                # the L2 steps already recorded.
+                l1_route = (
+                    signal.target_module,
+                    *(
+                        module for module in (signal.secondary_module,)
+                        if module and module != signal.target_module
+                    ),
+                )
+                try:
+                    l1_payload = build_failure_episode(
+                        detection_result=detection_result,
+                        signal=signal,
+                        attribution=FailureAttribution(
+                            layer=LAYER_L1,
+                            artifact=signal.target_module,
+                            reason_code=str(
+                                FailureEpisode.from_dict(
+                                    active_episode_payload
+                                ).attribution.get("reason_code") or ""
+                            ),
+                            evidence={},
+                        ),
+                        evolution_direction=evolution_direction,
+                        record_key=case_id,
+                        allowed_modules=l1_route,
+                    ).to_dict()
+                except UnaddressableFailure as exc:
+                    l1_payload = {"unaddressable": str(exc)}
+                if l1_payload is not None and "episode_id" in l1_payload:
+                    causal_memory.upsert_observation(
+                        FailureEpisode.from_dict(l1_payload)
+                    )
+                    active_episode_payload = l1_payload
 
         if not signal.should_evolve:
             # Stable success — no trigger
@@ -5404,7 +5514,7 @@ def run_online_evolution(
                 elif operation == "remove_rule" and rule_index is not None:
                     try:
                         removed_rule_index = int(rule_index)
-                        removed_meta = champion.modules[
+                        removed_meta = current_genome.modules[
                             target_module
                         ].get_rule_meta(removed_rule_index)
                     except (KeyError, TypeError, ValueError):
@@ -5499,6 +5609,8 @@ def run_online_evolution(
                         rationale[:300] or "LLM found no safe general edit"
                     )
                     print(f"    LLM requested NO_EDIT: {no_edit_reason}")
+                elif operation == "remove_rule" and rule_index is None:
+                    invalid_mutation_reason = "remove_rule_missing_rule_index"
                 elif operation in {"add_rule", "modify_rule", "remove_rule"} and (
                     not expected_effect or not contract_present
                 ):
@@ -6478,8 +6590,6 @@ def run_online_evolution(
                     # compares bigram overlap against this content, and a
                     # truncated prefix systematically underestimates overlap
                     # for long rules (letting paraphrase retries escape).
-                    # This structure is in-memory only (never checkpointed),
-                    # so storing full text carries no compatibility cost.
                     "content": edit.new_content,
                     "content_hash": hashlib.sha256(
                         edit.new_content.encode("utf-8")

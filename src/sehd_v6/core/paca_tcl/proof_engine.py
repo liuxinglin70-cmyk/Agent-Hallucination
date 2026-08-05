@@ -1450,11 +1450,23 @@ def adjudicate_case(
             "focused_prosecution_audits": focused_audits,
         }
         initial_proof = contract.adjudicate_proof_court(**initial_court_kwargs)
+        # The base court verdict is locally authoritative: the appeal stage
+        # augments it with independent verification, it does not re-validate
+        # it.  Marking it here makes the complete-initial-positive
+        # preservation in _resolve_incomplete_appeal reachable when the
+        # appeal infrastructure fails mid-way.
+        initial_proof["decision_authority"] = "authoritative"
         proof = initial_proof
         # Tracks the exact evidence bundle of whichever court call produced
         # the current proof, so the L2 policy re-adjudication replays the
         # identical inputs at the convergence point.
         final_court_kwargs = dict(initial_court_kwargs)
+        # The appeal evidence bundle defaults to the base prosecution and an
+        # empty defense so the localization stage can run even when the
+        # appeal stage was skipped or failed mid-way (a preserved initial
+        # verdict still localizes from base evidence).
+        combined_prosecution = prosecution
+        appeal_defense_certs = {"coverage_state": "incomplete", "candidates": []}
 
         # H2: Tightened trigger calibrator (priority 0-1 only)
         appeal_candidates = _appeal_trigger_calibrator_v35(
@@ -1586,7 +1598,12 @@ def adjudicate_case(
 
         # H3: Two-Phase Localization (only if multiple surviving origins)
         surviving_ids = proof.get("surviving_error_certificate_ids") or []
-        if proof.get("state") == "verified_error" and len(surviving_ids) >= 2:
+        counterfactual_rankings = None
+        if (
+            proof.get("state") == "verified_error"
+            and len(surviving_ids) >= 2
+            and "appeal_error" not in providers
+        ):
             # Get the surviving error certificates for counterfactual comparison
             all_certs = (combined_prosecution or prosecution or {}).get("candidates") or []
             surviving_errors = [
@@ -1646,7 +1663,9 @@ def adjudicate_case(
             surviving = proof.get("surviving_error_certificate_ids") or []
             proof["localization_status"] = (
                 "complete" if counterfactual_rankings else
-                "not_applicable" if len(surviving) < 2 else
+                "not_applicable" if (
+                    len(surviving) < 2 or "appeal_error" in providers
+                ) else
                 "failed_temporal_fallback"
             )
         else:

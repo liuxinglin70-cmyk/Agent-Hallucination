@@ -119,20 +119,29 @@ def load_state_manifest(manifest_dir: Path) -> dict[str, Any]:
         entry = manifest.get(key)
         if not isinstance(entry, Mapping):
             raise ValueError(f"manifest artifact entry missing: {key}")
-        path = manifest_dir / str(entry.get("path") or "")
-        if not path.is_file():
-            raise FileNotFoundError(
-                f"manifest artifact missing: {path}"
-            )
         expected = str(entry.get("sha256") or "")
-        actual = _file_sha256(path)
-        if expected and actual != expected:
+        if not expected:
+            raise ValueError(f"manifest artifact entry lacks sha256: {key}")
+        raw_path = str(entry.get("path") or "")
+        manifest_root = manifest_dir.resolve()
+        resolved = (manifest_dir / raw_path).resolve()
+        if not resolved.is_relative_to(manifest_root):
             raise ValueError(
-                f"manifest artifact hash mismatch: {path} "
+                f"manifest artifact path escapes the manifest directory: "
+                f"{raw_path}"
+            )
+        if not resolved.is_file():
+            raise FileNotFoundError(
+                f"manifest artifact missing: {resolved}"
+            )
+        actual = _file_sha256(resolved)
+        if actual != expected:
+            raise ValueError(
+                f"manifest artifact hash mismatch: {resolved} "
                 f"(expected {expected[:12]}..., got {actual[:12]}...)"
             )
         manifest[key] = {
-            "path": str(path),
+            "path": str(resolved),
             "sha256": expected,
         }
     return manifest

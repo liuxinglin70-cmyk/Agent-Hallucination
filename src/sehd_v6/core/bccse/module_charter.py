@@ -403,6 +403,7 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
     ),
     "causal_link_test": (
         "causal_field_coverage", "localization_status", "target_local_score",
+        "responsible_step",
     ),
     "earliest_origin_tiebreak": (
         "responsible_step", "localization_status", "target_local_score",

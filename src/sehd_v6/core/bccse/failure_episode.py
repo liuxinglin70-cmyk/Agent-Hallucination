@@ -42,7 +42,7 @@ _EVIDENCE_REF_KEYS = (
     "recovery_evidence_refs", "benchmark_causal_evidence_refs",
 )
 
-_EVALUATOR_ONLY_KEYS = frozenset({
+EVALUATOR_ONLY_KEYS = frozenset({
     "case_id", "source_id", "gold_label", "gold_explanation",
     "is_hallucination", "hallucination_step", "hallucination_reason",
     "hallucination_category", "hallucination_subcategory",
@@ -704,6 +704,8 @@ def _select_candidate(
     if not isinstance(court, Mapping):
         court = {}
     positive_ids = court.get("positive_candidate_ids") or []
+    if isinstance(positive_ids, (set, frozenset)):
+        positive_ids = sorted(str(value) for value in positive_ids)
     for candidate_id in positive_ids:
         row = next(
             (
@@ -720,7 +722,7 @@ def _select_candidate(
                 _row_refs(row, "origin_refs"),
                 _row_refs(row, "dependency_refs") or _row_refs(row, "dependencies"),
             )
-        return str(candidate_id), "candidate", (), ()
+        continue
     evidence = attribution.evidence if isinstance(attribution.evidence, Mapping) else {}
     kind = str(evidence.get("kind") or "")
     rows = _candidate_rows(detection_result, kind) if kind else []
@@ -1071,7 +1073,7 @@ def project_failure_episode_for_prompt(
         "candidate": {
             "candidate_id": slice_payload.candidate_id,
             "candidate_kind": slice_payload.candidate_kind,
-            "origin_refs": list(slice_payload.origin_refs),
+            "origin_refs": list(slice_payload.origin_refs)[:8],
         },
         "obligation_vs_observed": {
             "required_fields": list(slice_payload.required_fields),
@@ -1133,15 +1135,8 @@ def validate_failure_episode(
     }
     if episode.episode_id != _stable_identity(identity_payload):
         return False, "episode_id_mismatch"
-    if episode.attempts:
-        attempts_key = _canonical_json(
-            [attempt.to_dict() for attempt in episode.attempts]
-        )
-        if attempts_key in episode.episode_id:
-            return False, "attempts_entered_identity"
-    if episode.record_key in _canonical_json(
-        project_failure_episode_for_prompt(episode)
-    ):
+    projection = project_failure_episode_for_prompt(episode)
+    if "record_key" in _canonical_json(projection):
         return False, "record_key_leaks_into_prompt"
     return True, ""
 
@@ -1171,5 +1166,5 @@ def proposal_signature_for(
         "operation": str(operation or ""),
         "target_module": str(target_module or ""),
         "action_spec": dict(action_spec or {}),
-        "proposal_content": " ".join(str(proposal_content or "").split())[:240],
+        "proposal_content": " ".join(str(proposal_content or "").split()),
     })

@@ -467,6 +467,12 @@ def adjudicate_proof_court(
 
     # v3.5 H2: CONSENSUS GATE. Only admissible initial certificates count as
     # independent support; quarantined raw model output has no voting power.
+    # ``initial_supported_candidate_ids`` stays None so the gate derives it
+    # from the admissible initial prosecution itself: deriving it from the
+    # merged surviving rows would drop candidates whose initial certificate
+    # was deduplicated away by _merge_prosecutions (identical initial+appeal
+    # certs keep only the appeal row), erasing independently verified
+    # positives and blocking the appeal certificate that corroborates them.
     consensus_blocked: list[dict[str, Any]] = []
     if apply_consensus_gate_flag and initial_prosecution is not None:
         initial_rows = initial_prosecution.get("candidates") or []
@@ -478,11 +484,7 @@ def adjudicate_proof_court(
         surviving, consensus_blocked = apply_consensus_gate(
             surviving_errors=surviving,
             initial_prosecution={"candidates": admissible_initial},
-            initial_supported_candidate_ids={
-                str(row.get("source_candidate_id") or "")
-                for row in surviving
-                if str(row.get("certificate_id") or "").startswith("initial_")
-            },
+            initial_supported_candidate_ids=None,
         )
 
     # Truth adjudication precedes ledger append: only causal certificates that
