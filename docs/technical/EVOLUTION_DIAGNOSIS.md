@@ -178,6 +178,8 @@ EVOLUTION_FIXES_SUMMARY.md 的 R2）。
 | F8 | error cert 畸形→verifier / 缺失→obligation | 落地 | 证书质量 vs 证据义务面拆分 |
 | F9 | rule_trace 拆分 compiled/injected | 落地 | no_effect 归因可分辨注入与否 |
 | F10 | slot-contract 拒绝重试归一 | 落地 | rule_spec_contract 可重试且有约束文本 |
+| F11 | 防御侧证据缺口投影 | 落地 | incomplete defense→clean_defense_boundary |
+| F12 | applied_rule_ids 执行闭环 | 落地 | 三层 rule trace：compiled/injected/applied |
 | R1 | L2 accept 后回落 L1 | 回退 | L1 已在 20 例上跑过，瓶颈是接受率非预算 |
 | R2 | module_local_score 对齐输出面 | 回退 | 破坏 13 条契约测试，且未修好观测案例 |
 | R3 | L2 降级需 L1 支撑 | 回退 | 阻断合法的 hollow-defense 纠正 |

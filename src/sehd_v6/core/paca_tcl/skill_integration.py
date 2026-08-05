@@ -271,7 +271,13 @@ def _compile_module_delta(
     module: SkillModule,
     baseline_module: SkillModule,
 ) -> list[str]:
-    """Compile only rules that are not already part of the frozen baseline."""
+    """Compile only rules that are not already part of the frozen baseline.
+
+    Each rule carries its stable id inline (``[<id>]``) so the receiving
+    provider can self-report which evolved rules it actually applied via the
+    ``applied_rule_ids`` output field, closing the injection-to-execution
+    trace.
+    """
     if not module.active:
         return []
     unmatched_baseline = list(baseline_module.rules)
@@ -287,7 +293,10 @@ def _compile_module_delta(
         module.module_id,
         module.module_id,
     )
-    return [f"【{display_name}】{rule}" for rule in delta_rules]
+    return [
+        f"【{display_name}】[{_rule_stable_id(module.module_id, rule)}] {rule}"
+        for rule in delta_rules
+    ]
 
 
 def _rule_stable_id(module_id: str, rule: str) -> str:
@@ -476,6 +485,11 @@ def make_skill_aware_provider(
             ])
             for module_id in injected_modules:
                 lines.extend(compiled.module_texts[module_id].splitlines())
+            lines.extend([
+                "",
+                "如果本输出实际应用了上述某条进化规则（方括号中的规则 id），"
+                "请在 JSON 顶层添加 applied_rule_ids 数组列出对应 id；未应用则省略该字段。",
+            ])
         fragment_text = "\n".join(lines)
         fragment_hash = hashlib.sha256(fragment_text.encode("utf-8")).hexdigest()
         augmented_system = (
@@ -487,6 +501,15 @@ def make_skill_aware_provider(
             user=user,
             cache_dir=cache_dir,
         )
+        applied_rule_ids: list[str] = []
+        if isinstance(value, Mapping):
+            raw_applied = value.get("applied_rule_ids")
+            if isinstance(raw_applied, list):
+                applied_rule_ids = [str(item) for item in raw_applied]
+            # The self-report field is telemetry, not provider output; strip
+            # it so downstream schema validation sees only the base contract.
+            value = dict(value)
+            value.pop("applied_rule_ids", None)
         return value, {
             **meta,
             "bccse_genome_hash": compiled.genome_hash,
@@ -494,6 +517,7 @@ def make_skill_aware_provider(
             "bccse_route": route_key,
             "bccse_injected_modules": list(injected_modules),
             "bccse_injected_rule_ids": injected_rule_ids,
+            "bccse_applied_rule_ids": applied_rule_ids,
             "bccse_stage_skill_hash": fragment_hash,
             "bccse_route_skill_hash": fragment_hash,
         }

@@ -4559,6 +4559,91 @@ def test_attribute_failure_prosecution_gap_skipped_with_surviving_errors() -> No
     assert reason == "no_failure_shape"
 
 
+def test_attribute_failure_defense_gap_routes_clean_defense_boundary() -> None:
+    """Mirror of the prosecution gap: an unresolved terminal with incomplete
+    defense coverage and zero valid defense certificates means the
+    clean-boundary evidence was never established; the owner is
+    clean_defense_boundary."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="incomplete",
+        candidate_count=3,
+    )
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "prosecution_coverage": "complete",
+                "defense_coverage": "incomplete",
+                "required_candidate_count": 4,
+                "valid_error_certificate_count": 1,
+                "valid_defense_certificate_count": 0,
+                "surviving_error_certificate_ids": [],
+            },
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_defense_gap",
+        non_l1_failure_attributions=l2_telemetry,
+    )
+    assert owner == "clean_defense_boundary"
+    assert reason == "provider_artifact_missing"
+    assert l2_telemetry == []
+
+
+def test_attribute_failure_defense_gap_skipped_with_hollow_prosecution() -> None:
+    """A defense gap overlapping a hollow complete prosecution stays on the
+    L2 coverage-validity path, symmetric with the hollow-defense guard."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=None,
+        has_gold=False,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="incomplete",
+        candidate_count=3,
+    )
+    l2_telemetry: list[dict] = []
+    owner, reason = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "prosecution_coverage": "complete",
+                "defense_coverage": "incomplete",
+                "required_candidate_count": 4,
+                "valid_error_certificate_count": 0,
+                "valid_defense_certificate_count": 0,
+                "surviving_error_certificate_ids": [],
+            },
+        },
+        primary_type=HallucinationType.FACTUAL,
+        case_id="case_hollow_prosecution_with_gap",
+        non_l1_failure_attributions=l2_telemetry,
+    )
+    assert owner == ""
+    assert reason == "hollow_complete_prosecution"
+    assert len(l2_telemetry) == 1
+    assert l2_telemetry[0]["artifact"] == "coverage_validity_policy"
+
+
 def test_collect_injected_rule_trace_walks_provider_metas() -> None:
     """injected_rule_trace reflects only the provider calls that actually
     carried evolved rules, distinct from the compiled snapshot: a route that
@@ -4587,6 +4672,34 @@ def test_collect_injected_rule_trace_walks_provider_metas() -> None:
     trace = runner._collect_injected_rule_trace(result)
     assert trace == {"focused_prosecution_route": ["r1", "r2", "r3"]}
     assert runner._collect_injected_rule_trace({}) == {}
+
+
+def test_collect_applied_rule_trace_walks_provider_metas() -> None:
+    """applied_rule_trace reflects the rule ids each provider self-reported
+    applying, distinct from the injected set."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    result = {
+        "providers": {
+            "defense_route": {
+                "bccse_route": "defense_route",
+                "bccse_injected_rule_ids": ["d1", "d2"],
+                "bccse_applied_rule_ids": ["d1"],
+            },
+            "focused_prosecution": [
+                {
+                    "bccse_route": "focused_prosecution_route",
+                    "bccse_applied_rule_ids": ["f1", "f2", "f1"],
+                },
+            ],
+            "boundary_route": {"outcome": "failed_closed"},
+        },
+    }
+    assert runner._collect_applied_rule_trace(result) == {
+        "defense_route": ["d1"],
+        "focused_prosecution_route": ["f1", "f2"],
+    }
+    assert runner._collect_applied_rule_trace({}) == {}
 
 
 # ---------------------------------------------------------------------------

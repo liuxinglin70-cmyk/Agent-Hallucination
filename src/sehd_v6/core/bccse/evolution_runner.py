@@ -1007,6 +1007,7 @@ def _build_provider_artifact_projection(
         or adjudication.get("defense_coverage") or ""
     )
     hollow_defense = defense_state == "complete" and valid_defense == 0
+    hollow_prosecution = prosecution_state == "complete" and valid_error == 0
     if (
         state == "unresolved"
         and prosecution_state == "incomplete"
@@ -1017,6 +1018,23 @@ def _build_provider_artifact_projection(
         and not hollow_defense
     ):
         add("error_certificate", malformed=False, missing=["certificate"])
+
+    # 9. Defense evidence gap: mirror of item 8 on the defense side. An
+    # unresolved terminal with incomplete defense coverage and zero valid
+    # defense certificates means the clean-boundary evidence was never
+    # established for any candidate; the actionable owner is
+    # clean_defense_boundary (defense certificate issuance and coverage).
+    # A hollow complete prosecution is left to the L2 coverage-validity
+    # policy, symmetric with item 8's hollow-defense guard.
+    if (
+        state == "unresolved"
+        and defense_state == "incomplete"
+        and valid_defense == 0
+        and court_required > 0
+        and int(getattr(signal, "candidate_count", 0) or 0) > 0
+        and not hollow_prosecution
+    ):
+        add("defense_certificate", malformed=False, missing=["certificate"])
 
     return artifacts
 
@@ -1575,17 +1593,19 @@ def _probe_certification_label(
 # Detection with skill injection
 # ============================================================
 
-def _collect_injected_rule_trace(
+def _collect_rule_trace(
     result: Mapping[str, Any],
+    meta_key: str,
 ) -> dict[str, list[str]]:
-    """Aggregate which evolved rule ids each provider route actually received.
+    """Aggregate which evolved rule ids each provider route reported.
 
-    The skill-aware provider wrapper records the rule ids it injected into
-    every call's meta; this walks the detection result's provider bookkeeping
-    and returns route -> rule ids (order-preserving, deduplicated). Distinct
-    from the compiled trace: a route that never ran contributes nothing, so a
-    no-effect replay can distinguish "rule not injected" from "injected but
-    ignored".
+    The skill-aware provider wrapper records rule ids in every call's meta
+    (``bccse_injected_rule_ids`` for what it injected, ``bccse_applied_rule_ids``
+    for what the provider self-reported applying); this walks the detection
+    result's provider bookkeeping and returns route -> rule ids (order-
+    preserving, deduplicated). Distinct from the compiled trace: a route that
+    never ran contributes nothing, so a no-effect replay can distinguish
+    "rule not injected" from "injected but ignored".
     """
     providers = result.get("providers")
     if not isinstance(providers, Mapping):
@@ -1594,7 +1614,7 @@ def _collect_injected_rule_trace(
 
     def walk(node: Any) -> None:
         if isinstance(node, Mapping):
-            rule_ids = node.get("bccse_injected_rule_ids")
+            rule_ids = node.get(meta_key)
             if isinstance(rule_ids, list) and rule_ids:
                 route_key = str(node.get("bccse_route") or "unknown_route")
                 bucket = trace.setdefault(route_key, [])
@@ -1609,6 +1629,20 @@ def _collect_injected_rule_trace(
 
     walk(providers)
     return trace
+
+
+def _collect_injected_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    """Which evolved rule ids each provider route actually received."""
+    return _collect_rule_trace(result, "bccse_injected_rule_ids")
+
+
+def _collect_applied_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    """Which evolved rule ids each provider self-reported applying."""
+    return _collect_rule_trace(result, "bccse_applied_rule_ids")
 
 
 def _run_detection_with_genome(
@@ -1722,9 +1756,10 @@ def _run_detection_with_genome(
     if compiled_rule_trace:
         # Compiled rule trace: which evolved rules exist in this genome.
         # Audit telemetry only; it never participates in a verdict. The
-        # per-route injected trace lives in ``injected_rule_trace``.
+        # per-route injected/applied traces live in the result too.
         result["compiled_rule_trace"] = compiled_rule_trace
         result["injected_rule_trace"] = _collect_injected_rule_trace(result)
+        result["applied_rule_trace"] = _collect_applied_rule_trace(result)
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
     # but they cannot enter source fitness or champion promotion.
@@ -5671,14 +5706,19 @@ def run_online_evolution(
                 # Rule traces for no-effect attribution: ``compiled_rule_trace``
                 # lists the evolved rules present in this genome;
                 # ``injected_rule_trace`` lists which rules each provider route
-                # actually received, so a no-effect replay can distinguish a
-                # rule that was never injected from one the provider ignored.
+                # received; ``applied_rule_trace`` lists which ones the provider
+                # self-reported applying — so a no-effect replay can distinguish
+                # a rule that was never injected from one the provider ignored.
                 "compiled_rule_trace": (
                     candidate_result.get("compiled_rule_trace")
                     if isinstance(candidate_result, Mapping) else None
                 ),
                 "injected_rule_trace": (
                     candidate_result.get("injected_rule_trace")
+                    if isinstance(candidate_result, Mapping) else None
+                ),
+                "applied_rule_trace": (
+                    candidate_result.get("applied_rule_trace")
                     if isinstance(candidate_result, Mapping) else None
                 ),
                 "no_effect_classification": (

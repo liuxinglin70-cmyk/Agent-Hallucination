@@ -202,11 +202,30 @@ schema 落点的动作）、以及错误 owner 编辑改变错误模块输出面
   拿不到硬约束文本。统一两个前缀，并把
   `action_target_outside_schema` 加入可重试类别与约束词表。
 
+### 遗留方向修复（F11-F12，均已落地）
+
+**F11：防御侧证据缺口投影**（`evolution_runner.py`）
+- 新增与起诉侧对称的投影：unresolved + defense coverage incomplete +
+  零有效 defense certificate + 有候选 → `defense_certificate missing` →
+  `clean_defense_boundary`。Hollow complete prosecution 保持归 L2，与
+  F7 的 hollow-defense 守卫对称。
+
+**F12：provider 执行效果分层（applied_rule_ids 闭环）**
+（`skill_integration.py` + `evolution_runner.py`）
+- `_compile_module_delta` 在每条注入规则文本内联稳定 rule id
+  （`【module】[id] rule`），并在注入 fragment 末尾指示 provider：若实际
+  应用了某条进化规则，在 JSON 顶层输出 `applied_rule_ids`。
+- `make_skill_aware_provider` 把 `applied_rule_ids` 从 provider 输出中剥离
+  进 meta（`bccse_applied_rule_ids`），下游 schema 校验只看到基础契约。
+- 检测结果新增 `applied_rule_trace`（route → provider 自报应用的规则 id），
+  与 `compiled_rule_trace` / `injected_rule_trace` 三层闭环。no_effect 归因
+  现可区分：未注入 / 已注入但未应用 / 已应用但无 observable 变化。
+
 ## 遗留方向（本报告未改动）
 
-- **防御侧证据缺口投影**：`clean_defense_boundary` 侧尚无与起诉侧对称的
-  "incomplete defense + 零有效防御证书"投影，hollow-defense 走既有 L2
-  覆盖有效性 policy。
-- **provider 执行效果分层**：`injected_rule_trace` 只证明规则进入了
-  provider prompt，尚不能证明 condition 匹配 / provider 实际按规则改动了
-  哪个字段；需要 provider schema 增加 `applied_rule_ids` 字段才能闭环。
+- **provider 条件匹配的最终确认**：`applied_rule_ids` 是 provider 自报的
+  best-effort 证据（fail-open，不参与判定）。当 provider 未上报时，
+  `applied_rule_trace` 为空，只能回到 `injected_rule_trace` + observable
+  delta 推断。若需强闭合，需要 provider 在输出中增加每个
+  certificate/candidate 与所应用规则的字段级绑定（rule-level execution
+  effect），目前通过 `applied_rule_ids` 提供了最小闭环。
