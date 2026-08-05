@@ -351,7 +351,6 @@ def test_restore_never_resurrects_uncommitted_shadow() -> None:
         SkillGenome,
         create_baseline_genome,
     )
-    from src.sehd_v6.core.htc_tes.type_aware_fitness import TypeAwareFitness
 
     champion = create_baseline_genome()
     shadow = champion.clone()
@@ -379,7 +378,7 @@ def test_restore_never_resurrects_uncommitted_shadow() -> None:
         champion_genome=restored_champion,
         current_genome=restored_current,
         stable_genome=restored_stable,
-        type_fitness=TypeAwareFitness(),
+        experience_memory=runner.EvolutionExperienceMemory(),
         evolution_case_ids=("source",),
     )
     assert restored["next_case_index"] == 1

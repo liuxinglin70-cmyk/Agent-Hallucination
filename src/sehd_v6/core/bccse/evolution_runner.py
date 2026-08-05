@@ -101,10 +101,12 @@ from .v6_contracts import (
     build_adjudication_facts,
 )
 from .failure_episode import (
+    FailureEpisode,
     UnaddressableFailure,
     build_failure_episode,
     project_provider_artifacts,
 )
+from .evolution_experience_memory import EvolutionExperienceMemory
 from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
@@ -2049,7 +2051,7 @@ def _restore_state_from_checkpoint(
     champion_genome: SkillGenome,
     current_genome: SkillGenome,
     stable_genome: SkillGenome,
-    type_fitness: Any,
+    experience_memory: Any,
     evolution_case_ids: Sequence[str],
 ) -> dict[str, Any]:
     """Restore in-memory evolution state from a loaded checkpoint.
@@ -2092,7 +2094,7 @@ def _restore_state_from_checkpoint(
         if experience_path.is_file():
             with experience_path.open(encoding="utf-8") as handle:
                 memory_payload = json.load(handle)
-            type_fitness.get_experience_memory().from_dict(memory_payload)
+            experience_memory.from_dict(memory_payload)
 
     return {
         "steps": list(checkpoint.get("steps") or []),
@@ -2594,18 +2596,23 @@ def run_online_evolution(
     last_probe_triggered_count = 0
     active_attempt_index = 0
 
-    # HTC-TES v3: type-conditioned evolution components
+    # HTC-TES v3: type-conditioned evolution components. The combined
+    # causal memory composes the type statistics with the structural
+    # failure-mechanism index; both persist through the same artifact.
     type_classifier = HallucinationTypeClassifier()
     type_evolution = TypeConditionedEvolution()
     type_fitness = TypeAwareFitness()
+    causal_memory = EvolutionExperienceMemory(
+        type_fitness.get_experience_memory()
+    )
     if experience_memory_path is not None:
         memory_path = Path(experience_memory_path)
         if not memory_path.is_file():
             raise FileNotFoundError(f"Experience memory not found: {memory_path}")
         with memory_path.open(encoding="utf-8") as handle:
             memory_payload = json.load(handle)
-        type_fitness.get_experience_memory().from_dict(memory_payload)
-    stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+        causal_memory.from_dict(memory_payload)
+    stable_memory_payload = causal_memory.to_dict()
     # The causal episode payload attached to every step of the current
     # case; reset per iteration so a stale episode never leaks to the next
     # case's audit trail.
@@ -2662,7 +2669,7 @@ def run_online_evolution(
             champion_genome=champion_genome,
             current_genome=current_genome,
             stable_genome=stable_genome,
-            type_fitness=type_fitness,
+            experience_memory=causal_memory,
             evolution_case_ids=evolution_case_ids,
         )
         steps = [
@@ -2898,7 +2905,7 @@ def run_online_evolution(
                 steps[-1].attempt_index + 1,
             )
         if not stable_memory_payload:
-            stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+            stable_memory_payload = causal_memory.to_dict()
         if run_id is None:
             run_id = str(checkpoint.get("run_id") or run_id or "")
         provisional_count = int(checkpoint.get("provisional_edit_count") or 0)
@@ -3218,7 +3225,7 @@ def run_online_evolution(
         )
         _atomic_write_json(
             output_dir / "htc_tes_experience_memory.json",
-            type_fitness.get_experience_memory().to_dict(),
+            causal_memory.to_dict(),
         )
 
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
@@ -3677,7 +3684,7 @@ def run_online_evolution(
             current_genome = stable_genome.clone()
             policy_genome = stable_policy_genome.clone()
             l2_policy_accepts = stable_l2_policy_accepts
-            type_fitness.get_experience_memory().from_dict(stable_memory_payload)
+            causal_memory.from_dict(stable_memory_payload)
             stable_canaries.clear()
             stable_canaries.update(stable_canaries_checkpoint)
             for item in pending_probe_commits:
@@ -3736,7 +3743,7 @@ def run_online_evolution(
                             "probe_case_ids": probe_case_ids,
                         },
                     )
-            stable_memory_payload = type_fitness.get_experience_memory().to_dict()
+            stable_memory_payload = causal_memory.to_dict()
             stable_canaries_checkpoint = dict(stable_canaries)
             for item in pending_probe_commits:
                 step = steps[item.step_index]
@@ -4469,6 +4476,10 @@ def run_online_evolution(
                 ).to_dict()
             except UnaddressableFailure as exc:
                 episode_payload = {"unaddressable": str(exc)}
+        if episode_payload is not None and "episode_id" in episode_payload:
+            causal_memory.upsert_observation(
+                FailureEpisode.from_dict(episode_payload)
+            )
         if episode_payload is not None:
             active_episode_payload = episode_payload
         l2_attribution = next(
@@ -4510,6 +4521,10 @@ def run_online_evolution(
                 ).to_dict()
             except UnaddressableFailure as exc:
                 l2_episode_payload = {"unaddressable": str(exc)}
+            if l2_episode_payload is not None and "episode_id" in l2_episode_payload:
+                causal_memory.upsert_observation(
+                    FailureEpisode.from_dict(l2_episode_payload)
+                )
             active_episode_payload = l2_episode_payload
             if l2_stable_source:
                 # A stable-source L2 case skips the regular stable branch, so
@@ -6408,11 +6423,11 @@ def run_online_evolution(
     write_json(output_dir / "champion_genome.json", champion_genome.to_dict())
     write_json(output_dir / "policy_genome.json", policy_genome.to_dict())
     # HTC-TES v3: Save type-conditioned experience summary
-    type_coverage = type_fitness.get_experience_memory().get_type_coverage()
+    type_coverage = causal_memory.type_experience_memory.get_type_coverage()
     write_json(output_dir / "htc_tes_coverage.json", type_coverage)
     write_json(
         output_dir / "htc_tes_experience_memory.json",
-        type_fitness.get_experience_memory().to_dict(),
+        causal_memory.to_dict(),
     )
     persist_progress(len(evolution_case_ids), status="complete")
 

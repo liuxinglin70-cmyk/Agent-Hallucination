@@ -2508,9 +2508,11 @@ def test_runtime_invalid_experience_is_recorded_but_not_promotable(
     payload = json.loads(
         (tmp_path / "htc_tes_experience_memory.json").read_text(encoding="utf-8")
     )
+    type_memory = payload["type_experience_memory"]
+    assert payload["schema_version"] == "sehd.evolution_experience_memory.v1"
     entries = [
         entry
-        for rows in payload["types"].values()
+        for rows in type_memory["types"].values()
         for entry in rows
         if entry["metadata"].get("outcome") == "runtime_invalid"
     ]
@@ -5433,7 +5435,7 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
             encoding="utf-8"
         )
     )
-    experience = memory["types"]["unknown"][0]
+    experience = memory["type_experience_memory"]["types"]["unknown"][0]
     assert experience["metadata"]["outcome_stage"] == "l2_policy_replay"
     assert experience["metadata"]["outcome"] == "improved"
 
