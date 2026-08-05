@@ -235,10 +235,9 @@ def build_causal_reflection_prompt(
     accepted_edits_summary: str = "",
     capacity_guidance: str = "",
     allowed_target_modules: Sequence[str] | None = None,
-    runtime_observation: Mapping[str, Any] | None = None,
+    episode_projection: Mapping[str, Any] | None = None,
     candidate_count: int = 1,
     targeted_diagnosis: Mapping[str, Any] | None = None,
-    comparison_cases: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -253,10 +252,10 @@ def build_causal_reflection_prompt(
         template_hint: Optional template suggestion (weak hint, not answer).
         accepted_edits_summary: Summary of already-accepted edits (diversity guidance).
         capacity_guidance: Capacity conflict guidance when target module is full.
-        comparison_cases: Optional {"positive": ..., "negative": ...} rows of
-            case-agnostic summaries (state/artifact/reason) that bound the
-            condition to the discriminator the supporting case shares with
-            the source but the stable counter-case lacks.
+        episode_projection: The prompt-safe causal episode projection
+            (current failure edge, obligation-vs-observed diff, legal action
+            envelope and at most two historical references).  This is the
+            only structured observation the model receives.
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -323,8 +322,9 @@ Use this causal design sequence BEFORE writing a rule:
    measure. If the field is not in the selected module's allowed list, choose
    another allowed module or return no_edit.
 
-Read court_balance in structured_runtime_observation to locate who carried the
-verdict, then pick the executable owner inside the allowed modules:
+Read downstream_consumption and failure_edge inside structured_runtime_observation
+to locate who carried the verdict, then pick the executable owner inside the
+allowed modules:
 - verdict clean + surviving_error_certificates>0 or defense_certificates>0:
   the defense side defeated the error evidence; the executable fix is a
   tighter emission condition for defense/boundary records
@@ -369,6 +369,13 @@ case, you may add one operational specialization: name a distinct observable
 sub-pattern and the exact module-local output it must change. The specialization
 must add an executable trigger that the baseline lacks; never merely restate
 the baseline conclusion.
+
+historical_references in structured_runtime_observation describe what an earlier
+case with the same failure mechanism attempted and what the local execution
+produced. Use them only as generation hypotheses: prefer an action that the
+history shows moving an observable, and avoid repeating an action whose local
+outcome confirms no effect. History never decides acceptance and never relaxes
+the legal action envelope.
 
 Operation preference (v5.3.2):
 - STRONGLY prefer add_rule over modify_rule. Adding a new rule is safe;
@@ -511,10 +518,10 @@ listed for the target module in runtime_output_contracts.
         crs_section = "\n".join(crs_lines)
 
     observation_section = ""
-    if runtime_observation is not None:
+    if episode_projection is not None:
         observation_section = (
             "\n<structured_runtime_observation>\n"
-            + json.dumps(runtime_observation, ensure_ascii=False, sort_keys=True)
+            + json.dumps(episode_projection, ensure_ascii=False, sort_keys=True)
             + "\n</structured_runtime_observation>\n"
         )
 
@@ -585,38 +592,9 @@ listed for the target module in runtime_output_contracts.
                 "</gold_diagnostic_reference>\n\n"
             )
 
-    # Contrast-condition generation (v6 phase 3): a supporting case with the
-    # same failure signature and a stable counter-case bound the condition to
-    # the discriminator that separates them. Only case-agnostic summaries
-    # are injected; no case identity or raw trajectory is repeated.
-    comparison_section = ""
-    if comparison_cases:
-        lines: list[str] = []
-        positive = comparison_cases.get("positive")
-        negative = comparison_cases.get("negative")
-        if isinstance(positive, Mapping) and positive:
-            lines.append(
-                "- supporting case: same failure signature, "
-                f"state={str(positive.get('state') or '')}, "
-                f"artifact={str(positive.get('artifact') or '')}, "
-                f"reason={str(positive.get('reason') or '')}"
-            )
-        if isinstance(negative, Mapping) and negative:
-            lines.append(
-                "- stable counter-case: same type bucket, "
-                f"state={str(negative.get('state') or '')}; "
-                "the action must NOT fire here"
-            )
-        if lines:
-            comparison_section = (
-                "<contrast_cases>\n"
-                + "\n".join(lines)
-                + "\nThe rule condition must capture the trajectory-observable "
-                "discriminator the supporting case shares with the source but "
-                "the stable counter-case lacks; a condition that also fires on "
-                "the counter-case is over-broad and will be rejected.\n"
-                "</contrast_cases>\n\n"
-            )
+    # Contrast-condition generation was removed in Phase 3: the causal
+    # episode's historical references are the only prior-case generation
+    # context; the contrast registry is replay-side bookkeeping only.
 
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
@@ -635,7 +613,6 @@ listed for the target module in runtime_output_contracts.
         f"{observation_section}"
         f"{diagnosis_section}"
         f"{gold_section}"
-        f"{comparison_section}"
         "<detection_trace>\n"
         f"{detection_context}\n"
         "</detection_trace>\n\n"

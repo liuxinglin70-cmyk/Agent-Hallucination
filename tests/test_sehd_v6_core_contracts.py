@@ -480,9 +480,44 @@ def test_reflection_receives_structured_runtime_output_ownership() -> None:
         result, signal,
         allowed_modules=("evidence_obligation", "atomic_verifier_instruction"),
     )
+    from src.sehd_v6.core.bccse.failure_episode import (
+        project_failure_episode_for_prompt,
+    )
+    episode_projection = {
+        "detection": {"state": "unresolved", "trigger_source": "evidence_incomplete"},
+        "attribution": {
+            "layer": "l1_provider_rule",
+            "artifact": "evidence_obligation",
+            "reason_code": "provider_artifact_missing",
+        },
+        "obligation_vs_observed": {
+            "required_fields": ["certificate"],
+            "missing_fields": ["certificate"],
+        },
+        "downstream_consumption": {
+            "consumer": "proof_court",
+            "qualification_state": "unresolved",
+            "coverage_state": "incomplete/complete",
+        },
+        "failure_edge": {
+            "producer_route": "propagation_route",
+            "output_object": "error_certificate",
+            "field": "certificate",
+            "consumer": "proof_court",
+            "observed": "absent",
+            "required": "present",
+        },
+        "evidence_refs": ["event_1"],
+        "action_envelope": {
+            "legal_modules": ["evidence_obligation", "atomic_verifier_instruction"],
+            "legal_operations": ["require_evidence_field"],
+            "legal_output_fields": ["impact_evidence_refs"],
+            "legal_observables": ["causal_field_coverage"],
+        },
+    }
     _, user = build_causal_reflection_prompt(
         signal, current_skill_text="rules", detection_context="trace",
-        runtime_observation=observation,
+        episode_projection=episode_projection,
     )
     assert observation["observed_fields"]["prosecution_certificates"] == 0
     assert observation["observed_fields"]["defense_certificates"] == 1

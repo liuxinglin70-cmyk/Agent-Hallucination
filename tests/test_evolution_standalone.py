@@ -1111,24 +1111,21 @@ def test_pro_route_survives_flash_targeted_no_edit_residue(
     assert calls.count("reflection_pro") == 2
 
 
-def test_comparison_cases_registered_and_injected(tmp_path, monkeypatch) -> None:
-    """v6 phase 3: triggered cases register attribution signatures and stable
-    cases register as counter-case anchors; the reflection prompt receives
-    the contrast block when both exist."""
+def test_causal_episode_context_reaches_reflection(tmp_path, monkeypatch) -> None:
+    """Phase 3: the reflection prompt receives the causal episode context
+    (failure edge, obligation diff, legal envelope) and never the removed
+    contrast-condition block; the contrast registry stays replay-side only."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
+    from tests.fixtures.causal_evolution import (
+        missing_evidence_field,
+        signal_for,
+        stable_clean,
+    )
 
     prompts: list[str] = []
 
     def detector(*, genome, case_id, **kwargs):
-        state = (
-            "verified_clean"
-            if case_id == "stable" or genome.generation > 0
-            else "unresolved"
-        )
-        return {
-            "state": state, "runtime_valid": True,
-            "decision_authority": "authoritative", "census": [],
-        }
+        return stable_clean() if case_id == "stable" else missing_evidence_field()
 
     def mutation(**kwargs):
         prompts.append(kwargs.get("user") or "")
@@ -1139,7 +1136,7 @@ def test_comparison_cases_registered_and_injected(tmp_path, monkeypatch) -> None
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
     monkeypatch.setattr(
         runner, "attribute_failure",
-        lambda result, use_gold=False, gold_reflection=False: _signal(
+        lambda result, use_gold=False, gold_reflection=False: signal_for(
             str(result["state"])
         ),
     )
@@ -1151,10 +1148,15 @@ def test_comparison_cases_registered_and_injected(tmp_path, monkeypatch) -> None
         config={}, output_dir=tmp_path, census_root=tmp_path,
         mutation_route={"model": "DeepSeek-V4-Flash"},
         reflection_candidate_count=1,
-        run_id="contrast_cases",
+        run_id="causal_context",
     )
 
-    # The stable case was processed first, so the triggered source sees the
-    # counter-case anchor in its prompt (the contrast block is rendered).
-    assert any("<contrast_cases>" in user for user in prompts)
-    assert any("stable counter-case" in user for user in prompts)
+    assert prompts
+    user = prompts[0]
+    assert "<contrast_cases>" not in user
+    assert "stable counter-case" not in user
+    assert all("<contrast_cases>" not in prompt for prompt in prompts)
+    assert "failure_edge" in user
+    assert "action_envelope" in user
+    assert "obligation_vs_observed" in user
+    assert "provider_artifact_missing" in user

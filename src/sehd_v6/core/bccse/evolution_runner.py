@@ -104,6 +104,7 @@ from .failure_episode import (
     FailureEpisode,
     UnaddressableFailure,
     build_failure_episode,
+    project_failure_episode_for_prompt,
     project_provider_artifacts,
 )
 from .evolution_experience_memory import EvolutionExperienceMemory
@@ -1038,73 +1039,6 @@ def _select_contrast_neighbor(
         if str(entry.get("state") or "") in _CONTRAST_RESOLVED_STATES:
             return entry
     return None
-
-
-def _select_comparison_cases(
-    registry: Mapping[str, Sequence[Mapping[str, Any]]],
-    *,
-    case_id: str,
-    owner: str,
-    reason: str,
-    primary_type: Any,
-) -> dict[str, Mapping[str, Any]]:
-    """Pick one supporting case and one stable counter-case for
-    contrast-condition generation (v6 phase 3).
-
-    Positive: an earlier triggered case with the same attributed owner and
-    failure reason. Negative: an earlier stable case in the same type
-    bucket (a situation where the action must NOT fire). Stable cases are
-    often classified UNKNOWN (no failure shape), so the unknown bucket is
-    merged into the negative search. Rows are case-agnostic summaries, so
-    the reflection prompt never repeats a case identity or a raw
-    trajectory.
-    """
-    primary_key = str(getattr(primary_type, "value", primary_type) or "")
-    positive_bucket = list(registry.get(primary_key, ()))
-    negative_keys = [primary_key]
-    if primary_key != "unknown":
-        negative_keys.append("unknown")
-    negative_rows = []
-    for key in negative_keys:
-        negative_rows.extend(registry.get(key, ()))
-    positive: Mapping[str, Any] | None = None
-    negative: Mapping[str, Any] | None = None
-    negative_any: Mapping[str, Any] | None = None
-    # Positive matching degrades: same artifact+reason, then same artifact,
-    # then any non-stable row in the bucket.
-    for row in reversed(positive_bucket):
-        if str(row.get("case_id") or "") == case_id:
-            continue
-        if row.get("stable"):
-            continue
-        row_artifact = str(row.get("artifact") or "")
-        if positive is None and row_artifact == owner and str(
-            row.get("reason") or ""
-        ) == reason:
-            positive = row
-        elif positive is None and row_artifact == owner:
-            positive = row
-        elif positive is None:
-            positive = row
-        if positive is not None:
-            break
-    # Negative prefers a stable case sharing the owner (same situation where
-    # the action must NOT fire), falling back to any stable row.
-    for row in reversed(negative_rows):
-        if str(row.get("case_id") or "") == case_id:
-            continue
-        if row.get("stable"):
-            if str(row.get("owner") or "") == owner:
-                negative = row
-                break
-            if negative_any is None:
-                negative_any = row
-    if negative is None:
-        negative = negative_any
-    return {
-        "positive": positive or {},
-        "negative": negative or {},
-    }
 
 
 def _contrast_inversion(
@@ -2581,7 +2515,9 @@ def run_online_evolution(
     # v5.8 mechanism 2: same-type neighbour registry for contrastive replay
     # acceptance.  Rows are registered when a triggered case is classified;
     # neighbours are replayed only when an edit would otherwise be accepted.
-    contrast_registry: dict[str, list[dict[str, Any]]] = {}
+    # Replay-side bookkeeping only: reflection generation context comes from
+    # the causal experience memory, never from this registry.
+    contrast_replay_registry: dict[str, list[dict[str, Any]]] = {}
     # v5.6: source-scoped rejected-proposal tracking. Retry must explore a
     # genuinely different intervention, not paraphrase the rejected owner. The
     # canonical signature is (case, owner module, operation, content hash) and
@@ -2835,7 +2771,7 @@ def run_online_evolution(
             for value in (checkpoint.get("abstention_ladder_used") or ())
         }
         restored_contrast_registry = checkpoint.get("contrast_registry") or {}
-        contrast_registry = {
+        contrast_replay_registry = {
             str(hallucination_type): [
                 dict(row)
                 for row in (rows or ())
@@ -3215,7 +3151,7 @@ def run_online_evolution(
                 "abstention_ladder_used": sorted(abstention_ladder_used),
                 "contrast_registry": {
                     str(hallucination_type): list(rows)
-                    for hallucination_type, rows in contrast_registry.items()
+                    for hallucination_type, rows in contrast_replay_registry.items()
                 },
                 "rejected_policy_summaries": list(rejected_policy_summaries),
                 "localization_bias_signals": list(localization_bias_signals),
@@ -4530,7 +4466,7 @@ def run_online_evolution(
                 # A stable-source L2 case skips the regular stable branch, so
                 # register its counter-case anchor here to keep the contrast
                 # pool complete.
-                contrast_registry.setdefault(
+                contrast_replay_registry.setdefault(
                     type_result.primary_type.value, []
                 ).append({
                     "case_id": case_id,
@@ -4538,7 +4474,7 @@ def run_online_evolution(
                     "stable": True,
                     "owner": signal.target_module,
                 })
-                _trim_contrast_registry(contrast_registry)
+                _trim_contrast_registry(contrast_replay_registry)
             print(f"  [{idx}] L2_TRIGGERED {case_id}: "
                   f"{l2_attribution.get('artifact')} "
                   f"({l2_attribution.get('reason_code')})")
@@ -4596,7 +4532,7 @@ def run_online_evolution(
             # Register the stable case as a counter-case anchor: the same
             # type bucket later serves contrast-condition generation as the
             # situation where the proposed action must NOT fire.
-            contrast_registry.setdefault(
+            contrast_replay_registry.setdefault(
                 type_result.primary_type.value, []
             ).append({
                 "case_id": case_id,
@@ -4604,7 +4540,7 @@ def run_online_evolution(
                 "stable": True,
                 "owner": signal.target_module,
             })
-            _trim_contrast_registry(contrast_registry)
+            _trim_contrast_registry(contrast_replay_registry)
             # v5.9b: a stable case is a detection success, not a fruitless
             # reflection. Feeding it into the no-edit streak conflated
             # "nothing to evolve here" with "reflection is unproductive"
@@ -4773,7 +4709,7 @@ def run_online_evolution(
         # verdicts are stable enough to serve as contrast anchors; the
         # registry is replay-side bookkeeping and never feeds the verdict.
         if detection_state in _CONTRAST_RESOLVED_STATES:
-            contrast_registry.setdefault(
+            contrast_replay_registry.setdefault(
                 type_result.primary_type.value, []
             ).append({
                 "case_id": case_id,
@@ -4782,7 +4718,7 @@ def run_online_evolution(
                 "artifact": attribution_owner or signal.target_module,
                 "reason": attribution_reason or "",
             })
-            _trim_contrast_registry(contrast_registry)
+            _trim_contrast_registry(contrast_replay_registry)
 
         # --- [3] LLM Causal Process Reflection (PRIMARY PATH) ---
         # The LLM is the core engine of evolution — it reasons about WHY
@@ -4838,16 +4774,30 @@ def run_online_evolution(
             # Build accepted edits summary (diversity guidance)
             accepted_summary = build_accepted_edits_summary(accepted_edits_history)
 
-            # Build the primary causal reflection prompt
+            # Build the primary causal reflection prompt. The episode
+            # projection carries the current failure edge, the
+            # obligation-vs-observed diff, the legal action envelope and at
+            # most two prior same-mechanism references from the causal
+            # memory; it is the only structured observation the model gets.
+            current_episode = None
+            if active_episode_payload is not None and "episode_id" in active_episode_payload:
+                current_episode = FailureEpisode.from_dict(active_episode_payload)
+            history_refs = (
+                causal_memory.retrieve(
+                    episode=current_episode,
+                    exclude_episode_id=current_episode.episode_id,
+                )
+                if current_episode is not None else []
+            )
+            episode_projection = (
+                project_failure_episode_for_prompt(
+                    current_episode,
+                    historical_refs=history_refs,
+                )
+                if current_episode is not None else None
+            )
             runtime_observation = build_runtime_observation(
                 detection_result, signal, allowed_modules=allowed_modules,
-            )
-            comparison_cases = _select_comparison_cases(
-                contrast_registry,
-                case_id=case_id,
-                owner=attribution_owner or signal.target_module,
-                reason=attribution_reason or "",
-                primary_type=type_result.primary_type,
             )
             system_prompt, user_prompt = build_causal_reflection_prompt(
                 signal=signal,
@@ -4858,8 +4808,7 @@ def run_online_evolution(
                 accepted_edits_summary=accepted_summary,
                 capacity_guidance=capacity_guidance,
                 allowed_target_modules=allowed_modules,
-                runtime_observation=runtime_observation,
-                comparison_cases=comparison_cases,
+                episode_projection=episode_projection,
                 # Each candidate is generated by a separate request. This
                 # makes the cache key and reasoning sample independent rather
                 # than asking one response to expand itself into variants.
@@ -5073,7 +5022,7 @@ def run_online_evolution(
                             accepted_edits_summary=accepted_summary,
                             capacity_guidance=capacity_guidance,
                             allowed_target_modules=allowed_modules,
-                            runtime_observation=runtime_observation,
+                            episode_projection=episode_projection,
                             candidate_count=1,
                             targeted_diagnosis=diagnosis,
                         )
@@ -5981,7 +5930,7 @@ def run_online_evolution(
                 and not canary_regressions
             ):
                 neighbor = _select_contrast_neighbor(
-                    contrast_registry.get(
+                    contrast_replay_registry.get(
                         type_result.primary_type.value, ()
                     ),
                     case_id=case_id,
