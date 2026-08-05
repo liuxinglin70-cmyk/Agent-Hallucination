@@ -109,9 +109,11 @@ def _provider_repair_payload(
     original request and the cache key differs. Returns (body, user).
     """
     repair_user = user + (
-        "\n\nJSON_RECOVERY: Your previous response was truncated before the "
-        "closing brace. Return the COMPLETE JSON object now, with every "
-        "required field and no commentary. Start directly with {."
+        "\n\nJSON_RECOVERY: Your previous response carried no usable JSON "
+        "body: it was either truncated before the closing brace or spent the "
+        "whole budget on reasoning. Return the COMPLETE JSON object now, with "
+        "every required field and no commentary. Keep it minimal and start "
+        "directly with {."
     )
     repair_payload = dict(payload)
     repair_payload["messages"] = [
@@ -530,18 +532,18 @@ def provider_call_with_schema(
             choice = value["choices"][0]
             message = choice["message"]
             content = message.get("content")
-            if not isinstance(content, str) or not content.strip():
-                raise ValueError(
-                    "provider_empty_content:"
-                    f"finish_reason={choice.get('finish_reason') or 'unknown'},"
-                    "reasoning_content_present="
-                    f"{bool(message.get('reasoning_content'))}"
-                )
+            usable_content = (
+                content.strip() if isinstance(content, str) and content.strip()
+                else ""
+            )
             try:
-                parsed = json.loads(content)
+                if not usable_content:
+                    raise json.JSONDecodeError("empty provider body", "", 0)
+                parsed = json.loads(usable_content)
             except json.JSONDecodeError:
-                # v3.5.6: one bounded provider repair. A truncated JSON body
-                # (reasoning consumed the budget or output hit max_tokens) is
+                # v3.5.6: one bounded provider repair. A response carrying no
+                # usable JSON body — truncated before the closing brace, or
+                # empty because reasoning consumed the whole budget — is
                 # repairable only with a DIFFERENT request body (cache key
                 # differs). The repair re-sends the same system prompt with a
                 # compact instruction asking for strict JSON continuation.

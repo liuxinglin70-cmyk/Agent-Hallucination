@@ -148,6 +148,15 @@ def _normalize_condition(raw: str) -> str:
     return cond
 
 
+def condition_is_overloaded(condition: str) -> bool:
+    """Whether a condition packs more than one situation into one clause.
+
+    The single place the "one clause" rule is evaluated; the structural gate
+    routes through it so future callers cannot disagree about the shape.
+    """
+    return len(_CONDITION_CONJUNCTION_RE.findall(str(condition or ""))) > 1
+
+
 def _normalize_action(raw: str) -> str:
     action = " ".join(str(raw).split())
     action = action.rstrip(_TRAILING_PUNCT).strip()
@@ -215,7 +224,7 @@ def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
     if spec.direction not in ALLOWED_DIRECTIONS:
         return False, f"invalid_direction:{spec.direction}"
 
-    if len(_CONDITION_CONJUNCTION_RE.findall(spec.condition)) > 1:
+    if condition_is_overloaded(spec.condition):
         return False, "condition_overload"
     if _ACTION_SPLIT_RE.search(spec.action):
         return False, "multiple_actions"

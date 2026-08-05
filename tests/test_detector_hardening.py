@@ -640,6 +640,77 @@ def test_focused_prosecution_explicit_no_error_stays_complete(
     assert "all_quarantined" not in metas["candidate_001"]
 
 
+def test_provider_empty_content_goes_through_json_repair(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """An empty provider body (reasoning consumed the whole budget) shares the
+    truncated-JSON repair path instead of failing before it: both are one
+    bounded repair, and failing the empty case early silently burns the
+    recovery mechanism the truncated case already uses."""
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    calls: list[dict] = []
+
+    class _FakeResponse:
+        def __init__(self, payload: bytes):
+            self._payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return self._payload
+
+    class _FakeOpener:
+        def __init__(self):
+            self._queue: list[bytes] = []
+
+        def open(self, request, timeout=None):
+            calls.append({"body": request.data})
+            raw = self._queue.pop(0)
+            return _FakeResponse(raw)
+
+    opener = _FakeOpener()
+    valid = json.dumps({
+        "choices": [{"message": {"content": '{"ok": true}'}}],
+        "usage": {},
+    }).encode("utf-8")
+    empty = json.dumps({
+        "choices": [{"message": {
+            "content": "",
+            "reasoning_content": "reasoned until the budget ran out",
+        }}],
+        "usage": {},
+    }).encode("utf-8")
+    opener._queue = [empty, valid]
+
+    route = {"endpoint": "https://example.invalid", "timeout_seconds": 5}
+    monkeypatch.setattr(basic_runner, "DIRECT_PROVIDER_OPENER", opener)
+    monkeypatch.setattr(
+        basic_runner, "resolve_provider_credential", lambda *_a, **_k: "dummy-key",
+    )
+    monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", str(tmp_path / "global"))
+
+    parsed, meta = basic_runner.provider_call_with_schema(
+        route=route,
+        system="s",
+        user="u",
+        cache_dir=tmp_path,
+        require_candidates=False,
+        purpose="detector",
+    )
+
+    assert parsed == {"ok": True}
+    assert meta["repair_used"] is True
+    assert len(calls) == 2
+    assert b"JSON_RECOVERY" in calls[1]["body"]
+
+
 def test_global_cache_is_opt_in_without_fixed_system_path(
     tmp_path: Path, monkeypatch,
 ) -> None:

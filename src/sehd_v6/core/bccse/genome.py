@@ -244,6 +244,34 @@ EXPECTED_SCOPES: tuple[str, ...] = (
     "unresolved_cases",
 )
 
+# ``observable_process_delta`` reports movement in the past tense
+# ("prosecution_coverage:increased"), while a contract declares an intent in
+# the base form ("increase"). Both spellings therefore reach this contract
+# from the same model in the same call, and rejecting the inflected one is a
+# vocabulary accident rather than an invalid prediction.
+_DIRECTION_ALIASES: dict[str, str] = {
+    "increased": "increase",
+    "increases": "increase",
+    "decreased": "decrease",
+    "decreases": "decrease",
+    "add": "added",
+    "adds": "added",
+    "remove": "removed",
+    "removes": "removed",
+    "shifted": "shift",
+    "shifts": "shift",
+    "open": "opened",
+    "opens": "opened",
+    "close": "closed",
+    "closes": "closed",
+}
+
+
+def normalize_expected_direction(value: Any) -> str:
+    """Reduce a declared direction to the canonical EXPECTED_DIRECTIONS token."""
+    text = str(value or "").strip().lower()
+    return _DIRECTION_ALIASES.get(text, text)
+
 
 def validate_expected_effect_contract(content: Any) -> tuple[bool, str]:
     """Validate the structured counterfactual contract.
@@ -263,7 +291,7 @@ def validate_expected_effect_contract(content: Any) -> tuple[bool, str]:
     observable = str(content.get("observable_field") or "")
     if observable not in OBSERVABLE_FIELDS:
         return False, f"expected_effect_contract_invalid_field:{observable[:40]}"
-    direction = str(content.get("expected_direction") or "")
+    direction = normalize_expected_direction(content.get("expected_direction"))
     if direction not in EXPECTED_DIRECTIONS:
         return False, f"expected_effect_contract_invalid_direction:{direction[:40]}"
     scope = str(content.get("expected_scope") or "")
@@ -285,7 +313,7 @@ def sanitize_expected_effect_contract(content: Any) -> dict[str, Any]:
     observable = str(content.get("observable_field") or "")
     if observable in OBSERVABLE_FIELDS:
         sanitized["observable_field"] = observable
-    direction = str(content.get("expected_direction") or "")
+    direction = normalize_expected_direction(content.get("expected_direction"))
     if direction in EXPECTED_DIRECTIONS:
         sanitized["expected_direction"] = direction
     scope = str(content.get("expected_scope") or "")
