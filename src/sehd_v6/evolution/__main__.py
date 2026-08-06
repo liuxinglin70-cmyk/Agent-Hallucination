@@ -39,6 +39,10 @@ def main() -> int:
         help="optional mutation route JSON; defaults to SEHD_MUTATION_* env",
     )
     parser.add_argument("--initial-genome", type=Path, default=None)
+    parser.add_argument(
+        "--initial-policy-genome", type=Path, default=None,
+        help="optional audited L2 policy genome to continue evolving",
+    )
     parser.add_argument("--experience-memory", type=Path, default=None)
     parser.add_argument(
         "--resume-from", type=Path, default=None,
@@ -78,6 +82,7 @@ def main() -> int:
         census_root=args.census_root,
         mutation_route=args.mutation_route,
         initial_genome=args.initial_genome,
+        initial_policy_genome=args.initial_policy_genome,
         experience_memory_path=args.experience_memory,
         use_gold=args.use_gold,
         fitness_use_gold=args.fitness_use_gold,

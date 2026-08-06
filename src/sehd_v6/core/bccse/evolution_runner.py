@@ -3857,13 +3857,21 @@ def run_online_evolution(
                 feedback=plan.feedback_code,
             )
             return accepted_outcome
+        # P7.4: bounded cross-case Meta guidance informs the selection
+        # without enlarging the candidate set or touching the gate.  Only
+        # inject when the Meta state actually carries guidance, so an empty
+        # baseline leaves the prompt (and its provider cache key) unchanged.
+        meta_guidance = (
+            project_meta_review_for_prompt(meta_skill_state)
+            if (meta_skill_state.guidance_tokens
+                or meta_skill_state.ranking_preferences)
+            else None
+        )
         system_prompt, user_prompt = build_policy_selection_prompt(
             attribution=attribution,
             facts_summary=facts_summary,
             candidates=planned_candidates,
-            # P7.4: bounded cross-case Meta guidance informs the selection
-            # without enlarging the candidate set or touching the gate.
-            meta_guidance=project_meta_review_for_prompt(meta_skill_state),
+            meta_guidance=meta_guidance,
         )
         try:
             parsed, _meta = run_mutation_call(
