@@ -1757,6 +1757,7 @@ def _run_detection_with_genome(
     baseline_cache_root: Path | None = None,
     shared_cache_root: Path | None = None,
     policy_genome: PolicyGenome | None = None,
+    policy_scope: str | None = "working",
 ) -> dict[str, Any]:
     """Run PACA-TCL v3.5 with global skill injection.
 
@@ -1825,11 +1826,19 @@ def _run_detection_with_genome(
     # Conditional artifacts are not in the genome items (pending queue), and
     # an item whose registry dependency went pending/disabled is dropped at
     # projection time so the evaluator never sees an unexecutable policy.
-    policy_items = (
-        policy_genome.items_for_scope("working")
-        if policy_genome is not None and policy_genome.items
-        else None
-    )
+    #
+    # ``policy_scope=None`` is the CANDIDATE-VALIDATION channel: a candidate
+    # genome under evaluation must replay with its FULL item set so a newly
+    # proposed (still ``fitness_status=none``) item's effect is observable —
+    # otherwise the replay could never fire the candidate and every L2
+    # proposal would be silently rejected as no-effect.  Regular evolution
+    # detection and deployment always use a real scope.
+    if policy_genome is None or not policy_genome.items:
+        policy_items = None
+    elif policy_scope is None:
+        policy_items = list(policy_genome.items)
+    else:
+        policy_items = policy_genome.items_for_scope(policy_scope)
 
     compiled_rule_trace: dict[str, list[dict[str, str]]] = {}
 
@@ -3118,6 +3127,7 @@ def run_online_evolution(
         case_id: str,
         output_path: Path,
         policy_genome: PolicyGenome | None = None,
+        policy_scope: str | None = "working",
     ) -> dict[str, Any]:
         """Run one detector call in a counted, label-free envelope."""
         budget_usage["provider_calls"] += 1
@@ -3135,6 +3145,7 @@ def run_online_evolution(
         replay_kwargs: dict[str, Any] = {}
         if policy_genome is not None:
             replay_kwargs["policy_genome"] = policy_genome
+            replay_kwargs["policy_scope"] = policy_scope
         return _run_detection_with_genome(
             genome=genome,
             case_id=case_id,
@@ -3910,6 +3921,11 @@ def run_online_evolution(
                     / f"{idx:04d}_{case_id.replace('/', '_')}"
                 ),
                 policy_genome=candidate_genome,
+                # Candidate validation must observe the full candidate item
+                # set: a newly proposed item is still fitness_status=none and
+                # is excluded from the working scope, so a scoped replay could
+                # never fire it and every proposal would die as no-effect.
+                policy_scope=None,
             )
         except Exception as exc:
             finish(
@@ -7021,19 +7037,18 @@ def run_online_evolution(
     # the audited gate events into GateExperience rows, enumerate shadow
     # MetaEdit candidates, build a reporting-only drift snapshot, and persist
     # the meta configuration back into the single meta_review authority.
-    gate_experiences = [
-        aggregate_gate_experience(event, sequence=event.sequence).to_dict()
+    aggregated_experiences = [
+        aggregate_gate_experience(event, sequence=event.sequence)
         for event in gate_event_ledger.events
     ]
+    gate_experiences = [experience.to_dict() for experience in aggregated_experiences]
     meta_candidates = generate_meta_edit_candidates(
-        [aggregate_gate_experience(event, sequence=event.sequence)
-         for event in gate_event_ledger.events],
+        aggregated_experiences,
         [],  # OutcomeValidation rows are produced by development probes (P7.2)
         meta_skill_state,
     )
     drift_snapshot = build_drift_snapshot(
-        [aggregate_gate_experience(event, sequence=event.sequence)
-         for event in gate_event_ledger.events],
+        aggregated_experiences,
         [],
         registry_size=len(policy_genome.registry.all_predicate_names())
         + len(policy_genome.registry.all_action_instance_names()),

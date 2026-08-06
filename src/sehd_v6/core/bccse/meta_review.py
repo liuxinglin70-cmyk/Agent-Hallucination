@@ -24,7 +24,11 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .gate_feedback import FUZZY_FEEDBACK_CODES, GateEvent
+from .gate_feedback import (
+    FUZZY_FEEDBACK_CODES,
+    GateEvent,
+    project_cross_case_guidance,
+)
 from .meta_skill import (
     GUIDANCE_TOKENS,
     RANKING_PREFERENCES,
@@ -137,8 +141,6 @@ def aggregate_gate_experience(
     sequence: int = 0,
 ) -> GateExperience:
     """Aggregate one audited GateEvent into its GateExperience (P7.1)."""
-    from .gate_feedback import project_cross_case_guidance
-
     guidance = project_cross_case_guidance(event)
     return GateExperience(
         gate_event_id=event.event_id,

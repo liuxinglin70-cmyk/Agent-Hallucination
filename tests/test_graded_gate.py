@@ -302,6 +302,27 @@ def test_pending_item_rejects_unknown_status():
 # §10.7 hard violation always rejects (promotion contract)
 # ============================================================
 
+def test_candidate_replay_must_see_ungraded_new_item():
+    """Regression: a candidate genome under validation replays with its FULL
+    item set.  A newly proposed item is fitness_status=none and is excluded
+    from the working scope; if the candidate replay used the working scope it
+    could never fire the new item and every L2 proposal would die as
+    no-effect.  The candidate-validation channel (policy_scope=None) must
+    therefore expose the full items while the regular working scope hides it.
+    """
+    genome = apply_policy_edit(
+        create_baseline_policy_genome(),
+        PolicyEdit(
+            edit_id="e1", operation=PolicyOp.ADD_ITEM, new_item=make_item(),
+            rationale="r",
+        ),
+    )
+    # candidate-validation channel: full set is observable
+    assert [i.item_id for i in genome.items] == ["policy_1"]
+    # regular working scope: the ungraded candidate is not yet active
+    assert genome.items_for_scope(SCOPE_WORKING) == []
+
+
 def test_hard_violation_always_rejects():
     from src.sehd_v6.core.bccse.promotion_contract import (
         AUTHORITY_L2_POLICY,
