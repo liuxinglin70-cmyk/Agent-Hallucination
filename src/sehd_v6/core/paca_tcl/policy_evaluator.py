@@ -19,8 +19,6 @@ from ..bccse.v6_contracts import (
     ACTION_INVALIDATE_COVERAGE_CLAIM,
     ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
     AdjudicationFacts,
-    L2_ACTIONS,
-    L2_PREDICATES,
     PolicyItem,
     validate_policy_params,
 )

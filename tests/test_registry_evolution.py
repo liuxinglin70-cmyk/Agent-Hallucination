@@ -69,67 +69,10 @@ def _unknown_shape_detection():
     }
 
 
-def test_no_registered_action_registers_pending_vocabulary_entry(
-    tmp_path, monkeypatch, addressable_l1_failure,
-) -> None:
-    """An unactionable L2 attribution registers a pending (shadow-only)
-    vocabulary entry; it never enters the active evaluator this run."""
-    from src.sehd_v6.core.bccse.step_attributor import (
-        AttributionSignal, ErrorType, ReflectionType, TriggerSource,
-    )
-
-    def detector(*, genome, case_id, policy_genome=None, **kwargs):
-        if case_id == "anchor":
-            return _anchor_clean()
-        return _unknown_shape_detection()
-
-    mutation_calls: list[dict] = []
-
-    def mutation(**kwargs):
-        mutation_calls.append(kwargs)
-        # Select the first registration candidate.
-        return {"candidate_index": 0, "reason": "expose the fact"}, {}
-
-    def signal_for(result, use_gold=False, gold_reflection=False):
-        stable = str(result["state"]) == "verified_clean"
-        return AttributionSignal(
-            error_type=(
-                ErrorType.CORRECT if stable else ErrorType.EVIDENCE_INCOMPLETE
-            ),
-            target_module="evidence_obligation",
-            secondary_module="atomic_verifier_instruction",
-            attribution_confidence="medium",
-            reflection_type=(
-                ReflectionType.STABLE_SUCCESS if stable
-                else ReflectionType.OPTIMIZATION
-            ),
-            trigger_source=(
-                TriggerSource.NONE if stable
-                else TriggerSource.EVIDENCE_INCOMPLETE
-            ),
-            evidence_summary="x",
-            prosecution_coverage=0.5,
-            defense_coverage=0.5,
-            prosecution_coverage_state="incomplete",
-            defense_coverage_state="incomplete",
-            coverage_quantitative=False,
-            crs_scores={},
-            crs_aggregate=0.0,
-            crs_source="test",
-            crs_complete=True,
-            consensus_gate_applied=False,
-            candidate_count=1,
-            state=str(result["state"]),
-            gold_label=None,
-            has_gold=False,
-            gold_enhanced=False,
-            responsible_step_correct=False,
-        )
-
-    # Force an L2 attribution with no registered runtime action so the run
-    # opens the registry planner. We stub the attribution seam to route the
-    # case to the L2 surface with an unknown reason, and the policy planner
-    # to the no-registered-action route.
+def _install_no_action_l2_path(monkeypatch):
+    """Force an L2 attribution with no registered runtime action so the run
+    opens the registry planner, and stub the policy planner to the
+    no-registered-action route. Returns the runner module for further stubs."""
     from src.sehd_v6.core.bccse import evolution_runner as runner_module
     from src.sehd_v6.core.bccse.policy_reflection import PolicyPlan
     from src.sehd_v6.core.bccse.v6_contracts import (
@@ -151,8 +94,6 @@ def test_no_registered_action_registers_pending_vocabulary_entry(
         })
         return "", "no_registered_runtime_action", attribution
 
-    monkeypatch.setattr(runner_module, "_attribute_failure", l2_attribution)
-
     def no_action_plan(*, attribution, genome):
         return PolicyPlan(
             candidates=(),
@@ -160,13 +101,74 @@ def test_no_registered_action_registers_pending_vocabulary_entry(
             feedback_code=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
         )
 
+    monkeypatch.setattr(runner_module, "_attribute_failure", l2_attribution)
     monkeypatch.setattr(
         runner_module, "plan_policy_candidates", no_action_plan,
     )
+    return runner_module
+
+
+def _signal_for(result, use_gold=False, gold_reflection=False):
+    from src.sehd_v6.core.bccse.step_attributor import (
+        AttributionSignal, ErrorType, ReflectionType, TriggerSource,
+    )
+    stable = str(result["state"]) == "verified_clean"
+    return AttributionSignal(
+        error_type=(
+            ErrorType.CORRECT if stable else ErrorType.EVIDENCE_INCOMPLETE
+        ),
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+        attribution_confidence="medium",
+        reflection_type=(
+            ReflectionType.STABLE_SUCCESS if stable
+            else ReflectionType.OPTIMIZATION
+        ),
+        trigger_source=(
+            TriggerSource.NONE if stable
+            else TriggerSource.EVIDENCE_INCOMPLETE
+        ),
+        evidence_summary="x",
+        prosecution_coverage=0.5,
+        defense_coverage=0.5,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="incomplete",
+        coverage_quantitative=False,
+        crs_scores={},
+        crs_aggregate=0.0,
+        crs_source="test",
+        crs_complete=True,
+        consensus_gate_applied=False,
+        candidate_count=1,
+        state=str(result["state"]),
+        gold_label=None,
+        has_gold=False,
+        gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+
+
+def test_no_registered_action_registers_pending_vocabulary_entry(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    """An unactionable L2 attribution registers a pending (shadow-only)
+    vocabulary entry; it never enters the active evaluator this run."""
+    _install_no_action_l2_path(monkeypatch)
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean()
+        return _unknown_shape_detection()
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {"candidate_index": 0, "reason": "expose the fact"}, {}
 
     result = _run_loop(
         tmp_path, tmp_path / "out", monkeypatch,
-        detector=detector, mutation=mutation, signal_for=signal_for,
+        detector=detector, mutation=mutation, signal_for=_signal_for,
         records={"source": {}, "anchor": {}},
         run_id="registry_register",
     )
@@ -178,7 +180,10 @@ def test_no_registered_action_registers_pending_vocabulary_entry(
     ]
     assert len(registry_calls) == 1
     # One registration was applied and audited as pending (shadow-only).
-    registrations = result.evolution_audit["l2_registry_registrations"]
+    registrations = [
+        row for row in result.evolution_audit["l2_registry_registrations"]
+        if row.get("outcome") == "registered"
+    ]
     assert len(registrations) == 1
     assert registrations[0]["status"] == STATUS_PENDING
     target = registrations[0]["target"]
@@ -190,6 +195,39 @@ def test_no_registered_action_registers_pending_vocabulary_entry(
     )
     assert target not in registry.predicate_names()
     assert target not in registry.action_names()
+
+
+def test_failed_registration_is_audited_not_silent(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    """A registration whose model returns no candidate (or whose shadow
+    compile rejects) is recorded in the audit trail, never silently dropped."""
+    _install_no_action_l2_path(monkeypatch)
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean()
+        return _unknown_shape_detection()
+
+    def mutation(**kwargs):
+        # Model abstains from every registration candidate.
+        return {"no_proposal": True, "reason": "no extension justified"}, {}
+
+    result = _run_loop(
+        tmp_path, tmp_path / "out", monkeypatch,
+        detector=detector, mutation=mutation, signal_for=_signal_for,
+        records={"source": {}, "anchor": {}},
+        run_id="registry_abstain",
+    )
+
+    registrations = result.evolution_audit["l2_registry_registrations"]
+    assert len(registrations) == 1
+    assert registrations[0]["outcome"] == "no_registration"
+    assert registrations[0]["reason"] == "no extension justified"
+    # Abstention never mutates the registry.
+    assert result.policy_genome.registry.content_hash == (
+        L2_REGISTRY.content_hash
+    )
 
 
 def test_registry_state_persists_through_checkpoint_and_resume(

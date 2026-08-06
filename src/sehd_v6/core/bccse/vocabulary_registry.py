@@ -509,6 +509,29 @@ def _build_baseline_registry() -> VocabularyRegistry:
 
 _FACTS_FIELDS = frozenset(AdjudicationFacts.__dataclass_fields__)
 
+# Field-type map for compile-time type checking: every fact is one of
+# str / int / bool. A comparison whose operand types can never match the
+# field type is rejected at compile time, so the evaluator never hits a
+# runtime TypeError on a policy predicate.
+_FIELD_TYPES: dict[str, type] = {
+    "prosecution_coverage": str,
+    "defense_coverage": str,
+    "valid_error_certificate_count": int,
+    "valid_defense_certificate_count": int,
+    "surviving_error_count": int,
+    "defeated_error_count": int,
+    "quarantined_error_count": int,
+    "quarantined_defense_count": int,
+    "consensus_gate_applied": bool,
+    "consensus_gate_blocked_count": int,
+    "required_candidate_count": int,
+    "fully_quarantined": bool,
+    "boundary_path_state": str,
+    "boundary_authority_valid": bool,
+    "terminal_state": str,
+    "policy_stage": str,
+}
+
 # Closed value vocabulary a predicate may compare against (string literals
 # are confined to the coverage/terminal/boundary states the facts can hold).
 _DSL_ALLOWED_STRINGS = frozenset({
@@ -519,6 +542,23 @@ _DSL_ALLOWED_STRINGS = frozenset({
 
 class RegistryDslError(ValueError):
     """A DSL source failed whitelist/syntax validation (fail-closed)."""
+
+
+def _literal_type(node: ast.AST) -> type | None:
+    """Resolve the Python type of a literal/unsigned-number node, else None."""
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, bool):
+            return bool
+        if isinstance(node.value, int):
+            return int
+        if isinstance(node.value, str):
+            return str
+        return None
+    if isinstance(node, ast.List):
+        element_types = {_literal_type(element) for element in node.elts}
+        element_types.discard(None)
+        return element_types.pop() if len(element_types) == 1 else None
+    return None
 
 
 def _validate_dsl_node(node: ast.AST, fields: set[str]) -> None:
@@ -532,21 +572,22 @@ def _validate_dsl_node(node: ast.AST, fields: set[str]) -> None:
             _validate_dsl_node(value, fields)
         return
     if isinstance(node, ast.UnaryOp):
-        if not isinstance(node.op, ast.Not):
-            raise RegistryDslError("only `not` unary operator is allowed")
-        _validate_dsl_node(node.operand, fields)
-        return
+        # ``not`` for boolean logic; ``+``/``-`` only as an unsigned numeric
+        # literal sign so counts can be compared against e.g. ``>= 0``.
+        if isinstance(node.op, ast.Not):
+            _validate_dsl_node(node.operand, fields)
+            return
+        if isinstance(node.op, (ast.UAdd, ast.USub)) and isinstance(
+            node.operand, ast.Constant
+        ) and isinstance(node.operand.value, int) and not isinstance(
+            node.operand.value, bool
+        ):
+            return
+        raise RegistryDslError(
+            "only `not` and unsigned numeric signs are allowed unary operators"
+        )
     if isinstance(node, ast.Compare):
-        _validate_dsl_node(node.left, fields)
-        for operator in node.ops:
-            if not isinstance(operator, (
-                ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.In,
-            )):
-                raise RegistryDslError(
-                    f"comparison operator not allowed: {type(operator).__name__}"
-                )
-        for comparator in node.comparators:
-            _validate_dsl_node(comparator, fields)
+        _validate_compare_node(node, fields)
         return
     if isinstance(node, ast.Name):
         if node.id not in _FACTS_FIELDS:
@@ -556,26 +597,83 @@ def _validate_dsl_node(node: ast.AST, fields: set[str]) -> None:
         fields.add(node.id)
         return
     if isinstance(node, ast.Constant):
-        if isinstance(node.value, bool) or node.value is None:
-            raise RegistryDslError("boolean/None literals are not allowed")
-        if isinstance(node.value, str) and node.value not in _DSL_ALLOWED_STRINGS:
-            raise RegistryDslError(
-                f"string literal outside closed value vocabulary: {node.value!r}"
-            )
-        if not isinstance(node.value, (int, float, str)):
-            raise RegistryDslError(
-                f"literal type not allowed: {type(node.value).__name__}"
-            )
+        _validate_constant(node)
         return
     if isinstance(node, ast.List):
         for element in node.elts:
             if not isinstance(element, ast.Constant):
                 raise RegistryDslError("`in` lists may only contain literals")
-            _validate_dsl_node(element, fields)
+            _validate_constant(element)
         return
     raise RegistryDslError(
         f"DSL construct not allowed: {type(node).__name__}"
     )
+
+
+def _validate_constant(node: ast.Constant) -> None:
+    value = node.value
+    if isinstance(value, bool) or value is None:
+        raise RegistryDslError("boolean/None literals are not allowed")
+    if isinstance(value, str):
+        if value not in _DSL_ALLOWED_STRINGS:
+            raise RegistryDslError(
+                f"string literal outside closed value vocabulary: {value!r}"
+            )
+        return
+    if isinstance(value, int):
+        return
+    raise RegistryDslError(
+        f"literal type not allowed: {type(value).__name__}"
+    )
+
+
+def _operand_field_type(node: ast.AST) -> type | None:
+    """If the operand is a single whitelisted fact field, return its type."""
+    if isinstance(node, ast.Name):
+        return _FIELD_TYPES.get(node.id)
+    if isinstance(node, (ast.Constant, ast.List)):
+        return _literal_type(node)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        return int
+    return None
+
+
+def _validate_compare_node(node: ast.Compare, fields: set[str]) -> None:
+    for operator in node.ops:
+        if not isinstance(operator, (
+            ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.In,
+        )):
+            raise RegistryDslError(
+                f"comparison operator not allowed: {type(operator).__name__}"
+            )
+    operands = [node.left, *node.comparators]
+    for operand in operands:
+        _validate_dsl_node(operand, fields)
+    # Compile-time type check: a comparison whose operand types cannot match
+    # (e.g. a string field ordered against a numeric literal) would raise
+    # TypeError at evaluation time, so it is rejected here. Equality against
+    # a mismatched literal is legal (it is simply always False); ordering is
+    # not.
+    numeric_ops = any(
+        isinstance(operator, (ast.Lt, ast.LtE, ast.Gt, ast.GtE))
+        for operator in node.ops
+    )
+    if not numeric_ops:
+        return
+    operand_types = {
+        _operand_field_type(operand)
+        for operand in operands
+    }
+    operand_types.discard(None)
+    if bool in operand_types:
+        raise RegistryDslError(
+            "ordering comparison against a boolean field is not meaningful"
+        )
+    if len(operand_types) > 1:
+        raise RegistryDslError(
+            "ordering comparison mixes incompatible operand types: "
+            + ", ".join(sorted(t.__name__ for t in operand_types))
+        )
 
 
 def compile_predicate_dsl(
@@ -742,7 +840,7 @@ def apply_registry_edit(
     }
     operators = {
         name: registry.raw_operator(name)
-        for name in registry._action_operators
+        for name in registry.all_operator_names()
     }
     instances = {
         name: registry.raw_action_instance(name)

@@ -18,11 +18,7 @@ from enum import Enum
 from typing import Any
 
 from .v6_contracts import (
-    COVERAGE_DOWNGRADE_STATES,
-    L2_ACTIONS,
-    L2_PREDICATE_NAMES,
     POLICY_GENOME_CAPACITY,
-    POLICY_SIDES,
     PolicyItem,
     validate_policy_params,
 )
@@ -182,10 +178,9 @@ class PolicyGenome:
             "content_hash": self.content_hash,
             "metadata": dict(self.metadata),
             # The registry is the single vocabulary authority persisted with
-            # the genome; its audit trail (registry_audit) is the same
-            # registry's edit log, not a second copy.
+            # the genome; its audit trail lives inside the registry payload
+            # (``registry.audit``), never as a second copy beside it.
             "registry": self.registry.to_dict(),
-            "registry_audit": [edit.to_dict() for edit in self.registry.audit],
         }
 
     @classmethod
@@ -231,29 +226,11 @@ def _validate_item_contract(
         return False, f"unknown_precondition:{item.precondition}"
     if item.action not in active.action_names():
         return False, f"unknown_action:{item.action}"
-    params_valid, params_reason = _validate_params_against_registry(
-        active, item.action, item.params,
+    params_valid, params_reason = validate_policy_params(
+        item.action, item.params, registry=active,
     )
     if not params_valid:
         return False, params_reason
-    return True, ""
-
-
-def _validate_params_against_registry(
-    registry, action: str, params: dict[str, Any],
-) -> tuple[bool, str]:
-    required = registry.action_params().get(action)
-    if required is None:
-        return False, f"unknown_action:{action}"
-    for key in required:
-        if key not in params:
-            return False, f"missing_param:{key}"
-    side = params.get("side")
-    if "side" in required and side not in POLICY_SIDES:
-        return False, f"invalid_side:{side}"
-    to_state = params.get("to_state")
-    if action == "downgrade_coverage" and to_state not in COVERAGE_DOWNGRADE_STATES:
-        return False, f"invalid_downgrade_state:{to_state}"
     return True, ""
 
 

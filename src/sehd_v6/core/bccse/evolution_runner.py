@@ -3404,17 +3404,32 @@ def run_online_evolution(
                 user=user_prompt,
                 cache_dir=output_dir / "mutation_cache" / "registry_reflection",
             )
-        except Exception:
+        except Exception as exc:
+            # A failed reflection call is audited, never silent.
+            l2_registry_registrations.append({
+                "outcome": "reflection_call_failed",
+                "reason": f"{type(exc).__name__}:{str(exc)[:200]}",
+            })
             return
         candidate, select_reason = select_registry_candidate(parsed, candidates)
         if candidate is None:
+            l2_registry_registrations.append({
+                "outcome": "no_registration",
+                "reason": select_reason,
+            })
             return
         try:
             edit_kwargs = compile_registration_candidate(
                 candidate, policy_genome.registry,
             )
-        except ValueError:
-            # Shadow compile fail-closed: an invalid registration is dropped.
+        except ValueError as exc:
+            # Shadow compile fail-closed: an invalid registration is dropped
+            # and audited, never applied.
+            l2_registry_registrations.append({
+                "outcome": "shadow_compile_rejected",
+                "target": candidate.target,
+                "reason": str(exc)[:200],
+            })
             return
         new_registry = apply_registry_edit(
             policy_genome.registry,
@@ -3427,6 +3442,7 @@ def run_online_evolution(
         policy_genome.registry = new_registry
         applied_edit = new_registry.audit[-1]
         l2_registry_registrations.append({
+            "outcome": "registered",
             "edit_id": applied_edit.edit_id,
             "operation": applied_edit.operation,
             "target": applied_edit.target,
@@ -3717,7 +3733,7 @@ def run_online_evolution(
             )
             return
         proposed_edit, parse_reason = select_policy_candidate(
-            parsed, planned_candidates,
+            parsed, planned_candidates, registry=policy_genome.registry,
         )
         if proposed_edit is None:
             finish("skip_no_policy", reason=parse_reason or "no_proposal")

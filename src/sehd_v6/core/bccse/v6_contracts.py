@@ -171,11 +171,19 @@ L2_ACTIONS = COURT_LOCAL_ACTIONS
 ACTION_PARAMS: dict[str, tuple[str, ...]] = dict(L2_REGISTRY.action_params())
 
 
-def validate_policy_params(action: str, params: dict[str, Any]) -> tuple[bool, str]:
-    """Check action parameters against the closed vocabularies."""
-    if action not in L2_ACTIONS:
+def validate_policy_params(
+    action: str, params: dict[str, Any], registry=None,
+) -> tuple[bool, str]:
+    """Check action parameters against the closed vocabularies.
+
+    ``registry`` selects the vocabulary authority (defaults to the baseline
+    ``L2_REGISTRY``); a genome carrying an evolved registry validates its
+    items against that registry.
+    """
+    active = registry if registry is not None else L2_REGISTRY
+    required = active.action_params().get(action)
+    if required is None:
         return False, f"unknown_action:{action}"
-    required = ACTION_PARAMS.get(action, ())
     for key in required:
         if key not in params:
             return False, f"missing_param:{key}"

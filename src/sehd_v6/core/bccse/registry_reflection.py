@@ -34,7 +34,6 @@ from .vocabulary_registry import (
     RegistryDslError,
     VocabularyRegistry,
     compile_predicate_dsl,
-    predicate_facts_whitelist,
 )
 
 # Prompt-facing purpose for the registration reflection call. The runner
@@ -159,14 +158,10 @@ def plan_registry_candidates(
 def _court_operators(registry: VocabularyRegistry) -> dict[str, Any]:
     return {
         name: registry.raw_operator(name)
-        for name in _operator_names(registry)
+        for name in registry.all_operator_names()
         if registry.raw_operator(name) is not None
         and registry.raw_operator(name).runtime_owner == "court"
     }
-
-
-def _operator_names(registry: VocabularyRegistry) -> tuple[str, ...]:
-    return registry.all_operator_names()
 
 
 def compile_registration_candidate(

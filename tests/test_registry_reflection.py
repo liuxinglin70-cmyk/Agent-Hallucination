@@ -86,10 +86,34 @@ def test_legal_dsl_supports_boolean_and_comparison_operators():
     "quarantined_error_count >> 1",      # non-whitelisted operator
     'terminal_state == "not_a_state"',   # string outside value vocabulary
     "True",                              # no fact field referenced
+    "surviving_error_count == 1e9",      # float literal (counts are ints)
+    "terminal_state > 0",                # ordering str field vs int (TypeError)
+    "fully_quarantined > 0",             # ordering on a boolean field
 ])
 def test_invalid_dsl_fails_closed_at_compile_time(bad_source):
     with pytest.raises((RegistryDslError, SyntaxError, ValueError)):
         compile_predicate_dsl("bad", bad_source)
+
+
+def test_unsigned_and_negative_count_comparisons_are_legal():
+    # Unsigned/negative integer literals compare against count fields, so
+    # boundary predicates like ">= 0" or "== -1" compile and run.
+    assert compile_predicate_dsl("a", "surviving_error_count >= 0")(
+        AdjudicationFacts(surviving_error_count=0)
+    ) is True
+    assert compile_predicate_dsl("b", "surviving_error_count == -1")(
+        AdjudicationFacts(surviving_error_count=0)
+    ) is False
+
+
+def test_equality_with_mismatched_type_is_legal_but_ordering_is_not():
+    # Equality against a mismatched literal is simply always False (legal);
+    # an ordering comparison would raise TypeError at runtime (rejected).
+    assert compile_predicate_dsl("c", 'surviving_error_count == "complete"')(
+        AdjudicationFacts(surviving_error_count=0)
+    ) is False
+    with pytest.raises(RegistryDslError):
+        compile_predicate_dsl("d", 'surviving_error_count > "complete"')
 
 
 # ------------------------------------------------------------------

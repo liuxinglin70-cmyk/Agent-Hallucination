@@ -21,11 +21,8 @@ from typing import Any, Mapping
 
 from .v6_contracts import (
     ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
-    ACTION_PARAMS,
     COVERAGE_DOWNGRADE_STATES,
     FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
-    L2_ACTIONS,
-    L2_PREDICATE_NAMES,
     POLICY_ROUTES,
     POLICY_SIDES,
     ROUTE_CANDIDATE_ALREADY_PRESENT,
@@ -37,6 +34,7 @@ from .v6_contracts import (
     validate_policy_params,
 )
 from .policy_genome import PolicyEdit, PolicyGenome, PolicyOp
+from .vocabulary_registry import L2_REGISTRY
 
 
 @dataclass(frozen=True)
@@ -275,6 +273,7 @@ def build_policy_selection_prompt(
 def select_policy_candidate(
     response: Mapping[str, Any],
     candidates: tuple[PolicyEdit, ...],
+    registry=None,
 ) -> tuple[PolicyEdit | None, str]:
     if response.get("no_proposal"):
         return None, str(response.get("reason") or "no_proposal")
@@ -284,7 +283,7 @@ def select_policy_candidate(
             return None, "candidate_index_out_of_range"
         return candidates[index], ""
 
-    legacy, reason = parse_policy_proposal(response)
+    legacy, reason = parse_policy_proposal(response, registry=registry)
     if legacy is None:
         return None, reason or "missing_candidate_index"
 
@@ -341,13 +340,17 @@ def current_policy_text(genome: PolicyGenome) -> str:
     return "\n".join(lines)
 
 
-def _vocabulary_text() -> str:
-    """Closed-vocabulary table generated from v6_contracts (never a copied
-    literal), so prompt text cannot drift from the evaluator vocabulary."""
-    predicate_lines = "\n".join(f"- {name}" for name in L2_PREDICATE_NAMES)
+def _vocabulary_text(registry=None) -> str:
+    """Closed-vocabulary table generated from the registry (never a copied
+    literal), so prompt text cannot drift from the evaluator vocabulary.
+    Defaults to the baseline registry; a genome carrying an evolved registry
+    renders its own active vocabulary."""
+    active = registry if registry is not None else L2_REGISTRY
+    predicate_lines = "\n".join(f"- {name}" for name in active.predicate_names())
+    action_params = active.action_params()
     action_lines = "\n".join(
-        f"- {action} required_params={sorted(ACTION_PARAMS.get(action, ()))}"
-        for action in sorted(L2_ACTIONS)
+        f"- {action} required_params={sorted(action_params.get(action, ()))}"
+        for action in sorted(active.action_names())
     )
     return (
         "CLOSED PRECONDITION PREDICATES (exactly one, over adjudication facts):\n"
@@ -395,16 +398,18 @@ def build_policy_reflection_prompt(
     facts_summary: Mapping[str, Any],
     current_policy_text: str,
     rejected_summary: str = "",
+    registry=None,
 ) -> tuple[str, str]:
     """Build the (system, user) prompt pair for one L2 policy reflection.
 
     The user block carries the attribution triple, the addressable fact
     counts, the current policy set and the rejected-history summary; no
-    gold label or evaluator metadata is included.
+    gold label or evaluator metadata is included. ``registry`` selects the
+    vocabulary table (defaults to the baseline registry).
     """
     import json
 
-    system = _SYSTEM_PROMPT.format(vocabulary=_vocabulary_text())
+    system = _SYSTEM_PROMPT.format(vocabulary=_vocabulary_text(registry))
     facts_text = json.dumps(dict(facts_summary), ensure_ascii=False, sort_keys=True)
     evidence_text = json.dumps(
         dict(attribution.evidence), ensure_ascii=False, sort_keys=True,
@@ -426,6 +431,7 @@ def build_policy_reflection_prompt(
 
 def parse_policy_proposal(
     response: Mapping[str, Any],
+    registry=None,
 ) -> tuple[PolicyEdit | None, str]:
     """Parse one reflection response into a closed-vocabulary PolicyEdit.
 
@@ -434,7 +440,10 @@ def parse_policy_proposal(
     item identity (``item_id`` / ``source_case_id``) because identity
     belongs to the evolution loop, not to the model output. Legacy
     add-only responses without an ``operation`` field stay addressable.
+    ``registry`` is the vocabulary authority the response is validated
+    against; it defaults to the baseline registry.
     """
+    active = registry if registry is not None else L2_REGISTRY
     if not isinstance(response, Mapping) or not response:
         return None, "empty_response"
     if response.get("no_proposal"):
@@ -458,16 +467,18 @@ def parse_policy_proposal(
     new_item: PolicyItem | None = None
     if operation in {PolicyOp.ADD_ITEM.value, PolicyOp.MODIFY_ITEM.value}:
         precondition = str(response.get("precondition") or "")
-        if precondition not in L2_PREDICATE_NAMES:
+        if precondition not in active.predicate_names():
             return None, f"unknown_precondition:{precondition}"
         action = str(response.get("action") or "")
-        if action not in L2_ACTIONS:
+        if action not in active.action_names():
             return None, f"unknown_action:{action}"
         raw_params = response.get("params") or {}
         if not isinstance(raw_params, Mapping):
             return None, "invalid_params_type"
         params = {str(key): value for key, value in raw_params.items()}
-        params_valid, params_reason = validate_policy_params(action, params)
+        params_valid, params_reason = validate_policy_params(
+            action, params, registry=active,
+        )
         if not params_valid:
             return None, params_reason
         new_item = PolicyItem(
