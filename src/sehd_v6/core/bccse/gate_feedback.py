@@ -343,14 +343,14 @@ class GateEventLedger:
 
     @classmethod
     def from_list(cls, rows: Sequence[Mapping[str, Any]]) -> "GateEventLedger":
+        """Rebuild the ledger from persisted rows.  Fail-closed: a malformed
+        or schema-unknown row raises instead of being silently dropped, so a
+        resume never loses an audited decision."""
         ledger = cls()
         for row in rows or ():
             if not isinstance(row, Mapping):
-                continue
-            try:
-                event = GateEvent.from_dict(row)
-            except ValueError:
-                continue
+                raise ValueError("gate event row must be an object")
+            event = GateEvent.from_dict(row)
             ledger.events.append(event)
             ledger._ids.add(event.event_id)
         return ledger

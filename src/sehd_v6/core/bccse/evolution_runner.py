@@ -127,6 +127,16 @@ from .promotion_contract import (
     AUTHORITY_L2_POLICY,
     promote,
 )
+from .meta_review import (
+    aggregate_gate_experience,
+    build_drift_snapshot,
+    generate_meta_edit_candidates,
+)
+from .meta_skill import (
+    MetaSkillState,
+    apply_meta_edit,
+    create_baseline_meta_skill,
+)
 from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
@@ -2122,6 +2132,7 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "policy_genome": dict(checkpoint.get("policy_genome") or {}),
         "l2_policy_accepts": int(checkpoint.get("l2_policy_accepts") or 0),
         "l2_policy_audit": list(checkpoint.get("l2_policy_audit") or []),
+        "gate_events": list(checkpoint.get("gate_events") or []),
         "stable_policy_genome_payload": dict(
             checkpoint.get("stable_policy_genome_payload") or {}
         ),
@@ -2716,6 +2727,10 @@ def run_online_evolution(
     # recorded as a GateEvent; resume is idempotent on the stable event_id.
     # Pure telemetry — it never feeds back into a gate decision.
     gate_event_ledger = GateEventLedger()
+    # Meta Review (P7): the evolving meta configuration is restored from the
+    # experience memory's meta_review.meta_state sub-domain (single authority)
+    # and persists back there; the hard gate is never touched by it.
+    meta_skill_state = create_baseline_meta_skill()
     if experience_memory_path is not None:
         memory_path = Path(experience_memory_path)
         if not memory_path.is_file():
@@ -2723,6 +2738,13 @@ def run_online_evolution(
         with memory_path.open(encoding="utf-8") as handle:
             memory_payload = json.load(handle)
         causal_memory.from_dict(memory_payload)
+        # Restore the Meta state from the single meta_review authority.
+        persisted_meta = causal_memory.meta_review.get("meta_state") or {}
+        if persisted_meta:
+            try:
+                meta_skill_state = MetaSkillState.from_dict(persisted_meta)
+            except ValueError:
+                meta_skill_state = create_baseline_meta_skill()
     stable_memory_payload = causal_memory.to_dict()
     # The causal episode payload attached to every step of the current
     # case; reset per iteration so a stale episode never leaks to the next
@@ -3381,14 +3403,27 @@ def run_online_evolution(
             # A non-gate step (e.g. halted) is still audited, with an empty
             # grade; it never reaches the promotion vocabulary.
             decision = None
+        # Stable event identity (§11.4): a step is identified by its case
+        # slot only.  The gate_decision is deliberately excluded because a
+        # provisional step is later committed in place to accept_batch by
+        # flush_shadow_batch; keying on the decision would record the same
+        # logical step twice and break resume idempotence.  An interrupted +
+        # resumed run reproduces the same event_id for the same logical step
+        # and never double-writes.
+        # ``len(steps)`` at record time is the monotonic logical-step ordinal;
+        # it is stable across an interrupt+resume because the steps list is
+        # restored from the checkpoint before processing continues.
+        observation_id = (
+            f"{step.case_id}:{step.case_index}:{len(steps)}"
+        )
         try:
             event = GateEvent(
                 schema_version=GATE_EVENT_SCHEMA_VERSION,
                 event_id=gate_event_id(
-                    attempt_id=attempt_id,
-                    episode_id=episode_id,
-                    decision_kind=step.gate_decision,
-                    observation_id=f"{step.case_id}:{step.case_index}:{step.attempt_index}",
+                    attempt_id="",
+                    episode_id="",
+                    decision_kind="",
+                    observation_id=observation_id,
                 ),
                 subject_id=str(step.case_id),
                 episode_id=episode_id,
@@ -6969,6 +7004,47 @@ def run_online_evolution(
         persist_progress(len(evolution_case_ids))
     duration = time.time() - start_time
     final_gate_summary = gate.summary()
+
+    # --- Meta Review aggregation (P7.1-P7.5) ---
+    # Deterministic, prompt-safe and never touching the hard gate: aggregate
+    # the audited gate events into GateExperience rows, enumerate shadow
+    # MetaEdit candidates, build a reporting-only drift snapshot, and persist
+    # the meta configuration back into the single meta_review authority.
+    gate_experiences = [
+        aggregate_gate_experience(event, sequence=event.sequence).to_dict()
+        for event in gate_event_ledger.events
+    ]
+    meta_candidates = generate_meta_edit_candidates(
+        [aggregate_gate_experience(event, sequence=event.sequence)
+         for event in gate_event_ledger.events],
+        [],  # OutcomeValidation rows are produced by development probes (P7.2)
+        meta_skill_state,
+    )
+    drift_snapshot = build_drift_snapshot(
+        [aggregate_gate_experience(event, sequence=event.sequence)
+         for event in gate_event_ledger.events],
+        [],
+        registry_size=len(policy_genome.registry.all_predicate_names())
+        + len(policy_genome.registry.all_action_instance_names()),
+    )
+    causal_memory.meta_review["gate_experiences"] = gate_experiences
+    causal_memory.meta_review["meta_state"] = meta_skill_state.to_dict()
+    causal_memory.meta_review["drift_snapshots"] = [drift_snapshot.to_dict()]
+    causal_memory.meta_review["pending_validation_queue"] = [
+        entry.to_dict() for entry in policy_genome.pending_queue
+    ]
+    # P7.3: shadow recommendation only — candidates are recorded for audit
+    # but NOT auto-committed here; a profile switch (P7.7) requires the
+    # pre-registered evidence gate below.
+    meta_review_summary = {
+        "gate_experience_count": len(gate_experiences),
+        "shadow_candidate_count": len(meta_candidates),
+        "shadow_candidates": [edit.to_dict() for edit in meta_candidates],
+        "gate_profile": meta_skill_state.gate_profile,
+        "meta_state_hash": meta_skill_state.content_hash,
+        "drift": drift_snapshot.to_dict(),
+    }
+
     result = OnlineEvolutionResult(
         run_id=run_id,
         champion_genome=champion_genome,
@@ -7021,6 +7097,7 @@ def run_online_evolution(
             "runtime_invalid_claim_scope": (
                 "diagnostic_only_not_evolution_evidence"
             ),
+            "meta_review": meta_review_summary,
         },
     )
 
