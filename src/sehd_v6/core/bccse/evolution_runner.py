@@ -135,7 +135,6 @@ from .meta_review import (
 )
 from .meta_skill import (
     MetaSkillState,
-    apply_meta_edit,
     create_baseline_meta_skill,
 )
 from .module_charter import validate_action_surface
