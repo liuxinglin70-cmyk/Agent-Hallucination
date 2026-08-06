@@ -5484,6 +5484,89 @@ def test_l2_boundary_consume_repair_is_proposed_and_accepted(
     )
 
 
+def test_l2_boundary_consume_surviving_error_fails_closed_in_runner(
+    tmp_path, monkeypatch,
+) -> None:
+    """The surviving-error consume guard is enforced end to end (§7.7).
+
+    The P0 fixture ``boundary_conflict_with_surviving_error`` freezes a
+    verified-clean boundary that conflicts with an unresolved terminal while
+    an error certificate survives. The planner still owns the
+    predicate/action pairing and offers the consume candidate, but on the
+    candidate replay the evaluator's guards fail closed on the surviving
+    evidence: the item is skipped, the terminal stays unresolved, and the
+    audit carries the structured ``runtime_precondition_not_satisfied``
+    route. The P2 runner branch (proposed consume skipped by its replay
+    guards) is exactly the path this test exercises.
+    """
+    from tests.fixtures import meta_skill_evolution as p0
+
+    policy_replays: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        detection = p0.boundary_conflict_with_surviving_error()
+        if policy_genome is not None:
+            policy_replays.append(case_id)
+            item = policy_genome.items[0]
+            # The candidate replay runs the real evaluator: the consume
+            # guard fails closed on the surviving error, so the item lands
+            # in skipped with the structured route and nothing fires.
+            detection["proof_adjudication"]["policy_evaluation"] = {
+                "fired": [],
+                "skipped": [{
+                    "item_id": item.item_id,
+                    "precondition": item.precondition,
+                    "action": item.action,
+                    "reason": "runtime_precondition_not_satisfied",
+                }],
+                "effective_prosecution_coverage": "complete",
+                "effective_defense_coverage": "incomplete",
+                "telemetry": [],
+                "terminal_state": "verified_error",
+                "terminal_override": "",
+            }
+        return detection
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {"candidate_index": 0, "reason": "consume the clean boundary"}, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_boundary_surviving_error",
+    )
+
+    # The planner owned the pairing and offered the consume candidate, so
+    # exactly one selection call was made and one replay ran.
+    assert len(mutation_calls) == 1
+    assert policy_replays == ["source"]
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_no_effect"
+    ]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 0
+    entry = audit["l2_policy_audit"][0]
+    assert entry["decision"] == "reject_policy_no_effect"
+    assert entry["reason"] == "policy_skipped:runtime_precondition_not_satisfied"
+    assert entry["route_result"] == "runtime_precondition_not_satisfied"
+    assert entry["feedback_code"] == "policy_route_unavailable"
+    # Nothing was committed to the policy genome.
+    assert audit["policy_genome"]["items"] == []
+
+
 def _hollow_defense_fixture():
     """Shared fixture: a hollow-complete defense source case whose
     invalidate_coverage_claim policy demotes verified_clean to unresolved.

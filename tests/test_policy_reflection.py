@@ -243,6 +243,32 @@ def test_policy_planner_routes_consensus_block_to_engine_level() -> None:
     assert plan.feedback_code == "policy_route_unavailable"
 
 
+def test_policy_planner_consensus_block_with_verdict_is_not_engine_route() -> None:
+    # The engine-level route is defined for `consensus_gate_blocked` AND
+    # terminal unresolved. A consensus attribution that already carries a
+    # terminal verdict must not claim a pre-ledger engine repair; it falls
+    # through to the fail-closed no-registered-action route instead.
+    for terminal_state in ("verified_clean", "verified_error", ""):
+        attribution = FailureAttribution(
+            layer="l2_adjudication_policy",
+            artifact="consensus_gate_policy",
+            reason_code="consensus_gate_blocked",
+            evidence={
+                "consensus_gate_blocked_count": 1,
+                "terminal_state": terminal_state,
+            },
+        )
+
+        plan = plan_policy_candidates(
+            attribution=attribution,
+            genome=create_baseline_policy_genome(),
+        )
+
+        assert plan.candidates == ()
+        assert plan.route_result == "no_registered_runtime_action"
+        assert plan.feedback_code == "policy_route_unavailable"
+
+
 def test_policy_planner_routes_unknown_reason_to_no_registered_action() -> None:
     attribution = FailureAttribution(
         layer="l2_adjudication_policy",

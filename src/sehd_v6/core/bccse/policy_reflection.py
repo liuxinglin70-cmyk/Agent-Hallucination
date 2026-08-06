@@ -96,11 +96,17 @@ def plan_policy_candidates(
     attribution could not be executed.
     """
     reason = attribution.reason_code
-    if reason == "consensus_gate_blocked":
+    terminal_unresolved = (
+        str(attribution.evidence.get("terminal_state") or "") == "unresolved"
+    )
+    if reason == "consensus_gate_blocked" and terminal_unresolved:
         # The consensus gate sits before the occurrence ledger, so a blocked
         # certificate cannot be repaired by any post-ledger action: the
         # restore route requires a pre-ledger engine intervention that the
-        # current runtime does not implement.
+        # current runtime does not implement. The route is only meaningful
+        # while the terminal is unresolved; a consensus attribution that
+        # already carries a verdict falls through to the fail-closed
+        # no-registered-action route instead of claiming an engine repair.
         return PolicyPlan(
             candidates=(),
             route_result=ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED,
