@@ -252,8 +252,17 @@ def build_policy_selection_prompt(
     attribution: FailureAttribution,
     facts_summary: Mapping[str, Any],
     candidates: tuple[PolicyEdit, ...],
+    meta_guidance: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
-    """Ask the model only to select a deterministic candidate or abstain."""
+    """Ask the model only to select a deterministic candidate or abstain.
+
+    ``meta_guidance`` is the bounded, prompt-safe Meta projection
+    (``project_meta_review_for_prompt``; closed vocabulary, identity-free,
+    gold-free, ``authority="evolution_guidance_only"``).  It can inform the
+    selection but never enlarges the candidate set, never changes an owner
+    route, and never relaxes the gate.  Omitted by default so existing call
+    sites and provider cache keys are unchanged.
+    """
     import json
 
     system = (
@@ -267,6 +276,15 @@ def build_policy_selection_prompt(
         "facts": dict(facts_summary),
         "candidates": [candidate.to_dict() for candidate in candidates],
     }
+    if meta_guidance:
+        # Only the closed-vocabulary projection keys are forwarded.
+        payload["meta_guidance"] = {
+            "authority": "evolution_guidance_only",
+            "guidance_tokens": list(meta_guidance.get("guidance_tokens") or ()),
+            "ranking_preferences": list(
+                meta_guidance.get("ranking_preferences") or ()
+            ),
+        }
     return system, json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 

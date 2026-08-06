@@ -131,6 +131,7 @@ from .meta_review import (
     aggregate_gate_experience,
     build_drift_snapshot,
     generate_meta_edit_candidates,
+    project_meta_review_for_prompt,
 )
 from .meta_skill import (
     MetaSkillState,
@@ -3860,6 +3861,9 @@ def run_online_evolution(
             attribution=attribution,
             facts_summary=facts_summary,
             candidates=planned_candidates,
+            # P7.4: bounded cross-case Meta guidance informs the selection
+            # without enlarging the candidate set or touching the gate.
+            meta_guidance=project_meta_review_for_prompt(meta_skill_state),
         )
         try:
             parsed, _meta = run_mutation_call(
