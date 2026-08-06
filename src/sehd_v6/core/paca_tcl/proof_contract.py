@@ -340,6 +340,11 @@ def adjudicate_proof_court(
     # the baseline registry; a genome carrying an evolved registry passes it
     # here so pending/disabled entries are never executed.
     policy_registry=None,
+    # P9: pre-ledger consensus-restore policies.  They act after the
+    # consensus gate and before the occurrence snapshot, restoring audited
+    # blocked certificates into the surviving set so the occurrence ledger
+    # and earliest-origin localization flow from the final surviving set.
+    pre_ledger_policy_items: Sequence["PolicyItem"] | None = None,
 ) -> dict[str, Any]:
     """v3.5 proof court adjudication with consensus gate and counterfactual localization.
 
@@ -499,6 +504,71 @@ def adjudicate_proof_court(
             initial_supported_candidate_ids=None,
         )
 
+    # P9: pre-ledger consensus-restore policy.  An audited policy may return
+    # a blocked certificate to the surviving set BEFORE the occurrence
+    # snapshot, so the occurrence ledger and earliest-origin localization
+    # flow from the final surviving set (no post-ledger repair inconsistency).
+    pre_ledger_restore_evaluation: dict[str, Any] | None = None
+    if pre_ledger_policy_items and consensus_blocked:
+        from .policy_evaluator import (
+            PreLedgerPolicyFacts,
+            evaluate_pre_ledger_policies,
+        )
+
+        def _status_map(rows, key):
+            return {
+                str(row.get("certificate_id") or ""): str(row.get(key) or "")
+                for row in rows
+            }
+
+        defeated_ids = set(defeated)
+        facts = PreLedgerPolicyFacts(
+            consensus_gate_applied=True,
+            blocked_certificate_ids=tuple(
+                str(row.get("certificate_id") or "") for row in consensus_blocked
+            ),
+            blocked_certificate_audit_status={
+                str(row.get("certificate_id") or ""): "pass"
+                for row in consensus_blocked
+            },
+            blocked_certificate_causal_status=_status_map(
+                consensus_blocked, "benchmark_causal_status",
+            ),
+            blocked_certificate_impact_kind=_status_map(
+                consensus_blocked, "impact_kind",
+            ),
+            blocked_certificate_defense_status={
+                str(row.get("certificate_id") or ""): (
+                    "dominated"
+                    if str(row.get("certificate_id") or "") in defeated_ids
+                    else "standing"
+                )
+                for row in consensus_blocked
+            },
+            blocked_certificate_quarantine_status={
+                str(row.get("certificate_id") or ""): (
+                    "quarantined" if row.get("quarantined") else "clean"
+                )
+                for row in consensus_blocked
+            },
+            terminal_without_restore="",
+        )
+        restore_result = evaluate_pre_ledger_policies(
+            facts, pre_ledger_policy_items,
+        )
+        pre_ledger_restore_evaluation = restore_result.to_dict()
+        if restore_result.restored_certificate_ids:
+            restored_ids = set(restore_result.restored_certificate_ids)
+            restored_rows = [
+                row for row in consensus_blocked
+                if str(row.get("certificate_id") or "") in restored_ids
+            ]
+            surviving = [*surviving, *restored_rows]
+            consensus_blocked = [
+                row for row in consensus_blocked
+                if str(row.get("certificate_id") or "") not in restored_ids
+            ]
+
     # Truth adjudication precedes ledger append: only causal certificates that
     # survive schema validation, mechanism-matched defenses, deterministic
     # materiality/commitment checks, and (when enabled) consensus establish an
@@ -655,6 +725,8 @@ def adjudicate_proof_court(
             str(row["certificate_id"]) for row in consensus_blocked
         ],
         "consensus_gate_applied": apply_consensus_gate_flag and initial_prosecution is not None,
+        # P9 pre-ledger restore audit (None when no pre-ledger policy ran).
+        "pre_ledger_restore": pre_ledger_restore_evaluation,
         "counterfactual_rankings_used": counterfactual_rankings is not None,
         "focused_prosecution_chain_completeness": (
             [a.get("causal_chain_completeness", 0.0) for a in focused_prosecution_audits]

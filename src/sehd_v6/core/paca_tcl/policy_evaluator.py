@@ -10,7 +10,7 @@ proof court. Pure functions, no I/O, evaluation order equals genome order.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from ..bccse.v6_contracts import (
     ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
@@ -22,7 +22,14 @@ from ..bccse.v6_contracts import (
     PolicyItem,
     validate_policy_params,
 )
-from ..bccse.vocabulary_registry import L2_REGISTRY
+from ..bccse.vocabulary_registry import (
+    L2_REGISTRY,
+    POLICY_STAGE_POST_LEDGER,
+)
+
+# P9 pre-ledger stage constant (mirrors the registry's policy_stage anchor).
+POLICY_STAGE_PRE_LEDGER = "pre_ledger"
+ACTION_RESTORE_AUDITED_CONSENSUS = "restore_audited_consensus"
 
 _COVERAGE_RANK = {"unresolved": 0, "incomplete": 1, "complete": 2}
 
@@ -214,4 +221,128 @@ def evaluate_policies(
             facts.surviving_error_count, eff_prosecution, eff_defense,
         ),
         terminal_override=terminal_override,
+    )
+
+
+# ============================================================
+# P9: pre-ledger consensus-restore policy
+# ============================================================
+
+@dataclass(frozen=True)
+class PreLedgerPolicyFacts:
+    """Deterministic runtime facts a pre-ledger policy may read (§15.3).
+
+    Raw certificates are NEVER exposed to a model; only these precomputed,
+    court-derived facts are addressable.  ``blocked_*`` mappings are keyed by
+    certificate id and carry only closed-vocabulary status values.
+    """
+
+    consensus_gate_applied: bool = False
+    blocked_certificate_ids: tuple = ()
+    blocked_certificate_audit_status: Mapping = None
+    blocked_certificate_causal_status: Mapping = None
+    blocked_certificate_impact_kind: Mapping = None
+    blocked_certificate_defense_status: Mapping = None
+    blocked_certificate_quarantine_status: Mapping = None
+    terminal_without_restore: str = ""
+
+    def __post_init__(self) -> None:
+        # Normalize None mappings to empty dicts for a frozen, total shape.
+        for name in (
+            "blocked_certificate_audit_status",
+            "blocked_certificate_causal_status",
+            "blocked_certificate_impact_kind",
+            "blocked_certificate_defense_status",
+            "blocked_certificate_quarantine_status",
+        ):
+            if getattr(self, name) is None:
+                object.__setattr__(self, name, {})
+
+
+@dataclass(frozen=True)
+class PreLedgerPolicyResult:
+    """The outcome of a pre-ledger policy pass: which blocked certificate
+    ids an audited restore returned to the surviving set, plus audit rows."""
+
+    restored_certificate_ids: tuple
+    fired: tuple
+    skipped: tuple
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "restored_certificate_ids": list(self.restored_certificate_ids),
+            "fired": [dict(row) for row in self.fired],
+            "skipped": [dict(row) for row in self.skipped],
+        }
+
+
+def _restore_guards(facts: PreLedgerPolicyFacts, certificate_id: str) -> tuple[bool, str]:
+    """Fail-closed restore guards (§15.4).  Every condition must hold."""
+    if not facts.consensus_gate_applied:
+        return False, "consensus_gate_not_applied"
+    if certificate_id not in set(facts.blocked_certificate_ids):
+        return False, "certificate_not_in_blocked_set"
+    audit_status = facts.blocked_certificate_audit_status.get(certificate_id)
+    if audit_status != "pass":
+        return False, "schema_validation_not_passed"
+    causal = facts.blocked_certificate_causal_status.get(certificate_id)
+    if causal not in ("causes_incorrect_result", "propagates_to_incorrect_result"):
+        return False, "causal_status_not_causal"
+    impact = facts.blocked_certificate_impact_kind.get(certificate_id)
+    if impact in ("process_only", "process_debt"):
+        return False, "impact_process_only"
+    defense = facts.blocked_certificate_defense_status.get(certificate_id)
+    if defense == "dominated":
+        return False, "defeated_by_dominating_defense"
+    quarantine = facts.blocked_certificate_quarantine_status.get(certificate_id)
+    if quarantine == "quarantined":
+        return False, "quarantined_raw_output"
+    return True, ""
+
+
+def evaluate_pre_ledger_policies(
+    facts: PreLedgerPolicyFacts,
+    items: Sequence[PolicyItem],
+) -> PreLedgerPolicyResult:
+    """Apply pre-ledger policies to the blocked consensus set (§15).
+
+    Only the ``restore_audited_consensus`` operator acts here, and only on a
+    certificate that passes every fail-closed guard.  A defeated /
+    quarantined / process-only certificate is never restored.  The action
+    surfaces the certificate id; the caller returns it to the surviving set
+    so the occurrence ledger and earliest-origin localization flow from the
+    final surviving set naturally.
+    """
+    restored: list[str] = []
+    fired: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    for item in items:
+        if item.action != ACTION_RESTORE_AUDITED_CONSENSUS:
+            # The pre-ledger evaluator never executes a post-ledger operator.
+            skipped.append({
+                "item_id": item.item_id,
+                "action": item.action,
+                "reason": "unknown_stage_for_pre_ledger",
+            })
+            continue
+        certificate_id = str(item.params.get("certificate_id") or "")
+        ok, reason = _restore_guards(facts, certificate_id)
+        if not ok:
+            skipped.append({
+                "item_id": item.item_id,
+                "action": item.action,
+                "certificate_id": certificate_id,
+                "reason": reason,
+            })
+            continue
+        restored.append(certificate_id)
+        fired.append({
+            "item_id": item.item_id,
+            "action": item.action,
+            "certificate_id": certificate_id,
+        })
+    return PreLedgerPolicyResult(
+        restored_certificate_ids=tuple(restored),
+        fired=tuple(fired),
+        skipped=tuple(skipped),
     )

@@ -471,6 +471,15 @@ def _build_baseline_registry() -> VocabularyRegistry:
             policy_stage="pre_ledger",
             runtime_owner="engine",
         ),
+        # P9: the audited pre-ledger consensus-restore operator.  It is a
+        # court-local pre-ledger operator (not proposable as a post-ledger
+        # action); first registration is conditional/pending until validated.
+        ActionOperator(
+            operator="restore_audited_consensus",
+            params_schema=("certificate_id",),
+            policy_stage="pre_ledger",
+            runtime_owner="court",
+        ),
     ]
 
     def _instance(operator: ActionOperator) -> ActionInstance:
@@ -482,10 +491,15 @@ def _build_baseline_registry() -> VocabularyRegistry:
             status=STATUS_BASELINE,
         )
 
+    # Only post-ledger court operators become proposable baseline action
+    # instances.  A pre-ledger court operator (restore_audited_consensus) is
+    # registered for the pre-ledger evaluator but is never a post-ledger
+    # proposable action, so the two stages can never share an execution path.
     instances = [
         _instance(operator)
         for operator in operators
         if operator.runtime_owner == "court"
+        and operator.policy_stage == POLICY_STAGE_POST_LEDGER
     ]
 
     return VocabularyRegistry(

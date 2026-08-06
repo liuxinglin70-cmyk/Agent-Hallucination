@@ -1749,17 +1749,17 @@ tests/test_proof_court_policy_hook.py
 
 ## 15.7 验收
 
-- [ ] empty pre-policy byte-identical。
-- [ ] 合法 restore 进入 surviving set。
-- [ ] occurrence ledger 与 surviving set 一致。
-- [ ] responsible event/localization 一致。
-- [ ] defeated/quarantined/process-only 永不恢复。
-- [ ] post-ledger evaluator 不执行 pre operator。
-- [ ] pre-ledger evaluator 不执行 post operator。
-- [ ] unknown stage fail-closed。
-- [ ] gold firewall 保持。
-- [ ] P8 端到端闭环加入一条 pre-ledger fixture。
-- [ ] 新 provider smoke 中至少验证一次 targeted pre-ledger 路径后再启用自然 batch。
+- [x] empty pre-policy byte-identical。
+- [x] 合法 restore 进入 surviving set。
+- [x] occurrence ledger 与 surviving set 一致。
+- [x] responsible event/localization 一致。
+- [x] defeated/quarantined/process-only 永不恢复。
+- [x] post-ledger evaluator 不执行 pre operator。
+- [x] pre-ledger evaluator 不执行 post operator。
+- [x] unknown stage fail-closed。
+- [x] gold firewall 保持。
+- [x] P8 端到端闭环加入一条 pre-ledger fixture。
+- [ ] 新 provider smoke 中至少验证一次 targeted pre-ledger 路径后再启用自然 batch。（按任务调整不执行真实 provider smoke）
 
 ## 15.8 提交
 
