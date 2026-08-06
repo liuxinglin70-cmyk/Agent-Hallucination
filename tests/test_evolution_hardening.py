@@ -5508,11 +5508,89 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert experience["metadata"]["outcome"] == "improved"
 
 
+def test_l2_coverage_only_change_is_accepted_without_gold(
+    tmp_path, monkeypatch,
+) -> None:
+    """A policy that fires and moves only the effective coverage (the
+    terminal state is unchanged) needs no gold polarity to be accepted.
+
+    This is the designed self-supervised L2 path: coverage honesty is a
+    court-local correction that never claims a verdict, so requiring an
+    external label for it would starve every label-free L2 accept.
+    """
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "unresolved",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+        }
+        if policy_genome is not None:
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "pre_policy_state": "unresolved",
+                "state": "unresolved",
+                "policy_evaluation": {
+                    "fired": [{"item_id": item.item_id, "action": item.action}],
+                    "effective_prosecution_coverage": "complete",
+                    "effective_defense_coverage": "unresolved",
+                },
+            }
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "census": [],
+                "proof_adjudication": adjudication,
+            }
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    def mutation(**kwargs):
+        return {
+            "precondition": "defense_coverage_complete_and_zero_certificates",
+            "action": "invalidate_coverage_claim",
+            "params": {"side": "defense"},
+            "rationale": "hollow complete defense on an unresolved case",
+        }, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        # No gold at all: only the effective coverage moved, so the accept
+        # must not depend on an external label.
+        records={"source": {}, "anchor": {}},
+        run_id="l2_coverage_only_accept",
+        fitness_use_gold=False,
+    )
+
+    assert [step.gate_decision for step in result.steps] == ["accept_policy"]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 1
+    items = audit["policy_genome"]["items"]
+    assert len(items) == 1
+    assert items[0]["action"] == "invalidate_coverage_claim"
+    assert items[0]["params"] == {"side": "defense"}
+    assert result.edits_accepted == 0  # L1 skill surface untouched
+
+
 def test_l2_state_change_against_gold_polarity_is_rejected(
     tmp_path, monkeypatch,
 ) -> None:
-    """Direction discipline: the same hollow-defense demotion is rejected
-    when gold says the clean verdict was correct (score 2->1)."""
 
     def detector(*, genome, case_id, policy_genome=None, **kwargs):
         if case_id == "anchor":

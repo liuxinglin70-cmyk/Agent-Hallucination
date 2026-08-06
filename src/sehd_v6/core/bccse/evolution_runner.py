@@ -1407,6 +1407,22 @@ def _experience_intervention_trace(
     }
 
 
+def _field_binds_output_field(reported: str, expected: str) -> bool:
+    """Whether a provider-reported output field binds an ActionSpec field.
+
+    The provider self-reports the actual JSON collection key it affected
+    (e.g. ``candidates``, the census array key), while the ActionSpec's
+    ``output_field`` is the singular object name from the opcode operand
+    (e.g. ``candidate``). These name the same executable output in two
+    vocabularies, so exact matches and the singular/plural pair both bind.
+    """
+    if not expected or not reported:
+        return False
+    if reported == expected:
+        return True
+    return reported == f"{expected}s" or expected == f"{reported}s"
+
+
 def _attribute_intervention_fitness(
     assessment: FitnessAssessment,
     *,
@@ -1419,7 +1435,10 @@ def _attribute_intervention_fitness(
     provider replay may vary even when it ignores the evolved instruction.
     New ActionSpec-backed rules therefore earn fitness only when their stable
     rule id is injected, reported as applied, and bound to the ActionSpec's
-    output field. Older uninstrumented detector adapters remain readable.
+    output field. The binding is vocabulary-tolerant: the provider reports
+    the JSON key it affected (``candidates``), which may be the plural of the
+    ActionSpec's singular output field (``candidate``). Older uninstrumented
+    detector adapters remain readable.
     """
     action_spec = sanitize_action_spec(edit.action_spec)
     compiled = result.get("compiled_rule_trace")
@@ -1457,7 +1476,10 @@ def _attribute_intervention_fitness(
                 if (
                     isinstance(fields, Sequence)
                     and not isinstance(fields, str)
-                    and expected_field in {str(field) for field in fields}
+                    and any(
+                        _field_binds_output_field(str(field), expected_field)
+                        for field in fields
+                    )
                 ):
                     effect_ids.add(str(entry.get("rule_id") or ""))
     executed_ids = sorted(rule_ids & applied_ids & effect_ids)

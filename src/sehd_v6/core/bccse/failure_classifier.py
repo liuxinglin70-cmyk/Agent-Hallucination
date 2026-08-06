@@ -196,8 +196,15 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             },
         )
 
-    # Rule 2 — consensus gate blocked live candidates.
-    if L2_PREDICATES["consensus_gate_blocked_nonempty"](facts):
+    # Rule 2 — consensus gate blocked live candidates. The gate is a
+    # protection mechanism: blocking low-confidence candidates only becomes
+    # an L2 failure when the court cannot reach a verdict because of it. A
+    # gate that filtered candidates yet still produced a verdict is the
+    # detector working as designed, not an addressable failure.
+    if (
+        L2_PREDICATES["consensus_gate_blocked_nonempty"](facts)
+        and facts.terminal_state == "unresolved"
+    ):
         return _attr(
             LAYER_L2,
             L2_ARTIFACT_CONSENSUS_GATE,

@@ -224,3 +224,61 @@ def test_executed_action_keeps_its_replay_fitness() -> None:
 
     assert assessment is original
     assert audit["status"] == "executed"
+
+
+def test_plural_output_field_binds_the_singular_action_spec() -> None:
+    """The provider reports the JSON collection key it affected
+    (``candidates``), while the ActionSpec's ``output_field`` is the singular
+    object name (``candidate``). Both vocabularies must bind the same rule,
+    or an executed intervention is misreported as ``intervention_not_executed``
+    (observed in the 50-case batch on BFCL/028 attempt 1 and SmolAgents/068
+    attempt 2: applied_rule_trace and observable deltas both proved execution,
+    but the plural field name failed the exact-match binding)."""
+    spec = compile_action_spec(
+        "candidate_trigger",
+        "emit_candidate: candidate",
+    )
+    edit = SkillEdit(
+        edit_id="edit_plural_binding",
+        target_module="candidate_trigger",
+        operation="add_rule",
+        action_spec=spec.to_dict(),
+    )
+    original = FitnessAssessment("local_improvement", ("task_score_improved",))
+    assessment, audit = _attribute_intervention_fitness(
+        original,
+        edit=edit,
+        result={
+            "compiled_rule_trace": {
+                "candidate_trigger": [{"rule_id": "rule_plural"}],
+            },
+            "applied_rule_trace": {"construct_census_route": ["rule_plural"]},
+            "rule_effects_trace": {
+                "construct_census_route": [{
+                    "rule_id": "rule_plural",
+                    "output_fields": ["candidates"],
+                }],
+            },
+        },
+    )
+
+    assert assessment is original
+    assert audit["status"] == "executed"
+    assert audit["effect_rule_ids"] == ["rule_plural"]
+    assert audit["executed_rule_ids"] == ["rule_plural"]
+
+
+def test_field_binding_accepts_the_singular_plural_pair_in_both_directions() -> None:
+    """The binding helper normalizes the singular/plural pair: the provider
+    reports the JSON collection key (``candidates``) while the ActionSpec
+    names the singular object (``candidate``); both directions must bind."""
+    from src.sehd_v6.core.bccse.evolution_runner import (
+        _field_binds_output_field,
+    )
+
+    assert _field_binds_output_field("candidates", "candidate")
+    assert _field_binds_output_field("candidate", "candidates")
+    assert _field_binds_output_field("certificate_id", "certificate_id")
+    assert not _field_binds_output_field("candidate", "evidence")
+    assert not _field_binds_output_field("", "candidate")
+    assert not _field_binds_output_field("candidates", "")
