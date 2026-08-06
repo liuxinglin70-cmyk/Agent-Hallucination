@@ -304,3 +304,93 @@ def test_result_serializable_via_to_dict():
     assert set(payload) == {"layer", "artifact", "reason_code", "evidence"}
     assert payload["layer"] == contracts.LAYER_L1
     assert isinstance(payload["evidence"], dict)
+
+
+# ------------------------------------------------------------------
+# P0 frozen fixtures: attribution positive/negative reproducibility
+# ------------------------------------------------------------------
+
+from tests.fixtures import meta_skill_evolution as frozen
+
+
+def test_fixture_consensus_blocked_unresolved_attributes_l2_consensus():
+    result = classify_failure(
+        frozen.classifier_record(frozen.consensus_blocked_unresolved())
+    )
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_CONSENSUS_GATE
+    assert result.reason_code == "consensus_gate_blocked"
+
+
+def test_fixture_consensus_blocked_with_verdict_never_attributes_l2():
+    """A gate that filtered candidates yet still produced a verdict is the
+    detector working as designed, not an addressable L2 failure."""
+    result = classify_failure(
+        frozen.classifier_record(frozen.consensus_blocked_terminal_verdict())
+    )
+    assert result.layer == contracts.LAYER_NONE
+    assert result.reason_code == "no_failure_shape"
+
+
+def test_fixture_boundary_verified_clean_unresolved_attributes_l2_boundary():
+    result = classify_failure(
+        frozen.classifier_record(frozen.boundary_verified_clean_unresolved())
+    )
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_BOUNDARY_CONSUMPTION
+    assert result.reason_code == "boundary_terminal_conflict"
+
+
+def test_fixture_boundary_conflict_with_surviving_error_attributes_l2():
+    """Attribution still routes to the boundary-consumption policy; the
+    surviving error is what the post-ledger runtime must fail closed on."""
+    result = classify_failure(
+        frozen.classifier_record(frozen.boundary_conflict_with_surviving_error())
+    )
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_BOUNDARY_CONSUMPTION
+
+
+def test_fixture_hollow_prosecution_attributes_l2_coverage():
+    result = classify_failure(
+        frozen.classifier_record(frozen.hollow_prosecution())
+    )
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_COVERAGE_VALIDITY
+    assert result.reason_code == "hollow_complete_prosecution"
+
+
+def test_fixture_hollow_defense_attributes_l2_coverage():
+    result = classify_failure(
+        frozen.classifier_record(frozen.hollow_defense())
+    )
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_COVERAGE_VALIDITY
+    assert result.reason_code == "hollow_complete_defense"
+
+
+def test_fixture_l1_malformed_candidate_attributes_l1():
+    result = classify_failure(
+        frozen.classifier_record(frozen.l1_malformed_candidate())
+    )
+    assert result.layer == contracts.LAYER_L1
+    assert result.artifact == "candidate_trigger"
+    assert result.reason_code == "provider_artifact_malformed"
+
+
+def test_fixture_attributions_are_byte_identical_across_rebuilds():
+    import json
+
+    builders = (
+        frozen.consensus_blocked_unresolved,
+        frozen.consensus_blocked_terminal_verdict,
+        frozen.boundary_verified_clean_unresolved,
+        frozen.boundary_conflict_with_surviving_error,
+        frozen.hollow_prosecution,
+        frozen.hollow_defense,
+        frozen.l1_malformed_candidate,
+    )
+    for build in builders:
+        first = classify_failure(frozen.classifier_record(build())).to_dict()
+        second = classify_failure(frozen.classifier_record(build())).to_dict()
+        assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)

@@ -1164,3 +1164,185 @@ def test_causal_episode_context_reaches_reflection(
     assert "action_envelope" in user
     assert "obligation_vs_observed" in user
     assert "provider_artifact_missing" in user
+
+
+# ------------------------------------------------------------------
+# P0 frozen fixtures: offline end-to-end loop and interruption resume
+# ------------------------------------------------------------------
+
+from tests.fixtures import meta_skill_evolution as p0
+
+
+def _p0_detections() -> dict:
+    return p0.evolution_case_detections()
+
+
+def _run_p0_loop(tmp_path, output_dir, **overrides):
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    records = {"source1": {}, "source2": {}, "anchor": {}}
+    kwargs = {
+        "evolution_case_ids": ("source1", "source2"),
+        "records": records,
+        "config": {},
+        "output_dir": output_dir,
+        "census_root": tmp_path,
+        "mutation_route": {"model": "DeepSeek-V4-Flash"},
+        "canary_case_ids": ("anchor",),
+        "reflection_candidate_count": 1,
+    }
+    kwargs.update(overrides)
+    return runner.run_online_evolution(**kwargs)
+
+
+def test_p0_mocked_loop_l1_accept_path(tmp_path, monkeypatch, addressable_l1_failure):
+    calls = p0.install_mocked_evolution(
+        monkeypatch, detections=_p0_detections(),
+    )
+    result = _run_p0_loop(tmp_path, tmp_path / "l1_out", run_id="p0_l1")
+    # source1 is repaired by its candidate replay; source2 is never fixed,
+    # so its replay shows no effect and the edit is rejected on both
+    # bounded attempts.
+    assert result.edits_accepted == 1
+    assert result.edits_rejected == 2
+    decisions = [step.gate_decision for step in result.steps]
+    assert decisions == [
+        "accept_batch", "retry_fitness_no_effect", "reject_fitness_no_effect",
+    ]
+    # Every mutation call was answered by the offline responder; the
+    # detector stub saw the canary, both observations and both replays.
+    assert {call["purpose"] for call in calls["mutation"]} <= {"mutation"}
+    assert calls["observed_cases"] == ["anchor", "source1", "source2"]
+
+
+def test_p0_mocked_loop_l2_policy_accept_path(tmp_path, monkeypatch, addressable_l1_failure):
+    def replay(*, case_id, genome, policy_genome):
+        payload = p0.hollow_defense()
+        payload["proof_adjudication"]["policy_evaluation"] = {
+            "fired": [{
+                "item_id": "policy_fixture",
+                "precondition": "defense_coverage_complete_and_zero_certificates",
+                "action": "invalidate_coverage_claim",
+                "params": {"side": "defense"},
+            }],
+            "skipped": [],
+            "effective_prosecution_coverage": "incomplete",
+            "effective_defense_coverage": "unresolved",
+            "telemetry": [],
+            "terminal_state": "unresolved",
+        }
+        return payload
+
+    p0.install_mocked_evolution(
+        monkeypatch,
+        detections={"l2_source": p0.hollow_defense()},
+        replay=replay,
+    )
+    result = _run_p0_loop(
+        tmp_path, tmp_path / "l2_out",
+        evolution_case_ids=("l2_source",),
+        records={"l2_source": {}, "anchor": {}},
+        run_id="p0_l2",
+    )
+    assert result.evolution_audit["l2_policy_accepts"] == 1
+    l2_steps = [
+        step for step in result.steps
+        if step.trigger_source == "l2_policy_reflection"
+    ]
+    assert [step.gate_decision for step in l2_steps] == ["accept_policy"]
+    assert result.policy_genome.total_items == 1
+
+
+def test_p0_runtime_invalid_fixture_is_diagnostic_only(tmp_path, monkeypatch, addressable_l1_failure):
+    p0.install_mocked_evolution(
+        monkeypatch,
+        detections={"broken": RuntimeError("provider_timeout: offline")},
+    )
+    result = _run_p0_loop(
+        tmp_path, tmp_path / "invalid_out",
+        evolution_case_ids=("broken",),
+        records={"broken": {}, "anchor": {}},
+        run_id="p0_runtime_invalid",
+    )
+    assert result.runtime_invalid_cases == 1
+    assert [step.gate_decision for step in result.steps] == ["skip_runtime_invalid"]
+    assert result.evolution_audit["mutation_calls"] == 0
+
+
+def _strip_volatile(value):
+    if isinstance(value, dict):
+        return {
+            key: _strip_volatile(item)
+            for key, item in value.items()
+            if key not in {"timestamp", "updated_at", "duration_seconds"}
+        }
+    if isinstance(value, list):
+        return [_strip_volatile(item) for item in value]
+    return value
+
+
+def _normalized_run_artifacts(output_dir):
+    result = json.loads((output_dir / "evolution_result.json").read_text())
+    champion = json.loads((output_dir / "champion_genome.json").read_text())
+    policy = json.loads((output_dir / "policy_genome.json").read_text())
+    memory = json.loads(
+        (output_dir / "htc_tes_experience_memory.json").read_text()
+    )
+    return {
+        "champion_hash": champion["content_hash"],
+        "policy_hash": policy["content_hash"],
+        "steps": [
+            (step["case_id"], step["gate_decision"]) for step in result["steps"]
+        ],
+        "counters": {
+            key: result[key]
+            for key in (
+                "triggered_cases", "stable_cases", "runtime_invalid_cases",
+                "edits_accepted", "edits_rejected",
+            )
+        },
+        "memory": _strip_volatile(memory),
+    }
+
+
+@pytest.mark.parametrize("position", p0.INTERRUPTION_POSITIONS)
+def test_p0_interrupted_resume_matches_uninterrupted(
+    tmp_path, monkeypatch, addressable_l1_failure, position,
+):
+    """Checkpoint interruption at the observation / proposal / outcome
+    positions must resume to artifacts comparable with an uninterrupted
+    run (P0: interrupted and uninterrupted fixtures stay comparable)."""
+    reference_dir = tmp_path / "reference"
+    p0.install_mocked_evolution(
+        monkeypatch, detections=_p0_detections(),
+    )
+    _run_p0_loop(tmp_path, reference_dir, run_id="p0_reference")
+
+    interrupted_dir = tmp_path / f"interrupted_{position}"
+    interrupt_case = {
+        "observation": "source2",
+        "proposal": "source1",
+        "outcome": "source1",
+    }[position]
+    p0.install_mocked_evolution(
+        monkeypatch,
+        detections=_p0_detections(),
+        interrupt_at=position,
+        interrupt_case=interrupt_case,
+    )
+    with pytest.raises(KeyboardInterrupt, match="planned interruption"):
+        _run_p0_loop(tmp_path, interrupted_dir, run_id="p0_interrupted")
+
+    p0.install_mocked_evolution(
+        monkeypatch, detections=_p0_detections(),
+    )
+    resumed = _run_p0_loop(
+        tmp_path, interrupted_dir,
+        resume_from=interrupted_dir,
+        run_id="p0_resumed",
+    )
+    assert resumed.total_cases == 2
+    assert (
+        _normalized_run_artifacts(interrupted_dir)
+        == _normalized_run_artifacts(reference_dir)
+    )
