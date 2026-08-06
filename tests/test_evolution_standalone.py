@@ -866,6 +866,11 @@ def test_evolution_carries_initial_policy_genome_into_detector(
         ),
         rationale="r",
     ))
+    # An inherited policy skill enters the run already graded: only a working
+    # item (weak or strong) is projected into the evolution detector calls.
+    inherited_meta = inherited.get_item_meta(0)
+    inherited_meta["fitness_status"] = "weak"
+    inherited.set_item_meta(0, inherited_meta)
     seen_policy: list[list] = []
 
     def detector(*, genome, case_id, policy_genome=None, **kwargs):

@@ -119,6 +119,7 @@ from .evolution_experience_memory import EvolutionExperienceMemory
 from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
+    FITNESS_STATUS_WEAK,
     PolicyEdit,
     PolicyGenome,
     PolicyOp,
@@ -1799,8 +1800,12 @@ def _run_detection_with_genome(
                     shutil.copytree(source, genome_dir / name, dirs_exist_ok=True)
             marker.write_text("seeded\n", encoding="utf-8")
 
+    # Evolution runs on the working scope: baseline + weak + strong items.
+    # Conditional artifacts are not in the genome items (pending queue), and
+    # an item whose registry dependency went pending/disabled is dropped at
+    # projection time so the evaluator never sees an unexecutable policy.
     policy_items = (
-        list(policy_genome.items)
+        policy_genome.items_for_scope("working")
         if policy_genome is not None and policy_genome.items
         else None
     )
@@ -3888,22 +3893,27 @@ def run_online_evolution(
                     replay=replay_result,
                 )
                 return
-        if (
-            state_changed
-            and operation != PolicyOp.REMOVE_ITEM.value
-        ):
-            # A gold-verified terminal move is the strongest evidence an
-            # item can earn in this loop; lock it against later
-            # modify/remove so a subsequent reflection cannot erode a
-            # verified win. Coverage-only accepts stay correctable.
-            protected_index = (
+        if operation != PolicyOp.REMOVE_ITEM.value:
+            accepted_index = (
                 proposal_edit.item_index
                 if operation == PolicyOp.MODIFY_ITEM.value
                 else len(candidate_genome.items) - 1
             )
-            protected_meta = candidate_genome.get_item_meta(protected_index)
-            protected_meta["fitness_status"] = FITNESS_STATUS_STRONG
-            candidate_genome.set_item_meta(protected_index, protected_meta)
+            accepted_meta = candidate_genome.get_item_meta(accepted_index)
+            if state_changed:
+                # A gold-verified terminal move is the strongest evidence an
+                # item can earn in this loop; lock it against later
+                # modify/remove so a subsequent reflection cannot erode a
+                # verified win.
+                accepted_meta["fitness_status"] = FITNESS_STATUS_STRONG
+            elif accepted_meta.get("fitness_status") != FITNESS_STATUS_STRONG:
+                # A coverage-only / local-effect accept earned no independent
+                # correctness evidence, so it is weak: it enters the working
+                # scope but stays correctable (never promoted by canary
+                # non-regression alone) and is excluded from the deployable
+                # scope until it earns strong evidence.
+                accepted_meta["fitness_status"] = FITNESS_STATUS_WEAK
+            candidate_genome.set_item_meta(accepted_index, accepted_meta)
         policy_genome = candidate_genome
         finish("accept_policy", replay=replay_result)
         return accepted_outcome
@@ -3944,8 +3954,11 @@ def run_online_evolution(
                     ),
                     # The probe must measure the detector that subsequent
                     # cases actually run: champion genome plus the accepted
-                    # L2 policy surface.
-                    policy_genome=policy_genome if policy_genome.items else None,
+                    # L2 policy surface (working scope).
+                    policy_genome=(
+                        policy_genome if policy_genome.items_for_scope("working")
+                        else None
+                    ),
                 )
                 state = resolve_evolution_state(result)
                 runtime_valid = result.get("runtime_valid") is True
@@ -4719,7 +4732,10 @@ def run_online_evolution(
                 genome=current_genome,
                 case_id=case_id,
                 output_path=output_dir,
-                policy_genome=policy_genome if policy_genome.items else None,
+                policy_genome=(
+                    policy_genome if policy_genome.items_for_scope("working")
+                    else None
+                ),
             )
         except Exception as exc:
             runtime_error = f"{type(exc).__name__}: {exc}"
@@ -6220,7 +6236,10 @@ def run_online_evolution(
                     genome=candidate_genome,
                     case_id=case_id,
                     output_path=replay_root / "source",
-                    policy_genome=policy_genome if policy_genome.items else None,
+                    policy_genome=(
+                        policy_genome if policy_genome.items_for_scope("working")
+                        else None
+                    ),
                 )
             except Exception as exc:
                 reason = f"source_replay_runtime_error:{type(exc).__name__}:{exc}"
@@ -6294,7 +6313,11 @@ def run_online_evolution(
                             genome=candidate_genome,
                             case_id=canary_id,
                             output_path=canary_root / canary_id.replace("/", "_"),
-                            policy_genome=policy_genome if policy_genome.items else None,
+                            policy_genome=(
+                                policy_genome
+                                if policy_genome.items_for_scope("working")
+                                else None
+                            ),
                         )
                         preserved, audit = canary_preserved(
                             parent_canary, child_canary,
@@ -6428,7 +6451,11 @@ def run_online_evolution(
                                 replay_root / "contrast"
                                 / neighbor_id.replace("/", "_")
                             ),
-                            policy_genome=policy_genome if policy_genome.items else None,
+                            policy_genome=(
+                                policy_genome
+                                if policy_genome.items_for_scope("working")
+                                else None
+                            ),
                         )
                         neighbor_after_state = str(
                             neighbor_result.get("state") or ""

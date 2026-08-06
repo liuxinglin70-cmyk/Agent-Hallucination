@@ -946,15 +946,15 @@ tests/test_policy_genome.py
 
 ## 10.7 验收
 
-- [ ] weak 可修改/删除。
-- [ ] strong 默认不可修改。
-- [ ] conditional 不进入 active items。
-- [ ] evolution 使用 working view。
-- [ ] standalone detector 默认使用 deployable view。
-- [ ] pending queue resume 幂等。
-- [ ] registry dependencies 在 scope projection 时校验。
-- [ ] hard violation 永远 reject。
-- [ ] 完整测试通过。
+- [x] weak 可修改/删除。
+- [x] strong 默认不可修改。
+- [x] conditional 不进入 active items。
+- [x] evolution 使用 working view。
+- [x] standalone detector 默认使用 deployable view。
+- [x] pending queue resume 幂等。
+- [x] registry dependencies 在 scope projection 时校验。
+- [x] hard violation 永远 reject。
+- [x] 完整测试通过。
 
 ## 10.8 提交
 

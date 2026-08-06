@@ -194,8 +194,13 @@ def detect_record(
     """
     validate_record(record)
     output_dir = Path(output_dir or Path.cwd() / "detector_output")
+    # Standalone deployment uses the deployable scope: only baseline and
+    # strong items carry measured, independent correctness evidence, so a
+    # weak working item never changes a deployed verdict.  Conditional
+    # artifacts are absent from the genome items entirely (pending queue).
     policy_items = (
-        list(policy_genome.items) if policy_genome is not None else None
+        policy_genome.items_for_scope("deployable")
+        if policy_genome is not None else None
     )
     policy_registry = (
         policy_genome.registry if policy_genome is not None else None

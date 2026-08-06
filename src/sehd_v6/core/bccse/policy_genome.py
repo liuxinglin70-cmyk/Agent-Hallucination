@@ -15,7 +15,7 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
 
 from .v6_contracts import (
     POLICY_GENOME_CAPACITY,
@@ -27,8 +27,34 @@ from .vocabulary_registry import L2_REGISTRY, VocabularyRegistry
 FITNESS_STATUS_NONE = "none"
 FITNESS_STATUS_WEAK = "weak"
 FITNESS_STATUS_STRONG = "strong"
+FITNESS_STATUS_CONDITIONAL = "conditional"
 _FITNESS_STATUSES = frozenset(
-    {FITNESS_STATUS_NONE, FITNESS_STATUS_WEAK, FITNESS_STATUS_STRONG}
+    {
+        FITNESS_STATUS_NONE,
+        FITNESS_STATUS_WEAK,
+        FITNESS_STATUS_STRONG,
+        FITNESS_STATUS_CONDITIONAL,
+    }
+)
+
+# Runtime scope vocabulary for ``items_for_scope`` (closed).  ``working`` is
+# the evolution view: baseline + weak + strong.  ``deployable`` is the
+# standalone-detector view: baseline + strong only — a weak item has not
+# earned measured, independent correctness evidence, so it must not change a
+# deployed verdict.  ``conditional`` items never enter any runtime scope;
+# they live in the genome's pending validation queue until promoted.
+SCOPE_WORKING = "working"
+SCOPE_DEPLOYABLE = "deployable"
+SCOPES = frozenset({SCOPE_WORKING, SCOPE_DEPLOYABLE})
+
+# Pending validation queue item statuses (closed).  ``pending`` awaits its
+# required validation; ``validated`` / ``rejected`` are terminal outcomes
+# recorded so the queue's resume stays auditable.
+PENDING_STATUS_PENDING = "pending"
+PENDING_STATUS_VALIDATED = "validated"
+PENDING_STATUS_REJECTED = "rejected"
+PENDING_STATUSES = frozenset(
+    {PENDING_STATUS_PENDING, PENDING_STATUS_VALIDATED, PENDING_STATUS_REJECTED}
 )
 
 
@@ -87,6 +113,70 @@ class PolicyEdit:
 
 
 # ============================================================
+# Pending validation queue item
+# ============================================================
+
+@dataclass
+class PendingValidationItem:
+    """One conditional L2 artifact awaiting its required validation.
+
+    Conditional artifacts (telemetry-only proposals, first-use registry
+    entries, shadow Meta/registry candidates, unobservable effects) are
+    carried here — persisted with the checkpoint and experience memory — but
+    never enter the detector runtime.  ``registry_dependencies`` names the
+    vocabulary entries the proposal relies on; they are re-validated at
+    scope-projection time so a proposal whose dependency was retired is
+    dropped instead of silently activating.  ``created_sequence`` orders the
+    queue deterministically; ``status`` is one of the closed
+    ``PENDING_STATUSES``.
+    """
+
+    subject_id: str
+    layer: str = ""
+    proposal: dict[str, Any] = field(default_factory=dict)
+    registry_dependencies: tuple[str, ...] = ()
+    source_evidence: dict[str, Any] = field(default_factory=dict)
+    required_validation: str = ""
+    created_sequence: int = 0
+    status: str = PENDING_STATUS_PENDING
+
+    def __post_init__(self) -> None:
+        if self.status not in PENDING_STATUSES:
+            self.status = PENDING_STATUS_PENDING
+        self.registry_dependencies = tuple(self.registry_dependencies)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "subject_id": self.subject_id,
+            "layer": self.layer,
+            "proposal": dict(self.proposal),
+            "registry_dependencies": list(self.registry_dependencies),
+            "source_evidence": dict(self.source_evidence),
+            "required_validation": self.required_validation,
+            "created_sequence": self.created_sequence,
+            "status": self.status,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PendingValidationItem":
+        if not isinstance(data, Mapping):
+            raise ValueError("pending validation item must be an object")
+        return cls(
+            subject_id=str(data.get("subject_id") or ""),
+            layer=str(data.get("layer") or ""),
+            proposal=dict(data.get("proposal") or {}),
+            registry_dependencies=tuple(
+                str(value)
+                for value in (data.get("registry_dependencies") or ())
+            ),
+            source_evidence=dict(data.get("source_evidence") or {}),
+            required_validation=str(data.get("required_validation") or ""),
+            created_sequence=int(data.get("created_sequence") or 0),
+            status=str(data.get("status") or PENDING_STATUS_PENDING),
+        )
+
+
+# ============================================================
 # Genome
 # ============================================================
 
@@ -98,6 +188,11 @@ class PolicyGenome:
     (fitness_status / source_case_id / created_at_generation). Like the L1
     genome it is written AFTER batch commit, so it never participates in
     genome identity.
+
+    ``pending_queue`` carries conditional artifacts awaiting validation.  It
+    is persisted with the genome but, like ``item_meta``, never participates
+    in ``content_hash`` — a pending artifact is not part of the executable
+    policy identity.
     """
     genome_id: str
     items: list[PolicyItem] = field(default_factory=list)
@@ -106,6 +201,7 @@ class PolicyGenome:
     generation: int = 0
     edits_applied: list[PolicyEdit] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    pending_queue: list[PendingValidationItem] = field(default_factory=list)
     # The versioned L2 vocabulary registry this genome's items are evaluated
     # against. The registry is the single authority persisted with the genome
     # (no second copy in experience memory); it participates in content_hash
@@ -159,13 +255,92 @@ class PolicyGenome:
         self.item_meta[index] = normalized
 
     def is_item_protected(self, index: int) -> bool:
-        """Protected if baseline or passed fitness (weak/strong)."""
+        """Protected against modify/remove (P4 protection semantics).
+
+        - ``baseline`` items are always protected;
+        - ``strong`` items are protected by default: they carry measured,
+          independent correctness evidence and a later reflection must not
+          erode a verified win;
+        - ``weak`` items are correctable: they entered the working scope on
+          coverage-only / local-effect evidence and may be modified or
+          removed while they re-earn promotion;
+        - ``conditional`` artifacts are never in ``items`` (they live in the
+          pending queue), so they cannot be addressed here at all.
+        """
         if 0 <= index < len(self.items) and self.items[index].is_baseline:
             return True
         meta = self.get_item_meta(index)
-        return meta.get("fitness_status") in (
-            FITNESS_STATUS_WEAK, FITNESS_STATUS_STRONG
+        return meta.get("fitness_status") == FITNESS_STATUS_STRONG
+
+    def _item_in_scope(self, index: int, scope: str) -> bool:
+        """Scope membership: baseline always active; weak only in the
+        evolution (working) view; strong in both; conditional never."""
+        if not (0 <= index < len(self.items)):
+            return False
+        if self.items[index].is_baseline:
+            return True
+        status = self.get_item_meta(index).get(
+            "fitness_status", FITNESS_STATUS_NONE
         )
+        if status == FITNESS_STATUS_STRONG:
+            return True
+        if status == FITNESS_STATUS_WEAK:
+            return scope == SCOPE_WORKING
+        # none / conditional: not part of any executable scope.
+        return False
+
+    def _dependencies_active(self, index: int) -> bool:
+        """True when every registry dependency of item ``index`` resolves in
+        the genome's registry active view.  An item whose vocabulary entry was
+        retired (disabled) or is still pending is excluded from every scope at
+        projection time instead of failing closed inside the evaluator."""
+        registry = self.registry or L2_REGISTRY
+        item = self.items[index]
+        return (
+            registry.predicate_entry(item.precondition) is not None
+            and item.action in registry.action_names()
+        )
+
+    def items_for_scope(self, scope: str) -> list[PolicyItem]:
+        """Return the deterministic policy items active under ``scope``.
+
+        The projection validates each item's registry dependencies so a
+        vocabulary drift can never smuggle an unexecutable item into the
+        runtime: an item referencing a pending/disabled predicate or action
+        is dropped from the returned view (the genome itself is unchanged).
+        """
+        scope = str(scope or "")
+        if scope not in SCOPES:
+            raise ValueError(f"unknown policy scope: {scope!r}")
+        return [
+            item
+            for index, item in enumerate(self.items)
+            if self._item_in_scope(index, scope)
+            and self._dependencies_active(index)
+        ]
+
+    def pending_items(self) -> list[PendingValidationItem]:
+        """Queue entries still awaiting validation, in created order."""
+        return [
+            entry
+            for entry in sorted(
+                self.pending_queue, key=lambda entry: entry.created_sequence
+            )
+            if entry.status == PENDING_STATUS_PENDING
+        ]
+
+    def enqueue_pending(self, entry: PendingValidationItem) -> None:
+        """Append one conditional artifact idempotently.
+
+        Resume is idempotent: an entry whose ``subject_id`` is already queued
+        is not duplicated, so replaying a checkpoint never double-counts a
+        pending validation."""
+        if any(
+            existing.subject_id == entry.subject_id
+            for existing in self.pending_queue
+        ):
+            return
+        self.pending_queue.append(entry)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -177,6 +352,10 @@ class PolicyGenome:
             "edits_applied": [edit.to_dict() for edit in self.edits_applied],
             "content_hash": self.content_hash,
             "metadata": dict(self.metadata),
+            # The pending queue is persisted with the checkpoint/experience
+            # memory but is not part of the executable identity (see
+            # ``content_hash``); it is the carrier for conditional artifacts.
+            "pending_queue": [entry.to_dict() for entry in self.pending_queue],
             # The registry is the single vocabulary authority persisted with
             # the genome; its audit trail lives inside the registry payload
             # (``registry.audit``), never as a second copy beside it.
@@ -202,6 +381,11 @@ class PolicyGenome:
                 for edit in data.get("edits_applied", [])
             ],
             metadata=dict(data.get("metadata", {})),
+            pending_queue=[
+                PendingValidationItem.from_dict(entry)
+                for entry in data.get("pending_queue", [])
+                if isinstance(entry, Mapping)
+            ],
             registry=registry,
         )
 

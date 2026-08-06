@@ -1674,6 +1674,12 @@ def test_detect_record_forwards_policy_genome(tmp_path: Path, monkeypatch) -> No
         ),
         rationale="r",
     ))
+    # The standalone detector deploys only the deployable scope (baseline +
+    # strong); a freshly accepted item starts ungraded and must be promoted
+    # by measured evidence before it can change a deployed verdict.
+    meta = genome.get_item_meta(0)
+    meta["fitness_status"] = "strong"
+    genome.set_item_meta(0, meta)
 
     result = detect_record(
         record={"history": [{"role": "assistant", "content": "answer"}]},
@@ -1681,7 +1687,7 @@ def test_detect_record_forwards_policy_genome(tmp_path: Path, monkeypatch) -> No
         output_dir=tmp_path,
         policy_genome=genome,
     )
-    assert received["policy_items"] == list(genome.items)
+    assert received["policy_items"] == genome.items_for_scope("deployable")
     assert result["provenance"]["policy_genome_hash"] == genome.content_hash
     assert "genome_hash" not in result["provenance"]
 
