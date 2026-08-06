@@ -1960,7 +1960,10 @@ def _atomic_write_json(path: Path, value: Any) -> None:
 # that interrupted runs can be resumed without re-running already
 # processed cases (and without losing the audit trail).
 
-_CHECKPOINT_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v4"
+_CHECKPOINT_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v5"
+# P6: a v4 checkpoint is loaded by adding the default empty Meta sub-domains
+# and upgrading to the v5 in-memory shape at this single boundary.
+_CHECKPOINT_LEGACY_SCHEMA_VERSION = "agenthallu.bccse_v5_checkpoint.v4"
 _CHECKPOINT_REQUIRED_FILES: tuple[str, ...] = (
     "evolution_checkpoint.json",
     "champion_checkpoint.json",
@@ -1989,7 +1992,13 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
     if not isinstance(checkpoint, dict):
         raise ValueError("evolution_checkpoint.json must contain an object")
     schema = str(checkpoint.get("schema_version") or "")
-    if schema != _CHECKPOINT_SCHEMA_VERSION:
+    if schema == _CHECKPOINT_LEGACY_SCHEMA_VERSION:
+        # v4 -> v5 migration at this single boundary: add the default empty
+        # Meta sub-domains so the in-memory shape is always v5.
+        checkpoint = dict(checkpoint)
+        checkpoint.setdefault("gate_events", [])
+        checkpoint["schema_version"] = _CHECKPOINT_SCHEMA_VERSION
+    elif schema != _CHECKPOINT_SCHEMA_VERSION:
         raise ValueError(
             f"unsupported checkpoint schema_version: {schema!r} "
             f"(expected {_CHECKPOINT_SCHEMA_VERSION!r}); v3 checkpoints "
@@ -3262,7 +3271,7 @@ def run_online_evolution(
         _atomic_write_json(
             output_dir / "evolution_checkpoint.json",
             {
-                "schema_version": "agenthallu.bccse_v5_checkpoint.v4",
+                "schema_version": "agenthallu.bccse_v5_checkpoint.v5",
                 "run_id": run_id,
                 "status": status,
                 "next_case_index": next_case_index,

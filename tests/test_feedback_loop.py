@@ -396,7 +396,7 @@ def test_resume_matches_uninterrupted_run(
             encoding="utf-8"
         )
     )
-    assert resumed_memory["schema_version"] == "sehd.evolution_experience_memory.v1"
+    assert resumed_memory["schema_version"] == "sehd.evolution_experience_memory.v2"
     assert resumed_memory["failure_mechanisms"] == baseline_memory[
         "failure_mechanisms"
     ]

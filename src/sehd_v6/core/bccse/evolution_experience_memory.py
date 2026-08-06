@@ -34,7 +34,26 @@ from .failure_episode import (
 )
 from ..htc_tes.type_aware_fitness import TypeExperienceMemory
 
-SCHEMA_VERSION = "sehd.evolution_experience_memory.v1"
+SCHEMA_VERSION = "sehd.evolution_experience_memory.v2"
+# Legacy schema accepted only at the single ``from_dict`` migration boundary.
+_LEGACY_SCHEMA_VERSION = "sehd.evolution_experience_memory.v1"
+
+# P6 reserved Meta Review sub-domains.  They are initialized empty and do not
+# affect generation or the gate at this stage; P7 fills them.  The closed key
+# set is the single authority for the meta_review payload shape.
+META_REVIEW_KEYS = (
+    "gate_experiences",
+    "outcome_validations",
+    "meta_state",
+    "pending_validation_queue",
+    "efficiency_profile",
+    "drift_snapshots",
+    "dedup_ledgers",
+)
+
+
+def _empty_meta_review() -> dict[str, Any]:
+    return {key: ([] if key != "meta_state" else {}) for key in META_REVIEW_KEYS}
 
 NO_EFFECT_REASONS = frozenset({
     "condition_not_matched",
@@ -224,6 +243,8 @@ class EvolutionExperienceMemory:
         self._type_memory = type_experience_memory or TypeExperienceMemory()
         self._entries: dict[tuple[str, ...], MechanismEntry] = {}
         self._sequence = 0
+        # P6: reserved Meta Review sub-domains (empty; no behavior change).
+        self._meta_review: dict[str, Any] = _empty_meta_review()
 
     @property
     def type_experience_memory(self) -> TypeExperienceMemory:
@@ -436,6 +457,11 @@ class EvolutionExperienceMemory:
     def entries(self) -> Sequence[MechanismEntry]:
         return tuple(self._entries.values())
 
+    @property
+    def meta_review(self) -> dict[str, Any]:
+        """Reserved Meta Review sub-domains (P6: empty; P7 fills them)."""
+        return self._meta_review
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": SCHEMA_VERSION,
@@ -443,12 +469,25 @@ class EvolutionExperienceMemory:
             "failure_mechanisms": [
                 entry.to_dict() for entry in self._entries.values()
             ],
+            "meta_review": {
+                key: (
+                    list(value) if isinstance(value, list) else dict(value)
+                )
+                for key, value in self._meta_review.items()
+            },
         }
 
     def from_dict(self, data: Mapping[str, Any] | None) -> None:
-        """Load the current schema, or migrate a legacy type-only artifact."""
+        """Load the current schema, or migrate a legacy artifact.
+
+        Migration discipline (§12.5): a v1 payload is upgraded to the v2
+        in-memory shape only here, at this single boundary; a legacy
+        type-only artifact takes the explicit supported migration; any
+        unknown schema fails closed with ``ValueError``.
+        """
         data = data or {}
-        if str(data.get("schema_version") or "") == SCHEMA_VERSION:
+        schema = str(data.get("schema_version") or "")
+        if schema == SCHEMA_VERSION:
             if not isinstance(data.get("type_experience_memory"), Mapping):
                 raise ValueError(
                     "current-schema experience memory artifact is missing "
@@ -465,9 +504,52 @@ class EvolutionExperienceMemory:
                 if entry.signature
             }
             self._type_memory.from_dict(dict(data["type_experience_memory"]))
+            self._meta_review = self._migrate_meta_review(
+                data.get("meta_review")
+            )
+        elif schema == _LEGACY_SCHEMA_VERSION:
+            # Explicit supported migration: v1 predates the meta_review
+            # sub-domains, so they initialize empty.
+            if not isinstance(data.get("type_experience_memory"), Mapping):
+                raise ValueError(
+                    "v1 experience memory artifact is missing "
+                    "type_experience_memory"
+                )
+            self._entries = {
+                entry.signature: entry
+                for entry in (
+                    MechanismEntry.from_dict(dict(payload))
+                    for payload in (data.get("failure_mechanisms") or ())
+                    if isinstance(payload, Mapping)
+                )
+                if entry.signature
+            }
+            self._type_memory.from_dict(dict(data["type_experience_memory"]))
+            self._meta_review = _empty_meta_review()
+        elif schema:
+            raise ValueError(
+                f"unknown experience memory schema_version: {schema!r}"
+            )
         else:
+            # Legacy type-only artifact: the explicit supported migration.
             self._entries = {}
             self._type_memory.from_dict(data)
+            self._meta_review = _empty_meta_review()
         self._sequence = max(
             [entry.last_sequence for entry in self._entries.values()] or [0]
         )
+
+    @staticmethod
+    def _migrate_meta_review(value: Any) -> dict[str, Any]:
+        """Normalize the meta_review sub-domains, dropping unknown keys."""
+        migrated = _empty_meta_review()
+        if not isinstance(value, Mapping):
+            return migrated
+        for key in META_REVIEW_KEYS:
+            incoming = value.get(key)
+            if key == "meta_state":
+                if isinstance(incoming, Mapping):
+                    migrated[key] = dict(incoming)
+            elif isinstance(incoming, list):
+                migrated[key] = list(incoming)
+        return migrated

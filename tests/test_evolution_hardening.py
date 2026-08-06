@@ -1421,7 +1421,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
     # Public load API: returns a populated dict with the expected fields.
     checkpoint = runner.load_evolution_checkpoint(first_output)
     assert checkpoint
-    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v4"
+    assert checkpoint["schema_version"] == "agenthallu.bccse_v5_checkpoint.v5"
     assert checkpoint["next_case_index"] == 1
     assert checkpoint["evolution_case_ids"] == ["source"]
     assert checkpoint["champion_genome_payload"]
@@ -2514,7 +2514,7 @@ def test_runtime_invalid_experience_is_recorded_but_not_promotable(
         (tmp_path / "htc_tes_experience_memory.json").read_text(encoding="utf-8")
     )
     type_memory = payload["type_experience_memory"]
-    assert payload["schema_version"] == "sehd.evolution_experience_memory.v1"
+    assert payload["schema_version"] == "sehd.evolution_experience_memory.v2"
     entries = [
         entry
         for rows in type_memory["types"].values()

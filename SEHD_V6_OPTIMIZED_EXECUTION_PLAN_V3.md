@@ -1134,14 +1134,14 @@ tests/test_meta_skill_memory.py
 
 ## 12.6 验收
 
-- [ ] v1→v2 round-trip canonical equality。
-- [ ] checkpoint v4→v5 可加载。
-- [ ] unknown schema 拒绝。
-- [ ] interrupted/uninterrupted memory 规范化一致。
-- [ ] inherit_from 恢复空 Meta 子域。
-- [ ] stable rollback payload 覆盖 Meta 子域。
-- [ ] 不增加模型调用。
-- [ ] production behavior 不变。
+- [x] v1→v2 round-trip canonical equality。
+- [x] checkpoint v4→v5 可加载。
+- [x] unknown schema 拒绝。
+- [x] interrupted/uninterrupted memory 规范化一致。
+- [x] inherit_from 恢复空 Meta 子域。
+- [x] stable rollback payload 覆盖 Meta 子域。
+- [x] 不增加模型调用。
+- [x] production behavior 不变。
 
 ## 12.7 提交
 
