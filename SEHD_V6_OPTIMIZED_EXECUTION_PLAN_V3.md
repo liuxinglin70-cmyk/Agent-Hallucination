@@ -1526,31 +1526,31 @@ fix(meta): repair integrated meta-review findings
 
 不先跑大规模，不比较旧接受率。先证明优化后框架每条关键链路都能走完。
 
-## 14.2 E0：离线契约闭环
+## 14.2 E0：离线契约闭环 ✅ 已完成（tests/test_e2e_optimized_framework.py）
 
-使用 mocked provider 和匿名 fixture。
+使用 mocked provider 和匿名 fixture。E1/E2（真实 provider smoke / 开发批次）按任务调整不执行。
 
 必须覆盖：
 
-- [ ] L1 proposal -> replay -> weak/strong。
-- [ ] L2-post boundary proposal -> replay -> weak。
-- [ ] registry DSL proposal -> pending -> validation。
-- [ ] GateEvent -> feedback -> 下一次 reflection 可见。
-- [ ] Meta Review recommendation。
-- [ ] OutcomeValidation。
-- [ ] profile shadow。
-- [ ] rollback。
-- [ ] checkpoint/resume。
-- [ ] inherit_from。
-- [ ] deployable view 过滤 working/pending。
+- [x] L1 proposal -> replay -> weak/strong。
+- [x] L2-post boundary proposal -> replay -> weak。
+- [x] registry DSL proposal -> pending -> validation。
+- [x] GateEvent -> feedback -> 下一次 reflection 可见。
+- [x] Meta Review recommendation。
+- [x] OutcomeValidation。
+- [x] profile shadow。
+- [x] rollback。
+- [x] checkpoint/resume。
+- [x] inherit_from。
+- [x] deployable view 过滤 working/pending。
 
 通过条件：
 
-- [ ] 所有链路完成，无未捕获异常。
-- [ ] 所有 artifact 可写入、读取、恢复。
-- [ ] gold firewall 通过。
-- [ ] empty policy baseline 不变。
-- [ ] 不调用外部 API。
+- [x] 所有链路完成，无未捕获异常。
+- [x] 所有 artifact 可写入、读取、恢复。
+- [x] gold firewall 通过。
+- [x] empty policy baseline 不变。
+- [x] 不调用外部 API。
 
 ## 14.3 E1：全新少量 provider smoke run
 
