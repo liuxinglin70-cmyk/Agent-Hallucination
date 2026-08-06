@@ -147,7 +147,8 @@ edit 先应用到 candidate/shadow genome，champion 暂时不变。
 signal 决定**是否触发**进化并提供遥测；**失败 owner 由确定性失败分类器
 单独判定**（`failure_classifier.classify_failure()`）。它是检测记录可寻址
 失败形状的纯确定性函数——不调用 LLM、不使用启发式；所有谓词测试都经过
-`v6_contracts.L2_PREDICATES` 注册表，归因词表全局单源。输出为三元组
+版本化 baseline registry（`vocabulary_registry.L2_REGISTRY`，在
+`v6_contracts` 以 `L2_PREDICATES` 视图导出），归因词表全局单源。输出为三元组
 `layer / artifact / reason_code` 加可寻址证据。
 
 分类优先级（先查最上游）：
@@ -311,8 +312,9 @@ runtime observation 包含 `court_balance`（裁决收支表）：幸存/被隔�
 gold 极性/fitness → 接受或回滚。
 
 1. **提案**：一次 `purpose=policy_reflection` 的反思调用。prompt 中的封闭
-   词表（前提谓词、枚举动作、参数词表）在调用时从 `v6_contracts`
-   （`L2_PREDICATES` / `L2_ACTIONS`）动态生成，不是复制的文本；输入还包含
+   词表（前提谓词、枚举动作、参数词表）在调用时从版本化 registry
+   （`vocabulary_registry.L2_REGISTRY`，经 `v6_contracts` 的
+   `L2_PREDICATES` / `L2_ACTIONS` 视图）动态生成，不是复制的文本；输入还包含
    归因三元组、可寻址事实计数、当前策略集（带 `[index]` 编辑寻址）和被拒
    提案历史。模型只提出一条 edit（add_item 新项 / modify_item 按 item_index
    替换 / remove_item 按 item_index 删除），或返回显式 no_proposal；gold 不

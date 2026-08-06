@@ -9,9 +9,11 @@ the v6 direction (HANDOFF_V6_ADJUDICATION_EVOLUTION.md):
   deterministically by the proof court (see ``policy_genome`` /
   ``policy_evaluator``).
 
-Every predicate, action, layer, and artifact token used by the failure
-classifier, the policy genome, and the policy evaluator is defined here so
-the attribution vocabulary cannot drift between modules.
+The L2 precondition predicates, action operators/instances, and parameter
+tables are owned by the versioned baseline registry in
+``vocabulary_registry`` (the single authority for the L2 vocabulary); this
+module re-exports them as derived views and adds the layer/artifact/route
+tokens, so the attribution vocabulary cannot drift between modules.
 """
 
 from __future__ import annotations
@@ -56,38 +58,15 @@ L1_ARTIFACTS = frozenset(MODULE_IDS)
 # the engine-level context (boundary path), so neither the evaluator nor
 # the classifier ever reaches into raw provider payloads.
 
-# Policy execution stages. The current runtime only implements the
-# post-ledger surface (policies act after the occurrence ledger is fixed,
-# on coverage and the terminal edge only); the constant makes the stage
-# explicit on every fact snapshot so a future pre-ledger surface cannot
-# silently share the same execution path.
-POLICY_STAGE_POST_LEDGER = "post_ledger"
-
-@dataclass(frozen=True)
-class AdjudicationFacts:
-    prosecution_coverage: str = ""
-    defense_coverage: str = ""
-    valid_error_certificate_count: int = 0
-    valid_defense_certificate_count: int = 0
-    surviving_error_count: int = 0
-    defeated_error_count: int = 0
-    quarantined_error_count: int = 0
-    quarantined_defense_count: int = 0
-    consensus_gate_applied: bool = False
-    consensus_gate_blocked_count: int = 0
-    required_candidate_count: int = 0
-    fully_quarantined: bool = False
-    boundary_path_state: str = ""
-    boundary_authority_valid: bool = False
-    terminal_state: str = ""
-    policy_stage: str = POLICY_STAGE_POST_LEDGER
-
-    @property
-    def total_certificate_count(self) -> int:
-        return (
-            self.valid_error_certificate_count
-            + self.valid_defense_certificate_count
-        )
+# The fact snapshot type and the policy-stage constant live in the
+# versioned baseline registry (single source of truth for the L2
+# vocabulary); they are re-exported here so the shared contracts keep one
+# import surface. ``build_adjudication_facts`` below derives the snapshot
+# from one proof-court result.
+from .vocabulary_registry import (  # noqa: E402
+    POLICY_STAGE_POST_LEDGER,
+    AdjudicationFacts,
+)
 
 
 def build_adjudication_facts(
@@ -144,62 +123,16 @@ def build_adjudication_facts(
 # L2 precondition predicates (closed vocabulary)
 # ============================================================
 # Each predicate is a pure function of AdjudicationFacts. Policy items may
-# reference ONLY these names; the evaluator resolves them mechanically.
+# reference ONLY these names; the evaluator resolves them mechanically. The
+# names and their semantics are owned by the versioned baseline registry in
+# ``vocabulary_registry`` (single source of truth); the dict below is a
+# derived read-only view kept for callers that resolve predicates by name.
 
-def _pred_consensus_gate_blocked_nonempty(facts: AdjudicationFacts) -> bool:
-    return facts.consensus_gate_applied and facts.consensus_gate_blocked_count > 0
-
-
-def _hollow_coverage(facts: AdjudicationFacts, coverage: str, count: int) -> bool:
-    return coverage == "complete" and count == 0
-
-
-def _pred_defense_coverage_complete_and_zero_certificates(
-    facts: AdjudicationFacts,
-) -> bool:
-    return _hollow_coverage(
-        facts, facts.defense_coverage, facts.valid_defense_certificate_count
-    )
-
-
-def _pred_prosecution_coverage_complete_and_zero_certificates(
-    facts: AdjudicationFacts,
-) -> bool:
-    return _hollow_coverage(
-        facts, facts.prosecution_coverage, facts.valid_error_certificate_count
-    )
-
-
-def _pred_boundary_state_conflicts_with_terminal(facts: AdjudicationFacts) -> bool:
-    return (
-        facts.boundary_path_state == "verified_clean"
-        and facts.terminal_state == "unresolved"
-    )
-
-
-def _pred_surviving_errors_nonempty_and_verdict_clean(
-    facts: AdjudicationFacts,
-) -> bool:
-    return facts.surviving_error_count > 0 and facts.terminal_state == "verified_clean"
-
-
-def _pred_all_candidates_quarantined(facts: AdjudicationFacts) -> bool:
-    return facts.fully_quarantined
-
+from .vocabulary_registry import L2_REGISTRY  # noqa: E402
 
 L2_PREDICATES: dict[str, Any] = {
-    "consensus_gate_blocked_nonempty": _pred_consensus_gate_blocked_nonempty,
-    "defense_coverage_complete_and_zero_certificates": (
-        _pred_defense_coverage_complete_and_zero_certificates
-    ),
-    "prosecution_coverage_complete_and_zero_certificates": (
-        _pred_prosecution_coverage_complete_and_zero_certificates
-    ),
-    "boundary_state_conflicts_with_terminal": _pred_boundary_state_conflicts_with_terminal,
-    "surviving_errors_nonempty_and_verdict_clean": (
-        _pred_surviving_errors_nonempty_and_verdict_clean
-    ),
-    "all_candidates_quarantined": _pred_all_candidates_quarantined,
+    name: L2_REGISTRY.predicate_fn(name)
+    for name in L2_REGISTRY.predicate_names()
 }
 L2_PREDICATE_NAMES = tuple(L2_PREDICATES)
 
@@ -207,14 +140,15 @@ L2_PREDICATE_NAMES = tuple(L2_PREDICATES)
 # ============================================================
 # L2 actions (closed vocabulary)
 # ============================================================
-# ``L2_ACTIONS`` is the single source of truth for what the reflection
-# prompt may propose AND what the runtime can execute: every listed action
-# is applied deterministically by the policy evaluator inside the proof
-# court. Actions that would require provider re-execution
-# (``reclassify_candidate_state``, ``require_route_replay``) are reserved in
-# ``ENGINE_LEVEL_ACTIONS`` but excluded from ``L2_ACTIONS`` until the
-# runtime engine implements them, so a proposal for one fails at parse time
-# as ``unknown_action`` instead of reaching a runtime rejection.
+# The versioned baseline registry (``vocabulary_registry.L2_REGISTRY``) is
+# the single source of truth for what the reflection prompt may propose AND
+# what the runtime can execute; the constants below are registry-derived
+# views. Every listed action is applied deterministically by the policy
+# evaluator inside the proof court. Actions that would require provider
+# re-execution (``reclassify_candidate_state``, ``require_route_replay``)
+# are reserved in ``ENGINE_LEVEL_ACTIONS`` but excluded from ``L2_ACTIONS``
+# until the runtime engine implements them, so a proposal for one fails at
+# parse time as ``unknown_action`` instead of reaching a runtime rejection.
 
 POLICY_SIDES = frozenset({"prosecution", "defense"})
 COVERAGE_DOWNGRADE_STATES = frozenset({"incomplete", "unresolved"})
@@ -226,28 +160,15 @@ ACTION_REQUIRE_ROUTE_REPLAY = "require_route_replay"
 ACTION_EMIT_TELEMETRY_ONLY = "emit_telemetry_only"
 ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY = "consume_verified_clean_boundary"
 
-COURT_LOCAL_ACTIONS = frozenset({
-    ACTION_DOWNGRADE_COVERAGE,
-    ACTION_INVALIDATE_COVERAGE_CLAIM,
-    ACTION_EMIT_TELEMETRY_ONLY,
-    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
-})
+COURT_LOCAL_ACTIONS = L2_REGISTRY.action_names()
 # Reserved for a future engine that can re-execute providers; not part of
 # the proposable/executable vocabulary until implemented.
-ENGINE_LEVEL_ACTIONS = frozenset({
-    ACTION_RECLASSIFY_CANDIDATE_STATE,
-    ACTION_REQUIRE_ROUTE_REPLAY,
-})
+ENGINE_LEVEL_ACTIONS = L2_REGISTRY.engine_level_action_names()
 L2_ACTIONS = COURT_LOCAL_ACTIONS
 
-# Required parameter keys per action; values are validated against the
-# vocabularies below the table.
-ACTION_PARAMS: dict[str, tuple[str, ...]] = {
-    ACTION_DOWNGRADE_COVERAGE: ("side", "to_state"),
-    ACTION_INVALIDATE_COVERAGE_CLAIM: ("side",),
-    ACTION_EMIT_TELEMETRY_ONLY: (),
-    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY: (),
-}
+# Required parameter keys per action, owned by the registry; values are
+# validated against the vocabularies below the table.
+ACTION_PARAMS: dict[str, tuple[str, ...]] = dict(L2_REGISTRY.action_params())
 
 
 def validate_policy_params(action: str, params: dict[str, Any]) -> tuple[bool, str]:

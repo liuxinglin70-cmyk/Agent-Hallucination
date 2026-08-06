@@ -369,7 +369,8 @@ did the failure happen? Routing an unownable failure to some module anyway
 ends in no-edit steps or no-effect replays, so the failure classifier is a
 pure deterministic function of the addressable failure shape of one detection
 record — no LLM, no heuristics. Every predicate test goes through the
-`L2_PREDICATES` registry in `v6_contracts`, so the attribution vocabulary has
+versioned baseline registry (`vocabulary_registry.L2_REGISTRY`, re-exported as
+`L2_PREDICATES` in `v6_contracts`), so the attribution vocabulary has
 a single source of truth.
 
 The classification rules run in priority order:
@@ -426,10 +427,11 @@ free-text path serves only `remove_rule` and historical checkpoint replay.
 **L2 — adjudication-policy genome.** Closed-vocabulary policy items of the
 form (precondition predicate, enumerated action with closed-vocabulary
 parameters) over the adjudication facts of one detection. Every predicate and
-action name is defined once in `v6_contracts` (`L2_PREDICATES` /
-`L2_ACTIONS`); the reflection prompt's vocabulary table is generated from that
-registry at call time, and every parsed proposal is re-validated against the
-same closed sets. `validate_policy_edit` enforces vocabulary membership,
+action name is defined once in the versioned baseline registry
+(`vocabulary_registry.L2_REGISTRY`), re-exported as `L2_PREDICATES` /
+`L2_ACTIONS` in `v6_contracts`; the reflection prompt's vocabulary table is
+generated from that registry at call time, and every parsed proposal is
+re-validated against the same closed sets. `validate_policy_edit` enforces vocabulary membership,
 genome capacity (12 items), semantic deduplication, immutable baseline items
 and weak/strong fitness protection; `apply_policy_edit` returns a new genome
 with parent-hash lineage. The baseline is the empty policy set, so evolved

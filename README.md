@@ -244,7 +244,9 @@ one precondition predicate (a pure function over the frozen
 `AdjudicationFacts` snapshot) paired with one enumerated action —
 `downgrade_coverage`, `invalidate_coverage_claim`, `emit_telemetry_only` —
 whose parameters draw from closed vocabularies. The single source of truth
-for every predicate, action and parameter token is `v6_contracts.py`, and
+for every predicate, action and parameter token is the versioned baseline
+registry `vocabulary_registry.L2_REGISTRY` (re-exported through
+`v6_contracts.py`), and
 `L2_ACTIONS` contains exactly the actions the runtime can execute: the
 engine-level actions (`reclassify_candidate_state`, `require_route_replay`)
 are reserved in `ENGINE_LEVEL_ACTIONS` but excluded until a provider
