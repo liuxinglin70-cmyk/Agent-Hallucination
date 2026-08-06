@@ -94,9 +94,13 @@ from .signal_adapter import (
     resolve_evolution_state,
 )
 from .v6_contracts import (
+    FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
     LAYER_DETECTOR,
     LAYER_L1,
     LAYER_L2,
+    ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION,
+    ROUTE_EXECUTED,
+    ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
     FailureAttribution,
     build_adjudication_facts,
 )
@@ -3399,24 +3403,39 @@ def run_online_evolution(
         if not isinstance(adjudication, Mapping):
             adjudication = {}
         boundary_path = detection_result.get("boundary_path")
-        boundary_path_state = (
-            str(boundary_path.get("state") or "")
-            if isinstance(boundary_path, Mapping) else ""
+        if not isinstance(boundary_path, Mapping):
+            boundary_path = {}
+        boundary_path_state = str(boundary_path.get("state") or "")
+        boundary_validation = boundary_path.get("contract_validation")
+        boundary_authority_valid = (
+            isinstance(boundary_validation, Mapping)
+            and boundary_validation.get("decision") == "pass"
         )
         facts = build_adjudication_facts(
-            dict(adjudication), boundary_path_state=boundary_path_state,
+            dict(adjudication),
+            boundary_path_state=boundary_path_state,
+            boundary_authority_valid=boundary_authority_valid,
         )
         facts_summary = asdict(facts)
         proposal_edit: PolicyEdit | None = None
+        route_result = ""
+        feedback_code = ""
 
         def finish(
             decision: str,
             *,
             reason: str = "",
             replay: Mapping[str, Any] | None = None,
+            route: str = "",
+            feedback: str = "",
         ) -> None:
             nonlocal policy_genome, l2_policy_accepts, accepted_outcome
+            nonlocal route_result, feedback_code
             accepted = decision == "accept_policy"
+            route_result = route or (
+                ROUTE_EXECUTED if proposal_edit is not None else route_result
+            )
+            feedback_code = feedback or feedback_code
             accepted_outcome = accepted
             if accepted:
                 l2_policy_accepts += 1
@@ -3443,6 +3462,8 @@ def run_online_evolution(
                 "case_id": case_id,
                 "decision": decision,
                 "reason": reason,
+                "route_result": route_result,
+                "feedback_code": feedback_code,
                 "attribution": attribution.to_dict(),
                 "facts": facts_summary,
                 "proposal": proposal_edit.to_dict() if proposal_edit else None,
@@ -3580,14 +3601,17 @@ def run_online_evolution(
             finish("skip_no_policy", reason="no_mutation_route")
             return
 
-        planned_candidates = plan_policy_candidates(
+        plan = plan_policy_candidates(
             attribution=attribution,
             genome=policy_genome,
         )
+        planned_candidates = plan.candidates
         if not planned_candidates:
             finish(
                 "skip_no_policy",
-                reason="no_executable_policy_for_attribution",
+                reason=plan.route_result,
+                route=plan.route_result,
+                feedback=plan.feedback_code,
             )
             return accepted_outcome
         system_prompt, user_prompt = build_policy_selection_prompt(
@@ -3628,9 +3652,20 @@ def run_online_evolution(
             proposal_edit, policy_genome,
         )
         if not valid:
+            blocked_by_protection = validate_reason.startswith(
+                ("protected_item", "immutable_baseline_item")
+            )
             finish(
                 "skip_no_policy",
                 reason=f"invalid_policy_edit:{validate_reason}",
+                route=(
+                    ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION
+                    if blocked_by_protection else ""
+                ),
+                feedback=(
+                    FEEDBACK_POLICY_ROUTE_UNAVAILABLE
+                    if blocked_by_protection else ""
+                ),
             )
             return
         candidate_genome = apply_policy_edit(policy_genome, proposal_edit)
@@ -3659,6 +3694,36 @@ def run_online_evolution(
         if not isinstance(evaluation, Mapping):
             evaluation = {}
         fired = evaluation.get("fired") or []
+        skipped_rows = evaluation.get("skipped") or []
+        proposal_item_id = (
+            str(proposal_edit.new_item.item_id)
+            if proposal_edit.new_item is not None else ""
+        )
+        proposal_skip_reason = next(
+            (
+                str(row.get("reason") or "")
+                for row in skipped_rows
+                if isinstance(row, Mapping)
+                and str(row.get("item_id") or "") == proposal_item_id
+            ),
+            "",
+        )
+        if (
+            not fired
+            and proposal_skip_reason == ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED
+        ):
+            # The proposed action compiled and replayed, but its runtime
+            # guards failed closed on the replayed evidence (e.g. a boundary
+            # that was not authoritative): the candidate was executable in
+            # principle, unsatisfied in fact.
+            finish(
+                "reject_policy_no_effect",
+                reason=f"policy_skipped:{proposal_skip_reason}",
+                replay=replay_result,
+                route=ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
+                feedback=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
+            )
+            return
         state_changed = replay_state != detection_state
         coverage_changed = (
             evaluation.get("effective_prosecution_coverage")

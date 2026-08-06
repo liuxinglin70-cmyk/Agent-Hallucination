@@ -213,6 +213,143 @@ def test_boundary_path_state_enables_conflict_predicate_telemetry() -> None:
     assert without_boundary["policy_evaluation"]["fired"] == []
 
 
+def _unresolved_boundary_conflict_inputs() -> dict:
+    # Incomplete defense coverage keeps the court unresolved with zero
+    # surviving errors while the engine-level boundary path verified clean.
+    return {
+        "required_candidates": [],
+        "prosecution": {"coverage_state": "complete", "candidates": []},
+        "defense": {"coverage_state": "incomplete", "candidates": []},
+        "packet": _packet(),
+    }
+
+
+def _consume_boundary_policy() -> PolicyItem:
+    return PolicyItem(
+        item_id="policy_consume_boundary",
+        precondition="boundary_state_conflicts_with_terminal",
+        action="consume_verified_clean_boundary",
+        params={},
+    )
+
+
+def test_consume_boundary_moves_unresolved_to_verified_clean() -> None:
+    inputs = _unresolved_boundary_conflict_inputs()
+    baseline = proof_contract.adjudicate_proof_court(**inputs)
+    assert baseline["state"] == "unresolved"
+
+    result = proof_contract.adjudicate_proof_court(
+        **inputs,
+        policy_items=[_consume_boundary_policy()],
+        boundary_path_state="verified_clean",
+        boundary_authority_valid=True,
+    )
+
+    assert result["state"] == "verified_clean"
+    assert result["pre_policy_state"] == "unresolved"
+    evaluation = result["policy_evaluation"]
+    assert evaluation["fired"][0]["item_id"] == "policy_consume_boundary"
+    assert evaluation["terminal_override"] == "verified_clean"
+    consume_telemetry = [
+        row for row in evaluation["telemetry"]
+        if row["kind"] == "consume_verified_clean_boundary"
+    ]
+    assert len(consume_telemetry) == 1
+    assert consume_telemetry[0]["terminal_before"] == "unresolved"
+    assert consume_telemetry[0]["terminal_after"] == "verified_clean"
+    # The occurrence ledger records pre-policy evidence and must not move.
+    assert result["occurrence_ledger"] == baseline["occurrence_ledger"]
+    assert result["occurrence_state"] == baseline["occurrence_state"]
+    assert result["occurrence_ledger"]["state"] == "unresolved"
+
+
+def test_consume_boundary_fail_closed_without_authority() -> None:
+    inputs = _unresolved_boundary_conflict_inputs()
+    for authority in (False,):
+        result = proof_contract.adjudicate_proof_court(
+            **inputs,
+            policy_items=[_consume_boundary_policy()],
+            boundary_path_state="verified_clean",
+            boundary_authority_valid=authority,
+        )
+        assert result["state"] == "unresolved"
+        assert "pre_policy_state" not in result
+        evaluation = result["policy_evaluation"]
+        assert evaluation["fired"] == []
+        assert evaluation["skipped"][0]["reason"] == (
+            "runtime_precondition_not_satisfied"
+        )
+
+
+def test_consume_boundary_default_authority_is_fail_closed() -> None:
+    # Callers that predate the authority channel keep the terminal edge
+    # untouched: the parameter defaults to False.
+    inputs = _unresolved_boundary_conflict_inputs()
+    result = proof_contract.adjudicate_proof_court(
+        **inputs,
+        policy_items=[_consume_boundary_policy()],
+        boundary_path_state="verified_clean",
+    )
+    assert result["state"] == "unresolved"
+    assert "pre_policy_state" not in result
+
+
+def test_consume_boundary_fail_closed_with_surviving_errors() -> None:
+    surviving_certificate = _process_only_error_certificate()
+    surviving_certificate.update({
+        "impact_kind": "final_answer",
+        "benchmark_causal_status": "causes_incorrect_result",
+        "benchmark_causal_evidence_refs": ["event_002"],
+    })
+    inputs = {
+        "required_candidates": [_candidate()],
+        "prosecution": {
+            "coverage_state": "complete",
+            "candidates": [surviving_certificate],
+        },
+        "defense": {"coverage_state": "incomplete", "candidates": []},
+        "packet": _packet(),
+    }
+    baseline = proof_contract.adjudicate_proof_court(**inputs)
+    assert baseline["state"] == "verified_error"
+
+    result = proof_contract.adjudicate_proof_court(
+        **inputs,
+        policy_items=[_consume_boundary_policy()],
+        boundary_path_state="verified_clean",
+        boundary_authority_valid=True,
+    )
+    # Surviving errors dominate: the conflict precondition never fires, the
+    # terminal stays at the evidence verdict, nothing is overridden.
+    assert result["state"] == "verified_error"
+    assert "pre_policy_state" not in result
+    evaluation = result["policy_evaluation"]
+    assert evaluation["fired"] == []
+    assert evaluation["terminal_override"] == ""
+
+
+def test_consume_boundary_does_not_restore_consensus_blocked() -> None:
+    # A consensus-blocked unresolved case has no verified-clean boundary
+    # behind it in this fixture, so the consume item must stay inert: the
+    # post-ledger hook never resurrects gate-blocked certificates.
+    inputs = _unresolved_boundary_conflict_inputs()
+    policy = PolicyItem(
+        item_id="policy_consume_boundary",
+        precondition="boundary_state_conflicts_with_terminal",
+        action="consume_verified_clean_boundary",
+        params={},
+    )
+    result = proof_contract.adjudicate_proof_court(
+        **inputs,
+        policy_items=[policy],
+        boundary_path_state="unresolved",
+        boundary_authority_valid=True,
+    )
+    assert result["state"] == "unresolved"
+    assert "pre_policy_state" not in result
+    assert result["policy_evaluation"]["fired"] == []
+
+
 def _surviving_error_certificate() -> dict:
     cert = _process_only_error_certificate()
     cert.update({

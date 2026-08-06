@@ -1,6 +1,7 @@
 """Tests for the deterministic L2 policy evaluator."""
 
 from src.sehd_v6.core.bccse.v6_contracts import (
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_EMIT_TELEMETRY_ONLY,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
@@ -30,7 +31,9 @@ def _facts(**overrides) -> AdjudicationFacts:
         required_candidate_count=1,
         fully_quarantined=False,
         boundary_path_state="",
+        boundary_authority_valid=False,
         terminal_state="verified_clean",
+        policy_stage="post_ledger",
     )
     base.update(overrides)
     return AdjudicationFacts(**base)
@@ -231,6 +234,96 @@ def test_evaluation_is_deterministic():
     assert first.to_dict() == second.to_dict()
 
 
+def _boundary_conflict_facts(**overrides):
+    base = dict(
+        boundary_path_state="verified_clean",
+        boundary_authority_valid=True,
+        terminal_state="unresolved",
+        surviving_error_count=0,
+        defense_coverage="incomplete",
+        valid_defense_certificate_count=0,
+    )
+    base.update(overrides)
+    return _facts(**base)
+
+
+def _consume_item(item_id="p_consume"):
+    return PolicyItem(
+        item_id=item_id,
+        precondition="boundary_state_conflicts_with_terminal",
+        action=ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+        params={},
+        rationale="consume the verified-clean boundary verdict",
+    )
+
+
+def test_consume_boundary_fires_and_requests_terminal_override():
+    result = evaluate_policies(_boundary_conflict_facts(), [_consume_item()])
+    assert result.applied_item_ids == ("p_consume",)
+    assert result.fired[0]["action"] == ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY
+    assert result.fired[0]["params"] == {}
+    assert result.skipped == ()
+    assert result.terminal_override == "verified_clean"
+    # The evaluator never touches coverage; the court hook owns the actual
+    # terminal transition.
+    assert result.effective_prosecution_coverage == "complete"
+    assert result.effective_defense_coverage == "incomplete"
+    row = result.telemetry[0]
+    assert row["kind"] == "consume_verified_clean_boundary"
+    assert row["item_id"] == "p_consume"
+    assert row["terminal_before"] == "unresolved"
+    assert row["terminal_after"] == "verified_clean"
+    assert row["boundary_path_state"] == "verified_clean"
+    assert row["boundary_authority_valid"] is True
+    assert row["policy_stage"] == "post_ledger"
+
+
+def test_consume_boundary_fails_closed_without_authority():
+    result = evaluate_policies(
+        _boundary_conflict_facts(boundary_authority_valid=False),
+        [_consume_item()],
+    )
+    assert result.applied_item_ids == ()
+    assert result.fired == ()
+    assert result.terminal_override == ""
+    assert result.telemetry == ()
+    assert result.skipped == ({
+        "item_id": "p_consume",
+        "precondition": "boundary_state_conflicts_with_terminal",
+        "action": ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+        "reason": "runtime_precondition_not_satisfied",
+    },)
+
+
+def test_consume_boundary_fails_closed_with_surviving_errors():
+    result = evaluate_policies(
+        _boundary_conflict_facts(
+            surviving_error_count=1, terminal_state="verified_error",
+        ),
+        [_consume_item()],
+    )
+    # The conflict precondition itself is false on a verified_error
+    # terminal, so the item must not even fire.
+    assert result.fired == ()
+    assert result.skipped == ()
+    assert result.terminal_override == ""
+
+
+def test_consume_boundary_fails_closed_when_terminal_not_unresolved():
+    facts = _boundary_conflict_facts(terminal_state="verified_clean")
+    # boundary_state_conflicts_with_terminal is false, nothing happens.
+    result = evaluate_policies(facts, [_consume_item()])
+    assert result.fired == ()
+    assert result.terminal_override == ""
+
+
+def test_consume_boundary_is_deterministic():
+    facts = _boundary_conflict_facts()
+    first = evaluate_policies(facts, [_consume_item()])
+    second = evaluate_policies(facts, [_consume_item()])
+    assert first.to_dict() == second.to_dict()
+
+
 def test_terminal_recompute_verified_error_branch():
     facts = _facts(surviving_error_count=2)
     result = evaluate_policies(facts, [])
@@ -263,6 +356,7 @@ def test_to_dict_roundtrip_shape():
     assert set(payload) == {
         "applied_item_ids", "fired", "skipped",
         "effective_prosecution_coverage", "effective_defense_coverage",
-        "telemetry", "terminal_state",
+        "telemetry", "terminal_state", "terminal_override",
     }
     assert payload["applied_item_ids"] == ["p1"]
+    assert payload["terminal_override"] == ""

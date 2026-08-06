@@ -5312,7 +5312,13 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
         "skip_no_policy",
     ]
     assert audit["l2_policy_audit"][0]["reason"] == (
-        "no_executable_policy_for_attribution"
+        "engine_level_intervention_required"
+    )
+    assert audit["l2_policy_audit"][0]["route_result"] == (
+        "engine_level_intervention_required"
+    )
+    assert audit["l2_policy_audit"][0]["feedback_code"] == (
+        "policy_route_unavailable"
     )
     # The deterministic non-L1 attribution telemetry is preserved.
     assert [entry["layer"] for entry in audit["non_l1_failure_attributions"]] == [
@@ -5371,7 +5377,111 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
     assert [step.gate_decision for step in result.steps] == ["skip_no_policy"]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "skip_no_policy"
-    assert entry["reason"] == "no_executable_policy_for_attribution"
+    assert entry["reason"] == "engine_level_intervention_required"
+    assert entry["route_result"] == "engine_level_intervention_required"
+
+
+def test_l2_boundary_consume_repair_is_proposed_and_accepted(
+    tmp_path, monkeypatch,
+) -> None:
+    """A boundary_terminal_conflict attribution plans a real
+    consume_verified_clean_boundary candidate; the replayed terminal move
+    unresolved -> verified_clean is recorded with route_result=executed."""
+    policy_replays: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "unresolved",
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "incomplete",
+            "valid_error_certificate_count": 1,
+            "required_candidate_count": 1,
+        }
+        boundary_path = {
+            "state": "verified_clean",
+            "contract_validation": {"decision": "pass", "failed_checks": []},
+        }
+        if policy_genome is not None:
+            policy_replays.append(case_id)
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "pre_policy_state": "unresolved",
+                "state": "verified_clean",
+                "policy_evaluation": {
+                    "fired": [{"item_id": item.item_id, "action": item.action}],
+                    "skipped": [],
+                    "effective_prosecution_coverage": "incomplete",
+                    "effective_defense_coverage": "incomplete",
+                    "terminal_override": "verified_clean",
+                    "telemetry": [{
+                        "kind": "consume_verified_clean_boundary",
+                        "item_id": item.item_id,
+                        "terminal_before": "unresolved",
+                        "terminal_after": "verified_clean",
+                    }],
+                },
+            }
+            return {
+                "state": "verified_clean",
+                "occurrence_state": "unresolved",
+                "runtime_valid": True,
+                "census": [],
+                "proof_adjudication": adjudication,
+                "boundary_path": boundary_path,
+            }
+        return {
+            "state": "unresolved",
+            "occurrence_state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+            "boundary_path": boundary_path,
+        }
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {"candidate_index": 0, "reason": "consume the clean boundary"}, {}
+
+    def signal_for(result, use_gold=False, gold_reflection=False):
+        # Gold-clean trajectory: the unresolved -> verified_clean terminal
+        # move is aligned with the gold polarity (score 1 -> 2).
+        return replace(
+            _signal(str(result["state"])), gold_label=False, has_gold=True,
+        )
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records={"source": {"gold_label": False}, "anchor": {}},
+        run_id="l2_boundary_consume",
+        fitness_use_gold=True,
+    )
+
+    assert len(mutation_calls) == 1
+    assert policy_replays == ["source"]
+    assert [step.gate_decision for step in result.steps] == ["accept_policy"]
+    audit = result.evolution_audit
+    assert audit["l2_policy_accepts"] == 1
+    entry = audit["l2_policy_audit"][0]
+    assert entry["decision"] == "accept_policy"
+    assert entry["route_result"] == "executed"
+    assert entry["feedback_code"] == ""
+    proposal_item = entry["proposal"]["new_item"]
+    assert proposal_item["action"] == "consume_verified_clean_boundary"
+    assert proposal_item["precondition"] == (
+        "boundary_state_conflicts_with_terminal"
+    )
+    assert audit["policy_genome"]["items"][0]["action"] == (
+        "consume_verified_clean_boundary"
+    )
 
 
 def _hollow_defense_fixture():
@@ -6130,6 +6240,8 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
     assert reject_entry["reason"].startswith(
         "invalid_policy_edit:protected_item"
     )
+    assert reject_entry["route_result"] == "candidate_blocked_by_protection"
+    assert reject_entry["feedback_code"] == "policy_route_unavailable"
 
 
 

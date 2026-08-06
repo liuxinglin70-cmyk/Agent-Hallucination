@@ -332,6 +332,10 @@ def adjudicate_proof_court(
     # breaking the stable-detector package isolation contract.
     policy_items: Sequence["PolicyItem"] | None = None,
     boundary_path_state: str = "",
+    # Fail-closed default: a caller that does not prove boundary authority
+    # (the deterministic boundary path passed its contract validation) can
+    # never trigger a boundary-consuming terminal move.
+    boundary_authority_valid: bool = False,
 ) -> dict[str, Any]:
     """v3.5 proof court adjudication with consensus gate and counterfactual localization.
 
@@ -344,6 +348,10 @@ def adjudicate_proof_court(
     policy_items optionally applies deterministic L2 coverage-validity
     policies after adjudication; boundary_path_state supplies the engine-level
     boundary fact that the court itself cannot address. Both default to inert.
+    ``boundary_authority_valid`` certifies that the boundary path came from
+    the deterministic engine path with a passing contract validation; it
+    defaults to False so boundary consumption stays fail-closed for any
+    caller that cannot establish it.
     """
 
     event_order, _ = _address_space(packet)
@@ -662,7 +670,11 @@ def adjudicate_proof_court(
         from ..bccse.v6_contracts import build_adjudication_facts
         from .policy_evaluator import evaluate_policies
 
-        facts = build_adjudication_facts(result, boundary_path_state=boundary_path_state)
+        facts = build_adjudication_facts(
+            result,
+            boundary_path_state=boundary_path_state,
+            boundary_authority_valid=boundary_authority_valid,
+        )
         evaluation = evaluate_policies(facts, policy_items)
         eff_prosecution = evaluation.effective_prosecution_coverage
         eff_defense = evaluation.effective_defense_coverage
@@ -684,6 +696,17 @@ def adjudicate_proof_court(
         if coverage_shifted or recomputed_state != state:
             result["pre_policy_state"] = state
             result["state"] = recomputed_state
+        if (
+            evaluation.terminal_override == "verified_clean"
+            and result["state"] == "unresolved"
+        ):
+            # Boundary consumption acts on the terminal edge only. The
+            # evaluator already enforced every precondition (verified-clean
+            # boundary, valid authority, unresolved terminal, zero surviving
+            # errors), so this transition cannot cross a verified_error and
+            # the occurrence ledger is intentionally not recomputed.
+            result.setdefault("pre_policy_state", state)
+            result["state"] = "verified_clean"
         result["policy_evaluation"] = evaluation.to_dict()
 
     return result

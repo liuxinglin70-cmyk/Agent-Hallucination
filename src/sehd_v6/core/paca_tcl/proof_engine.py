@@ -1648,11 +1648,18 @@ def adjudicate_case(
                 else _PolicyItem.from_dict(dict(item))
                 for item in policy_items
             ]
+            boundary_path = base.get("boundary_path") or {}
+            boundary_validation = boundary_path.get("contract_validation") or {}
             proof = contract.adjudicate_proof_court(
                 **final_court_kwargs,
                 policy_items=normalized_policy_items,
-                boundary_path_state=str(
-                    (base.get("boundary_path") or {}).get("state") or ""
+                boundary_path_state=str(boundary_path.get("state") or ""),
+                # Authority is valid only when the deterministic boundary
+                # path passed its own contract validation (decision=pass);
+                # a quarantined or exception-fallback boundary stays
+                # non-authoritative, so consumption fails closed.
+                boundary_authority_valid=(
+                    boundary_validation.get("decision") == "pass"
                 ),
             )
 

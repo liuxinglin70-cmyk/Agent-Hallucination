@@ -16,19 +16,52 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from .v6_contracts import (
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
     ACTION_PARAMS,
     COVERAGE_DOWNGRADE_STATES,
+    FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
     L2_ACTIONS,
     L2_PREDICATE_NAMES,
+    POLICY_ROUTES,
     POLICY_SIDES,
+    ROUTE_CANDIDATE_ALREADY_PRESENT,
+    ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED,
+    ROUTE_EXECUTED,
+    ROUTE_NO_REGISTERED_RUNTIME_ACTION,
     FailureAttribution,
     PolicyItem,
     validate_policy_params,
 )
 from .policy_genome import PolicyEdit, PolicyGenome, PolicyOp
+
+
+@dataclass(frozen=True)
+class PolicyPlan:
+    """Outcome of the deterministic L2 planner for one attribution.
+
+    ``candidates`` are the executable edits the model may select from;
+    ``route_result`` is the closed-vocabulary explanation of the planning
+    outcome (ROUTE_EXECUTED means at least one candidate exists) and
+    ``feedback_code`` is the prompt-safe categorical companion.
+    """
+    candidates: tuple[PolicyEdit, ...] = ()
+    route_result: str = ROUTE_EXECUTED
+    feedback_code: str = ""
+
+    def __post_init__(self) -> None:
+        if self.route_result not in POLICY_ROUTES:
+            raise ValueError(f"unknown route_result: {self.route_result}")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "candidates": [candidate.to_dict() for candidate in self.candidates],
+            "route_result": self.route_result,
+            "feedback_code": self.feedback_code,
+        }
 
 
 def _planned_edit_id(
@@ -54,15 +87,25 @@ def plan_policy_candidates(
     *,
     attribution: FailureAttribution,
     genome: PolicyGenome,
-) -> tuple[PolicyEdit, ...]:
+) -> PolicyPlan:
     """Enumerate executable policy repairs owned by one attribution.
 
     The model may rank these candidates but cannot compose predicate/action
-    pairs. An empty result means the current L2 runtime has no action capable
-    of repairing the attributed artifact; the outcome remains an auditable,
-    non-executable L2 diagnosis.
+    pairs. When no candidate exists the plan still carries a structured
+    route result so the audit trail explains, in closed vocabulary, why the
+    attribution could not be executed.
     """
     reason = attribution.reason_code
+    if reason == "consensus_gate_blocked":
+        # The consensus gate sits before the occurrence ledger, so a blocked
+        # certificate cannot be repaired by any post-ledger action: the
+        # restore route requires a pre-ledger engine intervention that the
+        # current runtime does not implement.
+        return PolicyPlan(
+            candidates=(),
+            route_result=ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED,
+            feedback_code=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
+        )
     templates: list[tuple[str, str, dict[str, Any], str]] = []
     if reason == "hollow_complete_prosecution":
         templates.append((
@@ -85,15 +128,30 @@ def plan_policy_candidates(
             {"side": "prosecution", "to_state": "unresolved"},
             "Keep prosecution coverage unresolved when all candidates are quarantined.",
         ))
+    elif reason == "boundary_terminal_conflict":
+        templates.append((
+            "boundary_state_conflicts_with_terminal",
+            ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+            {},
+            "Consume the verified-clean boundary path as the terminal verdict.",
+        ))
+    if not templates:
+        return PolicyPlan(
+            candidates=(),
+            route_result=ROUTE_NO_REGISTERED_RUNTIME_ACTION,
+            feedback_code=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
+        )
 
     existing = {
         (item.precondition, item.action, tuple(sorted(item.params.items())))
         for item in genome.items
     }
+    templates_blocked_by_dedup = 0
     candidates: list[PolicyEdit] = []
     for precondition, action, params, rationale in templates:
         identity = (precondition, action, tuple(sorted(params.items())))
         if identity in existing:
+            templates_blocked_by_dedup += 1
             continue
         candidates.append(PolicyEdit(
             edit_id=_planned_edit_id(
@@ -118,17 +176,23 @@ def plan_policy_candidates(
             template[0] for template in templates
         }:
             continue
-        alternatives = (
-            ("invalidate_coverage_claim", {"side": item.params.get("side")}),
-            (
-                "downgrade_coverage",
-                {"side": item.params.get("side"), "to_state": "incomplete"},
-            ),
-            (
-                "downgrade_coverage",
-                {"side": item.params.get("side"), "to_state": "unresolved"},
-            ),
-        )
+        alternatives: tuple[tuple[str, dict[str, Any]], ...]
+        if item.action == ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY:
+            # Boundary consumption is parameterless; the only executable
+            # alternative is removing the item again.
+            alternatives = ()
+        else:
+            alternatives = (
+                ("invalidate_coverage_claim", {"side": item.params.get("side")}),
+                (
+                    "downgrade_coverage",
+                    {"side": item.params.get("side"), "to_state": "incomplete"},
+                ),
+                (
+                    "downgrade_coverage",
+                    {"side": item.params.get("side"), "to_state": "unresolved"},
+                ),
+            )
         for action, params in alternatives:
             if not params.get("side"):
                 continue
@@ -170,7 +234,13 @@ def plan_policy_candidates(
             item_index=index,
             rationale="Remove the existing correction if it no longer repairs the attribution.",
         ))
-    return tuple(candidates)
+    if not candidates and templates and templates_blocked_by_dedup == len(templates):
+        return PolicyPlan(
+            candidates=(),
+            route_result=ROUTE_CANDIDATE_ALREADY_PRESENT,
+            feedback_code=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
+        )
+    return PolicyPlan(candidates=tuple(candidates))
 
 
 def build_policy_selection_prompt(

@@ -200,7 +200,7 @@ def test_parse_policy_proposal_no_proposal_and_empty() -> None:
     assert reason == "empty_response"
 
 
-def test_policy_planner_has_no_fake_boundary_consumption_repair() -> None:
+def test_policy_planner_proposes_real_boundary_consumption() -> None:
     attribution = FailureAttribution(
         layer="l2_adjudication_policy",
         artifact="boundary_consumption_policy",
@@ -208,12 +208,103 @@ def test_policy_planner_has_no_fake_boundary_consumption_repair() -> None:
         evidence={"boundary_path_state": "verified_clean", "terminal_state": "unresolved"},
     )
 
-    candidates = plan_policy_candidates(
+    plan = plan_policy_candidates(
         attribution=attribution,
         genome=create_baseline_policy_genome(),
     )
 
-    assert candidates == ()
+    assert plan.route_result == "executed"
+    assert plan.feedback_code == ""
+    assert len(plan.candidates) == 1
+    candidate = plan.candidates[0]
+    assert candidate.operation == PolicyOp.ADD_ITEM.value
+    item = candidate.new_item
+    assert item is not None
+    assert item.precondition == "boundary_state_conflicts_with_terminal"
+    assert item.action == "consume_verified_clean_boundary"
+    assert item.params == {}
+
+
+def test_policy_planner_routes_consensus_block_to_engine_level() -> None:
+    attribution = FailureAttribution(
+        layer="l2_adjudication_policy",
+        artifact="consensus_gate_policy",
+        reason_code="consensus_gate_blocked",
+        evidence={"consensus_gate_blocked_count": 1, "terminal_state": "unresolved"},
+    )
+
+    plan = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+
+    assert plan.candidates == ()
+    assert plan.route_result == "engine_level_intervention_required"
+    assert plan.feedback_code == "policy_route_unavailable"
+
+
+def test_policy_planner_routes_unknown_reason_to_no_registered_action() -> None:
+    attribution = FailureAttribution(
+        layer="l2_adjudication_policy",
+        artifact="coverage_validity_policy",
+        reason_code="reason_without_template",
+        evidence={},
+    )
+
+    plan = plan_policy_candidates(
+        attribution=attribution,
+        genome=create_baseline_policy_genome(),
+    )
+
+    assert plan.candidates == ()
+    assert plan.route_result == "no_registered_runtime_action"
+    assert plan.feedback_code == "policy_route_unavailable"
+
+
+def test_policy_planner_routes_deduped_candidate_to_already_present() -> None:
+    attribution = FailureAttribution(
+        layer="l2_adjudication_policy",
+        artifact="boundary_consumption_policy",
+        reason_code="boundary_terminal_conflict",
+        evidence={},
+    )
+    genome = apply_policy_edit(create_baseline_policy_genome(), PolicyEdit(
+        edit_id="edit_consume",
+        operation=PolicyOp.ADD_ITEM.value,
+        new_item=PolicyItem(
+            item_id="policy_consume",
+            precondition="boundary_state_conflicts_with_terminal",
+            action="consume_verified_clean_boundary",
+            params={},
+        ),
+        rationale="seed",
+        source_case_id="case_seed",
+    ))
+
+    plan = plan_policy_candidates(attribution=attribution, genome=genome)
+
+    # The add candidate is deduplicated; the existing item still offers a
+    # removal candidate, so the plan stays executable.
+    assert plan.route_result == "executed"
+    assert [c.operation for c in plan.candidates] == [PolicyOp.REMOVE_ITEM.value]
+
+    # With the baseline-protection case the removal also disappears when the
+    # item is baseline, leaving an explicit already-present route.
+    baseline_item = PolicyItem(
+        item_id="policy_consume_baseline",
+        precondition="boundary_state_conflicts_with_terminal",
+        action="consume_verified_clean_boundary",
+        params={},
+        is_baseline=True,
+    )
+    baseline_genome = create_baseline_policy_genome()
+    baseline_genome.items.append(baseline_item)
+    baseline_plan = plan_policy_candidates(
+        attribution=attribution, genome=baseline_genome,
+    )
+    assert baseline_plan.candidates == ()
+    assert baseline_plan.route_result == "candidate_already_present"
+    assert baseline_plan.feedback_code == "policy_route_unavailable"
 
 
 def test_policy_planner_owns_predicate_action_pairing() -> None:
@@ -223,11 +314,13 @@ def test_policy_planner_owns_predicate_action_pairing() -> None:
         reason_code="hollow_complete_prosecution",
         evidence={},
     )
-    candidates = plan_policy_candidates(
+    plan = plan_policy_candidates(
         attribution=attribution,
         genome=create_baseline_policy_genome(),
     )
+    candidates = plan.candidates
 
+    assert plan.route_result == "executed"
     assert len(candidates) == 1
     item = candidates[0].new_item
     assert item is not None
@@ -256,8 +349,8 @@ def test_policy_planner_identity_is_content_addressed() -> None:
         genome=create_baseline_policy_genome(),
     )
 
-    assert first[0].edit_id == second[0].edit_id
-    assert first[0].to_dict() == second[0].to_dict()
+    assert first.candidates[0].edit_id == second.candidates[0].edit_id
+    assert first.to_dict() == second.to_dict()
 
 
 def _genome_with_telemetry_item():
@@ -335,6 +428,7 @@ def _base_adjudication(**_kwargs) -> dict:
             "responsible_event_id": None,
             "evidence_refs": [],
             "rationale": "No base candidate.",
+            "contract_validation": {"decision": "pass", "failed_checks": []},
         },
         "adjudication": {"state": "verified_clean"},
         "providers": {},
@@ -411,10 +505,12 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert len(policy_calls) == 1
     hook_kwargs = policy_calls[0]
     # The policy re-adjudication replays the exact evidence bundle of the
-    # court call that produced the current proof, plus the two hook inputs.
+    # court call that produced the current proof, plus the three hook inputs.
     prior_bundle = {
         key: value for key, value in hook_kwargs.items()
-        if key not in ("policy_items", "boundary_path_state")
+        if key not in (
+            "policy_items", "boundary_path_state", "boundary_authority_valid",
+        )
     }
     default_calls = [kwargs for kwargs in calls if "policy_items" not in kwargs]
     assert prior_bundle == default_calls[-1]
@@ -423,6 +519,58 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert isinstance(items[0], PolicyItem)
     assert items[0].item_id == "policy_hook_probe"
     assert hook_kwargs["boundary_path_state"] == "verified_clean"
+    # The boundary authority is derived from the deterministic boundary
+    # path's contract validation, not from the boundary state alone.
+    assert hook_kwargs["boundary_authority_valid"] is True
     # The deterministic evaluator ran inside the court hook.
     evaluation = result["proof_adjudication"]["policy_evaluation"]
     assert evaluation["fired"] == []
+
+
+def test_adjudicate_case_fails_closed_on_quarantined_boundary(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    from src.sehd_v6.core.paca_tcl import proof_engine
+
+    def quarantined_boundary_adjudication(**kwargs) -> dict:
+        base = _base_adjudication(**kwargs)
+        base["boundary_path"]["contract_validation"] = {
+            "decision": "quarantine", "failed_checks": ["rationale"],
+        }
+        return base
+
+    calls: list[dict] = []
+    real_court = proof_engine.contract.adjudicate_proof_court
+
+    def recording_court(**kwargs):
+        calls.append(kwargs)
+        return real_court(**kwargs)
+
+    monkeypatch.setattr(
+        proof_engine.v2, "adjudicate_case", quarantined_boundary_adjudication,
+    )
+    monkeypatch.setattr(proof_engine, "provider_call", _provider_stub)
+    monkeypatch.setattr(
+        proof_engine.contract, "adjudicate_proof_court", recording_court,
+    )
+    policy_dict = {
+        "item_id": "policy_consume_probe",
+        "precondition": "boundary_state_conflicts_with_terminal",
+        "action": "consume_verified_clean_boundary",
+        "params": {},
+        "rationale": "probe",
+        "source_case_id": "case_policy",
+        "is_baseline": False,
+    }
+    proof_engine.adjudicate_case(
+        case_id="case_quarantined_boundary",
+        record=_minimal_record(),
+        config=_minimal_config(),
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        policy_items=[policy_dict],
+    )
+    hook_kwargs = [
+        kwargs for kwargs in calls if "policy_items" in kwargs
+    ][0]
+    assert hook_kwargs["boundary_authority_valid"] is False

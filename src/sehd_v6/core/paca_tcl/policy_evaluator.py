@@ -13,9 +13,11 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from ..bccse.v6_contracts import (
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_EMIT_TELEMETRY_ONLY,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
+    ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
     AdjudicationFacts,
     L2_ACTIONS,
     L2_PREDICATES,
@@ -45,6 +47,7 @@ class PolicyEvaluationResult:
     effective_defense_coverage: str
     telemetry: tuple
     terminal_state: str
+    terminal_override: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +58,7 @@ class PolicyEvaluationResult:
             "effective_defense_coverage": self.effective_defense_coverage,
             "telemetry": [dict(row) for row in self.telemetry],
             "terminal_state": self.terminal_state,
+            "terminal_override": self.terminal_override,
         }
 
 
@@ -91,6 +95,7 @@ def evaluate_policies(
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     telemetry: list[dict[str, Any]] = []
+    terminal_override = ""
 
     for item in items:
         predicate = L2_PREDICATES.get(item.precondition)
@@ -120,6 +125,49 @@ def evaluate_policies(
                 "action": item.action,
                 "reason": detail,
             })
+            continue
+
+        if item.action == ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY:
+            # Consume is fail-closed on every runtime precondition: the
+            # boundary must itself be verified clean, produced by the
+            # authoritative deterministic boundary path, the terminal must
+            # still be unresolved, and no error certificate may survive.
+            # A fired-but-blocked consume is auditable, never silent.
+            consume_guards = (
+                facts.boundary_path_state == "verified_clean"
+                and facts.boundary_authority_valid
+                and facts.terminal_state == "unresolved"
+                and facts.surviving_error_count == 0
+            )
+            if not consume_guards:
+                skipped.append({
+                    "item_id": item.item_id,
+                    "precondition": item.precondition,
+                    "action": item.action,
+                    "reason": ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
+                })
+                continue
+            applied_item_ids.append(item.item_id)
+            fired.append({
+                "item_id": item.item_id,
+                "precondition": item.precondition,
+                "action": item.action,
+                "params": {},
+            })
+            # The court hook owns the actual terminal transition; the
+            # evaluator records the audited request plus before/after here
+            # so the consumption is reconstructable from the evaluation
+            # record alone.
+            telemetry.append({
+                "kind": "consume_verified_clean_boundary",
+                "item_id": item.item_id,
+                "terminal_before": facts.terminal_state,
+                "terminal_after": "verified_clean",
+                "boundary_path_state": facts.boundary_path_state,
+                "boundary_authority_valid": facts.boundary_authority_valid,
+                "policy_stage": facts.policy_stage,
+            })
+            terminal_override = "verified_clean"
             continue
 
         params = dict(item.params)
@@ -158,4 +206,5 @@ def evaluate_policies(
         terminal_state=_recompute_terminal_state(
             facts.surviving_error_count, eff_prosecution, eff_defense,
         ),
+        terminal_override=terminal_override,
     )

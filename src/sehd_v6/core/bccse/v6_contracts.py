@@ -56,6 +56,13 @@ L1_ARTIFACTS = frozenset(MODULE_IDS)
 # the engine-level context (boundary path), so neither the evaluator nor
 # the classifier ever reaches into raw provider payloads.
 
+# Policy execution stages. The current runtime only implements the
+# post-ledger surface (policies act after the occurrence ledger is fixed,
+# on coverage and the terminal edge only); the constant makes the stage
+# explicit on every fact snapshot so a future pre-ledger surface cannot
+# silently share the same execution path.
+POLICY_STAGE_POST_LEDGER = "post_ledger"
+
 @dataclass(frozen=True)
 class AdjudicationFacts:
     prosecution_coverage: str = ""
@@ -71,7 +78,9 @@ class AdjudicationFacts:
     required_candidate_count: int = 0
     fully_quarantined: bool = False
     boundary_path_state: str = ""
+    boundary_authority_valid: bool = False
     terminal_state: str = ""
+    policy_stage: str = POLICY_STAGE_POST_LEDGER
 
     @property
     def total_certificate_count(self) -> int:
@@ -85,6 +94,7 @@ def build_adjudication_facts(
     court_result: dict[str, Any],
     *,
     boundary_path_state: str = "",
+    boundary_authority_valid: bool = False,
 ) -> AdjudicationFacts:
     """Derive the addressable fact snapshot from one proof-court result."""
     def sequence_count(value: Any) -> int:
@@ -125,6 +135,7 @@ def build_adjudication_facts(
             and sequence_count(quarantined_errors) >= required_count
         ),
         boundary_path_state=str(boundary_path_state or ""),
+        boundary_authority_valid=bool(boundary_authority_valid),
         terminal_state=str(court_result.get("state") or ""),
     )
 
@@ -213,11 +224,13 @@ ACTION_INVALIDATE_COVERAGE_CLAIM = "invalidate_coverage_claim"
 ACTION_RECLASSIFY_CANDIDATE_STATE = "reclassify_candidate_state"
 ACTION_REQUIRE_ROUTE_REPLAY = "require_route_replay"
 ACTION_EMIT_TELEMETRY_ONLY = "emit_telemetry_only"
+ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY = "consume_verified_clean_boundary"
 
 COURT_LOCAL_ACTIONS = frozenset({
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
     ACTION_EMIT_TELEMETRY_ONLY,
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
 })
 # Reserved for a future engine that can re-execute providers; not part of
 # the proposable/executable vocabulary until implemented.
@@ -233,6 +246,7 @@ ACTION_PARAMS: dict[str, tuple[str, ...]] = {
     ACTION_DOWNGRADE_COVERAGE: ("side", "to_state"),
     ACTION_INVALIDATE_COVERAGE_CLAIM: ("side",),
     ACTION_EMIT_TELEMETRY_ONLY: (),
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY: (),
 }
 
 
@@ -251,6 +265,33 @@ def validate_policy_params(action: str, params: dict[str, Any]) -> tuple[bool, s
     if action == ACTION_DOWNGRADE_COVERAGE and to_state not in COVERAGE_DOWNGRADE_STATES:
         return False, f"invalid_downgrade_state:{to_state}"
     return True, ""
+
+
+# ============================================================
+# Policy route taxonomy: why an L2 attribution did or did not yield an
+# executable intervention
+# ============================================================
+# Every L2 attribution resolves to exactly one route. "executed" means a
+# candidate was proposed, validated and replayed; the other five explain,
+# in closed vocabulary, why no executable candidate reached the model.
+
+ROUTE_NO_REGISTERED_RUNTIME_ACTION = "no_registered_runtime_action"
+ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED = "runtime_precondition_not_satisfied"
+ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION = "candidate_blocked_by_protection"
+ROUTE_CANDIDATE_ALREADY_PRESENT = "candidate_already_present"
+ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED = "engine_level_intervention_required"
+ROUTE_EXECUTED = "executed"
+POLICY_ROUTES = frozenset({
+    ROUTE_NO_REGISTERED_RUNTIME_ACTION,
+    ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
+    ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION,
+    ROUTE_CANDIDATE_ALREADY_PRESENT,
+    ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED,
+    ROUTE_EXECUTED,
+})
+
+# Prompt-facing feedback codes accompanying a non-executed route.
+FEEDBACK_POLICY_ROUTE_UNAVAILABLE = "policy_route_unavailable"
 
 
 # ============================================================
