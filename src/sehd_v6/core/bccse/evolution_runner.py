@@ -116,6 +116,17 @@ from .failure_episode import (
     proposal_signature_for,
 )
 from .evolution_experience_memory import EvolutionExperienceMemory
+from .gate_feedback import (
+    SCHEMA_VERSION as GATE_EVENT_SCHEMA_VERSION,
+    GateEvent,
+    GateEventLedger,
+    gate_event_id,
+)
+from .promotion_contract import (
+    AUTHORITY_L1_FITNESS,
+    AUTHORITY_L2_POLICY,
+    promote,
+)
 from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
@@ -2692,6 +2703,10 @@ def run_online_evolution(
     causal_memory = EvolutionExperienceMemory(
         type_fitness.get_experience_memory()
     )
+    # Append-only audited gate ledger (P5): every terminal gate decision is
+    # recorded as a GateEvent; resume is idempotent on the stable event_id.
+    # Pure telemetry — it never feeds back into a gate decision.
+    gate_event_ledger = GateEventLedger()
     if experience_memory_path is not None:
         memory_path = Path(experience_memory_path)
         if not memory_path.is_file():
@@ -2898,6 +2913,9 @@ def run_online_evolution(
                         f"vocabulary contract: {item_reason}"
                     )
         l2_policy_accepts = int(checkpoint.get("l2_policy_accepts") or 0)
+        gate_event_ledger = GateEventLedger.from_list(
+            checkpoint.get("gate_events") or ()
+        )
         # The probe rollback anchor resumes from the last probe-stable policy
         # snapshot; checkpoints predating the snapshot field treat the
         # restored policy genome itself as the stable point.
@@ -3292,6 +3310,7 @@ def run_online_evolution(
                 },
                 "policy_genome": policy_genome.to_dict(),
                 "l2_policy_accepts": l2_policy_accepts,
+                "gate_events": gate_event_ledger.to_list(),
                 "l2_policy_audit": list(l2_policy_audit),
                 # Probe rollback anchors and the in-memory evolution context
                 # that a resume must reproduce exactly (behavior invariants
@@ -3315,10 +3334,75 @@ def run_online_evolution(
             causal_memory.to_dict(),
         )
 
+    def _record_gate_event(step: EvolutionStep) -> None:
+        """Project one evolution step into the audited gate ledger (P5).
+
+        Pure telemetry: the event records a decision the gate has already
+        made, so it can never influence that decision.  Resume is idempotent
+        on the stable event_id; no provider call is added.
+        """
+        episode_id = ""
+        attempt_id = ""
+        if isinstance(step.episode, Mapping):
+            episode_id = str(step.episode.get("episode_id") or "")
+            attempts = step.episode.get("attempts") or ()
+            if attempts and isinstance(attempts[-1], Mapping):
+                attempt_id = str(attempts[-1].get("attempt_id") or "")
+        proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
+        operation = str(proposal.get("operation") or "")
+        artifact = str(proposal.get("target_module") or "")
+        attribution = step.attribution if isinstance(step.attribution, Mapping) else {}
+        layer = str(attribution.get("layer") or "")
+        reasons = [
+            str(value)
+            for value in ((step.fitness_check or {}).get("reject_reasons") or ())
+        ]
+        try:
+            decision = promote(
+                layer=layer or "l1",
+                artifact=artifact,
+                legacy_decision=step.gate_decision,
+                decision_authority=(
+                    AUTHORITY_L2_POLICY if layer == LAYER_L2
+                    else AUTHORITY_L1_FITNESS
+                ),
+                reasons=reasons,
+            )
+        except ValueError:
+            # A non-gate step (e.g. halted) is still audited, with an empty
+            # grade; it never reaches the promotion vocabulary.
+            decision = None
+        try:
+            event = GateEvent(
+                schema_version=GATE_EVENT_SCHEMA_VERSION,
+                event_id=gate_event_id(
+                    attempt_id=attempt_id,
+                    episode_id=episode_id,
+                    decision_kind=step.gate_decision,
+                    observation_id=f"{step.case_id}:{step.case_index}:{step.attempt_index}",
+                ),
+                subject_id=str(step.case_id),
+                episode_id=episode_id,
+                attempt_id=attempt_id,
+                layer=layer,
+                artifact=artifact,
+                operation=operation,
+                stage=str(step.trigger_source or ""),
+                legacy_decision=str(step.gate_decision or ""),
+                evidence_grade=(decision.evidence_grade if decision else "skip"),
+                activation_state=(decision.activation_state if decision else ""),
+                hard_reject_codes=(decision.hard_reject_codes if decision else ()),
+                quality_reason_codes=(decision.quality_reason_codes if decision else ()),
+            )
+        except ValueError:
+            return
+        gate_event_ledger.record(event)
+
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         step.attempt_index = active_attempt_index
         step.episode = active_episode_payload
         steps.append(step)
+        _record_gate_event(step)
         persist_progress(next_case_index)
 
     def record_attempt(

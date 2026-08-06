@@ -1066,14 +1066,14 @@ planner candidates
 
 ## 11.8 验收
 
-- [ ] 每个 terminal gate decision 都有 GateEvent。
-- [ ] no-proposal/skip 也有 GateEvent。
-- [ ] resume 不重复写同一 event。
-- [ ] feedback 无 raw identity、gold、prompt、provider response。
-- [ ] feedback 不改变 owner route。
-- [ ] feedback 不放宽 ActionSpec/StructuralGate。
-- [ ] same-source 和 cross-case 投影严格分离。
-- [ ] 不增加 provider call。
+- [x] 每个 terminal gate decision 都有 GateEvent。
+- [x] no-proposal/skip 也有 GateEvent。
+- [x] resume 不重复写同一 event。
+- [x] feedback 无 raw identity、gold、prompt、provider response。
+- [x] feedback 不改变 owner route。
+- [x] feedback 不放宽 ActionSpec/StructuralGate。
+- [x] same-source 和 cross-case 投影严格分离。
+- [x] 不增加 provider call。
 
 ## 11.9 提交
 
