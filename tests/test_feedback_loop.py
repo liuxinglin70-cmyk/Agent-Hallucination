@@ -93,7 +93,9 @@ def _run(tmp_path, monkeypatch, *, detector, mutation, case_ids, run_id):
     )
 
 
-def test_attempt_carries_compiled_injected_applied_evidence(tmp_path, monkeypatch) -> None:
+def test_attempt_carries_compiled_injected_applied_evidence(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """An accepted local movement is recorded with full execution evidence."""
     prompts: list[str] = []
 
@@ -124,7 +126,7 @@ def test_attempt_carries_compiled_injected_applied_evidence(tmp_path, monkeypatc
 
 
 def test_two_case_sequential_history_shows_a_outcome_in_b_prompt(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """Case A's accepted local outcome is visible in case B's reflection
     input; the framework then compiles and replays B's proposal."""
@@ -164,7 +166,9 @@ def test_two_case_sequential_history_shows_a_outcome_in_b_prompt(
     assert entry["representatives"]["effective"] is not None
 
 
-def test_cross_case_no_effect_proposal_is_not_replayed(tmp_path, monkeypatch) -> None:
+def test_cross_case_no_effect_proposal_is_not_replayed(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """A proposal confirmed no-effect on case A is not replayed verbatim on
     the same-mechanism case B; reflection regenerates a distinct proposal."""
     detector_calls = 0
@@ -218,7 +222,9 @@ def test_cross_case_no_effect_proposal_is_not_replayed(tmp_path, monkeypatch) ->
     assert mutation_calls == 4  # A: X, X; B: X, Y
 
 
-def test_resume_after_observation_does_not_double_count(tmp_path, monkeypatch) -> None:
+def test_resume_after_observation_does_not_double_count(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """Breakpoint: observation persisted, reflection never called."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -294,7 +300,9 @@ def test_resume_after_observation_does_not_double_count(tmp_path, monkeypatch) -
     assert entry["representatives"]["effective"] is not None
 
 
-def test_resume_matches_uninterrupted_run(tmp_path, monkeypatch) -> None:
+def test_resume_matches_uninterrupted_run(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """Interruption at different breakpoints yields the same normalized
     memory, steps and counters as an uninterrupted run."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
@@ -394,7 +402,9 @@ def test_resume_matches_uninterrupted_run(tmp_path, monkeypatch) -> None:
     ]
 
 
-def test_type_memory_does_not_copy_episodes(tmp_path, monkeypatch) -> None:
+def test_type_memory_does_not_copy_episodes(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """The type-conditioned statistics stay summaries; only the mechanism
     index carries structured causal evidence."""
     result = _run(

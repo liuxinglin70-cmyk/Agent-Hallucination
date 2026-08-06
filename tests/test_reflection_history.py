@@ -197,7 +197,7 @@ def test_history_never_includes_raw_identity() -> None:
 
 
 def test_runner_call_budget_unchanged_with_episode_wiring(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """Episode context and history retrieval add zero model or replay calls."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
@@ -250,7 +250,9 @@ def test_runner_call_budget_unchanged_with_episode_wiring(
     assert result.evolution_audit["contrast_replays"] == 0
 
 
-def test_two_case_sequential_history_reaches_prompt(tmp_path, monkeypatch) -> None:
+def test_two_case_sequential_history_reaches_prompt(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """Case B's reflection prompt contains case A's local outcome."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
 

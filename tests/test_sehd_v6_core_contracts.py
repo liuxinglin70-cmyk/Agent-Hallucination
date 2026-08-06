@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import replace
 
 from src.sehd_v6.core.bccse.cesv_contract import (
     CausalInterventionEngine,
@@ -963,7 +964,7 @@ def test_replay_rejection_does_not_fake_multiple_convergence_cases() -> None:
 
 
 def test_online_evolution_keeps_label_free_directional_edit_provisional(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1187,7 +1188,7 @@ def test_runtime_observation_drops_editable_patch_fields() -> None:
 
 
 def test_invalid_slot_candidate_yields_no_edit_not_free_text(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """An action carrying verdict semantics for a module without verdict
     permission must fail the slot contract as an invalid mutation; the
@@ -1204,13 +1205,19 @@ def test_invalid_slot_candidate_yields_no_edit_not_free_text(
     monkeypatch.setattr(
         runner,
         "attribute_failure",
-        lambda result, use_gold=False, gold_reflection=False: _fn_clean_signal(),
+        lambda result, use_gold=False, gold_reflection=False: replace(
+            _fn_clean_signal(),
+            error_type=ErrorType.EVIDENCE_INCOMPLETE,
+            target_module="evidence_obligation",
+            trigger_source=TriggerSource.EVIDENCE_INCOMPLETE,
+            state="unresolved",
+        ),
     )
     monkeypatch.setattr(
         runner,
         "json_object_provider_call",
         lambda **kwargs: ({
-            "target_module": "causal_link_test",
+                "target_module": "evidence_obligation",
             "operation": "add_rule",
             "condition": "the proof court reaches the final adjudication edge",
             "action": "return clean",

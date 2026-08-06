@@ -392,13 +392,25 @@ def project_provider_artifacts(
     if not isinstance(health, Mapping):
         health = {}
 
-    def add(kind: str, *, malformed: bool, missing: list[str]) -> None:
-        artifacts.append({
+    def add(
+        kind: str,
+        *,
+        malformed: bool,
+        missing: list[str],
+        artifact_id: str = "",
+        source: str = "",
+    ) -> None:
+        artifact = {
             "kind": kind,
             "module_hint": "",
             "malformed": malformed,
             "missing_fields": missing,
-        })
+        }
+        if artifact_id:
+            artifact["artifact_id"] = artifact_id
+        if source:
+            artifact["source"] = source
+        artifacts.append(artifact)
 
     gold_label = getattr(signal, "gold_label", None)
     state = str(
@@ -407,17 +419,6 @@ def project_provider_artifacts(
     type_value = str(getattr(primary_type, "value", primary_type) or "")
     if bool(gold_label) and state == "verified_clean" and type_value == "omission":
         add("candidate", malformed=False, missing=["candidate"])
-
-    for health_key, kind in (
-        ("quarantined_error_certificate_count", "error_certificate"),
-        ("quarantined_defense_certificate_count", "defense_certificate"),
-    ):
-        try:
-            quarantined = int(health.get(health_key) or 0)
-        except (TypeError, ValueError):
-            quarantined = 0
-        if quarantined > 0:
-            add(kind, malformed=True, missing=[])
 
     try:
         required = int(health.get("required_candidate_count") or 0)
@@ -435,15 +436,11 @@ def project_provider_artifacts(
     if isinstance(authority_reasons, list) and authority_reasons:
         add("candidate", malformed=True, missing=[])
 
-    try:
-        fully_quarantined = int(
-            health.get("focused_prosecution_quarantined_candidate_count") or 0
-        )
-    except (TypeError, ValueError):
-        fully_quarantined = 0
-    if fully_quarantined > 0:
-        add("error_certificate", malformed=True, missing=[])
-
+    # Quarantine totals are containment telemetry, not an addressable defect.
+    # A quarantined object has already been removed from the proof court; its
+    # count alone neither identifies the broken field nor proves that the
+    # quarantine caused the terminal failure.  Only the per-object audits
+    # below carry enough provenance to create an executable L1 episode.
     for audit_key, kind in (
         ("error_audits", "error_certificate"),
         ("defense_audits", "defense_certificate"),
@@ -451,7 +448,6 @@ def project_provider_artifacts(
         audits = adjudication.get(audit_key)
         if not isinstance(audits, list):
             continue
-        missing_fields: list[str] = []
         for audit in audits:
             if not isinstance(audit, Mapping):
                 continue
@@ -459,12 +455,22 @@ def project_provider_artifacts(
                 continue
             failed = audit.get("failed_checks")
             if isinstance(failed, list):
-                missing_fields.extend(
+                missing_fields = sorted(set(
                     str(name) for name in failed
                     if name != "required_fields"
-                )
-        if missing_fields:
-            add(kind, malformed=True, missing=sorted(set(missing_fields)))
+                ))
+                if missing_fields:
+                    add(
+                        kind,
+                        malformed=True,
+                        missing=missing_fields,
+                        artifact_id=str(
+                            audit.get("certificate_id")
+                            or audit.get("candidate_id")
+                            or ""
+                        ),
+                        source=audit_key,
+                    )
 
     if str(health.get("appeal_status") or "") == "provider_error":
         add("error_certificate", malformed=True, missing=[])
@@ -491,10 +497,27 @@ def project_provider_artifacts(
         getattr(signal, "defense_coverage_state", "")
         or adjudication.get("defense_coverage") or ""
     )
+    error_type = str(
+        getattr(getattr(signal, "error_type", ""), "value", "")
+        or getattr(signal, "error_type", "")
+        or ""
+    )
     hollow_defense = defense_state == "complete" and valid_defense == 0
     hollow_prosecution = prosecution_state == "complete" and valid_error == 0
+    polarity_known = error_type in {
+        "unresolved_should_error", "unresolved_should_clean",
+    }
+    requires_error_certificate = (
+        error_type == "unresolved_should_error"
+        or (not polarity_known and defense_state == "complete")
+    )
+    requires_defense_certificate = (
+        error_type == "unresolved_should_clean"
+        or (not polarity_known and prosecution_state == "complete")
+    )
     if (
-        state == "unresolved"
+        requires_error_certificate
+        and state == "unresolved"
         and prosecution_state == "incomplete"
         and valid_error == 0
         and surviving_count == 0
@@ -505,7 +528,8 @@ def project_provider_artifacts(
         add("error_certificate", malformed=False, missing=["certificate"])
 
     if (
-        state == "unresolved"
+        requires_defense_certificate
+        and state == "unresolved"
         and defense_state == "incomplete"
         and valid_defense == 0
         and court_required > 0
@@ -703,6 +727,23 @@ def _select_candidate(
     court = detection_result.get("proof_adjudication") or {}
     if not isinstance(court, Mapping):
         court = {}
+    evidence = attribution.evidence if isinstance(attribution.evidence, Mapping) else {}
+    kind = str(evidence.get("kind") or "")
+    artifact_id = str(evidence.get("artifact_id") or "")
+    if kind and artifact_id:
+        for row in _candidate_rows(detection_result, kind):
+            row_id = str(row.get("candidate_id") or row.get("certificate_id") or "")
+            if row_id == artifact_id:
+                return (
+                    row_id,
+                    kind,
+                    _row_refs(row, "origin_refs")
+                    or _row_refs(row, "origin_event_id")
+                    or _row_refs(row, "target_origin_event_id"),
+                    _row_refs(row, "dependency_refs")
+                    or _row_refs(row, "dependencies"),
+                )
+
     positive_ids = court.get("positive_candidate_ids") or []
     if isinstance(positive_ids, (set, frozenset)):
         positive_ids = sorted(str(value) for value in positive_ids)
@@ -723,8 +764,6 @@ def _select_candidate(
                 _row_refs(row, "dependency_refs") or _row_refs(row, "dependencies"),
             )
         continue
-    evidence = attribution.evidence if isinstance(attribution.evidence, Mapping) else {}
-    kind = str(evidence.get("kind") or "")
     rows = _candidate_rows(detection_result, kind) if kind else []
     if rows:
         row = rows[0]

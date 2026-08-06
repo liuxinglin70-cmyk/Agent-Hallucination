@@ -3359,12 +3359,10 @@ def run_online_evolution(
         on such a case is audited but never advances the convergence streak,
         preserving the v5.9b invariant that stable cases cannot halt a run.
 
-        Returns True when the policy edit was accepted.  A rejected L2
-        proposal on a genuinely triggered case means the adjudication layer
-        could not repair the failure; the caller then falls through to the
-        L1 skill path so a skill-level intervention still gets a chance
-        (policy rules cannot fix a broken detection, they only reclassify
-        its adjudication).
+        Returns True when the policy edit was accepted. Rejected and
+        unavailable L2 repairs remain L2 outcomes: they do not authorize a
+        synthetic provider-rule episode because no L1 artifact defect has
+        been established.
         """
         nonlocal policy_genome, l2_policy_accepts
         accepted_outcome = False
@@ -4625,43 +4623,6 @@ def run_online_evolution(
         # --- [2] Causal process reflection (self-supervised trigger) ---
         signal = attribution_for(detection_result, case_id)
 
-        # LLM-enhanced attribution (v5.3): when confidence is low,
-        # use LLM to refine root-cause module identification.
-        if signal.attribution_confidence == "low" and mutation_route is not None:
-            from dataclasses import replace as _replace_signal
-            from .step_attributor import build_attribution_llm_prompt
-            attribution_route_bound = {
-                signal.target_module,
-                signal.secondary_module,
-            }
-            try:
-                attr_system, attr_user = build_attribution_llm_prompt(signal)
-                attr_parsed, _ = run_mutation_call(
-                    route=mutation_route,
-                    purpose="mutation",
-                    system=attr_system,
-                    user=attr_user,
-                    cache_dir=output_dir / "mutation_cache",
-                )
-                if isinstance(attr_parsed, dict):
-                    primary = str(attr_parsed.get("primary_module", ""))
-                    secondary = str(attr_parsed.get("secondary_module", ""))
-                    confidence = str(attr_parsed.get("confidence", "low")).lower()
-                    if (
-                        primary in MODULE_IDS
-                        and primary in attribution_route_bound
-                        and confidence in ("high", "medium", "low")
-                        and (primary != signal.target_module or secondary != signal.secondary_module)
-                    ):
-                        signal = _replace_signal(
-                            signal,
-                            target_module=primary,
-                            secondary_module=secondary if secondary in MODULE_IDS else signal.secondary_module,
-                            attribution_confidence=confidence,
-                        )
-            except Exception:
-                pass  # Fall back to rule-based attribution
-
         # --- Deterministic failure attribution (artifact-first) ---
         # The classifier runs on every detection, not only after the
         # self-supervised trigger: an adjudication-layer (L2) failure is
@@ -4686,15 +4647,6 @@ def run_online_evolution(
         # influenced by it (Phase 1 wiring only).
         episode_payload: dict[str, Any] | None = None
         if signal.should_evolve and classifier_attribution.layer == LAYER_L1:
-            route = (
-                attribution_owner,
-                *(
-                    module for module in (signal.target_module,)
-                    if module != attribution_owner
-                ),
-            )
-            if signal.secondary_module and signal.secondary_module not in route:
-                route = (*route, signal.secondary_module)
             try:
                 episode_payload = build_failure_episode(
                     detection_result=detection_result,
@@ -4702,7 +4654,7 @@ def run_online_evolution(
                     attribution=classifier_attribution,
                     evolution_direction=evolution_direction,
                     record_key=case_id,
-                    allowed_modules=route,
+                    allowed_modules=(attribution_owner,),
                 ).to_dict()
             except UnaddressableFailure as exc:
                 episode_payload = {"unaddressable": str(exc)}
@@ -4793,71 +4745,21 @@ def run_online_evolution(
                 ), next_case_index=idx + 1)
                 print(f"  [{idx}] SKIP_MUTATION_BUDGET_EXHAUSTED {case_id}")
                 continue
-            # A rejected L2 proposal on a genuinely triggered case falls
-            # through to the L1 skill path: the adjudication layer could not
-            # repair the failure, and policy rules only reclassify
-            # adjudication — they cannot fix a broken detection.  Without
-            # this fall-through an unresolved or mislabeled case with an L2
-            # attribution would never receive a skill-level intervention
-            # (observed: openmanus/091 stuck on reject_policy_no_effect with
-            # zero L1 attempts).  Stable-source L2 cases keep skipping L1:
-            # they were not triggers and must not spawn fruitless reflection.
-            if active_attempt_index > 0:
-                # An L1 retry re-enters the queue with the same detection and
-                # genome, so the L2 loop would repeat the identical policy
-                # reflection and replay; it already had its chance on the
-                # first attempt and its outcome is retry-independent.
-                l2_accepted = False
-            else:
-                l2_accepted = run_l2_policy_case(
-                    idx=idx,
-                    case_id=case_id,
-                    detection_result=detection_result,
-                    detection_state=detection_state,
-                    genome_before=genome_before,
-                    l2_attribution=l2_attribution,
-                    stable_source=l2_stable_source,
-                )
-            if l2_accepted or l2_stable_source:
-                continue
-            if episode_payload is None and active_episode_payload is not None:
-                # L2 fall-through: the L1 skill path must be grounded on an
-                # L1 mechanism episode (owned by the step attributor's
-                # authoritative primary), not on the L2 episode whose policy
-                # evaluator has no L1 legal surface.  The L2 episode stays on
-                # the L2 steps already recorded.
-                l1_route = (
-                    signal.target_module,
-                    *(
-                        module for module in (signal.secondary_module,)
-                        if module and module != signal.target_module
-                    ),
-                )
-                try:
-                    l1_payload = build_failure_episode(
-                        detection_result=detection_result,
-                        signal=signal,
-                        attribution=FailureAttribution(
-                            layer=LAYER_L1,
-                            artifact=signal.target_module,
-                            reason_code=str(
-                                FailureEpisode.from_dict(
-                                    active_episode_payload
-                                ).attribution.get("reason_code") or ""
-                            ),
-                            evidence={},
-                        ),
-                        evolution_direction=evolution_direction,
-                        record_key=case_id,
-                        allowed_modules=l1_route,
-                    ).to_dict()
-                except UnaddressableFailure as exc:
-                    l1_payload = {"unaddressable": str(exc)}
-                if l1_payload is not None and "episode_id" in l1_payload:
-                    causal_memory.upsert_observation(
-                        FailureEpisode.from_dict(l1_payload)
-                    )
-                    active_episode_payload = l1_payload
+            run_l2_policy_case(
+                idx=idx,
+                case_id=case_id,
+                detection_result=detection_result,
+                detection_state=detection_state,
+                genome_before=genome_before,
+                l2_attribution=l2_attribution,
+                stable_source=l2_stable_source,
+            )
+            # Layer ownership is causal authority.  A rejected or unavailable
+            # L2 policy does not prove an L1 defect, so it must not be recast
+            # as a synthetic L1 episode with empty artifact evidence.  A real
+            # provider-artifact defect is classified as L1 before this branch
+            # and enters the skill-reflection path directly.
+            continue
 
         if not signal.should_evolve:
             # Stable success — no trigger
@@ -4911,6 +4813,41 @@ def run_online_evolution(
               f"(attempt {active_attempt_index + 1}/"
               f"{max_mutation_attempts_per_case})")
 
+        l1_episode_addressable = bool(
+            attribution_owner
+            and classifier_attribution.layer == LAYER_L1
+            and isinstance(active_episode_payload, Mapping)
+            and active_episode_payload.get("episode_id")
+        )
+        if not l1_episode_addressable:
+            gate.record_no_edit()
+            record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source=signal.trigger_source.value,
+                attribution=signal.to_dict(),
+                edit_proposal={
+                    "operation": "no_edit",
+                    "reason": "no_addressable_l1_failure_episode",
+                    "classifier_attribution": classifier_attribution.to_dict(),
+                },
+                mutation_applied=None,
+                gate_decision="skip_unaddressable_failure",
+                genome_hash_before=genome_before,
+                genome_hash_after=current_genome.content_hash,
+                detection_state=detection_state,
+                timestamp=time.time(),
+                fitness_check={
+                    "classifier_attribution": classifier_attribution.to_dict(),
+                },
+            ), next_case_index=idx + 1)
+            print(
+                f"  [{idx}] SKIP_UNADDRESSABLE_FAILURE {case_id}: "
+                f"{classifier_attribution.layer}/"
+                f"{classifier_attribution.reason_code}"
+            )
+            continue
+
         # Deterministic short-circuit: once the mutation budget is exhausted
         # no reflection-family call can run again this run, so spending the
         # full reflection stack (type classification, attribution LLM,
@@ -4938,30 +4875,14 @@ def run_online_evolution(
             print(f"  [{idx}] SKIP_MUTATION_BUDGET_EXHAUSTED {case_id}")
             continue
 
-        # Deterministic classifier authority: an L1 attribution carries
-        # concrete provider-artifact evidence (missing/malformed candidate
-        # or certificate), so its owner leads the route and outranks the
-        # process-heuristic primary; the heuristic owner stays as a bounded
-        # fallback rather than a replacement.
-        if attribution_owner:
-            attribution_route = (
-                attribution_owner,
-                *(
-                    module for module in (signal.target_module,)
-                    if module != attribution_owner
-                ),
-            )
-            print(
-                f"    [ATTR] owner hypothesis: {attribution_owner} via "
-                f"{attribution_reason}"
-            )
-        else:
-            attribution_route = (signal.target_module,)
-        if (
-            signal.secondary_module
-            and signal.secondary_module not in attribution_route
-        ):
-            attribution_route += (signal.secondary_module,)
+        # A provider artifact has exactly one registered owner.  The step
+        # attributor's primary/secondary modules remain diagnostic context,
+        # but they cannot enter the executable route: editing a downstream
+        # fallback cannot repair the missing or malformed owned artifact.
+        print(
+            f"    [ATTR] owner hypothesis: {attribution_owner} via "
+            f"{attribution_reason}"
+        )
         bias_signal = _localization_bias_signal(detection_result)
         if bias_signal:
             localization_bias_signals.append({
@@ -4971,56 +4892,7 @@ def run_online_evolution(
                     detection_result.get("responsible_step")
                 ),
             })
-        type_allowed_modules = type_evolution.intersect_allowed_modules(
-            type_result.primary_type,
-            attribution_route,
-            secondary_type=type_result.secondary_type,
-        )
-        # The classifier's artifact owner leads the allowed route when one
-        # exists (label-free provider-artifact evidence); otherwise the
-        # heuristic attributor's primary keeps root-cause priority. Type
-        # classification may bound the route but cannot promote a module over
-        # the diagnosed artifact. Repeated here as an execution-boundary
-        # invariant so future classifier refactors cannot silently reorder it.
-        _lead_owner = attribution_owner or signal.target_module
-        if _lead_owner in type_allowed_modules:
-            type_allowed_modules = (
-                _lead_owner,
-                *(
-                    module for module in type_allowed_modules
-                    if module != _lead_owner
-                ),
-            )
-        # The attribution owner is derived from label-free runtime evidence
-        # and is already polarity-bounded. A partial typed intersection can
-        # silently drop it, which reintroduces the exact NO_EDIT deadlock
-        # the attribution exists to break. Keep it reachable as a fallback so
-        # reflection always has an executable owner.
-        if (
-            attribution_owner
-            and attribution_owner not in type_allowed_modules
-        ):
-            type_allowed_modules = (*type_allowed_modules, attribution_owner)
-        # v5.6 owner escalation: on a retry, move owners that already produced
-        # source_no_effect to the end of the allowed-module order. The model is
-        # then nudged toward a different attributed owner; the hard duplicate
-        # gate above rejects an actual paraphrase regardless of order.
-        if active_attempt_index > 0:
-            exhausted_owners = {
-                str(prior.get("target_module") or "")
-                for prior in rejected_source_proposals.get(case_id, [])
-            }
-            if exhausted_owners:
-                type_allowed_modules = (
-                    *(
-                        module for module in type_allowed_modules
-                        if module not in exhausted_owners
-                    ),
-                    *(
-                        module for module in type_allowed_modules
-                        if module in exhausted_owners
-                    ),
-                )
+        type_allowed_modules = (attribution_owner,)
         if not type_allowed_modules:
             gate.record_no_edit()
             record_step(EvolutionStep(

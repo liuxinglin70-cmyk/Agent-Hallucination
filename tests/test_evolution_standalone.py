@@ -111,7 +111,7 @@ def _write_records(tmp_path, *, jsonl: bool) -> object:
 
 
 @pytest.fixture
-def offline_evolution(monkeypatch, tmp_path):
+def offline_evolution(monkeypatch, tmp_path, addressable_l1_failure):
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
@@ -188,7 +188,7 @@ def test_standalone_evolution_accepts_mapping_input(tmp_path, offline_evolution)
 
 
 def test_standalone_evolution_without_credential_skips_mutation_provider(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -367,7 +367,7 @@ def test_online_evolution_passes_committed_genome_to_next_case(
 
 
 def test_online_evolution_runs_independent_candidates_and_critic(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -450,7 +450,7 @@ def test_online_evolution_runs_independent_candidates_and_critic(
 
 
 def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """v5.9: when every primary candidate retreats to no_edit, the diagnosis
     stage locates an executable owner and the targeted generation stage is
@@ -531,7 +531,7 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
 
 
 def test_online_evolution_diagnosis_downgrades_illegal_owner(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """A diagnosis proposing an owner outside the allowed set is downgraded
     to non-executable and the step stays a fail-closed no_edit."""
@@ -584,7 +584,7 @@ def test_online_evolution_diagnosis_downgrades_illegal_owner(
 
 
 def test_stable_cases_do_not_advance_convergence_streak(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """v5.9b: convergence is defined over triggered cases only. Stable
     (untriggered) cases and runtime-invalid detections carry no information
@@ -645,7 +645,7 @@ def test_stable_cases_do_not_advance_convergence_streak(
 
 
 def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """A multi-conjunction rule is rejected as condition_overload instead of
     being mechanically simplified: deleting conjuncts would change the rule's
@@ -722,7 +722,9 @@ def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
     assert rejected_steps[1].fitness_check.get("retry_scheduled") is False
 
 
-def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
+def test_resume_rewinds_halted_placeholder_steps(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """v5.9b: cases skipped by convergence were persisted as halted
     placeholders with the queue advanced past them, so a resume dropped them
     forever. Resume must rewind trailing placeholder steps and re-examine
@@ -786,7 +788,7 @@ def test_resume_rewinds_halted_placeholder_steps(tmp_path, monkeypatch) -> None:
 
 
 def test_mutation_budget_exhausted_short_circuits_reflection(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """Once the mutation call budget is exhausted, a triggered case must
     short-circuit deterministically before spending the reflection stack:
@@ -913,7 +915,7 @@ def test_evolution_carries_initial_policy_genome_into_detector(
 
 
 def test_pro_route_escalates_when_flash_diagnosis_cannot_find_owner(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """v6 phase 3: when every primary candidate retreats to no_edit and the
     Flash diagnosis cannot find an executable owner, the Pro route gets one
@@ -1014,7 +1016,7 @@ def test_pro_route_escalates_when_flash_diagnosis_cannot_find_owner(
 
 
 def test_pro_route_survives_flash_targeted_no_edit_residue(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """A no_edit recorded by the Flash diagnosis route must not discard the
     candidate the Pro route later generates (stale-reason regression)."""
@@ -1111,7 +1113,9 @@ def test_pro_route_survives_flash_targeted_no_edit_residue(
     assert calls.count("reflection_pro") == 2
 
 
-def test_causal_episode_context_reaches_reflection(tmp_path, monkeypatch) -> None:
+def test_causal_episode_context_reaches_reflection(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """Phase 3: the reflection prompt receives the causal episode context
     (failure edge, obligation diff, legal envelope) and never the removed
     contrast-condition block; the contrast registry stays replay-side only."""

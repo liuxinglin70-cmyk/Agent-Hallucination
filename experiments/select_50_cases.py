@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import random
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,6 +50,47 @@ CATEGORY_TARGETS = {
     "instruction": 1,
     "other": 1,
 }
+
+
+def balanced_online_order(cases: list[dict]) -> list[dict]:
+    """Interleave polarity, family, and category for the online case stream."""
+    remaining = list(cases)
+    family_targets = Counter(case["family"] for case in cases)
+    group_targets = Counter(case["group"] for case in cases if case["gold"])
+    family_seen: Counter[str] = Counter()
+    group_seen: Counter[str] = Counter()
+    ordered: list[dict] = []
+    clean_positions = {2, 5, 8}
+
+    while remaining:
+        position = len(ordered)
+        want_gold = position % 10 not in clean_positions
+        candidates = [case for case in remaining if case["gold"] is want_gold]
+        if not candidates:
+            candidates = remaining
+        previous_family = ordered[-1]["family"] if ordered else None
+
+        def score(case: dict) -> tuple:
+            family = case["family"]
+            group = case["group"]
+            return (
+                family == previous_family,
+                family_seen[family] / family_targets[family],
+                (
+                    group_seen[group] / group_targets[group]
+                    if case["gold"] and group_targets[group]
+                    else 0.0
+                ),
+                case["case_id"],
+            )
+
+        selected = min(candidates, key=score)
+        remaining.remove(selected)
+        ordered.append(selected)
+        family_seen[selected["family"]] += 1
+        if selected["gold"]:
+            group_seen[selected["group"]] += 1
+    return ordered
 
 
 def load_ledger() -> set[str]:
@@ -170,13 +212,12 @@ def select_50() -> list[dict]:
                 take(case)
                 break
 
-    picked.sort(key=lambda c: c["case_id"])
     if len(picked) != 50:
         raise RuntimeError(
             f"only {len(picked)} eligible cases after stratification; "
             "pool too small"
         )
-    return picked
+    return balanced_online_order(picked)
 
 
 def main() -> int:
@@ -187,13 +228,14 @@ def main() -> int:
         "clean": sum(1 for c in picked if not c["gold"]),
         "cases": [
             {
+                "sequence_index": index,
                 "case_id": c["case_id"],
                 "family": c["family"],
                 "gold": c["gold"],
                 "category": c["category"],
                 "subcategory": c["subcategory"],
             }
-            for c in picked
+            for index, c in enumerate(picked)
         ],
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -201,14 +243,22 @@ def main() -> int:
     path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8",
     )
+    records = {
+        case["case_id"]: json.loads(case["record_path"].read_text(encoding="utf-8"))
+        for case in picked
+    }
+    records_path = OUT_DIR / "records.json"
+    records_path.write_text(
+        json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
     # Quick balance summary.
-    from collections import Counter
     groups = Counter(c["group"] for c in picked if c["gold"])
     families = Counter(c["family"] for c in picked)
     print(f"hallu={manifest['hallucinated']} clean={manifest['clean']}")
     print("category groups:", dict(groups))
     print("families:", dict(families))
     print(f"manifest written: {path}")
+    print(f"records written: {records_path}")
     return 0
 
 

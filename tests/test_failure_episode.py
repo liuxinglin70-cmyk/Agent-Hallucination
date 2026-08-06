@@ -15,8 +15,10 @@ from src.sehd_v6.core.bccse.failure_episode import (
     build_failure_episode,
     build_mechanism_signature,
     project_failure_episode_for_prompt,
+    project_provider_artifacts,
     validate_failure_episode,
 )
+from src.sehd_v6.core.bccse.step_attributor import ErrorType
 from src.sehd_v6.core.bccse.v6_contracts import LAYER_L1, FailureAttribution
 
 from tests.fixtures.causal_evolution import (
@@ -134,6 +136,131 @@ def test_malformed_field_episode() -> None:
     assert episode.causal_slice.failure_edge.field == "evidence_refs"
     valid, reason = validate_failure_episode(episode)
     assert valid, reason
+
+
+def test_precise_audit_precedes_quarantine_total_and_selects_same_certificate() -> None:
+    detection = detection_result(
+        state="unresolved",
+        adjudication={
+            "state": "unresolved",
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 1,
+            "valid_defense_certificate_count": 1,
+            "error_audits": [
+                {
+                    "certificate_id": "error_bad",
+                    "decision": "quarantine",
+                    "failed_checks": ["impact_evidence_refs"],
+                }
+            ],
+        },
+        health={"quarantined_error_certificate_count": 1},
+        prosecution=[
+            {"certificate_id": "error_good", "impact_evidence_refs": ["event_1"]},
+            {"certificate_id": "error_bad", "impact_evidence_refs": []},
+        ],
+    )
+    signal = signal_for("unresolved")
+    artifacts = project_provider_artifacts(
+        detection_result=detection,
+        signal=signal,
+        primary_type="factual",
+    )
+    assert artifacts == [{
+        "kind": "error_certificate",
+        "module_hint": "",
+        "malformed": True,
+        "missing_fields": ["impact_evidence_refs"],
+        "artifact_id": "error_bad",
+        "source": "error_audits",
+    }]
+
+    from src.sehd_v6.core.bccse.failure_classifier import classify_failure
+
+    attribution = classify_failure({
+        "adjudication": detection["proof_adjudication"],
+        "provider_artifacts": artifacts,
+    })
+    episode = _build(detection, attribution=attribution, signal=signal)
+    assert attribution.evidence["artifact_id"] == "error_bad"
+    assert episode.causal_slice.candidate_id == "error_bad"
+    assert episode.causal_slice.malformed_fields == ("impact_evidence_refs",)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_kind"),
+    [
+        (ErrorType.UNRESOLVED_SHOULD_ERROR, "error_certificate"),
+        (ErrorType.UNRESOLVED_SHOULD_CLEAN, "defense_certificate"),
+        (ErrorType.UNRESOLVED_UNKNOWN, None),
+    ],
+)
+def test_missing_certificate_projection_respects_target_polarity(
+    error_type: ErrorType,
+    expected_kind: str | None,
+) -> None:
+    detection = detection_result(
+        state="unresolved",
+        adjudication={
+            "state": "unresolved",
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "incomplete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+            "required_candidate_count": 1,
+        },
+    )
+    signal = signal_for(
+        "unresolved",
+        error_type=error_type,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="incomplete",
+        candidate_count=1,
+    )
+
+    artifacts = project_provider_artifacts(
+        detection_result=detection,
+        signal=signal,
+        primary_type="contextual",
+    )
+
+    if expected_kind is None:
+        assert artifacts == []
+    else:
+        assert artifacts == [{
+            "kind": expected_kind,
+            "module_hint": "",
+            "malformed": False,
+            "missing_fields": ["certificate"],
+        }]
+
+
+def test_clean_target_with_complete_defense_does_not_invent_error_gap() -> None:
+    detection = detection_result(
+        state="unresolved",
+        adjudication={
+            "state": "unresolved",
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 2,
+            "required_candidate_count": 2,
+        },
+    )
+    signal = signal_for(
+        "unresolved",
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete",
+        candidate_count=2,
+    )
+
+    assert project_provider_artifacts(
+        detection_result=detection,
+        signal=signal,
+        primary_type="contextual",
+    ) == []
 
 
 def test_provider_output_unconsumed_downstream() -> None:
@@ -330,7 +457,12 @@ def test_runner_attaches_episode_audit_and_is_deterministic(
         runner,
         "attribute_failure",
         lambda result, use_gold=False, gold_reflection=False: signal_for(
-            str(result["state"])
+            str(result["state"]),
+            error_type=(
+                ErrorType.CORRECT
+                if str(result["state"]) == "verified_clean"
+                else ErrorType.UNRESOLVED_SHOULD_ERROR
+            ),
         ),
     )
     monkeypatch.setattr(

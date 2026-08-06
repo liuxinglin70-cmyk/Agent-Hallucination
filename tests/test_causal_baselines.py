@@ -106,7 +106,7 @@ def test_fixture_action_spec_compilation_is_deterministic() -> None:
 
 
 def test_offline_fixture_replay_makes_no_external_calls(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 

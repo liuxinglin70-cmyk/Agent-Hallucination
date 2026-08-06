@@ -38,7 +38,7 @@ from tests.fixtures.causal_evolution import (
 
 
 def test_remove_rule_proposal_reaches_gate_without_nameerror(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """The remove_rule assembly must read the working genome, not the
     undefined `champion` name: a removal proposal must fail with a real
@@ -220,10 +220,8 @@ def test_cross_case_dedup_survives_long_rules_and_is_module_scoped() -> None:
     ) is False
 
 
-def test_l2_fallthrough_grounds_l1_episode(tmp_path, monkeypatch) -> None:
-    """After an L2 attribution falls through to the L1 skill path, the L1
-    steps must carry an L1 episode (not the L2 episode whose policy
-    evaluator has no L1 legal surface)."""
+def test_l2_attribution_never_synthesizes_an_l1_episode(tmp_path, monkeypatch) -> None:
+    """An L2-only failure remains L2 when no executable policy exists."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     def detector(*, genome, case_id, **kwargs):
@@ -259,17 +257,19 @@ def test_l2_fallthrough_grounds_l1_episode(tmp_path, monkeypatch) -> None:
         output_dir=tmp_path,
         census_root=tmp_path,
         mutation_route={"model": "DeepSeek-V4-Flash"},
-        run_id="l2_fallthrough_review",
+        run_id="l2_ownership_review",
     )
     decisions = [step.gate_decision for step in result.steps]
     assert decisions[0] == "skip_no_policy"
     assert result.steps[0].episode["attribution"]["layer"] == (
         "l2_adjudication_policy"
     )
-    l1_steps = [step for step in result.steps[1:] if step.episode]
-    assert l1_steps
-    assert l1_steps[0].episode["attribution"]["layer"] == LAYER_L1
-    assert l1_steps[0].episode["attribution"]["artifact"] == "evidence_obligation"
+    assert len(result.steps) == 1
+    assert not any(
+        step.episode
+        and step.episode["attribution"]["layer"] == LAYER_L1
+        for step in result.steps
+    )
 
 
 def test_causal_link_test_reject_non_causal_origin_is_admissible() -> None:

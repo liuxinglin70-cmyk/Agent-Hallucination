@@ -58,8 +58,9 @@ def plan_policy_candidates(
     """Enumerate executable policy repairs owned by one attribution.
 
     The model may rank these candidates but cannot compose predicate/action
-    pairs.  An empty result means the current L2 runtime has no action capable
-    of repairing the attributed artifact; the caller can fall through to L1.
+    pairs. An empty result means the current L2 runtime has no action capable
+    of repairing the attributed artifact; the outcome remains an auditable,
+    non-executable L2 diagnosis.
     """
     reason = attribution.reason_code
     templates: list[tuple[str, str, dict[str, Any], str]] = []

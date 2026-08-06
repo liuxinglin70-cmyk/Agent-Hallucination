@@ -422,7 +422,7 @@ def test_runtime_observation_uses_surviving_certificate_ids() -> None:
 
 
 def test_same_source_no_effect_retry_can_produce_effective_skill(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -486,7 +486,9 @@ def test_same_source_no_effect_retry_can_produce_effective_skill(
     assert result.evolution_audit["mutation_retry_attempts"] == 1
 
 
-def test_conflict_gate_flag_is_advisory_not_a_veto(tmp_path, monkeypatch) -> None:
+def test_conflict_gate_flag_is_advisory_not_a_veto(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     """A complementarity flag from the LLM conflict gate no longer discards
     the edit before replay: it is recorded and blocks only the T6
     self-supervised provisional path, while gold-assisted fitness decides on
@@ -1016,7 +1018,9 @@ def test_classifier_is_conservative_and_secondary_affects_bounded_route() -> Non
     assert route == ("candidate_to_verifier_route", "evidence_obligation")
 
 
-def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch) -> None:
+def test_commit_canary_enters_real_child_provider_context(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     active_hashes: list[str] = []
@@ -1095,14 +1099,11 @@ def test_commit_canary_enters_real_child_provider_context(tmp_path, monkeypatch)
     applied = result.champion_genome.edits_applied[-1]
     assert applied.hallucination_type == "factual"
     assert applied.type_confidence != 1.0
-    assert applied.routing_allowed_modules == (
-        "evidence_obligation",
-        "atomic_verifier_instruction",
-    )
+    assert applied.routing_allowed_modules == ("evidence_obligation",)
 
 
 def test_directional_evidence_is_provisional_with_stable_canary(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1155,7 +1156,7 @@ def test_directional_evidence_is_provisional_with_stable_canary(
 
 
 def test_independent_registered_canary_unblocks_all_triggered_source_pool(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1251,7 +1252,7 @@ def test_label_free_run_fails_before_mutation_when_registered_canary_is_unstable
 
 
 def test_no_gold_local_process_gain_stays_unprotected_provisional(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1270,8 +1271,12 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
         return replace(
             _signal("unresolved"),
             error_type=ErrorType.UNRESOLVED_UNKNOWN,
-            target_module="abstention_rule",
-            secondary_module="evidence_obligation",
+            target_module="evidence_obligation",
+            secondary_module="atomic_verifier_instruction",
+            prosecution_coverage=1.0 if improved else 0.4,
+            prosecution_coverage_state=(
+                "complete" if improved else "incomplete"
+            ),
             crs_complete=improved,
             consensus_gate_applied=improved,
         )
@@ -1282,18 +1287,18 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
         runner,
         "json_object_provider_call",
         lambda **kwargs: ({
-            "target_module": "abstention_rule",
+            "target_module": "evidence_obligation",
             "operation": "add_rule",
-            "condition": "proof participants leave a material claim untested",
-                "action": "emit_boundary_finding: state",
-            "evidence_anchor": "material claim left untested",
-            "feature_description": "material claim left untested",
-            "expected_effect": "terminal state becomes decisive",
+            "condition": "a factual claim lacks cited trajectory support",
+            "action": "require_evidence_field: impact_evidence_refs",
+            "evidence_anchor": "material claim lacks impact evidence",
+            "feature_description": "material claim lacks impact evidence",
+            "expected_effect": "prosecution evidence coverage increases",
             "expected_effect_contract": {
-                "observable_field": "state",
-                "expected_direction": "shift",
-                "expected_scope": "unresolved_cases",
-                "trigger_condition": "the evidence boundary is complete",
+                "observable_field": "prosecution_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "prosecution evidence is incomplete",
             },
             "rationale": "Improve proof completeness.",
         }, {}),
@@ -1321,7 +1326,7 @@ def test_no_gold_local_process_gain_stays_unprotected_provisional(
 
 
 def test_runner_rejects_source_self_proof_and_counts_convergence(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1365,7 +1370,7 @@ def test_runner_rejects_source_self_proof_and_counts_convergence(
 
 
 def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """v5.4 public checkpoint resume API.
 
@@ -1489,7 +1494,7 @@ def test_checkpoint_resume_skips_processed_cases_and_preserves_state(
 
 
 def test_resume_restores_pending_probe_commit_and_rolls_it_back(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     import json
@@ -1587,7 +1592,7 @@ def test_resume_restores_pending_probe_commit_and_rolls_it_back(
 
 
 def test_resume_restores_same_source_retry_attempt_and_feedback(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1681,7 +1686,7 @@ def test_resume_restores_same_source_retry_attempt_and_feedback(
 
 @pytest.mark.parametrize("probe_fails", [False, True])
 def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
-    tmp_path, monkeypatch, probe_fails,
+    tmp_path, monkeypatch, probe_fails, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1757,7 +1762,7 @@ def test_source_replay_sampled_canary_and_periodic_gold_probe_budget(
 
 
 def test_no_gold_run_has_provisional_telemetry_but_no_accuracy_claim(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -1806,7 +1811,7 @@ def test_no_gold_run_has_provisional_telemetry_but_no_accuracy_claim(
 
 
 def test_unlabelled_probe_is_process_veto_only_in_no_gold_mode(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -3937,7 +3942,9 @@ def _probe_certification_fixture(tmp_path, monkeypatch, **extra_kwargs):
     )
 
 
-def test_probe_certification_recorded_when_opted_in(tmp_path, monkeypatch) -> None:
+def test_probe_certification_recorded_when_opted_in(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     import json
 
     result = _probe_certification_fixture(
@@ -4287,7 +4294,7 @@ def test_attribute_failure_fn_omission_clean_routes_candidate_trigger() -> None:
     assert l2_telemetry == []
 
 
-def test_attribute_failure_fn_clean_quarantined_error_routes_verifier_instruction() -> None:
+def test_attribute_failure_fn_quarantine_total_is_not_an_actionable_artifact() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
@@ -4300,8 +4307,8 @@ def test_attribute_failure_fn_clean_quarantined_error_routes_verifier_instructio
         case_id="case_fn_quarantined",
         non_l1_failure_attributions=[],
     )
-    assert owner == "atomic_verifier_instruction"
-    assert reason == "provider_artifact_malformed"
+    assert owner == ""
+    assert reason == "no_failure_shape"
 
 
 def test_attribute_failure_hollow_complete_defense_records_l2_telemetry() -> None:
@@ -4397,10 +4404,8 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
     assert owner == "clean_defense_boundary"
 
 
-def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> None:
-    """Unresolved terminals carry no gold polarity, so an L1 attribution is
-    accepted without a pool check. A quarantined error certificate is a
-    certificate-quality gap owned by the verifier instruction."""
+def test_attribute_failure_unresolved_quarantine_total_is_diagnostic_only() -> None:
+    """A quarantine count proves containment, not which field needs repair."""
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
 
@@ -4413,8 +4418,8 @@ def test_attribute_failure_unresolved_accepts_l1_owner_without_polarity() -> Non
         case_id="case_unresolved_l1",
         non_l1_failure_attributions=[],
     )
-    assert owner == "atomic_verifier_instruction"
-    assert reason == "provider_artifact_malformed"
+    assert owner == ""
+    assert reason == "no_failure_shape"
 
 
 def test_attribute_failure_no_failure_shape_returns_empty() -> None:
@@ -4457,6 +4462,7 @@ def test_attribute_failure_prosecution_gap_routes_evidence_obligation() -> None:
         gold_label=None,
         has_gold=False,
         prosecution_coverage_state="incomplete",
+        defense_coverage_state="complete",
         candidate_count=3,
     )
     l2_telemetry: list[dict] = []
@@ -4466,8 +4472,10 @@ def test_attribute_failure_prosecution_gap_routes_evidence_obligation() -> None:
             "proof_adjudication": {
                 "state": "unresolved",
                 "prosecution_coverage": "incomplete",
+                "defense_coverage": "complete",
                 "required_candidate_count": 4,
                 "valid_error_certificate_count": 0,
+                "valid_defense_certificate_count": 1,
                 "surviving_error_certificate_ids": [],
             },
         },
@@ -4953,7 +4961,7 @@ def test_contrast_inversion_rules() -> None:
 
 
 def test_valid_slots_persist_as_deterministic_render(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
     from src.sehd_v6.core.bccse.rule_contract import RuleSpec, render_rule
@@ -5126,6 +5134,80 @@ def _anchor_clean_result() -> dict:
     return {"state": "verified_clean", "runtime_valid": True, "census": []}
 
 
+def test_l1_episode_allows_only_the_authoritative_artifact_owner(
+    tmp_path, monkeypatch,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_run_detection_with_genome",
+        lambda **kwargs: {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: replace(
+            _signal("unresolved"),
+            target_module="abstention_rule",
+            secondary_module="candidate_trigger",
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "project_provider_artifacts",
+        lambda **kwargs: [{
+            "kind": "candidate",
+            "module_hint": "",
+            "malformed": False,
+            "missing_fields": ["candidate"],
+            "artifact_id": "missing_candidate",
+            "source": "construct_stage",
+        }],
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: ({
+            "target_module": "abstention_rule",
+            "operation": "add_rule",
+            "condition": "the boundary path is verified clean",
+            "action": "emit_boundary_finding: state",
+            "evidence_anchor": "candidate artifact absent from construct output",
+            "feature_description": "missing candidate artifact",
+            "rationale": "Edit the diagnostic fallback instead of the owner.",
+        }, {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        max_mutation_attempts_per_case=1,
+        run_id="artifact_owner_only",
+    )
+
+    step = result.steps[0]
+    assert step.gate_decision == "skip_invalid_mutation"
+    assert "target_module_outside_allowed:abstention_rule" in (
+        step.fitness_check["mutation_error"]
+    )
+    assert step.episode["action_envelope"]["legal_modules"] == [
+        "candidate_trigger"
+    ]
+    assert step.episode["attribution"]["fallback_owner_module"] == (
+        "abstention_rule"
+    )
+
+
 def _run_l2_loop(
     tmp_path,
     monkeypatch,
@@ -5160,8 +5242,8 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
 ) -> None:
     """A consensus-gate attribution has no executable L2 repair.
 
-    The planner must not ask the model to invent a telemetry-only policy or
-    replay one.  The unresolved detection still falls through to L1.
+    The planner must not ask the model to invent a telemetry-only policy,
+    replay one, or fabricate an L1 owner after the L2 no-policy result.
     """
     replay_states: list = []
 
@@ -5211,24 +5293,19 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
         detector=detector,
         mutation=mutation,
         signal_for=(
-            lambda result, use_gold=False, gold_reflection=False: _signal(
-                str(result["state"])
+            lambda result, use_gold=False, gold_reflection=False: replace(
+                _signal(str(result["state"])),
+                attribution_confidence="low",
             )
         ),
         records={"source": {}, "anchor": {}},
         run_id="l2_no_effect",
     )
 
-    assert len(mutation_calls) == 2
-    assert all(
-        call["purpose"] in {"reflection_diagnosis", "mutation"}
-        for call in mutation_calls
-    )
+    assert mutation_calls == []
+    assert result.evolution_audit["mutation_calls"] == 0
     assert replay_states == []
-    assert [step.gate_decision for step in result.steps] == [
-        "skip_no_policy",
-        "skip_no_edit",
-    ]
+    assert [step.gate_decision for step in result.steps] == ["skip_no_policy"]
     audit = result.evolution_audit
     assert audit["l2_policy_accepts"] == 0
     assert [entry["decision"] for entry in audit["l2_policy_audit"]] == [
@@ -5241,8 +5318,7 @@ def test_l2_no_effect_policy_is_rejected_without_l1_mutation(
     assert [entry["layer"] for entry in audit["non_l1_failure_attributions"]] == [
         "l2_adjudication_policy",
     ]
-    # Nothing was accepted anywhere and the L1 fall-through produced only
-    # schema-invalid NO_EDIT skips (no skill edit, no wasted acceptance).
+    # Nothing was accepted and no ungrounded L1 experience was generated.
     assert result.edits_accepted == 0
     assert result.edits_rejected == 0
     assert result.champion_genome.generation == 0
@@ -5289,18 +5365,10 @@ def test_l2_no_proposal_skips_without_replay(tmp_path, monkeypatch) -> None:
     )
 
     # The deterministic planner proves that this attribution has no runtime
-    # repair before any L2 model call is made.  Only the L1 fall-through uses
-    # the provider.
-    assert len(mutation_calls) == 2
-    assert all(
-        call["purpose"] in {"reflection_diagnosis", "mutation"}
-        for call in mutation_calls
-    )
+    # repair before any model call is made.
+    assert mutation_calls == []
     assert policy_replays == []
-    assert [step.gate_decision for step in result.steps] == [
-        "skip_no_policy",
-        "skip_no_edit",
-    ]
+    assert [step.gate_decision for step in result.steps] == ["skip_no_policy"]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "skip_no_policy"
     assert entry["reason"] == "no_executable_policy_for_attribution"
@@ -5513,14 +5581,11 @@ def test_l2_state_change_against_gold_polarity_is_rejected(
         fitness_use_gold=True,
     )
 
-    # L2 fitness rejected the demotion (moved against gold polarity).  The
-    # case was genuinely triggered, so the runner falls through to the L1
-    # skill path; the mock mutation returns the L2 vocabulary, so the L1
-    # attempt fails schema validation and ends as a NO_EDIT skip.
-    assert len(result.steps) == 2
+    # L2 fitness rejected the demotion (moved against gold polarity), and the
+    # L2-only attribution cannot be recast as an L1 skill defect.
+    assert len(result.steps) == 1
     assert [step.gate_decision for step in result.steps] == [
         "reject_policy_fitness",
-        "skip_no_edit",
     ]
     entry = result.evolution_audit["l2_policy_audit"][0]
     assert entry["decision"] == "reject_policy_fitness"
@@ -5529,7 +5594,9 @@ def test_l2_state_change_against_gold_polarity_is_rejected(
     assert result.evolution_audit["policy_genome"]["items"] == []
 
 
-def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -> None:
+def test_l1_replays_keep_the_accepted_l2_policy_context(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     real_attribute = runner.attribute_failure
@@ -5624,7 +5691,7 @@ def test_l1_replays_keep_the_accepted_l2_policy_context(tmp_path, monkeypatch) -
 
 
 def test_probe_measures_and_rolls_back_the_l2_policy_surface(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     """The development probe must evaluate the evolved detector surface
     (champion genome plus the accepted L2 policy), and a failed probe must
@@ -5967,15 +6034,10 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
 
     decisions = [step.gate_decision for step in result.steps]
     # L2 acceptance on source; the protected removal on source2 is rejected
-    # at the vocabulary gate.  The triggered source2 then falls through to
-    # the L1 skill path (policy cannot repair a broken detection), where
-    # the L2-vocabulary mock fails schema validation and retries within the
-    # bounded attempt budget.  The retry re-enters the queue past the L2
-    # loop (it already had its chance on attempt 0), so only one
-    # skip_no_policy is recorded for source2.
+    # at the vocabulary gate without creating an unrelated L1 mutation.
     assert decisions[0] == "accept_policy"
     assert decisions.count("skip_no_policy") == 1
-    assert any(
+    assert not any(
         decision in {"retry_invalid_mutation", "skip_invalid_mutation"}
         for decision in decisions[1:]
     )

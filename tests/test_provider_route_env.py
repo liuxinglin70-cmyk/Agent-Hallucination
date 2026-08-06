@@ -587,4 +587,4 @@ def test_evolution_accepts_case_insensitive_route_alias_without_provider_call(
     )
 
     assert result.edits_accepted == 0
-    assert result.steps[0].gate_decision in {"skip_stable", "skip_no_edit"}
+    assert result.steps[0].gate_decision == "skip_unaddressable_failure"

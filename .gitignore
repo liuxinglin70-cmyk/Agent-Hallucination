@@ -8,6 +8,7 @@ tmp_upload_*/
 *.txt
 
 # Experiment workspace (local-only)
+experiments/pytest-*/
 experiments/cache/
 experiments/progress/
 experiments/results/

@@ -112,7 +112,7 @@ def test_completed_run_writes_valid_state_manifest(
 
 
 def test_inherit_carries_complete_state_to_new_data_stream(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
     _inheritance_env(monkeypatch)
     first = _run_one(

@@ -343,7 +343,9 @@ def test_reference_contains_shared_and_private_facts() -> None:
     assert reference.episode_id == episode.episode_id
 
 
-def test_runner_persists_combined_memory_artifact(tmp_path, monkeypatch) -> None:
+def test_runner_persists_combined_memory_artifact(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     def detector(*, genome, case_id, **kwargs):

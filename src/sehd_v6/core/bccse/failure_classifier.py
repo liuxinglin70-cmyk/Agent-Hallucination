@@ -191,6 +191,8 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
                 "kind": str(artifact.get("kind") or ""),
                 "module_hint": str(artifact.get("module_hint") or ""),
                 "missing_fields": list(artifact.get("missing_fields") or []),
+                "artifact_id": str(artifact.get("artifact_id") or ""),
+                "source": str(artifact.get("source") or ""),
             },
         )
 
