@@ -1466,43 +1466,43 @@ provider_billed_usage
 
 ### 功能
 
-- [ ] MetaSkillState 有稳定 content hash 和 lineage。
-- [ ] MetaEdit 可增删 guidance 和 ranking preference。
-- [ ] GateExperience 与 OutcomeValidation 闭环。
-- [ ] exact false reject 和 class counterevidence 分离。
-- [ ] Meta guidance 可注入 L1/L2。
-- [ ] Meta 排序不扩大候选集合。
-- [ ] efficiency profile 可记录。
-- [ ] drift snapshot 可生成。
-- [ ] profile 可在满足证据后切换。
-- [ ] profile 无证据不切换。
-- [ ] rollback 同步完整。
+- [x] MetaSkillState 有稳定 content hash 和 lineage。
+- [x] MetaEdit 可增删 guidance 和 ranking preference。
+- [x] GateExperience 与 OutcomeValidation 闭环。
+- [x] exact false reject 和 class counterevidence 分离。
+- [x] Meta guidance 可注入 L1/L2。
+- [x] Meta 排序不扩大候选集合。
+- [x] efficiency profile 可记录。
+- [x] drift snapshot 可生成。
+- [x] profile 可在满足证据后切换。
+- [x] profile 无证据不切换。
+- [x] rollback 同步完整。
 
 ### 安全
 
-- [ ] Meta 不修改 verdict。
-- [ ] Meta 不绕过 hard gate。
-- [ ] Meta 不修改 ActionSpec。
-- [ ] Meta 不创建任意 policy。
-- [ ] Meta 不创建 operator。
-- [ ] prompt 无 identity/gold 泄漏。
-- [ ] final holdout 不写回。
+- [x] Meta 不修改 verdict。
+- [x] Meta 不绕过 hard gate。
+- [x] Meta 不修改 ActionSpec。
+- [x] Meta 不创建任意 policy。
+- [x] Meta 不创建 operator。
+- [x] prompt 无 identity/gold 泄漏。
+- [x] final holdout 不写回。
 
 ### 持久化
 
-- [ ] resume 幂等。
-- [ ] inheritance hash 完整。
-- [ ] interrupted/uninterrupted normalized equality。
-- [ ] rollback 后所有 state hash 恢复。
-- [ ] bugfix 后全量测试继续通过。
+- [x] resume 幂等。
+- [x] inheritance hash 完整。
+- [x] interrupted/uninterrupted normalized equality。
+- [x] rollback 后所有 state hash 恢复。
+- [x] bugfix 后全量测试继续通过。
 
 ### 成本
 
-- [ ] 新增调用都有 purpose 和上限。
-- [ ] logical/fresh transport 分离。
-- [ ] cache 和 retry 正确计数。
-- [ ] 无价格表时 `cost_status=unavailable`。
-- [ ] 不用假 0 代表未知成本。
+- [x] 新增调用都有 purpose 和上限。
+- [x] logical/fresh transport 分离。
+- [x] cache 和 retry 正确计数。
+- [x] 无价格表时 `cost_status=unavailable`。
+- [x] 不用假 0 代表未知成本。
 
 ## 13.20 提交建议
 

@@ -4051,6 +4051,7 @@ def run_online_evolution(
         nonlocal champion_genome, current_genome, stable_genome
         nonlocal policy_genome, l2_policy_accepts
         nonlocal stable_policy_genome, stable_l2_policy_accepts
+        nonlocal meta_skill_state
         nonlocal edits_accepted, edits_rejected, rollback_reason
         nonlocal last_probe_accepted_count, last_probe_triggered_count
         nonlocal stable_history_length
@@ -4150,6 +4151,16 @@ def run_online_evolution(
             policy_genome = stable_policy_genome.clone()
             l2_policy_accepts = stable_l2_policy_accepts
             causal_memory.from_dict(stable_memory_payload)
+            # Synchronized rollback (§13.17): the Meta configuration rolls
+            # back with the experience memory that is its single authority,
+            # so the gate profile and guidance never drift ahead of the
+            # genomes they were validated against.
+            persisted_meta = causal_memory.meta_review.get("meta_state") or {}
+            if persisted_meta:
+                try:
+                    meta_skill_state = MetaSkillState.from_dict(persisted_meta)
+                except ValueError:
+                    meta_skill_state = create_baseline_meta_skill()
             stable_canaries.clear()
             stable_canaries.update(stable_canaries_checkpoint)
             for item in pending_probe_commits:
