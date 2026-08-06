@@ -24,6 +24,7 @@ from ..bccse.v6_contracts import (
     PolicyItem,
     validate_policy_params,
 )
+from ..bccse.vocabulary_registry import L2_REGISTRY
 
 _COVERAGE_RANK = {"unresolved": 0, "incomplete": 1, "complete": 2}
 
@@ -80,15 +81,23 @@ def _recompute_terminal_state(
 def evaluate_policies(
     facts: AdjudicationFacts,
     items: Sequence[PolicyItem],
+    registry=None,
 ) -> PolicyEvaluationResult:
     """Apply L2 policy items to adjudication facts, deterministically.
 
     Items are evaluated in list order (genome order = deterministic
     priority). Unresolvable preconditions and invalid actions fail closed:
-    they are recorded in ``skipped`` and never applied. Actions outside
-    ``L2_ACTIONS`` (including the reserved engine-level actions, which the
-    runtime does not implement) fail closed as ``unknown_action``.
+    they are recorded in ``skipped`` and never applied. Actions outside the
+    active vocabulary (including the reserved engine-level actions, which
+    the runtime does not implement) fail closed as ``unknown_action``.
+
+    ``registry`` is the vocabulary authority the items are resolved against;
+    it defaults to the baseline ``L2_REGISTRY`` so existing callers keep the
+    baseline behavior. A genome carrying an evolved registry resolves its
+    items against that registry, so a pending or disabled entry is never
+    executed.
     """
+    active_registry = registry if registry is not None else L2_REGISTRY
     eff_prosecution = facts.prosecution_coverage
     eff_defense = facts.defense_coverage
     applied_item_ids: list[str] = []
@@ -98,7 +107,7 @@ def evaluate_policies(
     terminal_override = ""
 
     for item in items:
-        predicate = L2_PREDICATES.get(item.precondition)
+        predicate = active_registry.predicate_fn(item.precondition)
         if predicate is None:
             skipped.append({
                 "item_id": item.item_id,
@@ -109,7 +118,7 @@ def evaluate_policies(
             continue
         if not predicate(facts):
             continue
-        if item.action not in L2_ACTIONS:
+        if item.action not in active_registry.action_names():
             skipped.append({
                 "item_id": item.item_id,
                 "precondition": item.precondition,

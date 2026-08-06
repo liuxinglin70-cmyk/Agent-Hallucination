@@ -22,9 +22,13 @@ from src.sehd_v6.core.bccse.vocabulary_registry import (
     REGISTRY_SCHEMA_VERSION,
     REGISTRY_VERSION,
     STATUS_BASELINE,
+    STATUS_DISABLED,
+    STATUS_PENDING,
+    STATUS_REGISTERED,
     PredicateEntry,
     VocabularyRegistry,
     _build_baseline_registry,
+    apply_registry_edit,
 )
 from src.sehd_v6.core.paca_tcl.policy_evaluator import evaluate_policies
 
@@ -276,3 +280,128 @@ def test_evaluator_uses_only_registered_actions() -> None:
     for action, params in contracts.ACTION_PARAMS.items():
         assert action in L2_REGISTRY.action_names()
         assert L2_REGISTRY.action_params()[action] == params
+
+
+# ------------------------------------------------------------------
+# Online evolution (P3B): registration lifecycle and lineage
+# ------------------------------------------------------------------
+
+def _register_pending(registry, target="quarantined_error_count_nonzero"):
+    return apply_registry_edit(
+        registry, operation="register_predicate", target=target,
+        dsl="quarantined_error_count > 0",
+        reason_codes=("no_registered_runtime_action",),
+    )
+
+
+def test_first_registration_is_pending_not_active() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    assert registry.status_of("quarantined_error_count_nonzero") == STATUS_PENDING
+    # Pending entries are shadow-only: absent from every active view.
+    assert "quarantined_error_count_nonzero" not in registry.predicate_names()
+    assert registry.predicate_fn("quarantined_error_count_nonzero") is None
+
+
+def test_enable_promotes_pending_to_active() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    promoted = apply_registry_edit(
+        registry, operation="enable", target="quarantined_error_count_nonzero",
+    )
+    assert promoted.status_of(
+        "quarantined_error_count_nonzero"
+    ) == STATUS_REGISTERED
+    assert "quarantined_error_count_nonzero" in promoted.predicate_names()
+    assert promoted.predicate_fn("quarantined_error_count_nonzero") is not None
+
+
+def test_disable_excludes_entry_from_active_views() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    promoted = apply_registry_edit(
+        registry, operation="enable", target="quarantined_error_count_nonzero",
+    )
+    disabled = apply_registry_edit(
+        promoted, operation="disable", target="quarantined_error_count_nonzero",
+    )
+    assert disabled.status_of(
+        "quarantined_error_count_nonzero"
+    ) == STATUS_DISABLED
+    assert "quarantined_error_count_nonzero" not in disabled.predicate_names()
+    assert disabled.predicate_fn("quarantined_error_count_nonzero") is None
+
+
+def test_baseline_entries_cannot_be_disabled() -> None:
+    with pytest.raises(ValueError, match="baseline entry cannot be disabled"):
+        apply_registry_edit(
+            L2_REGISTRY, operation="disable",
+            target="all_candidates_quarantined",
+        )
+
+
+def test_register_duplicate_target_fails_closed() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    with pytest.raises(ValueError, match="already registered"):
+        apply_registry_edit(
+            registry, operation="register_predicate",
+            target="quarantined_error_count_nonzero",
+            dsl="quarantined_error_count > 0",
+        )
+
+
+def test_register_action_instance_binds_court_operator_only() -> None:
+    registry = apply_registry_edit(
+        L2_REGISTRY, operation="register_action",
+        target="downgrade_coverage_instance", operator="downgrade_coverage",
+    )
+    assert registry.status_of("downgrade_coverage_instance") == STATUS_PENDING
+    # Engine-level operators cannot be instantiated.
+    with pytest.raises(ValueError, match="not court-local"):
+        apply_registry_edit(
+            L2_REGISTRY, operation="register_action",
+            target="reclassify_instance", operator="reclassify_candidate_state",
+        )
+
+
+def test_registry_edit_audit_chain_is_verifiable() -> None:
+    r1 = _register_pending(L2_REGISTRY)
+    r2 = apply_registry_edit(
+        r1, operation="enable", target="quarantined_error_count_nonzero",
+    )
+    assert [e.sequence for e in r2.audit] == [1, 2]
+    first, second = r2.audit
+    # before_hash chains to the prior registry; after_hash seals the post-edit
+    # content (audit truncated to before the edit), so it is self-contained.
+    assert first.before_hash == L2_REGISTRY.content_hash
+    assert second.before_hash == r1.content_hash
+    assert first.after_hash != second.after_hash
+    assert first.operation == "register_predicate"
+    assert second.operation == "enable"
+
+
+def test_evolved_registry_roundtrip_recompiles_and_preserves_hash() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    promoted = apply_registry_edit(
+        registry, operation="enable", target="quarantined_error_count_nonzero",
+    )
+    restored = VocabularyRegistry.from_dict(promoted.to_dict())
+    assert restored.content_hash == promoted.content_hash
+    # The recompiled predicate is a pure function of the facts again.
+    fn = restored.predicate_fn("quarantined_error_count_nonzero")
+    assert fn is not None
+    assert fn(contracts.AdjudicationFacts(quarantined_error_count=3)) is True
+    assert fn(contracts.AdjudicationFacts(quarantined_error_count=0)) is False
+
+
+def test_genome_content_hash_binds_registry_state() -> None:
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyGenome,
+        create_baseline_policy_genome,
+    )
+    base = create_baseline_policy_genome()
+    evolved_registry = _register_pending(L2_REGISTRY)
+    same_items_evolved = PolicyGenome(
+        genome_id="x", items=list(base.items), registry=evolved_registry,
+    )
+    # Same items but a different registry -> different genome identity (§8.6).
+    assert same_items_evolved.content_hash != base.content_hash
+    restored = PolicyGenome.from_dict(same_items_evolved.to_dict())
+    assert restored.content_hash == same_items_evolved.content_hash

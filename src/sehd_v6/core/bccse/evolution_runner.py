@@ -100,6 +100,7 @@ from .v6_contracts import (
     LAYER_L2,
     ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION,
     ROUTE_EXECUTED,
+    ROUTE_NO_REGISTERED_RUNTIME_ACTION,
     ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
     FailureAttribution,
     build_adjudication_facts,
@@ -131,6 +132,14 @@ from .policy_reflection import (
     plan_policy_candidates,
     select_policy_candidate,
 )
+from .registry_reflection import (
+    PURPOSE_REGISTRY_REFLECTION,
+    build_registry_selection_prompt,
+    compile_registration_candidate,
+    plan_registry_candidates,
+    select_registry_candidate,
+)
+from .vocabulary_registry import apply_registry_edit
 from ..htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -2634,6 +2643,10 @@ def run_online_evolution(
         else create_baseline_policy_genome()
     )
     l2_policy_accepts = 0
+    # Audited record of every vocabulary registration applied this run. The
+    # authoritative registry state travels inside policy_genome (single
+    # authority); this list is audit telemetry, not a second copy.
+    l2_registry_registrations: list[dict[str, Any]] = []
     # Probe rollback anchors for the L2 surface, symmetric with stable_genome:
     # a failed development probe restores the policy genome accepted before
     # the last passing probe, so L1 and L2 roll back under one authority.
@@ -3361,6 +3374,67 @@ def run_online_evolution(
             return None
         return _evaluator_gold(records[case_id])
 
+    def _run_registry_reflection(
+        *,
+        attribution: FailureAttribution,
+        facts_summary: Mapping[str, Any],
+    ) -> None:
+        """Extend the L2 vocabulary when no runtime action can repair an
+        attribution. A registered entry is pending (shadow-only) on first
+        registration; the genome's registry is the single authority, so the
+        new state is checkpointed with the policy genome."""
+        nonlocal policy_genome
+        if mutation_route is None:
+            return
+        candidates = plan_registry_candidates(
+            attribution=attribution, registry=policy_genome.registry,
+        )
+        if not candidates:
+            return
+        system_prompt, user_prompt = build_registry_selection_prompt(
+            attribution=attribution,
+            facts_summary=facts_summary,
+            candidates=candidates,
+        )
+        try:
+            parsed, _meta = run_mutation_call(
+                route=mutation_route,
+                purpose=PURPOSE_REGISTRY_REFLECTION,
+                system=system_prompt,
+                user=user_prompt,
+                cache_dir=output_dir / "mutation_cache" / "registry_reflection",
+            )
+        except Exception:
+            return
+        candidate, select_reason = select_registry_candidate(parsed, candidates)
+        if candidate is None:
+            return
+        try:
+            edit_kwargs = compile_registration_candidate(
+                candidate, policy_genome.registry,
+            )
+        except ValueError:
+            # Shadow compile fail-closed: an invalid registration is dropped.
+            return
+        new_registry = apply_registry_edit(
+            policy_genome.registry,
+            **edit_kwargs,
+            reason_codes=(attribution.reason_code,),
+        )
+        # Rebind the genome's registry in place (same genome identity is
+        # recomputed from items+registry on next content_hash access); the
+        # registration is recorded as audit telemetry.
+        policy_genome.registry = new_registry
+        applied_edit = new_registry.audit[-1]
+        l2_registry_registrations.append({
+            "edit_id": applied_edit.edit_id,
+            "operation": applied_edit.operation,
+            "target": applied_edit.target,
+            "status": new_registry.status_of(applied_edit.target),
+            "sequence": applied_edit.sequence,
+            "registry_hash": new_registry.content_hash,
+        })
+
     def run_l2_policy_case(
         *,
         idx: int,
@@ -3607,6 +3681,14 @@ def run_online_evolution(
         )
         planned_candidates = plan.candidates
         if not planned_candidates:
+            # When the attribution has no registered runtime action, the L2
+            # vocabulary itself may be extended (P3B): a constrained
+            # registration planner enumerates deterministic candidates and
+            # the model may only select one or abstain. A registered entry is
+            # pending (shadow-only) on first registration and never enters
+            # the active evaluator until a later audited promotion.
+            if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
+                _run_registry_reflection(attribution=attribution, facts_summary=facts_summary)
             finish(
                 "skip_no_policy",
                 reason=plan.route_result,
@@ -6776,6 +6858,7 @@ def run_online_evolution(
             "non_l1_failure_attributions": non_l1_failure_attributions,
             "l2_policy_audit": l2_policy_audit,
             "l2_policy_accepts": l2_policy_accepts,
+            "l2_registry_registrations": l2_registry_registrations,
             "policy_genome": policy_genome.to_dict(),
             "abstention_ladder_advances": abstention_ladder_advances,
             "rollback_reason": rollback_reason,

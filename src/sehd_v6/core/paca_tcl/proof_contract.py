@@ -336,6 +336,10 @@ def adjudicate_proof_court(
     # (the deterministic boundary path passed its contract validation) can
     # never trigger a boundary-consuming terminal move.
     boundary_authority_valid: bool = False,
+    # The vocabulary registry the policy items resolve against. Defaults to
+    # the baseline registry; a genome carrying an evolved registry passes it
+    # here so pending/disabled entries are never executed.
+    policy_registry=None,
 ) -> dict[str, Any]:
     """v3.5 proof court adjudication with consensus gate and counterfactual localization.
 
@@ -675,7 +679,9 @@ def adjudicate_proof_court(
             boundary_path_state=boundary_path_state,
             boundary_authority_valid=boundary_authority_valid,
         )
-        evaluation = evaluate_policies(facts, policy_items)
+        evaluation = evaluate_policies(
+            facts, policy_items, registry=policy_registry,
+        )
         eff_prosecution = evaluation.effective_prosecution_coverage
         eff_defense = evaluation.effective_defense_coverage
         coverage_shifted = eff_prosecution != p_coverage or eff_defense != d_coverage

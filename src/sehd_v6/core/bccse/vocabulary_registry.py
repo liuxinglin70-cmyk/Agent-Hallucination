@@ -7,24 +7,24 @@ reflection planner/prompt, the policy-genome validator, and the failure
 classifier — reads the vocabulary from this module's ``L2_REGISTRY`` so the
 prompt vocabulary and the runtime semantics can never drift apart.
 
-P3A migrates the frozen constant set into this versioned registry without
-changing behavior: the baseline entries are exactly the pre-existing
-``v6_contracts`` constants, evaluation semantics are unchanged, and the
-registry itself is immutable. Online registration of new entries (the
-audited ``RegistryEdit`` generation path) belongs to P3B and is deliberately
-not wired here — only the audit data model is defined so later stages can
-record registration/disable/remove decisions without reshaping this module.
-
-The registry never enters ``PolicyGenome.content_hash`` (P3A scope): genome
-identity stays a pure function of the policy items, keeping lineage and
-cache keys stable across this refactor.
+P3A migrated the frozen constant set into this versioned registry without
+changing behavior. P3B makes the vocabulary online-evolvable: a minimal
+whitelist DSL compiles to pure predicates, ``apply_registry_edit`` applies
+audited ``RegistryEdit`` operations (register/disable/enable) producing an
+immutable lineage with a verifiable hash chain, and newly registered entries
+are ``pending`` (shadow-only) until explicitly promoted. The registry is the
+single authority persisted with the ``PolicyGenome`` and participates in its
+``content_hash`` (items + active registry state), so a genome's identity
+binds the exact vocabulary it was built on; usage counts and timestamps
+never enter the hash.
 """
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
@@ -88,13 +88,20 @@ FACTS_SCHEMA_VERSION = "sehd.adjudication_facts.v1"
 COMPILER_VERSION = "sehd.l2_baseline_compiler.v1"
 REGISTRY_VERSION = "l2_baseline_v1"
 
-# Entry status vocabulary (closed): baseline entries ship with the runtime
-# and cannot be removed; registered/disabled are reserved for the P3B online
-# path, which this stage does not wire.
+# Entry status vocabulary (closed). Only ``baseline`` and ``registered``
+# (working) entries enter the active evaluator; a freshly registered entry is
+# ``pending`` (shadow-only, not executable) until it is explicitly promoted,
+# and a ``disabled`` entry is excluded from every active view. Baseline
+# entries ship with the runtime and cannot be disabled or removed.
 STATUS_BASELINE = "baseline"
+STATUS_PENDING = "pending"
 STATUS_REGISTERED = "registered"
 STATUS_DISABLED = "disabled"
-ENTRY_STATUSES = frozenset({STATUS_BASELINE, STATUS_REGISTERED, STATUS_DISABLED})
+ENTRY_STATUSES = frozenset({
+    STATUS_BASELINE, STATUS_PENDING, STATUS_REGISTERED, STATUS_DISABLED,
+})
+# Statuses that make an entry resolvable by the runtime evaluator/planner.
+_ACTIVE_STATUSES = frozenset({STATUS_BASELINE, STATUS_REGISTERED})
 
 
 # ============================================================
@@ -262,9 +269,10 @@ class VocabularyRegistry:
     def audit(self) -> tuple[RegistryEdit, ...]:
         return self._audit
 
-    # --- active views (baseline + registered; disabled excluded) ---
+    # --- active views (baseline + registered/working; pending and disabled
+    # are excluded so a fresh or retired entry is never executable) ---
     def _active(self, entry: Any) -> bool:
-        return entry.status != STATUS_DISABLED
+        return entry.status in _ACTIVE_STATUSES
 
     def predicate_entry(self, name: str) -> PredicateEntry | None:
         entry = self._predicates.get(name)
@@ -302,6 +310,31 @@ class VocabularyRegistry:
             for name, entry in self._action_instances.items()
             if self._active(entry)
         })
+
+    # --- raw (status-unfiltered) views: serialization and hashing cover the
+    # full registry state, including pending and disabled entries, so the
+    # lineage hash captures every registration decision ---
+    def all_predicate_names(self) -> tuple[str, ...]:
+        return tuple(self._predicates)
+
+    def all_action_instance_names(self) -> tuple[str, ...]:
+        return tuple(self._action_instances)
+
+    def all_operator_names(self) -> tuple[str, ...]:
+        return tuple(self._action_operators)
+
+    def raw_predicate(self, name: str) -> PredicateEntry | None:
+        return self._predicates.get(name)
+
+    def raw_operator(self, name: str) -> ActionOperator | None:
+        return self._action_operators.get(name)
+
+    def raw_action_instance(self, name: str) -> ActionInstance | None:
+        return self._action_instances.get(name)
+
+    def status_of(self, name: str) -> str:
+        entry = self._predicates.get(name) or self._action_instances.get(name)
+        return entry.status if entry is not None else ""
 
     # --- canonical serialization / hash ---
     def to_dict(self) -> dict[str, Any]:
@@ -350,64 +383,20 @@ class VocabularyRegistry:
 # ============================================================
 # Baseline predicate semantics (deterministic, pure)
 # ============================================================
-# These are exactly the pre-registry v6_contracts predicate functions,
-# relocated here so the registry owns both the names and the semantics.
+# Each baseline predicate is defined by its canonical DSL source and
+# compiled by the same deterministic DSL compiler used for online
+# registration, so there is exactly one semantics authority (no parallel
+# hand-written implementation that could drift from the DSL form).
 
-def _pred_consensus_gate_blocked_nonempty(facts: AdjudicationFacts) -> bool:
-    return facts.consensus_gate_applied and facts.consensus_gate_blocked_count > 0
-
-
-def _hollow_coverage(facts: AdjudicationFacts, coverage: str, count: int) -> bool:
-    return coverage == "complete" and count == 0
-
-
-def _pred_defense_coverage_complete_and_zero_certificates(
-    facts: AdjudicationFacts,
-) -> bool:
-    return _hollow_coverage(
-        facts, facts.defense_coverage, facts.valid_defense_certificate_count
-    )
-
-
-def _pred_prosecution_coverage_complete_and_zero_certificates(
-    facts: AdjudicationFacts,
-) -> bool:
-    return _hollow_coverage(
-        facts, facts.prosecution_coverage, facts.valid_error_certificate_count
-    )
-
-
-def _pred_boundary_state_conflicts_with_terminal(facts: AdjudicationFacts) -> bool:
-    return (
-        facts.boundary_path_state == "verified_clean"
-        and facts.terminal_state == "unresolved"
-    )
-
-
-def _pred_surviving_errors_nonempty_and_verdict_clean(
-    facts: AdjudicationFacts,
-) -> bool:
-    return facts.surviving_error_count > 0 and facts.terminal_state == "verified_clean"
-
-
-def _pred_all_candidates_quarantined(facts: AdjudicationFacts) -> bool:
-    return facts.fully_quarantined
-
-
-def _predicate(
-    name: str,
-    dsl: str,
-    whitelist: tuple[str, ...],
-    evaluate: Callable[[AdjudicationFacts], bool],
-) -> PredicateEntry:
+def _predicate(name: str, dsl: str) -> PredicateEntry:
     return PredicateEntry(
         name=name,
         canonical_ast={"dsl": dsl},
         canonical_dsl=dsl,
-        facts_whitelist=whitelist,
+        facts_whitelist=predicate_facts_whitelist(dsl),
         registered_generation=0,
         status=STATUS_BASELINE,
-        evaluate=evaluate,
+        evaluate=compile_predicate_dsl(name, dsl),
         compiled_digest=hashlib.sha256(
             f"{COMPILER_VERSION}:{name}:{dsl}".encode("utf-8")
         ).hexdigest(),
@@ -419,38 +408,26 @@ def _build_baseline_registry() -> VocabularyRegistry:
         _predicate(
             "consensus_gate_blocked_nonempty",
             "consensus_gate_applied and consensus_gate_blocked_count > 0",
-            ("consensus_gate_applied", "consensus_gate_blocked_count"),
-            _pred_consensus_gate_blocked_nonempty,
         ),
         _predicate(
             "defense_coverage_complete_and_zero_certificates",
             'defense_coverage == "complete" and valid_defense_certificate_count == 0',
-            ("defense_coverage", "valid_defense_certificate_count"),
-            _pred_defense_coverage_complete_and_zero_certificates,
         ),
         _predicate(
             "prosecution_coverage_complete_and_zero_certificates",
             'prosecution_coverage == "complete" and valid_error_certificate_count == 0',
-            ("prosecution_coverage", "valid_error_certificate_count"),
-            _pred_prosecution_coverage_complete_and_zero_certificates,
         ),
         _predicate(
             "boundary_state_conflicts_with_terminal",
             'boundary_path_state == "verified_clean" and terminal_state == "unresolved"',
-            ("boundary_path_state", "terminal_state"),
-            _pred_boundary_state_conflicts_with_terminal,
         ),
         _predicate(
             "surviving_errors_nonempty_and_verdict_clean",
             'surviving_error_count > 0 and terminal_state == "verified_clean"',
-            ("surviving_error_count", "terminal_state"),
-            _pred_surviving_errors_nonempty_and_verdict_clean,
         ),
         _predicate(
             "all_candidates_quarantined",
             "fully_quarantined",
-            ("fully_quarantined",),
-            _pred_all_candidates_quarantined,
         ),
     ]
 
@@ -519,5 +496,341 @@ def _build_baseline_registry() -> VocabularyRegistry:
     )
 
 
-# The single authoritative registry instance for the L2 vocabulary.
+# ============================================================
+# Predicate DSL compiler (P3B online-evolvable vocabulary)
+# ============================================================
+# The minimal DSL compiles a restricted boolean/comparison expression over
+# the AdjudicationFacts whitelist into a pure ``(facts) -> bool`` closure.
+# Compilation is fail-closed: any construct outside the whitelist (function
+# calls, attribute access, subscripts, dynamic names, comprehensions,
+# regex, imports) is rejected at parse/validation time and never produces a
+# predicate. Only the canonical DSL source and its digest are persisted;
+# loading recompiles deterministically.
+
+_FACTS_FIELDS = frozenset(AdjudicationFacts.__dataclass_fields__)
+
+# Closed value vocabulary a predicate may compare against (string literals
+# are confined to the coverage/terminal/boundary states the facts can hold).
+_DSL_ALLOWED_STRINGS = frozenset({
+    "complete", "incomplete", "unresolved", "none",
+    "verified_clean", "verified_error", "cleared",
+})
+
+
+class RegistryDslError(ValueError):
+    """A DSL source failed whitelist/syntax validation (fail-closed)."""
+
+
+def _validate_dsl_node(node: ast.AST, fields: set[str]) -> None:
+    if isinstance(node, ast.Expression):
+        _validate_dsl_node(node.body, fields)
+        return
+    if isinstance(node, ast.BoolOp):
+        if not isinstance(node.op, (ast.And, ast.Or)):
+            raise RegistryDslError("only and/or boolean operators are allowed")
+        for value in node.values:
+            _validate_dsl_node(value, fields)
+        return
+    if isinstance(node, ast.UnaryOp):
+        if not isinstance(node.op, ast.Not):
+            raise RegistryDslError("only `not` unary operator is allowed")
+        _validate_dsl_node(node.operand, fields)
+        return
+    if isinstance(node, ast.Compare):
+        _validate_dsl_node(node.left, fields)
+        for operator in node.ops:
+            if not isinstance(operator, (
+                ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.In,
+            )):
+                raise RegistryDslError(
+                    f"comparison operator not allowed: {type(operator).__name__}"
+                )
+        for comparator in node.comparators:
+            _validate_dsl_node(comparator, fields)
+        return
+    if isinstance(node, ast.Name):
+        if node.id not in _FACTS_FIELDS:
+            raise RegistryDslError(
+                f"field outside AdjudicationFacts whitelist: {node.id}"
+            )
+        fields.add(node.id)
+        return
+    if isinstance(node, ast.Constant):
+        if isinstance(node.value, bool) or node.value is None:
+            raise RegistryDslError("boolean/None literals are not allowed")
+        if isinstance(node.value, str) and node.value not in _DSL_ALLOWED_STRINGS:
+            raise RegistryDslError(
+                f"string literal outside closed value vocabulary: {node.value!r}"
+            )
+        if not isinstance(node.value, (int, float, str)):
+            raise RegistryDslError(
+                f"literal type not allowed: {type(node.value).__name__}"
+            )
+        return
+    if isinstance(node, ast.List):
+        for element in node.elts:
+            if not isinstance(element, ast.Constant):
+                raise RegistryDslError("`in` lists may only contain literals")
+            _validate_dsl_node(element, fields)
+        return
+    raise RegistryDslError(
+        f"DSL construct not allowed: {type(node).__name__}"
+    )
+
+
+def compile_predicate_dsl(
+    name: str, dsl: str,
+) -> Callable[[AdjudicationFacts], bool]:
+    """Compile one DSL source into a pure predicate over AdjudicationFacts.
+
+    Returns the deterministic closure; raises ``RegistryDslError`` on any
+    whitelist/syntax violation so an invalid source is never registered.
+    """
+    tree = ast.parse(dsl, mode="eval")
+    fields: set[str] = set()
+    _validate_dsl_node(tree, fields)
+    if not fields:
+        raise RegistryDslError("predicate must reference at least one fact field")
+    code = compile(tree, filename=f"<registry_predicate:{name}>", mode="eval")
+
+    def evaluate(facts: AdjudicationFacts) -> bool:
+        namespace = {
+            field_name: getattr(facts, field_name) for field_name in fields
+        }
+        return bool(eval(code, {"__builtins__": {}}, namespace))
+
+    return evaluate
+
+
+def predicate_facts_whitelist(dsl: str) -> tuple[str, ...]:
+    """Return the sorted fact-field whitelist a DSL source references."""
+    tree = ast.parse(dsl, mode="eval")
+    fields: set[str] = set()
+    _validate_dsl_node(tree, fields)
+    return tuple(sorted(fields))
+
+
+# ============================================================
+# Entry deserialization (loading recompiles DSL deterministically)
+# ============================================================
+
+def _predicate_from_dict(data: Mapping[str, Any]) -> PredicateEntry:
+    name = str(data.get("name") or "")
+    dsl = str(data.get("canonical_dsl") or "")
+    status = str(data.get("status") or "")
+    if status not in ENTRY_STATUSES:
+        raise ValueError(f"unknown predicate status: {status!r}")
+    # Loading recompiles the predicate from its canonical DSL (never from a
+    # persisted callable), so a drifted or uncompilable payload fails closed.
+    evaluate = compile_predicate_dsl(name, dsl)
+    return PredicateEntry(
+        name=name,
+        canonical_ast=dict(data.get("canonical_ast") or {"dsl": dsl}),
+        canonical_dsl=dsl,
+        facts_whitelist=tuple(data.get("facts_whitelist") or ()),
+        compiled_digest=str(data.get("compiled_digest") or ""),
+        registered_generation=int(data.get("registered_generation") or 0),
+        status=status,
+        evaluate=evaluate,
+    )
+
+
+def _operator_from_dict(data: Mapping[str, Any]) -> ActionOperator:
+    return ActionOperator(
+        operator=str(data.get("operator") or ""),
+        params_schema=tuple(data.get("params_schema") or ()),
+        policy_stage=str(data.get("policy_stage") or ""),
+        runtime_owner=str(data.get("runtime_owner") or ""),
+    )
+
+
+def _instance_from_dict(data: Mapping[str, Any]) -> ActionInstance:
+    status = str(data.get("status") or "")
+    if status not in ENTRY_STATUSES:
+        raise ValueError(f"unknown action-instance status: {status!r}")
+    return ActionInstance(
+        name=str(data.get("name") or ""),
+        operator=str(data.get("operator") or ""),
+        params=tuple(data.get("params") or ()),
+        registered_generation=int(data.get("registered_generation") or 0),
+        status=status,
+    )
+
+
+def registry_edit_from_dict(data: Mapping[str, Any]) -> RegistryEdit:
+    return RegistryEdit(
+        edit_id=str(data.get("edit_id") or ""),
+        operation=str(data.get("operation") or ""),
+        target=str(data.get("target") or ""),
+        before_hash=str(data.get("before_hash") or ""),
+        after_hash=str(data.get("after_hash") or ""),
+        reason_codes=tuple(data.get("reason_codes") or ()),
+        sequence=int(data.get("sequence") or 0),
+    )
+
+
+def _registry_from_dict(data: Mapping[str, Any]) -> VocabularyRegistry:
+    """Rebuild a registry from its canonical payload, recompiling DSL."""
+    if str(data.get("schema_version") or "") != REGISTRY_SCHEMA_VERSION:
+        raise ValueError(
+            f"unknown registry schema_version: {data.get('schema_version')!r}"
+        )
+    predicates = {
+        str(row.get("name")): _predicate_from_dict(row)
+        for row in data.get("predicates") or ()
+    }
+    operators = {
+        str(row.get("operator")): _operator_from_dict(row)
+        for row in data.get("action_operators") or ()
+    }
+    instances = {
+        str(row.get("name")): _instance_from_dict(row)
+        for row in data.get("action_instances") or ()
+    }
+    audit = tuple(
+        registry_edit_from_dict(row) for row in data.get("audit") or ()
+    )
+    return VocabularyRegistry(
+        registry_version=str(data.get("registry_version") or REGISTRY_VERSION),
+        predicates=predicates,
+        action_operators=operators,
+        action_instances=instances,
+        audit=audit,
+    )
+
+
+VocabularyRegistry.from_dict = staticmethod(_registry_from_dict)
+
+
+# ============================================================
+# RegistryEdit application (online evolution; immutable lineage)
+# ============================================================
+
+def _next_sequence(registry: VocabularyRegistry) -> int:
+    return (registry.audit[-1].sequence + 1) if registry.audit else 1
+
+
+def _edit_id(operation: str, target: str, sequence: int, before_hash: str) -> str:
+    digest = hashlib.sha256(
+        f"{operation}:{target}:{sequence}:{before_hash}".encode("utf-8")
+    ).hexdigest()[:12]
+    return f"registry_edit_{digest}"
+
+
+def apply_registry_edit(
+    registry: VocabularyRegistry,
+    *,
+    operation: str,
+    target: str,
+    dsl: str = "",
+    operator: str = "",
+    reason_codes: tuple[str, ...] = (),
+) -> VocabularyRegistry:
+    """Apply one audited registry edit, returning a NEW registry.
+
+    ``operation`` is one of ``register_predicate`` / ``register_action`` /
+    ``disable`` / ``enable``. Baseline entries cannot be disabled, and an
+    unknown target/operator or uncompilable DSL fails closed (raises). The
+    new registry carries the appended ``RegistryEdit`` in its audit trail
+    with a chained before/after hash.
+    """
+    before_hash = registry.content_hash
+    sequence = _next_sequence(registry)
+    predicates = {
+        name: registry.raw_predicate(name)
+        for name in registry.all_predicate_names()
+    }
+    operators = {
+        name: registry.raw_operator(name)
+        for name in registry._action_operators
+    }
+    instances = {
+        name: registry.raw_action_instance(name)
+        for name in registry.all_action_instance_names()
+    }
+
+    if operation == "register_predicate":
+        if registry.raw_predicate(target) is not None:
+            raise ValueError(f"predicate already registered: {target}")
+        evaluate = compile_predicate_dsl(target, dsl)
+        predicates[target] = PredicateEntry(
+            name=target,
+            canonical_ast={"dsl": dsl},
+            canonical_dsl=dsl,
+            facts_whitelist=predicate_facts_whitelist(dsl),
+            compiled_digest=hashlib.sha256(
+                f"{COMPILER_VERSION}:{target}:{dsl}".encode("utf-8")
+            ).hexdigest(),
+            registered_generation=sequence,
+            # First registration is pending: shadow-only, never executable
+            # until a later enable promotes it to working.
+            status=STATUS_PENDING,
+            evaluate=evaluate,
+        )
+    elif operation == "register_action":
+        source_operator = operators.get(operator)
+        if source_operator is None:
+            raise ValueError(f"unknown action operator: {operator}")
+        if source_operator.runtime_owner != "court":
+            raise ValueError(
+                f"operator not court-local, cannot instantiate: {operator}"
+            )
+        if registry.raw_action_instance(target) is not None:
+            raise ValueError(f"action instance already registered: {target}")
+        instances[target] = ActionInstance(
+            name=target,
+            operator=operator,
+            params=source_operator.params_schema,
+            registered_generation=sequence,
+            status=STATUS_PENDING,
+        )
+    elif operation in ("disable", "enable"):
+        entry = predicates.get(target) or instances.get(target)
+        if entry is None:
+            raise ValueError(f"unknown registry entry: {target}")
+        if entry.status == STATUS_BASELINE and operation == "disable":
+            raise ValueError(f"baseline entry cannot be disabled: {target}")
+        new_status = (
+            STATUS_DISABLED if operation == "disable" else STATUS_REGISTERED
+        )
+        replacement = replace(entry, status=new_status)
+        if isinstance(replacement, PredicateEntry):
+            predicates[target] = replacement
+        else:
+            instances[target] = replacement
+    else:
+        raise ValueError(f"unknown registry operation: {operation}")
+
+    # ``after_hash`` seals the registry's vocabulary content after this edit
+    # (audit trail kept at its prior length), so it is verifiable and free of
+    # self-reference: rebuild the post-edit content with the same audit and
+    # confirm the hash matches. The edit is then appended to the audit trail.
+    content_after = VocabularyRegistry(
+        registry_version=registry.registry_version,
+        predicates=predicates,
+        action_operators=operators,
+        action_instances=instances,
+        audit=registry.audit,
+    )
+    edit = RegistryEdit(
+        edit_id=_edit_id(operation, target, sequence, before_hash),
+        operation=operation,
+        target=target,
+        before_hash=before_hash,
+        after_hash=content_after.content_hash,
+        reason_codes=tuple(reason_codes),
+        sequence=sequence,
+    )
+    return VocabularyRegistry(
+        registry_version=registry.registry_version,
+        predicates=predicates,
+        action_operators=operators,
+        action_instances=instances,
+        audit=registry.audit + (edit,),
+    )
+
+
+# The single authoritative baseline registry for the L2 vocabulary. It is
+# built after the DSL compiler is defined so every baseline predicate is
+# compiled by the same deterministic compiler used for online registration.
 L2_REGISTRY = _build_baseline_registry()

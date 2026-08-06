@@ -197,13 +197,19 @@ def detect_record(
     policy_items = (
         list(policy_genome.items) if policy_genome is not None else None
     )
+    policy_registry = (
+        policy_genome.registry if policy_genome is not None else None
+    )
     if genome is None:
         run_adjudication = adjudicator or adjudicate_case
         result = run_adjudication(
             case_id=case_id, record=record, config=config,
             output_dir=output_dir, census_root=census_root,
             **(
-                {"policy_items": policy_items}
+                {
+                    "policy_items": policy_items,
+                    "policy_registry": policy_registry,
+                }
                 if policy_items is not None else {}
             ),
         )
@@ -214,6 +220,7 @@ def detect_record(
                 case_id=case_id, record=record, config=config,
                 output_dir=output_dir, census_root=census_root,
                 policy_items=policy_items,
+                policy_registry=policy_registry,
             )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")

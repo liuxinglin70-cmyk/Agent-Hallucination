@@ -531,11 +531,12 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert len(policy_calls) == 1
     hook_kwargs = policy_calls[0]
     # The policy re-adjudication replays the exact evidence bundle of the
-    # court call that produced the current proof, plus the three hook inputs.
+    # court call that produced the current proof, plus the four hook inputs.
     prior_bundle = {
         key: value for key, value in hook_kwargs.items()
         if key not in (
             "policy_items", "boundary_path_state", "boundary_authority_valid",
+            "policy_registry",
         )
     }
     default_calls = [kwargs for kwargs in calls if "policy_items" not in kwargs]
@@ -545,6 +546,9 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert isinstance(items[0], PolicyItem)
     assert items[0].item_id == "policy_hook_probe"
     assert hook_kwargs["boundary_path_state"] == "verified_clean"
+    # No policy genome was supplied to the detection entry point, so the
+    # vocabulary registry defaults to the baseline (None -> evaluator default).
+    assert hook_kwargs["policy_registry"] is None
     # The boundary authority is derived from the deterministic boundary
     # path's contract validation, not from the boundary state alone.
     assert hook_kwargs["boundary_authority_valid"] is True

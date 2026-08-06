@@ -18,12 +18,15 @@ from enum import Enum
 from typing import Any
 
 from .v6_contracts import (
+    COVERAGE_DOWNGRADE_STATES,
     L2_ACTIONS,
     L2_PREDICATE_NAMES,
     POLICY_GENOME_CAPACITY,
+    POLICY_SIDES,
     PolicyItem,
     validate_policy_params,
 )
+from .vocabulary_registry import L2_REGISTRY, VocabularyRegistry
 
 FITNESS_STATUS_NONE = "none"
 FITNESS_STATUS_WEAK = "weak"
@@ -107,17 +110,27 @@ class PolicyGenome:
     generation: int = 0
     edits_applied: list[PolicyEdit] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # The versioned L2 vocabulary registry this genome's items are evaluated
+    # against. The registry is the single authority persisted with the genome
+    # (no second copy in experience memory); it participates in content_hash
+    # so a genome's identity binds the exact vocabulary it was built on.
+    registry: VocabularyRegistry | None = None
 
     def __post_init__(self) -> None:
         while len(self.item_meta) < len(self.items):
             self.item_meta.append({})
         self.item_meta = [dict(meta) for meta in self.item_meta[: len(self.items)]]
+        if self.registry is None:
+            self.registry = L2_REGISTRY
 
     @property
     def content_hash(self) -> str:
         # Meta is post-commit bookkeeping (fitness outcomes, provenance);
         # including it would change genome identity after every commit and
-        # break lineage replay and cache keys.
+        # break lineage replay and cache keys. The hash covers the policy
+        # items AND the registry's active canonical state (plus compiler and
+        # facts schema versions), so a genome built on a different vocabulary
+        # has a different identity — usage counts and timestamps never enter.
         state = {
             "items": [
                 {
@@ -126,7 +139,8 @@ class PolicyGenome:
                     "params": dict(item.params),
                 }
                 for item in self.items
-            ]
+            ],
+            "registry": self.registry.to_dict(),
         }
         text = json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -167,10 +181,21 @@ class PolicyGenome:
             "edits_applied": [edit.to_dict() for edit in self.edits_applied],
             "content_hash": self.content_hash,
             "metadata": dict(self.metadata),
+            # The registry is the single vocabulary authority persisted with
+            # the genome; its audit trail (registry_audit) is the same
+            # registry's edit log, not a second copy.
+            "registry": self.registry.to_dict(),
+            "registry_audit": [edit.to_dict() for edit in self.registry.audit],
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PolicyGenome":
+        registry_payload = data.get("registry")
+        registry = (
+            VocabularyRegistry.from_dict(registry_payload)
+            if isinstance(registry_payload, dict)
+            else None
+        )
         return cls(
             genome_id=str(data.get("genome_id") or ""),
             items=[PolicyItem.from_dict(d) for d in data.get("items", [])],
@@ -182,6 +207,7 @@ class PolicyGenome:
                 for edit in data.get("edits_applied", [])
             ],
             metadata=dict(data.get("metadata", {})),
+            registry=registry,
         )
 
     def clone(self) -> "PolicyGenome":
@@ -192,28 +218,54 @@ class PolicyGenome:
 # Validation and application
 # ============================================================
 
-def _validate_item_contract(item: PolicyItem) -> tuple[bool, str]:
+def _validate_item_contract(
+    item: PolicyItem, registry=None,
+) -> tuple[bool, str]:
+    # The registry the item is validated against defaults to the baseline
+    # vocabulary; a genome carrying an evolved registry validates against
+    # that registry so its registered entries are recognized as legal.
+    active = registry if registry is not None else L2_REGISTRY
     if not str(item.item_id or "").strip():
         return False, "empty_item_id"
-    if item.precondition not in L2_PREDICATE_NAMES:
+    if item.precondition not in active.predicate_names():
         return False, f"unknown_precondition:{item.precondition}"
-    if item.action not in L2_ACTIONS:
+    if item.action not in active.action_names():
         return False, f"unknown_action:{item.action}"
-    params_valid, params_reason = validate_policy_params(item.action, item.params)
+    params_valid, params_reason = _validate_params_against_registry(
+        active, item.action, item.params,
+    )
     if not params_valid:
         return False, params_reason
+    return True, ""
+
+
+def _validate_params_against_registry(
+    registry, action: str, params: dict[str, Any],
+) -> tuple[bool, str]:
+    required = registry.action_params().get(action)
+    if required is None:
+        return False, f"unknown_action:{action}"
+    for key in required:
+        if key not in params:
+            return False, f"missing_param:{key}"
+    side = params.get("side")
+    if "side" in required and side not in POLICY_SIDES:
+        return False, f"invalid_side:{side}"
+    to_state = params.get("to_state")
+    if action == "downgrade_coverage" and to_state not in COVERAGE_DOWNGRADE_STATES:
+        return False, f"invalid_downgrade_state:{to_state}"
     return True, ""
 
 
 def validate_policy_genome_items(genome: PolicyGenome) -> tuple[bool, str]:
     """Validate every item of a loaded genome against the closed vocabulary.
 
-    Loading is fail-closed: a payload that drifted from the current
-    ``L2_ACTIONS`` / predicate vocabulary is rejected here instead of being
-    silently skipped by the evaluator at runtime.
+    Loading is fail-closed: a payload that drifted from the genome's own
+    registry vocabulary is rejected here instead of being silently skipped
+    by the evaluator at runtime.
     """
     for item in genome.items:
-        item_ok, item_reason = _validate_item_contract(item)
+        item_ok, item_reason = _validate_item_contract(item, genome.registry)
         if not item_ok:
             return False, f"{item.item_id}:{item_reason}"
     return True, ""
@@ -232,7 +284,7 @@ def validate_policy_edit(
     if operation == PolicyOp.ADD_ITEM.value:
         if edit.new_item is None:
             return False, "missing_new_item"
-        valid, reason = _validate_item_contract(edit.new_item)
+        valid, reason = _validate_item_contract(edit.new_item, genome.registry)
         if not valid:
             return False, reason
         if genome.total_items >= POLICY_GENOME_CAPACITY:
@@ -262,7 +314,7 @@ def validate_policy_edit(
     if operation == PolicyOp.MODIFY_ITEM.value:
         if edit.new_item is None:
             return False, "missing_new_item"
-        valid, reason = _validate_item_contract(edit.new_item)
+        valid, reason = _validate_item_contract(edit.new_item, genome.registry)
         if not valid:
             return False, reason
         replacement_key = _identity_key(edit.new_item)

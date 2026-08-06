@@ -1323,6 +1323,7 @@ def adjudicate_case(
     *, case_id: str, record: dict[str, Any], config: dict[str, Any],
     output_dir: Path, census_root: Path | None = None,
     policy_items: Sequence[Mapping[str, Any]] | None = None,
+    policy_registry=None,
 ) -> dict[str, Any]:
     built = packet.build_packet(record)
 
@@ -1653,6 +1654,7 @@ def adjudicate_case(
             proof = contract.adjudicate_proof_court(
                 **final_court_kwargs,
                 policy_items=normalized_policy_items,
+                policy_registry=policy_registry,
                 boundary_path_state=str(boundary_path.get("state") or ""),
                 # Authority is valid only when the deterministic boundary
                 # path passed its own contract validation (decision=pass);

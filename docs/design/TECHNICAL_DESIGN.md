@@ -427,11 +427,15 @@ free-text path serves only `remove_rule` and historical checkpoint replay.
 **L2 — adjudication-policy genome.** Closed-vocabulary policy items of the
 form (precondition predicate, enumerated action with closed-vocabulary
 parameters) over the adjudication facts of one detection. Every predicate and
-action name is defined once in the versioned baseline registry
+action name is owned by the versioned registry
 (`vocabulary_registry.L2_REGISTRY`), re-exported as `L2_PREDICATES` /
 `L2_ACTIONS` in `v6_contracts`; the reflection prompt's vocabulary table is
 generated from that registry at call time, and every parsed proposal is
-re-validated against the same closed sets. `validate_policy_edit` enforces vocabulary membership,
+re-validated against the same closed sets. The vocabulary is online-evolvable
+(P3B): a constrained registration planner can register new whitelist-DSL
+predicates or court-local action instances as `pending` (shadow-only), and the
+registry is persisted with the policy genome and bound into its
+`content_hash`. `validate_policy_edit` enforces vocabulary membership,
 genome capacity (12 items), semantic deduplication, immutable baseline items
 and weak/strong fitness protection; `apply_policy_edit` returns a new genome
 with parent-hash lineage. The baseline is the empty policy set, so evolved
