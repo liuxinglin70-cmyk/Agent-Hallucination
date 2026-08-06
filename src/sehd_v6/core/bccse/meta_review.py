@@ -140,11 +140,23 @@ def aggregate_gate_experience(
     mechanism_signature: Sequence[str] = (),
     sequence: int = 0,
 ) -> GateExperience:
-    """Aggregate one audited GateEvent into its GateExperience (P7.1)."""
+    """Aggregate one audited GateEvent into its GateExperience (P7.1).
+
+    When no explicit ``mechanism_signature`` is supplied, one is derived from
+    the event's stable structural fields (layer/artifact/stage/operation) so
+    the Meta Review can attribute outcomes to a mechanism class instead of a
+    bare sequence of decisions.  Identities and case ids never participate.
+    """
     guidance = project_cross_case_guidance(event)
+    signature = tuple(str(v) for v in mechanism_signature) or (
+        event.layer,
+        event.artifact,
+        event.stage,
+        event.operation,
+    )
     return GateExperience(
         gate_event_id=event.event_id,
-        mechanism_signature=tuple(str(v) for v in mechanism_signature),
+        mechanism_signature=signature,
         layer=event.layer,
         artifact=event.artifact,
         stage=event.stage,
