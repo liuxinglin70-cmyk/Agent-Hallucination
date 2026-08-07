@@ -223,6 +223,30 @@ def build_runtime_observation(
     )
 
 
+def _sanitize_rejected_content_echo(content: Any) -> str:
+    """Bound the rejected-rule text echoed into the next reflection prompt.
+
+    Rejected rule text is fed back so the model avoids repeating the same
+    shape, but a case-specific fragment must never be able to re-purpose the
+    provider role: fragments that look like role/system overrides are
+    suppressed entirely.
+    """
+    text = " ".join(str(content or "").split())[:100]
+    lowered = text.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "ignore previous",
+            "system prompt",
+            "system instruction",
+            "do not follow",
+            "override all",
+        )
+    ):
+        return "<content suppressed>"
+    return text
+
+
 def build_causal_reflection_prompt(
     signal: AttributionSignal,
     current_skill_text: str,
@@ -468,7 +492,7 @@ listed for the target module in runtime_output_contracts.
     if rejected_buffer:
         rejected_lines = [
             f"  - {r.proposal.target_module}/{r.proposal.operation}: "
-            f"\"{r.proposal.content[:100]}\" -> REJECTED "
+            f"\"{_sanitize_rejected_content_echo(r.proposal.content)}\" -> REJECTED "
             f"({r.feedback_summary()})"
             for r in rejected_buffer[-5:]
         ]
@@ -757,10 +781,13 @@ def select_intervention_candidate(
     }
     if decision != "select":
         return None, audit
-    try:
-        index = int(critic_response.get("selected_index"))
-    except (TypeError, ValueError):
+    raw_index = critic_response.get("selected_index")
+    # Fail-closed on non-integer selectors: ``int(True) == 1`` and
+    # ``int(False) == 0`` would otherwise let a bool-valued index silently
+    # pick a candidate instead of rejecting the malformed response.
+    if isinstance(raw_index, bool) or not isinstance(raw_index, int):
         return None, audit
+    index = raw_index
     if index < 0 or index >= len(candidates):
         return None, audit
     audit["selected_index"] = index
