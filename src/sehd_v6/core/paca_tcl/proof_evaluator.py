@@ -576,42 +576,53 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         _metric_prediction_state(row) != "unresolved"
         for row in rows
     )
-    gold_positive = gold_negative = 0
+    judged_positive = judged_negative = 0
     tp = fp = fn = tn = step_correct = 0
     for row in rows:
         gold = row.get("gold_label")
         if gold is None:
             continue
-        gold_is_positive = parse_gold_label(gold)
+        try:
+            gold_is_positive = parse_gold_label(gold)
+        except ValueError:
+            # A single dirty gold value must not abort the whole batch
+            # evaluation (mirrors the tolerant _row_correct path).
+            continue
         predicted_state = _metric_prediction_state(row)
         predicted = (
             True if predicted_state == "verified_error"
             else False if predicted_state == "verified_clean"
             else None
         )
-        gold_positive += int(gold_is_positive)
-        gold_negative += int(not gold_is_positive)
         if predicted is True and gold_is_positive:
             tp += 1
+            judged_positive += 1
             gold_steps = {str(item) for item in row.get("gold_steps") or ()}
             step_correct += int(
                 bool(gold_steps) and _prediction_responsible_ref(row) in gold_steps
             )
         elif predicted is True:
             fp += 1
+            judged_positive += 1
         elif predicted is False and gold_is_positive:
             fn += 1
+            judged_negative += 1
         elif predicted is False:
             tn += 1
+            judged_negative += 1
 
     precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / gold_positive if gold_positive else 0.0
+    # Abstentions (predicted None) never enter the confusion buckets, so the
+    # recall/clean-recall/clean-FPR denominators must count only judged rows
+    # too; otherwise abstentions asymmetrically deflate recall and inflate
+    # clean FPR relative to the precision denominator.
+    recall = tp / judged_positive if judged_positive else 0.0
     hallucination_f1 = (
         2 * precision * recall / (precision + recall)
         if precision + recall else 0.0
     )
     clean_precision = tn / (tn + fn) if tn + fn else 0.0
-    clean_recall = tn / gold_negative if gold_negative else 0.0
+    clean_recall = tn / judged_negative if judged_negative else 0.0
     clean_f1 = (
         2 * clean_precision * clean_recall / (clean_precision + clean_recall)
         if clean_precision + clean_recall else 0.0
@@ -620,9 +631,9 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         macro_f1=(hallucination_f1 + clean_f1) / 2,
         precision=precision,
         hallucination_recall=recall,
-        clean_fpr=fp / gold_negative if gold_negative else 0.0,
+        clean_fpr=fp / judged_negative if judged_negative else 0.0,
         responsible_step_accuracy=(
-            step_correct / gold_positive if gold_positive else 0.0
+            step_correct / judged_positive if judged_positive else 0.0
         ),
         candidate_origin_coverage=float(
             metrics.get("candidate_origin_coverage_on_gold_positive") or 0.0

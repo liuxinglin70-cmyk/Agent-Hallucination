@@ -564,6 +564,9 @@ def adjudicate_proof_court(
                 if str(row.get("certificate_id") or "") in restored_ids
             ]
             surviving = [*surviving, *restored_rows]
+            # The ledger records a certificate in exactly one bucket: a
+            # restored row leaves the blocked list as it re-enters the
+            # surviving set.
             consensus_blocked = [
                 row for row in consensus_blocked
                 if str(row.get("certificate_id") or "") not in restored_ids

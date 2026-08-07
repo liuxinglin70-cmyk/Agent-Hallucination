@@ -502,7 +502,11 @@ def _appeal_trigger_calibrator_v35(
 
     # Priority 0: quarantined focused-prosecution certificates.  The merged
     # prosecution only contains validated certificates, so the quarantine
-    # signal must come from the per-candidate provider metadata.
+    # signal must come from the per-candidate provider metadata. A
+    # fully-quarantined candidate still triggers an appeal: the appeal is the
+    # audited re-review surface for quarantined evidence (its consensus-gate
+    # fate is decided by the court, which may carry the quarantine-exempt
+    # routing in a future pre-ledger restore).
     for candidate_id, meta in (focused_prosecution_metas or {}).items():
         if meta and meta.get("all_quarantined"):
             mark(candidate_id, 0)
@@ -513,6 +517,14 @@ def _appeal_trigger_calibrator_v35(
         if audit.get("decision") != "pass":
             mark(error.get("source_candidate_id"), 0)
         elif error.get("benchmark_causal_status") in {"process_only", "unresolved"}:
+            # process_only / unresolved causal status is structurally absent
+            # from the consensus gate's initial-support set (it only counts
+            # causes_incorrect_result / propagates_to_incorrect_result), so an
+            # appeal certificate for this candidate is always blocked; the
+            # trigger would only burn a provider call. Quarantine of the
+            # INITIAL certificates is not skipped here: those appeals are the
+            # audited re-review surface and stay triggerable.
+            continue
             mark(error.get("source_candidate_id"), 1)
 
     # Priority 0: quarantined defense certificates
@@ -1056,7 +1068,32 @@ def _validate_appeal_defense_deep_or_repair(
     )
     if not repair_audits:
         providers["appeal_defender_deep"]["outcome"] = "repaired"
-        return repair_response
+        # The repair prompt asks for replacement certificates ONLY for the
+        # invalid candidates, so returning the repair response alone would
+        # silently drop the valid defenses that survived the first deep
+        # validation (weakening the defense pool and risking a flipped
+        # clean verdict). Merge the repaired certificates with the original
+        # valid rows; on target overlap the repaired certificate wins.
+        merged_rows = list(valid_rows)
+        repaired_targets = {
+            str(row.get("target_candidate_id") or "")
+            for row in repair_rows
+            if str(row.get("target_candidate_id") or "")
+        }
+        merged_rows = [
+            row for row in merged_rows
+            if str(row.get("target_candidate_id") or "") not in repaired_targets
+        ]
+        merged_rows.extend(repair_rows)
+        merged = dict(response)
+        merged["candidates"] = merged_rows
+        providers["appeal_defender_deep"]["merged_valid_row_count"] = (
+            len(valid_rows)
+        )
+        providers["appeal_defender_deep"]["merged_repair_row_count"] = (
+            len(repair_rows)
+        )
+        return merged
     providers["appeal_defender_deep"]["outcome"] = "still_invalid"
     providers["appeal_defender_deep"]["remaining_failed_checks"] = [
         a.get("failed_checks") for a in repair_audits
