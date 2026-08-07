@@ -1915,3 +1915,153 @@ def test_provider_census_rejects_foreign_interaction_origin() -> None:
     assert audit["status"] == "partial"
     assert audit["failures"][0]["failed_checks"] == ["origin"]
     assert census == []
+
+
+# ============================================================
+# H3 localization regression: appeal skipped, counterfactual
+# re-adjudication must run on a legal evidence bundle.
+# ============================================================
+
+
+def _h3_census_candidate(candidate_id: str, origin: str) -> dict:
+    return {
+        "candidate_id": candidate_id,
+        "origin_hypothesis_event_id": origin,
+        "trigger_event_id": origin,
+        "axes": ["P"],
+        "candidate_kind": "claim",
+        "claim_or_commitment": "the agent made an unsupported claim",
+        "dependency_event_ids": [],
+        "module_tag": "Planning",
+        "observation": "observable",
+        "is_decision_point": True,
+    }
+
+
+def _h3_error_certificate(
+    certificate_id: str,
+    candidate_id: str,
+    origin: str,
+    consumption: str,
+    control: str,
+    impact: str,
+) -> dict:
+    return {
+        "certificate_id": certificate_id,
+        "source_candidate_id": candidate_id,
+        "origin_event_id": origin,
+        "claim_kind": "agent_assertion",
+        "norm_source": "prior_trajectory_evidence",
+        "norm_evidence_refs": [origin],
+        "breach_type": "contradiction",
+        "violation_evidence_refs": [origin],
+        "agent_control_event_id": control,
+        "agent_control_evidence_refs": [control],
+        "impact_kind": "final_answer",
+        "impact_event_ids": [impact],
+        "impact_evidence_refs": [impact],
+        "recovery_state": "post_impact_residual",
+        "recovery_evidence_refs": [impact],
+        "benchmark_causal_status": "causes_incorrect_result",
+        "benchmark_causal_evidence_refs": [impact],
+        "consumption_event_ids": [consumption],
+        "rationale": (
+            "The agent assertion contradicts prior evidence, caused an "
+            "incorrect final answer, and was only repaired after the impact."
+        ),
+    }
+
+
+def test_h3_localization_runs_when_appeal_is_skipped(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """Appeal-skipped multi-survivor verified_error must not crash the H3
+    counterfactual re-adjudication on the default appeal bundle.
+
+    The default bundle is an EMPTY COMPLETE defense; an "incomplete" stub
+    made ``adjudicate_proof_court`` raise ``ValueError`` inside H3, which
+    the outer try degraded into a runtime-invalid unresolved result and
+    erased the localization outcome (regression guard).
+    """
+    record = {
+        "question": "test",
+        "history": [
+            {"step": i, "role": "assistant", "content": f"e{i}"}
+            for i in range(1, 5)
+        ],
+    }
+    construct_route = {"name": "construct"}
+    defense_route = {"name": "defense"}
+
+    def base_case(**_kwargs):
+        return {
+            "runtime_valid": True,
+            "state": "unresolved",
+            "census": [],
+            "qualifications": [],
+            "propagations": [],
+            "boundary_path": {
+                "state": "unresolved",
+                "responsible_event_id": None,
+                "evidence_refs": [],
+                "rationale": "none",
+            },
+            "adjudication": {"state": "unresolved"},
+            "providers": {},
+        }
+
+    def provider(*, route, **_kwargs):
+        if route is construct_route:
+            return {"coverage_state": "complete", "candidates": [
+                _h3_census_candidate("candidate_001", "event_001"),
+                _h3_census_candidate("candidate_002", "event_002"),
+            ]}, {}
+        assert route is defense_route
+        return {"coverage_state": "incomplete", "candidates": []}, {}
+
+    def focused_prosecution(*, built, base, config, output_dir):
+        # The union census deterministically renames candidates to
+        # v3_candidate_00x, so certificates must reference those ids.
+        return {"coverage_state": "complete", "candidates": [
+            _h3_error_certificate(
+                "e1", "v3_candidate_001", "event_001",
+                "event_002", "event_002", "event_003",
+            ),
+            _h3_error_certificate(
+                "e2", "v3_candidate_002", "event_002",
+                "event_003", "event_003", "event_004",
+            ),
+        ]}, [], {}
+
+    monkeypatch.setattr(proof_engine.v2, "adjudicate_case", base_case)
+    monkeypatch.setattr(proof_engine, "provider_call", provider)
+    monkeypatch.setattr(
+        proof_engine, "_run_focused_prosecution", focused_prosecution,
+    )
+    # Appeal never triggers: the initial multi-survivor proof must still
+    # reach H3 localization from base evidence.
+    monkeypatch.setattr(
+        proof_engine, "_appeal_trigger_calibrator_v35", lambda **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        proof_engine, "_run_counterfactual_localization",
+        lambda **_kwargs: {
+            "event_001": {"causal_sufficiency_score": 1.0, "is_root_cause": True},
+        },
+    )
+
+    result = proof_engine.adjudicate_case(
+        case_id="case",
+        record=record,
+        config={
+            "construct_census_route": construct_route,
+            "defense_route": defense_route,
+        },
+        output_dir=tmp_path,
+    )
+
+    proof = result.get("proof_adjudication") or {}
+    assert result.get("runtime_valid") is True
+    assert result.get("state") == "verified_error"
+    assert proof.get("localization_status") == "complete"
+    assert proof.get("surviving_error_certificate_ids") == ["e1", "e2"]

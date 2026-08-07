@@ -525,7 +525,6 @@ def _appeal_trigger_calibrator_v35(
             # INITIAL certificates is not skipped here: those appeals are the
             # audited re-review surface and stay triggerable.
             continue
-            mark(error.get("source_candidate_id"), 1)
 
     # Priority 0: quarantined defense certificates
     for item, audit in zip((defense or {}).get("candidates") or [], proof.get("defense_audits") or []):
@@ -1500,11 +1499,15 @@ def adjudicate_case(
         # identical inputs at the convergence point.
         final_court_kwargs = dict(initial_court_kwargs)
         # The appeal evidence bundle defaults to the base prosecution and an
-        # empty defense so the localization stage can run even when the
-        # appeal stage was skipped or failed mid-way (a preserved initial
-        # verdict still localizes from base evidence).
+        # EMPTY COMPLETE defense so the localization stage can run even when
+        # the appeal stage was skipped or failed mid-way (a preserved initial
+        # verdict still localizes from base evidence).  The court contract
+        # raises ValueError on any non-complete appeal defense, so an
+        # "incomplete" stub would crash the H3 re-adjudication below instead
+        # of degrading gracefully; an empty complete defense is a legal
+        # evidence bundle that contributes no certificates.
         combined_prosecution = prosecution
-        appeal_defense_certs = {"coverage_state": "incomplete", "candidates": []}
+        appeal_defense_certs = {"coverage_state": "complete", "candidates": []}
 
         # H2: Tightened trigger calibrator (priority 0-1 only)
         appeal_candidates = _appeal_trigger_calibrator_v35(
