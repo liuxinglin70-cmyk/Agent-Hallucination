@@ -121,6 +121,7 @@ def resolve_provider_route(
     explicit_key_selector = _env_value(env, ordered, "API_KEY_ENV")
     if (
         not explicit_key_selector
+        and not selected_key_env
         and env.get("DEEPSEEK_API_KEY")
         and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT
     ):

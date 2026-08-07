@@ -170,6 +170,27 @@ class StructuralGate:
         self._consecutive_no_edit = 0
         self._converged = False
 
+    def snapshot_convergence(self) -> dict[str, Any]:
+        """Snapshot the convergence counters for a later synchronized restore.
+
+        Used by delayed rollbacks (e.g. a failed development probe): the
+        per-certificate restore in ``revoke_structural_accept`` is only exact
+        when the revoke immediately follows the accept, so a batch rollback
+        must restore one probe-time snapshot instead of replaying stale
+        per-certificate priors across intervening cases.
+        """
+        return {
+            "consecutive_no_edit": self._consecutive_no_edit,
+            "converged": self._converged,
+        }
+
+    def restore_convergence(self, snapshot: Mapping[str, Any]) -> None:
+        """Restore the convergence counters from a ``snapshot_convergence``."""
+        self._consecutive_no_edit = max(
+            0, int(snapshot.get("consecutive_no_edit") or 0)
+        )
+        self._converged = bool(snapshot.get("converged"))
+
     def _restore_last_edit_index(self, module: str) -> None:
         prior = [
             certificate.case_index
@@ -186,20 +207,34 @@ class StructuralGate:
         self,
         certificate: GateCertificate,
         reasons: Sequence[str],
+        *,
+        restore_streak: bool = True,
     ) -> None:
-        """Convert a structural accept into a post-replay fitness rejection."""
+        """Convert a structural accept into a post-replay fitness rejection.
+
+        ``restore_streak=True`` restores the certificate's accept-time
+        convergence checkpoint; it is only exact when the revoke immediately
+        follows the accept (same-case replay reject). Delayed batch rollbacks
+        (a failed development probe spanning multiple accepted cases) must
+        pass ``restore_streak=False`` and restore one probe-time snapshot via
+        ``restore_convergence`` instead, otherwise intervening no-edit
+        counting is silently erased or a stale high prior prematurely
+        converges the run.
+        """
         if certificate.decision != "accept":
             return
         certificate.decision = "reject"
         certificate.reject_reasons.extend(str(reason) for reason in reasons)
         self._total_edits = max(0, self._total_edits - 1)
         self._restore_last_edit_index(certificate.target_module)
-        # Structural acceptance is provisional until source replay succeeds.
-        # Restore the case-level convergence checkpoint so a failed proposal
-        # does not erase the preceding no-edit streak. The runner records one
-        # final no-edit outcome only after all attempts for this case fail.
-        self._consecutive_no_edit = certificate.prior_consecutive_no_edit
-        self._converged = certificate.prior_converged
+        if restore_streak:
+            # Structural acceptance is provisional until source replay
+            # succeeds. Restore the case-level convergence checkpoint so a
+            # failed proposal does not erase the preceding no-edit streak.
+            # The runner records one final no-edit outcome only after all
+            # attempts for this case fail.
+            self._consecutive_no_edit = certificate.prior_consecutive_no_edit
+            self._converged = certificate.prior_converged
 
     def defer_structural_reject(self, certificate: GateCertificate) -> None:
         """Undo attempt-level convergence accounting before a bounded retry.
