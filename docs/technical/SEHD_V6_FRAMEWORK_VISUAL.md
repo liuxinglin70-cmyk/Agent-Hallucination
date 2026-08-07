@@ -1,7 +1,5 @@
 # SEHD v6 自进化框架可视化（第三轮审查后）
 
-> 配套文档：`SEHD_V6_FRAMEWORK_TECHNICAL_REVIEW.md`（详细技术审查）。
-> 基线：`main@5cc2a2c` + 第三轮审查修复（G1-G5 已全部落地）；测试 **806 passed**。
 > 图例：🟢 已闭环 　🟡 部分/历史缺口（已修复见注）　🔴 未启动。
 
 ---
@@ -277,7 +275,7 @@ flowchart LR
 | **D2** | 动态词表的策略提议依赖注册时捕获的 intent | `registry_promotion.py` | 🟢 已闭环（intent 捕获 → 晋升 → 动态候选，commit `ad74ab0`） |
 | **P10** | 连续运行 + 独立评测 | — | 🔴 未启动 |
 
-> **第三轮结论**：G1-G5 五条断链已全部闭合（见 `EVOLUTION_FIXES_SUMMARY.md`），
+> **第三轮结论**：G1-G5 五条断链已全部闭合，
 > 自进化框架的「检测 → 归因 → 反思 → 回放 → 门控 → 反馈 → 元审查 → 证据门提交」
 > 闭环在运行时代码中成立；D1（ActionSpec postcondition 确定性执行证据）与
 > D3（stable checkpoint hash 校验）已随第四轮修复闭环。剩余 P10

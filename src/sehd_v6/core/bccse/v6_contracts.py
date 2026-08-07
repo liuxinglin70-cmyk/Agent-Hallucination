@@ -1,7 +1,8 @@
 """SEHD v6 shared contracts: closed vocabularies and core data types.
 
 Single source of truth for the two-layer evolvable surface introduced in
-the v6 direction (HANDOFF_V6_ADJUDICATION_EVOLUTION.md):
+the v6 direction (the L2 adjudication-policy layer, see
+``docs/design/TECHNICAL_DESIGN.md``):
 
 - L1 provider-rule layer: natural-language rules with slot structure,
   injected into provider prompts (see ``rule_contract`` / ``genome``).

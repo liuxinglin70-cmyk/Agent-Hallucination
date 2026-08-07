@@ -8,10 +8,7 @@ Configuration, role manifests and provider routes are frozen for a registered
 execution, while the injected strategy genome is intentionally mutable. The
 design follows a two-step research protocol:
 
-The reader-oriented companion guide
-[EXPERIMENT_FRAMEWORK_GUIDE.md](../technical/EXPERIMENT_FRAMEWORK_GUIDE.md)
-connects this design to the concrete CLI, result fields, dataset roles and
-claim boundaries. The normative project charter — core objective, design
+The normative project charter — core objective, design
 philosophy and advisor requirements that every agent must comply with — is
 the "Core Objective and Design Discipline" section of the repository
 [README](../../README.md); this design document only implements it.

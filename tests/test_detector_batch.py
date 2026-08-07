@@ -294,55 +294,6 @@ def test_batch_summary_has_no_predictions_key_and_writes_predictions_file(
     assert all(row["prediction"]["state"] == "verified_clean" for row in rows)
 
 
-def test_collect_replica_predictions_reads_predictions_files(tmp_path: Path) -> None:
-    import json
-
-    from experiments.run_decision_replicas import collect_replica_predictions
-
-    case_ids = ["case_a", "case_b"]
-    roots = []
-    for index in range(3):
-        root = tmp_path / f"replica_{index}"
-        root.mkdir()
-        rows = [
-            {
-                "case_id": case_id,
-                "prediction": {"state": "verified_error", "replica": index},
-            }
-            for case_id in case_ids
-        ]
-        (root / "predictions.json").write_text(
-            json.dumps(rows), encoding="utf-8"
-        )
-        roots.append(root)
-
-    collected = collect_replica_predictions(roots, case_ids)
-    assert all(len(collected[case_id]) == 3 for case_id in case_ids)
-    assert [row["replica"] for row in collected["case_a"]] == [0, 1, 2]
-
-
-def test_collect_replica_predictions_missing_file_yields_incomplete(
-    tmp_path: Path,
-) -> None:
-    import json
-
-    from experiments.run_decision_replicas import collect_replica_predictions
-
-    present = tmp_path / "replica_0"
-    present.mkdir()
-    (present / "predictions.json").write_text(
-        json.dumps([{"case_id": "case_a", "prediction": {"state": "unresolved"}}]),
-        encoding="utf-8",
-    )
-    absent = tmp_path / "replica_1"
-    absent.mkdir()
-
-    collected = collect_replica_predictions([present, absent], ["case_a"])
-    # One replica produced no predictions.json: the case stays below k so the
-    # caller routes it to the fail-closed incomplete_replicas branch.
-    assert len(collected["case_a"]) == 1
-
-
 # --- W1: library-level replica orchestration (run_replicated_batch) ------
 
 

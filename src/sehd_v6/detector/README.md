@@ -96,10 +96,10 @@ production promotion.
 ## Replicated Batch (Test-Time-Scaling Orchestration)
 
 `run_replicated_batch` runs the frozen detector `k` times per case and
-aggregates the three-state verdicts; it is the library-level entry point that
-the experiment CLI (`experiments/run_decision_replicas.py`) is a thin shell
-over. Each replica uses the same explicitly supplied genome, and its batch
-resume identity includes that genome hash.
+aggregates the three-state verdicts; it is the library-level entry point
+that experiment orchestration scripts are thin shells over. Each replica
+uses the same explicitly supplied genome, and its batch resume identity
+includes that genome hash.
 
 ```python
 from src.sehd_v6.detector import run_replicated_batch

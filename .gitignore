@@ -14,10 +14,6 @@ experiments/progress/
 experiments/results/
 experiments/logs/
 experiments/*.py
-!experiments/analyze_batch.py
-!experiments/run_batch_concurrent.py
-!experiments/select_batch_cases.py
-!experiments/select_50_cases.py
 experiments/protocols/*
 !experiments/protocols/README.md
 !experiments/protocols/used_case_ledger.txt

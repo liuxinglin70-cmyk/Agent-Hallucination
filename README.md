@@ -69,8 +69,9 @@ in themselves.
    Progress reports must show concrete intermediate experiment outputs, not
    only framework descriptions.
 
-Experiment plans under `experiments/plans/` must state how they comply with
-this section; reviews check compliance before results are accepted.
+Experiment protocols under `experiments/protocols/` must state how they
+comply with this section; reviews check compliance before results are
+accepted.
 
 ## Layout
 
@@ -95,7 +96,6 @@ SEHD v6
 │   └── visualization/    #   local-only diagrams
 ├── datasets/             # ③ raw datasets (local-only, git-ignored)
 └── experiments/          # ④ experiment workspace
-    ├── plans/            #   experiment plans (tracked)
     └── protocols/        #   README + used-case ledger (tracked);
                           #   all run artifacts local-only, git-ignored
 ```
@@ -110,15 +110,15 @@ re-added as a layer on top of the standalone detector and evolution modules.
 ```text
 docs/
 ├── design/                    # framework design
-│   └── TECHNICAL_DESIGN.md    # detector + evolution architecture
+│   ├── TECHNICAL_DESIGN.md    # detector + evolution architecture
+│   └── SELF_EVOLUTION_FRAMEWORK_REVIEW.md  # evolution loop implementation contract
 ├── technical/                 # technical documentation
 │   ├── DETECTION_EVOLUTION_FLOW.md   # detection-to-evolution data flow
-│   └── EXPERIMENT_FRAMEWORK_GUIDE.md # framework guide (historical)
+│   └── SEHD_V6_FRAMEWORK_VISUAL.md   # framework visual overview
 ├── papers/                    # reference paper index (README tracked)
 │   └── raw/                   # paper files (local-only, git-ignored)
 ├── notes/                     # personal notes (local-only)
-├── visualization/             # diagrams and visualizations (local-only)
-└── superpowers/               # historical planning records
+└── visualization/             # diagrams and visualizations (local-only)
 ```
 
 Module-level documentation lives beside the code:
@@ -565,7 +565,8 @@ SEHD_JUDGE_ENDPOINT=...
 ```
 
 Raw datasets belong in `datasets/` (see `datasets/README.md`). Experiment
-plans, progress, results and logs belong in `experiments/`.
+progress, results and logs belong in `experiments/` (local-only,
+git-ignored).
 
 ## Public API
 

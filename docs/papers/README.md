@@ -20,5 +20,3 @@ Add one entry per paper:
 
 - `../design/TECHNICAL_DESIGN.md` — detector and evolution architecture
 - `../technical/DETECTION_EVOLUTION_FLOW.md` — detection-to-evolution data flow
-- `../technical/EXPERIMENT_FRAMEWORK_GUIDE.md` — framework guide (historical
-  protocol description; protocols no longer ship in the framework code)
