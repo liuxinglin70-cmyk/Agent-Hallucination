@@ -2602,6 +2602,106 @@ def _record_detector_provider_usage(
                     ledger.record(purpose=f"{purpose}:{surface}", meta=sub)
 
 
+def _validate_evolution_params(
+    *,
+    evolution_case_ids: Sequence[str],
+    records: Mapping[str, dict[str, Any]],
+    reflection_candidate_count: int,
+    max_mutation_calls: int,
+    fitness_batch_size: int,
+    canary_limit: int,
+    validation_probe_every: int,
+    validation_probe_trigger_threshold: int,
+    max_mutation_attempts_per_case: int,
+    probe_limit: int,
+    probe_experience_record: bool,
+    probe_ids: Sequence[str],
+    canary_case_ids: Sequence[str],
+    use_gold: bool,
+    fitness_use_gold: bool,
+) -> None:
+    """Fail-fast validation of run_online_evolution parameters."""
+    if not evolution_case_ids:
+        raise ValueError("evolution_case_ids must not be empty")
+    if reflection_candidate_count < 1 or reflection_candidate_count > 5:
+        raise ValueError("reflection_candidate_count must be between 1 and 5")
+    if max_mutation_calls < 1:
+        raise ValueError("max_mutation_calls must be at least 1")
+    if len(evolution_case_ids) != len(set(evolution_case_ids)):
+        raise ValueError("evolution_case_ids contains duplicates")
+    missing_records = [case_id for case_id in evolution_case_ids if case_id not in records]
+    if missing_records:
+        raise ValueError(
+            "Evolution records missing: " + ", ".join(missing_records)
+        )
+    if fitness_batch_size != 1:
+        raise ValueError(
+            "fitness_batch_size must be 1: multi-edit shadow batches cannot "
+            "attribute a combined replay outcome to individual edits safely"
+        )
+    if canary_limit < 0 or canary_limit > 20:
+        raise ValueError("canary_limit must be between 0 and 20")
+    if validation_probe_every < 0:
+        raise ValueError("validation_probe_every must be non-negative")
+    if validation_probe_trigger_threshold < 0:
+        raise ValueError(
+            "validation_probe_trigger_threshold must be non-negative"
+        )
+    if max_mutation_attempts_per_case < 1 or max_mutation_attempts_per_case > 3:
+        raise ValueError("max_mutation_attempts_per_case must be between 1 and 3")
+    if probe_limit < 0 or probe_limit > 20:
+        raise ValueError("probe_limit must be between 0 and 20")
+    if not isinstance(probe_experience_record, bool):
+        raise ValueError("probe_experience_record must be a bool")
+    if len(probe_ids) != len(set(probe_ids)):
+        raise ValueError("probe_ids contains duplicates")
+    if len(canary_case_ids) != len(set(canary_case_ids)):
+        raise ValueError("canary_case_ids contains duplicates")
+    overlapping_canary_ids = sorted(
+        set(canary_case_ids).intersection(evolution_case_ids)
+    )
+    if overlapping_canary_ids:
+        raise ValueError(
+            "canary_case_ids must be disjoint from evolution_case_ids: "
+            + ", ".join(overlapping_canary_ids)
+        )
+    overlapping_canary_probe_ids = sorted(
+        set(canary_case_ids).intersection(probe_ids)
+    )
+    if overlapping_canary_probe_ids:
+        raise ValueError(
+            "canary_case_ids must be disjoint from probe_ids: "
+            + ", ".join(overlapping_canary_probe_ids)
+        )
+    overlapping_probe_ids = sorted(set(probe_ids).intersection(evolution_case_ids))
+    if overlapping_probe_ids:
+        raise ValueError(
+            "probe_ids must be disjoint from evolution_case_ids: "
+            + ", ".join(overlapping_probe_ids)
+        )
+    missing_probe_records = [case_id for case_id in probe_ids if case_id not in records]
+    if missing_probe_records:
+        raise ValueError("Probe records missing: " + ", ".join(missing_probe_records))
+    missing_canary_records = [
+        case_id for case_id in canary_case_ids if case_id not in records
+    ]
+    if missing_canary_records:
+        raise ValueError(
+            "Canary records missing: " + ", ".join(missing_canary_records)
+        )
+    registered_probe_ids = tuple(probe_ids[:probe_limit])
+    missing_probe_gold = [
+        case_id
+        for case_id in registered_probe_ids
+        if _evaluator_gold(records[case_id]) is None
+    ]
+    if missing_probe_gold and (use_gold or fitness_use_gold):
+        raise ValueError(
+            "Development probes require evaluator gold labels: "
+            + ", ".join(missing_probe_gold)
+        )
+
+
 def run_online_evolution(
     *,
     evolution_case_ids: Sequence[str],
@@ -2719,85 +2819,24 @@ def run_online_evolution(
     Returns:
         OnlineEvolutionResult with champion genome and audit trail.
     """
-    if not evolution_case_ids:
-        raise ValueError("evolution_case_ids must not be empty")
-    if reflection_candidate_count < 1 or reflection_candidate_count > 5:
-        raise ValueError("reflection_candidate_count must be between 1 and 5")
-    if max_mutation_calls < 1:
-        raise ValueError("max_mutation_calls must be at least 1")
-    if len(evolution_case_ids) != len(set(evolution_case_ids)):
-        raise ValueError("evolution_case_ids contains duplicates")
-    missing_records = [case_id for case_id in evolution_case_ids if case_id not in records]
-    if missing_records:
-        raise ValueError(
-            "Evolution records missing: " + ", ".join(missing_records)
-        )
-    if fitness_batch_size != 1:
-        raise ValueError(
-            "fitness_batch_size must be 1: multi-edit shadow batches cannot "
-            "attribute a combined replay outcome to individual edits safely"
-        )
-    if canary_limit < 0 or canary_limit > 20:
-        raise ValueError("canary_limit must be between 0 and 20")
-    if validation_probe_every < 0:
-        raise ValueError("validation_probe_every must be non-negative")
-    if validation_probe_trigger_threshold < 0:
-        raise ValueError(
-            "validation_probe_trigger_threshold must be non-negative"
-        )
-    if max_mutation_attempts_per_case < 1 or max_mutation_attempts_per_case > 3:
-        raise ValueError("max_mutation_attempts_per_case must be between 1 and 3")
-    if probe_limit < 0 or probe_limit > 20:
-        raise ValueError("probe_limit must be between 0 and 20")
-    if not isinstance(probe_experience_record, bool):
-        raise ValueError("probe_experience_record must be a bool")
-    if len(probe_ids) != len(set(probe_ids)):
-        raise ValueError("probe_ids contains duplicates")
-    if len(canary_case_ids) != len(set(canary_case_ids)):
-        raise ValueError("canary_case_ids contains duplicates")
-    overlapping_canary_ids = sorted(
-        set(canary_case_ids).intersection(evolution_case_ids)
+    _validate_evolution_params(
+        evolution_case_ids=evolution_case_ids,
+        records=records,
+        reflection_candidate_count=reflection_candidate_count,
+        max_mutation_calls=max_mutation_calls,
+        fitness_batch_size=fitness_batch_size,
+        canary_limit=canary_limit,
+        validation_probe_every=validation_probe_every,
+        validation_probe_trigger_threshold=validation_probe_trigger_threshold,
+        max_mutation_attempts_per_case=max_mutation_attempts_per_case,
+        probe_limit=probe_limit,
+        probe_experience_record=probe_experience_record,
+        probe_ids=probe_ids,
+        canary_case_ids=canary_case_ids,
+        use_gold=use_gold,
+        fitness_use_gold=fitness_use_gold,
     )
-    if overlapping_canary_ids:
-        raise ValueError(
-            "canary_case_ids must be disjoint from evolution_case_ids: "
-            + ", ".join(overlapping_canary_ids)
-        )
-    overlapping_canary_probe_ids = sorted(
-        set(canary_case_ids).intersection(probe_ids)
-    )
-    if overlapping_canary_probe_ids:
-        raise ValueError(
-            "canary_case_ids must be disjoint from probe_ids: "
-            + ", ".join(overlapping_canary_probe_ids)
-        )
-    overlapping_probe_ids = sorted(set(probe_ids).intersection(evolution_case_ids))
-    if overlapping_probe_ids:
-        raise ValueError(
-            "probe_ids must be disjoint from evolution_case_ids: "
-            + ", ".join(overlapping_probe_ids)
-        )
-    missing_probe_records = [case_id for case_id in probe_ids if case_id not in records]
-    if missing_probe_records:
-        raise ValueError("Probe records missing: " + ", ".join(missing_probe_records))
-    missing_canary_records = [
-        case_id for case_id in canary_case_ids if case_id not in records
-    ]
-    if missing_canary_records:
-        raise ValueError(
-            "Canary records missing: " + ", ".join(missing_canary_records)
-        )
     registered_probe_ids = tuple(probe_ids[:probe_limit])
-    missing_probe_gold = [
-        case_id
-        for case_id in registered_probe_ids
-        if _evaluator_gold(records[case_id]) is None
-    ]
-    if missing_probe_gold and (use_gold or fitness_use_gold):
-        raise ValueError(
-            "Development probes require evaluator gold labels: "
-            + ", ".join(missing_probe_gold)
-        )
     if mutation_route is not None:
         mutation_route = dict(mutation_route)
         model = str(mutation_route.get("model") or "")
