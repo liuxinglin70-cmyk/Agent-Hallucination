@@ -273,10 +273,13 @@ flowchart LR
 | # | 边界 | 位置 | 状态 |
 |---|---|---|---|
 | **D1** | L1 action 仍是自然语言注入，执行证据依赖 provider 自报（fail-open） | `module_charter.py` / `skill_integration.py` | 🟡 架构改造方向，未启动 |
-| **D2** | 动态词表的策略提议依赖注册时捕获的 intent；无 intent 的 promoted 条目仅可被引用 | `registry_promotion.py` | 🟡 已实现 intent 通道，无 intent 条目仍被动 |
+| **D2** | 动态词表的策略提议依赖注册时捕获的 intent | `registry_promotion.py` | 🟢 已闭环（intent 捕获 → 晋升 → 动态候选，commit `ad74ab0`） |
 | **D3** | stable genome/policy checkpoint 无 content_hash 校验 | `evolution_runner.py` | 🟡 加固建议 |
 | **P10** | 连续运行 + 独立评测 | — | 🔴 未启动 |
 
 > **第三轮结论**：G1-G5 五条断链已全部闭合（见 `EVOLUTION_FIXES_SUMMARY.md`），
 > 自进化框架的「检测 → 归因 → 反思 → 回放 → 门控 → 反馈 → 元审查 → 证据门提交」
-> 闭环在运行时代码中成立；剩余 D1-D3 为架构改造与加固方向，不阻断闭环。
+> 闭环在运行时代码中成立；遗留边界 D2（动态词表策略提议）已随
+> intent 捕获 → 晋升 → 动态候选链路闭环（commit `ad74ab0`）。剩余
+> D1（ActionSpec 确定性执行）与 D3（checkpoint hash 加固）为架构改造与
+> 加固方向，不阻断闭环。
