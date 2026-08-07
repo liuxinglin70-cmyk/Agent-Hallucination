@@ -376,6 +376,14 @@ def validate_runtime_rule(
     condition = normalized.split("时", 1)[0]
     if lowered.startswith(("when ", "if ")) or normalized.startswith("如果"):
         condition = re.split(r"[,，]", normalized, maxsplit=1)[0]
+    elif normalized.startswith("当"):
+        # ``当…时`` boundary: only accept a ``时`` followed by punctuation or
+        # end-of-string as the condition terminator. A plain ``split("时")``
+        # truncates on in-word ``时`` (e.g. ``当时间戳缺失时`` -> ``当``),
+        # corrupting the condition and the action boundary derived from it.
+        boundary = re.search(r"时(?=[，,。；;：:\s]|$)", normalized)
+        if boundary:
+            condition = normalized[: boundary.start() + 1]
     conjunctions = re.findall(
         r"且|并且|以及|或|\band\b|\bor\b",
         condition.lower(),
@@ -851,7 +859,11 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     allowed_operations = {operation.value for operation in SkillOp}
     if operation_value not in allowed_operations:
         return False, f"invalid_operation: {edit.operation}"
-    edit.operation = operation_value
+    # NOTE: the caller's ``edit.operation`` is intentionally NOT rewritten
+    # here — mutating the passed-in object from a validation function is a
+    # side effect that silently type-drifts SkillOp into str for every other
+    # consumer of the same edit (audit recording etc.). ``apply_edit``
+    # normalizes the operation on its own copy when it commits.
 
     module = genome.modules[edit.target_module]
 

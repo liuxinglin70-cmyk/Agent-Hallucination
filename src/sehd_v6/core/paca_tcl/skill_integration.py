@@ -485,11 +485,32 @@ def make_skill_aware_provider(
             ])
             for module_id in injected_modules:
                 for rule_id, rule in compiled.delta_rule_ids.get(module_id, ()):
+                    rule_text = str(rule or "")
+                    # Runtime injection guard: an evolved rule is instruction
+                    # text placed inside a provider system prompt. Suppress
+                    # fragments that attempt to override the role/system
+                    # boundary so a case-specific rule cannot re-purpose the
+                    # provider role (the evolution-time metamorphic gate is
+                    # not a runtime defense).
+                    rule_lowered = rule_text.lower()
+                    if any(
+                        marker in rule_lowered
+                        for marker in (
+                            "ignore previous instructions",
+                            "ignore all previous",
+                            "system prompt",
+                            "you are now",
+                            "act as system",
+                            "override all instructions",
+                            "do not follow",
+                        )
+                    ):
+                        continue
                     action_spec = compiled.action_specs.get(rule_id)
                     if action_spec and route_key in action_spec.get("route_ids", ()):
-                        condition = rule
-                        if rule.lower().startswith("when "):
-                            condition = rule[5:].partition(",")[0].strip()
+                        condition = rule_text
+                        if rule_text.lower().startswith("when "):
+                            condition = rule_text[5:].partition(",")[0].strip()
                         lines.append(json.dumps({
                             "rule_id": rule_id,
                             "condition": condition,
@@ -497,7 +518,7 @@ def make_skill_aware_provider(
                         }, ensure_ascii=False, sort_keys=True))
                     else:
                         lines.append(
-                            f"[{rule_id}] {rule}"
+                            f"[{rule_id}] {rule_text}"
                         )
             lines.extend([
                 "",
