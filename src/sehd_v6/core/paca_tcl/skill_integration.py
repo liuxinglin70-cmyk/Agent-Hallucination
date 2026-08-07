@@ -127,9 +127,6 @@ class CompiledPacaSkill:
     frozen_crs_weights: tuple[float, ...] = (0.35, 0.15, 0.20, 0.20, 0.10)
     schema_version: str = "agenthallu.paca_tcl_skill_integration.v5"
 
-    def for_stage(self, stage: PacaStage) -> CompiledStageSkill:
-        return self.stages[stage]
-
     def rule_trace(self) -> dict[str, list[dict[str, str]]]:
         """Return the stable rule-level execution trace for audit.
 
@@ -403,23 +400,6 @@ def compile_genome_for_paca(
     )
 
 
-def route_stage_map(config: Mapping[str, Any]) -> dict[int, PacaStage]:
-    """Map route object identities to stages, rejecting ambiguous reuse."""
-
-    result: dict[int, PacaStage] = {}
-    for stage, keys in ROUTE_STAGE_KEYS.items():
-        for key in keys:
-            route = config.get(key)
-            if not isinstance(route, dict):
-                continue
-            identity = id(route)
-            existing = result.get(identity)
-            if existing is not None and existing != stage:
-                raise ValueError(f"route object is reused across incompatible stages: {key}")
-            result[identity] = stage
-    return result
-
-
 def route_binding_map(
     config: Mapping[str, Any],
 ) -> dict[int, tuple[str, PacaStage, tuple[str, ...]]]:
@@ -646,92 +626,3 @@ def integrated_v35_provider(
             v35.provider_call = original_v35
             v35.json_object_provider_call = original_v35_json
             v2.provider_call = original_v2
-
-
-def adjudicate_case_with_genome(
-    *,
-    genome: SkillGenome,
-    case_id: str,
-    record: dict[str, Any],
-    config: dict[str, Any],
-    output_dir: Path,
-    census_root: Path,
-) -> dict[str, Any]:
-    """Run the frozen v3.5 case path with stage-specific evolved skill context."""
-
-    from . import proof_engine as v35
-
-    with integrated_v35_provider(genome=genome, config=config) as compiled:
-        output = v35.adjudicate_case(
-            case_id=case_id,
-            record=record,
-            config=config,
-            output_dir=output_dir,
-            census_root=census_root,
-        )
-    output["bccse_skill"] = {
-        "genome_hash": compiled.genome_hash,
-        "stage_skill_hashes": {
-            stage.value: item.content_hash for stage, item in compiled.stages.items()
-        },
-        "crs_weights_changed": False,
-        "base_detector": "PACA-TCL v3.5",
-    }
-    return output
-
-
-def build_cesv_skill_enhancement(
-    *,
-    packet: dict[str, Any],
-    candidates: Sequence[Mapping[str, Any]],
-    genome: SkillGenome,
-) -> CesvSkillEnhancement:
-    """Route CESV graph signals to the two registered L5 skill modules."""
-
-    graph = cesv.build_provenance_graph(packet)
-    engine = cesv.CausalInterventionEngine(graph)
-    earliest_active = genome.modules["earliest_origin_tiebreak"].active
-    causal_active = genome.modules["causal_link_test"].active
-    earliest: dict[str, str] = {}
-    diagnostics: dict[str, CausalLinkDiagnostic] = {}
-    rankings: dict[str, Mapping[str, Any]] = {}
-
-    for row in candidates:
-        candidate_id = str(row.get("candidate_id") or row.get("source_candidate_id") or "")
-        origin = str(
-            row.get("origin_event_id")
-            or row.get("origin_hypothesis_event_id")
-            or row.get("event_id")
-            or ""
-        )
-        if not candidate_id or origin not in graph.nodes:
-            continue
-        path = tuple(engine.causal_backtrack(origin))
-        root = path[0] if path else origin
-        intervention = engine.do_intervention(root)
-        effect = float(intervention.get("interventional_effect") or 0.0)
-        diagnostic = CausalLinkDiagnostic(
-            candidate_id=candidate_id,
-            observed_origin=origin,
-            propagate_root=root,
-            propagate_path=path,
-            interventional_effect=effect,
-            affected_downstream=int(intervention.get("affected_downstream") or 0),
-            total_downstream=int(intervention.get("total_downstream") or 0),
-            causal_link_supported=bool(intervention.get("severed_edge_count")) and effect > 0.0,
-        )
-        if earliest_active:
-            earliest[candidate_id] = root
-        if causal_active:
-            diagnostics[candidate_id] = diagnostic
-            rankings[root] = {
-                "causal_sufficiency_score": effect,
-                "is_root_cause": root != origin or diagnostic.causal_link_supported,
-                "source": "CESV_do_intervention_auxiliary",
-            }
-
-    return CesvSkillEnhancement(
-        earliest_origin_tiebreak=earliest,
-        causal_link_test=diagnostics,
-        counterfactual_rankings=rankings,
-    )

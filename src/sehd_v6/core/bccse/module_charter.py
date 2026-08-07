@@ -593,28 +593,6 @@ def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
     return True, ""
 
 
-def render_action_opcode_text(module_id: str) -> str:
-    """Render one module's closed action-opcode list for prompt injection.
-
-    Lists ``<opcode>`` with its English template so the model can compose
-    the exact ``"<opcode>: <target>"`` action slot the gate validates, and
-    the registered provider-schema target fields the target must name.
-    """
-    opcodes = MODULE_ACTION_OPCODES.get(module_id, ())
-    if not opcodes:
-        return "(no executable actions)"
-    lines = [
-        f"- {opcode} — {template}"
-        for opcode, template in opcodes
-    ]
-    operation_targets = MODULE_OPERATION_TARGETS.get(module_id, {})
-    for opcode, _template in opcodes:
-        targets = operation_targets.get(opcode, ())
-        if targets:
-            lines.append(f"{opcode} valid targets: " + ", ".join(targets))
-    return "\n".join(lines)
-
-
 def charter_for(module_id: str) -> ModuleCharter:
     """Return the charter for a registered module, else raise ValueError."""
     charter = MODULE_CHARTERS.get(module_id)

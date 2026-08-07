@@ -60,8 +60,6 @@ DIRECT_PROVIDER_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
 # 本机解析为无法写入的盘根目录，缓存被静默禁用）。
 # ============================================================
 
-_global_cache_write_lock = threading.Lock()
-
 
 def _global_cache_root() -> Path | None:
     """Global provider cache root, or None when the cache is disabled.
@@ -189,20 +187,16 @@ def _provider_repair_call(
 def _atomic_write_json(path: Path, value: Any) -> None:
     """原子写入 JSON 文件，防止并发写冲突。
 
-    先写入线程独占的临时文件（含 pid + tid 后缀，避免同名冲突），
-    然后 os.replace 原子替换。os.replace 在 POSIX 上是原子的，
-    保证读到的要么是旧文件要么是新文件。
+    os.replace 原子替换保证读到的要么是旧文件要么是新文件。
     """
-    import threading as _t
-    import os as _os
     path.parent.mkdir(parents=True, exist_ok=True)
     # 临时文件名含 pid + tid，确保不同线程写同一 hash 时不会冲突
-    tmp = path.with_suffix(f".{_os.getpid()}.{_t.get_ident()}.tmp")
+    tmp = path.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
     with open(tmp, "w", encoding="utf-8") as handle:
         json.dump(value, handle, ensure_ascii=False, sort_keys=True, indent=2)
         handle.flush()
-        _os.fsync(handle.fileno())
-    _os.replace(tmp, path)
+        os.fsync(handle.fileno())
+    os.replace(tmp, path)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -220,16 +214,6 @@ def write_json(path: Path, value: Any) -> None:
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(packet.canonical_json(row) + "\n" for row in rows), encoding="utf-8")
-
-
-def append_jsonl(path: Path, row: dict[str, Any]) -> None:
-    """v3.5.1: 追加一行到 JSONL 文件（线程安全，O(1) 而非 O(n) 重写）"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    line = packet.canonical_json(row) + "\n"
-    with _jsonl_append_lock:
-        with open(path, "a", encoding="utf-8") as handle:
-            handle.write(line)
-            handle.flush()
 
 
 def private_ref(case_id: str, prefix: str) -> str:
@@ -250,14 +234,6 @@ def parse_gold_label(value: Any) -> bool:
     if coerced is None:
         raise ValueError("unrecognized gold label")
     return coerced
-
-
-def parse_gold_steps(value: Any) -> set[int]:
-    if value is None:
-        return set()
-    if isinstance(value, int):
-        return {value}
-    return {int(token) for token in __import__("re").findall(r"\d+", str(value))}
 
 
 def _event_for_source_step(built: dict[str, Any], step: Any) -> str | None:

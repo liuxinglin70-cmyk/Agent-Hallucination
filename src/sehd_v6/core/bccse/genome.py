@@ -788,26 +788,6 @@ class SkillGenome:
     def clone(self) -> "SkillGenome":
         return SkillGenome.from_dict(self.to_dict())
 
-    def get_all_rules_text(self) -> str:
-        """Get all rules formatted for LLM context."""
-        parts = []
-        for mid in MODULE_IDS:
-            mod = self.modules[mid]
-            if not mod.active or not mod.rules:
-                continue
-            display = MODULE_DISPLAY_NAMES.get(mid, mid)
-            parts.append(f"[{display}] ({mid})")
-            for i, rule in enumerate(mod.rules, 1):
-                parts.append(f"  {i}. {rule}")
-        return "\n".join(parts)
-
-    def get_module_rules_text(self, module_id: str) -> str:
-        """Get rules for a specific module."""
-        mod = self.modules.get(module_id)
-        if not mod or not mod.rules:
-            return "(无规则)"
-        return "\n".join(f"  {i}. {r}" for i, r in enumerate(mod.rules, 1))
-
 
 # ============================================================
 # Edit Application

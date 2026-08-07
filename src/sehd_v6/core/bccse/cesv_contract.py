@@ -519,36 +519,6 @@ def uncertainty_error_separation(
     return "clean"
 
 
-def parse_dirichlet_response(response: dict[str, Any]) -> list[EvidentialScore]:
-    """Parse LLM response containing Dirichlet evidence parameters.
-
-    Expected LLM output format:
-    {
-        "candidates": [
-            {
-                "candidate_id": "...",
-                "event_id": "...",
-                "alpha_error": 5.0,
-                "alpha_clean": 2.0,
-                "evidence_rationale": "..."
-            },
-            ...
-        ]
-    }
-    """
-    scores = []
-    for item in response.get("candidates") or []:
-        alpha_error = float(item.get("alpha_error", 1.0))
-        alpha_clean = float(item.get("alpha_clean", 1.0))
-        scores.append(EvidentialScore(
-            alpha_error=alpha_error,
-            alpha_clean=alpha_clean,
-            candidate_id=str(item.get("candidate_id") or ""),
-            event_id=str(item.get("event_id") or ""),
-        ))
-    return scores
-
-
 # ============================================================
 # Phase 4: Sequential Hypothesis Arbiter (E-value)
 # ============================================================
