@@ -249,15 +249,19 @@ _POSTCONDITION_CHECKS = frozenset({
     "field_present",
     "field_nonempty",
     "coverage_not_complete",
+    "object_quarantined",
 })
 
-# output_object -> result surface row access.  Surfaces absent from this
-# map are provider-internal intermediates (candidate_qualification,
-# verification_certificate, causal_certificate_or_boundary) that the final
-# detection result does not expose; their obligations are unverifiable.
+# output_object -> result surface row access.  ``verification_certificate``
+# is the atomic-verifier's output; the certificates it verifies are the
+# prosecution certificate rows of the final result, and their quarantine
+# state is the proof court's ``quarantined_error_certificate_ids``.  The
+# ``causal_certificate_or_boundary`` surface is provider-internal and not
+# exposed by the final result; its obligations stay unverifiable.
 _OBJECT_SURFACE_KEYS: Mapping[str, tuple[str, ...]] = {
     "candidate": ("paca_census", "construct_census", "census"),
     "error_certificate": ("combined_prosecution", "prosecution"),
+    "verification_certificate": ("combined_prosecution", "prosecution"),
     "defense_certificate_or_boundary": ("combined_defense", "defense"),
 }
 
@@ -273,19 +277,23 @@ def _surface_rows(
     keys = _OBJECT_SURFACE_KEYS.get(output_object)
     if keys is None:
         return None
+    # The first key that yields rows wins; an empty earlier key must not
+    # shadow a populated later one (paca_census may be empty while
+    # construct_census carries the rows).
     for key in keys:
         payload = result.get(key)
         if isinstance(payload, list):
-            return [
-                dict(row) for row in payload if isinstance(row, Mapping)
-            ] or []
+            rows = [dict(row) for row in payload if isinstance(row, Mapping)]
+            if rows:
+                return rows
+            continue
         if not isinstance(payload, Mapping):
             continue
         rows = payload.get("candidates") or payload.get("certificates") or []
         if isinstance(rows, list):
-            return [
-                dict(row) for row in rows if isinstance(row, Mapping)
-            ] or []
+            rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+            if rows:
+                return rows
     return []
 
 
@@ -343,6 +351,32 @@ def evaluate_action_spec_postcondition(
         satisfied = not (prosecution == "complete" and defense == "complete")
         return satisfied, (
             "coverage_not_complete" if satisfied else "coverage_complete"
+        )
+
+    if postcondition == "object_quarantined":
+        proof = result.get("proof_adjudication") or {}
+        if not isinstance(proof, Mapping):
+            return False, "proof_adjudication_absent"
+        # The quarantine obligation acts on the module's certificate
+        # surface; the spec names the certificate-id FIELD, not a concrete
+        # value, so the deterministic check is the side's quarantined set
+        # being non-empty (the observable ``quarantined_certificates``
+        # contract).  An empty set means the provider quarantined nothing.
+        quarantined_ids_key = {
+            "error_certificate": "quarantined_error_certificate_ids",
+            "verification_certificate": "quarantined_error_certificate_ids",
+            "defense_certificate_or_boundary": (
+                "quarantined_defense_certificate_ids"
+            ),
+        }.get(spec.output_object)
+        if quarantined_ids_key is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        quarantined = proof.get(quarantined_ids_key) or []
+        satisfied = (
+            isinstance(quarantined, list) and len(quarantined) > 0
+        )
+        return satisfied, (
+            "object_quarantined" if satisfied else "object_not_quarantined"
         )
 
     return False, f"unmapped_postcondition:{postcondition}"

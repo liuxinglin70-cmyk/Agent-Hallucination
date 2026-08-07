@@ -310,6 +310,22 @@ def test_postcondition_object_present_and_absent() -> None:
     assert not satisfied and detail == "object_present"
 
 
+def test_surface_rows_skip_empty_earlier_keys() -> None:
+    """An empty paca_census must not shadow a populated construct_census."""
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    spec = compile_action_spec("candidate_trigger", "emit_candidate: candidate")
+    result = {
+        "paca_census": [],
+        "construct_census": [{"candidate_id": "c1"}],
+        "census": [{"candidate_id": "c2"}],
+    }
+    satisfied, detail = evaluate_action_spec_postcondition(spec, result)
+    assert satisfied and detail == "object_present"
+
+
 def test_postcondition_field_obligation_on_certificate_rows() -> None:
     from src.sehd_v6.core.bccse.action_spec import (
         evaluate_action_spec_postcondition,
@@ -365,10 +381,9 @@ def test_postcondition_quarantine_and_fail_closed_surfaces() -> None:
         evaluate_action_spec_postcondition,
     )
 
-    # The quarantine obligation belongs to atomic_verifier_instruction,
-    # whose output surface (verification_certificate) is provider-internal
-    # and not exposed in the final result: it must fail closed, never
-    # silently pass.
+    # The quarantine obligation of atomic_verifier_instruction maps to the
+    # proof court's quarantined-error set (the verifier's certificates are
+    # the prosecution certificate surface).
     quarantine_spec = compile_action_spec(
         "atomic_verifier_instruction", "quarantine_certificate: certificate_id",
     )
@@ -377,8 +392,31 @@ def test_postcondition_quarantine_and_fail_closed_surfaces() -> None:
         quarantine_spec,
         {"proof_adjudication": {"quarantined_error_certificate_ids": ["c1"]}},
     )
-    assert not satisfied
-    assert detail.startswith("unmapped_postcondition")
+    assert satisfied and detail == "object_quarantined"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        quarantine_spec,
+        {"proof_adjudication": {"quarantined_error_certificate_ids": []}},
+    )
+    assert not satisfied and detail == "object_not_quarantined"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        quarantine_spec, {},
+    )
+    assert not satisfied and detail == "object_not_quarantined"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        quarantine_spec, {"proof_adjudication": "bogus"},
+    )
+    assert not satisfied and detail == "proof_adjudication_absent"
+
+    # The verification certificate surface is now result-observable: its
+    # presence/absence obligations verify against the prosecution rows.
+    emit_spec = compile_action_spec(
+        "atomic_verifier_instruction", "emit_certificate: certificate_id",
+    )
+    satisfied, detail = evaluate_action_spec_postcondition(
+        emit_spec,
+        {"prosecution": {"candidates": [{"certificate_id": "c1"}]}},
+    )
+    assert satisfied and detail == "object_present"
 
     # A provider-internal surface is not observable in the final result and
     # must fail closed, never silently pass.

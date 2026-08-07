@@ -406,3 +406,5 @@ Magentic_One/068
 OpenDeepSearch/082
 # --- D1 verification smoke (2026-08-07, single case) ---
 BFCL/005
+# --- D1 postcondition real-result verification (2026-08-07, single case) ---
+BFCL/006
