@@ -221,10 +221,6 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_text("".join(packet.canonical_json(row) + "\n" for row in rows), encoding="utf-8")
 
 
-# v3.5.1: 线程安全的 JSONL 追加写，避免每次完成一例就全量重写
-_jsonl_append_lock = threading.Lock()
-
-
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
     """v3.5.1: 追加一行到 JSONL 文件（线程安全，O(1) 而非 O(n) 重写）"""
     path.parent.mkdir(parents=True, exist_ok=True)

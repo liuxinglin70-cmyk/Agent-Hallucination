@@ -10,9 +10,6 @@ MODEL_ALIASES = {
     "deepseek-v4-pro": "deepseek-v4-pro",
 }
 
-ALLOWED_PROVIDER_MODELS = frozenset(MODEL_ALIASES)
-
-
 def canonical_model_name(model: str) -> str:
     """Return the provider wire name or raise for an unregistered model."""
 

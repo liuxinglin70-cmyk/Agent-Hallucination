@@ -249,16 +249,6 @@ class StructuralGate:
         self._consecutive_no_edit = certificate.prior_consecutive_no_edit
         self._converged = certificate.prior_converged
 
-    def get_allowed_operations(self, module: str) -> list[str]:
-        """All operations are always allowed — trust the LLM's judgment.
-
-        The LLM causal reflection decides what operation is appropriate.
-        Structural constraints (capacity, duplicates) prevent abuse.
-
-        Returns v5 SkillOp values (add_rule / modify_rule / remove_rule).
-        """
-        return ["add_rule", "modify_rule", "remove_rule"]
-
     def evaluate(
         self,
         *,

@@ -92,15 +92,6 @@ def load_records(path: Path) -> dict[str, dict[str, Any]]:
     return records
 
 
-def load_checkpoint(output_dir: Path) -> dict[str, Any]:
-    """Public wrapper around :func:`load_evolution_checkpoint`.
-
-    Returns ``{}`` when no checkpoint exists.  See the upstream docstring
-    for the returned schema.
-    """
-    return load_evolution_checkpoint(Path(output_dir))
-
-
 def _resolve_mutation_route(
     route: Path | Mapping[str, Any] | None,
     *,
