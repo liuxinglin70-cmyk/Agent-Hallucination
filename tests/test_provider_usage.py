@@ -99,6 +99,31 @@ def test_round_trip_preserves_records():
     assert restored.to_dict() == ledger.to_dict()
 
 
+def test_string_false_booleans_are_not_coerced_to_true():
+    """A persisted string 'false' must not load as True (bool('false'))."""
+    from src.sehd_v6.core.provider_usage import UsageRecord
+
+    record = UsageRecord.from_dict({
+        "logical_call_id": "call_1",
+        "purpose": "mutation",
+        "request_hash": "h",
+        "cache_hit": "false",
+        "repair_used": "false",
+        "transport_attempts": 0,
+    })
+    assert record.cache_hit is False
+    assert record.repair_used is False
+
+    record_true = UsageRecord.from_dict({
+        "logical_call_id": "call_2",
+        "purpose": "mutation",
+        "request_hash": "h",
+        "cache_hit": True,
+        "transport_attempts": 0,
+    })
+    assert record_true.cache_hit is True
+
+
 def test_unknown_schema_version_is_rejected():
     with pytest.raises(ValueError, match="unsupported usage ledger schema"):
         ProviderUsageLedger.from_dict({"schema_version": "v0", "records": []})

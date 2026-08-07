@@ -93,14 +93,16 @@ class UsageRecord:
             logical_call_id=str(value.get("logical_call_id") or ""),
             purpose=str(value.get("purpose") or ""),
             request_hash=str(value.get("request_hash") or ""),
-            cache_hit=bool(value.get("cache_hit")),
+            # JSON booleans serialize as true/false; the string "false" must
+            # not be coerced into True by bool().
+            cache_hit=value.get("cache_hit") is True,
             cache_source=str(value.get("cache_source") or ""),
             transport_attempts=_nonnegative_int(value.get("transport_attempts")),
             prompt_tokens=_nonnegative_int(value.get("prompt_tokens")),
             completion_tokens=_nonnegative_int(value.get("completion_tokens")),
             reasoning_tokens=_nonnegative_int(value.get("reasoning_tokens")),
             latency_seconds=_nonnegative_float(value.get("latency_seconds")),
-            repair_used=bool(value.get("repair_used")),
+            repair_used=value.get("repair_used") is True,
             cost_status=str(value.get("cost_status") or COST_UNAVAILABLE),
         )
 
