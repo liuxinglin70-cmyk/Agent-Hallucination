@@ -135,6 +135,9 @@ from .promotion_contract import (
     promote,
 )
 from .meta_review import (
+    OUTCOME_SUPPORTS_ACCEPT,
+    OUTCOME_SUPPORTS_REJECT,
+    OutcomeValidation,
     aggregate_gate_experience,
     build_drift_snapshot,
     commit_validated_meta_edits,
@@ -4541,6 +4544,14 @@ def run_online_evolution(
                 audit["case_audits"], previous_probe_audits
             )
             audit["probe_certification"] = certification
+            # P7.2: the probe is the independent development validation of the
+            # edits it covers; the outcome validation rows let the Meta
+            # review consume probe evidence (certified -> supports_accept,
+            # regressed -> supports_reject) instead of running on gate events
+            # alone.
+            audit["validated_edit_ids"] = [
+                item.edit.edit_id for item in pending_probe_commits
+            ]
             if probe_experience_record:
                 probe_case_ids = [
                     str(case_audit.get("case_id"))
@@ -7411,14 +7422,44 @@ def run_online_evolution(
         for event in gate_event_ledger.events
     ]
     gate_experiences = [experience.to_dict() for experience in aggregated_experiences]
+    # P7.2: development-probe audits become OutcomeValidation rows.  A probe
+    # is the independent development validation of the edits it covers, so a
+    # certified probe supports its edits' acceptance and a regressed one
+    # supports their rejection; neutral probes carry no signal.  These rows
+    # only feed the advisory Meta loop — never the hard gate.
+    probe_validations: list[OutcomeValidation] = []
+    for probe_index, probe in enumerate(probe_history):
+        certification = str(probe.get("probe_certification") or "")
+        validated_edit_ids = [
+            str(edit_id)
+            for edit_id in (probe.get("validated_edit_ids") or ())
+            if str(edit_id)
+        ]
+        if certification == "neutral" or not validated_edit_ids:
+            continue
+        outcome = (
+            OUTCOME_SUPPORTS_ACCEPT
+            if certification == "certified"
+            else OUTCOME_SUPPORTS_REJECT
+        )
+        for edit_id in validated_edit_ids:
+            try:
+                probe_validations.append(OutcomeValidation(
+                    outcome=outcome,
+                    gate_event_id=edit_id,
+                    validation_event_id=f"probe_{probe_index}",
+                    evidence=("development_probe",),
+                ))
+            except ValueError:
+                continue
     meta_candidates = generate_meta_edit_candidates(
         aggregated_experiences,
-        [],  # OutcomeValidation rows are produced by development probes (P7.2)
+        probe_validations,
         meta_skill_state,
     )
     drift_snapshot = build_drift_snapshot(
         aggregated_experiences,
-        [],
+        probe_validations,
         registry_size=len(policy_genome.registry.all_predicate_names())
         + len(policy_genome.registry.all_action_instance_names()),
     )
@@ -7431,12 +7472,15 @@ def run_online_evolution(
         meta_skill_state,
         meta_candidates,
         aggregated_experiences,
-        [],  # OutcomeValidation rows are produced by development probes (P7.2)
+        probe_validations,
     )
     meta_edits_committed = [
         row for row in meta_commit_audit if row.get("committed")
     ]
     causal_memory.meta_review["gate_experiences"] = gate_experiences
+    causal_memory.meta_review["outcome_validations"] = [
+        validation.to_dict() for validation in probe_validations
+    ]
     causal_memory.meta_review["meta_state"] = committed_meta_state.to_dict()
     causal_memory.meta_review["meta_commit_audit"] = meta_commit_audit
     causal_memory.meta_review["drift_snapshots"] = [drift_snapshot.to_dict()]

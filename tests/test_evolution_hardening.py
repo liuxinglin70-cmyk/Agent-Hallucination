@@ -1024,6 +1024,69 @@ def test_shared_cache_re_seeds_when_baseline_cache_changes(
     assert marker.read_text(encoding="utf-8").strip() == prior_fingerprint
 
 
+def test_probe_validation_rows_reach_meta_review(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    """P7.2 wiring: probe audits carry the validated edit ids and the final
+    Meta aggregation persists them as OutcomeValidation rows (neutral probes
+    stay silent)."""
+    import json
+
+    result = _probe_certification_fixture(tmp_path, monkeypatch)
+    assert result.edits_accepted == 1
+
+    probes = result.evolution_audit["probe_history"]
+    assert probes, "the run must have executed at least one development probe"
+    # The first probe has no baseline -> neutral, but it must still record
+    # which edits it validated.
+    assert probes[0]["probe_certification"] == "neutral"
+    assert probes[0]["validated_edit_ids"], (
+        "a probe must record the edits it validated"
+    )
+
+    memory = json.loads(
+        (tmp_path / "htc_tes_experience_memory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    meta_review = memory.get("meta_review") or {}
+    validations = meta_review.get("outcome_validations") or []
+    # Neutral probes carry no signal, so no outcome validation row appears.
+    assert validations == []
+
+
+def test_probe_validation_rows_classify_certified_probe() -> None:
+    """A certified probe maps to supports_accept OutcomeValidation rows and
+    an unsupported certification stays silent."""
+    import json as _json
+
+    from src.sehd_v6.core.bccse.meta_review import (
+        OUTCOME_SUPPORTS_ACCEPT,
+        OutcomeValidation,
+    )
+
+    def build(outcome: str) -> OutcomeValidation:
+        return OutcomeValidation(
+            outcome=outcome,
+            gate_event_id="edit_x",
+            validation_event_id="probe_0",
+            evidence=("development_probe",),
+        )
+
+    certified = build(OUTCOME_SUPPORTS_ACCEPT)
+    assert certified.to_dict()["outcome"] == OUTCOME_SUPPORTS_ACCEPT
+    # The runner's neutral-probe path never constructs a row; the closed
+    # vocabulary rejects anything unknown fail-closed.
+    try:
+        OutcomeValidation(
+            outcome="not_a_validation", gate_event_id="e",
+        )
+    except ValueError:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("unknown outcome validation was accepted")
+
+
 def test_protected_evolved_rule_cannot_be_removed() -> None:
     child = apply_edit(create_baseline_genome(), _typed_edit())
     module = child.modules["evidence_obligation"]
