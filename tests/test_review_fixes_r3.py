@@ -17,7 +17,11 @@ Each test pins one concrete defect fixed in the review round:
   evidence gate, so the Meta loop stops re-deriving and discarding the same
   recommendation every run (G1 closure);
 - R36: the evidence gate is fail-closed — thin evidence, unregistered
-  targets and non-advisory operations all stay in shadow.
+  targets and non-advisory operations all stay in shadow;
+- R37: the structured ProviderUsageLedger is wired into the mutation call
+  path, persisted per run, and its totals land in the evolution audit (G5);
+- R38: the evaluator validates params against the genome's registry, not the
+  baseline, so an evolved-registry action actually executes (G3 enabler).
 """
 
 from __future__ import annotations
@@ -366,3 +370,124 @@ def test_r36_runner_persists_the_committed_state() -> None:
         in source
     ), "the meta_review authority must receive the post-commit state"
     assert 'causal_memory.meta_review["meta_commit_audit"]' in source
+
+
+# ============================================================
+# R37: ProviderUsageLedger wired into the mutation path (G5)
+# ============================================================
+
+def test_r37_mutation_calls_record_into_the_ledger() -> None:
+    source = inspect.getsource(evolution_runner.run_online_evolution)
+    # The ledger is instantiated once per run and records every logical
+    # mutation/reflection call with the provider meta in hand.
+    assert "provider_usage_ledger = ProviderUsageLedger()" in source
+    assert "provider_usage_ledger.record(" in source
+    # The record call must sit in run_mutation_call, after the counters are
+    # updated and the meta is known.
+    start = source.index("def run_mutation_call(")
+    handler = source[start : source.index("def attribution_for(", start)]
+    assert "provider_usage_ledger.record(" in handler
+
+
+def test_r37_ledger_is_persisted_and_totals_audited() -> None:
+    source = inspect.getsource(evolution_runner.run_online_evolution)
+    assert (
+        'output_dir / "provider_usage_ledger.json"'
+        in source
+    )
+    assert "provider_usage_ledger.to_dict()" in source
+    assert '"provider_usage_totals": provider_usage_ledger.totals()' in source
+
+
+def test_r37_ledger_records_reflection_purposes() -> None:
+    """The purpose token flows from the call kwargs into the ledger row."""
+    from src.sehd_v6.core.provider_usage import ProviderUsageLedger
+
+    ledger = ProviderUsageLedger()
+    ledger.record(
+        purpose="policy_reflection",
+        meta={
+            "cache_hit": False,
+            "transport_attempts": 2,
+            "repair_used": True,
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "completion_tokens_details": {"reasoning_tokens": 10},
+            },
+            "latency_seconds": 3.5,
+        },
+    )
+    assert ledger.totals()["logical_calls"] == 1
+    assert ledger.totals()["transport_attempts"] == 2
+    assert ledger.totals()["prompt_tokens"] == 100
+    assert ledger.totals()["completion_tokens"] == 50
+    assert ledger.totals()["reasoning_tokens"] == 10
+    assert ledger.totals()["by_purpose"]["policy_reflection"] == 1
+    assert ledger.totals()["repairs"] == 1
+
+
+def test_r37_cache_hits_are_reported_but_never_rebilled() -> None:
+    from src.sehd_v6.core.provider_usage import ProviderUsageLedger
+
+    ledger = ProviderUsageLedger()
+    ledger.record(
+        purpose="mutation",
+        meta={"cache_hit": True, "transport_attempts": 9, "usage": {}},
+    )
+    totals = ledger.totals()
+    assert totals["cache_hits"] == 1
+    assert totals["fresh_transport_calls"] == 0
+    assert totals["transport_attempts"] == 0
+    assert totals["logical_calls"] == 1
+
+
+# ============================================================
+# R38: param validation resolves against the active registry (G3 enabler)
+# ============================================================
+
+def test_r38_evaluator_validates_params_against_genome_registry() -> None:
+    """An evolved-registry action must pass param validation, not fail
+    against the baseline table (the silent-never-execute path)."""
+    from src.sehd_v6.core.bccse.policy_genome import (
+        create_baseline_policy_genome,
+    )
+    from src.sehd_v6.core.bccse.v6_contracts import PolicyItem
+    from src.sehd_v6.core.bccse.vocabulary_registry import (
+        AdjudicationFacts,
+        apply_registry_edit,
+    )
+    from src.sehd_v6.core.paca_tcl.policy_evaluator import evaluate_policies
+
+    genome = create_baseline_policy_genome()
+    genome.registry = apply_registry_edit(
+        genome.registry,
+        operation="register_action",
+        target="downgrade_coverage_instance",
+        operator="downgrade_coverage",
+        reason_codes=("no_registered_runtime_action",),
+    )
+    genome.registry = apply_registry_edit(
+        genome.registry,
+        operation="enable",
+        target="downgrade_coverage_instance",
+        reason_codes=("no_registered_runtime_action",),
+    )
+    item = PolicyItem(
+        item_id="alias_item",
+        precondition="all_candidates_quarantined",
+        action="downgrade_coverage_instance",
+        params={"side": "prosecution", "to_state": "unresolved"},
+        is_baseline=False,
+    )
+    facts = AdjudicationFacts(
+        prosecution_coverage="complete",
+        quarantined_error_count=2,
+        required_candidate_count=2,
+        fully_quarantined=True,
+    )
+    result = evaluate_policies(facts, [item], registry=genome.registry)
+    assert [row["action"] for row in result.fired] == [
+        "downgrade_coverage_instance",
+    ]
+    assert result.effective_prosecution_coverage == "unresolved"

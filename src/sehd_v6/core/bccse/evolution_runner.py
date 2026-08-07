@@ -36,6 +36,7 @@ from ..paca_tcl.basic_runner import (
     write_json,
     write_jsonl,
 )
+from ..provider_usage import ProviderUsageLedger
 from ...utils import ocse_packet as packet
 from ...utils.gold_label import coerce_gold_label
 from .reflection_engine import (
@@ -2676,6 +2677,13 @@ def run_online_evolution(
         # disable the guard for every edit it touched.
         "contrast_replay_errors": 0,
     }
+    # P0.2: structured per-logical-call ledger. The counters above stay the
+    # budget authority; the ledger adds the per-call token/transport/cache
+    # audit for reflection and attribution calls, where the provider meta is
+    # available at the call site. Detector-side usage remains on the
+    # detector_calls counter (the detector path does not surface its
+    # per-call meta out of the engine).
+    provider_usage_ledger = ProviderUsageLedger()
     # v3.5.3: per-case stable failure categories for mutation retry feedback.
     # When a mutation returns an invalid schema, the case is requeued with
     # attempt_index+1. On the retry, the stored categories are appended to the
@@ -3200,6 +3208,10 @@ def run_online_evolution(
                 budget_usage["mutation_repairs"] += int(
                     bool(meta.get("repair_used"))
                 )
+        provider_usage_ledger.record(
+            purpose=str(kwargs.get("purpose") or "mutation"),
+            meta=meta if isinstance(meta, Mapping) else None,
+        )
         return parsed, meta
 
     def attribution_for(
@@ -7272,6 +7284,7 @@ def run_online_evolution(
                 "diagnostic_only_not_evolution_evidence"
             ),
             "meta_review": meta_review_summary,
+            "provider_usage_totals": provider_usage_ledger.totals(),
         },
     )
 
@@ -7285,6 +7298,10 @@ def run_online_evolution(
     write_json(
         output_dir / "htc_tes_experience_memory.json",
         causal_memory.to_dict(),
+    )
+    write_json(
+        output_dir / "provider_usage_ledger.json",
+        provider_usage_ledger.to_dict(),
     )
     persist_progress(len(evolution_case_ids), status="complete")
 
