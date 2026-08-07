@@ -418,7 +418,12 @@ def _check_step_correct(row: Mapping[str, Any]) -> bool | None:
     ``LOCALIZATION_ERROR`` trigger (this previously turned every all-positive
     dataset into an unnecessary evolution signal for verdict-correct cases).
     """
-    raw_steps = row.get("gold_steps", row.get("hallucination_step"))
+    raw_steps = row.get("gold_steps")
+    # ``dict.get``'s default only applies when the key is ABSENT; a gold row
+    # whose gold_steps key holds None would otherwise never consult the
+    # hallucination_step fallback, silently disabling it.
+    if raw_steps is None:
+        raw_steps = row.get("hallucination_step")
     values = raw_steps if isinstance(raw_steps, (list, tuple, set)) else (
         () if raw_steps is None else (raw_steps,)
     )
@@ -552,7 +557,15 @@ def _classify_appeal_failure(diagnostics: Mapping[str, Any]) -> ErrorType | None
     status = str(diagnostics.get("appeal_status") or "not_required")
     error_text = str(diagnostics.get("appeal_error") or "").lower()
     error_type = str(diagnostics.get("appeal_error_type") or "")
-    if status not in _APPEAL_INCOMPLETE_STATUSES and not error_type:
+    # Prefix match: the engine emits ``incomplete_fail_closed_unresolved``
+    # while the legacy set carried ``incomplete_fail_closed``; a strict
+    # membership test against the drifted vocabulary would silently miss the
+    # incomplete status whenever the error field is absent.
+    status_incomplete = any(
+        status.startswith(prefix)
+        for prefix in _APPEAL_INCOMPLETE_STATUSES
+    )
+    if not status_incomplete and not error_type:
         return None
     if any(marker in error_text for marker in _APPEAL_COVERAGE_MARKERS):
         return ErrorType.APPEAL_COVERAGE_MISMATCH
@@ -986,11 +999,16 @@ def attribute_failure(
         # trigger was unreachable in production.
 
     # --- Additional: candidate miss detection ---
+    # This self-supervised enhancement must never overwrite a gold-derived
+    # trigger/error class: a gold-confirmed localization error (Trigger 3)
+    # with an empty census is still a localization error, not a candidate
+    # miss, and the audit must reflect the real trigger source.
     if (
         has_gold
         and error_type != ErrorType.CORRECT
         and candidate_count == 0
         and gold is True
+        and trigger_source == TriggerSource.NONE
     ):
         error_type = ErrorType.CANDIDATE_MISS
         trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
@@ -1245,7 +1263,8 @@ def attribute_failure(
     if error_type == ErrorType.LOCALIZATION_ERROR:
         gold_steps = row.get("gold_steps") or []
         # 只报告数量，绝不序列化具体 gold 步骤值，避免反思 prompt 被植入
-        # 标注答案（不变式 #3）。
+        # 标注答案（不变式 #3）；数量被显式测试锁定为允许披露（count is
+        # fine; values are not）。
         evidence_parts.append(
             f"step_mismatch:predicted={row.get('responsible_step')}_gold_step_count={len(gold_steps)}"
         )

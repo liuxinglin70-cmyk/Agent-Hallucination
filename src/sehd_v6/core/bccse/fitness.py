@@ -657,6 +657,25 @@ def assess_source_fitness(
             local_before,
             local_after,
         )
+    if (
+        delta < 0
+        and _MODULE_SCORE_GOLD_DIRECTION.get(target_module) is None
+    ):
+        # Neutral-direction module (e.g. candidate_trigger, whose local score
+        # only says whether candidates exist): a local-score drop with an
+        # unchanged task score carries no demonstrable harm — e.g. removing
+        # redundant candidates on a clean case is a fix, not a regression.
+        # Degrade to ``no_effect`` (audited, never a worse veto) instead of a
+        # hard regression; gold-assessed task improvements were already
+        # returned above, so reaching here means the task score did not move.
+        return FitnessAssessment(
+            "no_effect",
+            ("neutral_direction_module_local_drop",),
+            task_before,
+            task_after,
+            local_before,
+            local_after,
+        )
     reasons.append(f"module_local_score_regressed:{local_before:.3f}->{local_after:.3f}")
     return FitnessAssessment(
         "worse",

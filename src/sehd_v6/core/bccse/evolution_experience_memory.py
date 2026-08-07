@@ -102,7 +102,11 @@ def _slot_for(attempt: FailureAttempt) -> str | None:
         return "structural_reject"
     if attempt.no_effect_reason in NO_EFFECT_REASONS:
         return "no_effect"
-    if decision.startswith("reject"):
+    if decision.startswith("reject") or decision.startswith("rollback"):
+        # ``rollback_batch`` / ``rollback_probe`` / ``rollback_resume`` carry
+        # the same negative learning signal as a reject: without this clause
+        # a worse batch outcome (no no_effect_reason) falls out of every
+        # representative slot and the reflection never sees it.
         return "no_effect"
     return None
 
