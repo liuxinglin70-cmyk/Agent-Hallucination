@@ -3673,8 +3673,7 @@ def run_online_evolution(
             accepted_outcome = accepted
             if accepted:
                 l2_policy_accepts += 1
-                gate._consecutive_no_edit = 0
-                gate._converged = False
+                gate.reset_convergence()
             else:
                 # A fruitless or vetoed policy reflection advances the
                 # convergence streak exactly like a fruitless L1 reflection.
@@ -4085,6 +4084,9 @@ def run_online_evolution(
         nonlocal stable_memory_payload, stable_canaries_checkpoint
 
         before_budget = dict(budget_usage)
+        # Convergence is restored as a whole when the probe fails, so capture
+        # the probe-start snapshot for the synchronized rollback.
+        probe_convergence_snapshot = gate.snapshot_convergence()
         audit: dict[str, Any] = {
             "probe_index": len(probe_history),
             "reason": reason,
@@ -4191,8 +4193,15 @@ def run_online_evolution(
             stable_canaries.clear()
             stable_canaries.update(stable_canaries_checkpoint)
             for item in pending_probe_commits:
-                gate.revoke_structural_accept(item.certificate, [rollback_reason])
-                gate.record_no_edit()
+                gate.revoke_structural_accept(
+                    item.certificate,
+                    [rollback_reason],
+                    # Delayed batch rollback: the per-certificate accept-time
+                    # convergence snapshot is stale across the intervening
+                    # cases, so the counters are restored from the probe-time
+                    # snapshot below instead of being replayed per certificate.
+                    restore_streak=False,
+                )
                 step = steps[item.step_index]
                 step.gate_decision = "rollback_probe"
                 step.mutation_applied = None
@@ -4201,6 +4210,11 @@ def run_online_evolution(
                     **(step.fitness_check or {}),
                     "development_probe": audit,
                 }
+            # Synchronized convergence restore: the probe is rolled back as a
+            # whole, so the streak is the probe-start snapshot (never the sum
+            # of per-certificate priors, which would erase or inflate the
+            # intervening no-edit counting).
+            gate.restore_convergence(probe_convergence_snapshot)
             edits_accepted -= rolled_back
             edits_rejected += rolled_back
             del accepted_edits_history[stable_history_length:]
@@ -4498,6 +4512,11 @@ def run_online_evolution(
                 _provisional_accept_edit = False
                 _override_success = _htc_success
                 _shadow_result = source_audits[idx].get("shadow_result", {})
+                if not isinstance(_shadow_result, Mapping):
+                    # A committed edit must have a shadow replay result; a
+                    # corrupt audit row must never crash the whole run after
+                    # the champion was already advanced.
+                    _shadow_result = {}
                 _effect_audit = _expected_effect_audit(
                     item.edit,
                     item.individual_assessment,
@@ -4506,65 +4525,78 @@ def run_online_evolution(
                     before_result=item.source_result,
                     after_result=_shadow_result,
                 )
-                typed_assessment = type_fitness.assess_edit(
-                    source_case_id=item.case_id,
-                    hallucination_type=_type_result.primary_type,
-                    evolution_direction=_direction,
-                    detection_before=item.source_result,
-                    detection_after=_shadow_result,
-                    type_result=_type_result,
-                    target_module=item.edit.target_module,
-                    override_success=_override_success,
-                    feature_description=item.edit.feature_description,
-                    attempt_metadata=_structured_outcome(
-                        outcome=outcome_class_for(
-                            item.individual_assessment.decision
+                try:
+                    typed_assessment = type_fitness.assess_edit(
+                        source_case_id=item.case_id,
+                        hallucination_type=_type_result.primary_type,
+                        evolution_direction=_direction,
+                        detection_before=item.source_result,
+                        detection_after=_shadow_result,
+                        type_result=_type_result,
+                        target_module=item.edit.target_module,
+                        override_success=_override_success,
+                        feature_description=item.edit.feature_description,
+                        attempt_metadata=_structured_outcome(
+                            outcome=outcome_class_for(
+                                item.individual_assessment.decision
+                            ),
+                            stage="batch_commit",
+                            operation=(
+                                item.edit.operation.value
+                                if isinstance(item.edit.operation, SkillOp)
+                                else str(item.edit.operation)
+                            ),
+                            expected_effect_status=_effect_audit["status"],
+                            reason_categories=[
+                                str(value).split(":", 1)[0]
+                                for value in item.individual_assessment.reasons
+                            ],
+                            observable_deltas=_effect_audit["observable_deltas"],
+                            # Only independent gold-assisted fitness may claim
+                            # that the edited detector improved correctness.
+                            promotable=(_htc_success and fitness_use_gold),
+                            diagnostic_only=(
+                                not fitness_use_gold
+                                and not _provisional_accept_edit
+                            ),
+                            decision=item.individual_assessment.decision,
+                            layer="l1_provider_rule",
+                            artifact=item.edit.target_module,
+                            reason_code=(
+                                str(item.individual_assessment.reasons[0]).split(":", 1)[0]
+                                if item.individual_assessment.reasons else ""
+                            ),
+                            action_spec=item.edit.action_spec,
+                            intervention_trace=_experience_intervention_trace(
+                                _shadow_result
+                            ),
                         ),
-                        stage="batch_commit",
-                        operation=(
-                            item.edit.operation.value
-                            if isinstance(item.edit.operation, SkillOp)
-                            else str(item.edit.operation)
-                        ),
-                        expected_effect_status=_effect_audit["status"],
-                        reason_categories=[
-                            str(value).split(":", 1)[0]
-                            for value in item.individual_assessment.reasons
-                        ],
-                        observable_deltas=_effect_audit["observable_deltas"],
-                        # Only independent gold-assisted fitness may claim
-                        # that the edited detector improved correctness.
-                        promotable=(_htc_success and fitness_use_gold),
-                        diagnostic_only=(
-                            not fitness_use_gold
-                            and not _provisional_accept_edit
-                        ),
-                        decision=item.individual_assessment.decision,
-                        layer="l1_provider_rule",
-                        artifact=item.edit.target_module,
-                        reason_code=(
-                            str(item.individual_assessment.reasons[0]).split(":", 1)[0]
-                            if item.individual_assessment.reasons else ""
-                        ),
-                        action_spec=item.edit.action_spec,
-                        intervention_trace=_experience_intervention_trace(
-                            _shadow_result
-                        ),
-                    ),
-                )
+                    )
+                except Exception as exc:
+                    # The typed-fitness assessment is audit telemetry only; a
+                    # malformed shadow result must not abort the run after the
+                    # commit already happened (the rejected path already
+                    # tolerates this via runtime_errors).
+                    runtime_errors.append(
+                        f"typed_fitness:{item.case_id}:{type(exc).__name__}:{exc}"
+                    )
+                    typed_assessment = None
                 # Persist the typed-fitness assessment in the batch audit
                 # trail: it was previously computed and silently discarded,
                 # so its metrics (global fitness, DACR, decisive accuracy)
                 # were unobservable in evolution results.
-                batch_audit.setdefault("typed_fitness_assessments", []).append(
-                    typed_assessment.to_dict()
-                )
+                if typed_assessment is not None:
+                    batch_audit.setdefault("typed_fitness_assessments", []).append(
+                        typed_assessment.to_dict()
+                    )
                 # A successfully repaired source becomes a future regression
                 # anchor, so later edits cannot silently forget the fix.
+                _source_after = source_audits[idx].get("source_after")
                 if (
                     resolve_evolution_state(_shadow_result)
                     in {"verified_error", "verified_clean"}
-                    and not bool(source_audits[idx]["source_after"].get("should_evolve"))
+                    and isinstance(_source_after, Mapping)
+                    and not bool(_source_after.get("should_evolve"))
                 ):
                     stable_canaries[item.case_id] = _shadow_result
                     while len(stable_canaries) > max(8, canary_limit * 4):
@@ -6606,8 +6638,14 @@ def run_online_evolution(
                     case_id=case_id,
                 )
                 if neighbor is not None:
-                    neighbor_id = str(neighbor["case_id"])
-                    neighbor_before_state = str(neighbor["state"])
+                    # Registry rows may come from a restored checkpoint; read
+                    # defensively (the selector already filters on .get(), so a
+                    # malformed row must fail closed here, not raise KeyError).
+                    neighbor_id = str(neighbor.get("case_id") or "")
+                    neighbor_before_state = str(neighbor.get("state") or "")
+                    if not neighbor_id or not neighbor_before_state:
+                        neighbor = None
+                if neighbor is not None:
                     try:
                         neighbor_result = run_detection(
                             budget_kind="contrast",

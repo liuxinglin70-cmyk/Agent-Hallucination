@@ -20,6 +20,41 @@ BATCH_SCHEMA_VERSION = "agenthallu.standalone_detector_batch.v3"
 REPLICA_REPORT_SCHEMA_VERSION = "agenthallu.decision_replicas.v1"
 MAX_REPLICAS = 5
 
+# Bounded in-process retry for transient provider failures (timeouts, rate
+# limits, connection errors). Deterministic failures (schema violations,
+# runtime_valid=false) are never retried.
+_TRANSIENT_RETRIES = 2
+_TRANSIENT_BACKOFF_SECONDS = 1.0
+_TRANSIENT_HINTS = (
+    "timeout",
+    "timed out",
+    "rate limit",
+    "429",
+    "connection",
+    "temporarily unavailable",
+    "service unavailable",
+)
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return any(hint in text for hint in _TRANSIENT_HINTS)
+
+
+def _detect_with_transient_retry(detect_kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    """Run ``detect_record`` with a bounded retry on transient failures."""
+    last_exc: Exception | None = None
+    for attempt in range(_TRANSIENT_RETRIES + 1):
+        try:
+            return detect_record(**dict(detect_kwargs))
+        except Exception as exc:  # noqa: BLE001 - retried/raised below
+            last_exc = exc
+            if not _is_transient_error(exc) or attempt >= _TRANSIENT_RETRIES:
+                raise
+            time.sleep(_TRANSIENT_BACKOFF_SECONDS * (attempt + 1))
+    assert last_exc is not None
+    raise last_exc
+
 
 def load_batch_records(path: Path) -> dict[str, dict[str, Any]]:
     """Load records from one JSON/JSONL file or a directory of JSON files."""
@@ -189,7 +224,7 @@ def run_batch(
                 detect_kwargs["genome_source"] = genome_source
             if policy_genome is not None:
                 detect_kwargs["policy_genome"] = policy_genome
-            prediction = detect_record(**detect_kwargs)
+            prediction = _detect_with_transient_retry(detect_kwargs)
             if genome is not None:
                 provenance = prediction.get("provenance")
                 if not isinstance(provenance, dict):
