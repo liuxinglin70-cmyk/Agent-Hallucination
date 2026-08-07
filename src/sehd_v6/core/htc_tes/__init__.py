@@ -17,15 +17,9 @@ from .type_classifier import (
     HallucinationTypeClassifier,
     TrajectoryFeatures,
     TypeClassificationResult,
-    classify_hallucination_type,
 )
 
-from .type_conditioned_evolution import (
-    TypeConditionedEvolution,
-    TypeConditionedEdit,
-    TypeConditionedEditProposal,
-    build_type_conditioned_reflection_prompt,
-)
+from .type_conditioned_evolution import TypeConditionedEvolution
 
 from .type_aware_fitness import (
     TypeAwareFitness,
@@ -39,11 +33,7 @@ __all__ = [
     "HallucinationTypeClassifier",
     "TrajectoryFeatures",
     "TypeClassificationResult",
-    "classify_hallucination_type",
     "TypeConditionedEvolution",
-    "TypeConditionedEdit",
-    "TypeConditionedEditProposal",
-    "build_type_conditioned_reflection_prompt",
     "TypeAwareFitness",
     "TypeAwareFitnessAssessment",
     "TypeConditionedExperience",

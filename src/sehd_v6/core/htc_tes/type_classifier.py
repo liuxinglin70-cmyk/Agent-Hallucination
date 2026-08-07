@@ -662,21 +662,3 @@ class HallucinationTypeClassifier:
         elif support_count == 2:
             confidence = min(confidence, 0.78)
         return min(max(confidence, 0.0), 1.0)
-
-
-def classify_hallucination_type(
-    detection_result: Mapping[str, Any],
-    attribution_signal: Any = None,
-) -> TypeClassificationResult:
-    """Convenience function for single-call classification.
-
-    Args:
-        detection_result: The detection pipeline output.
-        attribution_signal: Optional attribution signal. Accepts either
-            an ``AttributionSignal`` dataclass or a ``Mapping[str, Any]`` dict.
-
-    Returns:
-        TypeClassificationResult with hallucination type classification.
-    """
-    classifier = HallucinationTypeClassifier()
-    return classifier.classify(detection_result, attribution_signal)

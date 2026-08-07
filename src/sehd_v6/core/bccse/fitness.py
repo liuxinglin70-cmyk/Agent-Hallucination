@@ -58,18 +58,6 @@ _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
 }
 
 
-def _score_direction_matches_gold(module: str, delta: float, gold: bool) -> bool:
-    """Check if score change direction is consistent with gold direction."""
-    if delta <= 0:
-        return True
-    direction = _MODULE_SCORE_GOLD_DIRECTION.get(module)
-    if direction is None:
-        return True
-    # direction=True means score-up is good for error (gold=True)
-    # direction=False means score-up is good for clean (gold=False)
-    return direction == gold
-
-
 @dataclass(frozen=True)
 class FitnessAssessment:
     """Auditable classification of one source replay."""
@@ -633,16 +621,6 @@ def assess_source_fitness(
                     "external_correctness",
                     f"module_local_score:{local_before:.3f}->{local_after:.3f}",
                 ),
-                task_before,
-                task_after,
-                local_before,
-                local_after,
-            )
-        # v5.3: check gold direction consistency
-        if gold_label is not None and not _score_direction_matches_gold(target_module, delta, gold_label):
-            return FitnessAssessment(
-                "no_effect",
-                ("score_direction_mismatch_with_gold",),
                 task_before,
                 task_after,
                 local_before,

@@ -25,7 +25,6 @@ _MODULE_EXPORTS = {
     "TypeClassificationResult": ("htc_tes", "TypeClassificationResult"),
     "TypeConditionedEvolution": ("htc_tes", "TypeConditionedEvolution"),
     "TypeAwareFitness": ("htc_tes", "TypeAwareFitness"),
-    "classify_hallucination_type": ("htc_tes", "classify_hallucination_type"),
 }
 
 

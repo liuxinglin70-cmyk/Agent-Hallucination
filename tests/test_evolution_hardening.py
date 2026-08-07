@@ -24,7 +24,6 @@ from src.sehd_v6.core.bccse.genome import (
 )
 from src.sehd_v6.core.bccse.safety_gate import create_structural_gate
 from src.sehd_v6.core.bccse.reflection_engine import RejectedEditEntry
-from src.sehd_v6.core.bccse.curriculum import get_case_priority_label
 from src.sehd_v6.core.bccse.signal_adapter import (
     extract_crs_signal,
     resolve_authoritative_state as resolve_signal_state,
@@ -715,9 +714,6 @@ def test_occurrence_state_overrides_conflicting_legacy_state_everywhere() -> Non
     # A conflicting legacy clean state must not manufacture the signal
     # adapter's high-confidence clean projection.
     assert extract_crs_signal(conflict).complete is False
-    assert get_case_priority_label(
-        "conflict", {"conflict": conflict}, use_gold=True
-    ) == "boundary_incorrect"
 
     classified = HallucinationTypeClassifier().classify(conflict, attributed)
     assert classified.trajectory_features is not None

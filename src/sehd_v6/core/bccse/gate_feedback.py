@@ -57,17 +57,6 @@ FUZZY_FEEDBACK_CODES = frozenset({
     FEEDBACK_DOWNSTREAM_EFFECT_NOT_ESTABLISHED,
 })
 
-# Same-source retry may carry the more precise closed-vocabulary state
-# (§11.6); cross-case guidance only ever carries the coarse codes above.
-RETRY_COMPILED_NOT_APPLIED = "compiled_not_applied"
-RETRY_APPLIED_WITHOUT_LOCAL_EFFECT = "applied_without_local_effect"
-RETRY_LOCAL_EFFECT_WITHOUT_DOWNSTREAM = "local_effect_without_downstream_effect"
-SAME_SOURCE_RETRY_STATES = frozenset({
-    RETRY_COMPILED_NOT_APPLIED,
-    RETRY_APPLIED_WITHOUT_LOCAL_EFFECT,
-    RETRY_LOCAL_EFFECT_WITHOUT_DOWNSTREAM,
-})
-
 # Closed vocabularies for the event trace/delta classification fields.
 TRACE_CLASSES = frozenset({
     "compiled", "applied", "fired", "skipped", "no_proposal", "runtime_invalid",
@@ -268,39 +257,11 @@ def _fuzzy_codes_for(event: GateEvent) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def _same_source_state(event: GateEvent) -> str:
-    """Precise closed-vocabulary retry state for the same source case."""
-    trace = event.execution_trace_class
-    observable = event.observable_delta_class
-    downstream = event.downstream_delta_class
-    if trace in ("compiled", "no_proposal") and observable == "none":
-        return RETRY_COMPILED_NOT_APPLIED
-    if trace in ("applied", "fired") and observable == "none":
-        return RETRY_APPLIED_WITHOUT_LOCAL_EFFECT
-    if observable in ("local", "downstream") and downstream != "terminal":
-        return RETRY_LOCAL_EFFECT_WITHOUT_DOWNSTREAM
-    return RETRY_COMPILED_NOT_APPLIED
-
-
-def project_same_source_retry(event: GateEvent) -> dict[str, Any]:
-    """Bounded retry projection for the SAME source case.
-
-    May carry the precise retry state plus the coarse fuzzy codes.  Never
-    carries thresholds, gold, prompts, provider text or raw identities.
-    """
-    return {
-        "kind": "same_source_retry",
-        "retry_state": _same_source_state(event),
-        "feedback_codes": list(_fuzzy_codes_for(event)),
-    }
-
-
 def project_cross_case_guidance(event: GateEvent) -> dict[str, Any]:
     """Bounded guidance projection for OTHER cases.
 
-    Only the coarse abstract codes are exposed; the precise same-source
-    retry state is deliberately withheld so a cross-case prompt cannot
-    reverse-engineer thresholds or gold polarity.
+    Only the coarse abstract codes are exposed; a cross-case prompt can
+    never reverse-engineer thresholds or gold polarity.
     """
     return {
         "kind": "cross_case_guidance",

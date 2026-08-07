@@ -188,7 +188,6 @@ from ..htc_tes import (
     HallucinationTypeClassifier,
     TypeConditionedEvolution,
     TypeAwareFitness,
-    classify_hallucination_type,
 )
 from ..provider_models import canonical_model_name
 from ...provider_routes import has_provider_credential

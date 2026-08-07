@@ -10,16 +10,11 @@ from src.sehd_v6.core.bccse.gate_feedback import (
     FEEDBACK_REGISTRY_ENTRY_PENDING,
     FEEDBACK_SCOPE_OR_OWNERSHIP_MISMATCH,
     FUZZY_FEEDBACK_CODES,
-    RETRY_APPLIED_WITHOUT_LOCAL_EFFECT,
-    RETRY_COMPILED_NOT_APPLIED,
-    RETRY_LOCAL_EFFECT_WITHOUT_DOWNSTREAM,
     SCHEMA_VERSION,
-    SAME_SOURCE_RETRY_STATES,
     GateEvent,
     GateEventLedger,
     gate_event_id,
     project_cross_case_guidance,
-    project_same_source_retry,
 )
 
 
@@ -162,25 +157,6 @@ def test_ledger_roundtrip_resume_no_duplicate():
 # §11.6 projection separation and prompt safety
 # ============================================================
 
-def test_same_source_projection_has_precise_state():
-    event = make_event(
-        execution_trace_class="applied", observable_delta_class="none",
-    )
-    projection = project_same_source_retry(event)
-    assert projection["retry_state"] == RETRY_APPLIED_WITHOUT_LOCAL_EFFECT
-    assert projection["retry_state"] in SAME_SOURCE_RETRY_STATES
-
-
-def test_same_source_state_mapping():
-    assert project_same_source_retry(make_event(
-        execution_trace_class="compiled", observable_delta_class="none",
-    ))["retry_state"] == RETRY_COMPILED_NOT_APPLIED
-    assert project_same_source_retry(make_event(
-        execution_trace_class="fired", observable_delta_class="local",
-        downstream_delta_class="downstream",
-    ))["retry_state"] == RETRY_LOCAL_EFFECT_WITHOUT_DOWNSTREAM
-
-
 def test_cross_case_projection_withholds_precise_state():
     event = make_event(execution_trace_class="applied")
     projection = project_cross_case_guidance(event)
@@ -188,33 +164,18 @@ def test_cross_case_projection_withholds_precise_state():
     assert set(projection["feedback_codes"]) <= FUZZY_FEEDBACK_CODES
 
 
-def test_projections_strictly_separated():
-    event = make_event(
-        quality_reason_codes=("policy_route_unavailable",),
-        execution_trace_class="applied",
-    )
-    same = project_same_source_retry(event)
-    cross = project_cross_case_guidance(event)
-    assert "retry_state" in same
-    assert "retry_state" not in cross
-    assert same["feedback_codes"] == cross["feedback_codes"]
-
-
 def test_feedback_has_no_identity_gold_or_raw_text():
     event = make_event(
         hard_reject_codes=("canary_regression",),
         quality_reason_codes=("state_change_against_gold_polarity",),
     )
-    for projection in (
-        project_same_source_retry(event),
-        project_cross_case_guidance(event),
-    ):
-        text = str(projection).lower()
-        assert "gold" not in text
-        assert "case/" not in text
-        assert event.subject_id not in str(projection.values())
-        # only closed codes appear
-        assert set(projection["feedback_codes"]) <= FUZZY_FEEDBACK_CODES
+    projection = project_cross_case_guidance(event)
+    text = str(projection).lower()
+    assert "gold" not in text
+    assert "case/" not in text
+    assert event.subject_id not in str(projection.values())
+    # only closed codes appear
+    assert set(projection["feedback_codes"]) <= FUZZY_FEEDBACK_CODES
 
 
 # ============================================================

@@ -8,7 +8,6 @@ from src.sehd_v6.core.bccse.promotion_contract import (
     ACTIVATION_PENDING,
     ACTIVATION_WORKING,
     AUTHORITY_L1_FITNESS,
-    AUTHORITY_L1_STRUCTURAL,
     AUTHORITY_L2_POLICY,
     EVIDENCE_DIMENSIONS,
     EVIDENCE_NEGATIVE,
@@ -250,7 +249,7 @@ def test_regression_fact_blocks_strong():
 
 
 def test_default_evidence_table_is_unavailable_not_fabricated():
-    decision = _promote("skip_stable", decision_authority=AUTHORITY_L1_STRUCTURAL)
+    decision = _promote("skip_stable", decision_authority=AUTHORITY_L1_FITNESS)
     assert set(decision.evidence_table) == set(EVIDENCE_DIMENSIONS)
     assert set(decision.evidence_table.values()) == {EVIDENCE_UNAVAILABLE}
 

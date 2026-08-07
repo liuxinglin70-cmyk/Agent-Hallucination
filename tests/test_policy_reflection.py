@@ -18,7 +18,6 @@ from src.sehd_v6.core.bccse.policy_genome import (
     create_baseline_policy_genome,
 )
 from src.sehd_v6.core.bccse.policy_reflection import (
-    build_policy_reflection_prompt,
     current_policy_text,
     parse_policy_proposal,
     plan_policy_candidates,
@@ -41,47 +40,6 @@ def _attribution() -> FailureAttribution:
         reason_code="hollow_complete_defense",
         evidence={"defense_coverage": "complete"},
     )
-
-
-def test_prompt_carries_full_executable_closed_vocabulary() -> None:
-    system, _user = build_policy_reflection_prompt(
-        attribution=_attribution(),
-        facts_summary={"defense_coverage": "complete"},
-        current_policy_text="(empty policy set)",
-    )
-    for predicate in L2_PREDICATE_NAMES:
-        assert predicate in system
-    for action in L2_ACTIONS:
-        assert action in system
-        for param in ACTION_PARAMS[action]:
-            assert param in system
-    # Engine-level actions are reserved but not proposable: the prompt must
-    # not surface vocabulary the runtime cannot execute.
-    assert "reclassify_candidate_state" not in system
-    assert "require_route_replay" not in system
-    assert "no_proposal" in system
-
-
-def test_prompt_carries_attribution_triple_and_context() -> None:
-    attribution = _attribution()
-    _system, user = build_policy_reflection_prompt(
-        attribution=attribution,
-        facts_summary={
-            "defense_coverage": "complete",
-            "valid_defense_certificate_count": 0,
-        },
-        current_policy_text=(
-            "consensus_gate_blocked_nonempty -> emit_telemetry_only()"
-        ),
-        rejected_summary="case_x: reject_policy_no_effect (no movement)",
-    )
-    assert attribution.layer in user
-    assert attribution.artifact in user
-    assert attribution.reason_code in user
-    assert '"defense_coverage": "complete"' in user
-    assert "consensus_gate_blocked_nonempty -> emit_telemetry_only()" in user
-    assert "case_x" not in user
-    assert "reject_policy_no_effect (no movement)" in user
 
 
 def test_parse_policy_proposal_valid_item_leaves_identity_to_caller() -> None:
