@@ -21,7 +21,13 @@ Each test pins one concrete defect fixed in the review round:
 - R37: the structured ProviderUsageLedger is wired into the mutation call
   path, persisted per run, and its totals land in the evolution audit (G5);
 - R38: the evaluator validates params against the genome's registry, not the
-  baseline, so an evolved-registry action actually executes (G3 enabler).
+  baseline, so an evolved-registry action actually executes (G3 enabler);
+- R39: stable rollback anchors (genome / policy genome / memory) are
+  hash-validated on checkpoint resume exactly like the champion/shadow
+  genomes (D3);
+- R40: an edit's ActionSpec postcondition is deterministically verified
+  against the replay result (D1 execution evidence), fail-closed for
+  unobservable surfaces.
 """
 
 from __future__ import annotations
@@ -491,3 +497,168 @@ def test_r38_evaluator_validates_params_against_genome_registry() -> None:
         "downgrade_coverage_instance",
     ]
     assert result.effective_prosecution_coverage == "unresolved"
+
+# ============================================================
+# R39: stable rollback anchors hash-validated on resume (D3)
+# ============================================================
+
+def _checkpoint_fixture(tmp_path, *, mutate_stable=None):
+    import json as _json
+
+    from src.sehd_v6.core.bccse.evolution_runner import (
+        _CHECKPOINT_SCHEMA_VERSION,
+        load_evolution_checkpoint,
+    )
+    from src.sehd_v6.core.bccse.genome import create_baseline_genome
+    from src.sehd_v6.core.bccse.policy_genome import (
+        create_baseline_policy_genome,
+    )
+
+    champion = create_baseline_genome()
+    shadow = create_baseline_genome()
+    stable = create_baseline_genome()
+    stable_policy = create_baseline_policy_genome()
+    stable_memory = {"schema_version": "v2", "counters": {"calls": 3}}
+    for name, payload in (
+        ("champion_checkpoint.json", champion.to_dict()),
+        ("shadow_checkpoint.json", shadow.to_dict()),
+    ):
+        (tmp_path / name).write_text(
+            _json.dumps(payload), encoding="utf-8",
+        )
+    checkpoint = {
+        "schema_version": _CHECKPOINT_SCHEMA_VERSION,
+        "run_id": "d3_run",
+        "next_case_index": 0,
+        "evolution_case_ids": ["case_a"],
+        "input_content_hash": "in",
+        "config_hash": "cfg",
+        "champion_genome_hash": champion.content_hash,
+        "shadow_genome_hash": shadow.content_hash,
+        "stable_genome_hash": stable.content_hash,
+        "stable_genome_payload": stable.to_dict(),
+        "stable_policy_genome_hash": stable_policy.content_hash,
+        "stable_policy_genome_payload": stable_policy.to_dict(),
+        "stable_memory_hash": None,
+        "stable_memory_payload": stable_memory,
+        "policy_genome": {},
+    }
+    checkpoint["stable_memory_hash"] = _payload_hash(stable_memory)
+    if mutate_stable == "genome":
+        # Rule text is part of the content identity (generation is not).
+        checkpoint["stable_genome_payload"]["modules"][
+            "evidence_obligation"
+        ]["rules"] = ["When tampered, require_evidence_field."]
+    elif mutate_stable == "policy":
+        checkpoint["stable_policy_genome_payload"]["items"] = [{
+            "item_id": "tampered",
+            "precondition": "consensus_gate_blocked_nonempty",
+            "action": "emit_telemetry_only",
+            "params": {},
+        }]
+    elif mutate_stable == "memory":
+        checkpoint["stable_memory_payload"]["counters"]["calls"] = 999
+    (tmp_path / "evolution_checkpoint.json").write_text(
+        _json.dumps(checkpoint), encoding="utf-8",
+    )
+    return load_evolution_checkpoint(tmp_path)
+
+
+def test_r39_stable_anchors_validate_on_resume(tmp_path) -> None:
+    restored = _checkpoint_fixture(tmp_path)
+    assert restored["stable_genome_hash"]
+    assert restored["stable_policy_genome_hash"]
+    assert restored["stable_memory_hash"]
+
+
+def test_r39_corrupt_stable_genome_refuses_resume(tmp_path) -> None:
+    from src.sehd_v6.core.bccse.evolution_runner import (
+        load_evolution_checkpoint,
+    )
+
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="stable genome"):
+        _checkpoint_fixture(tmp_path, mutate_stable="genome")
+
+
+def test_r39_corrupt_stable_policy_refuses_resume(tmp_path) -> None:
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="stable policy"):
+        _checkpoint_fixture(tmp_path, mutate_stable="policy")
+
+
+def test_r39_corrupt_stable_memory_refuses_resume(tmp_path) -> None:
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="stable memory"):
+        _checkpoint_fixture(tmp_path, mutate_stable="memory")
+
+
+def _payload_hash(payload):
+    import hashlib as _hashlib
+    import json as _json
+
+    text = _json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return _hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+# ============================================================
+# R40: ActionSpec postcondition verified on replay (D1)
+# ============================================================
+
+def test_r40_expected_effect_audit_verifies_postcondition() -> None:
+    from src.sehd_v6.core.bccse.action_spec import compile_action_spec
+    from src.sehd_v6.core.bccse.evolution_runner import _expected_effect_audit
+    from src.sehd_v6.core.bccse.fitness import FitnessAssessment
+    from src.sehd_v6.core.bccse.genome import SkillEdit
+
+    edit = SkillEdit(
+        edit_id="d1_edit", target_module="candidate_trigger",
+        operation="add_rule",
+        new_content="When x, emit_candidate: candidate.",
+        action_spec=compile_action_spec(
+            "candidate_trigger", "emit_candidate: candidate",
+        ).to_dict(),
+    )
+    assessment = FitnessAssessment(
+        decision="no_effect", reasons=(), task_score_before=0.0,
+        task_score_after=0.0, local_score_before=0.0, local_score_after=0.0,
+    )
+    audit = _expected_effect_audit(edit, assessment, after_result={})
+    evidence = audit["execution_evidence"]
+    assert evidence["execution_class"] == "no_observable_movement"
+    assert evidence["postcondition_satisfied"] is False
+    from tests.fixtures.causal_evolution import signal_for
+
+    audit_moved = _expected_effect_audit(
+        edit,
+        FitnessAssessment(
+            decision="directional_evidence", reasons=(),
+            task_score_before=0.0, task_score_after=0.5,
+            local_score_before=0.0, local_score_after=0.5,
+        ),
+        before=signal_for("unresolved"),
+        after=signal_for("verified_clean"),
+        after_result={},
+    )
+    evidence = audit_moved["execution_evidence"]
+    assert evidence["execution_class"] == "postcondition_not_satisfied"
+    assert evidence["postcondition_detail"] == "object_absent"
+    # The same movement with the obligation met classifies satisfied.
+    audit_met = _expected_effect_audit(
+        edit,
+        FitnessAssessment(
+            decision="directional_evidence", reasons=(),
+            task_score_before=0.0, task_score_after=0.5,
+            local_score_before=0.0, local_score_after=0.5,
+        ),
+        before=signal_for("unresolved"),
+        after=signal_for("verified_clean"),
+        after_result={"paca_census": [{"candidate_id": "c1"}]},
+    )
+    evidence = audit_met["execution_evidence"]
+    assert evidence["execution_class"] == "postcondition_satisfied"

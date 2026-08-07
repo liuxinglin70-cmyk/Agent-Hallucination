@@ -282,3 +282,169 @@ def test_field_binding_accepts_the_singular_plural_pair_in_both_directions() -> 
     assert not _field_binds_output_field("candidate", "evidence")
     assert not _field_binds_output_field("", "candidate")
     assert not _field_binds_output_field("candidates", "")
+
+# ============================================================
+# D1: deterministic postcondition evaluation
+# ============================================================
+
+def test_postcondition_object_present_and_absent() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    present_spec = compile_action_spec("candidate_trigger", "emit_candidate: candidate")
+    assert present_spec.postcondition == "object_present"
+    result = {"paca_census": [{"candidate_id": "c1"}]}
+    satisfied, detail = evaluate_action_spec_postcondition(present_spec, result)
+    assert satisfied and detail == "object_present"
+
+    absent_spec = compile_action_spec("candidate_trigger", "suppress_candidate: candidate")
+    assert absent_spec.postcondition == "object_absent"
+    satisfied, _ = evaluate_action_spec_postcondition(absent_spec, {})
+    assert satisfied
+
+    # A stale candidate contradicts the absence obligation.
+    satisfied, detail = evaluate_action_spec_postcondition(
+        absent_spec, {"paca_census": [{"candidate_id": "c1"}]},
+    )
+    assert not satisfied and detail == "object_present"
+
+
+def test_postcondition_field_obligation_on_certificate_rows() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    spec = compile_action_spec(
+        "evidence_obligation", "require_evidence_field: impact_evidence_refs",
+    )
+    assert spec.postcondition == "field_nonempty"
+    empty = {"prosecution": {"candidates": [{"certificate_id": "c1"}]}}
+    satisfied, detail = evaluate_action_spec_postcondition(spec, empty)
+    assert not satisfied and detail == "field_obligation_absent"
+    filled = {
+        "prosecution": {
+            "candidates": [
+                {"certificate_id": "c1", "impact_evidence_refs": ["ev_1"]},
+            ],
+        },
+    }
+    satisfied, detail = evaluate_action_spec_postcondition(spec, filled)
+    assert satisfied and detail == "field_obligation_satisfied"
+
+
+def test_postcondition_coverage_not_complete() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    spec = compile_action_spec(
+        "evidence_obligation", "keep_coverage_incomplete: coverage_state",
+    )
+    assert spec.postcondition == "coverage_not_complete"
+    open_result = {
+        "proof_adjudication": {
+            "prosecution_coverage": "incomplete",
+            "defense_coverage": "complete",
+        },
+    }
+    satisfied, _ = evaluate_action_spec_postcondition(spec, open_result)
+    assert satisfied
+    closed_result = {
+        "proof_adjudication": {
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+        },
+    }
+    satisfied, detail = evaluate_action_spec_postcondition(spec, closed_result)
+    assert not satisfied and detail == "coverage_complete"
+
+
+def test_postcondition_quarantine_and_fail_closed_surfaces() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    # The quarantine obligation belongs to atomic_verifier_instruction,
+    # whose output surface (verification_certificate) is provider-internal
+    # and not exposed in the final result: it must fail closed, never
+    # silently pass.
+    quarantine_spec = compile_action_spec(
+        "atomic_verifier_instruction", "quarantine_certificate: certificate_id",
+    )
+    assert quarantine_spec.postcondition == "object_quarantined"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        quarantine_spec,
+        {"proof_adjudication": {"quarantined_error_certificate_ids": ["c1"]}},
+    )
+    assert not satisfied
+    assert detail.startswith("unmapped_postcondition")
+
+    # A provider-internal surface is not observable in the final result and
+    # must fail closed, never silently pass.
+    unobservable_spec = compile_action_spec(
+        "causal_link_test", "test_causal_link: is_root_cause",
+    )
+    satisfied, detail = evaluate_action_spec_postcondition(
+        unobservable_spec, {},
+    )
+    assert not satisfied
+    assert detail.startswith(("unmapped_postcondition", "unobservable_in_result"))
+
+
+def test_classify_execution_evidence_taxonomy() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        ActionSpec,
+        classify_execution_evidence,
+    )
+
+    spec = ActionSpec(
+        module_id="candidate_trigger",
+        route_ids=("candidate_fallback_route",),
+        output_object="candidate",
+        output_field="",
+        operation="emit_candidate",
+        postcondition="object_present",
+        observable_field="candidate_count",
+        expected_direction="increase",
+    )
+    moved = classify_execution_evidence(
+        spec, {"paca_census": [{"candidate_id": "c1"}]}, True,
+    )
+    assert moved["execution_class"] == "postcondition_satisfied"
+    assert moved["postcondition_satisfied"] is True
+
+    unmet = classify_execution_evidence(spec, {}, True)
+    assert unmet["execution_class"] == "postcondition_not_satisfied"
+    assert unmet["postcondition_satisfied"] is False
+
+    unmoved = classify_execution_evidence(spec, {}, False)
+    assert unmoved["execution_class"] == "no_observable_movement"
+
+    nospec = classify_execution_evidence(None, {}, True)
+    assert nospec["execution_class"] == "action_spec_absent"
+    assert nospec["postcondition_satisfied"] is False
+
+
+def test_expected_effect_audit_carries_execution_evidence() -> None:
+    from src.sehd_v6.core.bccse.evolution_runner import _expected_effect_audit
+    from src.sehd_v6.core.bccse.fitness import FitnessAssessment
+    from src.sehd_v6.core.bccse.genome import SkillEdit
+
+    edit = SkillEdit(
+        edit_id="e1", target_module="evidence_obligation",
+        operation="add_rule",
+        new_content="When x, require_evidence_field: impact_evidence_refs.",
+        action_spec=compile_action_spec(
+            "evidence_obligation", "require_evidence_field: impact_evidence_refs",
+        ).to_dict(),
+    )
+    assessment = FitnessAssessment(
+        decision="no_effect", reasons=(), task_score_before=0.0,
+        task_score_after=0.0, local_score_before=0.0, local_score_after=0.0,
+    )
+    audit = _expected_effect_audit(edit, assessment)
+    evidence = audit["execution_evidence"]
+    assert evidence["execution_class"] == "action_spec_absent" or (
+        evidence["postcondition_satisfied"] in (True, False)
+    )

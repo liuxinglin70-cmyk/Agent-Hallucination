@@ -233,3 +233,152 @@ def sanitize_action_spec(value: Any) -> dict[str, Any]:
     except (KeyError, ValueError):
         return {}
     return canonical.to_dict() if spec == canonical else {}
+
+
+# ============================================================
+# Deterministic postcondition evaluation (D1 execution evidence)
+# ============================================================
+
+# postcondition -> result-observable semantics.  A postcondition with no
+# mapping here cannot be verified against the final detection result and
+# evaluates fail-closed to ``unmapped_postcondition``: an obligation that
+# the result schema does not expose is never silently treated as met.
+_POSTCONDITION_CHECKS = frozenset({
+    "object_present",
+    "object_absent",
+    "field_present",
+    "field_nonempty",
+    "coverage_not_complete",
+})
+
+# output_object -> result surface row access.  Surfaces absent from this
+# map are provider-internal intermediates (candidate_qualification,
+# verification_certificate, causal_certificate_or_boundary) that the final
+# detection result does not expose; their obligations are unverifiable.
+_OBJECT_SURFACE_KEYS: Mapping[str, tuple[str, ...]] = {
+    "candidate": ("paca_census", "construct_census", "census"),
+    "error_certificate": ("combined_prosecution", "prosecution"),
+    "defense_certificate_or_boundary": ("combined_defense", "defense"),
+}
+
+
+def _surface_rows(
+    result: Mapping[str, Any], output_object: str,
+) -> list[Mapping[str, Any]] | None:
+    """Rows of the surface an output_object maps to, or None if the surface
+    is not observable in the final result."""
+    if output_object == "boundary_finding":
+        boundary = result.get("boundary_path")
+        return [dict(boundary)] if isinstance(boundary, Mapping) and boundary else []
+    keys = _OBJECT_SURFACE_KEYS.get(output_object)
+    if keys is None:
+        return None
+    for key in keys:
+        payload = result.get(key)
+        if isinstance(payload, list):
+            return [
+                dict(row) for row in payload if isinstance(row, Mapping)
+            ] or []
+        if not isinstance(payload, Mapping):
+            continue
+        rows = payload.get("candidates") or payload.get("certificates") or []
+        if isinstance(rows, list):
+            return [
+                dict(row) for row in rows if isinstance(row, Mapping)
+            ] or []
+    return []
+
+
+def _field_obligation_met(
+    spec: ActionSpec, result: Mapping[str, Any],
+) -> tuple[bool, str]:
+    rows = _surface_rows(result, spec.output_object)
+    if rows is None:
+        return False, f"unobservable_in_result:{spec.output_object}"
+    if not spec.output_field:
+        return False, "output_field_unspecified"
+    for row in rows:
+        value = row.get(spec.output_field)
+        if value not in (None, "", [], {}):
+            return True, "field_obligation_satisfied"
+    return False, "field_obligation_absent"
+
+
+def evaluate_action_spec_postcondition(
+    spec: ActionSpec,
+    result: Mapping[str, Any],
+) -> tuple[bool, str]:
+    """Deterministically verify the spec's output obligation on a result.
+
+    This is the D1 execution evidence: provider self-report (rule_effects)
+    stays advisory telemetry, while a rule's declared postcondition is
+    checked against the actual replay result.  Fail-closed — an obligation
+    the result cannot expose is reported unsatisfied, never assumed met.
+    """
+    result = result if isinstance(result, Mapping) else {}
+    postcondition = spec.postcondition
+    if postcondition not in _POSTCONDITION_CHECKS:
+        return False, f"unmapped_postcondition:{postcondition}"
+
+    if postcondition in ("object_present", "object_absent"):
+        rows = _surface_rows(result, spec.output_object)
+        if rows is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        present = bool(rows)
+        # The detail reports what was OBSERVED, so a failed obligation
+        # carries the reason the check failed.
+        satisfied = present if postcondition == "object_present" else not present
+        return satisfied, ("object_present" if present else "object_absent")
+
+    if postcondition in ("field_present", "field_nonempty"):
+        satisfied, detail = _field_obligation_met(spec, result)
+        return satisfied, detail
+
+    if postcondition == "coverage_not_complete":
+        proof = result.get("proof_adjudication") or {}
+        if not isinstance(proof, Mapping):
+            return False, "proof_adjudication_absent"
+        prosecution = str(proof.get("prosecution_coverage") or "")
+        defense = str(proof.get("defense_coverage") or "")
+        satisfied = not (prosecution == "complete" and defense == "complete")
+        return satisfied, (
+            "coverage_not_complete" if satisfied else "coverage_complete"
+        )
+
+    return False, f"unmapped_postcondition:{postcondition}"
+
+
+def classify_execution_evidence(
+    spec: ActionSpec | None,
+    result: Mapping[str, Any],
+    observable_moved: bool,
+) -> dict[str, Any]:
+    """Classify the execution evidence of one edit on one replay result.
+
+    The closed execution classes implement the D1 acceptance taxonomy:
+    an edit that moved an observable output either satisfied its declared
+    output obligation (``postcondition_satisfied``) or did not
+    (``postcondition_not_satisfied``); an edit with no observable movement
+    reports ``no_observable_movement``; an edit without an ActionSpec
+    reports ``action_spec_absent``.
+    """
+    if spec is None:
+        return {
+            "execution_class": "action_spec_absent",
+            "postcondition_satisfied": False,
+            "postcondition_detail": "action_spec_absent",
+        }
+    satisfied, detail = evaluate_action_spec_postcondition(spec, result)
+    if not observable_moved:
+        execution_class = "no_observable_movement"
+    else:
+        execution_class = (
+            "postcondition_satisfied"
+            if satisfied
+            else "postcondition_not_satisfied"
+        )
+    return {
+        "execution_class": execution_class,
+        "postcondition_satisfied": satisfied,
+        "postcondition_detail": detail,
+    }

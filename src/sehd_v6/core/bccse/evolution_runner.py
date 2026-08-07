@@ -74,7 +74,12 @@ from .genome import (
     validate_expected_effect_contract,
 )
 from .rule_contract import RuleSpec, render_rule, validate_rule_spec
-from .action_spec import ActionSpec, compile_action_spec, sanitize_action_spec
+from .action_spec import (
+    ActionSpec,
+    classify_execution_evidence,
+    compile_action_spec,
+    sanitize_action_spec,
+)
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
@@ -434,6 +439,19 @@ def _expected_effect_audit(
         legacy_status = "observed"
 
     status = contract_status if contract else legacy_status
+    # D1: deterministic execution evidence.  The rule's compiled ActionSpec
+    # carries an output obligation; verify it against the replay result
+    # instead of relying on provider self-report.  L2 edits carry no
+    # ActionSpec and classify as action_spec_absent.
+    action_spec = getattr(edit, "action_spec", None)
+    spec = (
+        ActionSpec.from_dict(action_spec)
+        if isinstance(action_spec, Mapping) and action_spec
+        else None
+    )
+    execution_evidence = classify_execution_evidence(
+        spec, after_result or {}, bool(observable_delta_tokens),
+    )
     return {
         "expected": expected,
         "expected_effect_contract": contract,
@@ -449,6 +467,7 @@ def _expected_effect_audit(
         "target_output_changed": bool(observable_delta_tokens),
         "local_score_before": assessment.local_score_before,
         "local_score_after": assessment.local_score_after,
+        "execution_evidence": execution_evidence,
     }
 
 
@@ -2002,6 +2021,19 @@ _CHECKPOINT_REQUIRED_FILES: tuple[str, ...] = (
 )
 
 
+def _payload_hash(payload: Mapping[str, Any]) -> str:
+    """Canonical content hash of an embedded checkpoint payload.
+
+    The memory anchor is a plain dict (not a genome with a content_hash),
+    so its integrity is pinned with the same canonical-JSON hash the
+    payloads themselves use at write time.
+    """
+    text = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
     """Load and validate a persisted evolution checkpoint.
 
@@ -2078,6 +2110,49 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         and shadow_checkpoint_genome.content_hash != expected_shadow_hash
     ):
         raise ValueError("shadow checkpoint hash does not match its content")
+    # D3: the stable rollback anchors are validated against their content
+    # exactly like the champion/shadow genomes.  Checkpoints written before
+    # the hash fields existed skip validation (backward compatible); a
+    # mismatch refuses the resume instead of silently resuming from a
+    # drifted anchor.
+    stable_payload = dict(checkpoint.get("stable_genome_payload") or {})
+    expected_stable_hash = str(checkpoint.get("stable_genome_hash") or "")
+    if (
+        expected_stable_hash
+        and stable_payload
+        and SkillGenome.from_dict(stable_payload).content_hash
+        != expected_stable_hash
+    ):
+        raise ValueError(
+            "stable genome checkpoint hash does not match its content"
+        )
+    stable_policy_payload = dict(
+        checkpoint.get("stable_policy_genome_payload") or {}
+    )
+    expected_stable_policy_hash = str(
+        checkpoint.get("stable_policy_genome_hash") or ""
+    )
+    if (
+        expected_stable_policy_hash
+        and stable_policy_payload
+        and PolicyGenome.from_dict(stable_policy_payload).content_hash
+        != expected_stable_policy_hash
+    ):
+        raise ValueError(
+            "stable policy genome checkpoint hash does not match its content"
+        )
+    stable_memory_payload = dict(checkpoint.get("stable_memory_payload") or {})
+    expected_stable_memory_hash = str(
+        checkpoint.get("stable_memory_hash") or ""
+    )
+    if (
+        expected_stable_memory_hash
+        and stable_memory_payload
+        and _payload_hash(stable_memory_payload) != expected_stable_memory_hash
+    ):
+        raise ValueError(
+            "stable memory checkpoint hash does not match its content"
+        )
     experience_path = output_dir / "htc_tes_experience_memory.json"
     return {
         "schema_version": schema,
@@ -2117,6 +2192,11 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "stable_genome_payload": dict(
             checkpoint.get("stable_genome_payload") or {}
         ),
+        "stable_genome_hash": str(checkpoint.get("stable_genome_hash") or ""),
+        "stable_policy_genome_hash": str(
+            checkpoint.get("stable_policy_genome_hash") or ""
+        ),
+        "stable_memory_hash": str(checkpoint.get("stable_memory_hash") or ""),
         "stable_canaries": dict(checkpoint.get("stable_canaries") or {}),
         "stable_canaries_checkpoint": dict(
             checkpoint.get("stable_canaries_checkpoint") or {}
@@ -3425,6 +3505,8 @@ def run_online_evolution(
                 # like the once-per-source abstention ladder, plus the
                 # audit telemetry of the processed prefix).
                 "stable_policy_genome_payload": stable_policy_genome.to_dict(),
+                "stable_policy_genome_hash": stable_policy_genome.content_hash,
+                "stable_memory_hash": _payload_hash(stable_memory_payload),
                 "stable_l2_policy_accepts": stable_l2_policy_accepts,
                 "abstention_ladder_used": sorted(abstention_ladder_used),
                 "contrast_registry": {
