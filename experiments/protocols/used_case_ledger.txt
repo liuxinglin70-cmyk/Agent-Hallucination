@@ -404,3 +404,5 @@ OpenManus/036
 SmolAgents/068
 Magentic_One/068
 OpenDeepSearch/082
+# --- D1 verification smoke (2026-08-07, single case) ---
+BFCL/005
