@@ -554,7 +554,7 @@ def adjudicate_proof_court(
             terminal_without_restore="",
         )
         restore_result = evaluate_pre_ledger_policies(
-            facts, pre_ledger_policy_items,
+            facts, pre_ledger_policy_items, registry=policy_registry,
         )
         pre_ledger_restore_evaluation = restore_result.to_dict()
         if restore_result.restored_certificate_ids:

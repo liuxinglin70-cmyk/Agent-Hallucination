@@ -142,6 +142,7 @@ from .module_charter import validate_action_surface
 from .policy_genome import (
     FITNESS_STATUS_STRONG,
     FITNESS_STATUS_WEAK,
+    PENDING_STATUS_PENDING,
     PolicyEdit,
     PolicyGenome,
     PolicyOp,
@@ -162,7 +163,15 @@ from .registry_reflection import (
     plan_registry_candidates,
     select_registry_candidate,
 )
-from .vocabulary_registry import apply_registry_edit
+from .registry_promotion import (
+    REGISTRY_REQUIRED_VALIDATION,
+    enqueue_registry_validation,
+    promote_pending_registry_entries,
+)
+from .vocabulary_registry import (
+    AdjudicationFacts,
+    apply_registry_edit,
+)
 from ..htc_tes import (
     HallucinationType,
     HallucinationTypeClassifier,
@@ -3531,11 +3540,14 @@ def run_online_evolution(
         *,
         attribution: FailureAttribution,
         facts_summary: Mapping[str, Any],
+        case_id: str,
     ) -> None:
         """Extend the L2 vocabulary when no runtime action can repair an
         attribution. A registered entry is pending (shadow-only) on first
-        registration; the genome's registry is the single authority, so the
-        new state is checkpointed with the policy genome."""
+        registration and enters the pending validation queue, where later
+        independent observations decide its promotion; the genome's registry
+        is the single authority, so the new state is checkpointed with the
+        policy genome."""
         nonlocal policy_genome
         if mutation_route is None:
             return
@@ -3603,6 +3615,24 @@ def run_online_evolution(
             "sequence": applied_edit.sequence,
             "registry_hash": new_registry.content_hash,
         })
+        queued = enqueue_registry_validation(
+            genome=policy_genome,
+            operation=applied_edit.operation,
+            target=applied_edit.target,
+            facts=AdjudicationFacts(**dict(facts_summary)),
+            case_id=case_id,
+        )
+        l2_registry_registrations.append({
+            "outcome": (
+                "pending_registry_validation_enqueued"
+                if queued.status == PENDING_STATUS_PENDING
+                else "pending_registry_validation_rejected"
+            ),
+            "target": applied_edit.target,
+            "reason": str(
+                queued.source_evidence.get("reject_reason") or ""
+            ),
+        })
 
     def run_l2_policy_case(
         *,
@@ -3660,6 +3690,23 @@ def run_online_evolution(
             boundary_authority_valid=boundary_authority_valid,
         )
         facts_summary = asdict(facts)
+        # P3B: pending registry entries accumulate independent observations
+        # on every subsequent L2 case; an entry that clears the evidence
+        # threshold and stays applicable is promoted to working (enabled)
+        # here, before this case's planning reads the vocabulary.
+        if any(
+            entry.required_validation == REGISTRY_REQUIRED_VALIDATION
+            and entry.status == PENDING_STATUS_PENDING
+            for entry in policy_genome.pending_queue
+        ):
+            for promotion_row in promote_pending_registry_entries(
+                genome=policy_genome,
+                facts=facts,
+                case_id=case_id,
+                reason_code=attribution.reason_code,
+            ):
+                if promotion_row["outcome"] in ("promoted", "rejected"):
+                    l2_registry_registrations.append(promotion_row)
         proposal_edit: PolicyEdit | None = None
         route_result = ""
         feedback_code = ""
@@ -3856,7 +3903,11 @@ def run_online_evolution(
             # pending (shadow-only) on first registration and never enters
             # the active evaluator until a later audited promotion.
             if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
-                _run_registry_reflection(attribution=attribution, facts_summary=facts_summary)
+                _run_registry_reflection(
+                    attribution=attribution,
+                    facts_summary=facts_summary,
+                    case_id=case_id,
+                )
             finish(
                 "skip_no_policy",
                 reason=plan.route_result,

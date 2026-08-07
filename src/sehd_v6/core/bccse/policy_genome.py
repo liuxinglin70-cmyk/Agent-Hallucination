@@ -139,11 +139,13 @@ class PendingValidationItem:
     required_validation: str = ""
     created_sequence: int = 0
     status: str = PENDING_STATUS_PENDING
+    observed_case_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.status not in PENDING_STATUSES:
             self.status = PENDING_STATUS_PENDING
         self.registry_dependencies = tuple(self.registry_dependencies)
+        self.observed_case_ids = tuple(self.observed_case_ids)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -155,6 +157,7 @@ class PendingValidationItem:
             "required_validation": self.required_validation,
             "created_sequence": self.created_sequence,
             "status": self.status,
+            "observed_case_ids": list(self.observed_case_ids),
         }
 
     @classmethod
@@ -173,6 +176,10 @@ class PendingValidationItem:
             required_validation=str(data.get("required_validation") or ""),
             created_sequence=int(data.get("created_sequence") or 0),
             status=str(data.get("status") or PENDING_STATUS_PENDING),
+            observed_case_ids=tuple(
+                str(value)
+                for value in (data.get("observed_case_ids") or ())
+            ),
         )
 
 

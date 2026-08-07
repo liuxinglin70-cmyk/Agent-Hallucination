@@ -130,7 +130,13 @@ def evaluate_policies(
                 "reason": f"unknown_action:{item.action}",
             })
             continue
-        params_ok, detail = validate_policy_params(item.action, item.params)
+        # Parameter validation must resolve against the same registry the
+        # vocabulary check used: an evolved-registry action would otherwise
+        # pass the active-name check and then fail here against the baseline
+        # table, silently never executing.
+        params_ok, detail = validate_policy_params(
+            item.action, item.params, registry=active_registry,
+        )
         if not params_ok:
             skipped.append({
                 "item_id": item.item_id,
@@ -140,7 +146,13 @@ def evaluate_policies(
             })
             continue
 
-        if item.action == ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY:
+        # A promoted action instance is an alias bound to an operator; the
+        # registry is the single authority that resolves alias -> operator,
+        # so an enabled alias executes the operator's semantics and a name
+        # with no instance resolves to itself (already excluded above).
+        operator = active_registry.operator_of(item.action)
+
+        if operator == ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY:
             # Consume is fail-closed on every runtime precondition: the
             # boundary must itself be verified clean, produced by the
             # authoritative deterministic boundary path, the terminal must
@@ -192,17 +204,17 @@ def evaluate_policies(
             "params": dict(params),
         })
 
-        if item.action == ACTION_DOWNGRADE_COVERAGE:
+        if operator == ACTION_DOWNGRADE_COVERAGE:
             if params["side"] == "prosecution":
                 eff_prosecution = _lower_coverage(eff_prosecution, params["to_state"])
             else:
                 eff_defense = _lower_coverage(eff_defense, params["to_state"])
-        elif item.action == ACTION_INVALIDATE_COVERAGE_CLAIM:
+        elif operator == ACTION_INVALIDATE_COVERAGE_CLAIM:
             if params["side"] == "prosecution":
                 eff_prosecution = "unresolved"
             else:
                 eff_defense = "unresolved"
-        elif item.action == ACTION_EMIT_TELEMETRY_ONLY:
+        elif operator == ACTION_EMIT_TELEMETRY_ONLY:
             telemetry.append({
                 "kind": "telemetry_only",
                 "item_id": item.item_id,
@@ -302,6 +314,7 @@ def _restore_guards(facts: PreLedgerPolicyFacts, certificate_id: str) -> tuple[b
 def evaluate_pre_ledger_policies(
     facts: PreLedgerPolicyFacts,
     items: Sequence[PolicyItem],
+    registry=None,
 ) -> PreLedgerPolicyResult:
     """Apply pre-ledger policies to the blocked consensus set (§15).
 
@@ -311,12 +324,18 @@ def evaluate_pre_ledger_policies(
     surfaces the certificate id; the caller returns it to the surviving set
     so the occurrence ledger and earliest-origin localization flow from the
     final surviving set naturally.
+
+    ``registry`` is the vocabulary authority (defaults to the baseline
+    ``L2_REGISTRY``); a promoted action alias resolves to its operator here
+    exactly as in the post-ledger evaluator.
     """
+    active = registry if registry is not None else L2_REGISTRY
     restored: list[str] = []
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     for item in items:
-        if item.action != ACTION_RESTORE_AUDITED_CONSENSUS:
+        operator = active.operator_of(item.action)
+        if operator != ACTION_RESTORE_AUDITED_CONSENSUS:
             # The pre-ledger evaluator never executes a post-ledger operator.
             skipped.append({
                 "item_id": item.item_id,

@@ -338,6 +338,18 @@ class VocabularyRegistry:
         entry = self._predicates.get(name) or self._action_instances.get(name)
         return entry.status if entry is not None else ""
 
+    def operator_of(self, action: str) -> str:
+        """Resolve an action name to its executable operator.
+
+        A baseline action instance is its own operator; a registered
+        instance is an alias bound to an existing operator.  The evaluator
+        dispatches on the operator, so a promoted alias executes the same
+        semantics as the operator it was bound to and a name with no
+        instance resolves to itself (fail-closed at the vocabulary check).
+        """
+        instance = self._action_instances.get(action)
+        return instance.operator if instance is not None else action
+
     def policy_stage_of(self, action: str) -> str:
         """Resolve the execution stage of an action from the registry.
 
