@@ -191,13 +191,13 @@ before proposing a rule. This is the first stage of the planned collaborative
 reflection design, not a correctness vote.
 
 Evolution reflection supports bounded test-time scaling through
-`--reflection-candidates` (default `3` for the CLI). Multiple candidate rules are generated
+`--reflection-candidates` (default `1`). Multiple candidate rules are generated
 by independent mutation provider calls, duplicate candidates are removed, and a
 critic selects one replay candidate without rewriting it. The critic uses the
 `reflection_critic` provider purpose and is a search-prioritization role, not an
 independent correctness authority; source replay and separately authorized
-evaluation remain responsible for evidence. The library API defaults to one
-candidate for backward-compatible cost; the CLI opts into three.
+evaluation remain responsible for evidence. The CLI and library API share the
+same default.
 
 The library also enforces `--max-mutation-calls` (CLI default `100`) across
 generation, critic, attribution, and conflict-gate calls. Exhausting this budget

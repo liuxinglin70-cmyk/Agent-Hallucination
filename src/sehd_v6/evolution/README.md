@@ -78,10 +78,11 @@ For each case, in order:
 9. **Experience**: HTC-TES experience memory is updated.
 
 The public `run_evolution()` API defaults to one reflection candidate for
-backward-compatible cost. The CLI defaults to three independent candidates and
-supports `--reflection-candidates 1..5`. Generation, attribution, critic and
-conflict-gate calls share `--max-mutation-calls` (CLI default `100`); exhaustion
-fails closed and is recorded as `mutation_budget_exhausted`.
+backward-compatible cost, and the CLI shares that default
+(`--reflection-candidates`, supported range `1..5`). Generation, attribution,
+critic and conflict-gate calls share `--max-mutation-calls` (CLI default
+`100`); exhaustion fails closed and is recorded as
+`mutation_budget_exhausted`.
 
 The per-step `reflection` audit records generated/selected candidate counts,
 proposed and validated target modules, critic decision, and provider cache-hit
