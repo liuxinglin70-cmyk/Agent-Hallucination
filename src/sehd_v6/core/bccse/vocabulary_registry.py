@@ -1,4 +1,4 @@
-﻿"""SEHD v6 鈥?versioned baseline registry for the L2 adjudication vocabulary.
+"""SEHD v6 鈥?versioned baseline registry for the L2 adjudication vocabulary.
 
 Single source of truth for the L2 precondition predicates, court-local
 action operators/instances, action parameter tables, and the reserved

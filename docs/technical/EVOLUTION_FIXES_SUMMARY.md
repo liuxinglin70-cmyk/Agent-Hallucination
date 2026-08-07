@@ -264,3 +264,89 @@ ActionSpec = {
 
 **验收**：no_effect 归因不再依赖 provider 自报，即可区分「未注入 /
 已注入未触发 / 已触发但 postcondition 不满足 / 已满足但 court 不敏感」。
+
+## 第三轮深度审查修复（G1-G5 闭环 + R30-R38 硬化）
+
+第三轮审查（HEAD `5cc2a2c`）核查了设计文档声称"完整"的五条机制，确认
+五条断链并逐一闭合；全部提交均复跑全量测试（基线 761 → 799 通过）。
+
+### G1：Meta 审查闭环证据门提交（`meta_review.py` + `evolution_runner.py`）
+
+**问题**：元审查每轮聚合门控事件、生成候选，然后原样丢弃 —— 写回
+`meta_review.meta_state` 的是未修改的输入状态，同一候选每轮重新推导、
+重新丢弃，"自进化"的元层实际是只读遥测。
+
+**修复**：新增 `evaluate_commit_evidence` / `commit_validated_meta_edits`。
+候选需累计 ≥ `MIN_COMMIT_EVIDENCE`（3）条独立审计门控观测才能离开影子态；
+只有 advisory 操作（`add_guidance_token` / `enable_ranking_preference`）可
+自动提交，profile 切换与移除操作保持人工裁决。证据源注册表 fail-closed：
+目标无注册证据源、证据不足、非 advisory 操作一律留在影子态。runner 在
+聚合后提交并把新状态写回 `meta_review` 权威（同步回滚契约 §13.17 不变，
+提交发生在最后一次回滚之后）。
+
+### G2：门控反馈注入 L1 反思 prompt（`reflection_engine.py` + `evolution_runner.py`）
+
+**问题**：L2 策略选择已接收 `project_meta_review_for_prompt` 的跨案例
+指引，L1 因果反思（占变异大多数）没有等价注入点，对历史门控结果完全
+无感。
+
+**修复**：`build_causal_reflection_prompt` 新增可选尾参 `meta_guidance`，
+以 `<meta_guidance authority="evolution_guidance_only">` 注入
+`guidance_tokens` / `ranking_preferences` 两个闭词表键；空基线不改变
+prompt（provider 缓存键不变）。runner 在 L1 调用点使用与 L2 同一投影。
+gold 防火墙验证：gate_profile / content_hash 不跨 prompt 边界。
+
+### G3：pending → working 注册表晋升闭环（`registry_promotion.py` 等）
+
+**问题**：新注册词条永远停在 `pending`（影子态）——无晋升路径；且即使
+手动 enable，action 别名也因 evaluator 按 action 名分派而永不执行。
+
+**修复**：
+- 新 `registry_promotion.py`：注册时把词条入 pending queue（动机案例为
+  首个观测）；predicate 在自身动机事实集上不触发则当场拒绝。后续
+  `no_registered_runtime_action` 案例按**不同 case id** 累计观测，达到
+  `PROMOTION_OBSERVATION_THRESHOLD`（3）且仍适用时 enable（working）、
+  队列条目标记 validated；不再适用的条目拒绝。所有裁决审计入
+  `l2_registry_registrations`。`observed_case_ids` 随 checkpoint 持久化，
+  resume 幂等。
+- 暴露两处更深断链并修复：`evaluate_policies` 用基线注册表校验参数，
+  使进化注册表的 action 通过 active 检查后又被参数校验拒掉（静默永不
+  执行）——改为按 genome 注册表校验；新增 `VocabularyRegistry.operator_of`，
+  post-ledger 与 pre-ledger evaluator 均按 operator 分派，promoted 别名
+  真正可执行。
+
+### G4：pre-ledger 共识恢复策略接线（`proof_engine.py` + `vocabulary_registry.py`）
+
+**问题**：`pre_ledger_policy_items` 参数与 `evaluate_pre_ledger_policies`
+实现完整，但无任何生产调用方传入 —— 纯死代码，共识恢复永不执行。
+
+**修复**：注册表新增 `POLICY_STAGE_PRE_LEDGER` 常量与 `policy_stage_of`
+解析（实例→operator→stage，未知 action fail-closed 落 post-ledger）；
+engine 在调用 `adjudicate_proof_court` 前按 stage 切分 policy items，
+`restore_audited_consensus` 送达 pre-ledger 表面。消除 policy_evaluator
+中镜像的 stage 常量（单一权威）。
+
+### G5：ProviderUsageLedger 接入 mutation 路径（`evolution_runner.py`）
+
+**问题**：结构化调用账本实现完整但零生产引用，成本审计只有聚合计数。
+
+**修复**：每次 `run_mutation_call` 用调用点已有的 provider meta 记账
+（cache_hit / transport_attempts / repair_used / token / latency），
+run 结束时落盘 `provider_usage_ledger.json`，总额入
+`evolution_audit.provider_usage_totals`。detector 侧保持 `detector_calls`
+计数（engine 不外露其 per-call meta，不为此发明新通道）。
+
+### 硬化（R30-R38）
+
+- **R30**：contrast replay 异常递增 `contrast_replay_errors` 计数（邻居
+  门保持 fail-open 设计，但退化不再不可观测）。
+- **R31**：`canary_preserved` 状态解析失败改用互异哨兵值，杜绝
+  `None == None` 被审计方误读为 preserved。
+- **R32**：`fitness._proof_count` 补 `OverflowError`，畸形裁判行降级 0。
+- **R33/R34**：G2 的 prompt 注入与 runner 双调用点回归固定。
+- **R35/R36**：G1 证据门（提交/幂等/影子保持/非 advisory 拒绝）回归固定。
+- **R37**：G5 记账与落盘回归固定。
+- **R38**：G3 使能的参数校验按 genome 注册表执行。
+
+**安全边界复查结论**：gold 防火墙、fail-closed、单一权威、同步回滚四项
+在运行时代码中均成立，未因本轮改动放宽。

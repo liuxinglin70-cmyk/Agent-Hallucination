@@ -266,6 +266,8 @@ resume 安全性要点：case_ids 逐一比对 + `input_content_hash` + `config_
 
 ### G1（最严重）Meta Review 不闭环：MetaEdit 从不提交
 
+> **状态：已修复（第三轮，commit `cfc4c4f`）** — 证据门提交见 `EVOLUTION_FIXES_SUMMARY.md` G1 一节。
+
 **位置**：`evolution_runner.py:7064–7091`
 
 run 末尾生成 `meta_candidates` 后只写入 `meta_review_summary["shadow_candidates"]` 做审计，**从不调用 `apply_meta_edit`**。后果链：
@@ -290,11 +292,15 @@ MetaEdit 永不提交
 
 ### G2（次严重）反馈闭环断裂：GateEvent 投影从不注入任何 prompt
 
+> **状态：已修复（第三轮，commit `44ea0f4`）** — L1/L2 双 prompt 注入见 `EVOLUTION_FIXES_SUMMARY.md` G2 一节。
+
 `gate_feedback.project_cross_case_guidance` 的唯一 production 调用方是 `meta_review.aggregate_gate_experience`（用于提取 feedback_codes）；`project_same_source_retry` **零调用方**。没有任何 prompt builder 接收 GateFeedbackProjection。
 
 后果：V3 §11.7 设计的"L2→L1 和 gate→generation 统一反馈通道"在运行时不存在——GateEvent 是只写审计账本，feedback 永远到不了下一次 reflection。`_build_mutation_retry_feedback` 走的是另一套（`mutation_retry_feedback` + `rejected_source_proposals`），与 GateEvent 无关。
 
 ### G3 Registry 注册是死胡同：pending → working 无晋升路径
+
+> **状态：已修复（第三轮，commit `378147e`）** — 证据晋升 + 别名分派修复见 `EVOLUTION_FIXES_SUMMARY.md` G3 一节。
 
 `_run_registry_reflection` 把新 entry 注册为 `pending`（影子态），此后**无任何代码路径**把 pending entry 提升为 `registered`（working）：
 
@@ -306,6 +312,8 @@ MetaEdit 永不提交
 
 ### G4 P9 L2-pre 未接入引擎：`pre_ledger_policy_items` 无调用方
 
+> **状态：已修复（第三轮，commit `209a2c5`）** — stage 路由见 `EVOLUTION_FIXES_SUMMARY.md` G4 一节。
+
 `proof_contract.adjudicate_proof_court` 的 `pre_ledger_policy_items` 参数（L347）在**全仓库无任何调用方传入**：
 
 - `proof_engine.py` 只在 L1644 传 `policy_items`（post），不传 `pre_ledger_policy_items`；
@@ -315,6 +323,8 @@ MetaEdit 永不提交
 后果：P9 的 evaluator、guards、stage 隔离、单测全部正确，但 proof-court 集成块（`proof_contract.py:507–570`）是**死代码**——pre-ledger restore 永远不会在真实运行中发生。P9 §15.7 的"合法 restore 进入 surviving set / occurrence ledger 一致"验收在 engine 层面未达成（只到 evaluator 单测层面）。
 
 ### G5 ProviderUsageLedger 未接线
+
+> **状态：已修复（第三轮，commit `a47a007`）** — mutation 路径记账见 `EVOLUTION_FIXES_SUMMARY.md` G5 一节。
 
 `provider_usage.py` 的 `ProviderUsageLedger`（logical call / transport attempt / token / cost 审计）**无任何 production 调用方**。P0 §5.2 的"最小 usage ledger"只到模块 + 单测为止，§13.18 的逐请求成本审计未接入 runner。成本追踪目前只有 `budget_usage` 计数器（mutation_calls / detector_calls / tokens 无）。
 
@@ -343,6 +353,8 @@ neighbor_before_state = str(neighbor["state"])
 ---
 
 ## 9. 优化建议（按优先级）
+
+> **状态：G1-G5 已全部落地（第三轮），本节保留为历史建议；新的遗留项见 `EVOLUTION_FIXES_SUMMARY.md` 第三轮小节与 D1。**
 
 ### 第一优先级：闭合 Meta Review 循环（G1）
 这是"自进化框架是否成立"的决定性缺口。最小落地路径：
