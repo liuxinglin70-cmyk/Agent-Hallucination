@@ -1,761 +1,1213 @@
-# 检测器自进化框架 Review 与优化方案
+# 自进化框架因果经验闭环：代码实施契约
 
-## 1. Review 目标
+## 0. 文档用途与执行权威
 
-本报告围绕一个核心目标审查当前 SEHD v6：自进化流程是否能够真实产出可执行、可继承、可复用的 detection skill，并最终改善幻觉检测效果。
+本文档是本轮自进化框架优化的唯一实施规范，用于启动新的代码执行对话。执行模型必须先完整读取：
 
-审查重点如下：
+1. .agents/skills/pristine/SKILL.md
+2. 本文档
+3. 本文档“代码所有权”列出的现有实现
 
-1. 自进化主流程是否真正闭环，而不是只生成文本或修改 artifact。
-2. L1 provider rule 与 L2 adjudication policy 是否都能改变真实检测行为。
-3. 反思引擎的输入、输出和候选搜索是否适配 DeepSeek-V4-Flash / DeepSeek-V4-Pro。
-4. 经验记忆是否能把 replay 结果转化为下一轮更有效的生成信息。
-5. 当前测试和实验材料能证明什么，不能证明什么。
+执行模型不得根据旧实验日志、历史设计草稿或临时观察改变本文档的目标、非目标和验收边界。实验日志只提供证据，不拥有架构规则。
 
-本报告不把无 gold 的 provisional L1 规则进入工作 genome、coverage-only L2 policy 进入策略 genome 视为问题。这两条探索性继承路径是允许的。审查关注的是它们能否形成真实能力，而不是继续收紧接受门槛。
+本文档使用以下规范词：
 
-## 2. 仓库结构与主流程
+- **必须**：实现和验收不可省略。
+- **禁止**：触发即视为偏离任务。
+- **应当**：没有代码证据支持时不得偏离。
+- **可以**：不改变边界时允许采用的实现选择。
 
-当前仓库的核心模块边界清晰：
+实施遵循 First-Time Principle：
 
-| 模块 | 位置 | 职责 |
+- 从失败信息丢失的根因修复，不调整阈值掩盖问题。
+- 每条规则只有一个所有者，不保留长期双轨实现。
+- 代码命名解释“是什么”，注释只解释不可见的“为什么”。
+- 不保留 feature flag、兼容分支散落、注释代码、备份文件或待清理实现。
+- 旧格式兼容只能存在于明确的 I/O 迁移边界；内存中的核心模型只有一种当前格式。
+- 每个阶段完成后代码都必须是可运行、可测试、可提交的完整状态。
+
+---
+
+## 1. 任务目标
+
+本任务的目标是打通以下真实闭环：
+
+~~~text
+当前案例检测
+  -> 确定性失败归因
+  -> 结构化失败案例
+  -> 检索之前案例的同机制经验
+  -> 在现有一次反思调用中生成 skill
+  -> 编译并执行现有 ActionSpec
+  -> 记录本地执行结果
+  -> 更新 genome 与持久化经验
+  -> 下一案例使用更新后的 genome 和经验
+~~~
+
+完成后，框架必须能够回答：
+
+1. 当前案例为什么需要进化。
+2. 失败发生在哪个真实产物、字段和下游消费边上。
+3. 该断裂由哪个模块拥有，哪些动作在当前运行时合法。
+4. 之前相同机制的案例尝试过什么，产生了什么本地执行结果。
+5. 当前提案是否真正 compiled、injected、applied，并移动了目标 observable。
+6. 下一案例是否确实读取了前一案例保存的经验。
+
+本任务不以“产生更多文本规则”为完成标准。只有进入现有可执行链路并留下因果执行证据的规则才是 skill。
+
+---
+
+## 2. 明确非目标
+
+以下内容不属于本任务，执行模型禁止顺手实施：
+
+1. 不调整 skill 准入阈值、fitness 阈值、置信度阈值或候选数量阈值。
+2. 不通过放宽 structural gate、replay gate 或 acceptance gate 提高产出率。
+3. 不新增跨案例迁移验证，不用迁移效果定义 skill 是否有效。
+4. 不增加 provider、detector、reflection、critic 或 validation 模型调用。
+5. 不增加离线聚类任务，不要求先收集一批案例再归纳。
+6. 第一版不引入 embedding、向量数据库、学习式相似度或相似度阈值。
+7. 不围绕“十个单案例并发实验”设计共享状态；该实验只验证独立流程。
+8. 不在本任务中重写 detector、proof court 或完整 L1/L2 action vocabulary。
+9. 不以单批 accepted skill 数量作为代码验收阈值。
+10. 不硬编码 API 地址、模型密钥或实验凭据；继续从环境配置读取，日志不得输出密钥。
+11. 不修改与 src/sehd_v6 自进化链路无关的模块。
+12. 不推送远端、创建 PR 或部署，除非用户另行授权。
+
+如果正确实现需要突破任一非目标，执行模型必须停止当前阶段，给出文件、函数、运行结果和为什么无法在现有边界内完成的证据，不得自行扩大任务。
+
+---
+
+## 3. 当前能力边界
+
+### 3.1 已有且必须保留的能力
+
+现有代码已经提供：
+
+- src/sehd_v6/core/bccse/evolution_runner.py：逐案例在线运行、checkpoint、resume、source replay、contrast replay、genome 更新。
+- src/sehd_v6/core/bccse/failure_classifier.py：确定性 layer、artifact、reason 和 owner 补充归因。
+- src/sehd_v6/core/bccse/action_spec.py：把模块动作编译为 route、output object、field、operation、postcondition 和 observable。
+- src/sehd_v6/core/bccse/module_charter.py：模块权限、动作 opcode、合法字段和 observable 的权威来源。
+- src/sehd_v6/core/bccse/reflection_engine.py：现有反思调用和候选 schema。
+- src/sehd_v6/core/htc_tes/type_aware_fitness.py：类型经验统计。
+- src/sehd_v6/evolution/runner.py：公开 evolution API，已经支持 initial L1 genome、initial L2 policy genome 和 experience memory。
+- src/sehd_v6/evolution/__main__.py：CLI 入口。
+
+以下运行语义必须保持：
+
+- 当前 genome 和 policy genome 进入下一条案例。
+- evaluator-only 字段不会泄漏到 detector/provider。
+- runtime-invalid 不参与 mutation 和 fitness。
+- proposal 先作用于 candidate genome，不直接污染 working champion。
+- skill 仍由现有 source replay 和本地 observable movement 判断。
+- checkpoint 和 resume 保持幂等。
+
+### 3.2 当前根因
+
+当前 skill 提取的主要信息损失发生在归因与反思之间：
+
+- 归因输出能说明 artifact/reason/owner，但没有表示完整的生产者—字段—消费者断裂。
+- 反思输入包含截断后的宽泛原始轨迹，关键事件可能被无关内容挤出。
+- runtime observation、detection context 和 experience summary 重复描述相同事实，但没有统一对象身份。
+- 经验记忆偏向类型和结果统计，不能表达历史动作为什么有效或无效。
+- 当前 comparison case 只包含 state/artifact/reason 等粗粒度信息，不能支持真实因果归纳。
+
+本任务必须修复这个信息结构，不能把问题改写为“提高 acceptance rate”。
+
+---
+
+## 4. 目标架构与代码所有权
+
+### 4.1 目标数据流
+
+~~~text
+DetectionResult
+  -> FailureAttribution
+  -> FailureEpisodeBuilder
+       -> current FailureEpisode
+       -> prompt-safe causal projection
+       -> mechanism signature
+  -> EvolutionExperienceMemory.retrieve(previous compatible episodes)
+  -> ReflectionEngine(existing single call)
+  -> existing candidate parser
+  -> existing ActionSpec compiler
+  -> existing structural and replay gates
+  -> FailureAttempt outcome
+  -> EvolutionExperienceMemory.upsert
+  -> checkpoint
+~~~
+
+### 4.2 唯一所有权
+
+| 规则或数据 | 唯一所有者 | 禁止事项 |
 | --- | --- | --- |
-| Standalone detector | `src/sehd_v6/detector/` | 单轨迹 PACA-TCL v3.5 检测入口 |
-| Evolution public API | `src/sehd_v6/evolution/` | 自进化公开入口、记录加载、配置解析 |
-| PACA-TCL engine | `src/sehd_v6/core/paca_tcl/` | 候选发现、控辩证据、proof court、定位 |
-| BCCSE engine | `src/sehd_v6/core/bccse/` | 归因、反思、规则/策略 genome、fitness、回滚 |
-| HTC-TES | `src/sehd_v6/core/htc_tes/` | 类型分类、类型经验记忆、类型遥测 |
-| Experiment layer | `experiments/` | 实验计划、运行脚本、案例账本和本地结果 |
+| layer/artifact/reason/owner | failure_classifier.py 和现有最终 attribution contract | builder 不得重新猜 owner |
+| 候选、证明、court 原始产物 | detector result | memory 不得创建另一份真值 |
+| 因果切片、failure edge、机制签名 | 新 failure_episode.py | runner/reflection 不得各自重建 |
+| 模块权限和合法动作 | module_charter.py + action_spec.py | LLM 不得创造新 opcode 或字段 |
+| 历史机制经验持久化与检索 | 新 EvolutionExperienceMemory | contrast registry 不再为生成提供历史 |
+| prompt 编排和候选解析 | reflection_engine.py | prompt 不得再次接收完整未筛选轨迹 |
+| 流程编排 | evolution_runner.py | runner 不得拥有领域投影逻辑 |
+| 类型统计 | TypeExperienceMemory | 不得复制完整因果案例 |
+| skill 接受决定 | 现有 gate 和 source replay | 历史案例不得成为新 validation gate |
 
-实际 L1 流程为：
+### 4.3 现有同名类型的处理
 
-```text
-trajectory
-  -> detector(current L1 genome + current L2 policy)
-  -> self-supervised trigger
-  -> type classification
-  -> deterministic failure classification as a later owner supplement
-  -> reflection candidates
-  -> critic selection
-  -> structural gate
-  -> apply edit to candidate genome
-  -> full detector source replay
-  -> optional canary / contrast replay
-  -> commit into working champion or rollback
-  -> experience memory
-```
+src/sehd_v6/core/bccse/types.py 当前的 FailureEpisode 明确只表示 paired replay 输入，字段也只有 error type 和匿名引用。把在线因果闭环字段直接追加到这个类型会制造一个具有两套不相干语义的对象。
 
-实际 L2 流程为：
+Phase 1 必须在同一个提交中完成以下重命名：
 
-```text
-L2-attributed detection
-  -> one policy reflection call
-  -> closed-vocabulary parse and validation
-  -> candidate policy genome
-  -> proof-court replay with the same evidence bundle
-  -> observable state/coverage movement check
-  -> accept into working policy genome or rollback
-```
+- 将现有 paired replay 类型重命名为 ReplayEpisode；
+- 更新 proof evaluator、导出和所有测试调用点；
+- 不保留 FailureEpisode 别名、弃用 wrapper 或新旧构造分支；
+- 将 FailureEpisode 作为本文档定义的因果失败案例唯一名称。
 
-## 3. 总体判断
+ReplayEpisode 与 FailureEpisode 的职责不同，不是两条竞争的进化工作流：前者只是 paired replay 的匿名评估输入，后者是在线 skill 产生和经验记忆的权威结构。
 
-### 3.1 已经成立的能力
+新的 FailureEpisode 允许使用清晰的嵌套值类型，例如：
 
-当前框架不是“生成一条规则后假设它有效”的伪进化。L1 edit 会进入真实 detector provider prompt，source replay 会用 child genome 重新执行完整检测路径：
+- FailureEdge
+- CausalSlice
+- FailureAttempt
+- HistoricalEpisodeReference
 
-- `skill_integration.py:367-422` 按具体 provider route 注入对应 module 的规则。
-- `skill_integration.py:425-473` 在进程锁内替换真实 provider binding，退出后恢复。
-- `evolution_runner.py:4969-5054` 对 candidate genome 执行真实 source replay，再计算变化。
-- provider cache key 包含完整 system/user body，genome 变化会改变注入 prompt 和 request hash，不会把 baseline 响应误当作 child 响应。
+这些类型必须服务于 FailureEpisode，不能形成第二条工作流。
 
-L2 policy 也不是由 LLM 在运行时解释。policy item 由确定性 evaluator 执行，proof court 使用完整裁决规则重新计算终态：
+---
 
-- `policy_evaluator.py:82-181` 机械执行 predicate/action。
-- `proof_contract.py:651-685` 在 court convergence point 应用 policy，并按完整 court 条件重算终态。
-- `evolution_runner.py:2868-2977` 用 candidate policy genome replay 后再接受或回滚。
+## 5. FailureEpisode 当前格式
 
-以下工程约束也基本合理：
+### 5.1 Schema
 
-- detector 输入递归剥离 evaluator-only 字段。
-- invalid authority 和 runtime-invalid 不进入 mutation/fitness。
-- edit 先作用于 candidate/shadow genome，不直接污染 working genome。
-- checkpoint、genome hash、policy hash 和 replay 计数可审计。
-- L1/L2 都支持 add/modify/remove，进化面具备纠错能力。
-- 423 项仓库测试全部通过。
+目标 schema version：
 
-### 3.2 尚未成立的能力
+~~~text
+sehd.failure_episode.v1
+~~~
 
-当前代码证明了“框架能够执行进化 wiring”，但尚未证明“v6 能稳定产出跨案例有效 skill”。主要原因不是门槛过严，而是干预空间与失败空间没有完全对齐，反思候选搜索也会提前丢失可执行候选。
+建议的规范化结构：
 
-总体结论：
+~~~text
+FailureEpisode
+├── schema_version
+├── episode_id
+├── record_key
+├── detection
+│   ├── state
+│   ├── evolution_direction
+│   └── trigger_source
+├── attribution
+│   ├── layer
+│   ├── artifact
+│   ├── reason_code
+│   ├── owner_module
+│   └── fallback_owner_module
+├── causal_slice
+│   ├── candidate
+│   │   ├── candidate_id
+│   │   ├── candidate_kind
+│   │   ├── origin_refs
+│   │   └── dependency_refs
+│   ├── obligation
+│   │   ├── required_fields
+│   │   └── required_evidence_refs
+│   ├── provider_output
+│   │   ├── output_object
+│   │   ├── present_fields
+│   │   ├── missing_fields
+│   │   └── malformed_fields
+│   ├── downstream_consumption
+│   │   ├── consumer
+│   │   ├── qualification_state
+│   │   ├── certificate_state
+│   │   ├── quarantine_state
+│   │   ├── coverage_state
+│   │   └── court_effect
+│   ├── failure_edge
+│   │   ├── producer_route
+│   │   ├── output_object
+│   │   ├── field
+│   │   ├── consumer
+│   │   ├── observed
+│   │   └── required
+│   ├── evidence_refs
+│   └── completeness
+├── action_envelope
+│   ├── legal_modules
+│   ├── legal_operations
+│   ├── legal_output_fields
+│   └── legal_observables
+└── attempts
+    └── FailureAttempt[]
+~~~
 
-| 判断项 | 结论 |
+### 5.2 字段不变量
+
+- schema_version 必须显式存在。
+- episode_id 是规范化 observation 的稳定哈希。
+- record_key 只用于内部审计、幂等和 artifact 关联，不进入反思 prompt。
+- evolution_direction 使用现有 controller 已经确定的方向，不重新推导 gold。
+- attribution 必须来自现有权威归因结果。
+- missing_fields、malformed_fields 和所有引用必须排序并去重。
+- failure_edge 只能指向现有 ActionSpec 能影响的第一个可修复断裂。
+- 无法建立完整引用链时，completeness=partial；禁止补造事实。
+- action_envelope 必须由 module charter 和 ActionSpec registry 确定性生成。
+- attempts 不进入 episode_id；观察身份不能随尝试结果变化。
+- evaluator/gold 原始字段不得出现在 schema 的 prompt projection 中。
+
+### 5.3 稳定身份
+
+episode_id 建议按以下方式产生：
+
+~~~text
+sha256(canonical_json(
+  schema_version
+  + record_key
+  + detection_without_evaluator_fields
+  + attribution
+  + causal_slice
+  + action_envelope
+))
+~~~
+
+规范化要求：
+
+- map key 使用稳定顺序；
+- 集合转为排序后的 list；
+- 保留具有流程语义的 event 顺序；
+- 不包含时间戳、随机数、provider request id 或 attempts；
+- 同一输入重复运行必须得到相同哈希。
+
+mechanism_signature 与 episode_id 分离。前者用于跨案例检索，禁止包含 record key、case id、自然语言解释和时间信息。
+
+### 5.4 FailureAttempt
+
+每次提案的 outcome 使用结构化记录：
+
+~~~text
+FailureAttempt
+├── attempt_id
+├── proposal_signature
+├── operation
+├── target_module
+├── action_spec
+├── structural_result
+├── compiled
+├── injected
+├── applied
+├── observable_delta
+├── downstream_court_delta
+├── no_effect_reason
+└── decision
+~~~
+
+attempt_id 必须由 episode_id + proposal_signature + logical_attempt_index 稳定产生。checkpoint resume 使用 upsert，不允许重复 append。
+
+no_effect_reason 只能根据现有执行证据分类。第一版至少区分：
+
+- condition_not_matched
+- provider_did_not_apply_action
+- output_changed_then_removed_or_quarantined
+- provider_output_changed_but_downstream_invariant
+- expected_delta_observed
+- unresolved_no_effect
+
+证据不足时必须使用 unresolved_no_effect，不能根据最终 state 猜测中间原因。
+
+---
+
+## 6. FailureEpisodeBuilder
+
+### 6.1 文件和 API
+
+新增：
+
+~~~text
+src/sehd_v6/core/bccse/failure_episode.py
+~~~
+
+建议公开边界：
+
+~~~python
+build_failure_episode(...)
+build_mechanism_signature(...)
+project_failure_episode_for_prompt(...)
+validate_failure_episode(...)
+~~~
+
+实际参数应复用现有 typed result，不得把整个 runner local namespace 传入 builder。
+
+### 6.2 确定性构建步骤
+
+1. 接收 authoritative detection result、现有 attribution、现有 evolution direction。
+2. 根据 attribution 中的 artifact/reason/owner 选择当前责任链。
+3. 选择责任候选，优先顺序为：
+   - attribution 或 court 明确引用的 candidate；
+   - unresolved、quarantined 或 verified_error terminal edge 引用的 candidate；
+   - provider artifact 明确包含的 candidate；
+   - 最早进入当前 artifact 失败链的 candidate。
+4. 按稳定对象 ID 串联：
+   - candidate census；
+   - candidate qualification；
+   - evidence obligation；
+   - certificate；
+   - quarantine/coverage；
+   - proof court。
+5. 对比 required 和 observed：
+   - 必需字段缺失；
+   - 字段存在但为空；
+   - 字段格式错误；
+   - provider 输出存在但未被下游消费；
+   - 下游消费发生但没有移动目标 court edge。
+6. 在当前 attribution 对应的流程拓扑内选择第一个可由合法 ActionSpec 修复的断裂作为 failure_edge。
+7. 从真实对象提取最小 evidence slice。每个 snippet 必须由 event ref 或 artifact ref 定位。
+8. 从 module charter 和 ActionSpec registry 生成 action envelope。
+9. 校验引用、所有权、字段和合法动作。
+10. 生成 episode id、机制签名和 prompt-safe projection。
+
+### 6.3 多候选和不完整轨迹
+
+- 多个候选同时失败时，builder 必须按 court/attribution 的责任引用选择主候选。
+- 其他候选只作为 bounded supporting refs，不得把多个失败混成一个 edge。
+- 无法通过 ID 连接 provider output 和下游消费时，episode 仍可产生，但标记 partial。
+- partial 不是 runtime-invalid，也不是自动拒绝 skill 的新 gate。
+- 如果连 artifact、owner 或可修复 edge 都无法确定，记录结构化 unaddressable 原因并沿用现有 no-actionable 行为；禁止把它路由到随意模块。
+
+### 6.4 反思投影
+
+prompt projection 只包含：
+
+- detection state 和 evolution direction；
+- attribution；
+- 当前 candidate 的结构化身份；
+- obligation 与 observed 的差异；
+- primary failure edge；
+- 最小 evidence refs/snippets；
+- legal action envelope；
+- 历史参考的结构化摘要。
+
+必须删除：
+
+- record key、case id、dataset/source identity；
+- gold label、hallucination step、evaluator explanation；
+- provider 原始 response metadata；
+- 与 primary failure edge 无关的整段 trajectory；
+- 任意可由模型误认为指令的未界定历史文本。
+
+### 6.5 消除重复投影
+
+reflection_engine.build_runtime_observation() 和 runner 中现有 provider artifact projection 与新 builder 重叠。
+
+最终状态必须是：
+
+- 结构化 artifact/court 投影只在 failure_episode.py 定义；
+- 迁移阶段需要旧函数名时，只能委托给新实现；
+- Phase 3 完成后，reflection 直接消费 FailureEpisode，删除无意义 wrapper；
+- 不允许 runner、reflection 和 builder 各自维护字段列表。
+
+---
+
+## 7. 在线跨轨迹经验
+
+### 7.1 不采用离线聚类
+
+真实运行按单案例顺序更新。第一条案例没有历史，后续案例只读取当时已经完成的历史。
+
+在线行为：
+
+~~~text
+build current episode
+  -> retrieve prior compatible references, excluding current episode
+  -> upsert current observation for crash-safe checkpoint
+  -> generate/execute proposal
+  -> upsert attempt outcome
+  -> next case
+~~~
+
+这里的“结构索引”只是一种确定性查找，不是预先聚类，也不要求批量数据。
+
+### 7.2 持久化模型
+
+新增一个清晰的组合根：
+
+~~~text
+EvolutionExperienceMemory
+├── schema_version
+├── type_experience_memory
+└── failure_mechanisms
+~~~
+
+- TypeExperienceMemory 继续负责类型统计。
+- failure_mechanisms 负责结构化因果经验。
+- 两者写入现有 experience memory artifact，避免第二个 CLI 配置。
+- 旧 artifact 的读取由一个边界迁移函数完成；内存中立即转为当前 schema。
+- 当前版本只写新 schema，不在核心流程传播 old/new 判断。
+
+目标 schema version：
+
+~~~text
+sehd.evolution_experience_memory.v1
+~~~
+
+### 7.3 结构索引键
+
+第一版机制签名：
+
+~~~text
+(
+  layer,
+  artifact,
+  reason_code,
+  evolution_direction,
+  candidate_kind,
+  failure_edge.consumer,
+  normalized_missing_or_malformed_fields
+)
+~~~
+
+规则：
+
+- 所有值来自封闭或规范化字段。
+- 字段集合排序去重。
+- 不包含 case identity、自然语言 rationale、模型名称或时间。
+- 签名算法属于 failure_episode.py，memory 只消费，不复制实现。
+
+### 7.4 检索顺序
+
+检索按离散结构逐级回退：
+
+1. 完整机制签名一致；
+2. layer + artifact + direction + consumer 一致；
+3. layer + artifact + direction 一致；
+4. 无兼容历史。
+
+禁止：
+
+- 学习式相似度；
+- embedding；
+- 相似度阈值；
+- 通过 hallucination type/module 映射代替 artifact 机制；
+- 因“历史结果好”而放宽当前 ActionSpec 合法性。
+
+### 7.5 持久化内容和容量
+
+不缓存完整原始轨迹。每个结构索引项保存：
+
+- observation count；
+- outcome counts；
+- 最近一条本地执行有效代表；
+- 最近一条 executed-no-effect 代表；
+- 最近一条 structural reject 代表；
+- 最近一条 no-proposal/unaddressable 代表。
+
+代表选择是确定性的固定 outcome slot，不使用分数阈值。相同 slot 的替换顺序：
+
+1. complete 优先于 partial；
+2. outcome 证据字段更完整者优先；
+3. 相同时使用逻辑处理序号；
+4. 再相同时使用 episode id 作为稳定 tie-break。
+
+每个 slot 保存结构化 causal slice、ActionSpec 和 outcome，不保存完整 trajectory。持久化代表可以保存不透明 episode id，但不得保存 raw record key、case id 或 dataset identity。
+
+完整 episode 审计记录属于当前 run 的 evolution_result；跨运行 memory 只保存代表和累计计数。不要同时持久化一份无界 episode 列表和一份可漂移索引。
+
+### 7.6 供反思使用的历史参考
+
+每次最多向现有反思调用提供：
+
+- 一条本地有效代表；
+- 一条 no-effect 或 rejected 代表。
+
+如果没有本地有效代表，提供最相关的 no-effect/rejected 和 no-proposal 代表。检索为空时保持当前案例独立运行。
+
+历史投影必须包含：
+
+- 与当前案例共同的结构事实；
+- 当前案例独有的事实；
+- 历史案例独有的事实；
+- 历史 ActionSpec；
+- 历史本地执行 outcome 或明确 no-effect 原因。
+
+历史案例只帮助产生 proposal，不参与当前 skill 的 acceptance。
+
+---
+
+## 8. Reflection 集成
+
+### 8.1 调用预算
+
+接入前后，对同一个案例和相同重试配置：
+
+- detector 调用次数不增加；
+- reflection 调用次数不增加；
+- critic 调用次数不增加；
+- source replay 次数不增加；
+- contrast replay 次数不增加；
+- 不新增迁移或独立 validation 调用。
+
+如果实现导致调用次数增加，该阶段直接失败。
+
+### 8.2 输入职责
+
+新的 reflection input 必须由以下内容组成：
+
+1. 当前 episode prompt projection；
+2. 最多两个历史参考；
+3. 当前 genome 中可能重复或冲突的 skill；
+4. module charter 生成的合法动作范围；
+5. 现有输出 JSON schema。
+
+模型只负责：
+
+- 从可观察结构事实中形成 condition；
+- 在合法 action envelope 内选择 operation/field；
+- 给出短的因果 rationale。
+
+模型不负责：
+
+- 重做 failure attribution；
+- 猜测 owner；
+- 猜测未出现的 candidate 或字段；
+- 创造 opcode；
+- 判断 gold；
+- 重新阅读完整轨迹并自行关联对象；
+- 决定当前 skill 是否通过 gate。
+
+### 8.3 输出兼容
+
+第一版保持现有 reflection candidate schema 和 ActionSpec 编译器接口。不得同时引入新的候选 schema、修改动作 vocabulary 和重写 gate。
+
+如果当前 candidate schema 无法表达 action envelope 中已经存在的合法字段，应当在本阶段一次性修正 schema 所有者，并删除旧字段；不得增加 optional legacy 字段长期兼容。
+
+### 8.4 现有 contrast registry
+
+现有 registry 最终只负责已有的 contrast replay 安全保障，建议在代码中使用表达该职责的名称，例如 contrast_replay_registry。
+
+Phase 3 完成后必须删除其作为 reflection generation context 的用途。历史生成参考只来自 EvolutionExperienceMemory。
+
+---
+
+## 9. Outcome 回写与幂等
+
+### 9.1 更新时机
+
+每个案例按以下顺序持久化：
+
+1. detection 和 attribution 完成；
+2. build episode；
+3. 检索历史，明确排除当前 episode id；
+4. 将当前 observation upsert 到 checkpoint；
+5. 执行现有 reflection、compile 和 replay；
+6. 生成 FailureAttempt；
+7. upsert attempt outcome；
+8. 更新代表 slot 和统计；
+9. 写入最终 checkpoint/result；
+10. 进入下一案例。
+
+### 9.2 Resume
+
+必须为以下中断点编写集成测试：
+
+- observation 已写入、reflection 尚未调用；
+- proposal 已生成、source replay 尚未完成；
+- attempt outcome 已写入、case finalization 尚未完成。
+
+恢复后必须满足：
+
+- 同一 episode 不重复计数；
+- 同一 attempt 不重复 append；
+- 历史检索不把当前未完成 episode 当作前序案例；
+- provider 调用计数符合现有 resume contract；
+- 最终 memory 与无中断运行规范化相同。
+
+---
+
+## 10. 跨运行继承
+
+### 10.1 问题
+
+同一 run_online_evolution 内已经逐案例继承当前 genome 和 policy genome。跨完整运行时，API 与 CLI 的输入边界不对称，容易只继承 L1 或只加载 memory，形成不完整闭环。
+
+### 10.2 目标
+
+新增完整状态清单：
+
+~~~text
+evolution_state_manifest.json
+├── schema_version
+├── provider_rule_genome
+│   ├── path
+│   └── sha256
+├── adjudication_policy_genome
+│   ├── path
+│   └── sha256
+├── experience_memory
+│   ├── path
+│   └── sha256
+├── source_run_id
+└── lineage
+~~~
+
+目标 schema：
+
+~~~text
+sehd.evolution_state.v1
+~~~
+
+公开入口新增：
+
+~~~text
+--inherit-from <completed_output_dir>
+~~~
+
+### 10.3 语义
+
+- --resume-from：恢复同一输入队列，继续中断运行，必须校验输入/config hash。
+- --inherit-from：开始新的案例流，继承上一轮完整 genome、policy 和 memory。
+
+必须：
+
+- 原子加载三个 artifact；
+- 校验清单路径和 hash；
+- 拒绝显式参数与 manifest 冲突；
+- 保持现有 resume 语义不变；
+- CLI 和 public API 能力一致。
+
+不得：
+
+- 用 resume 模拟新数据继承；
+- 缺失 policy 时静默使用空 policy；
+- 缺失 memory 时静默开始空历史；
+- 写出 manifest 后继续允许未绑定 hash 的 artifact 替换。
+
+---
+
+## 11. 文件级实施范围
+
+### 11.1 必须新增
+
+~~~text
+src/sehd_v6/core/bccse/failure_episode.py
+tests/test_failure_episode.py
+tests/test_evolution_experience_memory.py
+~~~
+
+如组合 memory 需要独立所有者，可新增：
+
+~~~text
+src/sehd_v6/core/bccse/evolution_experience_memory.py
+~~~
+
+不要把新的因果经验实现继续塞进 type_aware_fitness.py。该模块保留类型统计职责。
+
+### 11.2 必须修改
+
+~~~text
+src/sehd_v6/core/bccse/types.py
+src/sehd_v6/core/bccse/evolution_runner.py
+src/sehd_v6/core/bccse/reflection_engine.py
+src/sehd_v6/core/htc_tes/type_aware_fitness.py
+src/sehd_v6/evolution/runner.py
+src/sehd_v6/evolution/__main__.py
+tests/test_evolution_hardening.py
+tests/test_evolution_standalone.py
+~~~
+
+根据现有导出方式同步修改 src/sehd_v6/core/bccse/__init__.py。
+
+### 11.3 原则上不修改
+
+~~~text
+src/sehd_v6/core/paca_tcl/
+src/sehd_v6/detector/
+实验数据原文件
+skill 准入和 fitness 阈值配置
+~~~
+
+如果 builder 缺少必要的真实 artifact ref，只允许对 detector 输出 contract 做最小、明确、可测试的结构补全；不得改变 detector 判决逻辑。发生这种情况时，必须先报告缺失字段、生产模块和下游用途。
+
+---
+
+## 12. 分阶段实施与 Git 边界
+
+每个阶段必须独立完成测试和 review 后提交。前一阶段未通过，不得开始下一阶段。
+
+### Phase 0：固定行为基线
+
+工作：
+
+- 运行当前完整测试并记录实际测试数，不在文档中假设固定数量。
+- 从已有实验 artifact 建立代表性 fixture：
+  - 正确稳定；
+  - 错误 owner/field；
+  - invalid mutation；
+  - compiled 但 no-effect；
+  - accepted local movement；
+  - L2 policy movement。
+- 固定 detector result、attribution、ActionSpec、调用次数和 label firewall 行为。
+
+验收：
+
+- 生产代码行为零变化。
+- fixture 可在无外部 API 的测试中稳定重放。
+- 当前测试全通过。
+
+提交：
+
+~~~text
+test(evolution): freeze causal evolution baselines
+~~~
+
+### Phase 1：建立唯一 FailureEpisode
+
+工作：
+
+- 扩展现有类型。
+- 实现 builder、validator、canonical serializer、prompt projection。
+- runner 生成 episode 并写入审计结果，但不改变 reflection proposal。
+- 将重复 artifact/runtime projection 委托到新唯一实现。
+
+验收：
+
+- 所有 runtime-valid 且 should_evolve 的 fixture 产生合法 episode，或产生明确的 unaddressable 结构原因。
+- 同一输入重复运行得到相同 episode id。
+- 所有 evidence ref 可解析；无法解析时为 partial。
+- prompt projection 无 label/identity 泄漏。
+- detector state、genome decision、gate decision 和调用次数与基线一致。
+- ReplayEpisode 的 proof evaluator 行为与基线一致。
+
+提交：
+
+~~~text
+refactor(evolution): model causal failure episodes
+~~~
+
+### Phase 2：持久化在线经验
+
+工作：
+
+- 实现 EvolutionExperienceMemory。
+- 把旧 type memory 作为组合成员保留。
+- 实现旧 artifact 的单边界迁移。
+- 实现结构签名、代表 slot、确定性检索和 checkpoint 恢复。
+
+验收：
+
+- 旧 memory 无损加载并写为唯一新 schema。
+- round-trip 后规范化内容一致。
+- exact match 优先，fallback 顺序稳定。
+- memory 不包含完整原始轨迹、gold 或 evaluator 字段。
+- resume 不重复计数。
+- 外部调用次数不变。
+
+提交：
+
+~~~text
+feat(evolution): persist online causal episode memory
+~~~
+
+### Phase 3：反思使用因果历史
+
+工作：
+
+- reflection 接收当前 episode 和历史参考。
+- 替换宽泛、重复的 generation context。
+- 删除 contrast registry 的生成用途。
+- 保持 candidate schema、ActionSpec 和现有 gate。
+
+验收：
+
+- 无历史时流程正常完成。
+- 有历史时 prompt 包含当前 edge、共同/差异事实、历史 action 和本地 outcome。
+- prompt 不包含 raw case identity、gold 或完整轨迹。
+- 不增加任何模型或 replay 调用。
+- 现有合法 candidate 仍可编译。
+- runner 不再拥有结构投影规则。
+
+提交：
+
+~~~text
+refactor(reflection): ground proposals in causal history
+~~~
+
+### Phase 4：闭合执行反馈
+
+工作：
+
+- 将 compiled/injected/applied/observable/downstream outcome 写回 FailureAttempt。
+- 结构化 no-effect 原因。
+- 跨案例复用现有 semantic duplicate 检查。
+- 完成两案例顺序集成测试和多中断点 resume 测试。
+
+验收：
+
+- accepted、rejected、runtime-invalid、executed-no-effect 可区分。
+- 后续同机制案例不会原样重复已确认 no-effect 的语义 proposal。
+- 两案例测试证明 A 的 outcome 在 B 的 reflection 前可见。
+- 中断恢复结果与无中断运行一致。
+- TypeExperienceMemory 不复制完整 episode。
+
+提交：
+
+~~~text
+feat(evolution): close the online causal feedback loop
+~~~
+
+### Phase 5：完整跨运行继承
+
+工作：
+
+- 实现 state manifest。
+- 实现 public API 和 CLI 的 inherit-from。
+- 校验 genome、policy、memory 的 hash 和 lineage。
+
+验收：
+
+- 新数据运行的初始三个 artifact hash 与上一轮 manifest 完全一致。
+- 冲突输入明确失败。
+- resume 行为和测试不变。
+- standalone/public API 能读取完整状态或明确拒绝不支持的使用方式。
+
+提交：
+
+~~~text
+feat(evolution): inherit complete evolution state
+~~~
+
+### Phase 6：真实 gold 小批次验证
+
+工作：
+
+- 选择未使用的十条 gold 数据。
+- 每个进程只运行一条，十个并发。
+- 输出目录和 memory 隔离。
+- 实时监控直到全部终态。
+- 对每条结果做结构化案例分析。
+
+验收：
+
+- 十个任务全部达到明确终态，无静默挂起。
+- 每个触发进化的 runtime-valid 案例有可审计 episode。
+- accepted skill 有完整执行证据。
+- 没有 skill 的案例能够定位到具体漏斗阶段。
+- 发现代码问题并修复后，必须重跑同一批十条。
+- 同批满足预期后才能标记完成并提交。
+
+提交：
+
+~~~text
+test(evolution): validate causal skill loop on gold batch <batch-id>
+~~~
+
+下一批必须更换十条数据，并更新 used-case ledger。
+
+---
+
+## 13. 测试矩阵
+
+### 13.1 Builder 单元测试
+
+至少覆盖：
+
+- 单候选完整生产—消费链；
+- 多候选但 court 指定责任候选；
+- missing field；
+- malformed field；
+- provider output 存在但下游未消费；
+- provider output 改变但 court invariant；
+- 引用断裂产生 partial；
+- 无合法 action 产生 unaddressable；
+- canonical hash 稳定；
+- mechanism signature 不受 case identity 影响；
+- prompt firewall。
+
+### 13.2 Memory 单元测试
+
+至少覆盖：
+
+- 旧 type-only memory 迁移；
+- 新 schema round-trip；
+- exact 和三级 fallback；
+- 当前 episode 排除；
+- outcome slot 替换顺序；
+- 统计累加；
+- resume upsert 幂等；
+- memory 无 raw trajectory 和 evaluator 字段。
+
+### 13.3 Reflection 单元测试
+
+至少覆盖：
+
+- 无历史；
+- effective + no-effect 历史；
+- 只有 rejected 历史；
+- partial 当前 episode；
+- action envelope 与 candidate schema 对齐；
+- prompt 长度不超过现有输入上限；
+- provider 调用数量与基线一致。
+
+### 13.4 顺序集成测试
+
+建立两条相同机制、不同 case identity 的确定性 fixture：
+
+~~~text
+case A
+  -> episode A
+  -> proposal A
+  -> no-effect 或 accepted local outcome
+  -> persisted memory
+
+case B
+  -> compatible episode B
+  -> retrieve A
+  -> reflection input contains A outcome
+  -> proposal is compiled and replayed
+~~~
+
+该测试只证明在线历史进入生成闭环，不以 B 必须改善为验收条件。
+
+### 13.5 调用预算测试
+
+对相同 fixture 比较 Phase 0 和 Phase 3：
+
+| 调用类型 | 允许变化 |
 | --- | --- |
-| L1 edit 是否真实进入 detector | 是 |
-| L1 source replay 是否真实运行 child genome | 是 |
-| L2 policy 是否真实进入 proof court | 是 |
-| L2 是否覆盖声明的三个失败 artifact | 否，目前主要能处理 coverage validity |
-| 两层能力是否能统一跨轮继承和独立部署 | 否，L2 继承和 detector API 未闭合 |
-| 反思候选是否充分利用结构校验和 replay 预算 | 否，critic 过早裁剪候选 |
-| 经验记忆是否能准确指导下一次可执行干预 | 部分成立，但索引和反馈信息不足 |
-| 当前证据是否证明检测效果提升 | 否，只有历史摘要，没有当前 v6 可复核结果 artifact |
+| detector/provider | 0 |
+| reflection | 0 |
+| critic | 0 |
+| source replay | 0 |
+| contrast replay | 0 |
+| migration validation | 必须为 0 |
+
+---
+
+## 14. 真实实验协议
+
+### 14.1 批次规则
+
+- 使用 gold 标签数据。
+- 每批十个不同案例。
+- 十个实验并发。
+- 每个实验只包含一条数据。
+- 同一批的进程不得共享工作 genome、policy memory 或写入文件。
+- 不同批次不得复用案例。
+- used-case ledger 是案例唯一性来源。
+- 十个并发实验不用于验证在线跨案例继承。
+
+### 14.2 修复规则
+
+如果一批中发现框架问题：
+
+1. 保存原始失败 artifact。
+2. 识别损失漏斗阶段。
+3. 定位唯一所有者模块。
+4. 按 pristine 修复根因。
+5. 运行相关单元和集成测试。
+6. 重新运行同一批十条。
+7. 只有重跑结果符合预期，批次才完成。
+
+禁止：
+
+- 修复后直接更换新批次；
+- 删除失败案例；
+- 因 content/problem 难处理而调整准入阈值；
+- 用单案例专用 condition、case id 或原文片段形成 skill；
+- 为提高通过数增加额外验证。
+
+### 14.3 实时监控
+
+执行模型必须持续监控：
+
+- 每个子任务状态；
+- 当前处理阶段；
+- provider error、timeout、content filter；
+- checkpoint 更新时间；
+- 最终 artifact 是否完整。
+
+监控等待应使用可中断的短轮询，不使用超过 60 秒的阻塞 sleep。状态没有变化时无需反复输出相同内容。
+
+### 14.4 每案例分析模板
+
+~~~text
+case_id:
+gold:
+baseline detection:
+evolution trigger:
+attribution:
+failure edge:
+episode completeness:
+history retrieval:
+proposal:
+ActionSpec:
+compiled / injected / applied:
+observable delta:
+downstream court delta:
+decision:
+no-effect reason:
+framework defect or expected behavior:
+~~~
+
+---
+
+## 15. 验收漏斗和解释边界
+
+必须记录以下计数：
+
+~~~text
+should_evolve
+  -> episode_created
+  -> failure_edge_complete
+  -> history_retrieved
+  -> proposal_generated
+  -> action_compiled
+  -> action_injected
+  -> action_applied
+  -> observable_changed
+  -> local_source_improved
+  -> skill_accepted
+~~~
+
+这些计数用于定位问题，不是新的 acceptance threshold。
+
+解释规则：
+
+- should_evolve -> episode_created 大量损失：结构化构建或归因 contract 有问题。
+- episode_created -> proposal_generated 大量损失：skill 提取能力不足。
+- proposal_generated -> action_compiled 大量损失：prompt/action envelope/schema 不一致。
+- action_compiled -> action_applied 大量损失：condition 或 provider 执行问题。
+- action_applied -> observable_changed 大量损失：动作字段与真实 owned output 不一致。
+- observable_changed -> local_source_improved 大量损失：下游 court 对该变化不敏感或方向错误。
+- 单纯 accepted rate 低不能直接证明 detector 底座不可用。
+
+本任务完成可以证明：
 
-## 4. 问题清单
+- 框架能从失败轨迹产生结构化、可追踪的 skill 生成依据；
+- 历史经验能逐案例进入后续生成；
+- skill 能进入真实执行和本地反馈链路。
 
-### P0-1：L2 声明的失败空间大于实际可执行动作空间
+本任务不能单独证明：
 
-这是当前最直接阻碍 L2 产出有效 skill 的问题。
+- 独立数据集整体检测准确率提高；
+- skill 具备普遍迁移效果；
+- detector 已达到最终科研性能。
 
-L2 声明拥有三个 artifact：
+---
 
-- `consensus_gate_policy`
-- `coverage_validity_policy`
-- `boundary_consumption_policy`
+## 16. 硬验收边界
 
-L2 prompt 从 `L2_ACTIONS` 暴露五种 action，见 `v6_contracts.py:208-223` 和 `policy_reflection.py:68-85`：
+以下全部满足才可宣称代码任务完成：
 
-- `downgrade_coverage`
-- `invalidate_coverage_claim`
-- `reclassify_candidate_state`
-- `require_route_replay`
-- `emit_telemetry_only`
+1. 所有当前测试通过。
+2. 所有新增单元和集成测试通过。
+3. runtime-valid 且触发进化的案例都产生合法 episode 或明确 unaddressable 原因。
+4. 所有 evidence ref 可解析，或 episode 明确标记 partial。
+5. prompt 中没有 gold、evaluator 和 case identity 泄漏。
+6. 外部模型和 replay 调用次数没有增加。
+7. skill 阈值和 acceptance gate 没有变化。
+8. 相同输入产生确定的 episode id、检索顺序和 prompt projection。
+9. checkpoint resume 不产生重复 episode、attempt 或统计。
+10. accepted skill 有 compiled、injected、applied 和 observable 证据。
+11. 同机制已确认 no-effect 的 proposal 不会被原样重复。
+12. 两案例顺序测试证明历史 outcome 进入后续 reflection。
+13. 完整状态可以通过 manifest 跨运行继承。
+14. 十个 gold 单案例并发实验保持隔离语义。
+15. 每次实验修复后重跑同批并通过。
+16. 每个完成阶段和每个完成批次都有独立 Git commit。
+17. Git diff 不包含无关用户文件、密钥、临时输出、备份或注释代码。
+18. 最终代码中没有长期双轨 projection、旧/new schema 分支散落或未使用 wrapper。
 
-但实际 evolution runner 在 replay 前拒绝全部 engine-level action：
+---
 
-```text
-reclassify_candidate_state
-require_route_replay
-```
+## 17. Review 清单
 
-对应代码为 `evolution_runner.py:2842-2849`。
+每次提交前执行模型必须检查：
 
-剩余 action 的实际能力如下：
+### 架构
 
-| Action | 能否改变 detector | 适用范围 |
-| --- | --- | --- |
-| `downgrade_coverage` | 能 | 空壳 coverage 或错误 complete 声明 |
-| `invalidate_coverage_claim` | 能 | 空壳 coverage 或错误 complete 声明 |
-| `emit_telemetry_only` | 不能 | replay 必然 no-effect |
+- 是否只有一个 failure episode builder？
+- attribution、ActionSpec、memory、reflection 的所有权是否清晰？
+- runner 是否只做编排？
+- 是否把新逻辑错误地放进 TypeExperienceMemory？
+- 是否存在同一事实的两份持久化来源？
 
-这意味着：
+### pristine
 
-- `coverage_validity_policy` 有真实可执行修复面。
-- `consensus_gate_policy` 通常没有能解除阻断或重建证据的 action。降低 coverage 往往只会保持 `unresolved`。
-- `boundary_consumption_policy` 没有“消费 boundary finding”或等价动作。降低 coverage 也不能把已存在的 `verified_clean` boundary 正确送入 terminal edge。
-- prompt 会诱导模型提出 runner 明确不支持的 action，浪费唯一一次 L2 reflection call。
+- 是否从根因修复，而不是增加 case-specific 分支？
+- 是否新增 feature flag、兼容开关或“暂时”路径？
+- 是否有注释解释代码“做什么”而不是“为什么”？
+- 是否有 TODO、dead code、备份文件或注释掉的实现？
+- 被新实现替代的旧逻辑是否已经删除？
 
-因此 L2 闭环在代码结构上存在，但还不是覆盖三个 artifact 的完整闭环。
+### 安全
 
-### P0-2：L2 学到的能力不能自然进入下一轮新案例或独立 detector
+- 是否读取但未打印环境密钥？
+- prompt 是否经过 evaluator/gold firewall？
+- artifact 是否包含不必要的原始轨迹？
+- manifest hash 是否在加载时验证？
 
-L1 和 L2 的继承边界不对称：
+### 实验
 
-- public evolution API 支持 `initial_genome`，见 `evolution/runner.py:131-132`、`235`。
-- public evolution API 没有 `initial_policy_genome`。
-- L2 policy 只能通过绑定原 `evolution_case_ids` 的 checkpoint resume 恢复，见 `evolution_runner.py:1881-1890`、`2262`。
-- standalone detector 的 `detect_record()` 只接受 L1 `genome`，不接受 policy genome，见 `paca_tcl/detector.py:148-169`。
-- CLI 也只有 `--genome`，没有 policy 输入，见 `paca_tcl/detector.py:224-250`。
+- 是否使用未出现过的数据？
+- 十个进程是否完全隔离？
+- 修复后是否重跑同一批？
+- 结论是否基于实际 artifact，而不是只看实验 summary？
 
-运行结束虽然写出 `policy_genome.json`，见 `evolution_runner.py:5574-5578`，但这个 artifact 没有对应的公共加载和执行路径。
+---
 
-结果是：L2 policy 可以在当前 `run_online_evolution()` 进程内影响后续案例，但不能像 L1 skill 一样作为下一轮全新数据的初始能力，也不能通过 standalone detector 部署验证。这会截断真正的跨轮自进化。
+## 18. 停止条件
 
-### P0-3：确定性 failure classifier 不是实际触发与路由的单一权威
+出现以下情况必须停止当前阶段并报告，不得用 workaround 继续：
 
-设计文档把 `failure_classifier.classify_failure()` 描述为失败层和 owner 的确定性权威，但实际流程仍由旧 `step_attributor.attribute_failure()` 先决定：
+- 需要调整阈值才能让测试通过；
+- 需要增加模型调用才能构建 episode；
+- 现有 detector result 没有必要 artifact，且无法在不改变判决语义的情况下补全；
+- 旧 checkpoint 无法无损迁移；
+- prompt firewall 无法证明；
+- Phase 0 基线本身不稳定；
+- 工作树存在与本任务重叠的用户修改；
+- API 连续失败且证据表明是外部服务问题；
+- 必须扩大到 detector/proof court 重写才能继续；
+- 一个阶段无法形成无临时双轨的完整提交。
 
-- 是否触发进化。
-- primary/secondary module。
-- error type。
-- type classifier 的主要输入。
+报告必须包含：
 
-只有 `signal.should_evolve=True` 后，runner 才调用 `_attribute_failure()` 和 `classify_failure()`，见 `evolution_runner.py:3774-3899`。
+- 阻塞文件和函数；
+- 最小复现；
+- 预期与实际；
+- 已排除的原因；
+- 继续所需的用户决策或新授权。
 
-而 `_attribute_failure()` 构造给 classifier 的 `provider_artifacts` 只覆盖：
+---
 
-- quarantine error/defense certificate。
-- gold FN + omission 时人工构造的 missing candidate。
+## 19. 下一对话启动指令
 
-对应代码为 `evolution_runner.py:705-743`。
+在新的对话中发送：
 
-这与 `failure_classifier.py:21-37` 声明的通用 provider artifact 输入契约并不等价。当前 detector result 并没有形成完整的 provider artifact integrity projection，classifier 无法直接看到所有 missing/malformed candidate、route record、certificate field。
+~~~text
+请执行自进化框架因果经验闭环的代码优化。
 
-后果如下：
+开始前必须完整读取：
+1. C:\Users\liuxinglin\Desktop\agent hallucination\.agents\skills\pristine\SKILL.md
+2. C:\Users\liuxinglin\Desktop\agent hallucination\docs\design\SELF_EVOLUTION_FRAMEWORK_REVIEW.md
 
-- 一部分真正的 L1 artifact failure 仍依赖旧启发式路由。
-- 一部分 L2 failure 只有在旧 trigger 先触发后才有机会进入 L2。
-- HTC-TES type 和旧 module map 仍在决定候选空间，确定性 classifier 只是后置补充。
-- 文档宣称的“artifact-first attribution”尚未真正落到主控制流。
+把第二份文档视为本任务唯一实施契约，不要重新发散设计，也不要使用历史实验日志覆盖其中的边界。
 
-这不是简单的文档偏差。错误 owner 会让反思生成一个 provider 无法执行的 edit，最终表现为 `no_edit` 或 `source_no_effect`，直接降低 skill 产出率。
+从 Phase 0 开始，先核验当前工作树、测试基线和代码真实状态，再逐阶段实施。每个阶段必须完成对应测试、review 和 Git commit 后才能进入下一阶段。不得调整 skill 准入阈值，不得增加迁移验证或模型调用，不得围绕十个单案例并发实验设计核心架构。任何修复必须遵守 pristine，从唯一规则所有者修复根因并删除被替代逻辑。
 
-### P1-1：L1 skill 的“规则已注入”与“规则实际被 provider 执行”不可区分
+持续执行到当前阶段的验收条件满足；发现超出实施契约的阻塞时，提供代码和运行证据后停止，不要自行扩大范围。
+~~~
 
-当前 source replay 能观察：
+---
 
-- state 变化。
-- trigger 变化。
-- coverage 变化。
-- candidate/certificate/quarantine 数量变化。
-- responsible step 和 localization 变化。
+## 20. 研究参考边界
 
-但 detector 没有输出 rule-level execution trace，例如：
+以下工作只用于理解历史经验、在线更新和可执行 skill 的已有思路，不是可直接复制的目标架构：
 
-- 哪条 evolved rule 被哪个 provider 收到。
-- rule condition 是否匹配。
-- provider 是否按 rule 改变了哪个输出字段。
-- rule 已执行但下游 court 抵消了效果，还是 provider 直接忽略了规则。
+- Reflexion: https://arxiv.org/abs/2303.11366
+- ExpeL: https://arxiv.org/abs/2308.10144
+- CLIN: https://arxiv.org/abs/2310.10134
+- Agent Workflow Memory: https://arxiv.org/abs/2409.07429
+- Voyager: https://arxiv.org/abs/2305.16291
+- AgentHallu: https://arxiv.org/abs/2601.06818
 
-当前只能通过 `bccse_injected_modules` 和最终 observable delta 间接推断。于是 `source_no_effect` 混合了至少四种原因：
-
-1. condition 在源案例上根本不成立。
-2. condition 成立，但 provider 忽略了自然语言规则。
-3. provider 改变了输出，但改变被 schema normalization/quarantine 消除。
-4. provider 输出已移动，但 downstream proof court 对终态不敏感。
-
-这四类失败需要完全不同的下一步 edit。当前 experience memory 只收到“没有 observable delta”，反思无法学习究竟该改 condition、action、module 还是 L2 policy。
-
-### P1-2：L1 action 仍是弱约束自然语言，artifact-to-behavior 耦合不足
-
-L1 已从整句自由文本改成 `condition/action/evidence_anchor` slots，这是正确方向。但 action 仍是自由英文，只通过关键词判断是否大致属于 module surface，见 `module_charter.py:295-370`。
-
-这可以阻止明显越权，却不能保证 provider 具体执行：
-
-- `require evidence`
-- `populate evidence field`
-- `keep coverage incomplete`
-- `emit certificate`
-
-这些动作在不同 provider schema 中对应不同字段和不同执行语义。当前 action 没有 opcode、目标字段、对象引用和 postcondition，模型生成的规则可能“语义合理但执行不明确”。历史交接材料也记录了 14 个提案中 8 个 no-effect/worse，见 `experiments/plans/HANDOFF_V6_ADJUDICATION_EVOLUTION.md:19-33`。
-
-### P1-3：critic 在结构校验前淘汰候选，未选候选永久丢失
-
-当前多候选流程为：
-
-```text
-生成 N 个候选
-  -> 基础 envelope 去重
-  -> LLM critic 选择 1 个
-  -> 只对该候选做完整解析、结构 gate 和 source replay
-```
-
-对应代码为 `evolution_runner.py:4127-4189`。
-
-问题在于 critic 看到的是尚未通过以下检查的候选：
-
-- RuleSpec contract。
-- target module action surface。
-- expected effect contract。
-- baseline immutability。
-- capacity、semantic overlap、rule index。
-
-如果 critic 选中的候选随后结构失败或 replay no-effect，其他候选不会进入同轮验证。一次候选扩展实际只增加了“让同一模型投票”的成本，没有充分扩大可执行搜索宽度。
-
-这直接违背 test-time scaling 的目标。更有效的方式应是先确定性预校验所有候选，再让 critic 排序合法候选，最后在既定 replay 预算内顺序尝试。
-
-### P1-4：反思输出协议对 `diagnosis` 的定义自相矛盾
-
-system prompt 要求 edit object 包含 `diagnosis`，见 `reflection_engine.py:572-577`。多候选示例给出的值是：
-
-```json
-"diagnosis": {}
-```
-
-见 `reflection_engine.py:746-752`。
-
-runner 的解析语义却是：
-
-- `diagnosis` 缺失：允许。
-- `diagnosis` 存在且为 `{}`：拒绝。
-- `diagnosis` 存在时必须有 `failed_output`、`owner_module`、`existing_rule_gap`。
-
-见 `evolution_runner.py:4385-4443`。
-
-prompt 没有完整定义这三个字段，但 parser 会据此拒绝。DeepSeek 在 strict JSON 输出中很容易照示例返回空对象，导致本来可执行的 rule 变成 `invalid_causal_diagnosis`。
-
-### P1-5：诊断和生成的二阶段结构只在 no-edit 后触发，且 binding 未完全执行
-
-当前流程先让 primary reflection 同时完成：
-
-- 诊断失败。
-- owner 判断。
-- 规则生成。
-- expected effect 预测。
-
-只有所有 primary candidate 都返回 no-edit，才启动 diagnosis-only call，见 `evolution_runner.py:4191-4285`。
-
-这会产生两个问题：
-
-1. 已生成但 owner 错误或 action 不可执行的候选不会得到 diagnosis stage 帮助。
-2. targeted prompt 虽声明必须保持 diagnosis owner，但 parser 只检查输出 module 是否在整个 allowed set 内，没有强制等于 diagnosis owner，见 `reflection_engine.py:646-653` 和 `evolution_runner.py:4289-4302`。
-
-二阶段结构已经出现，但还没有成为稳定的数据契约。
-
-### P1-6：L2 policy reflection 没有使用与其他 mutation call 一致的 DeepSeek thinking 配置
-
-`provider_thinking_control()` 对以下 purpose 默认关闭 DeepSeek V4 thinking：
-
-- `mutation`
-- `reflection_critic`
-- `reflection_diagnosis`
-
-见 `provider_routes.py:166-194`。
-
-L2 使用的 purpose 是 `policy_reflection`，见 `evolution_runner.py:2823-2829`，不在集合内。
-
-因此在未显式配置时：
-
-- L1 reflection 默认 non-thinking。
-- L2 reflection 默认可能启用 thinking。
-
-仓库已经记录过 DeepSeek V4 把 token 消耗在 `reasoning_content` 并返回空 `content` 的问题，见 `evolution/runner.py:34-44`。L2 prompt 的输出只是一个很小的闭词表 JSON，不需要长 reasoning；当前配置反而增加空响应和截断概率。
-
-### P1-7：反思 prompt 输入过载且包含不相关 charter
-
-每次 L1 reflection 都注入所有八个 module charter，见 `reflection_engine.py:557-560`，即使实际 allowed module 只有一到三个。
-
-同时输入还包括：
-
-- 最多 6000 字符原始 trajectory evidence。
-- candidates、prosecution、defense、adjudication、CRS 摘要。
-- structured runtime observation。
-- 当前 skill。
-- accepted/rejected history。
-- type guidance 和 experience summary。
-- 大段全局规则说明。
-
-DeepSeek-V4-Flash 在 non-thinking strict JSON 模式下适合完成边界清晰、schema 简洁的生成任务，不适合在一个超长 prompt 中重新判断全部架构职责。当前 prompt 同时要求“不要重新路由 owner”和“从所有 charter 中找 owner”，会增加 no_edit、错误 owner 和 schema 遗漏。
-
-### P2-1：HTC-TES 在控制流中的作用与设计描述不一致
-
-技术设计称：
-
-```text
-editable_modules = type_route(type) ∩ attribution_route(signal)
-```
-
-空集时应 `skip_route_conflict`，见 `docs/design/TECHNICAL_DESIGN.md:123-133`。
-
-实际代码在空交集时回退到 attribution route，见 `type_conditioned_evolution.py:264-305`。实际行为更有利于避免 type classifier 阻塞有效 edit，但意味着 type route 不是 hard safety constraint。
-
-同时 type classifier 本身使用多组固定权重和阈值，见 `type_classifier.py:251-257`，而其结果又大量来自 `target_module -> type` 映射，见 `type_classifier.py:463-475`。这使“type 决定 module”和“module 反推 type”存在循环。
-
-既然实际代码已把 type 降级为 advisory，推荐明确把 HTC-TES 定位为：
-
-- 经验组织标签。
-- 检索和多样性标签。
-- 实验遥测维度。
-
-不再让它参与关键 owner 决策。owner 应完全由 failure artifact 决定。
-
-### P2-2：经验记忆的索引不能精确区分可执行失败原因
-
-`TypeExperienceMemory` 主要按以下字段去重：
-
-- hallucination type。
-- evolution direction。
-- module。
-- feature description。
-- success boolean。
-
-见 `type_aware_fitness.py:117-139`。
-
-重复时只增加 `observation_count`，保留原 metadata。这样会把以下尝试折叠到同一条经验：
-
-- 相同 feature 但不同 operation。
-- 相同 feature 但不同 expected field。
-- provider 未执行与 downstream 无影响。
-- structural reject 与 source no-effect。
-
-另外 L2 rejected history 只保存 `decision + reason`，没有保存被拒 proposal 的 predicate/action/params 语义签名，见 `evolution_runner.py:2764-2771`。下一轮 policy reflection 可能重复提出同一无效策略。
-
-### P2-3：机械 condition 简化可能改变 skill 语义
-
-当 slot condition conjunction 过多时，runner 会截取部分 condition 后重新验证，见 `evolution_runner.py:4337-4365`。
-
-这种处理能提高结构通过率，但会扩大或改变规则触发范围。它可能让 source replay 产生 movement，却不再是模型原本提出的判别条件。对于最终要跨案例复用的 skill，机械改写语义比一次 schema reject 更危险。
-
-推荐只做无语义变化的 normalization。涉及删除条件的修改应回到生成阶段，由模型在明确保留核心 discriminant 的约束下重写。
-
-### P2-4：文档与真实执行边界存在漂移
-
-除 HTC-TES route 外，还有以下边界描述不一致：
-
-- `module_charter.py:265-284` 把 `abstention_rule` 描述为 final adjudication edge。
-- `reflection_engine.py:171-178` 又说明它只能塑造 boundary finding，不能直接改 proof court verdict。
-- `skill_integration.py:100-105` 显示它只注入 `boundary_route`，实际 final verdict 仍由确定性 court 决定。
-
-这种漂移会诱导反思模型提出实际不可执行的 final-edge rule，也会让后续开发者继续修 prompt 而不是修真实控制面。
-
-## 5. 反思引擎专项设计建议
-
-## 5.1 设计原则
-
-反思引擎不应再次判断整个 detector 是否正确。它只需要完成一个受限任务：根据已经确定的 failure artifact，提出一个能改变该 artifact 输出的可执行干预。
-
-建议把反思拆成三个明确对象：
-
-```text
-FailureObservation
-  -> InterventionCandidate[]
-  -> ReplayOutcome[]
-```
-
-正确性仍由 gold 或独立验证集评估；反思只负责提高可执行 skill 的产生率。
-
-## 5.2 建议输入：FailureObservation
-
-```json
-{
-  "layer": "l1_provider_rule | l2_adjudication_policy",
-  "artifact": "owner module or policy artifact",
-  "reason_code": "closed vocabulary reason",
-  "source_evidence_refs": ["addressable event/certificate ids"],
-  "observed_output": {
-    "field": "field name",
-    "value": "current value",
-    "problem": "missing | malformed | hollow | blocked | unconsumed"
-  },
-  "executable_surface": {
-    "route": "provider route or proof-court hook",
-    "owned_fields": ["closed field names"],
-    "legal_actions": ["closed action names"]
-  },
-  "current_artifact": {
-    "relevant_rules_or_policy_items": []
-  },
-  "execution_history": {
-    "similar_successes": [],
-    "similar_failures": []
-  }
-}
-```
-
-输入约束：
-
-- owner 由 deterministic planner 提供，不再让反思模型重新选择 layer。
-- 只注入 owner 对应 charter，不注入八个 charter。
-- 只注入与 failure field 有关的 trajectory/certificate evidence slice。
-- 原始轨迹仍标记为 untrusted evidence。
-- 不输入 gold、case identity 或最终答案解释。
-- 不重复输入同一事实的自由文本、CRS 和 structured observation 三种版本。
-
-## 5.3 建议输出：InterventionCandidate
-
-L1 建议从“自由 action 文本”升级为“自然语言 condition + 封闭 action opcode”：
-
-```json
-{
-  "operation": "add_rule | modify_rule | remove_rule",
-  "target_module": "evidence_obligation",
-  "rule_index": null,
-  "condition": "one trajectory-observable discriminator",
-  "action": {
-    "opcode": "require_evidence_field",
-    "object": "error_certificate",
-    "field": "impact_evidence_refs",
-    "on_missing": "keep_incomplete"
-  },
-  "evidence_anchor": "failure signature",
-  "expected_delta": {
-    "field": "causal_field_coverage",
-    "direction": "increase"
-  },
-  "rationale": "short causal explanation"
-}
-```
-
-L2 继续使用完全封闭结构，但只向模型暴露 runner 当前能够 replay 的 action：
-
-```json
-{
-  "operation": "add_item | modify_item | remove_item",
-  "item_index": null,
-  "precondition": "closed predicate",
-  "action": "closed executable action",
-  "params": {},
-  "expected_delta": {
-    "field": "terminal_state | effective_coverage | route_output",
-    "direction": "shift"
-  }
-}
-```
-
-`diagnosis` 不再作为可选且未定义的嵌套对象。诊断事实属于 `FailureObservation`，候选只表达干预。
-
-## 5.4 建议候选搜索流程
-
-```text
-1. Deterministic planner 固定 layer、artifact、owner、legal actions
-2. Flash 生成多个 intervention candidates
-3. 对全部候选做 deterministic schema/ownership/capacity/duplicate 预校验
-4. 丢弃非法候选，但保留每个 reject reason
-5. critic 只对合法候选排序，不做最终淘汰
-6. 按排序在既有 replay budget 内顺序尝试
-7. 第一个产生目标 observable movement 且无已知 regression 的候选进入工作 genome
-8. 所有候选和 replay outcome 写入 experience memory
-```
-
-这不是放宽门槛。它只是把 test-time scaling 的计算真正用于搜索可执行 skill，而不是在验证前让同一个模型丢掉候选。
-
-## 5.5 DeepSeek 模型适配
-
-### DeepSeek-V4-Flash
-
-适合：
-
-- 有明确 owner 和 legal action 的 JSON candidate generation。
-- 封闭词表 L2 candidate 排序。
-- 根据结构化 replay feedback 做一次定向重写。
-
-不适合：
-
-- 同时阅读八个 module charter 并重新推导架构 owner。
-- 在超长原始 trace 上完成诊断、路由、生成、critic 和 correctness 判断。
-- thinking mode 下输出很小的 strict JSON。
-
-建议：
-
-- mutation、diagnosis、critic、policy reflection 统一显式使用 non-thinking。
-- 每次只给一个 artifact 的 compact observation。
-- 一个 prompt 只定义一个 JSON schema，不保留 legacy schema 描述。
-- system/user 全部使用同一种主语言，规则 slot 继续使用英文。
-
-### DeepSeek-V4-Pro
-
-适合：
-
-- Flash 已经产生 `no_edit` 或连续产生可执行 no-effect 时，对因果 discriminant 做更深入诊断。
-- 对 source case、一个相似支持案例和一个反例进行对比，形成可泛化 condition。
-
-建议只在明确的失败类别触发 Pro，而不是让所有案例默认使用更昂贵模型。触发依据应是 categorical outcome，例如 `all_candidates_invalid`、`all_replays_no_effect`，而不是调一个连续分数阈值。
-
-## 6. 拟采用的目标架构
-
-### 6.1 统一 DetectorGenome
-
-把 L1 和 L2 作为一个可部署能力包：
-
-```json
-{
-  "schema_version": "sehd.detector_genome.v1",
-  "provider_rule_genome": {},
-  "adjudication_policy_genome": {},
-  "content_hash": "...",
-  "lineage": {}
-}
-```
-
-统一后：
-
-- evolution 输入使用 `initial_detector_genome`。
-- detector 输入使用 `detector_genome`。
-- source/canary/probe/standalone detector 都运行完全相同的两层能力。
-- 下一轮新案例可以继承 L1+L2，而不是只继承 L1。
-- artifact hash 能表示完整 detector behavior，不再需要分别追踪两个未绑定 identity。
-
-### 6.2 Artifact-first EvolutionPlanner
-
-把当前控制流调整为：
-
-```text
-authoritative detection result
-  -> build complete provider artifact integrity projection
-  -> deterministic classify_failure
-  -> if actionable: produce FailureObservation
-  -> if L1: reflect on one owner surface
-  -> if L2: enumerate/rank legal policy interventions
-  -> if no_actionable: telemetry only
-```
-
-旧 `step_attributor` 可以继续生成 trigger diagnostics 和 fitness telemetry，但不再拥有 layer/module routing authority。
-
-### 6.3 完成 L2 artifact-to-action 矩阵
-
-建议明确实现以下对应关系：
-
-| Failure artifact | 可执行 intervention |
-| --- | --- |
-| `coverage_validity_policy` | downgrade/invalidate hollow coverage claim |
-| `boundary_consumption_policy` | deterministic consume/reconcile boundary finding under closed preconditions |
-| `consensus_gate_policy` | execute route replay or deterministic reconsideration based on addressable initial/appeal evidence |
-
-其中 `require_route_replay` 已存在于 vocabulary，但 runner 明确拒绝。优先选择以下一种最终语义并完整实现，不保留“prompt 可见但 runtime 不可执行”的半状态：
-
-1. 真正实现 route replay，重新获得可验证证据。
-2. 从 vocabulary 和 prompt 删除该 action，直到 runtime 支持。
-
-对 closed-vocabulary L2，不建议让 LLM自由创造 predicate/action 组合。空间很小，可以由 deterministic planner 枚举所有与 artifact 匹配的 legal edits，LLM 只负责排序或返回 no-proposal。这样能从根本上消除无效 action 和漏字段。
-
-### 6.4 增加 rule execution trace
-
-每个 evolved L1 rule 应有稳定 `rule_id`。对应 provider 输出增加审计字段：
-
-```json
-{
-  "rule_applications": [
-    {
-      "rule_id": "...",
-      "condition_matched": true,
-      "action_applied": true,
-      "affected_fields": ["impact_evidence_refs"]
-    }
-  ]
-}
-```
-
-这个字段只用于 evolution telemetry，不参与 proof court verdict。
-
-有了该 trace，no-effect 可以确定性拆分为：
-
-- `condition_not_matched`
-- `provider_did_not_apply_action`
-- `output_changed_then_quarantined`
-- `provider_output_changed_but_court_invariant`
-- `expected_delta_observed`
-
-下一轮反思才能知道该改规则的哪一部分。
-
-### 6.5 重构经验记忆索引
-
-经验检索主键建议调整为：
-
-```text
-layer + artifact + reason_code + target_module + feature_signature
-```
-
-HTC-TES hallucination type 作为辅助标签保留，不再作为首要索引。
-
-每条经验保存：
-
-- 完整 intervention semantic signature。
-- operation/action opcode。
-- structural result。
-- rule application result。
-- observable deltas。
-- downstream court effect。
-- accepted/rejected/provisional 状态。
-- observation count。
-
-重复经验应合并计数，但必须更新 outcome 分布，不能只保留第一次 metadata。
-
-### 6.6 用对比案例生成可泛化 condition
-
-当前反思主要基于一个 source case。建议在已有检测结果中检索：
-
-- 一个相同 artifact/reason 的近邻案例。
-- 一个 owner 相同但不应触发该 action 的稳定反例。
-
-反思输入不需要完整复制两个轨迹，只提供对比 feature 和 addressable evidence slice。模型任务变成：找出 source/positive 共有、negative 不具备的 trajectory-observable discriminator。
-
-这比要求模型在 rationale 中声明“generalizable”更能产生真正可复用 skill。
-
-## 7. 实施优先级
-
-### 第一阶段：打通能力闭环
-
-1. 统一 L1/L2 persistence、load 和 detector execution boundary。
-2. 让 public evolution 可以从完整两层 genome 开始新一轮。
-3. 让 standalone detector 可以显式加载完整两层 genome。
-4. 对齐 policy prompt 与 runtime executable actions。
-5. 为 boundary consumption 和 consensus gate 提供真实可执行 intervention，或暂时从 actionable artifact 中移除不能修复的项。
-
-第一阶段完成后，L2 才是可以跨轮积累的真实 skill surface。
-
-### 第二阶段：提高 skill 产出率
-
-1. 建立完整 provider artifact integrity projection。
-2. 让 deterministic failure classifier 成为 layer/artifact/owner 的单一权威。
-3. L1 action 改为 semi-structured opcode。
-4. 候选先全部预校验，再 critic 排序，再按预算 replay。
-5. 统一 diagnosis/intervention schema，删除矛盾的可选字段。
-6. 增加 rule execution trace。
-
-### 第三阶段：提高 skill 泛化能力
-
-1. 经验记忆按 artifact/reason/intervention signature 检索。
-2. 引入支持案例与稳定反例的对比生成。
-3. 用 Pro 处理 Flash 的 categorical no-edit/no-effect failure，不默认扩大所有调用成本。
-4. HTC-TES 固定为经验标签和分析维度，不再进入 owner critical path。
-
-### 第四阶段：清理单一事实来源
-
-1. 统一 `abstention_rule` 的真实执行职责描述。
-2. 统一 type route 的 advisory 定位。
-3. 删除 prompt 可见但 runtime 不支持的 L2 action。
-4. 删除被新 `FailureObservation -> InterventionCandidate` 契约取代的旧诊断/owner 重复逻辑。
-
-## 8. 验证方案
-
-验证重点不是继续调整阈值，而是观察自进化漏斗中每一步是否真实产生能力。
-
-### 8.1 必须记录的产出指标
-
-| 指标 | 回答的问题 |
-| --- | --- |
-| actionable attribution count | 触发案例中有多少落到真实可编辑 artifact |
-| valid candidate count | 模型生成是否满足可执行 schema |
-| executable candidate count | 候选 action 是否被 runtime 支持 |
-| rule condition matched count | L1 rule 是否在 source/后续案例真实触发 |
-| provider action applied count | provider 是否执行了 evolved action |
-| observable movement count | edit 是否真实移动 owned output |
-| court movement count | output movement是否传到终态或有效 coverage |
-| inherited reuse count | 已接受 skill 是否在后续非 source 案例再次触发并产生预期效果 |
-| no-effect reason distribution | 产出失败发生在 condition、provider、schema 还是 court |
-| validation transition table | 独立验证集上 baseline -> evolved 的正确/错误迁移 |
-
-### 8.2 建议实验顺序
-
-1. Contract wiring：分别选择 L1 artifact、coverage validity、boundary consumption、consensus gate 形态，确认每类都有真实 executable candidate。
-2. Fresh small run：使用账本外全新案例，保存完整 `evolution_result.json`、完整 detector genome 和 replay artifacts。
-3. Cross-run inheritance：把第一轮完整两层 genome 加载到另一批全新案例，证明 L2 与 L1 都被继承。
-4. Reflection ablation：比较当前 critic-first 与“prevalidate-all + ranked replay”的候选有效率和 observable movement。
-5. Control-surface ablation：比较 free-text action 与 structured opcode 的 rule application 和 no-effect 分布。
-6. Independent validation：冻结完整两层 genome，在独立 validation set 上做 baseline/evolved paired evaluation。
-
-### 8.3 结果解释边界
-
-- source replay movement 证明 skill 可执行，不单独证明正确。
-- inherited reuse 证明 skill 不只记住 source case，不单独证明整体准确率提升。
-- stable canary 证明已知行为未明显退化，不单独证明新 verdict 正确。
-- 只有独立 validation 的 paired result 才能回答“幻觉检测效果是否提高”。
-
-## 9. 测试与证据边界
-
-本次执行：
-
-```text
-python -m pytest tests
-423 passed
-```
-
-测试覆盖了：
-
-- detector/evolution API contract。
-- label firewall 和 authority fail-closed。
-- L1 source replay、canary、checkpoint 和 resume。
-- L2 policy parse、genome、evaluator、proof-court hook 和 rollback。
-- reflection candidate、diagnosis fallback 和 mutation budget。
-
-但大量 evolution 测试使用 mock detector/provider，通过 `genome.generation` 或人工 policy payload 直接模拟状态变化。这能证明 orchestration 正确，不能证明真实 DeepSeek provider 会遵循 evolved rule。
-
-仓库当前没有保留可复核的 `experiments/**/evolution_result.json` 或 v6 champion run artifact。历史交接文档记录过两条能改变 source detection 的 L1 rule，但 artifact 已清理，且发生在 L2 完整闭环之前。因此当前最准确的证据结论是：
-
-```text
-框架 wiring 已通过单元测试；L1 曾有真实 source movement 记录；
-当前 v6 两层框架尚未通过可复核的跨轮、跨案例、独立验证实验。
-```
-
-## 10. 最终建议
-
-当前不应优先继续增加 gate、阈值或 prompt 特例。最优先的系统性工作是：
-
-1. 把 L1 和 L2 合成一个可继承、可部署的 detector genome。
-2. 让 failure artifact 与 executable intervention 一一对应，尤其补齐 boundary consumption 和 consensus gate。
-3. 让确定性 artifact classifier 真正成为反思前的控制权威。
-4. 把 L1 action 从弱自然语言升级为 provider-schema 对齐的半结构化动作。
-5. 增加 rule execution trace，结束对 `no_effect` 原因的猜测。
-6. 让多个候选先通过确定性预校验，再排序并利用 replay 预算搜索有效 skill。
-7. 用 artifact/replay outcome 组织经验，而不是主要依赖 type/module 循环映射。
-
-完成这些调整后，自进化流程才会从“可以运行并偶尔得到 movement”转变为“能够系统搜索、解释失败、跨轮继承并复用有效 skill”。
+实现优先级是先跑通本文档定义的 detector-specific 因果经验闭环。不得为了对齐论文术语增加抽象层，也不得在闭环完成前声称研究 novelty。
