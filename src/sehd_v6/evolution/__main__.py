@@ -38,6 +38,12 @@ def main() -> int:
         "--mutation-route", type=Path, default=None,
         help="optional mutation route JSON; defaults to SEHD_MUTATION_* env",
     )
+    parser.add_argument(
+        "--pro-mutation-route", type=Path, default=None,
+        help="optional deeper-diagnosis route JSON; enables one Pro attempt "
+        "when a source exhausts its bounded Flash attempts with a categorical "
+        "no-edit outcome (omitted by default: no escalation)",
+    )
     parser.add_argument("--initial-genome", type=Path, default=None)
     parser.add_argument(
         "--initial-policy-genome", type=Path, default=None,
@@ -81,6 +87,7 @@ def main() -> int:
         output_dir=args.output_dir,
         census_root=args.census_root,
         mutation_route=args.mutation_route,
+        pro_mutation_route=args.pro_mutation_route,
         initial_genome=args.initial_genome,
         initial_policy_genome=args.initial_policy_genome,
         experience_memory_path=args.experience_memory,

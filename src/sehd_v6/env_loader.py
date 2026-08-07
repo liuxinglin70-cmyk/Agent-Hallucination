@@ -36,6 +36,7 @@ def load_local_env(path: str | Path | None = None) -> Path | None:
     else:
         here = Path(__file__).resolve()
         candidates = tuple(parent / ".env" for parent in here.parents)
+    loaded: Path | None = None
     for candidate in candidates:
         if not candidate.is_file():
             continue
@@ -53,7 +54,19 @@ def load_local_env(path: str | Path | None = None) -> Path | None:
                 continue
             key, value = line.split("=", 1)
             key = key.strip()
+            value = value.strip()
+            # Strip trailing inline comments (``KEY=VALUE # comment``) only
+            # for unquoted values, so a quoted value keeps any literal '#'.
+            if not (
+                len(value) >= 2
+                and value[0] == value[-1]
+                and value[0] in {"'", '"'}
+            ):
+                value = value.split(" #", 1)[0].rstrip()
             if _KEY.fullmatch(key):
                 os.environ.setdefault(key, _unquote(value))
-        return candidate
-    return None
+        # A candidate that parsed no assignments (e.g. an empty .env in a
+        # nested directory) must not shadow a valid repository-root .env, so
+        # keep scanning upward instead of returning immediately.
+        loaded = candidate
+    return loaded
