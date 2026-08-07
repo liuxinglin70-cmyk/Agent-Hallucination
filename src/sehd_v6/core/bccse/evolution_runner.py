@@ -96,6 +96,7 @@ from .step_attributor import (
 )
 from .signal_adapter import (
     decision_authority_invalid,
+    missing_decision_authority,
     resolve_authoritative_state,
     resolve_evolution_state,
 )
@@ -1910,18 +1911,18 @@ def _run_detection_with_genome(
         result["rule_effects_trace"] = _collect_rule_effects_trace(result)
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
-    # but they cannot enter source fitness or champion promotion.
+    # but they cannot enter source fitness or champion promotion.  The
+    # non-authoritative classification is the single adapter authority; the
+    # runner only adds the missing-authority hard error on top of it.
     authority = str(result.get("decision_authority") or "").strip().lower()
-    if not authority:
+    if missing_decision_authority(result):
         raise RuntimeError("detector returned missing decision authority")
     proof = result.get("proof_adjudication")
     proof_authority = (
         str(proof.get("decision_authority") or "").strip().lower()
         if isinstance(proof, Mapping) else ""
     )
-    if authority != "authoritative" or (
-        proof_authority and proof_authority != "authoritative"
-    ) or decision_authority_invalid(result):
+    if decision_authority_invalid(result):
         # Fail closed with the full diagnostic on the exception: the
         # runtime-failure record persists it verbatim, so a fail-closed case
         # never needs an external replay to recover its root cause.

@@ -51,14 +51,34 @@ _LEGACY_INCIDENT_STATE_MAP = {
 
 
 def decision_authority_invalid(row: Mapping[str, Any]) -> bool:
-    """Whether a detector result is barred from authoritative decisions."""
+    """Whether a detector result is barred from authoritative decisions.
+
+    Single authority for the decision-authority check (the runner used to
+    keep a second, divergent implementation): a present authority that is
+    not ``authoritative`` is invalid (fail-closed).  An ABSENT authority is
+    not classified here — the runner treats a missing authority as a hard
+    error at its own boundary, and ``resolve_authoritative_state`` needs to
+    distinguish "no authority recorded" from "authority rejected".
+    """
     proof = row.get("proof_adjudication")
     proof = proof if isinstance(proof, Mapping) else {}
+    top = str(row.get("decision_authority") or "").strip().lower()
+    inner = str(proof.get("decision_authority") or "").strip().lower()
     return (
         row.get("runtime_valid") is False
-        or str(row.get("decision_authority") or "").strip().lower() == "invalid"
-        or str(proof.get("decision_authority") or "").strip().lower() == "invalid"
+        or (top and top != "authoritative")
+        or (inner and inner != "authoritative")
     )
+
+
+def missing_decision_authority(row: Mapping[str, Any]) -> bool:
+    """Whether the result carries no top-level decision authority at all.
+
+    A row without an explicit authority is not resumable evidence: callers
+    that require one fail closed instead of silently treating the absence
+    as authoritative.
+    """
+    return not str(row.get("decision_authority") or "").strip()
 
 
 def resolve_authoritative_state(row: Mapping[str, Any]) -> str:

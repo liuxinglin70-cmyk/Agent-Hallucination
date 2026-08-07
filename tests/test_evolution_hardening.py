@@ -771,6 +771,42 @@ def test_invalid_decision_authority_exposes_unresolved_without_rewriting_ledger(
     assert resolve_signal_state(runtime_invalid) == "unresolved"
 
 
+def test_non_authoritative_token_is_fail_closed_invalid() -> None:
+    """Any present authority token other than ``authoritative`` is invalid
+    (single-adapter semantics): an unknown token must expose unresolved, not
+    be silently accepted as authoritative."""
+    from src.sehd_v6.core.bccse.signal_adapter import (
+        decision_authority_invalid,
+        missing_decision_authority,
+    )
+
+    assert missing_decision_authority({"state": "verified_clean"}) is True
+    assert missing_decision_authority(
+        {"state": "verified_clean", "decision_authority": ""}
+    ) is True
+    assert missing_decision_authority(
+        {"state": "verified_clean", "decision_authority": "authoritative"}
+    ) is False
+
+    unknown = {
+        "state": "verified_clean",
+        "runtime_valid": True,
+        "decision_authority": "unknown_token",
+        "proof_adjudication": {},
+    }
+    assert decision_authority_invalid(unknown) is True
+    assert resolve_signal_state(unknown) == "unresolved"
+
+    authoritative = {
+        "state": "verified_clean",
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "proof_adjudication": {},
+    }
+    assert decision_authority_invalid(authoritative) is False
+    assert resolve_signal_state(authoritative) == "verified_clean"
+
+
 def test_detection_runner_rejects_invalid_decision_authority(
     tmp_path, monkeypatch,
 ) -> None:
