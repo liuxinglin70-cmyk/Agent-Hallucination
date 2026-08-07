@@ -250,19 +250,27 @@ _POSTCONDITION_CHECKS = frozenset({
     "field_nonempty",
     "coverage_not_complete",
     "object_quarantined",
+    "causal_status_present",
+    "origin_not_selected",
+    "responsible_origin_present",
+    "later_origin_not_selected",
 })
 
 # output_object -> result surface row access.  ``verification_certificate``
 # is the atomic-verifier's output; the certificates it verifies are the
 # prosecution certificate rows of the final result, and their quarantine
-# state is the proof court's ``quarantined_error_certificate_ids``.  The
-# ``causal_certificate_or_boundary`` surface is provider-internal and not
-# exposed by the final result; its obligations stay unverifiable.
+# state is the proof court's ``quarantined_error_certificate_ids``.
+# ``causal_certificate_or_boundary`` is the causal-link test's output: the
+# propagation findings (``propagations`` rows with a propagation_state) and
+# the pairwise counterfactual origin rankings (surfaced by the engine).
 _OBJECT_SURFACE_KEYS: Mapping[str, tuple[str, ...]] = {
     "candidate": ("paca_census", "construct_census", "census"),
     "error_certificate": ("combined_prosecution", "prosecution"),
     "verification_certificate": ("combined_prosecution", "prosecution"),
     "defense_certificate_or_boundary": ("combined_defense", "defense"),
+    "causal_certificate_or_boundary": (
+        "propagations", "counterfactual_rankings",
+    ),
 }
 
 
@@ -294,6 +302,11 @@ def _surface_rows(
             rows = [dict(row) for row in rows if isinstance(row, Mapping)]
             if rows:
                 return rows
+        # A mapping-of-rows surface (e.g. counterfactual_rankings keyed by
+        # origin) contributes its values as the rows.
+        rows = [dict(row) for row in payload.values() if isinstance(row, Mapping)]
+        if rows:
+            return rows
     return []
 
 
@@ -377,6 +390,42 @@ def evaluate_action_spec_postcondition(
         )
         return satisfied, (
             "object_quarantined" if satisfied else "object_not_quarantined"
+        )
+
+    if postcondition == "causal_status_present":
+        rows = _surface_rows(result, spec.output_object)
+        if rows is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        satisfied = bool(rows)
+        return satisfied, (
+            "causal_findings_present" if satisfied else "no_causal_findings"
+        )
+
+    if postcondition == "responsible_origin_present":
+        responsible = result.get("responsible_event_id")
+        satisfied = bool(responsible)
+        return satisfied, (
+            "responsible_origin_present"
+            if satisfied else "responsible_origin_absent"
+        )
+
+    if postcondition in ("origin_not_selected", "later_origin_not_selected"):
+        # The rejection/suppression outcome is observable as the origin
+        # selection decision itself: pairwise counterfactual rankings were
+        # produced and the court selected one responsible origin (the
+        # rejected or later one is by construction not the winner).  The
+        # spec cannot carry a concrete rejected id (its target is the
+        # responsible_event_id FIELD), so the strongest deterministic claim
+        # is the selection evidence.
+        rankings = result.get("counterfactual_rankings")
+        rankings_used = (
+            isinstance(rankings, Mapping) and len(rankings) > 0
+        )
+        responsible = bool(result.get("responsible_event_id"))
+        satisfied = rankings_used and responsible
+        return satisfied, (
+            "origin_selection_evidence_present"
+            if satisfied else "origin_selection_evidence_absent"
         )
 
     return False, f"unmapped_postcondition:{postcondition}"

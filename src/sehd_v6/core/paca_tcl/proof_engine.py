@@ -1827,6 +1827,12 @@ def adjudicate_case(
         "proof_adjudication": proof,
         "layered_v2_adjudication": base.get("adjudication"),
         "providers": providers,
+        # The pairwise origin rankings produced by the counterfactual
+        # localization stage.  Purely additive telemetry: the court already
+        # consumed them (``counterfactual_rankings_used``), and surfacing
+        # them here makes the causal-link-test execution surface
+        # deterministically verifiable for the D1 postcondition audit.
+        "counterfactual_rankings": counterfactual_rankings,
         "evidence_health": {
             "base_runtime_valid": base_runtime_valid,
             "construct_view_status": construct_audit.get("status"),

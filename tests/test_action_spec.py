@@ -427,7 +427,72 @@ def test_postcondition_quarantine_and_fail_closed_surfaces() -> None:
         unobservable_spec, {},
     )
     assert not satisfied
-    assert detail.startswith(("unmapped_postcondition", "unobservable_in_result"))
+    assert detail in ("no_causal_findings", "unmapped_postcondition")
+
+
+def test_postcondition_causal_surface_is_result_observable() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        evaluate_action_spec_postcondition,
+    )
+
+    test_spec = compile_action_spec(
+        "causal_link_test", "test_causal_link: is_root_cause",
+    )
+    assert test_spec.postcondition == "causal_status_present"
+    # Propagation findings satisfy the causal status obligation.
+    findings = {
+        "propagations": [
+            {
+                "candidate_id": "c1",
+                "propagation_state": "unrecovered_impact",
+                "impact_evidence_refs": ["ev_1"],
+            },
+        ],
+    }
+    satisfied, detail = evaluate_action_spec_postcondition(test_spec, findings)
+    assert satisfied and detail == "causal_findings_present"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        test_spec, {"propagations": []},
+    )
+    assert not satisfied and detail == "no_causal_findings"
+
+    # The impact-chain obligation verifies the causal rows' fields.
+    impact_spec = compile_action_spec(
+        "causal_link_test", "populate_impact_chain: impact_evidence_refs",
+    )
+    satisfied, detail = evaluate_action_spec_postcondition(
+        impact_spec, findings,
+    )
+    assert satisfied and detail == "field_obligation_satisfied"
+
+    # Origin selection obligations verify against the surfaced rankings.
+    reject_spec = compile_action_spec(
+        "causal_link_test", "reject_non_causal_origin: responsible_event_id",
+    )
+    assert reject_spec.postcondition == "origin_not_selected"
+    selection = {
+        "counterfactual_rankings": {"origin_1": {"rank": 1}},
+        "responsible_event_id": "origin_1",
+    }
+    satisfied, detail = evaluate_action_spec_postcondition(
+        reject_spec, selection,
+    )
+    assert satisfied and detail == "origin_selection_evidence_present"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        reject_spec, {"responsible_event_id": "origin_1"},
+    )
+    assert not satisfied and detail == "origin_selection_evidence_absent"
+
+    select_spec = compile_action_spec(
+        "earliest_origin_tiebreak", "select_earliest_origin: responsible_event_id",
+    )
+    assert select_spec.postcondition == "responsible_origin_present"
+    satisfied, detail = evaluate_action_spec_postcondition(
+        select_spec, {"responsible_event_id": "origin_1"},
+    )
+    assert satisfied and detail == "responsible_origin_present"
+    satisfied, detail = evaluate_action_spec_postcondition(select_spec, {})
+    assert not satisfied and detail == "responsible_origin_absent"
 
 
 def test_classify_execution_evidence_taxonomy() -> None:
