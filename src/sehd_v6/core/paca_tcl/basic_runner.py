@@ -21,6 +21,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from ...utils import ocse_packet as packet
+from ...utils.gold_label import coerce_gold_label
 from . import contract_v1 as contract
 from ...env_loader import load_local_env
 from ...provider_routes import (
@@ -236,17 +237,19 @@ def private_ref(case_id: str, prefix: str) -> str:
 
 
 def parse_gold_label(value: Any) -> bool:
-    """Parse an evaluator label; missing labels are not clean examples."""
+    """Parse an evaluator label; missing labels are not clean examples.
+
+    Delegates the token vocabulary to the single coercion authority
+    (``utils.gold_label.coerce_gold_label``) and keeps the legacy
+    fail-fast contract: an absent or unrecognizable label raises instead
+    of silently becoming a clean example.
+    """
     if value is None:
         raise ValueError("gold label is required for evaluation")
-    if isinstance(value, bool):
-        return value
-    normalized = str(value).strip().lower()
-    if normalized in {"true", "1", "yes"}:
-        return True
-    if normalized in {"false", "0", "no"}:
-        return False
-    raise ValueError("unrecognized gold label")
+    coerced = coerce_gold_label(value)
+    if coerced is None:
+        raise ValueError("unrecognized gold label")
+    return coerced
 
 
 def parse_gold_steps(value: Any) -> set[int]:
