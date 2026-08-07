@@ -68,6 +68,17 @@ def _normalize_signal(signal: Any) -> dict[str, Any]:
     return {}
 
 
+def _as_string_sequence(value: Any) -> tuple[str, ...]:
+    """Normalize a census ``axes``/list-like field to a string sequence.
+
+    ``str`` inputs are NOT iterated (a bare string would expand to its
+    characters); ``None`` and non-sequence values normalize to empty.
+    """
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return tuple(str(item) for item in value if item is not None)
+    return ()
+
+
 class HallucinationType(str, Enum):
     """Classification of agent hallucination types.
 
@@ -262,7 +273,11 @@ class HallucinationTypeClassifier:
         candidates = [row for row in (detection_result.get("census") or []) if isinstance(row, Mapping)]
         raw_kinds = [str(row.get("candidate_kind") or "").lower() for row in candidates]
         kinds = tuple(sorted(set(raw_kinds)))
-        axes = tuple(sorted({str(axis).lower() for row in candidates for axis in (row.get("axes") or [])}))
+        axes = tuple(sorted({
+            str(axis).lower()
+            for row in candidates
+            for axis in _as_string_sequence(row.get("axes"))
+        }))
         tags = tuple(sorted({str(row.get("module_tag") or "").lower() for row in candidates if row.get("module_tag")}))
         claims = [str(row.get("claim_or_commitment") or "").lower() for row in candidates]
         signal = _normalize_signal(attribution_signal)
@@ -344,13 +359,17 @@ class HallucinationTypeClassifier:
         # 1c. State × coverage structural signal
         state = resolve_evolution_state(detection_result)
         if state == "unresolved":
+            # The signal-side aggregate defaults to 0.0 when NO CRS signal
+            # exists, so a bare 0.0 must never be treated as a real low score
+            # (it would systematically label every CRS-less unresolved case
+            # as CONTEXTUAL). Only trust the signal-side aggregate when the
+            # per-dimension CRS scores are actually present; otherwise fall
+            # back to the parsed evidential scores, whose polarity is
+            # inverted (low average = anomalous).
+            crs_scores_present = bool(signal_dict.get("crs_scores"))
             raw_aggregate = signal_dict.get("crs_aggregate")
-            crs_agg = (
-                float(raw_aggregate)
-                if isinstance(raw_aggregate, (int, float))
-                else self._get_crs_aggregate(detection_result)
-            )
-            if crs_agg is not None:
+            if crs_scores_present and isinstance(raw_aggregate, (int, float)):
+                crs_agg: float | None = float(raw_aggregate)
                 if crs_agg > 0.4:
                     add_score(
                         HallucinationType.FACTUAL,
@@ -363,6 +382,23 @@ class HallucinationTypeClassifier:
                         self._layer1_state_weight,
                         "state_coverage",
                     )
+            else:
+                crs_agg = self._get_crs_aggregate(detection_result)
+                if crs_agg is not None:
+                    # evidential-scores source: a low aggregate is the anomaly
+                    # signal, so the polarity flips relative to the signal side.
+                    if crs_agg < 0.3:
+                        add_score(
+                            HallucinationType.FACTUAL,
+                            self._layer1_state_weight,
+                            "state_coverage",
+                        )
+                    elif crs_agg > 0.7:
+                        add_score(
+                            HallucinationType.CONTEXTUAL,
+                            self._layer1_state_weight,
+                            "state_coverage",
+                        )
 
         # ================================================================
         # Layer 2: Attribution enhancement (informative signals only)
@@ -485,7 +521,7 @@ class HallucinationTypeClassifier:
             claim = str(candidate.get("claim_or_commitment") or "").lower()
 
             # Candidate kind-based classification
-            axes = {str(value).lower() for value in candidate.get("axes") or []}
+            axes = {str(value).lower() for value in _as_string_sequence(candidate.get("axes"))}
             module_tag = str(candidate.get("module_tag") or "").lower()
             if "assertion" in kind or "claim" in kind or "factual" in kind or "f" in axes:
                 type_counts[HallucinationType.FACTUAL] += 1

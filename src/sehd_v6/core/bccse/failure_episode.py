@@ -365,6 +365,13 @@ def _sorted_dedup(values: Sequence[Any]) -> tuple[str, ...]:
     return tuple(sorted({str(value) for value in values if str(value)}))
 
 
+def _enum_value(value: Any) -> str:
+    """Resolve an enum member to its string value defensively."""
+    if value is None:
+        return ""
+    return getattr(value, "value", str(value))
+
+
 # ============================================================
 # Projections (single owner of artifact/court projections)
 # ============================================================
@@ -616,7 +623,7 @@ def build_runtime_observation(
         "prosecution_coverage": proof.get("prosecution_coverage"),
         "defense_coverage": proof.get("defense_coverage"),
         "state": detection_result.get("state"),
-        "trigger": signal.trigger_source.value,
+        "trigger": _enum_value(signal.trigger_source),
     }
     owner_fields = {
         module: list(MODULE_OBSERVABLE_FIELDS.get(module, ()))
@@ -635,8 +642,8 @@ def build_runtime_observation(
             "defense": bool(defense),
         },
         "diagnostic_gap": {
-            "trigger": signal.trigger_source.value,
-            "error_type": signal.error_type.value,
+            "trigger": _enum_value(signal.trigger_source),
+            "error_type": _enum_value(signal.error_type),
             "primary_module": signal.target_module,
             "secondary_module": signal.secondary_module,
             "confidence": signal.attribution_confidence,
@@ -692,11 +699,16 @@ def _candidate_rows(
     if kind == "candidate":
         rows = detection_result.get("census") or []
         return [row for row in rows if isinstance(row, Mapping)]
-    payload = (
-        detection_result.get("combined_prosecution")
-        if kind == "error_certificate"
-        else detection_result.get("combined_defense")
-    )
+    if kind == "error_certificate":
+        payload = (
+            detection_result.get("combined_prosecution")
+            or detection_result.get("prosecution")
+        )
+    else:
+        payload = (
+            detection_result.get("combined_defense")
+            or detection_result.get("defense")
+        )
     if not isinstance(payload, Mapping):
         return []
     rows = payload.get("candidates") or payload.get("certificates") or []
@@ -977,7 +989,12 @@ def build_failure_episode(
         attribution=attribution,
     )
 
-    missing_fields = _sorted_dedup(evidence.get("missing_fields") or ())
+    raw_missing = evidence.get("missing_fields")
+    if not isinstance(raw_missing, (list, tuple, set, frozenset)):
+        # A string value would be expanded into its characters by
+        # ``_sorted_dedup``; normalize non-sequence evidence defensively.
+        raw_missing = ()
+    missing_fields = _sorted_dedup(raw_missing)
     malformed_fields = missing_fields if attribution.reason_code == "provider_artifact_malformed" else ()
 
     downstream = _downstream_consumption(

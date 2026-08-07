@@ -118,6 +118,12 @@ def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
 
     legacy_state = str(row.get("state") or "")
     if legacy_state not in VALID_DETECTION_STATES:
+        # Legacy payloads may carry the pre-v3.5 top-level vocabulary
+        # (verified_hallucination etc.); normalize them through the same map
+        # as incident_state instead of crashing a resume/replay of old data.
+        normalized_legacy = _LEGACY_INCIDENT_STATE_MAP.get(legacy_state)
+        if normalized_legacy is not None:
+            return normalized_legacy
         raise ValueError(f"Invalid detector state: {legacy_state!r}")
     return legacy_state
 
