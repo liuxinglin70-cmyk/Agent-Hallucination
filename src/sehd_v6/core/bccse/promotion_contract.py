@@ -141,6 +141,7 @@ _PROVISIONAL_DECISIONS = frozenset({
     "provisional_no_gold_telemetry",
 })
 _REJECT_DECISIONS = frozenset({
+    "reject",
     "reject_apply",
     "reject_fitness",
     "reject_fitness_no_effect",
@@ -199,6 +200,7 @@ _HARD_REASON_PREFIXES: tuple[tuple[str, str], ...] = tuple(sorted(
         ("rule_spec", HARD_INVALID_SCHEMA),
         ("invalid_schema", HARD_INVALID_SCHEMA),
         ("immutable_baseline_item", HARD_PROTECTED_BASELINE_VIOLATION),
+        ("immutable_baseline_rule", HARD_PROTECTED_BASELINE_VIOLATION),
         ("protected_item", HARD_PROTECTED_BASELINE_VIOLATION),
         ("protected_baseline", HARD_PROTECTED_BASELINE_VIOLATION),
         ("ownership_mismatch", HARD_OWNERSHIP_MISMATCH),

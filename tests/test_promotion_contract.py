@@ -62,6 +62,7 @@ LEGACY_CATALOGUE = {
     "provisional_label_free": (GRADE_CONDITIONAL, ACTIVATION_PENDING),
     "provisional_no_gold_telemetry": (GRADE_CONDITIONAL, ACTIVATION_PENDING),
     # reject / rollback / retry
+    "reject": (GRADE_REJECT, ACTIVATION_NONE),
     "reject_apply": (GRADE_REJECT, ACTIVATION_NONE),
     "reject_fitness": (GRADE_REJECT, ACTIVATION_NONE),
     "reject_fitness_no_effect": (GRADE_REJECT, ACTIVATION_NONE),

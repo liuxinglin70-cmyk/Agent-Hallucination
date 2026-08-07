@@ -3552,10 +3552,32 @@ def run_online_evolution(
         artifact = str(proposal.get("target_module") or "")
         attribution = step.attribution if isinstance(step.attribution, Mapping) else {}
         layer = str(attribution.get("layer") or "")
-        reasons = [
-            str(value)
-            for value in ((step.fitness_check or {}).get("reject_reasons") or ())
-        ]
+        # The promotion contract needs the actual gate reasons to classify
+        # hard reject codes (P5/P7); every step records them under its own
+        # fitness_check keys, so they are aggregated here from the
+        # deterministic authority fields instead of one optional key that
+        # no construction site ever wrote.
+        fitness = step.fitness_check if isinstance(step.fitness_check, Mapping) else {}
+        reasons: list[str] = []
+        for key in ("reject_reasons", "retry_reason", "runtime_error",
+                    "mutation_error", "rollback_reason"):
+            value = fitness.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple)):
+                reasons.extend(str(item) for item in value)
+            elif str(value):
+                reasons.append(str(value))
+        assessment = fitness.get("assessment")
+        if isinstance(assessment, Mapping):
+            reasons.extend(
+                str(item)
+                for item in (assessment.get("reasons") or ())
+                if str(item)
+            )
+        l2 = fitness.get("l2_policy")
+        if isinstance(l2, Mapping) and str(l2.get("reason") or ""):
+            reasons.append(str(l2["reason"]))
         try:
             decision = promote(
                 layer=layer or "l1",
@@ -6419,6 +6441,7 @@ def run_online_evolution(
                         fitness_check={
                             "retry_scheduled": True,
                             "reflection": reflection_audit,
+                            "reject_reasons": list(reject_reasons),
                             "retry_reason": "semantic_overlap; "
                             + ", ".join(
                                 str(value).split(":", 1)[0]
@@ -6539,6 +6562,7 @@ def run_online_evolution(
                     fitness_check={
                         "retry_scheduled": retry_scheduled,
                         "reflection": reflection_audit,
+                        "reject_reasons": list(reject_reasons),
                         "retry_reason": rejected_entry.feedback_summary(),
                     },
                 ), next_case_index=(idx if retry_scheduled else idx + 1))

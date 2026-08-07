@@ -45,6 +45,42 @@ def make_event(**overrides) -> GateEvent:
     return GateEvent(**base)
 
 
+def _signal(state: str) -> object:
+    """A minimal AttributionSignal for runner-level gate tests."""
+    from src.sehd_v6.core.bccse.step_attributor import (
+        AttributionSignal,
+        ErrorType,
+        ReflectionType,
+        TriggerSource,
+    )
+
+    return AttributionSignal(
+        error_type=ErrorType.EVIDENCE_INCOMPLETE,
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+        attribution_confidence="medium",
+        reflection_type=ReflectionType.OPTIMIZATION,
+        trigger_source=TriggerSource.EVIDENCE_INCOMPLETE,
+        evidence_summary="mock",
+        prosecution_coverage=1.0,
+        defense_coverage=1.0,
+        prosecution_coverage_state="complete",
+        defense_coverage_state="complete",
+        coverage_quantitative=False,
+        crs_scores={},
+        crs_aggregate=0.0,
+        crs_source="mock",
+        crs_complete=True,
+        consensus_gate_applied=False,
+        candidate_count=1,
+        state=state,
+        gold_label=None,
+        has_gold=False,
+        gold_enhanced=False,
+        responsible_step_correct=False,
+    )
+
+
 # ============================================================
 # GateEvent schema / validation
 # ============================================================
@@ -227,39 +263,6 @@ def test_runner_records_gate_events_for_terminal_decisions(tmp_path, monkeypatch
     import json
 
     from src.sehd_v6.core.bccse import evolution_runner as runner
-    from src.sehd_v6.core.bccse.step_attributor import (
-        AttributionSignal,
-        ErrorType,
-        ReflectionType,
-        TriggerSource,
-    )
-
-    def _signal(state: str) -> AttributionSignal:
-        return AttributionSignal(
-            error_type=ErrorType.EVIDENCE_INCOMPLETE,
-            target_module="evidence_obligation",
-            secondary_module="atomic_verifier_instruction",
-            attribution_confidence="medium",
-            reflection_type=ReflectionType.OPTIMIZATION,
-            trigger_source=TriggerSource.EVIDENCE_INCOMPLETE,
-            evidence_summary="mock",
-            prosecution_coverage=1.0,
-            defense_coverage=1.0,
-            prosecution_coverage_state="complete",
-            defense_coverage_state="complete",
-            coverage_quantitative=False,
-            crs_scores={},
-            crs_aggregate=0.0,
-            crs_source="mock",
-            crs_complete=True,
-            consensus_gate_applied=False,
-            candidate_count=1,
-            state=state,
-            gold_label=None,
-            has_gold=False,
-            gold_enhanced=False,
-            responsible_step_correct=False,
-        )
 
     def detector(*, genome, case_id, **kwargs):
         return {
@@ -294,3 +297,80 @@ def test_runner_records_gate_events_for_terminal_decisions(tmp_path, monkeypatch
     assert events
     assert all(row.get("schema_version") == "sehd.gate_event.v1" for row in events)
     assert all(row.get("event_id") for row in events)
+
+
+def test_gate_event_carries_hard_reject_codes_from_structural_rejection(
+    tmp_path, monkeypatch, addressable_l1_failure,
+):
+    """A structural rejection must surface its real reject reasons on the
+    GateEvent (protected_baseline_violation -> hard code), so the meta
+    review loop can see WHY a gate rejected instead of an empty reason set
+    (previously every GateEvent carried empty hard/quality codes)."""
+    import json
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.genome import create_baseline_genome
+
+    def detector(*, genome, case_id, **kwargs):
+        return {
+            "state": "unresolved", "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        # Modify an immutable baseline rule of evidence_obligation (the
+        # addressable_l1_failure fixture routes the case there).
+        return {
+            "target_module": "evidence_obligation",
+            "operation": "modify_rule",
+            "rule_index": 0,
+            "condition": "cited evidence proves norm breach and agent control",
+            "action": "require_evidence_field: impact_evidence_refs",
+            "evidence_anchor": "rewritten baseline rule",
+            "rationale": "rewrite baseline",
+            "feature_description": "baseline rewrite attempt",
+            "expected_effect": "causal field coverage increases",
+            "expected_effect_contract": {
+                "observable_field": "causal_field_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "cited evidence is incomplete",
+            },
+        }, {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            "unresolved"
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        run_id="gate_events_hard",
+    )
+
+    assert result.steps[0].gate_decision == "reject"
+    events = result.steps[0].fitness_check.get("reject_reasons") or []
+    assert any("immutable_baseline_rule" in reason for reason in events)
+
+    checkpoint = json.loads(
+        (tmp_path / "evolution_checkpoint.json").read_text(encoding="utf-8")
+    )
+    gate_events = checkpoint.get("gate_events") or []
+    rejected = [
+        event for event in gate_events
+        if event.get("legacy_decision") == "reject"
+    ]
+    assert rejected, "the structural rejection must produce a GateEvent"
+    assert "protected_baseline_violation" in rejected[0]["hard_reject_codes"]
+    assert any(
+        "immutable_baseline_rule" in code
+        for code in rejected[0]["quality_reason_codes"]
+    )
