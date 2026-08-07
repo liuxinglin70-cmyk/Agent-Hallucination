@@ -130,6 +130,7 @@ from .promotion_contract import (
 from .meta_review import (
     aggregate_gate_experience,
     build_drift_snapshot,
+    commit_validated_meta_edits,
     generate_meta_edit_candidates,
     project_meta_review_for_prompt,
 )
@@ -7126,23 +7127,46 @@ def run_online_evolution(
         registry_size=len(policy_genome.registry.all_predicate_names())
         + len(policy_genome.registry.all_action_instance_names()),
     )
+    # P7.3: candidates clearing the pre-registered evidence gate are
+    # committed into the Meta state so the next run starts from the improved
+    # configuration; everything else stays a shadow recommendation.  Only
+    # advisory operations (guidance token / ranking preference) are
+    # auto-committable — a profile switch stays a manual lineage decision.
+    committed_meta_state, meta_commit_audit = commit_validated_meta_edits(
+        meta_skill_state,
+        meta_candidates,
+        aggregated_experiences,
+        [],  # OutcomeValidation rows are produced by development probes (P7.2)
+    )
+    meta_edits_committed = [
+        row for row in meta_commit_audit if row.get("committed")
+    ]
     causal_memory.meta_review["gate_experiences"] = gate_experiences
-    causal_memory.meta_review["meta_state"] = meta_skill_state.to_dict()
+    causal_memory.meta_review["meta_state"] = committed_meta_state.to_dict()
+    causal_memory.meta_review["meta_commit_audit"] = meta_commit_audit
     causal_memory.meta_review["drift_snapshots"] = [drift_snapshot.to_dict()]
     causal_memory.meta_review["pending_validation_queue"] = [
         entry.to_dict() for entry in policy_genome.pending_queue
     ]
-    # P7.3: shadow recommendation only — candidates are recorded for audit
-    # but NOT auto-committed here; a profile switch (P7.7) requires the
-    # pre-registered evidence gate below.
     meta_review_summary = {
         "gate_experience_count": len(gate_experiences),
         "shadow_candidate_count": len(meta_candidates),
         "shadow_candidates": [edit.to_dict() for edit in meta_candidates],
-        "gate_profile": meta_skill_state.gate_profile,
-        "meta_state_hash": meta_skill_state.content_hash,
+        "committed_edit_count": len(meta_edits_committed),
+        "commit_audit": meta_commit_audit,
+        "gate_profile": committed_meta_state.gate_profile,
+        "meta_state_hash": committed_meta_state.content_hash,
+        "meta_state_hash_before": meta_skill_state.content_hash,
+        "meta_generation": committed_meta_state.generation,
         "drift": drift_snapshot.to_dict(),
     }
+    if meta_edits_committed:
+        print(
+            f"  [META] committed {len(meta_edits_committed)} meta edit(s); "
+            f"generation {meta_skill_state.generation} -> "
+            f"{committed_meta_state.generation}"
+        )
+    meta_skill_state = committed_meta_state
 
     result = OnlineEvolutionResult(
         run_id=run_id,

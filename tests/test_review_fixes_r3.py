@@ -1,4 +1,4 @@
-"""Regression tests for the third-round deep review fixes (R30-R34).
+"""Regression tests for the third-round deep review fixes (R30-R36).
 
 Each test pins one concrete defect fixed in the review round:
 
@@ -12,7 +12,12 @@ Each test pins one concrete defect fixed in the review round:
 - R33: ``build_causal_reflection_prompt`` accepts optional ``meta_guidance``
   and injects it as bounded XML without gold/case identity;
 - R34: the L1 reflection call site injects the same Meta projection as the
-  L2 policy selection site (G2 gate-feedback loop closure).
+  L2 policy selection site (G2 gate-feedback loop closure);
+- R35: ``commit_validated_meta_edits`` applies candidates that clear the
+  evidence gate, so the Meta loop stops re-deriving and discarding the same
+  recommendation every run (G1 closure);
+- R36: the evidence gate is fail-closed — thin evidence, unregistered
+  targets and non-advisory operations all stay in shadow.
 """
 
 from __future__ import annotations
@@ -217,3 +222,147 @@ def test_r34_l1_injection_is_gated_on_non_empty_guidance() -> None:
     assert source.count(
         "if (meta_skill_state.guidance_tokens"
     ) == 2, "both call sites must skip injection on a clean baseline"
+
+
+# ============================================================
+# R35/R36: the meta review loop commits (G1)
+# ============================================================
+
+def _experience(code: str, sequence: int):
+    from src.sehd_v6.core.bccse.meta_review import GateExperience
+
+    return GateExperience(
+        gate_event_id=f"ev{sequence}",
+        mechanism_signature="sig",
+        layer="l2",
+        artifact="policy",
+        stage="gate",
+        evidence_grade="reject",
+        activation_state="none",
+        feedback_codes=(code,),
+        execution_trace_class="none",
+        follow_up_status="pending",
+        validation_source="",
+        sequence=sequence,
+    )
+
+
+def test_r35_sufficient_evidence_commits_into_meta_state() -> None:
+    from src.sehd_v6.core.bccse.meta_review import (
+        MIN_COMMIT_EVIDENCE,
+        commit_validated_meta_edits,
+        generate_meta_edit_candidates,
+    )
+    from src.sehd_v6.core.bccse.meta_skill import create_baseline_meta_skill
+
+    state = create_baseline_meta_skill()
+    rows = [
+        _experience("policy_route_unavailable", i)
+        for i in range(MIN_COMMIT_EVIDENCE)
+    ]
+    candidates = generate_meta_edit_candidates(rows, [], state)
+    assert candidates, "the fixture must produce a candidate to commit"
+
+    committed, audit = commit_validated_meta_edits(state, candidates, rows, [])
+    assert committed.generation == state.generation + 1
+    assert "prefer_registered_runtime_route" in committed.guidance_tokens
+    assert [row["committed"] for row in audit] == [True]
+    # The state is immutable: the caller's copy is untouched.
+    assert state.guidance_tokens == ()
+
+
+def test_r35_committed_state_stops_reproposing_the_same_edit() -> None:
+    """Idempotence is what actually closes the loop.
+
+    Without the commit the same candidate was re-derived and re-discarded on
+    every run; after it, the improved state must suppress the proposal.
+    """
+    from src.sehd_v6.core.bccse.meta_review import (
+        MIN_COMMIT_EVIDENCE,
+        commit_validated_meta_edits,
+        generate_meta_edit_candidates,
+    )
+    from src.sehd_v6.core.bccse.meta_skill import create_baseline_meta_skill
+
+    state = create_baseline_meta_skill()
+    rows = [
+        _experience("policy_route_unavailable", i)
+        for i in range(MIN_COMMIT_EVIDENCE)
+    ]
+    committed, _ = commit_validated_meta_edits(
+        state, generate_meta_edit_candidates(rows, [], state), rows, [],
+    )
+    assert generate_meta_edit_candidates(rows, [], committed) == []
+
+
+def test_r36_thin_evidence_stays_in_shadow() -> None:
+    from src.sehd_v6.core.bccse.meta_review import (
+        commit_validated_meta_edits,
+        generate_meta_edit_candidates,
+    )
+    from src.sehd_v6.core.bccse.meta_skill import create_baseline_meta_skill
+
+    state = create_baseline_meta_skill()
+    rows = [_experience("policy_route_unavailable", 0)]
+    candidates = generate_meta_edit_candidates(rows, [], state)
+    # One occurrence is enough to propose but never enough to commit.
+    assert candidates
+    committed, audit = commit_validated_meta_edits(state, candidates, rows, [])
+    assert committed.content_hash == state.content_hash
+    assert [row["blocked_reason"] for row in audit] == ["insufficient_evidence"]
+
+
+def test_r36_profile_switch_is_never_auto_committed() -> None:
+    """A gate-profile switch is a lineage decision, not an inference."""
+    from src.sehd_v6.core.bccse.meta_review import commit_validated_meta_edits
+    from src.sehd_v6.core.bccse.meta_skill import (
+        OP_SWITCH_PROFILE,
+        PROFILE_STEADY,
+        MetaEdit,
+        create_baseline_meta_skill,
+    )
+
+    state = create_baseline_meta_skill()
+    rows = [_experience("policy_route_unavailable", i) for i in range(50)]
+    edit = MetaEdit(
+        edit_id="switch",
+        operation=OP_SWITCH_PROFILE,
+        target=PROFILE_STEADY,
+        rationale="overwhelming evidence",
+    )
+    committed, audit = commit_validated_meta_edits(state, [edit], rows, [])
+    assert committed.gate_profile == state.gate_profile
+    assert audit[0]["blocked_reason"] == "operation_requires_manual_review"
+
+
+def test_r36_unregistered_target_has_no_evidence_source() -> None:
+    """Fail-closed: an evidence source must be registered to count."""
+    from src.sehd_v6.core.bccse.meta_review import evaluate_commit_evidence
+    from src.sehd_v6.core.bccse.meta_skill import OP_ADD_GUIDANCE, MetaEdit
+
+    rows = [_experience("policy_route_unavailable", i) for i in range(10)]
+    row = evaluate_commit_evidence(
+        MetaEdit(
+            edit_id="x",
+            operation=OP_ADD_GUIDANCE,
+            target="require_independent_anchor",
+            rationale="unrelated",
+        ),
+        rows,
+        [],
+    )
+    assert row["committed"] is False
+    assert row["blocked_reason"] == "target_has_no_registered_evidence_source"
+    # Unrelated feedback never counts toward an unregistered target.
+    assert row["evidence_observed"] == 0
+
+
+def test_r36_runner_persists_the_committed_state() -> None:
+    """The runner must write back the committed state, not its input."""
+    source = inspect.getsource(evolution_runner.run_online_evolution)
+    assert "commit_validated_meta_edits(" in source
+    assert (
+        'causal_memory.meta_review["meta_state"] = committed_meta_state.to_dict()'
+        in source
+    ), "the meta_review authority must receive the post-commit state"
+    assert 'causal_memory.meta_review["meta_commit_audit"]' in source

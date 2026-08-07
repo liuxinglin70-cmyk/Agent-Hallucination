@@ -358,6 +358,122 @@ def generate_meta_edit_candidates(
 # Prompt projection (§13.12) — the single authority
 # ============================================================
 
+# ============================================================
+# Commit evidence gate (§13.9) — the single auto-commit authority
+# ============================================================
+
+# A candidate must be backed by at least this many independent audited
+# feedback occurrences before it may leave shadow mode.  One occurrence is
+# enough to *propose* (see generate_meta_edit_candidates) but never enough
+# to commit: a single fuzzy gate event must not reshape later reflections.
+MIN_COMMIT_EVIDENCE = 3
+
+# Operations that may be auto-committed once the evidence threshold is met.
+# Deliberately narrow: these two only ever add an advisory prompt token or
+# re-rank an existing candidate set, so their worst case is a slightly worse
+# reflection hint.  Profile switches and any removal/disable stay manual —
+# they are lineage-visible policy decisions, not evidence-driven inferences.
+AUTO_COMMITTABLE_OPERATIONS = frozenset({OP_ADD_GUIDANCE, OP_ENABLE_RANKING})
+
+# Which audited signal backs which candidate target.  Registered up front so
+# the gate can never be satisfied by an unrelated code (fail-closed: a target
+# absent from this table is not committable at all).
+COMMIT_EVIDENCE_SOURCES: Mapping[str, tuple[str, ...]] = {
+    "prefer_registered_runtime_route": ("policy_route_unavailable",),
+    "avoid_pending_registry_dependency": ("registry_entry_pending",),
+    "action_shape_previously_effective": (OUTCOME_EXACT_FALSE_REJECT,),
+}
+
+
+def evaluate_commit_evidence(
+    edit: MetaEdit,
+    experiences: Sequence[GateExperience],
+    validations: Sequence[OutcomeValidation],
+    *,
+    min_evidence: int = MIN_COMMIT_EVIDENCE,
+) -> dict[str, Any]:
+    """Decide whether one shadow candidate has earned a commit.  Fail-closed.
+
+    Returns an audit row rather than a bare bool so the decision — and the
+    exact evidence count behind it — is always persisted, whether the
+    candidate commits or stays in shadow.
+    """
+    sources = COMMIT_EVIDENCE_SOURCES.get(edit.target, ())
+    observed = 0
+    for code in sources:
+        observed += sum(
+            1
+            for experience in experiences
+            for seen in experience.feedback_codes
+            if seen == code
+        )
+        observed += sum(
+            1 for validation in validations if validation.outcome == code
+        )
+
+    threshold = max(1, int(min_evidence))
+    if edit.operation not in AUTO_COMMITTABLE_OPERATIONS:
+        blocked = "operation_requires_manual_review"
+    elif not sources:
+        blocked = "target_has_no_registered_evidence_source"
+    elif observed < threshold:
+        blocked = "insufficient_evidence"
+    else:
+        blocked = ""
+
+    return {
+        "edit_id": edit.edit_id,
+        "operation": edit.operation,
+        "target": edit.target,
+        "evidence_codes": list(sources),
+        "evidence_observed": observed,
+        "evidence_required": threshold,
+        "committed": not blocked,
+        "blocked_reason": blocked,
+    }
+
+
+def commit_validated_meta_edits(
+    state: MetaSkillState,
+    candidates: Sequence[MetaEdit],
+    experiences: Sequence[GateExperience],
+    validations: Sequence[OutcomeValidation],
+    *,
+    min_evidence: int = MIN_COMMIT_EVIDENCE,
+) -> tuple[MetaSkillState, list[dict[str, Any]]]:
+    """Apply every candidate that clears the evidence gate, in order.
+
+    This is the step that closes the Meta loop: without it the review
+    re-derives and re-discards the same candidates every run.  Returns the
+    new state (unchanged if nothing qualified) plus one audit row per
+    candidate, so a shadow rejection is as traceable as a commit.
+
+    An edit that fails ``validate_meta_edit`` never propagates: it is
+    recorded as blocked and the state is left untouched.
+    """
+    from .meta_skill import apply_meta_edit, validate_meta_edit
+
+    current = state
+    audit: list[dict[str, Any]] = []
+    for edit in candidates:
+        row = evaluate_commit_evidence(
+            edit, experiences, validations, min_evidence=min_evidence,
+        )
+        if row["committed"]:
+            # Re-validate against the *evolving* state: an earlier commit in
+            # this same loop may have already satisfied this candidate.
+            valid, reason = validate_meta_edit(edit, current)
+            if valid:
+                current = apply_meta_edit(current, edit)
+                row["after_hash"] = current.content_hash
+                row["generation"] = current.generation
+            else:
+                row["committed"] = False
+                row["blocked_reason"] = f"invalid_against_current_state:{reason}"
+        audit.append(row)
+    return current, audit
+
+
 def project_meta_review_for_prompt(
     state: MetaSkillState,
     *,
