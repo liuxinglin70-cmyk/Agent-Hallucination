@@ -1,10 +1,10 @@
-"""SEHD v6 — versioned baseline registry for the L2 adjudication vocabulary.
+﻿"""SEHD v6 鈥?versioned baseline registry for the L2 adjudication vocabulary.
 
 Single source of truth for the L2 precondition predicates, court-local
 action operators/instances, action parameter tables, and the reserved
-engine-level actions. Every consumer — the deterministic evaluator, the
+engine-level actions. Every consumer 鈥?the deterministic evaluator, the
 reflection planner/prompt, the policy-genome validator, and the failure
-classifier — reads the vocabulary from this module's ``L2_REGISTRY`` so the
+classifier 鈥?reads the vocabulary from this module's ``L2_REGISTRY`` so the
 prompt vocabulary and the runtime semantics can never drift apart.
 
 P3A migrated the frozen constant set into this versioned registry without
@@ -39,12 +39,14 @@ from typing import Any, Callable, Mapping
 # this module (the vocabulary's single authority) so the registry and the
 # shared contracts import it from one root without a circular dependency.
 
-# Policy execution stages. The current runtime only implements the
-# post-ledger surface (policies act after the occurrence ledger is fixed,
-# on coverage and the terminal edge only); the constant makes the stage
-# explicit on every fact snapshot so a future pre-ledger surface cannot
-# silently share the same execution path.
+# Policy execution stages. ``post_ledger`` policies act after the occurrence
+# ledger is fixed, on coverage and the terminal edge only. ``pre_ledger``
+# policies act between the consensus gate and the occurrence snapshot, so a
+# restore flows into the ledger instead of repairing it afterwards. The stage
+# is explicit on every fact snapshot and every operator so the two surfaces
+# can never share an execution path.
 POLICY_STAGE_POST_LEDGER = "post_ledger"
+POLICY_STAGE_PRE_LEDGER = "pre_ledger"
 
 
 @dataclass(frozen=True)
@@ -81,7 +83,7 @@ class AdjudicationFacts:
 # ``facts_schema_version`` identifies the AdjudicationFacts snapshot the
 # predicates read; ``compiler_version`` identifies the deterministic
 # predicate/action semantics. Bumping any of them is a deliberate,
-# audited change — never an implicit side effect of editing an entry.
+# audited change 鈥?never an implicit side effect of editing an entry.
 
 REGISTRY_SCHEMA_VERSION = "sehd.l2_vocabulary_registry.v1"
 FACTS_SCHEMA_VERSION = "sehd.adjudication_facts.v1"
@@ -336,6 +338,25 @@ class VocabularyRegistry:
         entry = self._predicates.get(name) or self._action_instances.get(name)
         return entry.status if entry is not None else ""
 
+    def policy_stage_of(self, action: str) -> str:
+        """Resolve the execution stage of an action from the registry.
+
+        The registry is the single authority for stage routing (P3A): a caller
+        splitting a genome across the pre-/post-ledger surfaces asks here
+        instead of re-deriving stage from an action-name list of its own.  An
+        unregistered action resolves to the post-ledger surface, where the
+        DSL whitelist rejects it fail-closed; it is never silently granted the
+        pre-ledger surface, which runs before the occurrence snapshot.
+        """
+        operator = self._action_operators.get(action)
+        if operator is None:
+            instance = self._action_instances.get(action)
+            if instance is not None:
+                operator = self._action_operators.get(instance.operator)
+        if operator is None:
+            return POLICY_STAGE_POST_LEDGER
+        return operator.policy_stage or POLICY_STAGE_POST_LEDGER
+
     # --- canonical serialization / hash ---
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -462,13 +483,13 @@ def _build_baseline_registry() -> VocabularyRegistry:
         ActionOperator(
             operator="reclassify_candidate_state",
             params_schema=(),
-            policy_stage="pre_ledger",
+            policy_stage=POLICY_STAGE_PRE_LEDGER,
             runtime_owner="engine",
         ),
         ActionOperator(
             operator="require_route_replay",
             params_schema=(),
-            policy_stage="pre_ledger",
+            policy_stage=POLICY_STAGE_PRE_LEDGER,
             runtime_owner="engine",
         ),
         # P9: the audited pre-ledger consensus-restore operator.  It is a
@@ -477,7 +498,7 @@ def _build_baseline_registry() -> VocabularyRegistry:
         ActionOperator(
             operator="restore_audited_consensus",
             params_schema=("certificate_id",),
-            policy_stage="pre_ledger",
+            policy_stage=POLICY_STAGE_PRE_LEDGER,
             runtime_owner="court",
         ),
     ]

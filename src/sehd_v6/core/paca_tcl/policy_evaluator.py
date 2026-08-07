@@ -25,10 +25,9 @@ from ..bccse.v6_contracts import (
 from ..bccse.vocabulary_registry import (
     L2_REGISTRY,
     POLICY_STAGE_POST_LEDGER,
+    POLICY_STAGE_PRE_LEDGER,
 )
 
-# P9 pre-ledger stage constant (mirrors the registry's policy_stage anchor).
-POLICY_STAGE_PRE_LEDGER = "pre_ledger"
 ACTION_RESTORE_AUDITED_CONSENSUS = "restore_audited_consensus"
 
 _COVERAGE_RANK = {"unresolved": 0, "incomplete": 1, "complete": 2}

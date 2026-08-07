@@ -1680,17 +1680,39 @@ def adjudicate_case(
         # default path untouched.
         if policy_items:
             from ..bccse.v6_contracts import PolicyItem as _PolicyItem
+            from ..bccse.vocabulary_registry import (
+                L2_REGISTRY,
+                POLICY_STAGE_PRE_LEDGER,
+            )
 
             normalized_policy_items = [
                 item if isinstance(item, _PolicyItem)
                 else _PolicyItem.from_dict(dict(item))
                 for item in policy_items
             ]
+            # P9 stage routing: the registry is the single authority on which
+            # surface an action executes on. Pre-ledger items act before the
+            # occurrence snapshot; post-ledger items act on the terminal edge
+            # only. An action the registry does not know resolves to
+            # post-ledger, where the DSL whitelist rejects it fail-closed, so
+            # an unknown action can never reach the pre-ledger surface.
+            _stage_registry = policy_registry or L2_REGISTRY
+            pre_ledger_items = [
+                item for item in normalized_policy_items
+                if _stage_registry.policy_stage_of(item.action)
+                == POLICY_STAGE_PRE_LEDGER
+            ]
+            post_ledger_items = [
+                item for item in normalized_policy_items
+                if _stage_registry.policy_stage_of(item.action)
+                != POLICY_STAGE_PRE_LEDGER
+            ]
             boundary_path = base.get("boundary_path") or {}
             boundary_validation = boundary_path.get("contract_validation") or {}
             proof = contract.adjudicate_proof_court(
                 **final_court_kwargs,
-                policy_items=normalized_policy_items,
+                policy_items=post_ledger_items,
+                pre_ledger_policy_items=pre_ledger_items or None,
                 policy_registry=policy_registry,
                 boundary_path_state=str(boundary_path.get("state") or ""),
                 # Authority is valid only when the deterministic boundary

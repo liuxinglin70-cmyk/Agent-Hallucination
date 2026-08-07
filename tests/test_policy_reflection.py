@@ -531,12 +531,12 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert len(policy_calls) == 1
     hook_kwargs = policy_calls[0]
     # The policy re-adjudication replays the exact evidence bundle of the
-    # court call that produced the current proof, plus the four hook inputs.
+    # court call that produced the current proof, plus the five hook inputs.
     prior_bundle = {
         key: value for key, value in hook_kwargs.items()
         if key not in (
             "policy_items", "boundary_path_state", "boundary_authority_valid",
-            "policy_registry",
+            "policy_registry", "pre_ledger_policy_items",
         )
     }
     default_calls = [kwargs for kwargs in calls if "policy_items" not in kwargs]
@@ -545,6 +545,9 @@ def test_adjudicate_case_forwards_policy_items_to_proof_court(
     assert len(items) == 1
     assert isinstance(items[0], PolicyItem)
     assert items[0].item_id == "policy_hook_probe"
+    # A post-ledger action routes to the post-ledger surface only; the
+    # pre-ledger surface stays inert (P9 stage routing).
+    assert hook_kwargs["pre_ledger_policy_items"] is None
     assert hook_kwargs["boundary_path_state"] == "verified_clean"
     # No policy genome was supplied to the detection entry point, so the
     # vocabulary registry defaults to the baseline (None -> evaluator default).
@@ -604,3 +607,84 @@ def test_adjudicate_case_fails_closed_on_quarantined_boundary(
         kwargs for kwargs in calls if "policy_items" in kwargs
     ][0]
     assert hook_kwargs["boundary_authority_valid"] is False
+
+
+def test_adjudicate_case_routes_pre_ledger_items_to_pre_ledger_surface(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """G4: a pre-ledger action reaches the court's pre-ledger surface.
+
+    Before the stage split the engine forwarded every item to
+    ``policy_items`` only, leaving the pre-ledger consensus-recovery path
+    unreachable outside its own unit test.
+    """
+    from src.sehd_v6.core.paca_tcl import proof_engine
+
+    calls = _install_engine_stubs(monkeypatch, tmp_path)
+    policy_dict = {
+        "item_id": "policy_pre_ledger_probe",
+        "precondition": "consensus_gate_blocked_nonempty",
+        "action": "restore_audited_consensus",
+        "params": {},
+        "rationale": "probe",
+        "source_case_id": "case_policy",
+        "is_baseline": False,
+    }
+    proof_engine.adjudicate_case(
+        case_id="case_pre_ledger",
+        record=_minimal_record(),
+        config=_minimal_config(),
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        policy_items=[policy_dict],
+    )
+
+    hook_kwargs = [kwargs for kwargs in calls if "policy_items" in kwargs][0]
+    pre_items = hook_kwargs["pre_ledger_policy_items"]
+    assert pre_items is not None, "pre-ledger surface never received the item"
+    assert [item.item_id for item in pre_items] == ["policy_pre_ledger_probe"]
+    assert all(isinstance(item, PolicyItem) for item in pre_items)
+    # Stage routing is exclusive: a pre-ledger action must not also appear on
+    # the post-ledger surface, which would double-apply one authority.
+    assert hook_kwargs["policy_items"] == []
+
+
+def test_adjudicate_case_splits_mixed_stage_policy_items(
+    monkeypatch, tmp_path: Path,
+) -> None:
+    """A mixed batch is partitioned by the registry's declared stage."""
+    from src.sehd_v6.core.paca_tcl import proof_engine
+
+    calls = _install_engine_stubs(monkeypatch, tmp_path)
+    pre_item = {
+        "item_id": "policy_pre",
+        "precondition": "consensus_gate_blocked_nonempty",
+        "action": "restore_audited_consensus",
+        "params": {},
+        "rationale": "probe",
+        "source_case_id": "case_policy",
+        "is_baseline": False,
+    }
+    post_item = {
+        "item_id": "policy_post",
+        "precondition": "consensus_gate_blocked_nonempty",
+        "action": "emit_telemetry_only",
+        "params": {},
+        "rationale": "probe",
+        "source_case_id": "case_policy",
+        "is_baseline": False,
+    }
+    proof_engine.adjudicate_case(
+        case_id="case_mixed_stage",
+        record=_minimal_record(),
+        config=_minimal_config(),
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        policy_items=[pre_item, post_item],
+    )
+
+    hook_kwargs = [kwargs for kwargs in calls if "policy_items" in kwargs][0]
+    assert [i.item_id for i in hook_kwargs["pre_ledger_policy_items"]] == [
+        "policy_pre",
+    ]
+    assert [i.item_id for i in hook_kwargs["policy_items"]] == ["policy_post"]
