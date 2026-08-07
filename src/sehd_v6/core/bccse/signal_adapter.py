@@ -66,8 +66,8 @@ def decision_authority_invalid(row: Mapping[str, Any]) -> bool:
     inner = str(proof.get("decision_authority") or "").strip().lower()
     return (
         row.get("runtime_valid") is False
-        or (top and top != "authoritative")
-        or (inner and inner != "authoritative")
+        or bool(top and top != "authoritative")
+        or bool(inner and inner != "authoritative")
     )
 
 
