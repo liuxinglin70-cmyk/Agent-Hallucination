@@ -40,7 +40,11 @@ FORBIDDEN_OUTPUT_FIELDS = FORBIDDEN_INPUT_FIELDS
 
 
 def _forbidden_field_hits(value: Any) -> set[str]:
-    """Find evaluator-only keys at any detector boundary depth."""
+    """Find evaluator-only keys at any detector boundary depth.
+
+    Used on the OUTPUT side: the framework-produced result must never carry
+    evaluation fields at any depth, so the check is recursive there.
+    """
     if isinstance(value, Mapping):
         hits = {
             str(key) for key in value
@@ -57,11 +61,46 @@ def _forbidden_field_hits(value: Any) -> set[str]:
     return set()
 
 
+def _forbidden_input_hits(record: Mapping[str, Any]) -> set[str]:
+    """Find evaluator-only keys on the raw-trajectory input's control layers.
+
+    Mirrors the OCSE packet firewall: opaque tool payload content (the
+    arguments of a tool call) is task evidence, not dataset identity, so it
+    is never audited.  Only the schema layers this adapter owns are checked:
+    the record top level, the history rows, and the tool-call rows.
+    """
+    hits: set[str] = {
+        str(key) for key in record
+        if str(key) in FORBIDDEN_INPUT_FIELDS
+    }
+    for row in record.get("history") or ():
+        if not isinstance(row, Mapping):
+            continue
+        hits.update(
+            str(key) for key in row
+            if str(key) in FORBIDDEN_INPUT_FIELDS
+        )
+        for call in row.get("tool_calls") or ():
+            if not isinstance(call, Mapping):
+                continue
+            hits.update(
+                str(key) for key in call
+                if str(key) in FORBIDDEN_INPUT_FIELDS
+            )
+            function = call.get("function")
+            if isinstance(function, Mapping):
+                hits.update(
+                    str(key) for key in function
+                    if str(key) in FORBIDDEN_INPUT_FIELDS
+                )
+    return hits
+
+
 def validate_record(record: dict[str, Any]) -> None:
     """Validate one label-free raw trajectory before any provider call."""
     if not isinstance(record, dict):
         raise TypeError("record must be an object")
-    leaked = sorted(_forbidden_field_hits(record))
+    leaked = sorted(_forbidden_input_hits(record))
     if leaked:
         raise ValueError("detector input must be label-free: " + ", ".join(leaked))
     ocse_packet.build_packet(record)

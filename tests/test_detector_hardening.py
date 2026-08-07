@@ -803,9 +803,17 @@ def test_standalone_rejects_nested_evaluator_fields(tmp_path: Path) -> None:
             "history": [{
                 "role": "assistant",
                 "content": "answer",
-                "tool_calls": [{"function": {
-                    "name": "tool", "arguments": {"gold_label": True},
-                }}],
+                "gold_label": True,
+            }],
+        },
+        {
+            "history": [{
+                "role": "assistant",
+                "content": "answer",
+                "tool_calls": [{
+                    "gold_label": True,
+                    "function": {"name": "tool", "arguments": {}},
+                }],
             }],
         },
     ):
@@ -815,6 +823,34 @@ def test_standalone_rejects_nested_evaluator_fields(tmp_path: Path) -> None:
             assert "label-free" in str(exc)
         else:
             raise AssertionError("nested evaluator metadata entered detector")
+
+
+def test_standalone_allows_evaluator_like_key_inside_tool_arguments(
+    tmp_path: Path,
+) -> None:
+    """Opaque tool payload content is task evidence, not dataset identity:
+    a tool argument legitimately named ``gold_label`` must not trip the
+    input firewall (aligned with the OCSE packet firewall semantics)."""
+    try:
+        detect_record(
+            record={"history": [{
+                "role": "assistant",
+                "content": "answer",
+                "tool_calls": [{"function": {
+                    "name": "tool", "arguments": {"gold_label": True},
+                }}],
+            }]},
+            config={}, output_dir=tmp_path,
+            adjudicator=lambda **_kwargs: {
+                "runtime_valid": True,
+                "decision_authority": "authoritative",
+                "state": "verified_clean",
+            },
+        )
+    except ValueError as exc:
+        raise AssertionError(
+            "tool-argument key must not trip the input firewall"
+        ) from exc
 
 
 def test_standalone_rejects_nested_evaluator_output(tmp_path: Path) -> None:
