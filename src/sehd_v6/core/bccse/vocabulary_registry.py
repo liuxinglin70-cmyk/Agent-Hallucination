@@ -1,10 +1,10 @@
-"""SEHD v6 鈥?versioned baseline registry for the L2 adjudication vocabulary.
+"""SEHD v6 —versioned baseline registry for the L2 adjudication vocabulary.
 
 Single source of truth for the L2 precondition predicates, court-local
 action operators/instances, action parameter tables, and the reserved
-engine-level actions. Every consumer 鈥?the deterministic evaluator, the
+engine-level actions. Every consumer —the deterministic evaluator, the
 reflection planner/prompt, the policy-genome validator, and the failure
-classifier 鈥?reads the vocabulary from this module's ``L2_REGISTRY`` so the
+classifier —reads the vocabulary from this module's ``L2_REGISTRY`` so the
 prompt vocabulary and the runtime semantics can never drift apart.
 
 P3A migrated the frozen constant set into this versioned registry without
@@ -83,7 +83,7 @@ class AdjudicationFacts:
 # ``facts_schema_version`` identifies the AdjudicationFacts snapshot the
 # predicates read; ``compiler_version`` identifies the deterministic
 # predicate/action semantics. Bumping any of them is a deliberate,
-# audited change 鈥?never an implicit side effect of editing an entry.
+# audited change —never an implicit side effect of editing an entry.
 
 REGISTRY_SCHEMA_VERSION = "sehd.l2_vocabulary_registry.v1"
 FACTS_SCHEMA_VERSION = "sehd.adjudication_facts.v1"
