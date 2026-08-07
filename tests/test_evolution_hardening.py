@@ -909,6 +909,33 @@ def test_feature_description_firewall_covers_write_and_reload() -> None:
     assert memory.to_dict()["types"]["factual"][0]["feature_description"] == ""
 
 
+def test_type_experience_memory_from_dict_tolerates_corrupt_numeric_fields() -> None:
+    """A corrupted persisted artifact (explicit None / junk numerics) must
+    fail closed to defaults instead of crashing a resume/inherit."""
+    memory = TypeExperienceMemory()
+    memory.from_dict({
+        "max_per_type": None,
+        "types": {
+            "factual": [{
+                "evolution_direction": "unresolved_to_decisive",
+                "module_targeted": "evidence_obligation",
+                "strategy_used": "test",
+                "detection_improved": False,
+                "source_case_id": "source",
+                "timestamp": None,
+                "type_confidence": None,
+            }]
+        },
+    })
+    assert memory.to_dict()["max_per_type"] == 50
+    restored = memory.get_type_experiences(HallucinationType.FACTUAL)[0]
+    assert restored.timestamp == 0.0
+    assert restored.type_confidence == 0.0
+
+    memory.from_dict({"max_per_type": "junk", "types": {}})
+    assert memory.to_dict()["max_per_type"] == 50
+
+
 def test_protected_evolved_rule_cannot_be_removed() -> None:
     child = apply_edit(create_baseline_genome(), _typed_edit())
     module = child.modules["evidence_obligation"]

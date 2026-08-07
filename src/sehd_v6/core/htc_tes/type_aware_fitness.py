@@ -455,7 +455,13 @@ class TypeExperienceMemory:
             data: A dict previously produced by ``to_dict()``.
         """
         self.clear()
-        self._max_per_type = int(data.get("max_per_type", 50))
+        raw_max = data.get("max_per_type", 50)
+        try:
+            self._max_per_type = int(raw_max) if raw_max is not None else 50
+        except (TypeError, ValueError):
+            # A corrupted artifact must fail closed to the default instead of
+            # crashing a checkpoint resume/inherit.
+            self._max_per_type = 50
         types = data.get("types") or {}
         for type_name, entry_list in types.items():
             try:
@@ -465,6 +471,11 @@ class TypeExperienceMemory:
             for entry_data in entry_list:
                 if not isinstance(entry_data, Mapping):
                     continue
+                raw_timestamp = entry_data.get("timestamp", 0.0)
+                try:
+                    timestamp = float(raw_timestamp) if raw_timestamp is not None else 0.0
+                except (TypeError, ValueError):
+                    timestamp = 0.0
                 experience = TypeConditionedExperience(
                     hallucination_type=htype,
                     evolution_direction=str(entry_data.get("evolution_direction") or ""),
@@ -475,7 +486,7 @@ class TypeExperienceMemory:
                         in ("true", "1")
                     ),
                     source_case_id=str(entry_data.get("source_case_id") or ""),
-                    timestamp=float(entry_data.get("timestamp", 0.0)),
+                    timestamp=timestamp,
                     metadata=dict(entry_data.get("metadata") or {}),
                     feature_description=sanitize_feature_description(
                         str(entry_data.get("feature_description") or "")
