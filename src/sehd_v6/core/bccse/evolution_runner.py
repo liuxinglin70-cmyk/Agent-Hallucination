@@ -5392,6 +5392,20 @@ def run_online_evolution(
             # Build accepted edits summary (diversity guidance)
             accepted_summary = build_accepted_edits_summary(accepted_edits_history)
 
+            # P7.4: bounded cross-case Meta guidance informs both L1 and L2
+            # without enlarging the candidate set or touching the gate.  The
+            # same projection (closed vocabulary, identity-free, gold-free)
+            # serves the causal reflection prompt (L1) and the policy
+            # selection prompt (L2).  Only inject when the Meta state
+            # actually carries guidance, so an empty baseline leaves the
+            # prompt (and its provider cache key) unchanged.
+            meta_guidance = (
+                project_meta_review_for_prompt(meta_skill_state)
+                if (meta_skill_state.guidance_tokens
+                    or meta_skill_state.ranking_preferences)
+                else None
+            )
+
             # Build the primary causal reflection prompt. The episode
             # projection carries the current failure edge, the
             # obligation-vs-observed diff, the legal action envelope and at
@@ -5431,6 +5445,7 @@ def run_online_evolution(
                 # makes the cache key and reasoning sample independent rather
                 # than asking one response to expand itself into variants.
                 candidate_count=1,
+                meta_guidance=meta_guidance,
             )
 
             # HTC-TES v3: Append type-conditioned guidance to reflection prompt

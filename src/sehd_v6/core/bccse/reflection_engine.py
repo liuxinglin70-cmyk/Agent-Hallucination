@@ -259,6 +259,7 @@ def build_causal_reflection_prompt(
     episode_projection: Mapping[str, Any] | None = None,
     candidate_count: int = 1,
     targeted_diagnosis: Mapping[str, Any] | None = None,
+    meta_guidance: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -277,6 +278,11 @@ def build_causal_reflection_prompt(
             (current failure edge, obligation-vs-observed diff, legal action
             envelope and at most two historical references).  This is the
             only structured observation the model receives.
+        meta_guidance: Optional bounded cross-case Meta guidance (closed
+            vocabulary, identity-free).  Injected into the user prompt only
+            when the Meta state carries guidance tokens or ranking
+            preferences, so an empty baseline leaves the prompt and its
+            provider cache key unchanged.
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -617,6 +623,30 @@ listed for the target module in runtime_output_contracts.
     # episode's historical references are the only prior-case generation
     # context; the contrast registry is replay-side bookkeeping only.
 
+    # P7.5 gate-feedback into L1: bounded, closed-vocabulary guidance tokens
+    # and ranking preferences from the Meta state.  Never enlarges the
+    # candidate set, never changes owner routing, never relaxes the gate.
+    # Omitted when the Meta state is a clean baseline, so the provider cache
+    # key is unchanged.
+    meta_section = ""
+    if meta_guidance:
+        meta_section = (
+            "\n<meta_guidance authority=\"evolution_guidance_only\">\n"
+            + json.dumps(
+                {
+                    "guidance_tokens": list(
+                        meta_guidance.get("guidance_tokens") or ()
+                    ),
+                    "ranking_preferences": list(
+                        meta_guidance.get("ranking_preferences") or ()
+                    ),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            + "\n</meta_guidance>\n"
+        )
+
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
         f"trigger={signal.trigger_source.value}\n"
@@ -631,6 +661,7 @@ listed for the target module in runtime_output_contracts.
         f"attribution_evidence={html.escape(signal.evidence_summary[:1200], quote=True)}\n"
         f"{crs_section}\n"
         "</diagnostic_signal>\n\n"
+        f"{meta_section}"
         f"{observation_section}"
         f"{diagnosis_section}"
         f"{gold_section}"
