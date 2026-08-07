@@ -20,7 +20,7 @@ tokens, so the attribution vocabulary cannot drift between modules.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
 
 from .genome import MODULE_IDS, MODULE_STAGE
 
@@ -41,10 +41,13 @@ FAILURE_LAYERS = frozenset({LAYER_L1, LAYER_L2, LAYER_DETECTOR, LAYER_NONE})
 L2_ARTIFACT_CONSENSUS_GATE = "consensus_gate_policy"
 L2_ARTIFACT_COVERAGE_VALIDITY = "coverage_validity_policy"
 L2_ARTIFACT_BOUNDARY_CONSUMPTION = "boundary_consumption_policy"
+# v6.1 扩展：上诉机制策略
+L2_ARTIFACT_APPEAL_MECHANISM = "appeal_mechanism_policy"
 L2_ARTIFACTS = frozenset({
     L2_ARTIFACT_CONSENSUS_GATE,
     L2_ARTIFACT_COVERAGE_VALIDITY,
     L2_ARTIFACT_BOUNDARY_CONSUMPTION,
+    L2_ARTIFACT_APPEAL_MECHANISM,
 })
 
 # L1 artifacts are exactly the eight registered provider-rule modules.
@@ -90,6 +93,48 @@ def build_adjudication_facts(
     quarantined_errors = court_result.get("quarantined_error_certificate_ids") or []
     quarantined_defenses = court_result.get("quarantined_defense_certificate_ids") or []
     required_count = nonnegative_int(court_result.get("required_candidate_count"))
+    # v6.1 扩展：从审计记录中推导隔离原因分布
+    quarantine_schema_mismatch = 0
+    quarantine_evidence_missing = 0
+    quarantine_causal_broken = 0
+    quarantine_other = 0
+    
+    for audit in court_result.get("error_audits") or []:
+        if not isinstance(audit, Mapping):
+            continue
+        if str(audit.get("decision") or "") == "pass":
+            continue
+        failed = audit.get("failed_checks") or []
+        if not isinstance(failed, (list, tuple)):
+            continue
+        failed_set = {str(f) for f in failed}
+        if "schema_validation" in failed_set or "required_fields" in failed_set:
+            quarantine_schema_mismatch += 1
+        elif "evidence_refs" in failed_set or "evidence_quality" in failed_set:
+            quarantine_evidence_missing += 1
+        elif "causal_chain" in failed_set or "propagation" in failed_set:
+            quarantine_causal_broken += 1
+        else:
+            quarantine_other += 1
+    
+    for audit in court_result.get("defense_audits") or []:
+        if not isinstance(audit, Mapping):
+            continue
+        if str(audit.get("decision") or "") == "pass":
+            continue
+        failed = audit.get("failed_checks") or []
+        if not isinstance(failed, (list, tuple)):
+            continue
+        failed_set = {str(f) for f in failed}
+        if "schema_validation" in failed_set or "required_fields" in failed_set:
+            quarantine_schema_mismatch += 1
+        elif "evidence_refs" in failed_set or "evidence_quality" in failed_set:
+            quarantine_evidence_missing += 1
+        elif "causal_chain" in failed_set or "propagation" in failed_set:
+            quarantine_causal_broken += 1
+        else:
+            quarantine_other += 1
+
     return AdjudicationFacts(
         prosecution_coverage=str(court_result.get("prosecution_coverage") or ""),
         defense_coverage=str(court_result.get("defense_coverage") or ""),
@@ -117,6 +162,18 @@ def build_adjudication_facts(
         boundary_path_state=str(boundary_path_state or ""),
         boundary_authority_valid=bool(boundary_authority_valid),
         terminal_state=str(court_result.get("state") or ""),
+        # v6.1 扩展：上诉与定位状态
+        appeal_status=str(court_result.get("appeal_status") or ""),
+        appeal_triggered=bool(court_result.get("appeal_triggered", False)),
+        localization_status=str(court_result.get("localization_status") or ""),
+        responsible_step_available=bool(
+            court_result.get("responsible_step") is not None
+        ),
+        # v6.1 扩展：隔离原因分布（从审计记录推导）
+        quarantine_reason_schema_mismatch=quarantine_schema_mismatch,
+        quarantine_reason_evidence_missing=quarantine_evidence_missing,
+        quarantine_reason_causal_broken=quarantine_causal_broken,
+        quarantine_reason_other=quarantine_other,
     )
 
 
@@ -160,6 +217,10 @@ ACTION_RECLASSIFY_CANDIDATE_STATE = "reclassify_candidate_state"
 ACTION_REQUIRE_ROUTE_REPLAY = "require_route_replay"
 ACTION_EMIT_TELEMETRY_ONLY = "emit_telemetry_only"
 ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY = "consume_verified_clean_boundary"
+# v6.1 扩展：新动作常量
+ACTION_REQUIRE_ADDITIONAL_VERIFICATION = "require_additional_verification"
+ACTION_ESCALATE_TO_APPEAL = "escalate_to_appeal"
+ACTION_MARK_CANDIDATE_AMBIGUOUS = "mark_candidate_ambiguous"
 
 COURT_LOCAL_ACTIONS = L2_REGISTRY.action_names()
 # Reserved for a future engine that can re-execute providers; not part of
@@ -194,6 +255,15 @@ def validate_policy_params(
     to_state = params.get("to_state")
     if action == ACTION_DOWNGRADE_COVERAGE and to_state not in COVERAGE_DOWNGRADE_STATES:
         return False, f"invalid_downgrade_state:{to_state}"
+    # v6.1 扩展：新动作参数验证
+    if action == ACTION_REQUIRE_ADDITIONAL_VERIFICATION:
+        scope = params.get("verification_scope")
+        if scope not in ("candidate", "certificate", "evidence_chain"):
+            return False, f"invalid_verification_scope:{scope}"
+    if action == ACTION_MARK_CANDIDATE_AMBIGUOUS:
+        reason = params.get("ambiguity_reason")
+        if reason not in ("conflicting_evidence", "boundary_unclear", "multiple_interpretations"):
+            return False, f"invalid_ambiguity_reason:{reason}"
     return True, ""
 
 

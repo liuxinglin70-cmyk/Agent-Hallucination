@@ -38,6 +38,15 @@ from .step_attributor import (
     TriggerSource,
 )
 from .signal_adapter import resolve_evolution_state
+# v6.1 扩展：结构化经验检索与负反馈分析
+from .experience_retriever import (
+    retrieve_structured_experience,
+    format_experience_for_prompt,
+)
+from .negative_feedback_analyzer import (
+    analyze_negative_feedback,
+    format_negative_feedback_for_prompt,
+)
 
 # Evaluator-only keys that must never enter a reflection prompt (不变式 #3).
 # preferred_keys 路径直接序列化整个子树，若 events/messages 等键的值内部
@@ -260,6 +269,9 @@ def build_causal_reflection_prompt(
     candidate_count: int = 1,
     targeted_diagnosis: Mapping[str, Any] | None = None,
     meta_guidance: Mapping[str, Any] | None = None,
+    # v6.1 扩展：结构化经验检索与负反馈分析
+    experience_memory: Any = None,
+    negative_feedback_analysis: Any = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -283,6 +295,11 @@ def build_causal_reflection_prompt(
             when the Meta state carries guidance tokens or ranking
             preferences, so an empty baseline leaves the prompt and its
             provider cache key unchanged.
+        experience_memory: Optional EvolutionExperienceMemory for structured
+            historical experience retrieval. When provided, the prompt
+            includes pattern-matched successful/failed interventions.
+        negative_feedback_analysis: Optional pre-computed negative feedback
+            analysis. When not provided, computed from rejected_buffer.
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -647,6 +664,49 @@ listed for the target module in runtime_output_contracts.
             + "\n</meta_guidance>\n"
         )
 
+    # v6.1 扩展：结构化经验检索（替代浅层历史提示）
+    experience_section = ""
+    if experience_memory is not None and episode_projection is not None:
+        # 从 episode_projection 重建 FailureEpisode 用于检索
+        from .failure_episode import FailureEpisode, CausalSlice, ActionEnvelope
+        try:
+            # 尝试从 projection 中提取结构化信息
+            episode_dict = episode_projection.get("episode", {})
+            if episode_dict:
+                # 使用结构化经验检索
+                matches = retrieve_structured_experience(
+                    episode_projection, experience_memory, max_results=2
+                )
+                experience_section = format_experience_for_prompt(matches)
+        except Exception:
+            # 检索失败时静默回退到无经验状态
+            experience_section = ""
+
+    # v6.1 扩展：负反馈深度分析（替代表面化的拒绝列表）
+    negative_feedback_section = ""
+    if negative_feedback_analysis is not None:
+        negative_feedback_section = format_negative_feedback_for_prompt(
+            negative_feedback_analysis
+        )
+    elif rejected_buffer:
+        # 如果没有预计算的分析，从 rejected_buffer 实时计算
+        analysis = analyze_negative_feedback(rejected_buffer)
+        negative_feedback_section = format_negative_feedback_for_prompt(analysis)
+
+    # 保留原有的 rejected_info 用于测试兼容性
+    rejected_info = ""
+    if rejected_buffer:
+        rejected_lines = [
+            f"  - {r.proposal.target_module}/{r.proposal.operation}: "
+            f"\"{_sanitize_rejected_content_echo(r.proposal.content)}\" -> REJECTED "
+            f"({r.feedback_summary()})"
+            for r in rejected_buffer[-5:]
+        ]
+        rejected_info = (
+            "\n## Previously Rejected Edits (DO NOT repeat these)\n"
+            + "\n".join(rejected_lines)
+        )
+
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
         f"trigger={signal.trigger_source.value}\n"
@@ -663,6 +723,8 @@ listed for the target module in runtime_output_contracts.
         "</diagnostic_signal>\n\n"
         f"{meta_section}"
         f"{observation_section}"
+        f"{experience_section}"
+        f"{negative_feedback_section}"
         f"{diagnosis_section}"
         f"{gold_section}"
         "<detection_trace>\n"
@@ -674,7 +736,7 @@ listed for the target module in runtime_output_contracts.
         "<runtime_output_contracts>\n"
         f"{runtime_contract_text}\n"
         "</runtime_output_contracts>\n"
-        f"{rejected_info}{accepted_section}{capacity_section}{hint_section}\n"
+        f"{accepted_section}{capacity_section}{hint_section}{rejected_info}\n"
         "<task>\n"
         "Decide whether a safe general rule is justified by observable "
         "trajectory evidence. Do not assume the present class is wrong.\n"

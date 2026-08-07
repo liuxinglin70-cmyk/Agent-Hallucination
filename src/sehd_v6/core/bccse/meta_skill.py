@@ -38,6 +38,12 @@ GUIDANCE_TOKENS = frozenset({
     "seek_distinct_candidate_direction",
     "prefer_registered_runtime_route",
     "avoid_pending_registry_dependency",
+    # v6.1 扩展：负反馈指导令牌
+    "avoid_action_shape_previously_failed",
+    "avoid_unowned_output_target",
+    "avoid_condition_without_discriminator",
+    "avoid_redundant_intervention",
+    "avoid_scope_or_ownership_mismatch",
 })
 
 RANKING_PREFERENCES = frozenset({
@@ -51,6 +57,10 @@ RANKING_PREFERENCES = frozenset({
     "duplicate_risk",
     "registry_stability",
     "cost_efficiency",
+    # v6.1 扩展：加权排名偏好
+    "recent_feedback_weight",
+    "severity_weight",
+    "mechanism_reliability",
 })
 
 # Gate profiles (§13.10).  The hard gate is fixed under every profile; a

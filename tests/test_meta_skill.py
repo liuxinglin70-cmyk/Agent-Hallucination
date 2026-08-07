@@ -131,8 +131,9 @@ def test_duplicate_guidance_rejected():
 def test_closed_vocabularies_are_bounded():
     # The vocabularies are closed and non-empty; a MetaEdit can never create
     # an operator or a policy item because no such operation exists.
-    assert len(GUIDANCE_TOKENS) == 10
-    assert len(RANKING_PREFERENCES) == 10
+    # v6.1: expanded with negative-feedback tokens and weighted ranking preferences.
+    assert len(GUIDANCE_TOKENS) == 15
+    assert len(RANKING_PREFERENCES) == 13
     assert GATE_PROFILES == {PROFILE_CONSERVATIVE, PROFILE_STEADY}
 
 

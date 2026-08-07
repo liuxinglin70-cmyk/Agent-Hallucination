@@ -109,6 +109,8 @@ re-added as a layer on top of the standalone detector and evolution modules.
 
 ```text
 docs/
+├── SEHD_V6_ACADEMIC_DOCUMENT.md      # 学术科研技术文档（本框架的完整学术阐述）
+├── SEHD_V6_FRAMEWORK_VISUALIZATION.md # 框架可视化图谱（10 张 Mermaid 架构图）
 ├── design/                    # framework design
 │   ├── TECHNICAL_DESIGN.md    # detector + evolution architecture
 │   └── SELF_EVOLUTION_FRAMEWORK_REVIEW.md  # evolution loop implementation contract

@@ -17,6 +17,9 @@ from ..bccse.v6_contracts import (
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_EMIT_TELEMETRY_ONLY,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
+    ACTION_REQUIRE_ADDITIONAL_VERIFICATION,
+    ACTION_ESCALATE_TO_APPEAL,
+    ACTION_MARK_CANDIDATE_AMBIGUOUS,
     ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
     AdjudicationFacts,
     PolicyItem,
@@ -220,6 +223,45 @@ def evaluate_policies(
                 "item_id": item.item_id,
                 "rationale": item.rationale,
             })
+        elif operator == ACTION_REQUIRE_ADDITIONAL_VERIFICATION:
+            # 要求额外验证：降低覆盖完整性以反映验证不足
+            telemetry.append({
+                "kind": "require_additional_verification",
+                "item_id": item.item_id,
+                "verification_scope": params.get("verification_scope", ""),
+                "current_prosecution_coverage": eff_prosecution,
+                "current_defense_coverage": eff_defense,
+            })
+            # 要求额外验证时，将覆盖降级为 incomplete，表示需要更多证据
+            scope = params.get("verification_scope", "")
+            if scope == "certificate":
+                if eff_prosecution == "complete":
+                    eff_prosecution = "incomplete"
+                if eff_defense == "complete":
+                    eff_defense = "incomplete"
+        elif operator == ACTION_ESCALATE_TO_APPEAL:
+            # 升级到上诉：记录遥测，标记需要上诉
+            # 实际上诉流程由调用方触发
+            telemetry.append({
+                "kind": "escalate_to_appeal",
+                "item_id": item.item_id,
+                "terminal_state_before": facts.terminal_state,
+                "surviving_error_count": facts.surviving_error_count,
+            })
+            # 升级到上诉时，如果当前是 unresolved，保持 unresolved 等待上诉结果
+            # 如果当前是 verified_clean 但有争议，降级为 unresolved
+            if facts.terminal_state == "verified_clean" and facts.surviving_error_count > 0:
+                # 有幸存错误但判定为 clean，需要上诉审查
+                pass  # 终态由 court 重新计算
+        elif operator == ACTION_MARK_CANDIDATE_AMBIGUOUS:
+            # 标记候选为模糊：记录遥测，用于后续分析
+            telemetry.append({
+                "kind": "mark_candidate_ambiguous",
+                "item_id": item.item_id,
+                "ambiguity_reason": params.get("ambiguity_reason", ""),
+            })
+            # 标记模糊候选时，不改变覆盖状态，但记录需要人工审查
+            # 这会影响后续的进化决策
 
     return PolicyEvaluationResult(
         applied_item_ids=tuple(applied_item_ids),

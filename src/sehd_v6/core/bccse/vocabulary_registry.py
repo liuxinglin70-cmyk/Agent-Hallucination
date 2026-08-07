@@ -67,12 +67,29 @@ class AdjudicationFacts:
     boundary_authority_valid: bool = False
     terminal_state: str = ""
     policy_stage: str = POLICY_STAGE_POST_LEDGER
+    # v6.1 扩展：上诉与定位状态
+    appeal_status: str = ""  # "pending" | "completed" | "failed" | ""
+    appeal_triggered: bool = False
+    localization_status: str = ""  # "complete" | "not_applicable" | "failed_temporal_fallback" | ""
+    responsible_step_available: bool = False
+    # v6.1 扩展：隔离原因分布（封闭词表计数）
+    quarantine_reason_schema_mismatch: int = 0
+    quarantine_reason_evidence_missing: int = 0
+    quarantine_reason_causal_broken: int = 0
+    quarantine_reason_other: int = 0
 
     @property
     def total_certificate_count(self) -> int:
         return (
             self.valid_error_certificate_count
             + self.valid_defense_certificate_count
+        )
+
+    @property
+    def total_quarantine_count(self) -> int:
+        return (
+            self.quarantined_error_count
+            + self.quarantined_defense_count
         )
 
 
@@ -462,6 +479,33 @@ def _build_baseline_registry() -> VocabularyRegistry:
             "all_candidates_quarantined",
             "fully_quarantined",
         ),
+        # v6.1 扩展：上诉相关谓词
+        _predicate(
+            "appeal_pending_and_terminal_unresolved",
+            'appeal_triggered and appeal_status == "appeal_pending" and terminal_state == "unresolved"',
+        ),
+        _predicate(
+            "appeal_failed_with_surviving_errors",
+            'appeal_triggered and appeal_status == "appeal_failed" and surviving_error_count > 0',
+        ),
+        # v6.1 扩展：定位相关谓词
+        _predicate(
+            "localization_failed_with_temporal_fallback",
+            'localization_status == "localization_failed_temporal_fallback"',
+        ),
+        _predicate(
+            "responsible_step_missing_and_verdict_error",
+            'not responsible_step_available and terminal_state == "verified_error"',
+        ),
+        # v6.1 扩展：隔离原因谓词
+        _predicate(
+            "quarantine_schema_mismatch_dominant",
+            "quarantine_reason_schema_mismatch > quarantine_reason_evidence_missing and quarantine_reason_schema_mismatch > quarantine_reason_causal_broken and quarantine_reason_schema_mismatch > 0",
+        ),
+        _predicate(
+            "quarantine_evidence_missing_dominant",
+            "quarantine_reason_evidence_missing > quarantine_reason_schema_mismatch and quarantine_reason_evidence_missing > quarantine_reason_causal_broken and quarantine_reason_evidence_missing > 0",
+        ),
     ]
 
     operators = [
@@ -486,6 +530,25 @@ def _build_baseline_registry() -> VocabularyRegistry:
         ActionOperator(
             operator="consume_verified_clean_boundary",
             params_schema=(),
+            policy_stage=POLICY_STAGE_POST_LEDGER,
+            runtime_owner="court",
+        ),
+        # v6.1 扩展：新动作操作符
+        ActionOperator(
+            operator="require_additional_verification",
+            params_schema=("verification_scope",),
+            policy_stage=POLICY_STAGE_POST_LEDGER,
+            runtime_owner="court",
+        ),
+        ActionOperator(
+            operator="escalate_to_appeal",
+            params_schema=(),
+            policy_stage=POLICY_STAGE_POST_LEDGER,
+            runtime_owner="court",
+        ),
+        ActionOperator(
+            operator="mark_candidate_ambiguous",
+            params_schema=("ambiguity_reason",),
             policy_stage=POLICY_STAGE_POST_LEDGER,
             runtime_owner="court",
         ),
@@ -577,6 +640,15 @@ _FIELD_TYPES: dict[str, type] = {
     "boundary_authority_valid": bool,
     "terminal_state": str,
     "policy_stage": str,
+    # v6.1 扩展字段类型
+    "appeal_status": str,
+    "appeal_triggered": bool,
+    "localization_status": str,
+    "responsible_step_available": bool,
+    "quarantine_reason_schema_mismatch": int,
+    "quarantine_reason_evidence_missing": int,
+    "quarantine_reason_causal_broken": int,
+    "quarantine_reason_other": int,
 }
 
 # Closed value vocabulary a predicate may compare against (string literals
@@ -584,6 +656,13 @@ _FIELD_TYPES: dict[str, type] = {
 _DSL_ALLOWED_STRINGS = frozenset({
     "complete", "incomplete", "unresolved", "none",
     "verified_clean", "verified_error", "cleared",
+    # v6.1 扩展：上诉状态
+    "appeal_pending", "appeal_completed", "appeal_failed",
+    # v6.1 扩展：定位状态
+    "localization_complete", "localization_not_applicable",
+    "localization_failed_temporal_fallback",
+    # v6.1 扩展：隔离原因
+    "schema_mismatch", "evidence_missing", "causal_broken",
 })
 
 

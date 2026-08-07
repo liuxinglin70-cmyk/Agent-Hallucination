@@ -226,12 +226,54 @@ def _predicate_witnesses():
             _facts(fully_quarantined=True, required_candidate_count=1),
             _facts(fully_quarantined=False, required_candidate_count=1),
         ),
+        # v6.1 扩展谓词见证
+        "appeal_pending_and_terminal_unresolved": (
+            _facts(appeal_triggered=True, appeal_status="appeal_pending", terminal_state="unresolved"),
+            _facts(appeal_triggered=False, appeal_status="", terminal_state="unresolved"),
+        ),
+        "appeal_failed_with_surviving_errors": (
+            _facts(appeal_triggered=True, appeal_status="appeal_failed", surviving_error_count=1),
+            _facts(appeal_triggered=True, appeal_status="appeal_failed", surviving_error_count=0),
+        ),
+        "localization_failed_with_temporal_fallback": (
+            _facts(localization_status="localization_failed_temporal_fallback"),
+            _facts(localization_status="localization_complete"),
+        ),
+        "responsible_step_missing_and_verdict_error": (
+            _facts(responsible_step_available=False, terminal_state="verified_error"),
+            _facts(responsible_step_available=True, terminal_state="verified_error"),
+        ),
+        "quarantine_schema_mismatch_dominant": (
+            _facts(
+                quarantine_reason_schema_mismatch=3,
+                quarantine_reason_evidence_missing=1,
+                quarantine_reason_causal_broken=0,
+            ),
+            _facts(
+                quarantine_reason_schema_mismatch=1,
+                quarantine_reason_evidence_missing=3,
+                quarantine_reason_causal_broken=0,
+            ),
+        ),
+        "quarantine_evidence_missing_dominant": (
+            _facts(
+                quarantine_reason_schema_mismatch=1,
+                quarantine_reason_evidence_missing=3,
+                quarantine_reason_causal_broken=0,
+            ),
+            _facts(
+                quarantine_reason_schema_mismatch=3,
+                quarantine_reason_evidence_missing=1,
+                quarantine_reason_causal_broken=0,
+            ),
+        ),
     }
 
 
 def test_registry_declares_exactly_the_baseline_vocabulary() -> None:
     # Guard against silent vocabulary drift: the registry holds exactly the
-    # six baseline predicates and four court-local action instances.
+    # baseline predicates and court-local action instances.
+    # v6.1: expanded with appeal/localization/quarantine predicates and new actions.
     assert set(L2_REGISTRY.predicate_names()) == {
         "consensus_gate_blocked_nonempty",
         "defense_coverage_complete_and_zero_certificates",
@@ -239,12 +281,23 @@ def test_registry_declares_exactly_the_baseline_vocabulary() -> None:
         "boundary_state_conflicts_with_terminal",
         "surviving_errors_nonempty_and_verdict_clean",
         "all_candidates_quarantined",
+        # v6.1 扩展谓词
+        "appeal_pending_and_terminal_unresolved",
+        "appeal_failed_with_surviving_errors",
+        "localization_failed_with_temporal_fallback",
+        "responsible_step_missing_and_verdict_error",
+        "quarantine_schema_mismatch_dominant",
+        "quarantine_evidence_missing_dominant",
     }
     assert L2_REGISTRY.action_names() == {
         "downgrade_coverage",
         "invalidate_coverage_claim",
         "emit_telemetry_only",
         "consume_verified_clean_boundary",
+        # v6.1 扩展动作
+        "require_additional_verification",
+        "escalate_to_appeal",
+        "mark_candidate_ambiguous",
     }
     for name in L2_REGISTRY.predicate_names():
         assert L2_REGISTRY.predicate_entry(name).status == STATUS_BASELINE

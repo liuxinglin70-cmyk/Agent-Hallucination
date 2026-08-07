@@ -68,6 +68,7 @@ from typing import Any
 
 from .genome import MODULE_IDS
 from .v6_contracts import (
+    L2_ARTIFACT_APPEAL_MECHANISM,
     L2_ARTIFACT_BOUNDARY_CONSUMPTION,
     L2_ARTIFACT_CONSENSUS_GATE,
     L2_ARTIFACT_COVERAGE_VALIDITY,
@@ -101,6 +102,13 @@ REASON_HOLLOW_PROSECUTION = "hollow_complete_prosecution"
 REASON_BOUNDARY_CONFLICT = "boundary_terminal_conflict"
 REASON_INTERNAL_INCONSISTENCY = "internal_inconsistency"
 REASON_NO_FAILURE_SHAPE = "no_failure_shape"
+# v6.1 扩展：新失败形状
+REASON_APPEAL_PENDING = "appeal_pending_blocked"
+REASON_APPEAL_FAILED = "appeal_failed_with_errors"
+REASON_LOCALIZATION_FALLBACK = "localization_temporal_fallback"
+REASON_RESPONSIBLE_STEP_MISSING = "responsible_step_missing"
+REASON_CASCADING_FAILURE = "cascading_failure"
+REASON_QUARANTINE_PATTERN = "quarantine_pattern_dominant"
 
 
 # ============================================================
@@ -247,6 +255,80 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             {
                 "boundary_path_state": facts.boundary_path_state,
                 "terminal_state": facts.terminal_state,
+            },
+        )
+
+    # Rule 4.1 — v6.1: appeal pending blocked terminal.
+    if L2_PREDICATES["appeal_pending_and_terminal_unresolved"](facts):
+        return _attr(
+            LAYER_L2,
+            L2_ARTIFACT_APPEAL_MECHANISM,
+            REASON_APPEAL_PENDING,
+            {
+                "appeal_status": facts.appeal_status,
+                "terminal_state": facts.terminal_state,
+            },
+        )
+
+    # Rule 4.2 — v6.1: appeal failed with surviving errors.
+    if L2_PREDICATES["appeal_failed_with_surviving_errors"](facts):
+        return _attr(
+            LAYER_L2,
+            L2_ARTIFACT_APPEAL_MECHANISM,
+            REASON_APPEAL_FAILED,
+            {
+                "appeal_status": facts.appeal_status,
+                "surviving_error_count": facts.surviving_error_count,
+            },
+        )
+
+    # Rule 4.3 — v6.1: localization fallback used.
+    if L2_PREDICATES["localization_failed_with_temporal_fallback"](facts):
+        return _attr(
+            LAYER_L1,
+            "earliest_origin_tiebreak",
+            REASON_LOCALIZATION_FALLBACK,
+            {
+                "localization_status": facts.localization_status,
+            },
+        )
+
+    # Rule 4.4 — v6.1: responsible step missing with error verdict.
+    # Only fires when the court explicitly reported a localization attempt
+    # but produced no responsible step; a missing field in the record is
+    # not a failure shape (the fixture simply never ran localization).
+    if (
+        L2_PREDICATES["responsible_step_missing_and_verdict_error"](facts)
+        and facts.localization_status != ""
+    ):
+        return _attr(
+            LAYER_L1,
+            "earliest_origin_tiebreak",
+            REASON_RESPONSIBLE_STEP_MISSING,
+            {
+                "terminal_state": facts.terminal_state,
+            },
+        )
+
+    # Rule 4.5 — v6.1: quarantine pattern analysis.
+    if L2_PREDICATES["quarantine_schema_mismatch_dominant"](facts):
+        return _attr(
+            LAYER_L1,
+            "atomic_verifier_instruction",
+            REASON_QUARANTINE_PATTERN,
+            {
+                "dominant_reason": "schema_mismatch",
+                "count": facts.quarantine_reason_schema_mismatch,
+            },
+        )
+    if L2_PREDICATES["quarantine_evidence_missing_dominant"](facts):
+        return _attr(
+            LAYER_L1,
+            "evidence_obligation",
+            REASON_QUARANTINE_PATTERN,
+            {
+                "dominant_reason": "evidence_missing",
+                "count": facts.quarantine_reason_evidence_missing,
             },
         )
 
