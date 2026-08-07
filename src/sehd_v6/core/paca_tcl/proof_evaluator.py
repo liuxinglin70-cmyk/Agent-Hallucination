@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import http.client
 import json
 import os
 import random
@@ -256,6 +257,8 @@ def _json_object_provider_call(
             }
         except (
             urlerror.URLError,
+            OSError,
+            http.client.HTTPException,
             TimeoutError,
             json.JSONDecodeError,
             KeyError,

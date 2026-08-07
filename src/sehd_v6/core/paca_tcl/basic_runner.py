@@ -8,6 +8,7 @@ protocols live outside this package.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import random
@@ -609,7 +610,15 @@ def provider_call_with_schema(
                 "transport_attempts": transport_attempts,
                 "repair_used": repair_used,
             }
-        except (urlerror.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
+        except (
+            urlerror.URLError,
+            OSError,
+            http.client.HTTPException,
+            TimeoutError,
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+        ) as exc:
             last_error = exc
             if isinstance(exc, ValueError):
                 # A contract failure (empty content, non-object response,

@@ -411,6 +411,56 @@ def test_provider_transport_retries_429_using_bounded_retry_after(
     assert sleeps == [12.0]
 
 
+def test_provider_transport_retries_connection_reset_error(
+    tmp_path, monkeypatch,
+):
+    """A ConnectionResetError mid-read must enter the bounded retry path
+    instead of bypassing the transport budget (regression guard for the
+    transport exception whitelist)."""
+    import json
+
+    from src.sehd_v6.core.paca_tcl import basic_runner
+
+    attempts = 0
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise ConnectionResetError("connection reset by peer")
+        return Response()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
+    monkeypatch.setattr(basic_runner, "_global_cache_path", lambda _hash: None)
+    value, _meta = basic_runner.provider_call_with_schema(
+        route={
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+            "api_key_environment": "DEEPSEEK_API_KEY",
+            "transport_retries": 1,
+            "timeout_seconds": 10,
+            "total_timeout_seconds": 60,
+        },
+        system="return json", user="{}", cache_dir=tmp_path,
+        require_candidates=False,
+    )
+    assert value == {}
+    assert attempts == 2
+
+
 def test_provider_transport_default_total_budget_covers_every_retry(
     tmp_path, monkeypatch,
 ):
