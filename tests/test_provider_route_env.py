@@ -180,6 +180,58 @@ def test_deepseek_key_never_replaces_nonofficial_proxy_selector():
     assert route["api_key_environment"] == "AUTODL_API_KEY"
 
 
+def test_explicit_key_selector_overrides_official_default_environment():
+    """An explicit SEHD_*_API_KEY_ENV selector must win over the official
+    DEEPSEEK_API_KEY default, even on the official endpoint (previously the
+    official branch silently rewrote the route, making the selector dead)."""
+    from src.sehd_v6.provider_routes import resolve_provider_route
+
+    route = resolve_provider_route(
+        {
+            "endpoint": "https://api.deepseek.com",
+            "model": "deepseek-v4-flash",
+        },
+        purpose="detector",
+        route_name="defense_route",
+        environ={
+            "SEHD_ROUTE_DEFENSE_API_KEY_ENV": "CUSTOM_KEY",
+            "DEEPSEEK_API_KEY": "test-only-placeholder",
+        },
+    )
+    assert route["api_key_environment"] == "CUSTOM_KEY"
+
+    # Purpose-level selector applies to every route of that purpose.
+    route = resolve_provider_route(
+        {"endpoint": "https://api.deepseek.com"},
+        purpose="mutation",
+        environ={
+            "SEHD_MUTATION_API_KEY_ENV": "MUTATION_KEY",
+            "DEEPSEEK_API_KEY": "test-only-placeholder",
+        },
+    )
+    assert route["api_key_environment"] == "MUTATION_KEY"
+
+
+def test_invalid_explicit_key_selector_fails_closed():
+    """A malformed api-key environment name in a selector must raise instead
+    of silently falling back to the official default."""
+    from src.sehd_v6.provider_routes import resolve_provider_route
+
+    try:
+        resolve_provider_route(
+            {"endpoint": "https://api.deepseek.com"},
+            purpose="detector",
+            environ={
+                "SEHD_DETECTOR_API_KEY_ENV": "not a valid name",
+                "DEEPSEEK_API_KEY": "test-only-placeholder",
+            },
+        )
+    except ValueError as exc:
+        assert "api-key environment name" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("invalid key selector did not fail closed")
+
+
 def test_proxy_route_without_key_selector_fails_closed():
     from src.sehd_v6.provider_routes import resolve_provider_credential, resolve_provider_route
 

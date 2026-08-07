@@ -119,16 +119,25 @@ def resolve_provider_route(
     # route with no selector can use the official default environment.
     selected_key_env = str(resolved.get("api_key_environment") or "")
     explicit_key_selector = _env_value(env, ordered, "API_KEY_ENV")
-    if (
-        not explicit_key_selector
-        and not selected_key_env
+    if explicit_key_selector:
+        # An explicit per-route/purpose selector is the highest-precedence
+        # key source; it must never be silently replaced by the official
+        # default below (a user-supplied selector would be dead otherwise).
+        if not _ENV_NAME.fullmatch(explicit_key_selector):
+            raise ValueError(
+                f"Invalid provider api-key environment name: "
+                f"{explicit_key_selector!r}"
+            )
+        resolved["api_key_environment"] = explicit_key_selector
+    elif (
+        not selected_key_env
         and env.get("DEEPSEEK_API_KEY")
         and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT
     ):
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
     elif not selected_key_env and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    elif not explicit_key_selector and selected_key_env == OFFICIAL_API_KEY_ENV:
+    elif selected_key_env == OFFICIAL_API_KEY_ENV:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
     if not resolved.get("api_key_environment") and str(
         resolved.get("endpoint") or ""

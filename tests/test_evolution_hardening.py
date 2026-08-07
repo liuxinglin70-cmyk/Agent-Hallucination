@@ -2068,6 +2068,72 @@ def test_missing_gold_step_is_not_a_localization_error() -> None:
     assert signal2.should_evolve is True
 
 
+def test_gold_steps_rejoin_attribution_in_runner_gold_mode(
+    tmp_path, monkeypatch,
+) -> None:
+    """use_gold=True must re-join ``gold_steps`` into attribution exactly
+    like ``gold_label``: the detector firewall strips both, and a runner
+    that only re-joined the label silently left ``responsible_step_correct``
+    permanently False, erasing the localization-correctness gradient in
+    fitness for gold error cases (and making LOCALIZATION_ERROR unreachable
+    on the real run path)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        row = _diagnostic_row(localization_status="failed_temporal_fallback")
+        row["responsible_step"] = 2
+        # A real verified_error carries valid certificates; without them the
+        # hollow-coverage L2 attribution hijacks the case before the
+        # localization path.
+        row["proof_adjudication"]["defense_coverage"] = "incomplete"
+        row["proof_adjudication"]["valid_error_certificate_count"] = 2
+        return row
+
+    def mutation(**kwargs):
+        return {"operation": "no_edit", "rationale": "declined"}, {
+            "cache_hit": False,
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    # Correct localization: gold_steps match the responsible step.
+    correct = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {"gold_label": True, "gold_steps": [2]}},
+        config={}, output_dir=tmp_path / "gold_steps_correct",
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        use_gold=True,
+        reflection_candidate_count=1,
+        run_id="gold_steps_correct",
+    )
+    correct_step = correct.steps[0]
+    assert correct_step.attribution["error_type"] == ErrorType.CORRECT.value
+    assert correct_step.attribution["responsible_step_correct"] is True
+    assert correct_step.gate_decision == "skip_stable"
+
+    # Mislocalization: gold_steps disagree, the LOCALIZATION_ERROR trigger
+    # must be reachable on the real runner path.
+    mislocalized = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {"gold_label": True, "gold_steps": [9]}},
+        config={}, output_dir=tmp_path / "gold_steps_wrong",
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        use_gold=True,
+        reflection_candidate_count=1,
+        run_id="gold_steps_wrong",
+    )
+    wrong_step = mislocalized.steps[0]
+    assert wrong_step.attribution["error_type"] == ErrorType.LOCALIZATION_ERROR.value
+    assert wrong_step.attribution["responsible_step_correct"] is False
+    # The localization trigger fires evolution on the run path; the
+    # deterministic L1 classifier may not resolve an owner for it, in which
+    # case the step fails closed as unaddressable instead of guessing.
+    assert wrong_step.gate_decision in {"skip_no_edit", "skip_unaddressable_failure"}
+
+
 def test_retry_duplicate_proposal_rejects_same_owner_paraphrase() -> None:
     """A retry that repeats a rejected source proposal is discarded pre-replay."""
     from src.sehd_v6.core.bccse import evolution_runner as runner

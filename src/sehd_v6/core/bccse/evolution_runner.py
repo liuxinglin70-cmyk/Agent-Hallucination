@@ -3340,6 +3340,15 @@ def run_online_evolution(
             gold = _evaluator_gold(records[case_id])
             if gold is not None:
                 payload["gold_label"] = gold
+                # ``gold_steps`` is the authoritative localization-correctness
+                # input (``responsible_step_correct`` in fitness); it was
+                # stripped by the detector firewall like every evaluator field,
+                # so it is re-joined here under the same explicit opt-in.  A
+                # gold error case without gold_steps stays
+                # responsible_step_correct=False in fitness (documented
+                # behaviour: unverified localization is not evidence of a
+                # defect, but also not evidence of correctness).
+                payload["gold_steps"] = records[case_id].get("gold_steps")
         return attribute_failure(
             payload, use_gold=use_gold, gold_reflection=gold_reflection,
         )
