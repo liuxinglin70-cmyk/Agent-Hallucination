@@ -26,11 +26,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
-from .v6_contracts import FailureAttribution
+from .v6_contracts import FailureAttribution, validate_policy_params
 from .vocabulary_registry import (
+    L2_REGISTRY,
     RegistryDslError,
     VocabularyRegistry,
     compile_predicate_dsl,
@@ -55,6 +56,13 @@ class RegistryCandidate:
     dsl: str = ""
     operator: str = ""
     rationale: str = ""
+    # Intended edit captured at registration time (register_action only):
+    # the model names the precondition and the operator parameters it
+    # believes repair the observed failure.  Stored with the pending
+    # validation entry and reused as a dynamic policy candidate after the
+    # entry is promoted, so a promoted vocabulary entry is actually usable.
+    precondition: str = ""
+    params: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +72,8 @@ class RegistryCandidate:
             "dsl": self.dsl,
             "operator": self.operator,
             "rationale": self.rationale,
+            "precondition": self.precondition,
+            "params": dict(self.params),
         }
 
 
@@ -200,6 +210,18 @@ def compile_registration_candidate(
             raise ValueError(
                 f"action instance already registered: {candidate.target}"
             )
+        if candidate.precondition and (
+            candidate.precondition not in registry.predicate_names()
+        ):
+            raise ValueError(
+                f"intent precondition not active: {candidate.precondition}"
+            )
+        if candidate.params:
+            params_ok, params_reason = validate_policy_params(
+                candidate.operator, dict(candidate.params), registry=registry,
+            )
+            if not params_ok:
+                raise ValueError(f"intent params invalid: {params_reason}")
         return {
             "operation": "register_action",
             "target": candidate.target,
@@ -221,7 +243,14 @@ def build_registry_selection_prompt(
         "fixed by the framework; you only rank candidates, you never compose "
         "free DSL or new operator semantics. Return JSON only: "
         "{\"candidate_index\": <int>, \"reason\": \"...\"} or "
-        "{\"no_proposal\": true, \"reason\": \"...\"}."
+        "{\"no_proposal\": true, \"reason\": \"...\"}.\n"
+        "For a register_action candidate you MAY additionally supply the "
+        "intended edit the registration would enable: "
+        "\"precondition\": <one active predicate name>, "
+        "\"params\": {<required operator parameter values>}. Both are "
+        "re-validated against the closed vocabulary; if you omit them the "
+        "entry is registered without an intended edit and can only be used "
+        "by a later policy reflection."
     )
     payload = {
         "attribution": attribution.to_dict(),
@@ -234,7 +263,17 @@ def build_registry_selection_prompt(
 def select_registry_candidate(
     response: Mapping[str, Any],
     candidates: tuple[RegistryCandidate, ...],
+    registry: VocabularyRegistry | None = None,
 ) -> tuple[RegistryCandidate | None, str]:
+    """Select one candidate, carrying an optional intended edit.
+
+    For a ``register_action`` candidate the response may supply
+    ``precondition`` and ``params``; both are validated against the closed
+    vocabulary (registry defaults to the baseline).  Fail-closed: an
+    invalid precondition or parameter set drops the intent (the
+    registration itself is unaffected), never silently stores a broken
+    edit.
+    """
     if not isinstance(response, Mapping) or not response:
         return None, "empty_response"
     if response.get("no_proposal"):
@@ -243,5 +282,21 @@ def select_registry_candidate(
     if isinstance(index, int) and not isinstance(index, bool):
         if not 0 <= index < len(candidates):
             return None, "candidate_index_out_of_range"
-        return candidates[index], ""
+        candidate = candidates[index]
+        if candidate.operation != "register_action":
+            return candidate, ""
+        precondition = str(response.get("precondition") or "").strip()
+        raw_params = response.get("params")
+        params = dict(raw_params) if isinstance(raw_params, Mapping) else {}
+        active = registry if registry is not None else L2_REGISTRY
+        if precondition and precondition not in active.predicate_names():
+            return candidate, f"intent_precondition_unknown:{precondition}"
+        if params:
+            operator_name = candidate.operator
+            params_ok, reason = validate_policy_params(
+                operator_name, params, registry=active,
+            )
+            if not params_ok:
+                return candidate, f"intent_params_invalid:{reason}"
+        return replace(candidate, precondition=precondition, params=params), ""
     return None, "missing_candidate_index"

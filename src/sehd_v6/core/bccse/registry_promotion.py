@@ -17,16 +17,21 @@ change the executable vocabulary.
 
 from __future__ import annotations
 
-from typing import Any
+import hashlib
+import json
+from typing import Any, Mapping
 
 from .policy_genome import (
     PENDING_STATUS_PENDING,
     PENDING_STATUS_REJECTED,
     PENDING_STATUS_VALIDATED,
     PendingValidationItem,
+    PolicyEdit,
     PolicyGenome,
+    PolicyOp,
 )
 from .registry_reflection import REGISTRATION_REASON_NO_ACTION
+from .v6_contracts import PolicyItem, validate_policy_params
 from .vocabulary_registry import (
     L2_REGISTRY,
     AdjudicationFacts,
@@ -50,6 +55,7 @@ def enqueue_registry_validation(
     target: str,
     facts: AdjudicationFacts,
     case_id: str,
+    intended_edit: Mapping[str, Any] | None = None,
 ) -> PendingValidationItem:
     """Queue one freshly registered entry for evidence accumulation.
 
@@ -58,6 +64,11 @@ def enqueue_registry_validation(
     entry must demonstrably apply to those facts or it is rejected at once
     (a predicate that never fires on its own motivating case can never be
     promoted).  Idempotent on ``target`` via the genome's queue.
+
+    ``intended_edit`` is the model-captured edit the registration would
+    enable (precondition + operator parameters for an action instance); it
+    is stored with the queue entry and becomes a dynamic policy candidate
+    after promotion.
     """
     registry = genome.registry or L2_REGISTRY
     entry = PendingValidationItem(
@@ -70,6 +81,8 @@ def enqueue_registry_validation(
         created_sequence=len(genome.pending_queue),
         status=PENDING_STATUS_PENDING,
     )
+    if intended_edit:
+        entry.source_evidence["intended_edit"] = dict(intended_edit)
     if operation == "register_predicate":
         predicate = registry.raw_predicate(str(target))
         if predicate is None or not predicate.evaluate(facts):
@@ -167,3 +180,77 @@ def promote_pending_registry_entries(
         row["registry_hash"] = promoted.content_hash
         audit.append(row)
     return audit
+
+
+def promoted_intent_candidates(
+    genome: PolicyGenome,
+    facts: AdjudicationFacts,
+) -> tuple[PolicyEdit, ...]:
+    """Turn promoted registration intents into executable policy candidates.
+
+    A ``register_action`` entry promoted to working carries the intended
+    edit the model captured at registration time.  When the same failure
+    pattern recurs, that intent becomes a concrete add_item candidate so
+    the promoted vocabulary is actually usable instead of merely
+    executable-in-principle.  Fail-closed: the intent is re-validated
+    against the genome's registry at proposal time (an entry whose
+    vocabulary drifted, or whose intent never became active, contributes
+    nothing), and the candidate is deduplicated against the existing items.
+    """
+    registry = genome.registry or L2_REGISTRY
+    existing = {
+        (item.precondition, item.action, tuple(sorted(item.params.items())))
+        for item in genome.items
+    }
+    candidates: list[PolicyEdit] = []
+    for entry in genome.pending_queue:
+        if entry.required_validation != REGISTRY_REQUIRED_VALIDATION:
+            continue
+        if entry.status != PENDING_STATUS_VALIDATED:
+            continue
+        if entry.proposal.get("operation") != "register_action":
+            continue
+        target = str(entry.subject_id)
+        if registry.status_of(target) != "registered":
+            continue
+        instance = registry.raw_action_instance(target)
+        if instance is None or registry.raw_operator(instance.operator) is None:
+            continue
+        intent = entry.source_evidence.get("intended_edit")
+        if not isinstance(intent, Mapping):
+            continue
+        precondition = str(intent.get("precondition") or "")
+        params = dict(intent.get("params") or {})
+        if precondition not in registry.predicate_names():
+            continue
+        params_ok, _ = validate_policy_params(
+            instance.operator, params, registry=registry,
+        )
+        if not params_ok:
+            continue
+        identity = (
+            precondition, target, tuple(sorted(params.items())),
+        )
+        if identity in existing:
+            continue
+        candidates.append(PolicyEdit(
+            edit_id=f"policy_edit_promoted_{hashlib.sha256(
+                json.dumps(
+                    {"precondition": precondition, "action": target},
+                    sort_keys=True, separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()[:12]}",
+            operation=PolicyOp.ADD_ITEM.value,
+            new_item=PolicyItem(
+                item_id="",
+                precondition=precondition,
+                action=target,
+                params=params,
+                rationale=(
+                    "intended edit of the promoted vocabulary entry "
+                    f"{target}"
+                ),
+            ),
+            rationale=f"promoted entry {target} intent",
+        ))
+    return tuple(candidates)

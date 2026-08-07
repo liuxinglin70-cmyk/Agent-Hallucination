@@ -15,7 +15,12 @@ dispatched on the action name instead of the operator.
 - P5: the post-ledger evaluator executes a promoted action alias through
   its operator;
 - P6: the pre-ledger evaluator resolves an alias to the restore operator;
-- P7: queue round-trip preserves observed_case_ids (checkpoint/resume).
+- P7: queue round-trip preserves observed_case_ids (checkpoint/resume);
+- P8: a registration may carry an intended edit (precondition + params),
+  validated fail-closed, stored with the queue entry, and surfaced as a
+  concrete policy candidate only after promotion;
+- P9: detector-side provider metas (per-surface usage) are recorded into
+  the same usage ledger the mutation path uses.
 """
 
 from __future__ import annotations
@@ -409,3 +414,262 @@ def test_observed_case_ids_survive_round_trip() -> None:
     assert entry.observed_case_ids == ("case_1", "case_2")
     assert entry.status == PENDING_STATUS_PENDING
     assert restored.registry.content_hash == genome.registry.content_hash
+
+# ============================================================
+# P8: registration intent -> promoted policy candidate
+# ============================================================
+
+def test_enqueue_action_with_intended_edit() -> None:
+    from src.sehd_v6.core.bccse.registry_reflection import (
+        RegistryCandidate,
+        select_registry_candidate,
+    )
+
+    genome = create_baseline_policy_genome()
+    _register_action_alias(genome)
+    candidate, reason = select_registry_candidate(
+        {
+            "candidate_index": 0,
+            "reason": "expose the repair",
+            "precondition": "all_candidates_quarantined",
+            "params": {"side": "prosecution", "to_state": "unresolved"},
+        },
+        (RegistryCandidate(
+            candidate_id="c1", operation="register_action",
+            target="downgrade_coverage_instance",
+            operator="downgrade_coverage",
+        ),),
+        registry=genome.registry,
+    )
+    assert reason == ""
+    assert candidate is not None
+    assert candidate.precondition == "all_candidates_quarantined"
+    assert candidate.params == {"side": "prosecution", "to_state": "unresolved"}
+    entry = enqueue_registry_validation(
+        genome=genome,
+        operation="register_action",
+        target="downgrade_coverage_instance",
+        facts=FACTS_QUARANTINED,
+        case_id="case_1",
+        intended_edit={
+            "precondition": candidate.precondition,
+            "params": dict(candidate.params),
+        },
+    )
+    assert entry.source_evidence["intended_edit"] == {
+        "precondition": "all_candidates_quarantined",
+        "params": {"side": "prosecution", "to_state": "unresolved"},
+    }
+
+
+def test_intent_validation_is_fail_closed() -> None:
+    from src.sehd_v6.core.bccse.registry_reflection import (
+        RegistryCandidate,
+        select_registry_candidate,
+    )
+
+    genome = create_baseline_policy_genome()
+    _register_action_alias(genome)
+    candidate = RegistryCandidate(
+        candidate_id="c1", operation="register_action",
+        target="downgrade_coverage_instance",
+        operator="downgrade_coverage",
+    )
+    # Unknown precondition drops the intent (registration itself survives).
+    selected, reason = select_registry_candidate(
+        {
+            "candidate_index": 0,
+            "precondition": "no_such_predicate",
+            "params": {"side": "prosecution", "to_state": "unresolved"},
+        },
+        (candidate,),
+        registry=genome.registry,
+    )
+    assert selected is candidate
+    assert reason.startswith("intent_precondition_unknown")
+    # Invalid params are rejected too.
+    selected2, reason2 = select_registry_candidate(
+        {
+            "candidate_index": 0,
+            "precondition": "all_candidates_quarantined",
+            "params": {"side": "bogus"},
+        },
+        (candidate,),
+        registry=genome.registry,
+    )
+    assert selected2 is candidate
+    assert reason2.startswith("intent_params_invalid")
+
+
+def test_promoted_intent_becomes_policy_candidate() -> None:
+    from src.sehd_v6.core.bccse.registry_promotion import (
+        promoted_intent_candidates,
+    )
+
+    genome = create_baseline_policy_genome()
+    _register_action_alias(genome)
+    enqueue_registry_validation(
+        genome=genome,
+        operation="register_action",
+        target="downgrade_coverage_instance",
+        facts=FACTS_QUARANTINED,
+        case_id="case_1",
+        intended_edit={
+            "precondition": "all_candidates_quarantined",
+            "params": {"side": "prosecution", "to_state": "unresolved"},
+        },
+    )
+    promote_pending_registry_entries(
+        genome=genome,
+        facts=FACTS_QUARANTINED,
+        case_id="case_2",
+        reason_code=REGISTRATION_REASON,
+    )
+    promote_pending_registry_entries(
+        genome=genome,
+        facts=FACTS_QUARANTINED,
+        case_id="case_3",
+        reason_code=REGISTRATION_REASON,
+    )
+    candidates = promoted_intent_candidates(genome, FACTS_QUARANTINED)
+    assert len(candidates) == 1
+    item = candidates[0].new_item
+    assert item is not None
+    assert item.precondition == "all_candidates_quarantined"
+    assert item.action == "downgrade_coverage_instance"
+    assert item.params == {"side": "prosecution", "to_state": "unresolved"}
+    # The candidate survives the genome's own item contract once the
+    # evolution loop assigns identity (item_id is loop-owned, never
+    # model-owned).
+    from src.sehd_v6.core.bccse.policy_genome import _validate_item_contract
+    from src.sehd_v6.core.bccse.v6_contracts import PolicyItem as _PolicyItem
+    ok, reason = _validate_item_contract(
+        _PolicyItem(
+            item_id="loop_assigned",
+            precondition=item.precondition,
+            action=item.action,
+            params=item.params,
+        ),
+        genome.registry,
+    )
+    assert ok, reason
+
+
+def test_intent_without_promotion_produces_no_candidate() -> None:
+    from src.sehd_v6.core.bccse.registry_promotion import (
+        promoted_intent_candidates,
+    )
+
+    genome = create_baseline_policy_genome()
+    _register_action_alias(genome)
+    enqueue_registry_validation(
+        genome=genome,
+        operation="register_action",
+        target="downgrade_coverage_instance",
+        facts=FACTS_QUARANTINED,
+        case_id="case_1",
+        intended_edit={
+            "precondition": "all_candidates_quarantined",
+            "params": {"side": "prosecution", "to_state": "unresolved"},
+        },
+    )
+    assert promoted_intent_candidates(genome, FACTS_QUARANTINED) == ()
+
+
+def test_stale_intent_after_vocabulary_drift_contributes_nothing() -> None:
+    from src.sehd_v6.core.bccse.registry_promotion import (
+        promoted_intent_candidates,
+    )
+
+    genome = create_baseline_policy_genome()
+    _register_action_alias(genome)
+    enqueue_registry_validation(
+        genome=genome,
+        operation="register_action",
+        target="downgrade_coverage_instance",
+        facts=FACTS_QUARANTINED,
+        case_id="case_1",
+        intended_edit={
+            "precondition": "all_candidates_quarantined",
+            "params": {"side": "prosecution", "to_state": "unresolved"},
+        },
+    )
+    promote_pending_registry_entries(
+        genome=genome,
+        facts=FACTS_QUARANTINED,
+        case_id="case_2",
+        reason_code=REGISTRATION_REASON,
+    )
+    promote_pending_registry_entries(
+        genome=genome,
+        facts=FACTS_QUARANTINED,
+        case_id="case_3",
+        reason_code=REGISTRATION_REASON,
+    )
+    # Retire the promoted alias the intent references: the candidate must
+    # vanish fail-closed instead of referencing a dead action.
+    genome.registry = apply_registry_edit(
+        genome.registry, operation="disable",
+        target="downgrade_coverage_instance",
+        reason_codes=(REGISTRATION_REASON,),
+    )
+    assert promoted_intent_candidates(genome, FACTS_QUARANTINED) == ()
+
+
+# ============================================================
+# P9: detector-side provider metas feed the usage ledger
+# ============================================================
+
+def test_detector_provider_usage_walker_records_surfaces() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.provider_usage import ProviderUsageLedger
+
+    ledger = ProviderUsageLedger()
+    result = {
+        "providers": {
+            "construct_census": {
+                "initial": {
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                    "cache_hit": False,
+                },
+                "repair": {
+                    "usage": {"prompt_tokens": 20},
+                    "cache_hit": False,
+                    "transport_attempts": 1,
+                },
+            },
+            "defense": {
+                "usage": {"prompt_tokens": 30},
+                "cache_hit": False,
+            },
+            "focused_prosecution": {
+                "candidate_1": {
+                    "usage": {"prompt_tokens": 40},
+                    "cache_hit": True,
+                },
+            },
+            "errored_surface": {"error_type": "TimeoutError"},
+        },
+    }
+    runner._record_detector_provider_usage(ledger, result, "source")
+    totals = ledger.totals()
+    assert totals["logical_calls"] == 4
+    assert totals["cache_hits"] == 1
+    # Tokens are billed for fresh calls only (cached ones are reported,
+    # never re-billed): 10 + 20 + 30 = 60.
+    assert totals["prompt_tokens"] == 60
+    assert totals["completion_tokens"] == 5
+    assert totals["transport_attempts"] == 1
+    by_purpose = totals["by_purpose"]
+    assert by_purpose["detector:source:defense"] == 1
+    assert by_purpose["detector:source:construct_census"] == 2
+    assert "errored_surface" not in " ".join(by_purpose)
+
+
+def test_detector_usage_walker_skips_non_mapping_results() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.provider_usage import ProviderUsageLedger
+
+    ledger = ProviderUsageLedger()
+    runner._record_detector_provider_usage(ledger, {"state": "unresolved"}, "source")
+    assert ledger.totals()["logical_calls"] == 0

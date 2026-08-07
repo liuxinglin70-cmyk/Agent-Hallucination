@@ -168,6 +168,7 @@ from .registry_promotion import (
     REGISTRY_REQUIRED_VALIDATION,
     enqueue_registry_validation,
     promote_pending_registry_entries,
+    promoted_intent_candidates,
 )
 from .vocabulary_registry import (
     AdjudicationFacts,
@@ -2428,6 +2429,33 @@ def _llm_no_conflict_gate(
     return False, reason, indices, True
 
 
+def _record_detector_provider_usage(
+    ledger: ProviderUsageLedger,
+    result: Mapping[str, Any],
+    budget_kind: str,
+) -> None:
+    """Record the per-surface provider metas a detection result carries.
+
+    The engine places one provider-meta dict per surface (usage, latency,
+    cache fields) in ``result["providers"]``; some surfaces nest their metas
+    (construct initial/repair, per-candidate focused prosecution), so walk
+    one level.  Error-only dicts (no ``usage`` key) are skipped: they carry
+    no billable tokens and the budget counters already account for the call.
+    """
+    providers = result.get("providers")
+    if not isinstance(providers, Mapping):
+        return
+    purpose = f"detector:{budget_kind}"
+    for surface, meta in providers.items():
+        if isinstance(meta, Mapping) and "usage" in meta:
+            ledger.record(purpose=f"{purpose}:{surface}", meta=meta)
+            continue
+        if isinstance(meta, Mapping):
+            for sub in meta.values():
+                if isinstance(sub, Mapping) and "usage" in sub:
+                    ledger.record(purpose=f"{purpose}:{surface}", meta=sub)
+
+
 def run_online_evolution(
     *,
     evolution_case_ids: Sequence[str],
@@ -3172,7 +3200,7 @@ def run_online_evolution(
         if policy_genome is not None:
             replay_kwargs["policy_genome"] = policy_genome
             replay_kwargs["policy_scope"] = policy_scope
-        return _run_detection_with_genome(
+        result = _run_detection_with_genome(
             genome=genome,
             case_id=case_id,
             record=_detector_record(records[case_id]),
@@ -3183,6 +3211,14 @@ def run_online_evolution(
             shared_cache_root=shared_cache_root,
             **replay_kwargs,
         )
+        # P0.2 detector side: the engine already surfaces one provider-meta
+        # dict per surface in the result's ``providers`` map (with usage /
+        # latency / cache fields); walk it and record every leaf into the
+        # same per-logical-call ledger the mutation path uses.
+        _record_detector_provider_usage(
+            provider_usage_ledger, result, budget_kind,
+        )
+        return result
 
     def run_mutation_call(**kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """Count attribution/reflection calls separately from detector calls."""
@@ -3588,7 +3624,9 @@ def run_online_evolution(
                 "reason": f"{type(exc).__name__}:{str(exc)[:200]}",
             })
             return
-        candidate, select_reason = select_registry_candidate(parsed, candidates)
+        candidate, select_reason = select_registry_candidate(
+            parsed, candidates, registry=policy_genome.registry,
+        )
         if candidate is None:
             l2_registry_registrations.append({
                 "outcome": "no_registration",
@@ -3633,6 +3671,14 @@ def run_online_evolution(
             target=applied_edit.target,
             facts=AdjudicationFacts(**dict(facts_summary)),
             case_id=case_id,
+            intended_edit=(
+                {
+                    "precondition": candidate.precondition,
+                    "params": dict(candidate.params),
+                }
+                if candidate.precondition or candidate.params
+                else None
+            ),
         )
         l2_registry_registrations.append({
             "outcome": (
@@ -3908,18 +3954,25 @@ def run_online_evolution(
         )
         planned_candidates = plan.candidates
         if not planned_candidates:
-            # When the attribution has no registered runtime action, the L2
-            # vocabulary itself may be extended (P3B): a constrained
-            # registration planner enumerates deterministic candidates and
-            # the model may only select one or abstain. A registered entry is
-            # pending (shadow-only) on first registration and never enters
-            # the active evaluator until a later audited promotion.
             if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
-                _run_registry_reflection(
-                    attribution=attribution,
-                    facts_summary=facts_summary,
-                    case_id=case_id,
-                )
+                # A promoted vocabulary entry carries the intended edit its
+                # model captured at registration time; before registering yet
+                # another entry, surface that intent as a concrete policy
+                # candidate so the promoted vocabulary is actually usable.
+                promoted = promoted_intent_candidates(policy_genome, facts)
+                if promoted:
+                    plan = PolicyPlan(
+                        candidates=promoted,
+                        route_result=ROUTE_EXECUTED,
+                        feedback_code="",
+                    )
+                    planned_candidates = promoted
+                else:
+                    _run_registry_reflection(
+                        attribution=attribution,
+                        facts_summary=facts_summary,
+                        case_id=case_id,
+                    )
             finish(
                 "skip_no_policy",
                 reason=plan.route_result,
