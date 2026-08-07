@@ -972,6 +972,58 @@ def test_type_experience_memory_from_dict_tolerates_corrupt_numeric_fields() -> 
     assert memory.to_dict()["max_per_type"] == 50
 
 
+def test_shared_cache_re_seeds_when_baseline_cache_changes(
+    tmp_path, monkeypatch,
+) -> None:
+    """A changed baseline cache must invalidate the previously seeded shared
+    copy instead of surviving forever behind its marker (R2)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    baseline = tmp_path / "baseline"
+    output_dir = tmp_path / "out"
+    shared = tmp_path / "shared"
+    for name in ("defense_cache", "layered_v2"):
+        directory = baseline / name
+        directory.mkdir(parents=True)
+        (directory / "a.json").write_text("{}", encoding="utf-8")
+
+    def detector(**kwargs):
+        return {
+            "state": "verified_clean", "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    monkeypatch.setattr(runner.v35, "adjudicate_case", detector)
+    genome = create_baseline_genome()
+    runner._run_detection_with_genome(
+        genome=genome, case_id="c1", record={}, config={},
+        output_dir=output_dir, census_root=tmp_path,
+        baseline_cache_root=baseline, shared_cache_root=shared,
+    )
+    marker = shared / genome.content_hash / ".baseline_cache_seeded"
+    assert marker.is_file()
+    assert (shared / genome.content_hash / "defense_cache" / "a.json").is_file()
+
+    # The baseline cache content changes; the next detection must refresh
+    # the shared seed instead of reusing the stale marker.
+    (baseline / "defense_cache" / "b.json").write_text("{}", encoding="utf-8")
+    runner._run_detection_with_genome(
+        genome=genome, case_id="c2", record={}, config={},
+        output_dir=output_dir, census_root=tmp_path,
+        baseline_cache_root=baseline, shared_cache_root=shared,
+    )
+    assert (shared / genome.content_hash / "defense_cache" / "b.json").is_file()
+
+    # Unchanged baseline content keeps the seed stable (no refresh churn).
+    prior_fingerprint = marker.read_text(encoding="utf-8").strip()
+    runner._run_detection_with_genome(
+        genome=genome, case_id="c3", record={}, config={},
+        output_dir=output_dir, census_root=tmp_path,
+        baseline_cache_root=baseline, shared_cache_root=shared,
+    )
+    assert marker.read_text(encoding="utf-8").strip() == prior_fingerprint
+
+
 def test_protected_evolved_rule_cannot_be_removed() -> None:
     child = apply_edit(create_baseline_genome(), _typed_edit())
     module = child.modules["evidence_obligation"]

@@ -1820,17 +1820,82 @@ def _run_detection_with_genome(
         "defense_cache", "appeal_prosecutor_cache", "appeal_defender_cache",
         "counterfactual_cache",
     )
+
+    def cache_seed_fingerprint(root: Path) -> str:
+        """Fingerprint the baseline cache content so a changed baseline
+        invalidates previously seeded copies (R2: a stale seed previously
+        survived forever once its marker existed).  File count and total
+        size per cache dir; the seed sources are rebuilt wholesale, so
+        content changes always move one of the two."""
+        digest = hashlib.sha256()
+        digest.update(str(root).encode("utf-8"))
+        for name in cache_dirs:
+            source = root / name
+            if not source.is_dir():
+                continue
+            total_bytes = 0
+            file_count = 0
+            for path in source.rglob("*"):
+                if path.is_file():
+                    try:
+                        total_bytes += path.stat().st_size
+                        file_count += 1
+                    except OSError:
+                        pass
+            digest.update(f"{name}:{file_count}:{total_bytes}".encode("utf-8"))
+        return digest.hexdigest()
+
+    def refresh_cache_seed(
+        *,
+        cache_root: Path,
+        marker_path: Path,
+    ) -> None:
+        """Seed or refresh ``cache_root`` from ``baseline_cache_root``.
+
+        The marker carries the seed fingerprint; when the baseline content
+        changed, the stale seeded directories are cleared and re-seeded.
+        Any failure degrades to keeping the existing cache (correct, just
+        potentially stale) instead of aborting the detection.
+        """
+        if baseline_cache_root is None:
+            return
+        fingerprint = cache_seed_fingerprint(Path(baseline_cache_root))
+        prior = ""
+        if marker_path.exists():
+            try:
+                prior = marker_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                prior = ""
+        if prior == fingerprint:
+            return
+        for name in cache_dirs:
+            target = cache_root / name
+            if target.exists():
+                try:
+                    shutil.rmtree(target)
+                except OSError:
+                    # Keep the stale cache when the clear fails (e.g. a file
+                    # is locked on Windows); correctness does not depend on
+                    # the refresh.
+                    pass
+        try:
+            for name in cache_dirs:
+                source = Path(baseline_cache_root) / name
+                if source.is_dir():
+                    shutil.copytree(source, cache_root / name, dirs_exist_ok=True)
+            marker_path.write_text(fingerprint + "\n", encoding="utf-8")
+        except OSError:
+            pass
+
     if shared_cache_root is not None:
         # Use the shared cache root passed by the caller (fixed path, not relative)
         shared_hash_root = Path(shared_cache_root) / genome.content_hash
         shared_hash_root.mkdir(parents=True, exist_ok=True)
         marker = shared_hash_root / ".baseline_cache_seeded"
-        if baseline_cache_root is not None and not marker.exists():
-            for name in cache_dirs:
-                source = Path(baseline_cache_root) / name
-                if source.is_dir():
-                    shutil.copytree(source, shared_hash_root / name, dirs_exist_ok=True)
-            marker.write_text("seeded\n", encoding="utf-8")
+        refresh_cache_seed(
+            cache_root=shared_hash_root,
+            marker_path=marker,
+        )
         # Create symlinks: genome_dir/<cache_name> -> shared_hash_root/<cache_name>
         for name in cache_dirs:
             link_path = genome_dir / name
@@ -1847,12 +1912,10 @@ def _run_detection_with_genome(
     else:
         # Fallback: original behavior (no sharing) for backward compatibility
         marker = genome_dir / ".baseline_cache_seeded"
-        if baseline_cache_root is not None and not marker.exists():
-            for name in cache_dirs:
-                source = Path(baseline_cache_root) / name
-                if source.is_dir():
-                    shutil.copytree(source, genome_dir / name, dirs_exist_ok=True)
-            marker.write_text("seeded\n", encoding="utf-8")
+        refresh_cache_seed(
+            cache_root=genome_dir,
+            marker_path=marker,
+        )
 
     # Evolution runs on the working scope: baseline + weak + strong items.
     # Conditional artifacts are not in the genome items (pending queue), and
