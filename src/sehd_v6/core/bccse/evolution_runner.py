@@ -2660,6 +2660,11 @@ def run_online_evolution(
         "mutation_repairs": 0,
         "mutation_retry_attempts": 0,
         "mutation_budget_exhausted": 0,
+        # A contrast replay that raised: the neighbour gate stays fail-open by
+        # design (it guards against overfitting, it is not a verdict
+        # authority), so without this counter a provider outage would silently
+        # disable the guard for every edit it touched.
+        "contrast_replay_errors": 0,
     }
     # v3.5.3: per-case stable failure categories for mutation retry feedback.
     # When a mutation returns an invalid schema, the case is requeued with
@@ -3081,9 +3086,12 @@ def run_online_evolution(
             parent_state = resolve_evolution_state(parent_result)
             child_state = resolve_evolution_state(child_result)
         except ValueError as exc:
+            # Distinct sentinels, never None: an audit consumer recomputing
+            # stability as ``before_state == after_state`` must not read two
+            # unresolved states as a preserved anchor.
             return False, {
-                "before_state": None,
-                "after_state": None,
+                "before_state": "unresolved_state_error",
+                "after_state": "unresolved_state_error_after",
                 "preserved": False,
                 "error": f"canary_state:{exc}",
             }
@@ -6677,6 +6685,7 @@ def run_online_evolution(
                         }
                     except Exception as exc:
                         inverted = False
+                        budget_usage["contrast_replay_errors"] += 1
                         contrast_audit = {
                             "neighbor_case_id": neighbor_id,
                             "state_before": neighbor_before_state,

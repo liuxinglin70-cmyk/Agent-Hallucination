@@ -174,7 +174,7 @@ def _proof_count(row: Mapping[str, Any], key: str, fallback: int) -> int:
         return fallback
     try:
         return max(0, int(proof.get(key) or 0))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
