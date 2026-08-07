@@ -67,10 +67,13 @@ class AdjudicationFacts:
     boundary_authority_valid: bool = False
     terminal_state: str = ""
     policy_stage: str = POLICY_STAGE_POST_LEDGER
-    # v6.1 扩展：上诉与定位状态
-    appeal_status: str = ""  # "pending" | "completed" | "failed" | ""
+    # v6.1 扩展：上诉与定位状态。值域必须与 proof_engine 实际输出一致：
+    # appeal_status: "not_required" | "complete" | "provider_error" |
+    #   "incomplete_initial_error_preserved" | "incomplete_fail_closed_unresolved"
+    appeal_status: str = ""
     appeal_triggered: bool = False
-    localization_status: str = ""  # "complete" | "not_applicable" | "failed_temporal_fallback" | ""
+    # localization_status: "complete" | "not_applicable" | "failed_temporal_fallback"
+    localization_status: str = ""
     responsible_step_available: bool = False
     # v6.1 扩展：隔离原因分布（封闭词表计数）
     quarantine_reason_schema_mismatch: int = 0
@@ -479,19 +482,21 @@ def _build_baseline_registry() -> VocabularyRegistry:
             "all_candidates_quarantined",
             "fully_quarantined",
         ),
-        # v6.1 扩展：上诉相关谓词
+        # v6.1 扩展：上诉相关谓词。值域匹配 proof_engine 实际输出：
+        # "incomplete_fail_closed_unresolved" = 上诉触发但未能完成且终态未决
+        # "provider_error" = 上诉触发但提供者调用失败
         _predicate(
             "appeal_pending_and_terminal_unresolved",
-            'appeal_triggered and appeal_status == "appeal_pending" and terminal_state == "unresolved"',
+            'appeal_triggered and appeal_status == "incomplete_fail_closed_unresolved" and terminal_state == "unresolved"',
         ),
         _predicate(
             "appeal_failed_with_surviving_errors",
-            'appeal_triggered and appeal_status == "appeal_failed" and surviving_error_count > 0',
+            'appeal_triggered and appeal_status == "provider_error" and surviving_error_count > 0',
         ),
-        # v6.1 扩展：定位相关谓词
+        # v6.1 扩展：定位相关谓词。引擎发出 "failed_temporal_fallback"
         _predicate(
             "localization_failed_with_temporal_fallback",
-            'localization_status == "localization_failed_temporal_fallback"',
+            'localization_status == "failed_temporal_fallback"',
         ),
         _predicate(
             "responsible_step_missing_and_verdict_error",
@@ -653,15 +658,17 @@ _FIELD_TYPES: dict[str, type] = {
 
 # Closed value vocabulary a predicate may compare against (string literals
 # are confined to the coverage/terminal/boundary states the facts can hold).
+# These must exactly match the values the proof engine emits at runtime;
+# the proof engine is the single authority for its own status strings.
 _DSL_ALLOWED_STRINGS = frozenset({
     "complete", "incomplete", "unresolved", "none",
     "verified_clean", "verified_error", "cleared",
-    # v6.1 扩展：上诉状态
-    "appeal_pending", "appeal_completed", "appeal_failed",
-    # v6.1 扩展：定位状态
-    "localization_complete", "localization_not_applicable",
-    "localization_failed_temporal_fallback",
-    # v6.1 扩展：隔离原因
+    # v6.1: appeal states emitted by proof_engine.py
+    "not_required", "provider_error",
+    "incomplete_initial_error_preserved", "incomplete_fail_closed_unresolved",
+    # v6.1: localization states emitted by proof_engine.py
+    "not_applicable", "failed_temporal_fallback",
+    # v6.1: quarantine reason categories from court audit failed_checks
     "schema_mismatch", "evidence_missing", "causal_broken",
 })
 

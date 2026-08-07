@@ -226,18 +226,18 @@ def _predicate_witnesses():
             _facts(fully_quarantined=True, required_candidate_count=1),
             _facts(fully_quarantined=False, required_candidate_count=1),
         ),
-        # v6.1 扩展谓词见证
+        # v6.1 扩展谓词见证：值域与 proof_engine 实际输出一致
         "appeal_pending_and_terminal_unresolved": (
-            _facts(appeal_triggered=True, appeal_status="appeal_pending", terminal_state="unresolved"),
+            _facts(appeal_triggered=True, appeal_status="incomplete_fail_closed_unresolved", terminal_state="unresolved"),
             _facts(appeal_triggered=False, appeal_status="", terminal_state="unresolved"),
         ),
         "appeal_failed_with_surviving_errors": (
-            _facts(appeal_triggered=True, appeal_status="appeal_failed", surviving_error_count=1),
-            _facts(appeal_triggered=True, appeal_status="appeal_failed", surviving_error_count=0),
+            _facts(appeal_triggered=True, appeal_status="provider_error", surviving_error_count=1),
+            _facts(appeal_triggered=True, appeal_status="provider_error", surviving_error_count=0),
         ),
         "localization_failed_with_temporal_fallback": (
-            _facts(localization_status="localization_failed_temporal_fallback"),
-            _facts(localization_status="localization_complete"),
+            _facts(localization_status="failed_temporal_fallback"),
+            _facts(localization_status="complete"),
         ),
         "responsible_step_missing_and_verdict_error": (
             _facts(responsible_step_available=False, terminal_state="verified_error"),
