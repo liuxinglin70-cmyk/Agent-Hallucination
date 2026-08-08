@@ -1351,6 +1351,153 @@ def _resolve_incomplete_appeal(
     }
 
 
+def _run_appeal_phase(
+    *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any],
+    output_dir: Path, providers: dict[str, Any],
+    appeal_candidates: list[dict[str, Any]],
+    prosecution: dict[str, Any], defense: dict[str, Any],
+    initial_proof: dict[str, Any],
+    initial_court_kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    """Run the H2 calibrated appeal: prosecution, informed defense, re-adjudication.
+
+    Why this function exists: the appeal stage chains four provider calls
+    (appeal prosecution, informed defense, deep certificate repair) with a
+    bounded retry each, then merges prosecutions and re-adjudicates under the
+    consensus gate. Every provider failure fails closed: the stage records
+    ``providers["appeal_error"]`` and returns ``{"error": exc}`` so the caller
+    preserves the locally authoritative initial verdict via
+    ``_resolve_incomplete_appeal`` with the original exception.
+    """
+    allowed_ids = {str(row.get("candidate_id") or "") for row in appeal_candidates}
+    try:
+        # H2: Appeal prosecution first; the informed defender needs to
+        # see the appeal prosecution certificates.
+        appeal_user = _appeal_prosecutor_user_v35(
+            built=built, candidates=appeal_candidates, base=base,
+            prosecution=prosecution, defense=defense, proof=initial_proof,
+        )
+        appeal_prosecution, providers["appeal_prosecutor"] = provider_call(
+            route=config["appeal_prosecutor_route"],
+            system=APPEAL_PROSECUTOR_SYSTEM_V35, user=appeal_user,
+            cache_dir=output_dir / "appeal_prosecutor_cache",
+        )
+        # v3.5.3: Validate the reviewed_candidate_ids contract. A
+        # structurally repairable failure (missing coverage state,
+        # missing/unreviewed ids, foreign candidate) triggers ONE
+        # bounded retry with a different request body — different cache
+        # key, structured case-agnostic feedback, no prompt poison.
+        appeal_prosecution = _validate_appeal_prosecution_contract_or_retry(
+            appeal_prosecution,
+            allowed_ids=allowed_ids,
+            retry_call=lambda failure_category: provider_call(
+                route=config["appeal_prosecutor_route"],
+                system=APPEAL_PROSECUTOR_RETRY_SYSTEM_V35,
+                user=_appeal_prosecutor_retry_user_v35(
+                    built=built, candidates=appeal_candidates, base=base,
+                    prosecution=prosecution, defense=defense, proof=initial_proof,
+                    failure_category=failure_category,
+                ),
+                cache_dir=output_dir / "appeal_prosecutor_cache" / "retry_1",
+            ),
+            providers=providers,
+        )
+
+        # H2: Informed defender (sees prosecution certificates)
+        appeal_defender_user = _appeal_defender_user_v35(
+            built=built, candidates=appeal_candidates, base=base,
+            prosecution=prosecution, defense=defense, proof=initial_proof,
+            appeal_prosecution=appeal_prosecution,
+        )
+        appeal_defense_certs, providers["appeal_defender"] = provider_call(
+            route=config["appeal_defender_route"],
+            system=APPEAL_DEFENDER_SYSTEM_V35, user=appeal_defender_user,
+            cache_dir=output_dir / "appeal_defender_cache",
+        )
+        # v3.5.4: Validate the defender coverage contract with ONE
+        # bounded retry, symmetric with the prosecutor above. A
+        # structurally repairable failure (missing coverage_state,
+        # missing/unreviewed target_candidate_ids, truncation)
+        # triggers ONE retry with a different request body (different
+        # cache key, structured case-agnostic feedback). The deeper
+        # per-certificate schema check stays in adjudicate_proof_court
+        # so a structurally complete but schema-invalid defense still
+        # fail-closes there — the retry never weakens the contract.
+        appeal_defense_certs = _validate_appeal_defense_contract_or_retry(
+            appeal_defense_certs,
+            allowed_ids=allowed_ids,
+            retry_call=lambda failure_category: provider_call(
+                route=config["appeal_defender_route"],
+                system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
+                user=_appeal_defender_retry_user_v35(
+                    built=built, candidates=appeal_candidates, base=base,
+                    prosecution=prosecution, defense=defense, proof=initial_proof,
+                    appeal_prosecution=appeal_prosecution,
+                    failure_category=failure_category,
+                ),
+                cache_dir=output_dir / "appeal_defender_cache" / "retry_1",
+            ),
+            providers=providers,
+        )
+
+        # v5.6: deep certificate-level defense validation with ONE
+        # bounded compact repair. The top-level contract retry above
+        # cannot see per-certificate schema failures (a structurally
+        # complete defense may still contain an invalid target_origin
+        # or evidence_ref). Give the defender one validator-driven
+        # repair for the specific failed candidates; the final court
+        # validator is unchanged and remains fail-closed.
+        appeal_defense_certs = _validate_appeal_defense_deep_or_repair(
+            appeal_defense_certs,
+            built=built,
+            candidates=appeal_candidates,
+            base=base,
+            prosecution=prosecution,
+            defense=defense,
+            proof=initial_proof,
+            appeal_prosecution=appeal_prosecution,
+            required_candidates=_required_candidates(base),
+            retry_call=lambda invalid_audits: provider_call(
+                route=config["appeal_defender_route"],
+                system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
+                user=_appeal_defender_deep_repair_user_v35(
+                    built=built, candidates=appeal_candidates, base=base,
+                    prosecution=prosecution, defense=defense, proof=initial_proof,
+                    appeal_prosecution=appeal_prosecution,
+                    invalid_audits=invalid_audits,
+                ),
+                cache_dir=output_dir / "appeal_defender_cache" / "deep_repair_1",
+            ),
+            providers=providers,
+        )
+
+        # Merge prosecutions
+        combined_prosecution = _merge_prosecutions(
+            prosecution, appeal_prosecution, built, allowed_ids,
+        )
+
+        # v3.5: adjudicate with consensus gate + appeal defense
+        appeal_court_kwargs = {
+            **initial_court_kwargs,
+            "prosecution": combined_prosecution,
+            "appeal_defense": appeal_defense_certs,
+            "initial_prosecution": prosecution,  # H2: for consensus gate
+            "apply_consensus_gate_flag": True,   # H2: enable consensus gate
+        }
+        proof = contract.adjudicate_proof_court(**appeal_court_kwargs)
+        return {
+            "proof": proof,
+            "appeal_prosecution": appeal_prosecution,
+            "appeal_defense_certs": appeal_defense_certs,
+            "combined_prosecution": combined_prosecution,
+            "final_court_kwargs": dict(appeal_court_kwargs),
+            "error": None,
+        }
+    except Exception as exc:
+        providers["appeal_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
+        return {"error": exc}
+
+
 # ============================================================
 # Main adjudication pipeline
 # ============================================================
@@ -1466,126 +1613,23 @@ def adjudicate_case(
         )
 
         if appeal_candidates:
-            allowed_ids = {str(row.get("candidate_id") or "") for row in appeal_candidates}
-            try:
-                # H2: Appeal prosecution first; the informed defender needs to
-                # see the appeal prosecution certificates.
-                appeal_user = _appeal_prosecutor_user_v35(
-                    built=built, candidates=appeal_candidates, base=base,
-                    prosecution=prosecution, defense=defense, proof=initial_proof,
+            appeal_outcome = _run_appeal_phase(
+                built=built, base=base, config=config, output_dir=output_dir,
+                providers=providers, appeal_candidates=appeal_candidates,
+                prosecution=prosecution, defense=defense,
+                initial_proof=initial_proof,
+                initial_court_kwargs=initial_court_kwargs,
+            )
+            if appeal_outcome["error"] is None:
+                proof = appeal_outcome["proof"]
+                appeal_prosecution = appeal_outcome["appeal_prosecution"]
+                appeal_defense_certs = appeal_outcome["appeal_defense_certs"]
+                combined_prosecution = appeal_outcome["combined_prosecution"]
+                final_court_kwargs = appeal_outcome["final_court_kwargs"]
+            else:
+                proof = _resolve_incomplete_appeal(
+                    initial_proof, appeal_outcome["error"],
                 )
-                appeal_prosecution, providers["appeal_prosecutor"] = provider_call(
-                    route=config["appeal_prosecutor_route"],
-                    system=APPEAL_PROSECUTOR_SYSTEM_V35, user=appeal_user,
-                    cache_dir=output_dir / "appeal_prosecutor_cache",
-                )
-                # v3.5.3: Validate the reviewed_candidate_ids contract. A
-                # structurally repairable failure (missing coverage state,
-                # missing/unreviewed ids, foreign candidate) triggers ONE
-                # bounded retry with a different request body — different cache
-                # key, structured case-agnostic feedback, no prompt poison.
-                appeal_prosecution = _validate_appeal_prosecution_contract_or_retry(
-                    appeal_prosecution,
-                    allowed_ids=allowed_ids,
-                    retry_call=lambda failure_category: provider_call(
-                        route=config["appeal_prosecutor_route"],
-                        system=APPEAL_PROSECUTOR_RETRY_SYSTEM_V35,
-                        user=_appeal_prosecutor_retry_user_v35(
-                            built=built, candidates=appeal_candidates, base=base,
-                            prosecution=prosecution, defense=defense, proof=initial_proof,
-                            failure_category=failure_category,
-                        ),
-                        cache_dir=output_dir / "appeal_prosecutor_cache" / "retry_1",
-                    ),
-                    providers=providers,
-                )
-
-                # H2: Informed defender (sees prosecution certificates)
-                appeal_defender_user = _appeal_defender_user_v35(
-                    built=built, candidates=appeal_candidates, base=base,
-                    prosecution=prosecution, defense=defense, proof=initial_proof,
-                    appeal_prosecution=appeal_prosecution,
-                )
-                appeal_defense_certs, providers["appeal_defender"] = provider_call(
-                    route=config["appeal_defender_route"],
-                    system=APPEAL_DEFENDER_SYSTEM_V35, user=appeal_defender_user,
-                    cache_dir=output_dir / "appeal_defender_cache",
-                )
-                # v3.5.4: Validate the defender coverage contract with ONE
-                # bounded retry, symmetric with the prosecutor above. A
-                # structurally repairable failure (missing coverage_state,
-                # missing/unreviewed target_candidate_ids, truncation)
-                # triggers ONE retry with a different request body (different
-                # cache key, structured case-agnostic feedback). The deeper
-                # per-certificate schema check stays in adjudicate_proof_court
-                # so a structurally complete but schema-invalid defense still
-                # fail-closes there — the retry never weakens the contract.
-                appeal_defense_certs = _validate_appeal_defense_contract_or_retry(
-                    appeal_defense_certs,
-                    allowed_ids=allowed_ids,
-                    retry_call=lambda failure_category: provider_call(
-                        route=config["appeal_defender_route"],
-                        system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
-                        user=_appeal_defender_retry_user_v35(
-                            built=built, candidates=appeal_candidates, base=base,
-                            prosecution=prosecution, defense=defense, proof=initial_proof,
-                            appeal_prosecution=appeal_prosecution,
-                            failure_category=failure_category,
-                        ),
-                        cache_dir=output_dir / "appeal_defender_cache" / "retry_1",
-                    ),
-                    providers=providers,
-                )
-
-                # v5.6: deep certificate-level defense validation with ONE
-                # bounded compact repair. The top-level contract retry above
-                # cannot see per-certificate schema failures (a structurally
-                # complete defense may still contain an invalid target_origin
-                # or evidence_ref). Give the defender one validator-driven
-                # repair for the specific failed candidates; the final court
-                # validator is unchanged and remains fail-closed.
-                appeal_defense_certs = _validate_appeal_defense_deep_or_repair(
-                    appeal_defense_certs,
-                    built=built,
-                    candidates=appeal_candidates,
-                    base=base,
-                    prosecution=prosecution,
-                    defense=defense,
-                    proof=initial_proof,
-                    appeal_prosecution=appeal_prosecution,
-                    required_candidates=_required_candidates(base),
-                    retry_call=lambda invalid_audits: provider_call(
-                        route=config["appeal_defender_route"],
-                        system=APPEAL_DEFENDER_RETRY_SYSTEM_V35,
-                        user=_appeal_defender_deep_repair_user_v35(
-                            built=built, candidates=appeal_candidates, base=base,
-                            prosecution=prosecution, defense=defense, proof=initial_proof,
-                            appeal_prosecution=appeal_prosecution,
-                            invalid_audits=invalid_audits,
-                        ),
-                        cache_dir=output_dir / "appeal_defender_cache" / "deep_repair_1",
-                    ),
-                    providers=providers,
-                )
-
-                # Merge prosecutions
-                combined_prosecution = _merge_prosecutions(
-                    prosecution, appeal_prosecution, built, allowed_ids,
-                )
-
-                # v3.5: adjudicate with consensus gate + appeal defense
-                appeal_court_kwargs = {
-                    **initial_court_kwargs,
-                    "prosecution": combined_prosecution,
-                    "appeal_defense": appeal_defense_certs,
-                    "initial_prosecution": prosecution,  # H2: for consensus gate
-                    "apply_consensus_gate_flag": True,   # H2: enable consensus gate
-                }
-                proof = contract.adjudicate_proof_court(**appeal_court_kwargs)
-                final_court_kwargs = dict(appeal_court_kwargs)
-            except Exception as exc:
-                providers["appeal_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
-                proof = _resolve_incomplete_appeal(initial_proof, exc)
 
         # H3: Two-Phase Localization (only if multiple surviving origins)
         surviving_ids = proof.get("surviving_error_certificate_ids") or []
