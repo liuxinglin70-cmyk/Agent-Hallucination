@@ -20,7 +20,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .genome import ALLOWED_VERDICTS, MODULE_IDS, MODULE_STAGE
+from .vocabulary import ALLOWED_VERDICTS
+from .genome import MODULE_IDS, MODULE_STAGE
 
 
 @dataclass(frozen=True)

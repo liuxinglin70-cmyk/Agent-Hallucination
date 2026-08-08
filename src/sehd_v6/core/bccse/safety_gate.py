@@ -24,16 +24,15 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from .genome import (
-    FORBIDDEN_CONTENT_MARKERS,
     MODULE_IDS,
     SkillOp,
     SkillGenome,
     _detect_rule_direction,
-    semantic_overlap,
     validate_runtime_rule,
     DEDUP_LOW_THRESHOLD,
     DEDUP_HIGH_THRESHOLD,
 )
+from .vocabulary import FORBIDDEN_CONTENT_MARKERS, semantic_overlap
 from .rule_contract import RuleSpec, validate_rule_spec
 
 

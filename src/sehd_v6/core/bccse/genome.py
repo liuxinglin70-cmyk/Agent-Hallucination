@@ -28,15 +28,13 @@ from typing import Any, Mapping
 # Module IDs and Stage Mapping (preserved from v4)
 # ============================================================
 
-MODULE_IDS = (
-    "candidate_trigger",
-    "evidence_obligation",
-    "candidate_to_verifier_route",
-    "atomic_verifier_instruction",
-    "clean_defense_boundary",
-    "causal_link_test",
-    "earliest_origin_tiebreak",
-    "abstention_rule",
+from .vocabulary import (
+    ALLOWED_VERDICTS,
+    FORBIDDEN_CONTENT_MARKERS,
+    LOCAL_NEGATION_MODULES,
+    MODULE_IDS,
+    semantic_overlap,
+    validate_feature_description,
 )
 
 MODULE_DISPLAY_NAMES: dict[str, str] = {
@@ -97,24 +95,6 @@ FITNESS_STATUS_STRONG = "strong"
 DEDUP_LOW_THRESHOLD = 0.70
 DEDUP_HIGH_THRESHOLD = 0.95
 
-# Modules allowed to directly emit a final verdict.
-# Key = module_id, Value = frozenset of allowed verdict tokens.
-# Rationale (from v5.1 success + R2 failure analysis):
-#   - abstention_rule: its job IS the final adjudication boundary
-#   - clean_defense_boundary: v5.1 proved defense→clean is effective
-#   - causal_link_test: may deny a causal link (local negation only)
-#   - all others: CRS/coverage not yet computed or wrong semantic layer
-ALLOWED_VERDICTS: dict[str, frozenset[str]] = {
-    "abstention_rule": frozenset({"clean", "error", "unresolved"}),
-    "clean_defense_boundary": frozenset({"clean"}),
-}
-
-# Modules allowed to perform local negation (not a final verdict).
-# causal_link_test may say "causal link does not hold" which weakens
-# the prosecution but does not directly emit clean/error/unresolved.
-LOCAL_NEGATION_MODULES: frozenset[str] = frozenset({"causal_link_test"})
-
-
 # ============================================================
 # Operations
 # ============================================================
@@ -124,57 +104,6 @@ class SkillOp(str, Enum):
     ADD_RULE = "add_rule"
     MODIFY_RULE = "modify_rule"
     REMOVE_RULE = "remove_rule"
-
-
-# ============================================================
-# Forbidden content (firewall against leakage)
-# ============================================================
-
-FORBIDDEN_CONTENT_MARKERS = frozenset({
-    "case_id", "source_id", "agent_id", "model_id",
-    "gold_explanation_text", "outer_metric", "outer_error",
-    "example_specific_fact", "continuous_threshold_search",
-})
-
-_FEATURE_POISON_PATTERNS = (
-    r"https?://",
-    r"\b(?:case|source|agent|model)[-_ ]?id\b",
-    r"\b(?:case|source)[_-]\d+\b",
-    r"\bag_\w{8,}\b",
-    r"\b0x[0-9a-f]{6,}\b",
-    r"\b(?:gold|ground[ -]?truth|golden label)\b",
-    r"(?:\u91d1\u6807|\u7b54\u6848|\u6b63\u786e\u6807\u7b7e|"
-    r"\u771f\u5b9e\u6807\u7b7e|\u672c\u6848\u4f8b|\u8fd9\u4e2a\u6848\u4f8b)",
-    r"\b(?:ignore|disregard|override)\s+(?:all\s+)?"
-    r"(?:previous|prior|above|system|developer)\b.{0,40}"
-    r"\b(?:instruction|prompt|rule|message)s?\b",
-    r"\b(?:system|developer|assistant)\s+(?:prompt|message)\b",
-    r"\b(?:you are|follow these instructions|output only|return json)\b",
-    r"\b(?:instruction|prompt)\s*:",
-    r"^(?:ignore|follow|output|return|write|add|remove|modify|delete|always|never|must)\b",
-    r"\b[a-z][a-z_]+/\d+\b",
-)
-
-
-def validate_feature_description(content: str) -> tuple[bool, str]:
-    """Validate label-free feature provenance before it can reach prompts.
-
-    Feature descriptions are persisted and later included in reflection
-    context, so they need the same case/gold/URL boundary as runtime rules plus
-    an explicit prompt-instruction boundary. Empty descriptions are allowed;
-    the typed trajectory extractor can supply a safe fallback.
-    """
-    normalized = " ".join(str(content or "").split())
-    if len(normalized) > 500:
-        return False, "feature_description_too_long"
-    lowered = normalized.lower()
-    for marker in FORBIDDEN_CONTENT_MARKERS:
-        if marker in lowered:
-            return False, f"feature_forbidden_content:{marker}"
-    for pattern in _FEATURE_POISON_PATTERNS:
-        if re.search(pattern, lowered, flags=re.IGNORECASE | re.DOTALL):
-            return False, f"feature_prompt_or_case_pollution:{pattern}"
-    return True, ""
 
 
 def sanitize_feature_description(content: str) -> str:
@@ -974,24 +903,6 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             return False, f"protected_rule: fitness_status={status}"
 
     return True, ""
-
-
-def semantic_overlap(text_a: str, text_b: str) -> float:
-    """Compute language-agnostic character-bigram Jaccard similarity."""
-    def tokens(text: str) -> set[str]:
-        normalized = re.sub(r"[\W_]+", "", text.lower(), flags=re.UNICODE)
-        if len(normalized) < 2:
-            return {normalized} if normalized else set()
-        return {
-            normalized[index:index + 2]
-            for index in range(len(normalized) - 1)
-        }
-
-    tokens_a = tokens(text_a)
-    tokens_b = tokens(text_b)
-    if not tokens_a or not tokens_b:
-        return 0.0
-    return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
 
 def _detect_rule_direction(rule_text: str) -> str:

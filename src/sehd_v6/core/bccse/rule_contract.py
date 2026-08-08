@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .genome import (
+from .vocabulary import (
     ALLOWED_VERDICTS,
     FORBIDDEN_CONTENT_MARKERS,
     LOCAL_NEGATION_MODULES,

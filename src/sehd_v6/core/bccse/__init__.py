@@ -33,11 +33,11 @@ from .genome import (
     create_baseline_genome,
     apply_edit,
     validate_edit,
-    semantic_overlap,
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
     FITNESS_STATUS_STRONG,
 )
+from .vocabulary import semantic_overlap
 from .step_attributor import (
     ErrorType,
     ReflectionType,
