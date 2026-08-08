@@ -3210,6 +3210,88 @@ def _selected_canaries(
     return ranked[:requested]
 
 
+def _run_mutation_call(
+    *, budget_usage: dict[str, int], max_mutation_calls: int,
+    provider_usage_ledger: ProviderUsageLedger, **kwargs: Any,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Count attribution/reflection calls separately from detector calls."""
+    if budget_usage["mutation_calls"] >= max_mutation_calls:
+        budget_usage["mutation_budget_exhausted"] += 1
+        raise RuntimeError("mutation_call_budget_exhausted")
+    budget_usage["mutation_calls"] += 1
+    try:
+        parsed, meta = json_object_provider_call(**kwargs)
+    except Exception:
+        budget_usage["mutation_errors"] += 1
+        raise
+    if isinstance(meta, Mapping) and meta.get("cache_hit"):
+        budget_usage["mutation_cache_hits"] += 1
+    if isinstance(meta, Mapping):
+        # Cache hits served zero network traffic; their recorded
+        # transport attempts/repair flag belong to the original call and
+        # must not be re-counted on every replay of the cached entry.
+        if not meta.get("cache_hit"):
+            budget_usage["mutation_transport_attempts"] += int(
+                meta.get("transport_attempts") or 0
+            )
+            budget_usage["mutation_repairs"] += int(
+                bool(meta.get("repair_used"))
+            )
+    provider_usage_ledger.record(
+        purpose=str(kwargs.get("purpose") or "mutation"),
+        meta=meta if isinstance(meta, Mapping) else None,
+    )
+    return parsed, meta
+
+
+def _run_counted_detection(
+    *, budget_kind: str, genome: SkillGenome, case_id: str,
+    output_path: Path, budget_usage: dict[str, int],
+    records: Mapping[str, dict[str, Any]], config: dict[str, Any],
+    census_root: Path | None, baseline_cache_root: Path | None,
+    shared_cache_root: Path | None,
+    provider_usage_ledger: ProviderUsageLedger,
+    policy_genome: PolicyGenome | None = None,
+    policy_scope: str | None = "working",
+) -> dict[str, Any]:
+    """Run one detector call in a counted, label-free envelope."""
+    budget_usage["provider_calls"] += 1
+    budget_usage["detector_calls"] += 1
+    budget_field = {
+        "source": "source_replays",
+        "canary": "canary_cases",
+        "contrast": "contrast_replays",
+        "policy": "policy_replays",
+        "probe": "probe_cases",
+    }.get(budget_kind)
+    if budget_field is not None:
+        # Debit before dispatch so runtime-invalid attempts are auditable.
+        budget_usage[budget_field] += 1
+    replay_kwargs: dict[str, Any] = {}
+    if policy_genome is not None:
+        replay_kwargs["policy_genome"] = policy_genome
+        replay_kwargs["policy_scope"] = policy_scope
+    result = _run_detection_with_genome(
+        genome=genome,
+        case_id=case_id,
+        record=_detector_record(records[case_id]),
+        config=config,
+        output_dir=output_path,
+        census_root=census_root,
+        baseline_cache_root=baseline_cache_root,
+        shared_cache_root=shared_cache_root,
+        **replay_kwargs,
+    )
+    # P0.2 detector side: the engine already surfaces one provider-meta
+    # dict per surface in the result's ``providers`` map (with usage /
+    # latency / cache fields); walk it and record every leaf into the
+    # same per-logical-call ledger the mutation path uses.
+    _record_detector_provider_usage(
+        provider_usage_ledger, result, budget_kind,
+    )
+    return result
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -3648,71 +3730,22 @@ def run_online_evolution(
         policy_scope: str | None = "working",
     ) -> dict[str, Any]:
         """Run one detector call in a counted, label-free envelope."""
-        budget_usage["provider_calls"] += 1
-        budget_usage["detector_calls"] += 1
-        budget_field = {
-            "source": "source_replays",
-            "canary": "canary_cases",
-            "contrast": "contrast_replays",
-            "policy": "policy_replays",
-            "probe": "probe_cases",
-        }.get(budget_kind)
-        if budget_field is not None:
-            # Debit before dispatch so runtime-invalid attempts are auditable.
-            budget_usage[budget_field] += 1
-        replay_kwargs: dict[str, Any] = {}
-        if policy_genome is not None:
-            replay_kwargs["policy_genome"] = policy_genome
-            replay_kwargs["policy_scope"] = policy_scope
-        result = _run_detection_with_genome(
-            genome=genome,
-            case_id=case_id,
-            record=_detector_record(records[case_id]),
-            config=config,
-            output_dir=output_path,
-            census_root=census_root,
+        return _run_counted_detection(
+            budget_kind=budget_kind, genome=genome, case_id=case_id,
+            output_path=output_path, budget_usage=budget_usage,
+            records=records, config=config, census_root=census_root,
             baseline_cache_root=baseline_cache_root,
             shared_cache_root=shared_cache_root,
-            **replay_kwargs,
+            provider_usage_ledger=provider_usage_ledger,
+            policy_genome=policy_genome, policy_scope=policy_scope,
         )
-        # P0.2 detector side: the engine already surfaces one provider-meta
-        # dict per surface in the result's ``providers`` map (with usage /
-        # latency / cache fields); walk it and record every leaf into the
-        # same per-logical-call ledger the mutation path uses.
-        _record_detector_provider_usage(
-            provider_usage_ledger, result, budget_kind,
-        )
-        return result
 
     def run_mutation_call(**kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """Count attribution/reflection calls separately from detector calls."""
-        if budget_usage["mutation_calls"] >= max_mutation_calls:
-            budget_usage["mutation_budget_exhausted"] += 1
-            raise RuntimeError("mutation_call_budget_exhausted")
-        budget_usage["mutation_calls"] += 1
-        try:
-            parsed, meta = json_object_provider_call(**kwargs)
-        except Exception:
-            budget_usage["mutation_errors"] += 1
-            raise
-        if isinstance(meta, Mapping) and meta.get("cache_hit"):
-            budget_usage["mutation_cache_hits"] += 1
-        if isinstance(meta, Mapping):
-            # Cache hits served zero network traffic; their recorded
-            # transport attempts/repair flag belong to the original call and
-            # must not be re-counted on every replay of the cached entry.
-            if not meta.get("cache_hit"):
-                budget_usage["mutation_transport_attempts"] += int(
-                    meta.get("transport_attempts") or 0
-                )
-                budget_usage["mutation_repairs"] += int(
-                    bool(meta.get("repair_used"))
-                )
-        provider_usage_ledger.record(
-            purpose=str(kwargs.get("purpose") or "mutation"),
-            meta=meta if isinstance(meta, Mapping) else None,
+        return _run_mutation_call(
+            budget_usage=budget_usage, max_mutation_calls=max_mutation_calls,
+            provider_usage_ledger=provider_usage_ledger, **kwargs,
         )
-        return parsed, meta
 
     # Seed independent label-free anchors before processing the evolution
     # sample. Without this explicit pool, an all-triggered sample has no

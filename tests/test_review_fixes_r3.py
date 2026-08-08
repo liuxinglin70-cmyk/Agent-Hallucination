@@ -386,11 +386,9 @@ def test_r37_mutation_calls_record_into_the_ledger() -> None:
     # The ledger is instantiated once per run and records every logical
     # mutation/reflection call with the provider meta in hand.
     assert "provider_usage_ledger = ProviderUsageLedger()" in source
-    assert "provider_usage_ledger.record(" in source
-    # The record call must sit in run_mutation_call, after the counters are
+    # The record call sits in _run_mutation_call, after the counters are
     # updated and the meta is known.
-    start = source.index("def run_mutation_call(")
-    handler = source[start : source.index("def persist_progress(", start)]
+    handler = inspect.getsource(evolution_runner._run_mutation_call)
     assert "provider_usage_ledger.record(" in handler
 
 
