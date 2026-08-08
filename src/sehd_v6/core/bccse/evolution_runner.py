@@ -3106,6 +3106,110 @@ def _build_evolution_result(
     )
 
 
+# ============================================================
+# Per-run detector/attribution helpers (extracted from the main loop)
+# ============================================================
+
+def _canary_preserved(
+    parent_result: Mapping[str, Any],
+    child_result: Mapping[str, Any],
+) -> tuple[bool, dict[str, Any]]:
+    """Require both verdict and process stability on a replay anchor."""
+    try:
+        parent_state = resolve_evolution_state(parent_result)
+        child_state = resolve_evolution_state(child_result)
+    except ValueError as exc:
+        # Distinct sentinels, never None: an audit consumer recomputing
+        # stability as ``before_state == after_state`` must not read two
+        # unresolved states as a preserved anchor.
+        return False, {
+            "before_state": "unresolved_state_error",
+            "after_state": "unresolved_state_error_after",
+            "preserved": False,
+            "error": f"canary_state:{exc}",
+        }
+    try:
+        parent_signal = attribute_failure(parent_result, use_gold=False)
+        child_signal = attribute_failure(child_result, use_gold=False)
+        parent_triggered = parent_signal.should_evolve
+        child_triggered = child_signal.should_evolve
+    except Exception as exc:
+        return False, {
+            "before_state": parent_state,
+            "after_state": child_state,
+            "preserved": False,
+            "error": f"canary_attribution:{type(exc).__name__}:{exc}",
+        }
+    preserved = (
+        parent_state == child_state
+        and bool(child_result.get("runtime_valid"))
+        and not parent_triggered
+        and not child_triggered
+    )
+    return preserved, {
+        "before_state": parent_state,
+        "after_state": child_state,
+        "before_should_evolve": parent_triggered,
+        "after_should_evolve": child_triggered,
+        "runtime_valid": bool(child_result.get("runtime_valid")),
+        "preserved": preserved,
+    }
+
+
+def _attribution_for_result(
+    result: Mapping[str, Any], case_id: str, *,
+    records: Mapping[str, dict[str, Any]],
+    use_gold: bool, gold_reflection: bool,
+) -> AttributionSignal:
+    """Join gold to attribution only under the explicit use_gold opt-in."""
+    payload = dict(result)
+    if use_gold:
+        gold = _evaluator_gold(records[case_id])
+        if gold is not None:
+            payload["gold_label"] = gold
+            # ``gold_steps`` is the authoritative localization-correctness
+            # input (``responsible_step_correct`` in fitness); it was
+            # stripped by the detector firewall like every evaluator field,
+            # so it is re-joined here under the same explicit opt-in.  A
+            # gold error case without gold_steps stays
+            # responsible_step_correct=False in fitness (documented
+            # behaviour: unverified localization is not evidence of a
+            # defect, but also not evidence of correctness).
+            payload["gold_steps"] = records[case_id].get("gold_steps")
+    return attribute_failure(
+        payload, use_gold=use_gold, gold_reflection=gold_reflection,
+    )
+
+
+def _fitness_gold_label(
+    case_id: str, *,
+    records: Mapping[str, dict[str, Any]], fitness_use_gold: bool,
+) -> bool | None:
+    if not fitness_use_gold:
+        return None
+    return _evaluator_gold(records[case_id])
+
+
+def _selected_canaries(
+    edit: SkillEdit, *,
+    stable_canaries: dict[str, dict[str, Any]], canary_limit: int,
+    genome_content_hash: str,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Deterministically sample a small risk-adaptive canary set."""
+    if not stable_canaries or canary_limit == 0:
+        return []
+    requested = canary_limit
+    if edit.operation == SkillOp.ADD_RULE:
+        requested = min(requested, 1)
+    ranked = sorted(
+        stable_canaries.items(),
+        key=lambda item: hashlib.sha256(
+            f"{genome_content_hash}:{edit.edit_id}:{item[0]}".encode("utf-8")
+        ).hexdigest(),
+    )
+    return ranked[:requested]
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -3528,51 +3632,6 @@ def run_online_evolution(
     if run_id is None:
         run_id = f"bccse_v5_{uuid.uuid4().hex[:8]}"
 
-    def canary_preserved(
-        parent_result: Mapping[str, Any],
-        child_result: Mapping[str, Any],
-    ) -> tuple[bool, dict[str, Any]]:
-        """Require both verdict and process stability on a replay anchor."""
-        try:
-            parent_state = resolve_evolution_state(parent_result)
-            child_state = resolve_evolution_state(child_result)
-        except ValueError as exc:
-            # Distinct sentinels, never None: an audit consumer recomputing
-            # stability as ``before_state == after_state`` must not read two
-            # unresolved states as a preserved anchor.
-            return False, {
-                "before_state": "unresolved_state_error",
-                "after_state": "unresolved_state_error_after",
-                "preserved": False,
-                "error": f"canary_state:{exc}",
-            }
-        try:
-            parent_signal = attribute_failure(parent_result, use_gold=False)
-            child_signal = attribute_failure(child_result, use_gold=False)
-            parent_triggered = parent_signal.should_evolve
-            child_triggered = child_signal.should_evolve
-        except Exception as exc:
-            return False, {
-                "before_state": parent_state,
-                "after_state": child_state,
-                "preserved": False,
-                "error": f"canary_attribution:{type(exc).__name__}:{exc}",
-            }
-        preserved = (
-            parent_state == child_state
-            and bool(child_result.get("runtime_valid"))
-            and not parent_triggered
-            and not child_triggered
-        )
-        return preserved, {
-            "before_state": parent_state,
-            "after_state": child_state,
-            "before_should_evolve": parent_triggered,
-            "after_should_evolve": child_triggered,
-            "runtime_valid": bool(child_result.get("runtime_valid")),
-            "preserved": preserved,
-        }
-
     print(f"[{run_id}] Starting online evolution: {len(evolution_case_ids)} cases")
     print(f"  Config: use_gold={use_gold}, cooldown={module_cooldown}, "
           f"max_edits={max_total_edits}, convergence_window={convergence_window}")
@@ -3655,29 +3714,6 @@ def run_online_evolution(
         )
         return parsed, meta
 
-    def attribution_for(
-        result: Mapping[str, Any],
-        case_id: str,
-    ) -> AttributionSignal:
-        """Join gold to attribution only under the explicit use_gold opt-in."""
-        payload = dict(result)
-        if use_gold:
-            gold = _evaluator_gold(records[case_id])
-            if gold is not None:
-                payload["gold_label"] = gold
-                # ``gold_steps`` is the authoritative localization-correctness
-                # input (``responsible_step_correct`` in fitness); it was
-                # stripped by the detector firewall like every evaluator field,
-                # so it is re-joined here under the same explicit opt-in.  A
-                # gold error case without gold_steps stays
-                # responsible_step_correct=False in fitness (documented
-                # behaviour: unverified localization is not evidence of a
-                # defect, but also not evidence of correctness).
-                payload["gold_steps"] = records[case_id].get("gold_steps")
-        return attribute_failure(
-            payload, use_gold=use_gold, gold_reflection=gold_reflection,
-        )
-
     # Seed independent label-free anchors before processing the evolution
     # sample. Without this explicit pool, an all-triggered sample has no
     # stable case available for the non-regression gate.
@@ -3693,7 +3729,10 @@ def run_online_evolution(
                     output_dir / "baseline_canaries" / canary_id.replace("/", "_")
                 ),
             )
-            canary_signal = attribution_for(canary_result, canary_id)
+            canary_signal = _attribution_for_result(
+                canary_result, canary_id, records=records,
+                use_gold=use_gold, gold_reflection=gold_reflection,
+            )
             audit.update({
                 "state": resolve_evolution_state(canary_result),
                 "should_evolve": canary_signal.should_evolve,
@@ -3716,23 +3755,6 @@ def run_online_evolution(
             "label-free evolution cannot distinguish directional evidence "
             "from self-confirmation"
         )
-
-    def selected_canaries(edit: SkillEdit) -> list[tuple[str, dict[str, Any]]]:
-        """Deterministically sample a small risk-adaptive canary set."""
-        if not stable_canaries or canary_limit == 0:
-            return []
-        requested = canary_limit
-        if edit.operation == SkillOp.ADD_RULE:
-            requested = min(requested, 1)
-        ranked = sorted(
-            stable_canaries.items(),
-            key=lambda item: hashlib.sha256(
-                f"{current_genome.content_hash}:{edit.edit_id}:{item[0]}".encode(
-                    "utf-8"
-                )
-            ).hexdigest(),
-        )
-        return ranked[:requested]
 
     def persist_progress(next_case_index: int, status: str = "in_progress") -> None:
         pending_probe_payloads = []
@@ -4016,11 +4038,6 @@ def run_online_evolution(
         updated = replace(episode, attempts=(*episode.attempts, attempt))
         causal_memory.upsert_attempt(updated, attempt)
         active_episode_payload = updated.to_dict()
-
-    def fitness_gold(case_id: str) -> bool | None:
-        if not fitness_use_gold:
-            return None
-        return _evaluator_gold(records[case_id])
 
     def _run_registry_reflection(
         *,
@@ -4351,7 +4368,9 @@ def run_online_evolution(
                     layer=LAYER_L2,
                     artifact=attribution.artifact,
                     reason_code=attribution.reason_code,
-                    promotable=(state_improved and fitness_gold(case_id) is not None),
+                    promotable=(state_improved and _fitness_gold_label(
+                        case_id, records=records, fitness_use_gold=fitness_use_gold,
+                    ) is not None),
                     diagnostic_only=False,
                 ),
                 feature_description=(
@@ -4584,7 +4603,9 @@ def run_online_evolution(
                 replay=replay_result,
             )
             return
-        gold_label = fitness_gold(case_id)
+        gold_label = _fitness_gold_label(
+            case_id, records=records, fitness_use_gold=fitness_use_gold,
+        )
         if state_changed:
             if gold_label is None:
                 finish(
@@ -5591,7 +5612,10 @@ def run_online_evolution(
         detection_state = resolve_evolution_state(detection_result)
 
         # --- [2] Causal process reflection (self-supervised trigger) ---
-        signal = attribution_for(detection_result, case_id)
+        signal = _attribution_for_result(
+            detection_result, case_id, records=records,
+            use_gold=use_gold, gold_reflection=gold_reflection,
+        )
 
         # --- Deterministic failure attribution (artifact-first) ---
         # The classifier runs on every detection, not only after the
@@ -7072,7 +7096,10 @@ def run_online_evolution(
                 ), next_case_index=idx + 1)
                 print(f"  [{idx}] REJECT_FITNESS_RUNTIME {case_id}: {reason}")
                 continue
-            candidate_signal = attribution_for(candidate_result, case_id)
+            candidate_signal = _attribution_for_result(
+                candidate_result, case_id, records=records,
+                use_gold=use_gold, gold_reflection=gold_reflection,
+            )
             assessment = assess_source_fitness(
                 signal,
                 candidate_signal,
@@ -7080,7 +7107,9 @@ def run_online_evolution(
                 operation=edit.operation,
                 before_result=detection_result,
                 after_result=candidate_result,
-                gold_label=fitness_gold(case_id),
+                gold_label=_fitness_gold_label(
+                    case_id, records=records, fitness_use_gold=fitness_use_gold,
+                ),
             )
             assessment, causal_execution_audit = _attribute_intervention_fitness(
                 assessment,
@@ -7092,7 +7121,11 @@ def run_online_evolution(
             canary_regressions: list[str] = []
             if (assessment.passed or assessment.evidence_only) and stable_canaries:
                 canary_root = replay_root / "canaries"
-                for canary_id, parent_canary in selected_canaries(edit):
+                for canary_id, parent_canary in _selected_canaries(
+                    edit, stable_canaries=stable_canaries,
+                    canary_limit=canary_limit,
+                    genome_content_hash=current_genome.content_hash,
+                ):
                     try:
                         child_canary = run_detection(
                             budget_kind="canary",
@@ -7105,7 +7138,7 @@ def run_online_evolution(
                                 else None
                             ),
                         )
-                        preserved, audit = canary_preserved(
+                        preserved, audit = _canary_preserved(
                             parent_canary, child_canary,
                         )
                         canary_audit.append({"case_id": canary_id, **audit})
@@ -7255,7 +7288,9 @@ def run_online_evolution(
                         inverted = _contrast_inversion(
                             before_state=neighbor_before_state,
                             after_state=neighbor_after_state,
-                            gold_label=fitness_gold(neighbor_id),
+                            gold_label=_fitness_gold_label(
+                                neighbor_id, records=records, fitness_use_gold=fitness_use_gold,
+                            ),
                         )
                         contrast_audit = {
                             "neighbor_case_id": neighbor_id,

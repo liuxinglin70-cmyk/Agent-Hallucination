@@ -85,9 +85,8 @@ def test_r30_contrast_gate_stays_fail_open() -> None:
 # ============================================================
 
 def test_r31_canary_state_error_avoids_none_equality() -> None:
-    source = inspect.getsource(evolution_runner.run_online_evolution)
-    start = source.index("def canary_preserved(")
-    handler = source[start : source.index("preserved = (", start)]
+    source = inspect.getsource(evolution_runner._canary_preserved)
+    handler = source[: source.index("preserved = (")]
     assert '"before_state": None' not in handler
     assert '"after_state": None' not in handler
     before = handler.index('"before_state": "')
@@ -391,7 +390,7 @@ def test_r37_mutation_calls_record_into_the_ledger() -> None:
     # The record call must sit in run_mutation_call, after the counters are
     # updated and the meta is known.
     start = source.index("def run_mutation_call(")
-    handler = source[start : source.index("def attribution_for(", start)]
+    handler = source[start : source.index("def persist_progress(", start)]
     assert "provider_usage_ledger.record(" in handler
 
 
