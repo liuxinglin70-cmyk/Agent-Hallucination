@@ -3576,6 +3576,63 @@ def _record_gate_event(
     gate_event_ledger.record(event)
 
 
+def _record_attempt(
+    *, active_episode_payload: dict[str, Any] | None, causal_memory: Any,
+    decision: str,
+    operation: str = "",
+    target_module: str = "",
+    action_spec: Mapping[str, Any] | None = None,
+    structural_result: str = "accepted",
+    compiled: bool = False,
+    injected: bool = False,
+    applied: bool = False,
+    observable_delta: Sequence[str] = (),
+    downstream_court_delta: Sequence[str] = (),
+    no_effect_reason: str = "",
+    proposal_content: str = "",
+) -> dict[str, Any] | None:
+    """Append one execution outcome to the current episode.
+
+    Returns the updated episode payload, or the input unchanged when there
+    is no active episode (caller keeps the prior payload).
+    """
+    if (
+        active_episode_payload is None
+        or "episode_id" not in active_episode_payload
+    ):
+        return active_episode_payload
+    episode = FailureEpisode.from_dict(active_episode_payload)
+    proposal = proposal_signature_for(
+        operation=operation,
+        target_module=target_module,
+        action_spec=action_spec,
+        proposal_content=proposal_content,
+    )
+    attempt = FailureAttempt(
+        attempt_id=attempt_id_for(
+            episode.episode_id, proposal, len(episode.attempts),
+        ),
+        proposal_signature=proposal,
+        operation=operation,
+        target_module=target_module,
+        action_spec=dict(action_spec or {}),
+        structural_result=structural_result,
+        compiled=compiled,
+        injected=injected,
+        applied=applied,
+        observable_delta=tuple(str(value) for value in observable_delta),
+        downstream_court_delta=tuple(
+            str(value) for value in downstream_court_delta
+        ),
+        no_effect_reason=no_effect_reason,
+        decision=decision,
+        proposal_content=" ".join(str(proposal_content).split()),
+    )
+    updated = replace(episode, attempts=(*episode.attempts, attempt))
+    causal_memory.upsert_attempt(updated, attempt)
+    return updated.to_dict()
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -4138,41 +4195,17 @@ def run_online_evolution(
     ) -> None:
         """Append one execution outcome to the current episode."""
         nonlocal active_episode_payload
-        if (
-            active_episode_payload is None
-            or "episode_id" not in active_episode_payload
-        ):
-            return
-        episode = FailureEpisode.from_dict(active_episode_payload)
-        proposal = proposal_signature_for(
-            operation=operation,
-            target_module=target_module,
-            action_spec=action_spec,
+        active_episode_payload = _record_attempt(
+            active_episode_payload=active_episode_payload,
+            causal_memory=causal_memory, decision=decision, operation=operation,
+            target_module=target_module, action_spec=action_spec,
+            structural_result=structural_result, compiled=compiled,
+            injected=injected, applied=applied,
+            observable_delta=observable_delta,
+            downstream_court_delta=downstream_court_delta,
+            no_effect_reason=no_effect_reason,
             proposal_content=proposal_content,
         )
-        attempt = FailureAttempt(
-            attempt_id=attempt_id_for(
-                episode.episode_id, proposal, len(episode.attempts),
-            ),
-            proposal_signature=proposal,
-            operation=operation,
-            target_module=target_module,
-            action_spec=dict(action_spec or {}),
-            structural_result=structural_result,
-            compiled=compiled,
-            injected=injected,
-            applied=applied,
-            observable_delta=tuple(str(value) for value in observable_delta),
-            downstream_court_delta=tuple(
-                str(value) for value in downstream_court_delta
-            ),
-            no_effect_reason=no_effect_reason,
-            decision=decision,
-            proposal_content=" ".join(str(proposal_content).split()),
-        )
-        updated = replace(episode, attempts=(*episode.attempts, attempt))
-        causal_memory.upsert_attempt(updated, attempt)
-        active_episode_payload = updated.to_dict()
 
     def _run_registry_reflection(
         *,
