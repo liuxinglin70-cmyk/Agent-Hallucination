@@ -3503,6 +3503,7 @@ class _RunState:
     stable_canaries_checkpoint: Any = None
     active_episode_payload: Any = None
     triggered_cases: int = 0
+    stable_cases: int = 0
 
 
 def _record_gate_event(
@@ -4040,6 +4041,1147 @@ def _save_evolution_results(
           f"(effective: {type_coverage['effective_coverage']:.1%})")
 
 
+def _flush_shadow_batch_impl(
+    *, next_case_index: int, force: bool = False,
+    state: _RunState, provisional_edits: list[ProvisionalEdit],
+    fitness_batch_size: int, batch_history: list[dict[str, Any]],
+    fitness_use_gold: bool, steps: list[Any], gate: Any,
+    budget_usage: dict[str, int], accepted_edits_history: list[dict[str, Any]],
+    pending_probe_commits: list[PendingProbeCommit],
+    pending_probe_step_indexes: list[int],
+    stable_canaries: dict[str, dict[str, Any]], canary_limit: int,
+    rejected_buffer: list[RejectedEditEntry], output_dir: Path,
+    type_classifier: Any, type_evolution: Any, type_fitness: Any,
+    registered_probe_ids: Sequence[str], validation_probe_every: int,
+    validation_probe_trigger_threshold: int,
+    run_development_probe: Any, record_attempt: Any,
+    persist_progress: Any,
+) -> bool:
+    """Commit or roll back the current reversible shadow batch."""
+
+    if not provisional_edits:
+        return True
+    if not force and len(provisional_edits) < fitness_batch_size:
+        return True
+
+    batch_id = f"batch_{len(batch_history):03d}"
+    source_audits = [
+        {
+            "case_id": item.case_id,
+            "edit_id": item.edit.edit_id,
+            "assessment": item.individual_assessment.to_dict(),
+            "source_after": item.source_after_signal.to_dict(),
+            "shadow_result": item.source_after_result,
+        }
+        for item in provisional_edits
+    ]
+    batch_canary_audits = [
+        audit
+        for item in provisional_edits
+        for audit in item.canary_audits
+    ]
+    runtime_errors: list[str] = []
+
+    decisions = [
+        value["assessment"]["decision"] for value in source_audits
+    ]
+    improved_count = sum(
+        value in {"strong_improvement", "local_improvement"}
+        for value in decisions
+    )
+    worse_count = sum(value == "worse" for value in decisions)
+    # v5.3.5 incremental commit: each edit is validated independently.
+    # Edits that are worse are isolated and rejected; non-worse edits
+    # (improved or no_effect) are committed. This avoids the old behavior
+    # where a single worse edit rolled back the entire batch, discarding
+    # per-case FIXED edits (especially FN fixes).
+    # v5.3.5 modify_rule relaxation: modify_rule is no longer held to the
+    # strict required_improvements threshold. As long as worse_count == 0
+    # across the batch, all non-worse edits (add or modify) are committed.
+    # Rationale: only an explicit source improvement is promotable. A
+    # no-effect edit is retained as telemetry, not silently committed.
+    accepted_indices: list[int] = []
+    rejected_indices: list[int] = []
+    for i, dec in enumerate(decisions):
+        # Label-free directional evidence may advance the reversible
+        # working genome only when an independent sampled canary proves
+        # process non-regression. It remains explicitly provisional: the
+        # commit never grants it protected fitness status (protection is
+        # reserved for gold-assisted edits) and the run result keeps
+        # final_champion_claim=False until an external authority scores
+        # it. Independent canaries protect known behavior; they do not
+        # establish that a newly decisive verdict is correct.
+        label_free_provisional = (
+            not fitness_use_gold
+            and dec == "directional_evidence"
+            and bool(provisional_edits[i].canary_audits)
+            and all(
+                bool(audit.get("preserved"))
+                for audit in provisional_edits[i].canary_audits
+            )
+        )
+        if (
+            dec in {"strong_improvement", "local_improvement"}
+            or label_free_provisional
+        ):
+            accepted_indices.append(i)
+        else:
+            rejected_indices.append(i)
+    # Commit policy:
+    # - If any runtime_error: reject entire batch (cannot trust audits)
+    # - If any source_audit missing: reject entire batch
+    # - Otherwise: commit accepted_indices, reject rejected_indices
+    audit_complete = len(source_audits) == len(provisional_edits)
+    if runtime_errors or not audit_complete:
+        passed = False
+        accepted_indices = []
+        rejected_indices = list(range(len(provisional_edits)))
+    elif not accepted_indices:
+        # All edits worse or no acceptable edits
+        passed = False
+    else:
+        passed = True
+    batch_audit = {
+        "batch_id": batch_id,
+        "provisional_edit_count": len(provisional_edits),
+        "champion_hash_before": state.champion_genome.content_hash,
+        "shadow_hash": state.current_genome.content_hash,
+        "source_audits": source_audits,
+        "stable_canary_audits": batch_canary_audits,
+        "runtime_errors": runtime_errors,
+        "improved_count": improved_count,
+        "worse_count": worse_count,
+        "accepted_indices": accepted_indices,
+        "rejected_indices": rejected_indices,
+        "fitness_use_gold": fitness_use_gold,
+        "commit_validation": "single_source_replay_plus_sampled_canaries",
+        "source_replays": len(source_audits),
+        "canary_cases": len(batch_canary_audits),
+        "probe_cases": 0,
+        "provider_calls": (
+            len(source_audits)
+            + len(batch_canary_audits)
+            + sum(
+                int(
+                    bool(
+                        (steps[item.step_index].fitness_check or {}).get(
+                            "contrast_replays"
+                        )
+                    )
+                )
+                for item in provisional_edits
+            )
+        ),
+        "rollback_reason": "",
+        "promotion_eligible": bool(fitness_use_gold),
+        "claim_scope": (
+            "gold_development_candidate"
+            if fitness_use_gold
+            else "label_free_provisional_telemetry"
+        ),
+        "passed": passed,
+    }
+
+    # v5.3.5 incremental commit: commit accepted edits, reject worse edits.
+    # Champion genome gains only the accepted edits; rejected edits are
+    # rolled back individually without discarding the accepted ones.
+    if accepted_indices:
+        # Rebuild champion genome from accepted edits only.
+        # current_genome already contains all provisional edits applied;
+        # we cannot partially unapply, so rebuild from champion + accepted.
+        new_champion = state.champion_genome
+        # Iterate over a copy to avoid skip-when-remove bug.
+        failed_indices: list[int] = []
+        for idx in list(accepted_indices):
+            item = provisional_edits[idx]
+            try:
+                new_champion = apply_edit(new_champion, item.edit)
+            except ValueError:
+                # If re-apply fails (e.g. protected rule state changed),
+                # skip this edit and mark as rejected.
+                failed_indices.append(idx)
+                continue
+            # Re-capture rule index on the new champion
+            if item.edit.operation == "add_rule":
+                item.applied_rule_idx = (
+                    len(new_champion.modules[item.edit.target_module].rules) - 1
+                )
+        # Move failed re-applies from accepted to rejected.
+        for idx in failed_indices:
+            accepted_indices.remove(idx)
+            rejected_indices.append(idx)
+        state.champion_genome = new_champion
+        state.current_genome = new_champion
+        state.edits_accepted += len(accepted_indices)
+        for idx in accepted_indices:
+            item = provisional_edits[idx]
+            # Set fitness_status on accepted rules (v5.3 protected modify)
+            assessment_decision = (
+                source_audits[idx]["assessment"]["decision"]
+                if idx < len(source_audits) else ""
+            )
+            # Fitness protection is earned only by gold-assisted replay
+            # evidence. A label-free provisional accept commits to the
+            # development champion as telemetry but stays unprotected
+            # (fitness_status=none): without an external correctness
+            # authority it must remain modifiable and removable by later
+            # evolution, and the promotion_status marker alone records
+            # whether a live conflict gate vouched for it.
+            _is_provisional_accept = (
+                not fitness_use_gold
+                and assessment_decision == "directional_evidence"
+                and bool(item.conflict_gate_passed)
+            )
+            if not fitness_use_gold:
+                fitness_status = FITNESS_STATUS_NONE
+            else:
+                fitness_status = (
+                    FITNESS_STATUS_STRONG
+                    if assessment_decision == "strong_improvement"
+                    else FITNESS_STATUS_WEAK
+                )
+            _promotion_status = (
+                "provisional_accept"
+                if _is_provisional_accept
+                else (
+                    "provisional_label_free"
+                    if not fitness_use_gold
+                    else "gold_development_candidate"
+                )
+            )
+            mod = state.champion_genome.modules[item.edit.target_module]
+            rule_idx = item.applied_rule_idx
+            if rule_idx is None and item.edit.rule_index is not None:
+                rule_idx = item.edit.rule_index
+            if rule_idx is not None and rule_idx < len(mod.rules):
+                meta = mod.get_rule_meta(rule_idx)
+                meta["fitness_status"] = fitness_status
+                meta["promotion_status"] = _promotion_status
+                mod.set_rule_meta(rule_idx, meta)
+            accepted_edits_history.append({
+                "edit_id": item.edit.edit_id,
+                "target_module": item.edit.target_module,
+                "operation": item.edit.operation,
+                "new_content": item.edit.new_content,
+                "case_id": item.case_id,
+                "batch_id": batch_id,
+                "promotion_status": _promotion_status,
+            })
+            pending_probe_commits.append(PendingProbeCommit(
+                case_id=item.case_id,
+                case_index=item.case_index,
+                edit=item.edit,
+                certificate=item.certificate,
+                step_index=item.step_index,
+            ))
+            pending_probe_step_indexes.append(item.step_index)
+            # Record the committed type-conditioned experience from the
+            # authoritative source result and its shadow replay.
+            _type_result = type_classifier.classify(
+                item.source_result, item.source_signal
+            )
+            _direction = type_evolution._infer_evolution_direction(
+                item.source_signal.state, item.source_signal.gold_label,
+            )
+            _htc_success = assessment_decision in {
+                "strong_improvement", "local_improvement",
+            }
+            # A label-free source replay cannot self-certify correctness,
+            # even when the conflict gate agrees with the proposal.
+            _provisional_accept_edit = False
+            _override_success = _htc_success
+            _shadow_result = source_audits[idx].get("shadow_result", {})
+            if not isinstance(_shadow_result, Mapping):
+                # A committed edit must have a shadow replay result; a
+                # corrupt audit row must never crash the whole run after
+                # the champion was already advanced.
+                _shadow_result = {}
+            _effect_audit = _expected_effect_audit(
+                item.edit,
+                item.individual_assessment,
+                before=item.source_signal,
+                after=item.source_after_signal,
+                before_result=item.source_result,
+                after_result=_shadow_result,
+            )
+            try:
+                typed_assessment = type_fitness.assess_edit(
+                    source_case_id=item.case_id,
+                    hallucination_type=_type_result.primary_type,
+                    evolution_direction=_direction,
+                    detection_before=item.source_result,
+                    detection_after=_shadow_result,
+                    type_result=_type_result,
+                    target_module=item.edit.target_module,
+                    override_success=_override_success,
+                    feature_description=item.edit.feature_description,
+                    attempt_metadata=_structured_outcome(
+                        outcome=outcome_class_for(
+                            item.individual_assessment.decision
+                        ),
+                        stage="batch_commit",
+                        operation=(
+                            item.edit.operation.value
+                            if isinstance(item.edit.operation, SkillOp)
+                            else str(item.edit.operation)
+                        ),
+                        expected_effect_status=_effect_audit["status"],
+                        reason_categories=[
+                            str(value).split(":", 1)[0]
+                            for value in item.individual_assessment.reasons
+                        ],
+                        observable_deltas=_effect_audit["observable_deltas"],
+                        # Only independent gold-assisted fitness may claim
+                        # that the edited detector improved correctness.
+                        promotable=(_htc_success and fitness_use_gold),
+                        diagnostic_only=(
+                            not fitness_use_gold
+                            and not _provisional_accept_edit
+                        ),
+                        decision=item.individual_assessment.decision,
+                        layer="l1_provider_rule",
+                        artifact=item.edit.target_module,
+                        reason_code=(
+                            str(item.individual_assessment.reasons[0]).split(":", 1)[0]
+                            if item.individual_assessment.reasons else ""
+                        ),
+                        action_spec=item.edit.action_spec,
+                        intervention_trace=_experience_intervention_trace(
+                            _shadow_result
+                        ),
+                    ),
+                )
+            except Exception as exc:
+                # The typed-fitness assessment is audit telemetry only; a
+                # malformed shadow result must not abort the run after the
+                # commit already happened (the rejected path already
+                # tolerates this via runtime_errors).
+                runtime_errors.append(
+                    f"typed_fitness:{item.case_id}:{type(exc).__name__}:{exc}"
+                )
+                typed_assessment = None
+            # Persist the typed-fitness assessment in the batch audit
+            # trail: it was previously computed and silently discarded,
+            # so its metrics (global fitness, DACR, decisive accuracy)
+            # were unobservable in evolution results.
+            if typed_assessment is not None:
+                batch_audit.setdefault("typed_fitness_assessments", []).append(
+                    typed_assessment.to_dict()
+                )
+            # A successfully repaired source becomes a future regression
+            # anchor, so later edits cannot silently forget the fix.
+            _source_after = source_audits[idx].get("source_after")
+            if (
+                resolve_evolution_state(_shadow_result)
+                in {"verified_error", "verified_clean"}
+                and isinstance(_source_after, Mapping)
+                and not bool(_source_after.get("should_evolve"))
+            ):
+                stable_canaries[item.case_id] = _shadow_result
+                while len(stable_canaries) > max(8, canary_limit * 4):
+                    stable_canaries.pop(next(iter(stable_canaries)))
+            step = steps[item.step_index]
+            step.gate_decision = "accept_batch"
+            step.mutation_applied = item.edit.to_dict()
+            step.genome_hash_after = state.champion_genome.content_hash
+            step.fitness_check = {
+                **(step.fitness_check or {}),
+                "batch": batch_audit,
+            }
+            injected_flag, applied_flag = _injected_applied_flags(
+                item.edit, _shadow_result,
+            )
+            state_after = str(
+                getattr(item.source_after_signal, "state", "")
+            )
+            accepted_deltas = tuple(
+                _expected_effect_audit(
+                    item.edit,
+                    item.individual_assessment,
+                    before=item.source_signal,
+                    after=item.source_after_signal,
+                    before_result=item.source_result,
+                    after_result=_shadow_result,
+                )["observable_deltas"]
+            )
+            record_attempt(
+                decision="accept_batch",
+                operation=(
+                    item.edit.operation.value
+                    if isinstance(item.edit.operation, SkillOp)
+                    else str(item.edit.operation)
+                ),
+                target_module=item.edit.target_module,
+                action_spec=item.edit.action_spec,
+                structural_result="accepted",
+                compiled=bool(item.edit.action_spec),
+                injected=injected_flag,
+                applied=applied_flag,
+                observable_delta=accepted_deltas,
+                downstream_court_delta=(
+                    (
+                        f"state:{item.source_signal.state}->{state_after}",
+                    )
+                    if state_after and state_after != item.source_signal.state
+                    else ()
+                ),
+                no_effect_reason=(
+                    "expected_delta_observed" if accepted_deltas else ""
+                ),
+                proposal_content=item.edit.new_content,
+            )
+            step.episode = state.active_episode_payload
+
+        # Snapshot only after fitness metadata and experience have been
+        # attached, so artifacts with the same hash have identical audit
+        # semantics.
+        snapshot_dir = output_dir / "champion_snapshots"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_path = snapshot_dir / f"{state.champion_genome.content_hash[:16]}.json"
+        write_json(snapshot_path, state.champion_genome.to_dict())
+
+    if not accepted_indices:
+        passed = False
+        batch_audit["passed"] = False
+
+    if rejected_indices:
+        # Roll back rejected edits individually.
+        # If any accepted edits were committed, current_genome already
+        # points to the new champion; rejected edits are simply not applied.
+        # If no accepted edits, reset current_genome to champion.
+        if not accepted_indices:
+            state.current_genome = state.champion_genome
+        state.edits_rejected += len(rejected_indices)
+        for idx in rejected_indices:
+            item = provisional_edits[idx]
+            item_assessment = item.individual_assessment
+            reasons = [
+                f"source_{item_assessment.decision}:"
+                + ",".join(item_assessment.reasons)
+            ]
+            if runtime_errors:
+                reasons.append("shadow_batch_runtime_error")
+            # Preserve negative learning signal as well. A batch-level
+            # canary failure or a shadow replay rejection is valuable
+            # evidence for avoiding the same strategy later.
+            if idx < len(source_audits):
+                rejected_result = source_audits[idx].get("shadow_result")
+                if isinstance(rejected_result, Mapping):
+                    try:
+                        rejected_effect = _expected_effect_audit(
+                            item.edit,
+                            item_assessment,
+                            before=item.source_signal,
+                            after=item.source_after_signal,
+                            before_result=item.source_result,
+                            after_result=rejected_result,
+                        )
+                        rejected_type = type_classifier.classify(
+                            item.source_result, item.source_signal,
+                        )
+                        rejected_assessment = type_fitness.assess_edit(
+                            source_case_id=item.case_id,
+                            hallucination_type=rejected_type.primary_type,
+                            evolution_direction=type_evolution._infer_evolution_direction(
+                                item.source_signal.state,
+                                item.source_signal.gold_label,
+                            ),
+                            detection_before=item.source_result,
+                            detection_after=rejected_result,
+                            type_result=rejected_type,
+                            target_module=item.edit.target_module,
+                            override_success=False,
+                            feature_description=item.edit.feature_description,
+                            attempt_metadata=_structured_outcome(
+                                outcome=outcome_class_for(
+                                    item_assessment.decision
+                                ),
+                                stage="batch_commit",
+                                operation=(
+                                    item.edit.operation.value
+                                    if isinstance(item.edit.operation, SkillOp)
+                                    else str(item.edit.operation)
+                                ),
+                                expected_effect_status=rejected_effect[
+                                    "status"
+                                ],
+                                reason_categories=[
+                                    str(value).split(":", 1)[0]
+                                    for value in item_assessment.reasons
+                                ],
+                                observable_deltas=rejected_effect[
+                                    "observable_deltas"
+                                ],
+                                promotable=False,
+                                decision=item_assessment.decision,
+                                layer="l1_provider_rule",
+                                artifact=item.edit.target_module,
+                                reason_code=(
+                                    str(item_assessment.reasons[0]).split(":", 1)[0]
+                                    if item_assessment.reasons else ""
+                                ),
+                            ),
+                        )
+                        batch_audit.setdefault(
+                            "rejected_typed_fitness_assessments", []
+                        ).append(rejected_assessment.to_dict())
+                    except Exception as exc:
+                        runtime_errors.append(
+                            f"experience:{item.case_id}:{type(exc).__name__}:{exc}"
+                        )
+            gate.revoke_structural_accept(item.certificate, reasons)
+            # One processed case produced no effective committed edit.
+            # Structural acceptance had reset convergence, so restore the
+            # case-level no-edit signal exactly once after replay rejects.
+            gate.record_no_edit()
+            batch_effect = _expected_effect_audit(
+                item.edit,
+                item_assessment,
+                before=item.source_signal,
+                after=item.source_after_signal,
+                before_result=item.source_result,
+                after_result=item.source_after_result,
+            )
+            rejected_buffer.append(RejectedEditEntry(
+                proposal=type(
+                    "P",
+                    (),
+                    {
+                        "target_module": item.edit.target_module,
+                        "operation": item.edit.operation,
+                        "content": item.edit.new_content[:80],
+                    },
+                )(),
+                regressed_cases=[],
+                budget_consumed=len(source_audits),
+                reject_reasons=reasons,
+                rejection_stage=(
+                    "batch_runtime" if runtime_errors else "source_fitness"
+                ),
+                observed_effect=batch_effect["status"],
+                observable_deltas=tuple(
+                    batch_effect["observable_deltas"]
+                ),
+            ))
+            step = steps[item.step_index]
+            step.gate_decision = "rollback_batch"
+            step.mutation_applied = None
+            step.genome_hash_after = state.champion_genome.content_hash
+            step.fitness_check = {
+                **(step.fitness_check or {}),
+                "batch": batch_audit,
+            }
+            rejected_flags = _injected_applied_flags(
+                item.edit, item.source_after_result,
+            )
+            record_attempt(
+                decision="rollback_batch",
+                operation=(
+                    item.edit.operation.value
+                    if isinstance(item.edit.operation, SkillOp)
+                    else str(item.edit.operation)
+                ),
+                target_module=item.edit.target_module,
+                action_spec=item.edit.action_spec,
+                structural_result="accepted",
+                compiled=bool(item.edit.action_spec),
+                injected=rejected_flags[0],
+                applied=rejected_flags[1],
+                observable_delta=tuple(
+                    batch_effect["observable_deltas"]
+                ),
+                no_effect_reason=(
+                    _no_effect_reason_for(
+                        _classify_replay_no_effect(
+                            item.source_result, item.source_after_result,
+                        ),
+                        rejected_flags[0],
+                        rejected_flags[1],
+                    )
+                    if item.individual_assessment.decision == "no_effect"
+                    else ""
+                ),
+                proposal_content=item.edit.new_content,
+            )
+            step.episode = state.active_episode_payload
+
+    probe_due_reason = ""
+    if accepted_indices and registered_probe_ids:
+        if (
+            validation_probe_every > 0
+            and state.edits_accepted - state.last_probe_accepted_count
+            >= validation_probe_every
+        ):
+            probe_due_reason = "accepted_edit_cadence"
+        elif (
+            validation_probe_trigger_threshold > 0
+            and state.triggered_cases - state.last_probe_triggered_count
+            >= validation_probe_trigger_threshold
+        ):
+            probe_due_reason = "triggered_case_threshold"
+    if probe_due_reason:
+        probe_passed, probe_audit = run_development_probe(
+            reason=probe_due_reason,
+        )
+        batch_audit["probe_cases"] = probe_audit["probe_cases"]
+        batch_audit["provider_calls"] += probe_audit["provider_calls"]
+        batch_audit["development_probe"] = probe_audit
+        if not probe_passed:
+            passed = False
+            batch_audit["passed"] = False
+            batch_audit["rollback_reason"] = probe_audit["rollback_reason"]
+            batch_audit["probe_vetoed_indices"] = list(accepted_indices)
+            accepted_indices = []
+    batch_audit["champion_hash_after"] = state.champion_genome.content_hash
+    if accepted_indices and not rejected_indices:
+        print(
+            f"  [{batch_id}] COMMIT {len(accepted_indices)} edits "
+            f"→ {state.champion_genome.content_hash[:12]}"
+        )
+    elif accepted_indices and rejected_indices:
+        print(
+            f"  [{batch_id}] PARTIAL COMMIT {len(accepted_indices)} edits, "
+            f"REJECT {len(rejected_indices)} worse edits "
+            f"→ {state.champion_genome.content_hash[:12]}"
+        )
+    else:
+        rollback_count = int(
+            (batch_audit.get("development_probe") or {}).get(
+                "rolled_back_edits", len(rejected_indices),
+            )
+        )
+        print(
+            f"  [{batch_id}] ROLLBACK {rollback_count} edits: "
+            f"improved={improved_count}, worse={worse_count}, "
+            f"runtime_errors={len(runtime_errors)}"
+        )
+
+    batch_history.append(batch_audit)
+    provisional_edits.clear()
+    persist_progress(next_case_index)
+    return passed
+
+
+def _run_l2_policy_case_impl(
+    *,
+    idx: int,
+    case_id: str,
+    detection_result: Mapping[str, Any],
+    detection_state: str,
+    genome_before: str,
+    l2_attribution: Mapping[str, Any],
+    stable_source: bool = False,
+    state: _RunState,
+    mutation_route: dict[str, Any] | None,
+    gate: Any, records: Mapping[str, dict[str, Any]], output_dir: Path,
+    type_fitness: Any, fitness_use_gold: bool,
+    l2_policy_audit: list[dict[str, Any]],
+    l2_registry_registrations: list[dict[str, Any]],
+    rejected_policy_summaries: list[str],
+    run_detection: Any, run_mutation_call: Any,
+    record_attempt: Any, record_step: Any,
+    run_registry_reflection: Any,
+) -> bool:
+    """Close the L2 proposal loop for one adjudication-layer failure.
+
+    One reflection call proposes a single closed-vocabulary policy edit
+    (add_item / modify_item / remove_item); the candidate genome must
+    then show an observable effect in a source replay and, whenever the
+    terminal state moves, move it toward the gold polarity under the
+    same discipline as L1 edits. Rejected candidates are only ever
+    replayed as copies, so the working genome rolls back inherently.
+
+    ``stable_source`` marks a case the step attributor considered stable
+    (its L2 attribution opened independently): a fruitless L2 proposal
+    on such a case is audited but never advances the convergence streak,
+    preserving the v5.9b invariant that stable cases cannot halt a run.
+
+    Returns True when the policy edit was accepted. Rejected and
+    unavailable L2 repairs remain L2 outcomes: they do not authorize a
+    synthetic provider-rule episode because no L1 artifact defect has
+    been established.
+    """
+    accepted_outcome = False
+
+    attribution = FailureAttribution(
+        layer=str(l2_attribution.get("layer") or LAYER_L2),
+        artifact=str(l2_attribution.get("artifact") or ""),
+        reason_code=str(l2_attribution.get("reason_code") or ""),
+        evidence=dict(l2_attribution.get("evidence") or {}),
+    )
+    adjudication = detection_result.get("proof_adjudication") or {}
+    if not isinstance(adjudication, Mapping):
+        adjudication = {}
+    boundary_path = detection_result.get("boundary_path")
+    if not isinstance(boundary_path, Mapping):
+        boundary_path = {}
+    boundary_path_state = str(boundary_path.get("state") or "")
+    boundary_validation = boundary_path.get("contract_validation")
+    boundary_authority_valid = (
+        isinstance(boundary_validation, Mapping)
+        and boundary_validation.get("decision") == "pass"
+    )
+    facts = build_adjudication_facts(
+        dict(adjudication),
+        boundary_path_state=boundary_path_state,
+        boundary_authority_valid=boundary_authority_valid,
+    )
+    facts_summary = asdict(facts)
+    # P3B: pending registry entries accumulate independent observations
+    # on every subsequent L2 case; an entry that clears the evidence
+    # threshold and stays applicable is promoted to working (enabled)
+    # here, before this case's planning reads the vocabulary.
+    if any(
+        entry.required_validation == REGISTRY_REQUIRED_VALIDATION
+        and entry.status == PENDING_STATUS_PENDING
+        for entry in state.policy_genome.pending_queue
+    ):
+        for promotion_row in promote_pending_registry_entries(
+            genome=state.policy_genome,
+            facts=facts,
+            case_id=case_id,
+            reason_code=attribution.reason_code,
+        ):
+            if promotion_row["outcome"] in ("promoted", "rejected"):
+                l2_registry_registrations.append(promotion_row)
+    proposal_edit: PolicyEdit | None = None
+    route_result = ""
+    feedback_code = ""
+
+    def finish(
+        decision: str,
+        *,
+        reason: str = "",
+        replay: Mapping[str, Any] | None = None,
+        route: str = "",
+        feedback: str = "",
+    ) -> None:
+        nonlocal accepted_outcome
+        nonlocal route_result, feedback_code
+        accepted = decision == "accept_policy"
+        route_result = route or (
+            ROUTE_EXECUTED if proposal_edit is not None else route_result
+        )
+        feedback_code = feedback or feedback_code
+        accepted_outcome = accepted
+        if accepted:
+            state.l2_policy_accepts += 1
+            gate.reset_convergence()
+        else:
+            # A fruitless or vetoed policy reflection advances the
+            # convergence streak exactly like a fruitless L1 reflection.
+            # A stable-source L2 attribution must not push the streak:
+            # the case was not a trigger and v5.9b forbids stable cases
+            # from halting a run.
+            if not stable_source:
+                gate.record_no_edit()
+            # The rejection carries the proposal's closed-vocabulary
+            # semantic signature so the next policy reflection can
+            # recognise and avoid the same ineffective edit.
+            rejected_policy_summaries.append(
+                _policy_rejection_signature(
+                    decision, reason, proposal_edit,
+                )
+            )
+            del rejected_policy_summaries[:-20]
+        audit_entry: dict[str, Any] = {
+            "case_id": case_id,
+            "decision": decision,
+            "reason": reason,
+            "route_result": route_result,
+            "feedback_code": feedback_code,
+            "attribution": attribution.to_dict(),
+            "facts": facts_summary,
+            "proposal": proposal_edit.to_dict() if proposal_edit else None,
+            "policy_genome_hash": state.policy_genome.content_hash,
+        }
+        if isinstance(replay, Mapping):
+            replay_adjudication = replay.get("proof_adjudication") or {}
+            if not isinstance(replay_adjudication, Mapping):
+                replay_adjudication = {}
+            audit_entry["policy_evaluation"] = dict(
+                replay_adjudication.get("policy_evaluation") or {}
+            )
+            audit_entry["replay_state"] = resolve_evolution_state(replay)
+        l2_policy_audit.append(audit_entry)
+        replay_state_value = str(
+            audit_entry.get("replay_state") or detection_state
+        )
+        state_improved = accepted and replay_state_value != detection_state
+        policy_operation = (
+            str(proposal_edit.operation) if proposal_edit else "no_proposal"
+        )
+        policy_action = (
+            str(proposal_edit.new_item.action)
+            if proposal_edit and proposal_edit.new_item else "none"
+        )
+        record_attempt(
+            decision=decision,
+            operation=f"policy:{policy_operation}:{policy_action}",
+            target_module=attribution.artifact,
+            action_spec=(
+                {
+                    "policy_item_id": str(proposal_edit.new_item.item_id),
+                    "action": policy_action,
+                }
+                if proposal_edit and proposal_edit.new_item
+                else {}
+            ),
+            structural_result=(
+                "no_proposal"
+                if decision == "skip_no_policy"
+                else (
+                    "accepted"
+                    if accepted or decision.startswith("reject")
+                    else "rejected"
+                )
+            ),
+            compiled=bool(proposal_edit),
+            injected=isinstance(replay, Mapping),
+            applied=bool(
+                isinstance(replay, Mapping)
+                and isinstance(replay.get("proof_adjudication"), Mapping)
+                and bool(
+                    (replay["proof_adjudication"].get("policy_evaluation") or {})
+                    .get("fired")
+                )
+            ),
+            observable_delta=(
+                (f"state:{detection_state}->{replay_state_value}",)
+                if replay_state_value != detection_state else ()
+            ),
+            no_effect_reason=(
+                "expected_delta_observed"
+                if state_improved
+                else (
+                    str(reason or "")[:80]
+                    if not accepted
+                    else "provider_output_changed_but_downstream_invariant"
+                )
+            ),
+        )
+        type_fitness.get_experience_memory().add_experience(
+            hallucination_type=HallucinationType.UNKNOWN,
+            evolution_direction=(
+                f"{detection_state}_to_{replay_state_value}"
+                if replay_state_value != detection_state
+                else "l2_process_repair"
+            ),
+            module_targeted=attribution.artifact,
+            strategy_used=(
+                f"policy:{policy_operation}:{policy_action}"
+            ),
+            detection_improved=state_improved,
+            source_case_id=case_id,
+            metadata=_structured_outcome(
+                outcome=(
+                    "improved" if state_improved
+                    else ("directional" if accepted else "rejected")
+                ),
+                stage="l2_policy_replay",
+                operation=policy_operation,
+                expected_effect_status=(
+                    "terminal_state_changed" if state_improved
+                    else (
+                        "coverage_effect_only" if accepted
+                        else "not_committed"
+                    )
+                ),
+                reason_categories=[reason or decision],
+                decision=decision,
+                layer=LAYER_L2,
+                artifact=attribution.artifact,
+                reason_code=attribution.reason_code,
+                promotable=(state_improved and _fitness_gold_label(
+                    case_id, records=records, fitness_use_gold=fitness_use_gold,
+                ) is not None),
+                diagnostic_only=False,
+            ),
+            feature_description=(
+                f"{attribution.artifact}:{attribution.reason_code}"
+            ),
+            type_confidence=0.0,
+        )
+        record_step(EvolutionStep(
+            case_id=case_id,
+            case_index=idx,
+            trigger_source="l2_policy_reflection",
+            attribution=dict(l2_attribution),
+            edit_proposal=(
+                proposal_edit.to_dict() if proposal_edit else None
+            ),
+            mutation_applied=(
+                proposal_edit.to_dict() if accepted else None
+            ),
+            gate_decision=decision,
+            genome_hash_before=genome_before,
+            genome_hash_after=state.current_genome.content_hash,
+            detection_state=detection_state,
+            timestamp=time.time(),
+            fitness_check={"l2_policy": audit_entry},
+        ), next_case_index=idx + 1)
+        print(
+            f"  [{idx}] L2_POLICY {case_id}: {decision}"
+            + (f" ({reason})" if reason else "")
+        )
+
+    if mutation_route is None:
+        finish("skip_no_policy", reason="no_mutation_route")
+        return
+
+    plan = plan_policy_candidates(
+        attribution=attribution,
+        genome=state.policy_genome,
+    )
+    planned_candidates = plan.candidates
+    if not planned_candidates:
+        if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
+            # A promoted vocabulary entry carries the intended edit its
+            # model captured at registration time; before registering yet
+            # another entry, surface that intent as a concrete policy
+            # candidate so the promoted vocabulary is actually usable.
+            promoted = promoted_intent_candidates(state.policy_genome, facts)
+            if promoted:
+                plan = PolicyPlan(
+                    candidates=promoted,
+                    route_result=ROUTE_EXECUTED,
+                    feedback_code="",
+                )
+                planned_candidates = promoted
+            else:
+                run_registry_reflection(
+                    attribution=attribution,
+                    facts_summary=facts_summary,
+                    case_id=case_id,
+                )
+        finish(
+            "skip_no_policy",
+            reason=plan.route_result,
+            route=plan.route_result,
+            feedback=plan.feedback_code,
+        )
+        return accepted_outcome
+    # P7.4: bounded cross-case Meta guidance informs the selection
+    # without enlarging the candidate set or touching the gate.  Only
+    # inject when the Meta state actually carries guidance, so an empty
+    # baseline leaves the prompt (and its provider cache key) unchanged.
+    meta_skill_state = state.meta_skill_state
+    meta_guidance = (
+        project_meta_review_for_prompt(meta_skill_state)
+        if (meta_skill_state.guidance_tokens
+            or meta_skill_state.ranking_preferences)
+        else None
+    )
+    system_prompt, user_prompt = build_policy_selection_prompt(
+        attribution=attribution,
+        facts_summary=facts_summary,
+        candidates=planned_candidates,
+        meta_guidance=meta_guidance,
+    )
+    try:
+        parsed, _meta = run_mutation_call(
+            route=mutation_route,
+            purpose="policy_reflection",
+            system=system_prompt,
+            user=user_prompt,
+            cache_dir=output_dir / "mutation_cache" / "policy_reflection",
+        )
+    except Exception as exc:
+        finish(
+            "skip_no_policy",
+            reason=f"reflection_call_failed:{type(exc).__name__}: "
+            f"{str(exc)[:300]}",
+        )
+        return
+    proposed_edit, parse_reason = select_policy_candidate(
+        parsed, planned_candidates, registry=state.policy_genome.registry,
+    )
+    if proposed_edit is None:
+        finish("skip_no_policy", reason=parse_reason or "no_proposal")
+        return
+    if proposed_edit.new_item is not None:
+        proposed_edit.new_item = replace(
+            proposed_edit.new_item,
+            item_id=f"policy_{uuid.uuid4().hex[:8]}",
+            source_case_id=case_id,
+        )
+    proposed_edit.source_case_id = case_id
+    proposal_edit = proposed_edit
+    valid, validate_reason = validate_policy_edit(
+        proposal_edit, state.policy_genome,
+    )
+    if not valid:
+        blocked_by_protection = validate_reason.startswith(
+            ("protected_item", "immutable_baseline_item")
+        )
+        finish(
+            "skip_no_policy",
+            reason=f"invalid_policy_edit:{validate_reason}",
+            route=(
+                ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION
+                if blocked_by_protection else ""
+            ),
+            feedback=(
+                FEEDBACK_POLICY_ROUTE_UNAVAILABLE
+                if blocked_by_protection else ""
+            ),
+        )
+        return
+    candidate_genome = apply_policy_edit(state.policy_genome, proposal_edit)
+    try:
+        replay_result = run_detection(
+            budget_kind="policy",
+            genome=state.current_genome,
+            case_id=case_id,
+            output_path=(
+                output_dir / "policy_replays"
+                / f"{idx:04d}_{case_id.replace('/', '_')}"
+            ),
+            policy_genome=candidate_genome,
+            # Candidate validation must observe the full candidate item
+            # set: a newly proposed item is still fitness_status=none and
+            # is excluded from the working scope, so a scoped replay could
+            # never fire it and every proposal would die as no-effect.
+            policy_scope=None,
+        )
+    except Exception as exc:
+        finish(
+            "reject_policy_fitness",
+            reason=f"replay_runtime_invalid:{type(exc).__name__}",
+        )
+        return
+    replay_state = resolve_evolution_state(replay_result)
+    replay_adjudication = replay_result.get("proof_adjudication") or {}
+    if not isinstance(replay_adjudication, Mapping):
+        replay_adjudication = {}
+    evaluation = replay_adjudication.get("policy_evaluation") or {}
+    if not isinstance(evaluation, Mapping):
+        evaluation = {}
+    fired = evaluation.get("fired") or []
+    skipped_rows = evaluation.get("skipped") or []
+    proposal_item_id = (
+        str(proposal_edit.new_item.item_id)
+        if proposal_edit.new_item is not None else ""
+    )
+    proposal_skip_reason = next(
+        (
+            str(row.get("reason") or "")
+            for row in skipped_rows
+            if isinstance(row, Mapping)
+            and str(row.get("item_id") or "") == proposal_item_id
+        ),
+        "",
+    )
+    if (
+        not fired
+        and proposal_skip_reason == ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED
+    ):
+        # The proposed action compiled and replayed, but its runtime
+        # guards failed closed on the replayed evidence (e.g. a boundary
+        # that was not authoritative): the candidate was executable in
+        # principle, unsatisfied in fact.
+        finish(
+            "reject_policy_no_effect",
+            reason=f"policy_skipped:{proposal_skip_reason}",
+            replay=replay_result,
+            route=ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
+            feedback=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
+        )
+        return
+    state_changed = replay_state != detection_state
+    coverage_changed = (
+        evaluation.get("effective_prosecution_coverage")
+        != facts.prosecution_coverage
+        or evaluation.get("effective_defense_coverage")
+        != facts.defense_coverage
+    )
+    operation = str(proposal_edit.operation)
+    if operation == PolicyOp.REMOVE_ITEM.value:
+        # A removal is justified only by evidence: the targeted item must
+        # have fired on the source detection, and removing it must move
+        # the terminal edge or the effective coverage observably.
+        source_evaluation = (
+            detection_result.get("proof_adjudication") or {}
+        ).get("policy_evaluation")
+        source_evaluation = (
+            source_evaluation
+            if isinstance(source_evaluation, Mapping) else {}
+        )
+        original_fired_ids = {
+            str(row.get("item_id") or "")
+            for row in (source_evaluation.get("fired") or [])
+            if isinstance(row, Mapping)
+        }
+        removed_item = state.policy_genome.items[proposal_edit.item_index]
+        effect_ok = (
+            removed_item.item_id in original_fired_ids
+            and (state_changed or coverage_changed)
+        )
+        no_effect_reason = "removed_item_did_not_move_the_terminal_edge"
+    else:
+        effect_ok = bool(fired) and (state_changed or coverage_changed)
+        no_effect_reason = "policy_did_not_move_the_terminal_edge"
+    if not effect_ok:
+        finish(
+            "reject_policy_no_effect",
+            reason=no_effect_reason,
+            replay=replay_result,
+        )
+        return
+    gold_label = _fitness_gold_label(
+        case_id, records=records, fitness_use_gold=fitness_use_gold,
+    )
+    if state_changed:
+        if gold_label is None:
+            finish(
+                "reject_policy_fitness",
+                reason="state_change_without_gold_polarity",
+                replay=replay_result,
+            )
+            return
+        try:
+            score_before = task_state_score(detection_state, gold_label)
+            score_after = task_state_score(replay_state, gold_label)
+        except ValueError:
+            finish(
+                "reject_policy_fitness",
+                reason="unscorable_state",
+                replay=replay_result,
+            )
+            return
+        if score_after <= score_before:
+            finish(
+                "reject_policy_fitness",
+                reason="state_change_against_gold_polarity",
+                replay=replay_result,
+            )
+            return
+    if operation != PolicyOp.REMOVE_ITEM.value:
+        accepted_index = (
+            proposal_edit.item_index
+            if operation == PolicyOp.MODIFY_ITEM.value
+            else len(candidate_genome.items) - 1
+        )
+        accepted_meta = candidate_genome.get_item_meta(accepted_index)
+        if state_changed:
+            # A gold-verified terminal move is the strongest evidence an
+            # item can earn in this loop; lock it against later
+            # modify/remove so a subsequent reflection cannot erode a
+            # verified win.
+            accepted_meta["fitness_status"] = FITNESS_STATUS_STRONG
+        elif accepted_meta.get("fitness_status") != FITNESS_STATUS_STRONG:
+            # A coverage-only / local-effect accept earned no independent
+            # correctness evidence, so it is weak: it enters the working
+            # scope but stays correctable (never promoted by canary
+            # non-regression alone) and is excluded from the deployable
+            # scope until it earns strong evidence.
+            accepted_meta["fitness_status"] = FITNESS_STATUS_WEAK
+        candidate_genome.set_item_meta(accepted_index, accepted_meta)
+    state.policy_genome = candidate_genome
+    finish("accept_policy", replay=replay_result)
+    return accepted_outcome
+
+
 def run_online_evolution(
     *,
     evolution_case_ids: Sequence[str],
@@ -4261,7 +5403,6 @@ def run_online_evolution(
         if initial_policy_genome is not None
         else create_baseline_policy_genome()
     )
-    l2_policy_accepts = 0
     # Audited record of every vocabulary registration applied this run. The
     # authoritative registry state travels inside policy_genome (single
     # authority); this list is audit telemetry, not a second copy.
@@ -4269,8 +5410,6 @@ def run_online_evolution(
     # Probe rollback anchors for the L2 surface, symmetric with stable_genome:
     # a failed development probe restores the policy genome accepted before
     # the last passing probe, so L1 and L2 roll back under one authority.
-    stable_policy_genome = policy_genome.clone()
-    stable_l2_policy_accepts = 0
     l2_policy_audit: list[dict[str, Any]] = []
     rejected_policy_summaries: list[str] = []
     # v5.8 mechanism 3: procedural abstention ladder state.  A source may use
@@ -4288,14 +5427,33 @@ def run_online_evolution(
     # canonical signature is (case, owner module, operation, content hash) and
     # ``observable_deltas`` records what the rejected edit actually moved.
     rejected_source_proposals: dict[str, list[dict[str, Any]]] = {}
-    rollback_reason = ""
-    stable_genome = champion_genome.clone()
     pending_probe_step_indexes: list[int] = []
     pending_probe_commits: list[PendingProbeCommit] = []
-    stable_history_length = 0
-    last_probe_accepted_count = 0
-    last_probe_triggered_count = 0
     active_attempt_index = 0
+    # Single authority for every scalar the extracted
+    # stage functions rebind: the probe rollback swaps the
+    # genome triple, fitness commit advances the counters,
+    # and the episode payload is rebuilt per case.
+    state = _RunState(
+        champion_genome=champion_genome,
+        current_genome=champion_genome,
+        stable_genome=champion_genome.clone(),
+        policy_genome=policy_genome,
+        stable_policy_genome=policy_genome.clone(),
+        l2_policy_accepts=0,
+        stable_l2_policy_accepts=0,
+        edits_accepted=0,
+        edits_rejected=0,
+        rollback_reason="",
+        last_probe_accepted_count=0,
+        last_probe_triggered_count=0,
+        stable_history_length=0,
+        stable_memory_payload={},
+        stable_canaries_checkpoint={},
+        active_episode_payload=None,
+        triggered_cases=0,
+        stable_cases=0,
+    )
 
     # HTC-TES v3: type-conditioned evolution components. The combined
     # causal memory composes the type statistics with the structural
@@ -4313,7 +5471,7 @@ def run_online_evolution(
     # Meta Review (P7): the evolving meta configuration is restored from the
     # experience memory's meta_review.meta_state sub-domain (single authority)
     # and persists back there; the hard gate is never touched by it.
-    meta_skill_state = create_baseline_meta_skill()
+    state.meta_skill_state = create_baseline_meta_skill()
     if experience_memory_path is not None:
         memory_path = Path(experience_memory_path)
         if not memory_path.is_file():
@@ -4325,27 +5483,27 @@ def run_online_evolution(
         persisted_meta = causal_memory.meta_review.get("meta_state") or {}
         if persisted_meta:
             try:
-                meta_skill_state = MetaSkillState.from_dict(persisted_meta)
+                state.meta_skill_state = MetaSkillState.from_dict(persisted_meta)
             except ValueError:
-                meta_skill_state = create_baseline_meta_skill()
-    stable_memory_payload = causal_memory.to_dict()
+                state.meta_skill_state = create_baseline_meta_skill()
+    state.stable_memory_payload = causal_memory.to_dict()
     # The causal episode payload attached to every step of the current
     # case; reset per iteration so a stale episode never leaks to the next
     # case's audit trail.
-    active_episode_payload: dict[str, Any] | None = None
+    state.active_episode_payload: dict[str, Any] | None = None
 
     # A rolling set of label-free, previously stable cases protects decisive
     # behavior from catastrophic forgetting. These are evolution cases only;
     # validation and outer partitions remain unopened.
     stable_canaries: dict[str, dict[str, Any]] = {}
-    stable_canaries_checkpoint: dict[str, dict[str, Any]] = {}
+    state.stable_canaries_checkpoint: dict[str, dict[str, Any]] = {}
     baseline_canary_audit: list[dict[str, Any]] = []
     # Diagnostic-only counters: runtime failures are observations, never
     # evolution evidence, so they are tracked separately from triggered cases.
-    stable_cases = 0
-    triggered_cases = 0
-    edits_accepted = 0
-    edits_rejected = 0
+    state.stable_cases = 0
+    state.triggered_cases = 0
+    state.edits_accepted = 0
+    state.edits_rejected = 0
     runtime_invalid_cases = 0
     runtime_error_categories: dict[str, int] = {}
 
@@ -4358,12 +5516,12 @@ def run_online_evolution(
             records=records, config=config,
             gate=gate, budget_usage=budget_usage,
             stable_canaries=stable_canaries,
-            stable_canaries_checkpoint=stable_canaries_checkpoint,
+            stable_canaries_checkpoint=state.stable_canaries_checkpoint,
             rejected_buffer=rejected_buffer,
-            champion_genome=champion_genome, current_genome=current_genome,
-            stable_genome=stable_genome,
-            policy_genome=policy_genome,
-            stable_policy_genome=stable_policy_genome,
+            champion_genome=state.champion_genome, current_genome=state.current_genome,
+            stable_genome=state.stable_genome,
+            policy_genome=state.policy_genome,
+            stable_policy_genome=state.stable_policy_genome,
             causal_memory=causal_memory,
         )
         steps = resumed["steps"]
@@ -4371,27 +5529,27 @@ def run_online_evolution(
         batch_history = resumed["batch_history"]
         probe_history = resumed["probe_history"]
         baseline_canary_audit = resumed["baseline_canary_audit"]
-        rollback_reason = resumed["rollback_reason"]
+        state.rollback_reason = resumed["rollback_reason"]
         pending_probe_step_indexes = resumed["pending_probe_step_indexes"]
         pending_probe_commits = resumed["pending_probe_commits"]
-        stable_cases = resumed["stable_cases"]
-        triggered_cases = resumed["triggered_cases"]
-        edits_accepted = resumed["edits_accepted"]
-        edits_rejected = resumed["edits_rejected"]
-        stable_memory_payload = resumed["stable_memory_payload"]
-        stable_history_length = resumed["stable_history_length"]
-        last_probe_accepted_count = resumed["last_probe_accepted_count"]
-        last_probe_triggered_count = resumed["last_probe_triggered_count"]
+        state.stable_cases = resumed["stable_cases"]
+        state.triggered_cases = resumed["triggered_cases"]
+        state.edits_accepted = resumed["edits_accepted"]
+        state.edits_rejected = resumed["edits_rejected"]
+        state.stable_memory_payload = resumed["stable_memory_payload"]
+        state.stable_history_length = resumed["stable_history_length"]
+        state.last_probe_accepted_count = resumed["last_probe_accepted_count"]
+        state.last_probe_triggered_count = resumed["last_probe_triggered_count"]
         active_attempt_index = resumed["active_attempt_index"]
         mutation_retry_feedback = resumed["mutation_retry_feedback"]
         rejected_source_proposals = resumed["rejected_source_proposals"]
         runtime_invalid_cases = resumed["runtime_invalid_cases"]
         runtime_error_categories = resumed["runtime_error_categories"]
-        policy_genome = resumed["policy_genome"]
-        l2_policy_accepts = resumed["l2_policy_accepts"]
+        state.policy_genome = resumed["policy_genome"]
+        state.l2_policy_accepts = resumed["l2_policy_accepts"]
         gate_event_ledger = resumed["gate_event_ledger"]
-        stable_policy_genome = resumed["stable_policy_genome"]
-        stable_l2_policy_accepts = resumed["stable_l2_policy_accepts"]
+        state.stable_policy_genome = resumed["stable_policy_genome"]
+        state.stable_l2_policy_accepts = resumed["stable_l2_policy_accepts"]
         abstention_ladder_used = resumed["abstention_ladder_used"]
         contrast_replay_registry = resumed["contrast_replay_registry"]
         rejected_policy_summaries = resumed["rejected_policy_summaries"]
@@ -4404,8 +5562,8 @@ def run_online_evolution(
         print(
             f"[resume] restored checkpoint from {resume_from}: "
             f"next_case_index={resume_next_case_index}, "
-            f"steps={len(steps)}, edits_accepted={edits_accepted}, "
-            f"edits_rejected={edits_rejected}"
+            f"steps={len(steps)}, edits_accepted={state.edits_accepted}, "
+            f"edits_rejected={state.edits_rejected}"
         )
 
     if run_id is None:
@@ -4453,7 +5611,7 @@ def run_online_evolution(
         try:
             canary_result = run_detection(
                 budget_kind="canary",
-                genome=champion_genome,
+                genome=state.champion_genome,
                 case_id=canary_id,
                 output_path=(
                     output_dir / "baseline_canaries" / canary_id.replace("/", "_")
@@ -4477,8 +5635,8 @@ def run_online_evolution(
                 "error": f"{type(exc).__name__}:{exc}",
             })
         baseline_canary_audit.append(audit)
-    if resume_from is None or not stable_canaries_checkpoint:
-        stable_canaries_checkpoint = dict(stable_canaries)
+    if resume_from is None or not state.stable_canaries_checkpoint:
+        state.stable_canaries_checkpoint = dict(stable_canaries)
     if registered_canary_ids and not stable_canaries and not fitness_use_gold:
         raise RuntimeError(
             "No registered canary remained stable under the initial genome; "
@@ -4490,21 +5648,21 @@ def run_online_evolution(
         _persist_progress(_PersistenceContext(
             output_dir=output_dir, run_id=run_id,
             evolution_case_ids=evolution_case_ids, records=records,
-            config=config, gate=gate, champion_genome=champion_genome,
-            current_genome=current_genome, stable_genome=stable_genome,
-            policy_genome=policy_genome,
-            stable_policy_genome=stable_policy_genome,
+            config=config, gate=gate, champion_genome=state.champion_genome,
+            current_genome=state.current_genome, stable_genome=state.stable_genome,
+            policy_genome=state.policy_genome,
+            stable_policy_genome=state.stable_policy_genome,
             causal_memory=causal_memory, gate_event_ledger=gate_event_ledger,
             steps=steps, provisional_edits=provisional_edits,
             accepted_edits_history=accepted_edits_history,
             batch_history=batch_history, probe_history=probe_history,
             baseline_canary_audit=baseline_canary_audit,
             registered_canary_ids=registered_canary_ids,
-            budget_usage=budget_usage, rollback_reason=rollback_reason,
+            budget_usage=budget_usage, rollback_reason=state.rollback_reason,
             stable_canaries=stable_canaries,
-            stable_canaries_checkpoint=stable_canaries_checkpoint,
-            stable_memory_payload=stable_memory_payload,
-            stable_history_length=stable_history_length,
+            stable_canaries_checkpoint=state.stable_canaries_checkpoint,
+            stable_memory_payload=state.stable_memory_payload,
+            stable_history_length=state.stable_history_length,
             pending_probe_step_indexes=pending_probe_step_indexes,
             pending_probe_commits=pending_probe_commits,
             active_attempt_index=active_attempt_index,
@@ -4513,13 +5671,13 @@ def run_online_evolution(
             rejected_buffer=rejected_buffer,
             runtime_invalid_cases=runtime_invalid_cases,
             runtime_error_categories=runtime_error_categories,
-            last_probe_accepted_count=last_probe_accepted_count,
-            last_probe_triggered_count=last_probe_triggered_count,
-            stable_cases=stable_cases, triggered_cases=triggered_cases,
-            edits_accepted=edits_accepted, edits_rejected=edits_rejected,
-            l2_policy_accepts=l2_policy_accepts,
+            last_probe_accepted_count=state.last_probe_accepted_count,
+            last_probe_triggered_count=state.last_probe_triggered_count,
+            stable_cases=state.stable_cases, triggered_cases=state.triggered_cases,
+            edits_accepted=state.edits_accepted, edits_rejected=state.edits_rejected,
+            l2_policy_accepts=state.l2_policy_accepts,
             l2_policy_audit=l2_policy_audit,
-            stable_l2_policy_accepts=stable_l2_policy_accepts,
+            stable_l2_policy_accepts=state.stable_l2_policy_accepts,
             abstention_ladder_used=abstention_ladder_used,
             contrast_replay_registry=contrast_replay_registry,
             rejected_policy_summaries=rejected_policy_summaries,
@@ -4529,7 +5687,7 @@ def run_online_evolution(
 
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         step.attempt_index = active_attempt_index
-        step.episode = active_episode_payload
+        step.episode = state.active_episode_payload
         steps.append(step)
         _record_gate_event(step, gate_event_ledger=gate_event_ledger, steps=steps)
         persist_progress(next_case_index)
@@ -4550,9 +5708,8 @@ def run_online_evolution(
         proposal_content: str = "",
     ) -> None:
         """Append one execution outcome to the current episode."""
-        nonlocal active_episode_payload
-        active_episode_payload = _record_attempt(
-            active_episode_payload=active_episode_payload,
+        state.active_episode_payload = _record_attempt(
+            active_episode_payload=state.active_episode_payload,
             causal_memory=causal_memory, decision=decision, operation=operation,
             target_module=target_module, action_spec=action_spec,
             structural_result=structural_result, compiled=compiled,
@@ -4571,7 +5728,7 @@ def run_online_evolution(
     ) -> None:
         _run_registry_reflection_impl(
             attribution=attribution, facts_summary=facts_summary,
-            case_id=case_id, policy_genome=policy_genome,
+            case_id=case_id, policy_genome=state.policy_genome,
             mutation_route=mutation_route,
             run_mutation_call=run_mutation_call, output_dir=output_dir,
             l2_registry_registrations=l2_registry_registrations,
@@ -4587,1322 +5744,59 @@ def run_online_evolution(
         l2_attribution: Mapping[str, Any],
         stable_source: bool = False,
     ) -> bool:
-        """Close the L2 proposal loop for one adjudication-layer failure.
-
-        One reflection call proposes a single closed-vocabulary policy edit
-        (add_item / modify_item / remove_item); the candidate genome must
-        then show an observable effect in a source replay and, whenever the
-        terminal state moves, move it toward the gold polarity under the
-        same discipline as L1 edits. Rejected candidates are only ever
-        replayed as copies, so the working genome rolls back inherently.
-
-        ``stable_source`` marks a case the step attributor considered stable
-        (its L2 attribution opened independently): a fruitless L2 proposal
-        on such a case is audited but never advances the convergence streak,
-        preserving the v5.9b invariant that stable cases cannot halt a run.
-
-        Returns True when the policy edit was accepted. Rejected and
-        unavailable L2 repairs remain L2 outcomes: they do not authorize a
-        synthetic provider-rule episode because no L1 artifact defect has
-        been established.
-        """
-        nonlocal policy_genome, l2_policy_accepts
-        accepted_outcome = False
-
-        attribution = FailureAttribution(
-            layer=str(l2_attribution.get("layer") or LAYER_L2),
-            artifact=str(l2_attribution.get("artifact") or ""),
-            reason_code=str(l2_attribution.get("reason_code") or ""),
-            evidence=dict(l2_attribution.get("evidence") or {}),
+        return _run_l2_policy_case_impl(
+            idx=idx, case_id=case_id, detection_result=detection_result,
+            detection_state=detection_state, genome_before=genome_before,
+            l2_attribution=l2_attribution, stable_source=stable_source,
+            state=state, mutation_route=mutation_route, gate=gate,
+            records=records, output_dir=output_dir,
+            type_fitness=type_fitness, fitness_use_gold=fitness_use_gold,
+            l2_policy_audit=l2_policy_audit,
+            l2_registry_registrations=l2_registry_registrations,
+            rejected_policy_summaries=rejected_policy_summaries,
+            run_detection=run_detection,
+            run_mutation_call=run_mutation_call,
+            record_attempt=record_attempt, record_step=record_step,
+            run_registry_reflection=_run_registry_reflection,
         )
-        adjudication = detection_result.get("proof_adjudication") or {}
-        if not isinstance(adjudication, Mapping):
-            adjudication = {}
-        boundary_path = detection_result.get("boundary_path")
-        if not isinstance(boundary_path, Mapping):
-            boundary_path = {}
-        boundary_path_state = str(boundary_path.get("state") or "")
-        boundary_validation = boundary_path.get("contract_validation")
-        boundary_authority_valid = (
-            isinstance(boundary_validation, Mapping)
-            and boundary_validation.get("decision") == "pass"
-        )
-        facts = build_adjudication_facts(
-            dict(adjudication),
-            boundary_path_state=boundary_path_state,
-            boundary_authority_valid=boundary_authority_valid,
-        )
-        facts_summary = asdict(facts)
-        # P3B: pending registry entries accumulate independent observations
-        # on every subsequent L2 case; an entry that clears the evidence
-        # threshold and stays applicable is promoted to working (enabled)
-        # here, before this case's planning reads the vocabulary.
-        if any(
-            entry.required_validation == REGISTRY_REQUIRED_VALIDATION
-            and entry.status == PENDING_STATUS_PENDING
-            for entry in policy_genome.pending_queue
-        ):
-            for promotion_row in promote_pending_registry_entries(
-                genome=policy_genome,
-                facts=facts,
-                case_id=case_id,
-                reason_code=attribution.reason_code,
-            ):
-                if promotion_row["outcome"] in ("promoted", "rejected"):
-                    l2_registry_registrations.append(promotion_row)
-        proposal_edit: PolicyEdit | None = None
-        route_result = ""
-        feedback_code = ""
-
-        def finish(
-            decision: str,
-            *,
-            reason: str = "",
-            replay: Mapping[str, Any] | None = None,
-            route: str = "",
-            feedback: str = "",
-        ) -> None:
-            nonlocal policy_genome, l2_policy_accepts, accepted_outcome
-            nonlocal route_result, feedback_code
-            accepted = decision == "accept_policy"
-            route_result = route or (
-                ROUTE_EXECUTED if proposal_edit is not None else route_result
-            )
-            feedback_code = feedback or feedback_code
-            accepted_outcome = accepted
-            if accepted:
-                l2_policy_accepts += 1
-                gate.reset_convergence()
-            else:
-                # A fruitless or vetoed policy reflection advances the
-                # convergence streak exactly like a fruitless L1 reflection.
-                # A stable-source L2 attribution must not push the streak:
-                # the case was not a trigger and v5.9b forbids stable cases
-                # from halting a run.
-                if not stable_source:
-                    gate.record_no_edit()
-                # The rejection carries the proposal's closed-vocabulary
-                # semantic signature so the next policy reflection can
-                # recognise and avoid the same ineffective edit.
-                rejected_policy_summaries.append(
-                    _policy_rejection_signature(
-                        decision, reason, proposal_edit,
-                    )
-                )
-                del rejected_policy_summaries[:-20]
-            audit_entry: dict[str, Any] = {
-                "case_id": case_id,
-                "decision": decision,
-                "reason": reason,
-                "route_result": route_result,
-                "feedback_code": feedback_code,
-                "attribution": attribution.to_dict(),
-                "facts": facts_summary,
-                "proposal": proposal_edit.to_dict() if proposal_edit else None,
-                "policy_genome_hash": policy_genome.content_hash,
-            }
-            if isinstance(replay, Mapping):
-                replay_adjudication = replay.get("proof_adjudication") or {}
-                if not isinstance(replay_adjudication, Mapping):
-                    replay_adjudication = {}
-                audit_entry["policy_evaluation"] = dict(
-                    replay_adjudication.get("policy_evaluation") or {}
-                )
-                audit_entry["replay_state"] = resolve_evolution_state(replay)
-            l2_policy_audit.append(audit_entry)
-            replay_state_value = str(
-                audit_entry.get("replay_state") or detection_state
-            )
-            state_improved = accepted and replay_state_value != detection_state
-            policy_operation = (
-                str(proposal_edit.operation) if proposal_edit else "no_proposal"
-            )
-            policy_action = (
-                str(proposal_edit.new_item.action)
-                if proposal_edit and proposal_edit.new_item else "none"
-            )
-            record_attempt(
-                decision=decision,
-                operation=f"policy:{policy_operation}:{policy_action}",
-                target_module=attribution.artifact,
-                action_spec=(
-                    {
-                        "policy_item_id": str(proposal_edit.new_item.item_id),
-                        "action": policy_action,
-                    }
-                    if proposal_edit and proposal_edit.new_item
-                    else {}
-                ),
-                structural_result=(
-                    "no_proposal"
-                    if decision == "skip_no_policy"
-                    else (
-                        "accepted"
-                        if accepted or decision.startswith("reject")
-                        else "rejected"
-                    )
-                ),
-                compiled=bool(proposal_edit),
-                injected=isinstance(replay, Mapping),
-                applied=bool(
-                    isinstance(replay, Mapping)
-                    and isinstance(replay.get("proof_adjudication"), Mapping)
-                    and bool(
-                        (replay["proof_adjudication"].get("policy_evaluation") or {})
-                        .get("fired")
-                    )
-                ),
-                observable_delta=(
-                    (f"state:{detection_state}->{replay_state_value}",)
-                    if replay_state_value != detection_state else ()
-                ),
-                no_effect_reason=(
-                    "expected_delta_observed"
-                    if state_improved
-                    else (
-                        str(reason or "")[:80]
-                        if not accepted
-                        else "provider_output_changed_but_downstream_invariant"
-                    )
-                ),
-            )
-            type_fitness.get_experience_memory().add_experience(
-                hallucination_type=HallucinationType.UNKNOWN,
-                evolution_direction=(
-                    f"{detection_state}_to_{replay_state_value}"
-                    if replay_state_value != detection_state
-                    else "l2_process_repair"
-                ),
-                module_targeted=attribution.artifact,
-                strategy_used=(
-                    f"policy:{policy_operation}:{policy_action}"
-                ),
-                detection_improved=state_improved,
-                source_case_id=case_id,
-                metadata=_structured_outcome(
-                    outcome=(
-                        "improved" if state_improved
-                        else ("directional" if accepted else "rejected")
-                    ),
-                    stage="l2_policy_replay",
-                    operation=policy_operation,
-                    expected_effect_status=(
-                        "terminal_state_changed" if state_improved
-                        else (
-                            "coverage_effect_only" if accepted
-                            else "not_committed"
-                        )
-                    ),
-                    reason_categories=[reason or decision],
-                    decision=decision,
-                    layer=LAYER_L2,
-                    artifact=attribution.artifact,
-                    reason_code=attribution.reason_code,
-                    promotable=(state_improved and _fitness_gold_label(
-                        case_id, records=records, fitness_use_gold=fitness_use_gold,
-                    ) is not None),
-                    diagnostic_only=False,
-                ),
-                feature_description=(
-                    f"{attribution.artifact}:{attribution.reason_code}"
-                ),
-                type_confidence=0.0,
-            )
-            record_step(EvolutionStep(
-                case_id=case_id,
-                case_index=idx,
-                trigger_source="l2_policy_reflection",
-                attribution=dict(l2_attribution),
-                edit_proposal=(
-                    proposal_edit.to_dict() if proposal_edit else None
-                ),
-                mutation_applied=(
-                    proposal_edit.to_dict() if accepted else None
-                ),
-                gate_decision=decision,
-                genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
-                detection_state=detection_state,
-                timestamp=time.time(),
-                fitness_check={"l2_policy": audit_entry},
-            ), next_case_index=idx + 1)
-            print(
-                f"  [{idx}] L2_POLICY {case_id}: {decision}"
-                + (f" ({reason})" if reason else "")
-            )
-
-        if mutation_route is None:
-            finish("skip_no_policy", reason="no_mutation_route")
-            return
-
-        plan = plan_policy_candidates(
-            attribution=attribution,
-            genome=policy_genome,
-        )
-        planned_candidates = plan.candidates
-        if not planned_candidates:
-            if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
-                # A promoted vocabulary entry carries the intended edit its
-                # model captured at registration time; before registering yet
-                # another entry, surface that intent as a concrete policy
-                # candidate so the promoted vocabulary is actually usable.
-                promoted = promoted_intent_candidates(policy_genome, facts)
-                if promoted:
-                    plan = PolicyPlan(
-                        candidates=promoted,
-                        route_result=ROUTE_EXECUTED,
-                        feedback_code="",
-                    )
-                    planned_candidates = promoted
-                else:
-                    _run_registry_reflection(
-                        attribution=attribution,
-                        facts_summary=facts_summary,
-                        case_id=case_id,
-                    )
-            finish(
-                "skip_no_policy",
-                reason=plan.route_result,
-                route=plan.route_result,
-                feedback=plan.feedback_code,
-            )
-            return accepted_outcome
-        # P7.4: bounded cross-case Meta guidance informs the selection
-        # without enlarging the candidate set or touching the gate.  Only
-        # inject when the Meta state actually carries guidance, so an empty
-        # baseline leaves the prompt (and its provider cache key) unchanged.
-        meta_guidance = (
-            project_meta_review_for_prompt(meta_skill_state)
-            if (meta_skill_state.guidance_tokens
-                or meta_skill_state.ranking_preferences)
-            else None
-        )
-        system_prompt, user_prompt = build_policy_selection_prompt(
-            attribution=attribution,
-            facts_summary=facts_summary,
-            candidates=planned_candidates,
-            meta_guidance=meta_guidance,
-        )
-        try:
-            parsed, _meta = run_mutation_call(
-                route=mutation_route,
-                purpose="policy_reflection",
-                system=system_prompt,
-                user=user_prompt,
-                cache_dir=output_dir / "mutation_cache" / "policy_reflection",
-            )
-        except Exception as exc:
-            finish(
-                "skip_no_policy",
-                reason=f"reflection_call_failed:{type(exc).__name__}: "
-                f"{str(exc)[:300]}",
-            )
-            return
-        proposed_edit, parse_reason = select_policy_candidate(
-            parsed, planned_candidates, registry=policy_genome.registry,
-        )
-        if proposed_edit is None:
-            finish("skip_no_policy", reason=parse_reason or "no_proposal")
-            return
-        if proposed_edit.new_item is not None:
-            proposed_edit.new_item = replace(
-                proposed_edit.new_item,
-                item_id=f"policy_{uuid.uuid4().hex[:8]}",
-                source_case_id=case_id,
-            )
-        proposed_edit.source_case_id = case_id
-        proposal_edit = proposed_edit
-        valid, validate_reason = validate_policy_edit(
-            proposal_edit, policy_genome,
-        )
-        if not valid:
-            blocked_by_protection = validate_reason.startswith(
-                ("protected_item", "immutable_baseline_item")
-            )
-            finish(
-                "skip_no_policy",
-                reason=f"invalid_policy_edit:{validate_reason}",
-                route=(
-                    ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION
-                    if blocked_by_protection else ""
-                ),
-                feedback=(
-                    FEEDBACK_POLICY_ROUTE_UNAVAILABLE
-                    if blocked_by_protection else ""
-                ),
-            )
-            return
-        candidate_genome = apply_policy_edit(policy_genome, proposal_edit)
-        try:
-            replay_result = run_detection(
-                budget_kind="policy",
-                genome=current_genome,
-                case_id=case_id,
-                output_path=(
-                    output_dir / "policy_replays"
-                    / f"{idx:04d}_{case_id.replace('/', '_')}"
-                ),
-                policy_genome=candidate_genome,
-                # Candidate validation must observe the full candidate item
-                # set: a newly proposed item is still fitness_status=none and
-                # is excluded from the working scope, so a scoped replay could
-                # never fire it and every proposal would die as no-effect.
-                policy_scope=None,
-            )
-        except Exception as exc:
-            finish(
-                "reject_policy_fitness",
-                reason=f"replay_runtime_invalid:{type(exc).__name__}",
-            )
-            return
-        replay_state = resolve_evolution_state(replay_result)
-        replay_adjudication = replay_result.get("proof_adjudication") or {}
-        if not isinstance(replay_adjudication, Mapping):
-            replay_adjudication = {}
-        evaluation = replay_adjudication.get("policy_evaluation") or {}
-        if not isinstance(evaluation, Mapping):
-            evaluation = {}
-        fired = evaluation.get("fired") or []
-        skipped_rows = evaluation.get("skipped") or []
-        proposal_item_id = (
-            str(proposal_edit.new_item.item_id)
-            if proposal_edit.new_item is not None else ""
-        )
-        proposal_skip_reason = next(
-            (
-                str(row.get("reason") or "")
-                for row in skipped_rows
-                if isinstance(row, Mapping)
-                and str(row.get("item_id") or "") == proposal_item_id
-            ),
-            "",
-        )
-        if (
-            not fired
-            and proposal_skip_reason == ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED
-        ):
-            # The proposed action compiled and replayed, but its runtime
-            # guards failed closed on the replayed evidence (e.g. a boundary
-            # that was not authoritative): the candidate was executable in
-            # principle, unsatisfied in fact.
-            finish(
-                "reject_policy_no_effect",
-                reason=f"policy_skipped:{proposal_skip_reason}",
-                replay=replay_result,
-                route=ROUTE_RUNTIME_PRECONDITION_NOT_SATISFIED,
-                feedback=FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
-            )
-            return
-        state_changed = replay_state != detection_state
-        coverage_changed = (
-            evaluation.get("effective_prosecution_coverage")
-            != facts.prosecution_coverage
-            or evaluation.get("effective_defense_coverage")
-            != facts.defense_coverage
-        )
-        operation = str(proposal_edit.operation)
-        if operation == PolicyOp.REMOVE_ITEM.value:
-            # A removal is justified only by evidence: the targeted item must
-            # have fired on the source detection, and removing it must move
-            # the terminal edge or the effective coverage observably.
-            source_evaluation = (
-                detection_result.get("proof_adjudication") or {}
-            ).get("policy_evaluation")
-            source_evaluation = (
-                source_evaluation
-                if isinstance(source_evaluation, Mapping) else {}
-            )
-            original_fired_ids = {
-                str(row.get("item_id") or "")
-                for row in (source_evaluation.get("fired") or [])
-                if isinstance(row, Mapping)
-            }
-            removed_item = policy_genome.items[proposal_edit.item_index]
-            effect_ok = (
-                removed_item.item_id in original_fired_ids
-                and (state_changed or coverage_changed)
-            )
-            no_effect_reason = "removed_item_did_not_move_the_terminal_edge"
-        else:
-            effect_ok = bool(fired) and (state_changed or coverage_changed)
-            no_effect_reason = "policy_did_not_move_the_terminal_edge"
-        if not effect_ok:
-            finish(
-                "reject_policy_no_effect",
-                reason=no_effect_reason,
-                replay=replay_result,
-            )
-            return
-        gold_label = _fitness_gold_label(
-            case_id, records=records, fitness_use_gold=fitness_use_gold,
-        )
-        if state_changed:
-            if gold_label is None:
-                finish(
-                    "reject_policy_fitness",
-                    reason="state_change_without_gold_polarity",
-                    replay=replay_result,
-                )
-                return
-            try:
-                score_before = task_state_score(detection_state, gold_label)
-                score_after = task_state_score(replay_state, gold_label)
-            except ValueError:
-                finish(
-                    "reject_policy_fitness",
-                    reason="unscorable_state",
-                    replay=replay_result,
-                )
-                return
-            if score_after <= score_before:
-                finish(
-                    "reject_policy_fitness",
-                    reason="state_change_against_gold_polarity",
-                    replay=replay_result,
-                )
-                return
-        if operation != PolicyOp.REMOVE_ITEM.value:
-            accepted_index = (
-                proposal_edit.item_index
-                if operation == PolicyOp.MODIFY_ITEM.value
-                else len(candidate_genome.items) - 1
-            )
-            accepted_meta = candidate_genome.get_item_meta(accepted_index)
-            if state_changed:
-                # A gold-verified terminal move is the strongest evidence an
-                # item can earn in this loop; lock it against later
-                # modify/remove so a subsequent reflection cannot erode a
-                # verified win.
-                accepted_meta["fitness_status"] = FITNESS_STATUS_STRONG
-            elif accepted_meta.get("fitness_status") != FITNESS_STATUS_STRONG:
-                # A coverage-only / local-effect accept earned no independent
-                # correctness evidence, so it is weak: it enters the working
-                # scope but stays correctable (never promoted by canary
-                # non-regression alone) and is excluded from the deployable
-                # scope until it earns strong evidence.
-                accepted_meta["fitness_status"] = FITNESS_STATUS_WEAK
-            candidate_genome.set_item_meta(accepted_index, accepted_meta)
-        policy_genome = candidate_genome
-        finish("accept_policy", replay=replay_result)
-        return accepted_outcome
 
     def run_development_probe(*, reason: str) -> tuple[bool, dict[str, Any]]:
         """Apply the independent development envelope as a veto-only gate."""
-        nonlocal champion_genome, current_genome, stable_genome
-        nonlocal policy_genome, l2_policy_accepts
-        nonlocal stable_policy_genome, stable_l2_policy_accepts
-        nonlocal meta_skill_state
-        nonlocal edits_accepted, edits_rejected, rollback_reason
-        nonlocal last_probe_accepted_count, last_probe_triggered_count
-        nonlocal stable_history_length
-        nonlocal stable_memory_payload, stable_canaries_checkpoint
-
-        before_budget = dict(budget_usage)
-        # Convergence is restored as a whole when the probe fails, so capture
-        # the probe-start snapshot for the synchronized rollback.
-        probe_convergence_snapshot = gate.snapshot_convergence()
-        audit: dict[str, Any] = {
-            "probe_index": len(probe_history),
-            "reason": reason,
-            "genome_hash": champion_genome.content_hash,
-            "case_audits": [],
-            "passed": True,
-            "rollback_reason": "",
-            "promotion_effect": "continue_only_not_final_champion",
-        }
-        failures: list[str] = []
-        for probe_id in registered_probe_ids:
-            gold = _evaluator_gold(records[probe_id])
-            try:
-                result = run_detection(
-                    budget_kind="probe",
-                    genome=champion_genome,
-                    case_id=probe_id,
-                    output_path=(
-                        output_dir
-                        / "development_probes"
-                        / f"probe_{len(probe_history):03d}"
-                        / probe_id.replace("/", "_")
-                    ),
-                    # The probe must measure the detector that subsequent
-                    # cases actually run: champion genome plus the accepted
-                    # L2 policy surface (working scope).
-                    policy_genome=(
-                        policy_genome if policy_genome.items_for_scope("working")
-                        else None
-                    ),
-                )
-                state = resolve_evolution_state(result)
-                runtime_valid = result.get("runtime_valid") is True
-                authority_invalid = decision_authority_invalid(result)
-                if gold is None:
-                    # Unlabelled probe mode is deliberately process-only: it
-                    # can veto runtime/authority loss, but it cannot score a
-                    # clean/error polarity or provide correctness evidence.
-                    score = None
-                    passed = runtime_valid and not authority_invalid
-                else:
-                    score = task_state_score(state, gold)
-                    passed = runtime_valid and not authority_invalid and score == 2
-                audit["case_audits"].append({
-                    "case_id": probe_id,
-                    "state": state,
-                    "gold_correct": (passed if gold is not None else None),
-                    "task_score": score,
-                    "runtime_valid": runtime_valid,
-                    "probe_mode": (
-                        "gold_correctness_veto"
-                        if gold is not None
-                        else "label_free_process_veto"
-                    ),
-                })
-                if not passed:
-                    failures.append(
-                        f"{probe_id}:"
-                        + ("gold_mismatch" if gold is not None else "runtime_or_authority_invalid")
-                    )
-            except Exception as exc:
-                # The attempt and provider call were debited before dispatch.
-                error = f"{probe_id}:{type(exc).__name__}:{exc}"
-                failures.append(error)
-                audit["case_audits"].append({
-                    "case_id": probe_id,
-                    "state": "runtime_invalid",
-                    "gold_correct": False,
-                    "runtime_valid": False,
-                    "error": error,
-                })
-
-        audit["source_replays"] = 0
-        audit["canary_cases"] = 0
-        audit["probe_cases"] = (
-            budget_usage["probe_cases"] - before_budget["probe_cases"]
+        return _run_development_probe_impl(
+            reason=reason, state=state, budget_usage=budget_usage,
+            gate=gate, causal_memory=causal_memory, records=records,
+            output_dir=output_dir, probe_history=probe_history,
+            registered_probe_ids=registered_probe_ids,
+            run_detection=run_detection, steps=steps,
+            accepted_edits_history=accepted_edits_history,
+            pending_probe_commits=pending_probe_commits,
+            pending_probe_step_indexes=pending_probe_step_indexes,
+            stable_canaries=stable_canaries,
+            probe_experience_record=probe_experience_record,
+            type_fitness=type_fitness,
         )
-        audit["provider_calls"] = (
-            budget_usage["provider_calls"] - before_budget["provider_calls"]
-        )
-        last_probe_triggered_count = triggered_cases
-
-        if failures:
-            rollback_reason = "development_probe_failed:" + "|".join(failures)
-            audit["passed"] = False
-            audit["rollback_reason"] = rollback_reason
-            rolled_back = len(pending_probe_commits)
-            audit["rolled_back_edits"] = rolled_back
-            champion_genome = stable_genome.clone()
-            current_genome = stable_genome.clone()
-            policy_genome = stable_policy_genome.clone()
-            l2_policy_accepts = stable_l2_policy_accepts
-            causal_memory.from_dict(stable_memory_payload)
-            # Synchronized rollback (§13.17): the Meta configuration rolls
-            # back with the experience memory that is its single authority,
-            # so the gate profile and guidance never drift ahead of the
-            # genomes they were validated against.
-            persisted_meta = causal_memory.meta_review.get("meta_state") or {}
-            if persisted_meta:
-                try:
-                    meta_skill_state = MetaSkillState.from_dict(persisted_meta)
-                except ValueError:
-                    meta_skill_state = create_baseline_meta_skill()
-            stable_canaries.clear()
-            stable_canaries.update(stable_canaries_checkpoint)
-            for item in pending_probe_commits:
-                gate.revoke_structural_accept(
-                    item.certificate,
-                    [rollback_reason],
-                    # Delayed batch rollback: the per-certificate accept-time
-                    # convergence snapshot is stale across the intervening
-                    # cases, so the counters are restored from the probe-time
-                    # snapshot below instead of being replayed per certificate.
-                    restore_streak=False,
-                )
-                step = steps[item.step_index]
-                step.gate_decision = "rollback_probe"
-                step.mutation_applied = None
-                step.genome_hash_after = stable_genome.content_hash
-                step.fitness_check = {
-                    **(step.fitness_check or {}),
-                    "development_probe": audit,
-                }
-            # Synchronized convergence restore: the probe is rolled back as a
-            # whole, so the streak is the probe-start snapshot (never the sum
-            # of per-certificate priors, which would erase or inflate the
-            # intervening no-edit counting).
-            gate.restore_convergence(probe_convergence_snapshot)
-            edits_accepted -= rolled_back
-            edits_rejected += rolled_back
-            del accepted_edits_history[stable_history_length:]
-            pending_probe_commits.clear()
-            pending_probe_step_indexes.clear()
-            last_probe_accepted_count = edits_accepted
-        else:
-            rollback_reason = ""
-            audit["rolled_back_edits"] = 0
-            stable_genome = champion_genome.clone()
-            stable_policy_genome = policy_genome.clone()
-            stable_l2_policy_accepts = l2_policy_accepts
-            stable_history_length = len(accepted_edits_history)
-            # v5.8: fail-closed probe certification. Compared against the
-            # previous probe baseline; the first probe has no baseline and
-            # stays neutral. The label is auditable from the step record and
-            # (opt-in) persisted to the experience memory.
-            previous_probe_audits = (
-                probe_history[-1].get("case_audits") if probe_history else None
-            )
-            certification = _probe_certification(
-                audit["case_audits"], previous_probe_audits
-            )
-            audit["probe_certification"] = certification
-            # P7.2: the probe is the independent development validation of the
-            # edits it covers; the outcome validation rows let the Meta
-            # review consume probe evidence (certified -> supports_accept,
-            # regressed -> supports_reject) instead of running on gate events
-            # alone.
-            audit["validated_edit_ids"] = [
-                item.edit.edit_id for item in pending_probe_commits
-            ]
-            if probe_experience_record:
-                probe_case_ids = [
-                    str(case_audit.get("case_id"))
-                    for case_audit in audit["case_audits"]
-                ]
-                # Written before the stable-memory snapshot so a certified
-                # edit's record survives together with the edit itself.
-                for item in pending_probe_commits:
-                    type_fitness.get_experience_memory().add_experience(
-                        hallucination_type=HallucinationType.UNKNOWN,
-                        evolution_direction="probe_certification",
-                        module_targeted=item.edit.target_module,
-                        strategy_used=f"probe_certification:{certification}",
-                        detection_improved=certification == "certified",
-                        source_case_id=item.case_id,
-                        metadata={
-                            "probe_certification": certification,
-                            "probe_index": audit["probe_index"],
-                            "probe_case_ids": probe_case_ids,
-                        },
-                    )
-            stable_memory_payload = causal_memory.to_dict()
-            stable_canaries_checkpoint = dict(stable_canaries)
-            for item in pending_probe_commits:
-                step = steps[item.step_index]
-                step.fitness_check = {
-                    **(step.fitness_check or {}),
-                    "development_probe": audit,
-                }
-            pending_probe_commits.clear()
-            pending_probe_step_indexes.clear()
-            last_probe_accepted_count = edits_accepted
-
-        probe_history.append(audit)
-        return not failures, audit
 
     def flush_shadow_batch(*, next_case_index: int, force: bool = False) -> bool:
         """Commit or roll back the current reversible shadow batch."""
-        nonlocal champion_genome, current_genome
-        nonlocal edits_accepted, edits_rejected
-
-        if not provisional_edits:
-            return True
-        if not force and len(provisional_edits) < fitness_batch_size:
-            return True
-
-        batch_id = f"batch_{len(batch_history):03d}"
-        source_audits = [
-            {
-                "case_id": item.case_id,
-                "edit_id": item.edit.edit_id,
-                "assessment": item.individual_assessment.to_dict(),
-                "source_after": item.source_after_signal.to_dict(),
-                "shadow_result": item.source_after_result,
-            }
-            for item in provisional_edits
-        ]
-        batch_canary_audits = [
-            audit
-            for item in provisional_edits
-            for audit in item.canary_audits
-        ]
-        runtime_errors: list[str] = []
-
-        decisions = [
-            value["assessment"]["decision"] for value in source_audits
-        ]
-        improved_count = sum(
-            value in {"strong_improvement", "local_improvement"}
-            for value in decisions
+        return _flush_shadow_batch_impl(
+            next_case_index=next_case_index, force=force, state=state,
+            provisional_edits=provisional_edits,
+            fitness_batch_size=fitness_batch_size,
+            batch_history=batch_history, fitness_use_gold=fitness_use_gold,
+            steps=steps, gate=gate, budget_usage=budget_usage,
+            accepted_edits_history=accepted_edits_history,
+            pending_probe_commits=pending_probe_commits,
+            pending_probe_step_indexes=pending_probe_step_indexes,
+            stable_canaries=stable_canaries, canary_limit=canary_limit,
+            rejected_buffer=rejected_buffer, output_dir=output_dir,
+            type_classifier=type_classifier, type_evolution=type_evolution,
+            type_fitness=type_fitness,
+            registered_probe_ids=registered_probe_ids,
+            validation_probe_every=validation_probe_every,
+            validation_probe_trigger_threshold=validation_probe_trigger_threshold,
+            run_development_probe=run_development_probe,
+            record_attempt=record_attempt, persist_progress=persist_progress,
         )
-        worse_count = sum(value == "worse" for value in decisions)
-        # v5.3.5 incremental commit: each edit is validated independently.
-        # Edits that are worse are isolated and rejected; non-worse edits
-        # (improved or no_effect) are committed. This avoids the old behavior
-        # where a single worse edit rolled back the entire batch, discarding
-        # per-case FIXED edits (especially FN fixes).
-        # v5.3.5 modify_rule relaxation: modify_rule is no longer held to the
-        # strict required_improvements threshold. As long as worse_count == 0
-        # across the batch, all non-worse edits (add or modify) are committed.
-        # Rationale: only an explicit source improvement is promotable. A
-        # no-effect edit is retained as telemetry, not silently committed.
-        accepted_indices: list[int] = []
-        rejected_indices: list[int] = []
-        for i, dec in enumerate(decisions):
-            # Label-free directional evidence may advance the reversible
-            # working genome only when an independent sampled canary proves
-            # process non-regression. It remains explicitly provisional: the
-            # commit never grants it protected fitness status (protection is
-            # reserved for gold-assisted edits) and the run result keeps
-            # final_champion_claim=False until an external authority scores
-            # it. Independent canaries protect known behavior; they do not
-            # establish that a newly decisive verdict is correct.
-            label_free_provisional = (
-                not fitness_use_gold
-                and dec == "directional_evidence"
-                and bool(provisional_edits[i].canary_audits)
-                and all(
-                    bool(audit.get("preserved"))
-                    for audit in provisional_edits[i].canary_audits
-                )
-            )
-            if (
-                dec in {"strong_improvement", "local_improvement"}
-                or label_free_provisional
-            ):
-                accepted_indices.append(i)
-            else:
-                rejected_indices.append(i)
-        # Commit policy:
-        # - If any runtime_error: reject entire batch (cannot trust audits)
-        # - If any source_audit missing: reject entire batch
-        # - Otherwise: commit accepted_indices, reject rejected_indices
-        audit_complete = len(source_audits) == len(provisional_edits)
-        if runtime_errors or not audit_complete:
-            passed = False
-            accepted_indices = []
-            rejected_indices = list(range(len(provisional_edits)))
-        elif not accepted_indices:
-            # All edits worse or no acceptable edits
-            passed = False
-        else:
-            passed = True
-        batch_audit = {
-            "batch_id": batch_id,
-            "provisional_edit_count": len(provisional_edits),
-            "champion_hash_before": champion_genome.content_hash,
-            "shadow_hash": current_genome.content_hash,
-            "source_audits": source_audits,
-            "stable_canary_audits": batch_canary_audits,
-            "runtime_errors": runtime_errors,
-            "improved_count": improved_count,
-            "worse_count": worse_count,
-            "accepted_indices": accepted_indices,
-            "rejected_indices": rejected_indices,
-            "fitness_use_gold": fitness_use_gold,
-            "commit_validation": "single_source_replay_plus_sampled_canaries",
-            "source_replays": len(source_audits),
-            "canary_cases": len(batch_canary_audits),
-            "probe_cases": 0,
-            "provider_calls": (
-                len(source_audits)
-                + len(batch_canary_audits)
-                + sum(
-                    int(
-                        bool(
-                            (steps[item.step_index].fitness_check or {}).get(
-                                "contrast_replays"
-                            )
-                        )
-                    )
-                    for item in provisional_edits
-                )
-            ),
-            "rollback_reason": "",
-            "promotion_eligible": bool(fitness_use_gold),
-            "claim_scope": (
-                "gold_development_candidate"
-                if fitness_use_gold
-                else "label_free_provisional_telemetry"
-            ),
-            "passed": passed,
-        }
-
-        # v5.3.5 incremental commit: commit accepted edits, reject worse edits.
-        # Champion genome gains only the accepted edits; rejected edits are
-        # rolled back individually without discarding the accepted ones.
-        if accepted_indices:
-            # Rebuild champion genome from accepted edits only.
-            # current_genome already contains all provisional edits applied;
-            # we cannot partially unapply, so rebuild from champion + accepted.
-            new_champion = champion_genome
-            # Iterate over a copy to avoid skip-when-remove bug.
-            failed_indices: list[int] = []
-            for idx in list(accepted_indices):
-                item = provisional_edits[idx]
-                try:
-                    new_champion = apply_edit(new_champion, item.edit)
-                except ValueError:
-                    # If re-apply fails (e.g. protected rule state changed),
-                    # skip this edit and mark as rejected.
-                    failed_indices.append(idx)
-                    continue
-                # Re-capture rule index on the new champion
-                if item.edit.operation == "add_rule":
-                    item.applied_rule_idx = (
-                        len(new_champion.modules[item.edit.target_module].rules) - 1
-                    )
-            # Move failed re-applies from accepted to rejected.
-            for idx in failed_indices:
-                accepted_indices.remove(idx)
-                rejected_indices.append(idx)
-            champion_genome = new_champion
-            current_genome = new_champion
-            edits_accepted += len(accepted_indices)
-            for idx in accepted_indices:
-                item = provisional_edits[idx]
-                # Set fitness_status on accepted rules (v5.3 protected modify)
-                assessment_decision = (
-                    source_audits[idx]["assessment"]["decision"]
-                    if idx < len(source_audits) else ""
-                )
-                # Fitness protection is earned only by gold-assisted replay
-                # evidence. A label-free provisional accept commits to the
-                # development champion as telemetry but stays unprotected
-                # (fitness_status=none): without an external correctness
-                # authority it must remain modifiable and removable by later
-                # evolution, and the promotion_status marker alone records
-                # whether a live conflict gate vouched for it.
-                _is_provisional_accept = (
-                    not fitness_use_gold
-                    and assessment_decision == "directional_evidence"
-                    and bool(item.conflict_gate_passed)
-                )
-                if not fitness_use_gold:
-                    fitness_status = FITNESS_STATUS_NONE
-                else:
-                    fitness_status = (
-                        FITNESS_STATUS_STRONG
-                        if assessment_decision == "strong_improvement"
-                        else FITNESS_STATUS_WEAK
-                    )
-                _promotion_status = (
-                    "provisional_accept"
-                    if _is_provisional_accept
-                    else (
-                        "provisional_label_free"
-                        if not fitness_use_gold
-                        else "gold_development_candidate"
-                    )
-                )
-                mod = champion_genome.modules[item.edit.target_module]
-                rule_idx = item.applied_rule_idx
-                if rule_idx is None and item.edit.rule_index is not None:
-                    rule_idx = item.edit.rule_index
-                if rule_idx is not None and rule_idx < len(mod.rules):
-                    meta = mod.get_rule_meta(rule_idx)
-                    meta["fitness_status"] = fitness_status
-                    meta["promotion_status"] = _promotion_status
-                    mod.set_rule_meta(rule_idx, meta)
-                accepted_edits_history.append({
-                    "edit_id": item.edit.edit_id,
-                    "target_module": item.edit.target_module,
-                    "operation": item.edit.operation,
-                    "new_content": item.edit.new_content,
-                    "case_id": item.case_id,
-                    "batch_id": batch_id,
-                    "promotion_status": _promotion_status,
-                })
-                pending_probe_commits.append(PendingProbeCommit(
-                    case_id=item.case_id,
-                    case_index=item.case_index,
-                    edit=item.edit,
-                    certificate=item.certificate,
-                    step_index=item.step_index,
-                ))
-                pending_probe_step_indexes.append(item.step_index)
-                # Record the committed type-conditioned experience from the
-                # authoritative source result and its shadow replay.
-                _type_result = type_classifier.classify(
-                    item.source_result, item.source_signal
-                )
-                _direction = type_evolution._infer_evolution_direction(
-                    item.source_signal.state, item.source_signal.gold_label,
-                )
-                _htc_success = assessment_decision in {
-                    "strong_improvement", "local_improvement",
-                }
-                # A label-free source replay cannot self-certify correctness,
-                # even when the conflict gate agrees with the proposal.
-                _provisional_accept_edit = False
-                _override_success = _htc_success
-                _shadow_result = source_audits[idx].get("shadow_result", {})
-                if not isinstance(_shadow_result, Mapping):
-                    # A committed edit must have a shadow replay result; a
-                    # corrupt audit row must never crash the whole run after
-                    # the champion was already advanced.
-                    _shadow_result = {}
-                _effect_audit = _expected_effect_audit(
-                    item.edit,
-                    item.individual_assessment,
-                    before=item.source_signal,
-                    after=item.source_after_signal,
-                    before_result=item.source_result,
-                    after_result=_shadow_result,
-                )
-                try:
-                    typed_assessment = type_fitness.assess_edit(
-                        source_case_id=item.case_id,
-                        hallucination_type=_type_result.primary_type,
-                        evolution_direction=_direction,
-                        detection_before=item.source_result,
-                        detection_after=_shadow_result,
-                        type_result=_type_result,
-                        target_module=item.edit.target_module,
-                        override_success=_override_success,
-                        feature_description=item.edit.feature_description,
-                        attempt_metadata=_structured_outcome(
-                            outcome=outcome_class_for(
-                                item.individual_assessment.decision
-                            ),
-                            stage="batch_commit",
-                            operation=(
-                                item.edit.operation.value
-                                if isinstance(item.edit.operation, SkillOp)
-                                else str(item.edit.operation)
-                            ),
-                            expected_effect_status=_effect_audit["status"],
-                            reason_categories=[
-                                str(value).split(":", 1)[0]
-                                for value in item.individual_assessment.reasons
-                            ],
-                            observable_deltas=_effect_audit["observable_deltas"],
-                            # Only independent gold-assisted fitness may claim
-                            # that the edited detector improved correctness.
-                            promotable=(_htc_success and fitness_use_gold),
-                            diagnostic_only=(
-                                not fitness_use_gold
-                                and not _provisional_accept_edit
-                            ),
-                            decision=item.individual_assessment.decision,
-                            layer="l1_provider_rule",
-                            artifact=item.edit.target_module,
-                            reason_code=(
-                                str(item.individual_assessment.reasons[0]).split(":", 1)[0]
-                                if item.individual_assessment.reasons else ""
-                            ),
-                            action_spec=item.edit.action_spec,
-                            intervention_trace=_experience_intervention_trace(
-                                _shadow_result
-                            ),
-                        ),
-                    )
-                except Exception as exc:
-                    # The typed-fitness assessment is audit telemetry only; a
-                    # malformed shadow result must not abort the run after the
-                    # commit already happened (the rejected path already
-                    # tolerates this via runtime_errors).
-                    runtime_errors.append(
-                        f"typed_fitness:{item.case_id}:{type(exc).__name__}:{exc}"
-                    )
-                    typed_assessment = None
-                # Persist the typed-fitness assessment in the batch audit
-                # trail: it was previously computed and silently discarded,
-                # so its metrics (global fitness, DACR, decisive accuracy)
-                # were unobservable in evolution results.
-                if typed_assessment is not None:
-                    batch_audit.setdefault("typed_fitness_assessments", []).append(
-                        typed_assessment.to_dict()
-                    )
-                # A successfully repaired source becomes a future regression
-                # anchor, so later edits cannot silently forget the fix.
-                _source_after = source_audits[idx].get("source_after")
-                if (
-                    resolve_evolution_state(_shadow_result)
-                    in {"verified_error", "verified_clean"}
-                    and isinstance(_source_after, Mapping)
-                    and not bool(_source_after.get("should_evolve"))
-                ):
-                    stable_canaries[item.case_id] = _shadow_result
-                    while len(stable_canaries) > max(8, canary_limit * 4):
-                        stable_canaries.pop(next(iter(stable_canaries)))
-                step = steps[item.step_index]
-                step.gate_decision = "accept_batch"
-                step.mutation_applied = item.edit.to_dict()
-                step.genome_hash_after = champion_genome.content_hash
-                step.fitness_check = {
-                    **(step.fitness_check or {}),
-                    "batch": batch_audit,
-                }
-                injected_flag, applied_flag = _injected_applied_flags(
-                    item.edit, _shadow_result,
-                )
-                state_after = str(
-                    getattr(item.source_after_signal, "state", "")
-                )
-                accepted_deltas = tuple(
-                    _expected_effect_audit(
-                        item.edit,
-                        item.individual_assessment,
-                        before=item.source_signal,
-                        after=item.source_after_signal,
-                        before_result=item.source_result,
-                        after_result=_shadow_result,
-                    )["observable_deltas"]
-                )
-                record_attempt(
-                    decision="accept_batch",
-                    operation=(
-                        item.edit.operation.value
-                        if isinstance(item.edit.operation, SkillOp)
-                        else str(item.edit.operation)
-                    ),
-                    target_module=item.edit.target_module,
-                    action_spec=item.edit.action_spec,
-                    structural_result="accepted",
-                    compiled=bool(item.edit.action_spec),
-                    injected=injected_flag,
-                    applied=applied_flag,
-                    observable_delta=accepted_deltas,
-                    downstream_court_delta=(
-                        (
-                            f"state:{item.source_signal.state}->{state_after}",
-                        )
-                        if state_after and state_after != item.source_signal.state
-                        else ()
-                    ),
-                    no_effect_reason=(
-                        "expected_delta_observed" if accepted_deltas else ""
-                    ),
-                    proposal_content=item.edit.new_content,
-                )
-                step.episode = active_episode_payload
-
-            # Snapshot only after fitness metadata and experience have been
-            # attached, so artifacts with the same hash have identical audit
-            # semantics.
-            snapshot_dir = output_dir / "champion_snapshots"
-            snapshot_dir.mkdir(parents=True, exist_ok=True)
-            snapshot_path = snapshot_dir / f"{champion_genome.content_hash[:16]}.json"
-            write_json(snapshot_path, champion_genome.to_dict())
-
-        if not accepted_indices:
-            passed = False
-            batch_audit["passed"] = False
-
-        if rejected_indices:
-            # Roll back rejected edits individually.
-            # If any accepted edits were committed, current_genome already
-            # points to the new champion; rejected edits are simply not applied.
-            # If no accepted edits, reset current_genome to champion.
-            if not accepted_indices:
-                current_genome = champion_genome
-            edits_rejected += len(rejected_indices)
-            for idx in rejected_indices:
-                item = provisional_edits[idx]
-                item_assessment = item.individual_assessment
-                reasons = [
-                    f"source_{item_assessment.decision}:"
-                    + ",".join(item_assessment.reasons)
-                ]
-                if runtime_errors:
-                    reasons.append("shadow_batch_runtime_error")
-                # Preserve negative learning signal as well. A batch-level
-                # canary failure or a shadow replay rejection is valuable
-                # evidence for avoiding the same strategy later.
-                if idx < len(source_audits):
-                    rejected_result = source_audits[idx].get("shadow_result")
-                    if isinstance(rejected_result, Mapping):
-                        try:
-                            rejected_effect = _expected_effect_audit(
-                                item.edit,
-                                item_assessment,
-                                before=item.source_signal,
-                                after=item.source_after_signal,
-                                before_result=item.source_result,
-                                after_result=rejected_result,
-                            )
-                            rejected_type = type_classifier.classify(
-                                item.source_result, item.source_signal,
-                            )
-                            rejected_assessment = type_fitness.assess_edit(
-                                source_case_id=item.case_id,
-                                hallucination_type=rejected_type.primary_type,
-                                evolution_direction=type_evolution._infer_evolution_direction(
-                                    item.source_signal.state,
-                                    item.source_signal.gold_label,
-                                ),
-                                detection_before=item.source_result,
-                                detection_after=rejected_result,
-                                type_result=rejected_type,
-                                target_module=item.edit.target_module,
-                                override_success=False,
-                                feature_description=item.edit.feature_description,
-                                attempt_metadata=_structured_outcome(
-                                    outcome=outcome_class_for(
-                                        item_assessment.decision
-                                    ),
-                                    stage="batch_commit",
-                                    operation=(
-                                        item.edit.operation.value
-                                        if isinstance(item.edit.operation, SkillOp)
-                                        else str(item.edit.operation)
-                                    ),
-                                    expected_effect_status=rejected_effect[
-                                        "status"
-                                    ],
-                                    reason_categories=[
-                                        str(value).split(":", 1)[0]
-                                        for value in item_assessment.reasons
-                                    ],
-                                    observable_deltas=rejected_effect[
-                                        "observable_deltas"
-                                    ],
-                                    promotable=False,
-                                    decision=item_assessment.decision,
-                                    layer="l1_provider_rule",
-                                    artifact=item.edit.target_module,
-                                    reason_code=(
-                                        str(item_assessment.reasons[0]).split(":", 1)[0]
-                                        if item_assessment.reasons else ""
-                                    ),
-                                ),
-                            )
-                            batch_audit.setdefault(
-                                "rejected_typed_fitness_assessments", []
-                            ).append(rejected_assessment.to_dict())
-                        except Exception as exc:
-                            runtime_errors.append(
-                                f"experience:{item.case_id}:{type(exc).__name__}:{exc}"
-                            )
-                gate.revoke_structural_accept(item.certificate, reasons)
-                # One processed case produced no effective committed edit.
-                # Structural acceptance had reset convergence, so restore the
-                # case-level no-edit signal exactly once after replay rejects.
-                gate.record_no_edit()
-                batch_effect = _expected_effect_audit(
-                    item.edit,
-                    item_assessment,
-                    before=item.source_signal,
-                    after=item.source_after_signal,
-                    before_result=item.source_result,
-                    after_result=item.source_after_result,
-                )
-                rejected_buffer.append(RejectedEditEntry(
-                    proposal=type(
-                        "P",
-                        (),
-                        {
-                            "target_module": item.edit.target_module,
-                            "operation": item.edit.operation,
-                            "content": item.edit.new_content[:80],
-                        },
-                    )(),
-                    regressed_cases=[],
-                    budget_consumed=len(source_audits),
-                    reject_reasons=reasons,
-                    rejection_stage=(
-                        "batch_runtime" if runtime_errors else "source_fitness"
-                    ),
-                    observed_effect=batch_effect["status"],
-                    observable_deltas=tuple(
-                        batch_effect["observable_deltas"]
-                    ),
-                ))
-                step = steps[item.step_index]
-                step.gate_decision = "rollback_batch"
-                step.mutation_applied = None
-                step.genome_hash_after = champion_genome.content_hash
-                step.fitness_check = {
-                    **(step.fitness_check or {}),
-                    "batch": batch_audit,
-                }
-                rejected_flags = _injected_applied_flags(
-                    item.edit, item.source_after_result,
-                )
-                record_attempt(
-                    decision="rollback_batch",
-                    operation=(
-                        item.edit.operation.value
-                        if isinstance(item.edit.operation, SkillOp)
-                        else str(item.edit.operation)
-                    ),
-                    target_module=item.edit.target_module,
-                    action_spec=item.edit.action_spec,
-                    structural_result="accepted",
-                    compiled=bool(item.edit.action_spec),
-                    injected=rejected_flags[0],
-                    applied=rejected_flags[1],
-                    observable_delta=tuple(
-                        batch_effect["observable_deltas"]
-                    ),
-                    no_effect_reason=(
-                        _no_effect_reason_for(
-                            _classify_replay_no_effect(
-                                item.source_result, item.source_after_result,
-                            ),
-                            rejected_flags[0],
-                            rejected_flags[1],
-                        )
-                        if item.individual_assessment.decision == "no_effect"
-                        else ""
-                    ),
-                    proposal_content=item.edit.new_content,
-                )
-                step.episode = active_episode_payload
-
-        probe_due_reason = ""
-        if accepted_indices and registered_probe_ids:
-            if (
-                validation_probe_every > 0
-                and edits_accepted - last_probe_accepted_count
-                >= validation_probe_every
-            ):
-                probe_due_reason = "accepted_edit_cadence"
-            elif (
-                validation_probe_trigger_threshold > 0
-                and triggered_cases - last_probe_triggered_count
-                >= validation_probe_trigger_threshold
-            ):
-                probe_due_reason = "triggered_case_threshold"
-        if probe_due_reason:
-            probe_passed, probe_audit = run_development_probe(
-                reason=probe_due_reason,
-            )
-            batch_audit["probe_cases"] = probe_audit["probe_cases"]
-            batch_audit["provider_calls"] += probe_audit["provider_calls"]
-            batch_audit["development_probe"] = probe_audit
-            if not probe_passed:
-                passed = False
-                batch_audit["passed"] = False
-                batch_audit["rollback_reason"] = probe_audit["rollback_reason"]
-                batch_audit["probe_vetoed_indices"] = list(accepted_indices)
-                accepted_indices = []
-        batch_audit["champion_hash_after"] = champion_genome.content_hash
-        if accepted_indices and not rejected_indices:
-            print(
-                f"  [{batch_id}] COMMIT {len(accepted_indices)} edits "
-                f"→ {champion_genome.content_hash[:12]}"
-            )
-        elif accepted_indices and rejected_indices:
-            print(
-                f"  [{batch_id}] PARTIAL COMMIT {len(accepted_indices)} edits, "
-                f"REJECT {len(rejected_indices)} worse edits "
-                f"→ {champion_genome.content_hash[:12]}"
-            )
-        else:
-            rollback_count = int(
-                (batch_audit.get("development_probe") or {}).get(
-                    "rolled_back_edits", len(rejected_indices),
-                )
-            )
-            print(
-                f"  [{batch_id}] ROLLBACK {rollback_count} edits: "
-                f"improved={improved_count}, worse={worse_count}, "
-                f"runtime_errors={len(runtime_errors)}"
-            )
-
-        batch_history.append(batch_audit)
-        provisional_edits.clear()
-        persist_progress(next_case_index)
-        return passed
 
     persist_progress(resume_next_case_index)
 
@@ -5923,7 +5817,7 @@ def run_online_evolution(
         )
     while source_work_queue:
         idx, case_id, active_attempt_index = source_work_queue.popleft()
-        active_episode_payload = None
+        state.active_episode_payload = None
         if active_attempt_index > 0:
             budget_usage["mutation_retry_attempts"] += 1
         # --- Check halt (including convergence) ---
@@ -5936,24 +5830,24 @@ def run_online_evolution(
                 edit_proposal=None,
                 mutation_applied=None,
                 gate_decision="halted",
-                genome_hash_before=current_genome.content_hash,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_before=state.current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state="skipped",
                 timestamp=time.time(),
             ), next_case_index=idx + 1)
             continue
 
-        genome_before = current_genome.content_hash
+        genome_before = state.current_genome.content_hash
 
         # --- [1] Run detection with current skill (global injection) ---
         try:
             detection_result = run_detection(
                 budget_kind="case",
-                genome=current_genome,
+                genome=state.current_genome,
                 case_id=case_id,
                 output_path=output_dir,
                 policy_genome=(
-                    policy_genome if policy_genome.items_for_scope("working")
+                    state.policy_genome if state.policy_genome.items_for_scope("working")
                     else None
                 ),
             )
@@ -5973,7 +5867,7 @@ def run_online_evolution(
                     "run_id": run_id,
                     "case_id": case_id,
                     "case_index": idx,
-                    "genome_hash": current_genome.content_hash,
+                    "genome_hash": state.current_genome.content_hash,
                     "error": runtime_error,
                     "error_category": invalid_signal.runtime_error_category,
                     "failure_details": (
@@ -6024,7 +5918,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="skip_runtime_invalid",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state="runtime_invalid",
                 timestamp=time.time(),
                 fitness_check={
@@ -6087,7 +5981,7 @@ def run_online_evolution(
                 FailureEpisode.from_dict(episode_payload)
             )
         if episode_payload is not None:
-            active_episode_payload = episode_payload
+            state.active_episode_payload = episode_payload
         l2_attribution = next(
             (
                 entry for entry in reversed(non_l1_failure_attributions)
@@ -6107,9 +6001,9 @@ def run_online_evolution(
             l2_stable_source = not signal.should_evolve
             if active_attempt_index == 0:
                 if l2_stable_source:
-                    stable_cases += 1
+                    state.stable_cases += 1
                 else:
-                    triggered_cases += 1
+                    state.triggered_cases += 1
             l2_episode_payload: dict[str, Any] | None = None
             try:
                 l2_episode_payload = build_failure_episode(
@@ -6131,7 +6025,7 @@ def run_online_evolution(
                 causal_memory.upsert_observation(
                     FailureEpisode.from_dict(l2_episode_payload)
                 )
-            active_episode_payload = l2_episode_payload
+            state.active_episode_payload = l2_episode_payload
             if l2_stable_source:
                 # A stable-source L2 case skips the regular stable branch, so
                 # register its counter-case anchor here to keep the contrast
@@ -6163,7 +6057,7 @@ def run_online_evolution(
                     mutation_applied=None,
                     gate_decision="skip_mutation_budget_exhausted",
                     genome_hash_before=genome_before,
-                    genome_hash_after=current_genome.content_hash,
+                    genome_hash_after=state.current_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
                 ), next_case_index=idx + 1)
@@ -6188,12 +6082,12 @@ def run_online_evolution(
         if not signal.should_evolve:
             # Stable success — no trigger
             if active_attempt_index == 0:
-                stable_cases += 1
+                state.stable_cases += 1
             stable_canaries[case_id] = detection_result
             while len(stable_canaries) > max(8, canary_limit * 4):
                 stable_canaries.pop(next(iter(stable_canaries)))
             if not pending_probe_commits:
-                stable_canaries_checkpoint = dict(stable_canaries)
+                state.stable_canaries_checkpoint = dict(stable_canaries)
             # Register the stable case as a counter-case anchor: the same
             # type bucket later serves contrast-condition generation as the
             # situation where the proposed action must NOT fire.
@@ -6222,7 +6116,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="skip_stable",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
             ), next_case_index=idx + 1)
@@ -6231,7 +6125,7 @@ def run_online_evolution(
 
         # --- Triggered! ---
         if active_attempt_index == 0:
-            triggered_cases += 1
+            state.triggered_cases += 1
         print(f"  [{idx}] TRIGGERED {case_id}: {signal.trigger_source.value} "
               f"→ {signal.error_type.value} → {signal.target_module} "
               f"(attempt {active_attempt_index + 1}/"
@@ -6240,8 +6134,8 @@ def run_online_evolution(
         l1_episode_addressable = bool(
             attribution_owner
             and classifier_attribution.layer == LAYER_L1
-            and isinstance(active_episode_payload, Mapping)
-            and active_episode_payload.get("episode_id")
+            and isinstance(state.active_episode_payload, Mapping)
+            and state.active_episode_payload.get("episode_id")
         )
         if not l1_episode_addressable:
             gate.record_no_edit()
@@ -6258,7 +6152,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="skip_unaddressable_failure",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check={
@@ -6292,7 +6186,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="skip_mutation_budget_exhausted",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
             ), next_case_index=idx + 1)
@@ -6328,7 +6222,7 @@ def run_online_evolution(
                     "hallucination_type": type_result.primary_type.value,
                 }, mutation_applied=None, gate_decision="skip_route_conflict",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state, timestamp=time.time(),
             ), next_case_index=idx + 1)
             continue
@@ -6382,7 +6276,7 @@ def run_online_evolution(
             # Prepare rich context for LLM
             skill_context = "\n\n".join(
                 format_skill_context_for_llm(
-                    current_genome.modules,
+                    state.current_genome.modules,
                     module,
                 )
                 for module in allowed_modules
@@ -6400,7 +6294,7 @@ def run_online_evolution(
             capacity_guidance = "\n".join(
                 value
                 for value in (
-                    build_capacity_guidance(current_genome.modules, module)
+                    build_capacity_guidance(state.current_genome.modules, module)
                     for module in allowed_modules
                 )
                 if value
@@ -6416,6 +6310,7 @@ def run_online_evolution(
             # selection prompt (L2).  Only inject when the Meta state
             # actually carries guidance, so an empty baseline leaves the
             # prompt (and its provider cache key) unchanged.
+            meta_skill_state = state.meta_skill_state
             meta_guidance = (
                 project_meta_review_for_prompt(meta_skill_state)
                 if (meta_skill_state.guidance_tokens
@@ -6429,8 +6324,8 @@ def run_online_evolution(
             # most two prior same-mechanism references from the causal
             # memory; it is the only structured observation the model gets.
             current_episode = None
-            if active_episode_payload is not None and "episode_id" in active_episode_payload:
-                current_episode = FailureEpisode.from_dict(active_episode_payload)
+            if state.active_episode_payload is not None and "episode_id" in state.active_episode_payload:
+                current_episode = FailureEpisode.from_dict(state.active_episode_payload)
             history_refs = (
                 causal_memory.retrieve(
                     episode=current_episode,
@@ -6825,7 +6720,7 @@ def run_online_evolution(
                 elif operation == "remove_rule" and rule_index is not None:
                     try:
                         removed_rule_index = int(rule_index)
-                        removed_meta = current_genome.modules[
+                        removed_meta = state.current_genome.modules[
                             target_module
                         ].get_rule_meta(removed_rule_index)
                     except (KeyError, TypeError, ValueError):
@@ -6954,8 +6849,8 @@ def run_online_evolution(
                     new_content=new_content,
                     entries=causal_memory.entries(),
                     exclude_episode_id=(
-                        active_episode_payload.get("episode_id", "")
-                        if active_episode_payload is not None else ""
+                        state.active_episode_payload.get("episode_id", "")
+                        if state.active_episode_payload is not None else ""
                     ),
                 ):
                     # Phase 4: a later same-mechanism case must not replay a
@@ -7089,7 +6984,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="skip_no_edit",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
             ), next_case_index=idx + 1)
@@ -7140,7 +7035,7 @@ def run_online_evolution(
                     if retry_scheduled else "skip_invalid_mutation"
                 ),
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check={
@@ -7164,7 +7059,7 @@ def run_online_evolution(
             operation=edit.operation,
             content=edit.new_content,
             preconditions=(),
-            current_genome=current_genome,
+            current_genome=state.current_genome,
             rule_index=edit.rule_index,
             expected_module=allowed_modules,
             rule_slots=pending_rule_slots,
@@ -7222,7 +7117,7 @@ def run_online_evolution(
                         mutation_applied=None,
                         gate_decision="retry_structural",
                         genome_hash_before=genome_before,
-                        genome_hash_after=current_genome.content_hash,
+                        genome_hash_after=state.current_genome.content_hash,
                         detection_state=detection_state,
                         timestamp=time.time(),
                         fitness_check={
@@ -7236,10 +7131,10 @@ def run_online_evolution(
                             ),
                         },
                     ), next_case_index=idx)
-                    edits_rejected += 1
+                    state.edits_rejected += 1
                     print(f"  [{idx}] NOVELTY_RETRY {case_id}: {reject_reasons}")
                     continue
-                edits_rejected += 1
+                state.edits_rejected += 1
                 rejected_entry = RejectedEditEntry(
                     proposal=type('P', (), {'target_module': edit.target_module, 'operation': edit.operation, 'content': edit.new_content[:80]})(),
                     regressed_cases=[],
@@ -7343,7 +7238,7 @@ def run_online_evolution(
                         "retry_structural" if retry_scheduled else "reject"
                     ),
                     genome_hash_before=genome_before,
-                    genome_hash_after=current_genome.content_hash,
+                    genome_hash_after=state.current_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
                     fitness_check={
@@ -7378,7 +7273,7 @@ def run_online_evolution(
         }
         if edit.operation in (SkillOp.ADD_RULE, SkillOp.MODIFY_RULE):
             _existing_rules = list(
-                current_genome.modules[edit.target_module].rules
+                state.current_genome.modules[edit.target_module].rules
             )
             if (
                 edit.operation == SkillOp.MODIFY_RULE
@@ -7422,7 +7317,7 @@ def run_online_evolution(
 
         # --- [5] Apply edit ---
         try:
-            candidate_genome = apply_edit(current_genome, edit)
+            candidate_genome = apply_edit(state.current_genome, edit)
             # v5.3.4: capture the rule index this edit produced, for batch commit
             if edit.operation == "add_rule":
                 _applied_rule_idx = len(candidate_genome.modules[edit.target_module].rules) - 1
@@ -7434,7 +7329,7 @@ def run_online_evolution(
             print(f"  [{idx}] EDIT_ERROR {case_id}: {e}")
             gate.revoke_structural_accept(cert, [f"apply_edit_failed:{e}"])
             gate.record_no_edit()
-            edits_rejected += 1
+            state.edits_rejected += 1
             record_attempt(
                 decision="reject_apply",
                 operation=(
@@ -7457,7 +7352,7 @@ def run_online_evolution(
                 mutation_applied=None,
                 gate_decision="reject_apply",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check={"reflection": reflection_audit},
@@ -7477,7 +7372,7 @@ def run_online_evolution(
                     case_id=case_id,
                     output_path=replay_root / "source",
                     policy_genome=(
-                        policy_genome if policy_genome.items_for_scope("working")
+                        state.policy_genome if state.policy_genome.items_for_scope("working")
                         else None
                     ),
                 )
@@ -7495,7 +7390,7 @@ def run_online_evolution(
                 }
                 gate.revoke_structural_accept(cert, [reason])
                 gate.record_no_edit()
-                edits_rejected += 1
+                state.edits_rejected += 1
                 record_attempt(
                     decision="reject_fitness_runtime",
                     operation=(
@@ -7519,7 +7414,7 @@ def run_online_evolution(
                     mutation_applied=None,
                     gate_decision="reject_fitness_runtime",
                     genome_hash_before=genome_before,
-                    genome_hash_after=current_genome.content_hash,
+                    genome_hash_after=state.current_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
                     fitness_check=fitness_audit,
@@ -7554,7 +7449,7 @@ def run_online_evolution(
                 for canary_id, parent_canary in _selected_canaries(
                     edit, stable_canaries=stable_canaries,
                     canary_limit=canary_limit,
-                    genome_content_hash=current_genome.content_hash,
+                    genome_content_hash=state.current_genome.content_hash,
                 ):
                     try:
                         child_canary = run_detection(
@@ -7563,8 +7458,8 @@ def run_online_evolution(
                             case_id=canary_id,
                             output_path=canary_root / canary_id.replace("/", "_"),
                             policy_genome=(
-                                policy_genome
-                                if policy_genome.items_for_scope("working")
+                                state.policy_genome
+                                if state.policy_genome.items_for_scope("working")
                                 else None
                             ),
                         )
@@ -7707,8 +7602,8 @@ def run_online_evolution(
                                 / neighbor_id.replace("/", "_")
                             ),
                             policy_genome=(
-                                policy_genome
-                                if policy_genome.items_for_scope("working")
+                                state.policy_genome
+                                if state.policy_genome.items_for_scope("working")
                                 else None
                             ),
                         )
@@ -7830,7 +7725,7 @@ def run_online_evolution(
                     ]
                     gate.revoke_structural_accept(cert, reasons)
                     gate.record_no_edit()
-                    edits_rejected += 1
+                    state.edits_rejected += 1
                     injected_flag, applied_flag = _injected_applied_flags(
                         edit, candidate_result
                     )
@@ -7891,7 +7786,7 @@ def run_online_evolution(
                         mutation_applied=None,
                         gate_decision="reject_fitness",
                         genome_hash_before=genome_before,
-                        genome_hash_after=current_genome.content_hash,
+                        genome_hash_after=state.current_genome.content_hash,
                         detection_state=detection_state,
                         timestamp=time.time(),
                         fitness_check=fitness_audit,
@@ -7900,7 +7795,7 @@ def run_online_evolution(
                     continue
                 reasons = ["source_no_effect:" + ",".join(assessment.reasons)]
                 gate.revoke_structural_accept(cert, reasons)
-                edits_rejected += 1
+                state.edits_rejected += 1
                 rejected_entry = RejectedEditEntry(
                     proposal=type(
                         "P",
@@ -7993,7 +7888,7 @@ def run_online_evolution(
                         if retry_scheduled else "reject_fitness_no_effect"
                     ),
                     genome_hash_before=genome_before,
-                    genome_hash_after=current_genome.content_hash,
+                    genome_hash_after=state.current_genome.content_hash,
                     detection_state=detection_state, timestamp=time.time(),
                     fitness_check=fitness_audit,
                 ), next_case_index=(idx if retry_scheduled else idx + 1))
@@ -8009,8 +7904,8 @@ def run_online_evolution(
                     ["label_free_candidate_is_telemetry_only"],
                 )
                 gate.record_no_edit()
-                edits_rejected += 1
-                current_genome = champion_genome
+                state.edits_rejected += 1
+                state.current_genome = state.champion_genome
                 record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -8020,7 +7915,7 @@ def run_online_evolution(
                     mutation_applied=None,
                     gate_decision="provisional_no_gold_telemetry",
                     genome_hash_before=genome_before,
-                    genome_hash_after=champion_genome.content_hash,
+                    genome_hash_after=state.champion_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
                     fitness_check={
@@ -8032,9 +7927,9 @@ def run_online_evolution(
                     },
                 ), next_case_index=idx + 1)
                 continue
-            champion_genome = candidate_genome
-            current_genome = candidate_genome
-            edits_accepted += 1
+            state.champion_genome = candidate_genome
+            state.current_genome = candidate_genome
+            state.edits_accepted += 1
             accepted_edits_history.append({
                 "target_module": edit.target_module,
                 "operation": edit.operation,
@@ -8051,7 +7946,7 @@ def run_online_evolution(
                 mutation_applied=edit.to_dict(),
                 gate_decision="accept_fitness_disabled",
                 genome_hash_before=genome_before,
-                genome_hash_after=current_genome.content_hash,
+                genome_hash_after=state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check=None,
@@ -8060,7 +7955,7 @@ def run_online_evolution(
 
         # Admit locally useful edits to a reversible shadow genome. Champion is
         # unchanged until flush_shadow_batch commits the batch.
-        current_genome = candidate_genome
+        state.current_genome = candidate_genome
         step_index = len(steps)
         provisional_edits.append(ProvisionalEdit(
             case_id=case_id,
@@ -8086,7 +7981,7 @@ def run_online_evolution(
             mutation_applied=None,
             gate_decision="provisional",
             genome_hash_before=genome_before,
-            genome_hash_after=current_genome.content_hash,
+            genome_hash_after=state.current_genome.content_hash,
             detection_state=detection_state,
             timestamp=time.time(),
             fitness_check=fitness_audit,
@@ -8178,13 +8073,13 @@ def run_online_evolution(
     meta_candidates = generate_meta_edit_candidates(
         aggregated_experiences,
         probe_validations,
-        meta_skill_state,
+        state.meta_skill_state,
     )
     drift_snapshot = build_drift_snapshot(
         aggregated_experiences,
         probe_validations,
-        registry_size=len(policy_genome.registry.all_predicate_names())
-        + len(policy_genome.registry.all_action_instance_names()),
+        registry_size=len(state.policy_genome.registry.all_predicate_names())
+        + len(state.policy_genome.registry.all_action_instance_names()),
     )
     # P7.3: candidates clearing the pre-registered evidence gate are
     # committed into the Meta state so the next run starts from the improved
@@ -8192,7 +8087,7 @@ def run_online_evolution(
     # advisory operations (guidance token / ranking preference) are
     # auto-committable — a profile switch stays a manual lineage decision.
     committed_meta_state, meta_commit_audit = commit_validated_meta_edits(
-        meta_skill_state,
+        state.meta_skill_state,
         meta_candidates,
         aggregated_experiences,
         probe_validations,
@@ -8208,7 +8103,7 @@ def run_online_evolution(
     causal_memory.meta_review["meta_commit_audit"] = meta_commit_audit
     causal_memory.meta_review["drift_snapshots"] = [drift_snapshot.to_dict()]
     causal_memory.meta_review["pending_validation_queue"] = [
-        entry.to_dict() for entry in policy_genome.pending_queue
+        entry.to_dict() for entry in state.policy_genome.pending_queue
     ]
     meta_review_summary = {
         "gate_experience_count": len(gate_experiences),
@@ -8218,34 +8113,34 @@ def run_online_evolution(
         "commit_audit": meta_commit_audit,
         "gate_profile": committed_meta_state.gate_profile,
         "meta_state_hash": committed_meta_state.content_hash,
-        "meta_state_hash_before": meta_skill_state.content_hash,
+        "meta_state_hash_before": state.meta_skill_state.content_hash,
         "meta_generation": committed_meta_state.generation,
         "drift": drift_snapshot.to_dict(),
     }
     if meta_edits_committed:
         print(
             f"  [META] committed {len(meta_edits_committed)} meta edit(s); "
-            f"generation {meta_skill_state.generation} -> "
+            f"generation {state.meta_skill_state.generation} -> "
             f"{committed_meta_state.generation}"
         )
-    meta_skill_state = committed_meta_state
+    state.meta_skill_state = committed_meta_state
 
     result = _build_evolution_result(
-        run_id=run_id, champion_genome=champion_genome,
-        policy_genome=policy_genome, steps=steps,
+        run_id=run_id, champion_genome=state.champion_genome,
+        policy_genome=state.policy_genome, steps=steps,
         final_gate_summary=final_gate_summary,
         evolution_case_ids=evolution_case_ids,
-        triggered_cases=triggered_cases, edits_accepted=edits_accepted,
-        edits_rejected=edits_rejected, stable_cases=stable_cases,
+        triggered_cases=state.triggered_cases, edits_accepted=state.edits_accepted,
+        edits_rejected=state.edits_rejected, stable_cases=state.stable_cases,
         runtime_invalid_cases=runtime_invalid_cases, use_gold=use_gold,
         gate=gate, duration=duration, budget_usage=budget_usage,
         localization_bias_signals=localization_bias_signals,
         non_l1_failure_attributions=non_l1_failure_attributions,
         l2_policy_audit=l2_policy_audit,
-        l2_policy_accepts=l2_policy_accepts,
+        l2_policy_accepts=state.l2_policy_accepts,
         l2_registry_registrations=l2_registry_registrations,
         abstention_ladder_advances=abstention_ladder_advances,
-        rollback_reason=rollback_reason, probe_history=probe_history,
+        rollback_reason=state.rollback_reason, probe_history=probe_history,
         validation_probe_every=validation_probe_every,
         validation_probe_trigger_threshold=validation_probe_trigger_threshold,
         registered_probe_ids=registered_probe_ids, probe_limit=probe_limit,
@@ -8260,12 +8155,12 @@ def run_online_evolution(
 
     _save_evolution_results(
         output_dir=output_dir, result=result,
-        champion_genome=champion_genome, policy_genome=policy_genome,
+        champion_genome=state.champion_genome, policy_genome=state.policy_genome,
         causal_memory=causal_memory, provider_usage_ledger=provider_usage_ledger,
         evolution_case_ids=evolution_case_ids, run_id=run_id,
-        duration=duration, triggered_cases=triggered_cases,
-        stable_cases=stable_cases, edits_accepted=edits_accepted,
-        edits_rejected=edits_rejected, gate=gate,
+        duration=duration, triggered_cases=state.triggered_cases,
+        stable_cases=state.stable_cases, edits_accepted=state.edits_accepted,
+        edits_rejected=state.edits_rejected, gate=gate,
         registered_canary_ids=registered_canary_ids,
         baseline_canary_audit=baseline_canary_audit,
         type_coverage=causal_memory.type_experience_memory.get_type_coverage(),

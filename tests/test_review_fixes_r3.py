@@ -213,9 +213,14 @@ def test_r34_l1_and_l2_share_one_meta_projection() -> None:
     rule reflection (the large majority of mutations) ran blind to the
     recorded gate history.
     """
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    # L1 lives in the main loop; the L2 policy surface is now the extracted
+    # module-level stage. Both must consume the same bounded projection.
+    sources = (
+        inspect.getsource(evolution_runner.run_online_evolution)
+        + inspect.getsource(evolution_runner._run_l2_policy_case_impl)
+    )
     injections = [
-        line for line in source.splitlines()
+        line for line in sources.splitlines()
         if "meta_guidance=meta_guidance," in line
     ]
     assert len(injections) == 2, (
@@ -223,12 +228,15 @@ def test_r34_l1_and_l2_share_one_meta_projection() -> None:
         "L2 policy-selection call sites"
     )
     # One shared projection helper, not two divergent renderings.
-    assert source.count("project_meta_review_for_prompt(meta_skill_state)") == 2
+    assert sources.count("project_meta_review_for_prompt(meta_skill_state)") == 2
 
 
 def test_r34_l1_injection_is_gated_on_non_empty_guidance() -> None:
-    source = inspect.getsource(evolution_runner.run_online_evolution)
-    assert source.count(
+    sources = (
+        inspect.getsource(evolution_runner.run_online_evolution)
+        + inspect.getsource(evolution_runner._run_l2_policy_case_impl)
+    )
+    assert sources.count(
         "if (meta_skill_state.guidance_tokens"
     ) == 2, "both call sites must skip injection on a clean baseline"
 
