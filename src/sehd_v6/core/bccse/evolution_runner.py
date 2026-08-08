@@ -2702,6 +2702,145 @@ def _validate_evolution_params(
         )
 
 
+def _build_evolution_result(
+    *, run_id: str, champion_genome: SkillGenome,
+    policy_genome: PolicyGenome, steps: list[EvolutionStep],
+    final_gate_summary: dict[str, Any],
+    evolution_case_ids: Sequence[str],
+    triggered_cases: int, edits_accepted: int, edits_rejected: int,
+    stable_cases: int, runtime_invalid_cases: int, use_gold: bool,
+    gate, duration: float, budget_usage: dict[str, int],
+    localization_bias_signals: list[dict[str, str]],
+    non_l1_failure_attributions: list[dict[str, Any]],
+    l2_policy_audit: list[dict[str, Any]], l2_policy_accepts: int,
+    l2_registry_registrations: list[dict[str, Any]],
+    abstention_ladder_advances: list[dict[str, str]],
+    rollback_reason: str, probe_history: list[dict[str, Any]],
+    validation_probe_every: int, validation_probe_trigger_threshold: int,
+    registered_probe_ids: tuple[str, ...], probe_limit: int,
+    canary_limit: int, max_mutation_attempts_per_case: int,
+    registered_canary_ids: Sequence[str],
+    baseline_canary_audit: list[dict[str, Any]],
+    runtime_error_categories: dict[str, int],
+    meta_review_summary: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger,
+) -> OnlineEvolutionResult:
+    """Assemble the final OnlineEvolutionResult from run state.
+
+    Why this function exists: the result constructor takes 20+ keyword
+    arguments drawn from run state that accumulated across the main loop.
+    Extracting the assembly keeps the tail of run_online_evolution readable
+    and makes the result contract testable in isolation.
+    """
+    return OnlineEvolutionResult(
+        run_id=run_id,
+        champion_genome=champion_genome,
+        policy_genome=policy_genome,
+        steps=steps,
+        gate_summary=final_gate_summary,
+        total_cases=len(evolution_case_ids),
+        triggered_cases=triggered_cases,
+        edits_accepted=edits_accepted,
+        edits_rejected=edits_rejected,
+        stable_cases=stable_cases,
+        runtime_invalid_cases=runtime_invalid_cases,
+        use_gold=use_gold,
+        halted=gate.is_halted,
+        halt_reason=gate.halt_reason,
+        duration_seconds=duration,
+        evolution_audit={
+            **budget_usage,
+            "total_provider_calls": (
+                budget_usage["detector_calls"] + budget_usage["mutation_calls"]
+            ),
+            "localization_bias_signals": localization_bias_signals,
+            "non_l1_failure_attributions": non_l1_failure_attributions,
+            "l2_policy_audit": l2_policy_audit,
+            "l2_policy_accepts": l2_policy_accepts,
+            "l2_registry_registrations": l2_registry_registrations,
+            "policy_genome": policy_genome.to_dict(),
+            "abstention_ladder_advances": abstention_ladder_advances,
+            "rollback_reason": rollback_reason,
+            "probe_history": probe_history,
+            "validation_probe_every": validation_probe_every,
+            "validation_probe_trigger_threshold": (
+                validation_probe_trigger_threshold
+            ),
+            "probe_ids": list(registered_probe_ids),
+            "probe_limit": probe_limit,
+            "canary_limit": canary_limit,
+            "max_mutation_attempts_per_case": max_mutation_attempts_per_case,
+            "canary_case_ids": list(registered_canary_ids),
+            "baseline_canary_audit": baseline_canary_audit,
+            "rejection_summary": _build_rejection_summary(
+                final_gate_summary, steps,
+            ),
+            "final_champion_claim": False,
+            "result_scope": "development_candidate_not_final_holdout_champion",
+            "label_free_accuracy_claim": False,
+            "no_gold_promotion_allowed": False,
+            "runtime_invalid_cases": runtime_invalid_cases,
+            "runtime_error_categories": dict(runtime_error_categories),
+            "runtime_invalid_claim_scope": (
+                "diagnostic_only_not_evolution_evidence"
+            ),
+            "meta_review": meta_review_summary,
+            "provider_usage_totals": provider_usage_ledger.totals(),
+        },
+    )
+
+
+def _save_evolution_results(
+    *, output_dir: Path, result: OnlineEvolutionResult,
+    champion_genome: SkillGenome, policy_genome: PolicyGenome,
+    causal_memory: EvolutionExperienceMemory,
+    provider_usage_ledger: ProviderUsageLedger,
+    evolution_case_ids: Sequence[str], run_id: str,
+    duration: float, triggered_cases: int, stable_cases: int,
+    edits_accepted: int, edits_rejected: int, gate,
+    registered_canary_ids: Sequence[str],
+    baseline_canary_audit: list[dict[str, Any]],
+    type_coverage: dict[str, Any],
+    persist_progress,
+) -> None:
+    """Persist evolution results and print the completion summary.
+
+    Why this function exists: run_online_evolution's tail block writes five
+    JSON artifacts and prints a six-line summary. Extracting it keeps the
+    main loop readable and makes the persistence contract testable.
+    """
+    write_json(output_dir / "evolution_result.json", result.to_dict())
+    write_json(output_dir / "champion_genome.json", champion_genome.to_dict())
+    write_json(output_dir / "policy_genome.json", policy_genome.to_dict())
+    write_json(output_dir / "htc_tes_coverage.json", type_coverage)
+    write_json(
+        output_dir / "htc_tes_experience_memory.json",
+        causal_memory.to_dict(),
+    )
+    write_json(
+        output_dir / "provider_usage_ledger.json",
+        provider_usage_ledger.to_dict(),
+    )
+    persist_progress(len(evolution_case_ids), status="complete")
+
+    print(f"\n[{run_id}] Complete in {duration:.1f}s:")
+    print(f"  Cases: {len(evolution_case_ids)} total, {triggered_cases} triggered, "
+          f"{stable_cases} stable")
+    print(f"  Edits: {edits_accepted} accepted, {edits_rejected} rejected")
+    if registered_canary_ids:
+        print(
+            f"  Baseline canaries: "
+            f"{sum(bool(item.get('admitted')) for item in baseline_canary_audit)}/"
+            f"{len(registered_canary_ids)} admitted"
+        )
+    print(f"  Halted: {gate.is_halted} ({gate.halt_reason})")
+    print(f"  Champion: {champion_genome.content_hash[:16]}...")
+    # HTC-TES v3: Print type coverage summary
+    print(f"  HTC-TES: {type_coverage['types_with_experience']}/"
+          f"{type_coverage['total_types']} types covered "
+          f"(effective: {type_coverage['effective_coverage']:.1%})")
+
+
 def run_online_evolution(
     *,
     evolution_case_ids: Sequence[str],
@@ -7545,95 +7684,45 @@ def run_online_evolution(
         )
     meta_skill_state = committed_meta_state
 
-    result = OnlineEvolutionResult(
-        run_id=run_id,
-        champion_genome=champion_genome,
-        policy_genome=policy_genome,
-        steps=steps,
-        gate_summary=final_gate_summary,
-        total_cases=len(evolution_case_ids),
-        triggered_cases=triggered_cases,
-        edits_accepted=edits_accepted,
-        edits_rejected=edits_rejected,
-        stable_cases=stable_cases,
-        runtime_invalid_cases=runtime_invalid_cases,
-        use_gold=use_gold,
-        halted=gate.is_halted,
-        halt_reason=gate.halt_reason,
-        duration_seconds=duration,
-        evolution_audit={
-            **budget_usage,
-            "total_provider_calls": (
-                budget_usage["detector_calls"] + budget_usage["mutation_calls"]
-            ),
-            "localization_bias_signals": localization_bias_signals,
-            "non_l1_failure_attributions": non_l1_failure_attributions,
-            "l2_policy_audit": l2_policy_audit,
-            "l2_policy_accepts": l2_policy_accepts,
-            "l2_registry_registrations": l2_registry_registrations,
-            "policy_genome": policy_genome.to_dict(),
-            "abstention_ladder_advances": abstention_ladder_advances,
-            "rollback_reason": rollback_reason,
-            "probe_history": probe_history,
-            "validation_probe_every": validation_probe_every,
-            "validation_probe_trigger_threshold": (
-                validation_probe_trigger_threshold
-            ),
-            "probe_ids": list(registered_probe_ids),
-            "probe_limit": probe_limit,
-            "canary_limit": canary_limit,
-            "max_mutation_attempts_per_case": max_mutation_attempts_per_case,
-            "canary_case_ids": list(registered_canary_ids),
-            "baseline_canary_audit": baseline_canary_audit,
-            "rejection_summary": _build_rejection_summary(
-                final_gate_summary, steps,
-            ),
-            "final_champion_claim": False,
-            "result_scope": "development_candidate_not_final_holdout_champion",
-            "label_free_accuracy_claim": False,
-            "no_gold_promotion_allowed": False,
-            "runtime_invalid_cases": runtime_invalid_cases,
-            "runtime_error_categories": dict(runtime_error_categories),
-            "runtime_invalid_claim_scope": (
-                "diagnostic_only_not_evolution_evidence"
-            ),
-            "meta_review": meta_review_summary,
-            "provider_usage_totals": provider_usage_ledger.totals(),
-        },
+    result = _build_evolution_result(
+        run_id=run_id, champion_genome=champion_genome,
+        policy_genome=policy_genome, steps=steps,
+        final_gate_summary=final_gate_summary,
+        evolution_case_ids=evolution_case_ids,
+        triggered_cases=triggered_cases, edits_accepted=edits_accepted,
+        edits_rejected=edits_rejected, stable_cases=stable_cases,
+        runtime_invalid_cases=runtime_invalid_cases, use_gold=use_gold,
+        gate=gate, duration=duration, budget_usage=budget_usage,
+        localization_bias_signals=localization_bias_signals,
+        non_l1_failure_attributions=non_l1_failure_attributions,
+        l2_policy_audit=l2_policy_audit,
+        l2_policy_accepts=l2_policy_accepts,
+        l2_registry_registrations=l2_registry_registrations,
+        abstention_ladder_advances=abstention_ladder_advances,
+        rollback_reason=rollback_reason, probe_history=probe_history,
+        validation_probe_every=validation_probe_every,
+        validation_probe_trigger_threshold=validation_probe_trigger_threshold,
+        registered_probe_ids=registered_probe_ids, probe_limit=probe_limit,
+        canary_limit=canary_limit,
+        max_mutation_attempts_per_case=max_mutation_attempts_per_case,
+        registered_canary_ids=registered_canary_ids,
+        baseline_canary_audit=baseline_canary_audit,
+        runtime_error_categories=runtime_error_categories,
+        meta_review_summary=meta_review_summary,
+        provider_usage_ledger=provider_usage_ledger,
     )
 
-    # Save results
-    write_json(output_dir / "evolution_result.json", result.to_dict())
-    write_json(output_dir / "champion_genome.json", champion_genome.to_dict())
-    write_json(output_dir / "policy_genome.json", policy_genome.to_dict())
-    # HTC-TES v3: Save type-conditioned experience summary
-    type_coverage = causal_memory.type_experience_memory.get_type_coverage()
-    write_json(output_dir / "htc_tes_coverage.json", type_coverage)
-    write_json(
-        output_dir / "htc_tes_experience_memory.json",
-        causal_memory.to_dict(),
+    _save_evolution_results(
+        output_dir=output_dir, result=result,
+        champion_genome=champion_genome, policy_genome=policy_genome,
+        causal_memory=causal_memory, provider_usage_ledger=provider_usage_ledger,
+        evolution_case_ids=evolution_case_ids, run_id=run_id,
+        duration=duration, triggered_cases=triggered_cases,
+        stable_cases=stable_cases, edits_accepted=edits_accepted,
+        edits_rejected=edits_rejected, gate=gate,
+        registered_canary_ids=registered_canary_ids,
+        baseline_canary_audit=baseline_canary_audit,
+        type_coverage=causal_memory.type_experience_memory.get_type_coverage(),
+        persist_progress=persist_progress,
     )
-    write_json(
-        output_dir / "provider_usage_ledger.json",
-        provider_usage_ledger.to_dict(),
-    )
-    persist_progress(len(evolution_case_ids), status="complete")
-
-    print(f"\n[{run_id}] Complete in {duration:.1f}s:")
-    print(f"  Cases: {len(evolution_case_ids)} total, {triggered_cases} triggered, "
-          f"{stable_cases} stable")
-    print(f"  Edits: {edits_accepted} accepted, {edits_rejected} rejected")
-    if registered_canary_ids:
-        print(
-            f"  Baseline canaries: "
-            f"{sum(bool(item.get('admitted')) for item in baseline_canary_audit)}/"
-            f"{len(registered_canary_ids)} admitted"
-        )
-    print(f"  Halted: {gate.is_halted} ({gate.halt_reason})")
-    print(f"  Champion: {champion_genome.content_hash[:16]}...")
-    # HTC-TES v3: Print type coverage summary
-    print(f"  HTC-TES: {type_coverage['types_with_experience']}/"
-          f"{type_coverage['total_types']} types covered "
-          f"(effective: {type_coverage['effective_coverage']:.1%})")
-
     return result

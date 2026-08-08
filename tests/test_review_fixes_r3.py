@@ -396,13 +396,14 @@ def test_r37_mutation_calls_record_into_the_ledger() -> None:
 
 
 def test_r37_ledger_is_persisted_and_totals_audited() -> None:
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    save_source = inspect.getsource(evolution_runner._save_evolution_results)
     assert (
         'output_dir / "provider_usage_ledger.json"'
-        in source
+        in save_source
     )
-    assert "provider_usage_ledger.to_dict()" in source
-    assert '"provider_usage_totals": provider_usage_ledger.totals()' in source
+    assert "provider_usage_ledger.to_dict()" in save_source
+    build_source = inspect.getsource(evolution_runner._build_evolution_result)
+    assert '"provider_usage_totals": provider_usage_ledger.totals()' in build_source
 
 
 def test_r37_ledger_records_reflection_purposes() -> None:
