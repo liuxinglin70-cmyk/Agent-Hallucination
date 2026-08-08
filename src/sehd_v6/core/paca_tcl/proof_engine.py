@@ -1374,59 +1374,9 @@ def adjudicate_case(
             user=v2._provider_user(built), cache_dir=output_dir / "construct_census_cache",
         )
         base = base_future.result()
-        try:
-            construct_value, construct_provider = construct_future.result()
-            construct_value, axis_normalized_count = _normalize_construct_value(construct_value)
-            construct_census, construct_audit = validate_provider_census(construct_value, built)
-            construct_audit["axis_normalized_count"] = axis_normalized_count
-            # v3.5.6: one bounded census-repair call. A structurally incomplete
-            # or schema-invalid census response is repairable under the same
-            # coverage contract (coverage_state="complete" + every supplied
-            # candidate returned). The retry uses a different request body so
-            # the cache key differs, and never weakens the fail-closed
-            # construct authority: a still-incomplete retry keeps the same
-            # non-authoritative outcome.
-            if construct_audit.get("status") != "complete":
-                # Structured repair feedback: the generic "must be complete"
-                # instruction cannot repair a candidate whose dependency
-                # references a nonexistent event id — the model does not know
-                # WHICH candidate is invalid or WHAT the legal references
-                # are.  Feed the concrete validation failures and the legal
-                # event-id universe back so the repair can actually fix the
-                # references (observed: BFCL/143 failed 3x with
-                # construct_not_complete until the failures were surfaced).
-                repair_failures = construct_audit.get("failures") or []
-                legal_event_ids = [
-                    str(event["event_id"]) for event in built["events"]
-                ]
-                repair_hint = (
-                    "\nCONSTRUCT_CENSUS_REPAIR=coverage_state must be "
-                    "\"complete\" and every supplied candidate must pass "
-                    "validation. Validation failures to fix: "
-                    + json.dumps(repair_failures, ensure_ascii=False)
-                    + ". Legal event IDs for origin_hypothesis_event_id: "
-                    + json.dumps(legal_event_ids, ensure_ascii=False)
-                    + ". Legal trigger_event_id and dependency_event_ids "
-                    "(event IDs or tool interaction IDs copied exactly from "
-                    "TRAJECTORY_PACKET): "
-                    + json.dumps(_addressable_refs(built), ensure_ascii=False)
-                    + ". Re-emit the FULL census with the repaired candidates "
-                    "(same candidate_ids). Return JSON only."
-                )
-                repair_user = v2._provider_user(built) + repair_hint
-                repair_value, repair_provider = provider_call(
-                    route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
-                    user=repair_user, cache_dir=output_dir / "construct_census_cache" / "repair_1",
-                )
-                construct_provider = {"initial": construct_provider, "repair": repair_provider}
-                construct_value, axis_normalized_count = _normalize_construct_value(repair_value)
-                construct_census, construct_audit = validate_provider_census(repair_value, built)
-                construct_audit["axis_normalized_count"] = axis_normalized_count
-                construct_audit["repaired_after_incomplete"] = True
-        except Exception as exc:
-            construct_census = []
-            construct_audit = {"status": "provider_error", "error_type": type(exc).__name__, "error": str(exc)[:500]}
-            construct_provider = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
+        construct_census, construct_audit, construct_provider = (
+            _resolve_construct_census(construct_future, built, config, output_dir)
+        )
 
     construct_authoritative, construct_authority_reasons = _construct_authority(
         construct_audit
@@ -1783,7 +1733,121 @@ def adjudicate_case(
         providers["proof_court_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
         runtime_valid = False
 
-    # Build output
+    return _build_adjudication_output(
+        proof=proof, base=base, built=built, providers=providers,
+        runtime_valid=runtime_valid,
+        prosecution=prosecution, defense=defense,
+        appeal_prosecution=appeal_prosecution,
+        appeal_defense_certs=appeal_defense_certs,
+        combined_prosecution=combined_prosecution,
+        initial_proof=initial_proof,
+        appeal_candidates=appeal_candidates,
+        focused_audits=focused_audits,
+        counterfactual_rankings=counterfactual_rankings,
+        construct_audit=construct_audit,
+        construct_authoritative=construct_authoritative,
+        construct_authority_reasons=construct_authority_reasons,
+        base_runtime_valid=base_runtime_valid,
+    )
+
+
+# ============================================================
+# Phase 1: Construct census resolution
+# ============================================================
+
+def _resolve_construct_census(
+    construct_future, built: dict[str, Any],
+    config: dict[str, Any], output_dir: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    """Resolve the construct census from a concurrent provider future.
+
+    Returns (census, audit, provider_metadata). Includes one bounded repair
+    call when the initial response is structurally incomplete.
+    """
+    try:
+        construct_value, construct_provider = construct_future.result()
+        construct_value, axis_normalized_count = _normalize_construct_value(construct_value)
+        construct_census, construct_audit = validate_provider_census(construct_value, built)
+        construct_audit["axis_normalized_count"] = axis_normalized_count
+        # v3.5.6: one bounded census-repair call. A structurally incomplete
+        # or schema-invalid census response is repairable under the same
+        # coverage contract (coverage_state="complete" + every supplied
+        # candidate returned). The retry uses a different request body so
+        # the cache key differs, and never weakens the fail-closed
+        # construct authority: a still-incomplete retry keeps the same
+        # non-authoritative outcome.
+        if construct_audit.get("status") != "complete":
+            # Structured repair feedback: the generic "must be complete"
+            # instruction cannot repair a candidate whose dependency
+            # references a nonexistent event id — the model does not know
+            # WHICH candidate is invalid or WHAT the legal references
+            # are.  Feed the concrete validation failures and the legal
+            # event-id universe back so the repair can actually fix the
+            # references (observed: BFCL/143 failed 3x with
+            # construct_not_complete until the failures were surfaced).
+            repair_failures = construct_audit.get("failures") or []
+            legal_event_ids = [
+                str(event["event_id"]) for event in built["events"]
+            ]
+            repair_hint = (
+                "\nCONSTRUCT_CENSUS_REPAIR=coverage_state must be "
+                "\"complete\" and every supplied candidate must pass "
+                "validation. Validation failures to fix: "
+                + json.dumps(repair_failures, ensure_ascii=False)
+                + ". Legal event IDs for origin_hypothesis_event_id: "
+                + json.dumps(legal_event_ids, ensure_ascii=False)
+                + ". Legal trigger_event_id and dependency_event_ids "
+                "(event IDs or tool interaction IDs copied exactly from "
+                "TRAJECTORY_PACKET): "
+                + json.dumps(_addressable_refs(built), ensure_ascii=False)
+                + ". Re-emit the FULL census with the repaired candidates "
+                "(same candidate_ids). Return JSON only."
+            )
+            repair_user = v2._provider_user(built) + repair_hint
+            repair_value, repair_provider = provider_call(
+                route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
+                user=repair_user, cache_dir=output_dir / "construct_census_cache" / "repair_1",
+            )
+            construct_provider = {"initial": construct_provider, "repair": repair_provider}
+            construct_value, axis_normalized_count = _normalize_construct_value(repair_value)
+            construct_census, construct_audit = validate_provider_census(repair_value, built)
+            construct_audit["axis_normalized_count"] = axis_normalized_count
+            construct_audit["repaired_after_incomplete"] = True
+    except Exception as exc:
+        construct_census = []
+        construct_audit = {"status": "provider_error", "error_type": type(exc).__name__, "error": str(exc)[:500]}
+        construct_provider = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
+    return construct_census, construct_audit, construct_provider
+
+
+# ============================================================
+# Output assembly
+# ============================================================
+
+def _build_adjudication_output(
+    *, proof: dict[str, Any], base: dict[str, Any], built: dict[str, Any],
+    providers: dict[str, Any], runtime_valid: bool,
+    prosecution: dict[str, Any] | None,
+    defense: dict[str, Any] | None,
+    appeal_prosecution: dict[str, Any] | None,
+    appeal_defense_certs: dict[str, Any] | None,
+    combined_prosecution: dict[str, Any] | None,
+    initial_proof: dict[str, Any] | None,
+    appeal_candidates: list[dict[str, Any]],
+    focused_audits: list[dict[str, Any]],
+    counterfactual_rankings: dict[str, Any] | None,
+    construct_audit: dict[str, Any],
+    construct_authoritative: bool,
+    construct_authority_reasons: list[dict[str, Any]],
+    base_runtime_valid: bool,
+) -> dict[str, Any]:
+    """Assemble the final adjudication output from proof-court results.
+
+    Why this function exists: adjudicate_case accumulates a dozen intermediate
+    artifacts through concurrent phases, then flattens them into the output
+    schema. Extracting the flattening keeps the orchestration readable and
+    makes the output contract testable in isolation.
+    """
     failure_reasons = proof.get("authority_failure_reasons") or []
     if not runtime_valid:
         # v5.8 observability: every invalidated run carries a machine-readable
