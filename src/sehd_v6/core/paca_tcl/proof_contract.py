@@ -366,6 +366,54 @@ def _merge_appeal_defense(
 
 
 # ============================================================
+# Deterministic pre-checks (materiality + commitment)
+# ============================================================
+
+def _run_deterministic_prechecks(
+    *, valid_errors: list[dict[str, Any]], packet: dict[str, Any],
+    apply_materiality_check: bool, apply_commitment_check: bool,
+    defenses_by_candidate: dict[str, list[dict[str, Any]]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Run deterministic materiality/commitment pre-checks over valid errors.
+
+    Why this function exists: both pre-checks share one shape — filter valid
+    errors by breach type, run a deterministic check, and convert a passing
+    verdict into a synthetic defense that joins the dominance pool. Keeping
+    them in one place makes the guardrail pipeline (what may demote a
+    prosecution certificate before dominance) auditable at a glance.
+    """
+    materiality_results: dict[str, dict[str, Any]] = {}
+    commitment_results: dict[str, dict[str, Any]] = {}
+    for row in valid_errors:
+        breach_type = str(row.get("breach_type") or "")
+        if apply_materiality_check and breach_type == "contradiction":
+            check, results, prefix, trigger = (
+                check_materiality, materiality_results,
+                "materiality_defense_", "immaterial_difference",
+            )
+        elif apply_commitment_check and breach_type == "invalid_action":
+            check, results, prefix, trigger = (
+                check_commitment, commitment_results,
+                "commitment_defense_", "rejected_attempt",
+            )
+        else:
+            continue
+        result = check(row, packet)
+        results[str(row["certificate_id"])] = result
+        if result["decision"] == trigger and result.get("defense_type"):
+            target_id = str(row["source_candidate_id"])
+            defenses_by_candidate.setdefault(target_id, []).append({
+                "certificate_id": f"{prefix}{row['certificate_id']}",
+                "target_candidate_id": target_id,
+                "target_origin_event_id": str(row.get("origin_event_id") or ""),
+                "defense_type": result["defense_type"],
+                "evidence_refs": [str(row.get("origin_event_id") or "")],
+                "rationale": result["reason"],
+            })
+    return materiality_results, commitment_results
+
+
+# ============================================================
 # Consensus gate + pre-ledger restore
 # ============================================================
 
@@ -814,43 +862,12 @@ def adjudicate_proof_court(
     for row in valid_defenses:
         defenses_by_candidate.setdefault(str(row["target_candidate_id"]), []).append(row)
 
-    # v3.4: materiality pre-check (preserved)
-    materiality_results: dict[str, dict[str, Any]] = {}
-    if apply_materiality_check:
-        for row in valid_errors:
-            if str(row.get("breach_type") or "") == "contradiction":
-                result = check_materiality(row, packet)
-                materiality_results[str(row["certificate_id"])] = result
-                if result["decision"] == "immaterial_difference" and result.get("defense_type"):
-                    target_id = str(row["source_candidate_id"])
-                    synthetic_defense = {
-                        "certificate_id": f"materiality_defense_{row['certificate_id']}",
-                        "target_candidate_id": target_id,
-                        "target_origin_event_id": str(row.get("origin_event_id") or ""),
-                        "defense_type": result["defense_type"],
-                        "evidence_refs": [str(row.get("origin_event_id") or "")],
-                        "rationale": result["reason"],
-                    }
-                    defenses_by_candidate.setdefault(target_id, []).append(synthetic_defense)
-
-    # v3.4: commitment pre-check (preserved)
-    commitment_results: dict[str, dict[str, Any]] = {}
-    if apply_commitment_check:
-        for row in valid_errors:
-            if str(row.get("breach_type") or "") == "invalid_action":
-                result = check_commitment(row, packet)
-                commitment_results[str(row["certificate_id"])] = result
-                if result["decision"] == "rejected_attempt" and result.get("defense_type"):
-                    target_id = str(row["source_candidate_id"])
-                    synthetic_defense = {
-                        "certificate_id": f"commitment_defense_{row['certificate_id']}",
-                        "target_candidate_id": target_id,
-                        "target_origin_event_id": str(row.get("origin_event_id") or ""),
-                        "defense_type": result["defense_type"],
-                        "evidence_refs": [str(row.get("origin_event_id") or "")],
-                        "rationale": result["reason"],
-                    }
-                    defenses_by_candidate.setdefault(target_id, []).append(synthetic_defense)
+    materiality_results, commitment_results = _run_deterministic_prechecks(
+        valid_errors=valid_errors, packet=packet,
+        apply_materiality_check=apply_materiality_check,
+        apply_commitment_check=apply_commitment_check,
+        defenses_by_candidate=defenses_by_candidate,
+    )
 
     # Defense dominance (preserved from v3.4)
     surviving = []
