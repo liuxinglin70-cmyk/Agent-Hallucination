@@ -3633,6 +3633,115 @@ def _record_attempt(
     return updated.to_dict()
 
 
+def _run_registry_reflection_impl(
+    *, attribution: FailureAttribution, facts_summary: Mapping[str, Any],
+    case_id: str, policy_genome: PolicyGenome,
+    mutation_route: dict[str, Any] | None,
+    run_mutation_call: Any, output_dir: Path,
+    l2_registry_registrations: list[dict[str, Any]],
+) -> None:
+    """Extend the L2 vocabulary when no runtime action can repair an
+    attribution. A registered entry is pending (shadow-only) on first
+    registration and enters the pending validation queue, where later
+    independent observations decide its promotion; the genome's registry
+    is the single authority, so the new state is checkpointed with the
+    policy genome."""
+    if mutation_route is None:
+        return
+    candidates = plan_registry_candidates(
+        attribution=attribution, registry=policy_genome.registry,
+    )
+    if not candidates:
+        return
+    system_prompt, user_prompt = build_registry_selection_prompt(
+        attribution=attribution,
+        facts_summary=facts_summary,
+        candidates=candidates,
+    )
+    try:
+        parsed, _meta = run_mutation_call(
+            route=mutation_route,
+            purpose=PURPOSE_REGISTRY_REFLECTION,
+            system=system_prompt,
+            user=user_prompt,
+            cache_dir=output_dir / "mutation_cache" / "registry_reflection",
+        )
+    except Exception as exc:
+        # A failed reflection call is audited, never silent.
+        l2_registry_registrations.append({
+            "outcome": "reflection_call_failed",
+            "reason": f"{type(exc).__name__}:{str(exc)[:200]}",
+        })
+        return
+    candidate, select_reason = select_registry_candidate(
+        parsed, candidates, registry=policy_genome.registry,
+    )
+    if candidate is None:
+        l2_registry_registrations.append({
+            "outcome": "no_registration",
+            "reason": select_reason,
+        })
+        return
+    try:
+        edit_kwargs = compile_registration_candidate(
+            candidate, policy_genome.registry,
+        )
+    except ValueError as exc:
+        # Shadow compile fail-closed: an invalid registration is dropped
+        # and audited, never applied.
+        l2_registry_registrations.append({
+            "outcome": "shadow_compile_rejected",
+            "target": candidate.target,
+            "reason": str(exc)[:200],
+        })
+        return
+    new_registry = apply_registry_edit(
+        policy_genome.registry,
+        **edit_kwargs,
+        reason_codes=(attribution.reason_code,),
+    )
+    # Rebind the genome's registry in place (same genome identity is
+    # recomputed from items+registry on next content_hash access); the
+    # registration is recorded as audit telemetry.
+    policy_genome.registry = new_registry
+    applied_edit = new_registry.audit[-1]
+    l2_registry_registrations.append({
+        "outcome": "registered",
+        "edit_id": applied_edit.edit_id,
+        "operation": applied_edit.operation,
+        "target": applied_edit.target,
+        "status": new_registry.status_of(applied_edit.target),
+        "sequence": applied_edit.sequence,
+        "registry_hash": new_registry.content_hash,
+    })
+    queued = enqueue_registry_validation(
+        genome=policy_genome,
+        operation=applied_edit.operation,
+        target=applied_edit.target,
+        facts=AdjudicationFacts(**dict(facts_summary)),
+        case_id=case_id,
+        intended_edit=(
+            {
+                "precondition": candidate.precondition,
+                "params": dict(candidate.params),
+            }
+            if candidate.precondition or candidate.params
+            else None
+        ),
+    )
+    l2_registry_registrations.append({
+        "outcome": (
+            "pending_registry_validation_enqueued"
+            if queued.status == PENDING_STATUS_PENDING
+            else "pending_registry_validation_rejected"
+        ),
+        "target": applied_edit.target,
+        "reason": str(
+            queued.source_evidence.get("reject_reason") or ""
+        ),
+    })
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -4213,107 +4322,13 @@ def run_online_evolution(
         facts_summary: Mapping[str, Any],
         case_id: str,
     ) -> None:
-        """Extend the L2 vocabulary when no runtime action can repair an
-        attribution. A registered entry is pending (shadow-only) on first
-        registration and enters the pending validation queue, where later
-        independent observations decide its promotion; the genome's registry
-        is the single authority, so the new state is checkpointed with the
-        policy genome."""
-        nonlocal policy_genome
-        if mutation_route is None:
-            return
-        candidates = plan_registry_candidates(
-            attribution=attribution, registry=policy_genome.registry,
+        _run_registry_reflection_impl(
+            attribution=attribution, facts_summary=facts_summary,
+            case_id=case_id, policy_genome=policy_genome,
+            mutation_route=mutation_route,
+            run_mutation_call=run_mutation_call, output_dir=output_dir,
+            l2_registry_registrations=l2_registry_registrations,
         )
-        if not candidates:
-            return
-        system_prompt, user_prompt = build_registry_selection_prompt(
-            attribution=attribution,
-            facts_summary=facts_summary,
-            candidates=candidates,
-        )
-        try:
-            parsed, _meta = run_mutation_call(
-                route=mutation_route,
-                purpose=PURPOSE_REGISTRY_REFLECTION,
-                system=system_prompt,
-                user=user_prompt,
-                cache_dir=output_dir / "mutation_cache" / "registry_reflection",
-            )
-        except Exception as exc:
-            # A failed reflection call is audited, never silent.
-            l2_registry_registrations.append({
-                "outcome": "reflection_call_failed",
-                "reason": f"{type(exc).__name__}:{str(exc)[:200]}",
-            })
-            return
-        candidate, select_reason = select_registry_candidate(
-            parsed, candidates, registry=policy_genome.registry,
-        )
-        if candidate is None:
-            l2_registry_registrations.append({
-                "outcome": "no_registration",
-                "reason": select_reason,
-            })
-            return
-        try:
-            edit_kwargs = compile_registration_candidate(
-                candidate, policy_genome.registry,
-            )
-        except ValueError as exc:
-            # Shadow compile fail-closed: an invalid registration is dropped
-            # and audited, never applied.
-            l2_registry_registrations.append({
-                "outcome": "shadow_compile_rejected",
-                "target": candidate.target,
-                "reason": str(exc)[:200],
-            })
-            return
-        new_registry = apply_registry_edit(
-            policy_genome.registry,
-            **edit_kwargs,
-            reason_codes=(attribution.reason_code,),
-        )
-        # Rebind the genome's registry in place (same genome identity is
-        # recomputed from items+registry on next content_hash access); the
-        # registration is recorded as audit telemetry.
-        policy_genome.registry = new_registry
-        applied_edit = new_registry.audit[-1]
-        l2_registry_registrations.append({
-            "outcome": "registered",
-            "edit_id": applied_edit.edit_id,
-            "operation": applied_edit.operation,
-            "target": applied_edit.target,
-            "status": new_registry.status_of(applied_edit.target),
-            "sequence": applied_edit.sequence,
-            "registry_hash": new_registry.content_hash,
-        })
-        queued = enqueue_registry_validation(
-            genome=policy_genome,
-            operation=applied_edit.operation,
-            target=applied_edit.target,
-            facts=AdjudicationFacts(**dict(facts_summary)),
-            case_id=case_id,
-            intended_edit=(
-                {
-                    "precondition": candidate.precondition,
-                    "params": dict(candidate.params),
-                }
-                if candidate.precondition or candidate.params
-                else None
-            ),
-        )
-        l2_registry_registrations.append({
-            "outcome": (
-                "pending_registry_validation_enqueued"
-                if queued.status == PENDING_STATUS_PENDING
-                else "pending_registry_validation_rejected"
-            ),
-            "target": applied_edit.target,
-            "reason": str(
-                queued.source_evidence.get("reject_reason") or ""
-            ),
-        })
 
     def run_l2_policy_case(
         *,
