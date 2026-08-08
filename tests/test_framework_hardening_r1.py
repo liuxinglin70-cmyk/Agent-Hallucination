@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
+from src.sehd_v6.core.bccse.signal_adapter import metric_snapshot
 from src.sehd_v6.core.paca_tcl import basic_runner
 from src.sehd_v6.core.paca_tcl import layered_engine
-from src.sehd_v6.core.paca_tcl import proof_evaluator
 from src.sehd_v6.detector import batch
 
 
@@ -92,7 +92,7 @@ def test_metric_snapshot_parses_string_gold_label() -> None:
         "candidate_path": {"state": "verified_error"},
         "boundary_path": {"state": "verified_clean"},
     }
-    snapshot = proof_evaluator.metric_snapshot([row])
+    snapshot = metric_snapshot([row])
     # Predicted positive on a clean gold -> FP; the old bool("false") bug
     # would have reported a TP instead.
     assert snapshot.precision == 0.0
@@ -112,7 +112,7 @@ def test_metric_snapshot_abstention_is_not_true_negative() -> None:
         "candidate_path": {"state": "unresolved"},
         "boundary_path": {"state": "unresolved"},
     }
-    snapshot = proof_evaluator.metric_snapshot([row])
+    snapshot = metric_snapshot([row])
     assert snapshot.unresolved_rate == 1.0
     assert snapshot.clean_fpr == 0.0
     assert snapshot.macro_f1 == 0.0
@@ -129,7 +129,7 @@ def test_metric_snapshot_rejects_missing_authority_envelope() -> None:
         "candidate_path": {"state": "verified_error"},
         "boundary_path": {"state": "verified_clean"},
     }
-    snapshot = proof_evaluator.metric_snapshot([row])
+    snapshot = metric_snapshot([row])
     assert snapshot.valid_output_rate == 0.0
     assert snapshot.invalid_rate == 1.0
     assert snapshot.unresolved_rate == 1.0
@@ -211,7 +211,7 @@ def test_mutation_transport_reuses_run_local_cache(monkeypatch, tmp_path: Path) 
         calls.append(request.full_url)
         return _FakeResponse()
 
-    monkeypatch.setattr(proof_evaluator.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setenv("PACA_GLOBAL_CACHE_ROOT", "off")
 
     route = {
@@ -223,11 +223,13 @@ def test_mutation_transport_reuses_run_local_cache(monkeypatch, tmp_path: Path) 
         "timeout_seconds": 10,
     }
     cache_dir = tmp_path / "mutation_cache"
-    _, meta_first = proof_evaluator._json_object_provider_call(
+    _, meta_first = basic_runner.json_object_provider_call(
         route=route, system="return json", user="{}", cache_dir=cache_dir,
+        purpose="mutation",
     )
-    _, meta_second = proof_evaluator._json_object_provider_call(
+    _, meta_second = basic_runner.json_object_provider_call(
         route=route, system="return json", user="{}", cache_dir=cache_dir,
+        purpose="mutation",
     )
     assert len(calls) == 1
     assert meta_first["cache_hit"] is False

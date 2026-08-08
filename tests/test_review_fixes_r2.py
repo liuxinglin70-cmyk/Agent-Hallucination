@@ -54,7 +54,7 @@ from src.sehd_v6.core.bccse.safety_gate import (
     create_structural_gate,
 )
 from src.sehd_v6.core.htc_tes.type_classifier import HallucinationTypeClassifier
-from src.sehd_v6.core.paca_tcl import proof_evaluator
+from src.sehd_v6.core.bccse.signal_adapter import metric_snapshot
 from src.sehd_v6.core.paca_tcl.policy_evaluator import (
     POLICY_STAGE_PRE_LEDGER,
 )
@@ -247,7 +247,7 @@ def test_r08_abstention_does_not_deflate_recall() -> None:
         _snapshot_row("unresolved", True),   # abstention, gold positive
         _snapshot_row("verified_error", True),  # tp
     ]
-    snapshot = proof_evaluator.metric_snapshot(rows)
+    snapshot = metric_snapshot(rows)
     assert snapshot.hallucination_recall == pytest.approx(1.0)
     assert snapshot.clean_fpr == 0.0
 

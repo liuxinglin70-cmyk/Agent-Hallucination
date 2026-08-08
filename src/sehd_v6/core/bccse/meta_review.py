@@ -313,28 +313,21 @@ def generate_meta_edit_candidates(
         for code in experience.feedback_codes:
             feedback_counts[code] = feedback_counts.get(code, 0) + 1
 
-    # Recurring route-unavailability -> prefer a registered runtime route.
-    if (
-        feedback_counts.get("policy_route_unavailable", 0) >= 1
-        and "prefer_registered_runtime_route" not in state.guidance_tokens
-    ):
-        candidates.append(MetaEdit(
-            edit_id=_next_id(OP_ADD_GUIDANCE, "prefer_registered_runtime_route"),
-            operation=OP_ADD_GUIDANCE,
-            target="prefer_registered_runtime_route",
-            rationale="recurring policy_route_unavailable",
-        ))
-    # Recurring pending-registry dependency -> avoid pending dependencies.
-    if (
-        feedback_counts.get("registry_entry_pending", 0) >= 1
-        and "avoid_pending_registry_dependency" not in state.guidance_tokens
-    ):
-        candidates.append(MetaEdit(
-            edit_id=_next_id(OP_ADD_GUIDANCE, "avoid_pending_registry_dependency"),
-            operation=OP_ADD_GUIDANCE,
-            target="avoid_pending_registry_dependency",
-            rationale="recurring registry_entry_pending",
-        ))
+    # Candidate targets are the same registered targets the commit gate
+    # knows (COMMIT_EVIDENCE_SOURCES); enumerate them from that table so a
+    # new evidence-backed target becomes a candidate without a second
+    # hard-coded mapping here.
+    for target, evidence_codes in sorted(COMMIT_EVIDENCE_SOURCES.items()):
+        if (
+            any(feedback_counts.get(code, 0) >= 1 for code in evidence_codes)
+            and target not in state.guidance_tokens
+        ):
+            candidates.append(MetaEdit(
+                edit_id=_next_id(OP_ADD_GUIDANCE, target),
+                operation=OP_ADD_GUIDANCE,
+                target=target,
+                rationale=f"recurring {evidence_codes[0]}",
+            ))
     # v6.1 扩展：从负反馈生成反向指导
     for validation in validations:
         if validation.outcome == OUTCOME_CONTRADICTS_ACCEPT:

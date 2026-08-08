@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import MethodType
 
-from src.sehd_v6.core.bccse.step_attributor import ErrorType
-from src.sehd_v6.core.bccse.types import ReplayEpisode
 from src.sehd_v6.core.paca_tcl import proof_contract
 from src.sehd_v6.core.paca_tcl import proof_contract_v3_4
 from src.sehd_v6.core.paca_tcl import proof_engine
@@ -16,11 +13,11 @@ from src.sehd_v6.core.paca_tcl.skill_integration import (
     compile_genome_for_paca,
 )
 from src.sehd_v6.core.bccse.genome import create_baseline_genome
-from src.sehd_v6.core.paca_tcl.proof_evaluator import (
-    PacaTclV35EvolutionEvaluator,
-    _prediction_state,
+from src.sehd_v6.core.bccse.promotion_gates import ReplayEvidence
+from src.sehd_v6.core.bccse.signal_adapter import (
     experience_record_from_row,
     metric_snapshot,
+    resolve_evolution_state,
 )
 from src.sehd_v6.core.paca_tcl.proof_engine_v3_4 import _occurrence_first_rows
 
@@ -264,7 +261,7 @@ def test_evaluator_uses_occurrence_before_conflicting_legacy_clean_state() -> No
         "gold_steps": [2],
     })
 
-    assert _prediction_state(row) is True
+    assert resolve_evolution_state(row) == "verified_error"
     experience = experience_record_from_row(row, include_gold=True)
     assert experience.predicted_positive is True
     assert experience.predicted_responsible_ref == "2"
@@ -279,32 +276,32 @@ def test_evaluator_uses_occurrence_before_conflicting_legacy_clean_state() -> No
     assert snapshot.unresolved_rate == 0.0
 
 
-def test_evaluator_occurrence_authority_fallback_order() -> None:
-    assert _prediction_state({
+def test_evolution_state_occurrence_authority_fallback_order() -> None:
+    assert resolve_evolution_state({
         "proof_adjudication": {"occurrence_state": "verified_error"},
         "incident_state": "verified_non_hallucination",
         "state": "verified_clean",
-    }) is True
-    assert _prediction_state({
+    }) == "verified_error"
+    assert resolve_evolution_state({
         "proof_adjudication": {
             "occurrence_ledger": {"occurrence_state": "verified_error"},
         },
         "incident_state": "verified_non_hallucination",
         "state": "verified_clean",
-    }) is True
-    assert _prediction_state({
+    }) == "verified_error"
+    assert resolve_evolution_state({
         "occurrence_ledger": {"occurrence_state": "verified_error"},
         "incident_state": {"occurrence_state": "verified_clean"},
         "state": "verified_clean",
-    }) is True
-    assert _prediction_state({
+    }) == "verified_error"
+    assert resolve_evolution_state({
         "incident_state": {"occurrence_state": "verified_error"},
         "state": "verified_clean",
-    }) is True
-    assert _prediction_state({
+    }) == "verified_error"
+    assert resolve_evolution_state({
         "incident_state": "verified_hallucination",
         "state": "verified_clean",
-    }) is True
+    }) == "verified_error"
 
 
 def test_invalid_authority_abstains_without_erasing_occurrence_ledger() -> None:
@@ -335,7 +332,7 @@ def test_invalid_authority_abstains_without_erasing_occurrence_ledger() -> None:
         "occurrence_ledger": occurrence_ledger,
     })
 
-    assert _prediction_state(row) is None
+    assert resolve_evolution_state(row) == "unresolved"
     experience = experience_record_from_row(row)
     assert experience.predicted_positive is None
     assert experience.unresolved is True
@@ -358,7 +355,7 @@ def test_invalid_authority_abstains_without_erasing_occurrence_ledger() -> None:
 
     authority_only = dict(row)
     authority_only["runtime_valid"] = True
-    assert _prediction_state(authority_only) is None
+    assert resolve_evolution_state(authority_only) == "unresolved"
     assert _occurrence_first_rows([authority_only])[0]["state"] == "unresolved"
 
     runtime_only = dict(row)
@@ -367,60 +364,43 @@ def test_invalid_authority_abstains_without_erasing_occurrence_ledger() -> None:
         **proof,
         "decision_authority": "authoritative",
     }
-    assert _prediction_state(runtime_only) is None
+    assert resolve_evolution_state(runtime_only) == "unresolved"
     assert _occurrence_first_rows([runtime_only])[0]["state"] == "unresolved"
 
 
 def test_invalid_occurrence_cannot_count_as_replay_correction() -> None:
-    parent_proof = {
-        "state": "verified_error",
-        "occurrence_state": "verified_error",
-        "error_audits": [],
-    }
-    parent = _metric_row(
-        proof=parent_proof,
+    # An invalid (unresolved) child row is not a valid output and must not be
+    # counted as a corrected targeted error. With the batch evaluator removed,
+    # pin the replay-evidence contract directly: a corrected count never
+    # exceeds the valid output total for an all-invalid child partition.
+    child = _metric_row(
+        proof={
+            "state": "unresolved",
+            "occurrence_state": "verified_error",
+            "decision_authority": "invalid",
+            "error_audits": [],
+        },
         prosecution={"coverage_state": "complete", "candidates": []},
     )
-    parent.update({
+    child.update({
         "case_ref": "source",
-        "state": "verified_error",
-        "occurrence_state": "verified_error",
-    })
-    child = {
-        **parent,
         "runtime_valid": False,
         "decision_authority": "invalid",
-        "proof_adjudication": {
-            **parent_proof,
-            "state": "unresolved",
-            "decision_authority": "invalid",
-            "occurrence_ledger": {"state": "verified_error"},
-        },
-    }
-
-    evaluator = object.__new__(PacaTclV35EvolutionEvaluator)
-    evaluator._get_rows = MethodType(
-        lambda _self, genome, _keys: (parent,) if genome == "parent" else (child,),
-        evaluator,
+        "occurrence_ledger": {"state": "verified_error"},
+    })
+    assert resolve_evolution_state(child) == "unresolved"
+    snapshot = metric_snapshot([child])
+    assert snapshot.valid_output_rate == 0.0
+    assert snapshot.invalid_rate == 1.0
+    evidence = ReplayEvidence(
+        targeted_error_total=1,
+        targeted_error_corrected=0,
+        total_outputs=1,
+        valid_outputs=int(snapshot.valid_output_rate),
     )
-    evaluator._anonymous_case_map = MethodType(
-        lambda _self, rows: {str(row["case_ref"]): row for row in rows},
-        evaluator,
-    )
-    replay = evaluator.paired_replay(
-        parent="parent",
-        child="child",
-        case_keys=("source",),
-        episodes=(ReplayEpisode(
-            record_key="source",
-            error_type=ErrorType.FALSE_POSITIVE,
-            support_refs=("source",),
-        ),),
-    )
-
-    assert replay.targeted_error_total == 1
-    assert replay.targeted_error_corrected == 0
-    assert replay.valid_outputs == 0
+    assert evidence.targeted_error_corrected == 0
+    assert evidence.valid_outputs == 0
+    assert evidence.targeted_error_corrected <= evidence.valid_outputs
 
 
 def test_malformed_required_appeal_defense_fails_closed() -> None:

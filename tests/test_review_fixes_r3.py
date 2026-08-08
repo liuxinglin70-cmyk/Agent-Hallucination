@@ -48,18 +48,18 @@ def test_r30_budget_usage_registers_contrast_replay_errors() -> None:
     A key created only inside the ``except`` branch would keep the audit
     schema unstable between a clean run and a degraded one.
     """
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    source = inspect.getsource(evolution_runner.EvolutionLoop)
     assert '"contrast_replay_errors": 0,' in source
 
 
 def test_r30_contrast_replay_exception_increments_counter() -> None:
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    source = inspect.getsource(evolution_runner.EvolutionLoop)
     marker = 'budget_usage["contrast_replay_errors"] += 1'
     assert marker in source
     # The increment belongs to the contrast replay handler: it must sit
     # between the replay call and the fail-open audit row, otherwise the
     # neighbour gate's unreliability is still unobservable.
-    handler_start = source.index('except Exception as exc:\n                        inverted = False')
+    handler_start = source.index('except Exception as exc:\n                            inverted = False')
     handler_end = source.index('"runtime_error"', handler_start)
     assert handler_start < source.index(marker) < handler_end
 
@@ -71,9 +71,9 @@ def test_r30_contrast_gate_stays_fail_open() -> None:
     into a fail-closed veto that a transient provider outage could use to
     reject every otherwise-admissible edit.
     """
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    source = inspect.getsource(evolution_runner.EvolutionLoop)
     handler = source[
-        source.index('except Exception as exc:\n                        inverted = False'):
+        source.index('except Exception as exc:\n                            inverted = False'):
     ]
     handler = handler[: handler.index('fitness_audit["contrast_replay"]')]
     assert "inverted = False" in handler
@@ -216,7 +216,7 @@ def test_r34_l1_and_l2_share_one_meta_projection() -> None:
     # L1 lives in the main loop; the L2 policy surface is now the extracted
     # module-level stage. Both must consume the same bounded projection.
     sources = (
-        inspect.getsource(evolution_runner.run_online_evolution)
+        inspect.getsource(evolution_runner.EvolutionLoop)
         + inspect.getsource(evolution_runner._run_l2_policy_case_impl)
     )
     injections = [
@@ -233,7 +233,7 @@ def test_r34_l1_and_l2_share_one_meta_projection() -> None:
 
 def test_r34_l1_injection_is_gated_on_non_empty_guidance() -> None:
     sources = (
-        inspect.getsource(evolution_runner.run_online_evolution)
+        inspect.getsource(evolution_runner.EvolutionLoop)
         + inspect.getsource(evolution_runner._run_l2_policy_case_impl)
     )
     assert sources.count(
@@ -376,7 +376,7 @@ def test_r36_unregistered_target_has_no_evidence_source() -> None:
 
 def test_r36_runner_persists_the_committed_state() -> None:
     """The runner must write back the committed state, not its input."""
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    source = inspect.getsource(evolution_runner.EvolutionLoop)
     assert "commit_validated_meta_edits(" in source
     assert (
         'causal_memory.meta_review["meta_state"] = committed_meta_state.to_dict()'
@@ -390,7 +390,7 @@ def test_r36_runner_persists_the_committed_state() -> None:
 # ============================================================
 
 def test_r37_mutation_calls_record_into_the_ledger() -> None:
-    source = inspect.getsource(evolution_runner.run_online_evolution)
+    source = inspect.getsource(evolution_runner.EvolutionLoop)
     # The ledger is instantiated once per run and records every logical
     # mutation/reflection call with the provider meta in hand.
     assert "provider_usage_ledger = ProviderUsageLedger()" in source

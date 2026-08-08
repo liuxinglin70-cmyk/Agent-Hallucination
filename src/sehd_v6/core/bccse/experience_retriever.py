@@ -12,8 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .evolution_experience_memory import EvolutionExperienceMemory
-from .failure_episode import FailureEpisode, HistoricalEpisodeReference
+from .evolution_experience_memory import EvolutionExperienceMemory, MechanismEntry
+from .failure_episode import (
+    CausalSlice,
+    FailureEpisode,
+)
 
 
 @dataclass(frozen=True)
@@ -39,15 +42,11 @@ class ExperienceMatch:
     retrieval_path: str = "exact"  # "exact" | "shape_context" | "causal"
 
 
-def extract_failure_pattern(episode: FailureEpisode) -> FailurePattern:
-    """Extract a structured failure pattern from one FailureEpisode.
-
-    The pattern is deterministic: same episode always yields the same pattern.
-    No case identity, gold, or raw trajectory text participates.
-    """
-    slice_payload = episode.causal_slice
-    attribution = episode.attribution
-
+def _pattern_from_slice(
+    slice_payload: CausalSlice,
+    mechanism_signature: tuple[str, ...],
+) -> FailurePattern:
+    """Derive a FailurePattern from one causal slice (deterministic)."""
     # Failure shape: what kind of structural break occurred
     missing = set(slice_payload.missing_fields)
     malformed = set(slice_payload.malformed_fields)
@@ -88,13 +87,54 @@ def extract_failure_pattern(episode: FailureEpisode) -> FailurePattern:
         context.append(f"certificate_{slice_payload.certificate_state}")
 
     return FailurePattern(
-        mechanism_signature=tuple(
-            str(v) for v in episode.attribution.get("mechanism_signature", ())
-        ),
+        mechanism_signature=tuple(str(v) for v in mechanism_signature),
         failure_shape=shape,
         causal_position=position,
         impact_scope=scope,
         context_features=tuple(sorted(context)),
+    )
+
+
+def extract_failure_pattern(episode: FailureEpisode) -> FailurePattern:
+    """Extract a structured failure pattern from one FailureEpisode.
+
+    The pattern is deterministic: same episode always yields the same pattern.
+    No case identity, gold, or raw trajectory text participates.
+    """
+    return _pattern_from_slice(
+        episode.causal_slice,
+        tuple(str(v) for v in episode.attribution.get("mechanism_signature", ())),
+    )
+
+
+def _entry_pattern(entry: MechanismEntry) -> FailurePattern:
+    """Reconstruct a stored entry's pattern from its representatives' slices.
+
+    Level 2 retrieval previously compared the query against an all-"unknown"
+    pattern, which silently discarded the shape/position/scope weights. Each
+    representative already persists its causal slice, so the entry's pattern
+    is recoverable; prefer the most informative (complete) representative.
+    """
+    representatives = [
+        rep for rep in entry.representatives.values() if rep is not None
+    ]
+    if representatives:
+        representatives.sort(
+            key=lambda rep: (
+                rep.completeness != "complete",
+                -int(rep.evidence_fields),
+                -int(rep.sequence),
+            )
+        )
+        return _pattern_from_slice(
+            CausalSlice.from_dict(representatives[0].causal_slice),
+            entry.signature,
+        )
+    return FailurePattern(
+        mechanism_signature=entry.signature,
+        failure_shape="unknown",
+        causal_position="unknown",
+        impact_scope="unknown",
     )
 
 
@@ -109,15 +149,18 @@ def _similarity(a: FailurePattern, b: FailurePattern) -> float:
     sig_b = set(b.mechanism_signature)
     if sig_a and sig_b:
         score += 0.4 * len(sig_a & sig_b) / max(len(sig_a), len(sig_b))
-    # Failure shape match
-    if a.failure_shape == b.failure_shape:
-        score += 0.25
+    # Failure shape match (an "unknown" side cannot match; skip its weight)
+    if "unknown" not in (a.failure_shape, b.failure_shape):
+        if a.failure_shape == b.failure_shape:
+            score += 0.25
     # Causal position match
-    if a.causal_position == b.causal_position:
-        score += 0.2
+    if "unknown" not in (a.causal_position, b.causal_position):
+        if a.causal_position == b.causal_position:
+            score += 0.2
     # Impact scope match
-    if a.impact_scope == b.impact_scope:
-        score += 0.1
+    if "unknown" not in (a.impact_scope, b.impact_scope):
+        if a.impact_scope == b.impact_scope:
+            score += 0.1
     # Context overlap
     ctx_a = set(a.context_features)
     ctx_b = set(b.context_features)
@@ -192,29 +235,17 @@ def retrieve_structured_experience(
             )
             if not sig_match:
                 continue
-        
-        entry_pattern = FailurePattern(
-            mechanism_signature=entry.signature,
-            failure_shape="unknown",
-            causal_position="unknown",
-            impact_scope="unknown",
-        )
-        sim = _similarity(current_pattern, entry_pattern)
+
+        sim = _similarity(current_pattern, _entry_pattern(entry))
         if sim > 0.3:
             shape_matches.append((sim, entry))
-    
+
     # 如果预过滤后结果太少，放宽条件
     if len(shape_matches) < max_results:
         for entry in entries:
             if any(entry is e for _, e in shape_matches):
                 continue  # 跳过已匹配的
-            entry_pattern = FailurePattern(
-                mechanism_signature=entry.signature,
-                failure_shape="unknown",
-                causal_position="unknown",
-                impact_scope="unknown",
-            )
-            sim = _similarity(current_pattern, entry_pattern)
+            sim = _similarity(current_pattern, _entry_pattern(entry))
             if sim > 0.2:  # 放宽阈值
                 shape_matches.append((sim, entry))
     

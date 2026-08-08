@@ -2062,7 +2062,11 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         counterfactual_used_count += int(bool(health.get("counterfactual_rankings_used")))
         completeness = health.get("focused_chain_completeness")
         if isinstance(completeness, list):
+            # Cap the accumulated per-certificate scores: the aggregate is a
+            # mean, so a single malformed bulk payload must not grow this
+            # list without bound.
             chain_completeness_scores.extend(completeness)
+            del chain_completeness_scores[1000:]
 
     metrics.update({
         "proof_state_counts": dict(proof_states),

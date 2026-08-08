@@ -103,11 +103,26 @@ class EditProposal:
         }
 
 
+@dataclass(frozen=True)
+class RejectedEditProposal:
+    """Minimal rejected-edit proposal view for negative-feedback prompts.
+
+    A full :class:`EditProposal` carries reflection-only fields (clause id,
+    preconditions, rationale) that are meaningless for a rejected runtime
+    edit; the negative-feedback path only needs the module/operation/content
+    identity. Keeping this a named type documents that narrower contract.
+    """
+
+    target_module: str
+    operation: str
+    content: str
+
+
 @dataclass
 class RejectedEditEntry:
     """A rejected edit stored for negative feedback."""
 
-    proposal: EditProposal
+    proposal: EditProposal | RejectedEditProposal
     regressed_cases: list[str]
     budget_consumed: int
     reject_reasons: list[str] = field(default_factory=list)

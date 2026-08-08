@@ -15,7 +15,11 @@ vector so it cannot be mistaken for a native PACA-TCL v3.5 output.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+
+from ...utils.gold_label import coerce_gold_label
+from .promotion_gates import MetricSnapshot
+from .types import ExperienceRecord
 
 
 CRS_DIMENSIONS = (
@@ -496,6 +500,192 @@ def _proof_projection(row: Mapping[str, Any]) -> CRSSignal:
         certificate_id=None,
         complete=False,
         projection_confidence=0.0,
+    )
+
+
+def has_explicit_authority(row: Mapping[str, Any]) -> bool:
+    """Whether the row carries the authoritative envelope required for scoring."""
+    proof = row.get("proof_adjudication")
+    proof = proof if isinstance(proof, Mapping) else {}
+    top = str(row.get("decision_authority") or "").strip().lower()
+    inner = str(proof.get("decision_authority") or "").strip().lower()
+    return (
+        top == "authoritative"
+        and (not inner or inner == "authoritative")
+    )
+
+
+def prediction_state(row: Mapping[str, Any]) -> bool | None:
+    """Predicted polarity of a detector row; ``None`` for unresolved."""
+    state = resolve_evolution_state(row)
+    if state == "verified_error":
+        return True
+    if state == "verified_clean":
+        return False
+    return None
+
+
+def _scoreable_state(row: Mapping[str, Any]) -> bool | None:
+    if row.get("runtime_valid") is not True or not has_explicit_authority(row):
+        return None
+    return prediction_state(row)
+
+
+def _candidate_origin_refs(row: Mapping[str, Any]) -> tuple[str, ...]:
+    refs: list[str] = []
+    for candidate in row.get("census") or ():
+        if not isinstance(candidate, Mapping):
+            continue
+        value = candidate.get("origin_hypothesis_event_id")
+        if value is not None:
+            refs.append(str(value))
+    return tuple(dict.fromkeys(refs))
+
+
+def _walk_provider_meta(value: Any):
+    if isinstance(value, Mapping):
+        if value.get("request_hash") and not value.get("cache_hit"):
+            yield value
+        for child in value.values():
+            yield from _walk_provider_meta(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_provider_meta(child)
+
+
+def experience_record_from_row(
+    row: Mapping[str, Any], *, include_gold: bool = False,
+) -> ExperienceRecord:
+    """Convert one detector row into the compiler-only, label-free view.
+
+    Gold fields enter the record only when ``include_gold`` is explicitly
+    requested; the default evolution path stays label-free.
+    """
+    state = resolve_evolution_state(row)
+    gold_steps = tuple(str(item) for item in row.get("gold_steps") or ())
+    health = row.get("evidence_health") or {}
+    proof = row.get("proof_adjudication") or {}
+    quarantined = (
+        len(proof.get("quarantined_error_certificate_ids") or ())
+        + len(proof.get("quarantined_defense_certificate_ids") or ())
+    )
+    provider_metas = tuple(_walk_provider_meta(row.get("providers") or {}))
+    responsible = row.get("occurrence_responsible_step")
+    if responsible is None:
+        responsible = row.get("responsible_event_id")
+    if responsible is None:
+        responsible = row.get("responsible_step")
+    return ExperienceRecord(
+        record_key=str(row.get("case_ref") or ""),
+        partition="evolution",
+        gold_positive=(coerce_gold_label(row.get("gold_label")) if include_gold else None),
+        predicted_positive=prediction_state(row),
+        gold_responsible_ref=(gold_steps[0] if include_gold and gold_steps else None),
+        predicted_responsible_ref=(
+            str(responsible)
+            if responsible is not None and prediction_state(row) is not None
+            else None
+        ),
+        candidate_origin_refs=_candidate_origin_refs(row),
+        analysis_dimension="trajectory_causal_validity",
+        origin_relation="earliest_agent_controlled_origin",
+        evidence_obligation="complete_admissible_causal_chain",
+        clean_boundary="supported_or_correct_or_ordinary_failure",
+        certificate_valid=not decision_authority_invalid(row),
+        unresolved=state == "unresolved",
+        model_calls=len(provider_metas),
+        latency_seconds=sum(float(meta.get("latency_seconds") or 0.0) for meta in provider_metas),
+        metadata={
+            "proof_state": state,
+            "occurrence_state": row.get("occurrence_state"),
+            "legacy_proof_state": row.get("state"),
+            "prediction_state_authority": (
+                "invalid" if decision_authority_invalid(row) else "occurrence"
+            ),
+            "wide_construct_state": row.get("wide_construct_state"),
+            "construct_view_status": health.get("construct_view_status"),
+            "candidate_count": len(row.get("census") or ()),
+            "required_candidate_count": int(health.get("required_candidate_count") or 0),
+            "resolved_candidate_count": int(health.get("resolved_candidate_count") or 0),
+            "quarantined_certificate_count": quarantined,
+        },
+    )
+
+
+def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
+    """Aggregate a MetricSnapshot from detector rows.
+
+    The evolution terminal state (``resolve_evolution_state``) is the single
+    authority for polarity; abstentions never enter the confusion buckets.
+    """
+    metas = tuple(
+        meta
+        for row in rows
+        for meta in _walk_provider_meta(row.get("providers") or {})
+    )
+    case_count = len(rows)
+    unresolved = 0
+    judged_positive = judged_negative = 0
+    tp = fp = fn = tn = step_correct = 0
+    for row in rows:
+        predicted = _scoreable_state(row)
+        if predicted is None:
+            unresolved += 1
+            continue
+        gold = coerce_gold_label(row.get("gold_label"))
+        if gold is None:
+            continue
+        if predicted and gold:
+            tp += 1
+            judged_positive += 1
+            gold_steps = {str(item) for item in row.get("gold_steps") or ()}
+            responsible = row.get("occurrence_responsible_step")
+            if responsible is None:
+                responsible = row.get("responsible_step")
+            step_correct += int(
+                bool(gold_steps)
+                and responsible is not None
+                and str(responsible) in gold_steps
+            )
+        elif predicted:
+            fp += 1
+            judged_positive += 1
+        elif gold:
+            fn += 1
+            judged_negative += 1
+        else:
+            tn += 1
+            judged_negative += 1
+
+    valid_outputs = case_count - unresolved
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / judged_positive if judged_positive else 0.0
+    hallucination_f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision + recall else 0.0
+    )
+    clean_precision = tn / (tn + fn) if tn + fn else 0.0
+    clean_recall = tn / judged_negative if judged_negative else 0.0
+    clean_f1 = (
+        2 * clean_precision * clean_recall / (clean_precision + clean_recall)
+        if clean_precision + clean_recall else 0.0
+    )
+    return MetricSnapshot(
+        macro_f1=(hallucination_f1 + clean_f1) / 2,
+        precision=precision,
+        hallucination_recall=recall,
+        clean_fpr=fp / judged_negative if judged_negative else 0.0,
+        responsible_step_accuracy=(
+            step_correct / judged_positive if judged_positive else 0.0
+        ),
+        valid_output_rate=valid_outputs / case_count if case_count else 0.0,
+        unresolved_rate=unresolved / case_count if case_count else 0.0,
+        invalid_rate=(
+            1.0 - valid_outputs / case_count if case_count else 0.0
+        ),
+        model_calls=len(metas),
+        latency_seconds=sum(float(meta.get("latency_seconds") or 0.0) for meta in metas),
+        cost=0.0,
     )
 
 

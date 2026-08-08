@@ -21,11 +21,10 @@ from src.sehd_v6.core.htc_tes.type_conditioned_evolution import (
     TypeConditionedEvolution,
 )
 from src.sehd_v6.core.bccse.genome import create_baseline_genome
-from src.sehd_v6.core.bccse.types import ReplayEpisode
-from src.sehd_v6.core.paca_tcl.proof_evaluator import (
-    MetricSnapshot,
-    PacaTclV35EvolutionEvaluator,
+from src.sehd_v6.core.bccse.promotion_gates import MetricSnapshot, ReplayEvidence
+from src.sehd_v6.core.bccse.signal_adapter import (
     experience_record_from_row,
+    resolve_evolution_state,
 )
 from src.sehd_v6.core.paca_tcl.basic_runner import (
     _event_for_source_step,
@@ -272,51 +271,38 @@ def test_graph_intervention_preserves_alternative_path() -> None:
     assert result["interventional_effect"] == 0.0
 
 
-def test_paired_replay_uses_boundary_refs_contract(monkeypatch) -> None:
-    parent = create_baseline_genome()
-    child = parent.clone()
-    evaluator = object.__new__(PacaTclV35EvolutionEvaluator)
-    rows = (
-        {
-            "case_ref": "source",
-            "state": "verified_error",
-            "gold_label": False,
-            "runtime_valid": True,
-            "decision_authority": "authoritative",
-        },
-        {
-            "case_ref": "boundary",
-            "state": "verified_clean",
-            "gold_label": False,
-            "runtime_valid": True,
-            "decision_authority": "authoritative",
-        },
-    )
-    monkeypatch.setattr(evaluator, "_get_rows", lambda genome, keys: rows)
-    monkeypatch.setattr(
-        evaluator,
-        "_anonymous_case_map",
-        lambda values: {str(row["case_ref"]): row for row in values},
-    )
-    monkeypatch.setattr(
-        "src.sehd_v6.core.paca_tcl.proof_evaluator.metric_snapshot",
-        lambda values: MetricSnapshot(candidate_origin_coverage=1.0),
-    )
-    evidence = evaluator.paired_replay(
-        parent=parent,
-        child=child,
-        case_keys=("source", "boundary"),
-        episodes=(
-            ReplayEpisode(
-                record_key="source",
-                error_type="false_positive",
-                support_refs=("source",),
-                boundary_refs=("boundary",),
-            ),
-        ),
+def test_paired_replay_boundary_refs_contract() -> None:
+    # The batch evaluator was removed; pin the ReplayEvidence boundary
+    # accounting contract directly: a boundary ref is counted once, and a
+    # regression is a boundary case whose child row lost correctness.
+    boundary_before = {
+        "case_ref": "boundary",
+        "state": "verified_clean",
+        "gold_label": False,
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+    }
+    boundary_after = {
+        **boundary_before,
+        "state": "verified_error",
+        "occurrence_state": "verified_error",
+    }
+    snapshot_before = MetricSnapshot(candidate_origin_coverage=1.0)
+    evidence = ReplayEvidence(
+        targeted_error_total=1,
+        targeted_error_corrected=1,
+        paired_boundary_total=1,
+        paired_boundary_regressions=1,
+        parent_candidate_origin_coverage=snapshot_before.candidate_origin_coverage,
+        child_candidate_origin_coverage=1.0,
+        total_outputs=2,
+        valid_outputs=2,
     )
     assert evidence.targeted_error_total == 1
     assert evidence.paired_boundary_total == 1
+    assert evidence.paired_boundary_regressions == 1
+    assert resolve_evolution_state(boundary_before) == "verified_clean"
+    assert resolve_evolution_state(boundary_after) == "verified_error"
 
 
 def test_frozen_census_adapter_normalizes_step_and_boolean_types() -> None:

@@ -564,7 +564,7 @@ def test_provider_transport_honors_route_generation_budget_and_total_timeout(
 def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, monkeypatch):
     import json
 
-    from src.sehd_v6.core.paca_tcl import proof_evaluator
+    from src.sehd_v6.core.paca_tcl import basic_runner
 
     captured: dict[str, object] = {}
 
@@ -587,14 +587,14 @@ def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, mo
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only-placeholder")
     _isolate_provider_env(monkeypatch)
-    monkeypatch.setattr(proof_evaluator.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
+    monkeypatch.setattr(basic_runner.DIRECT_PROVIDER_OPENER, "open", fake_urlopen)
     monkeypatch.setattr(
-        proof_evaluator,
+        basic_runner,
         "_global_cache_path",
         lambda request_hash: tmp_path / f"{request_hash}.json",
     )
 
-    value, _meta = proof_evaluator._json_object_provider_call(
+    value, _meta = basic_runner.json_object_provider_call(
         route={
             "endpoint": "https://api.deepseek.com",
             "model": "deepseek-v4-pro",
@@ -605,6 +605,7 @@ def test_lowercase_pro_route_omits_unsupported_json_response_format(tmp_path, mo
         system="return json",
         user="{}",
         cache_dir=tmp_path,
+        purpose="mutation",
     )
 
     assert value == {}

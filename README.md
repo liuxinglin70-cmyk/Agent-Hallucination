@@ -638,13 +638,9 @@ detector/__init__.py (detect_record)
         ├── proof_contract.py (proof-court contract)
         └── basic_runner.py (provider transport)
 
-proof_evaluator.py
-  ├── proof_engine.py (adjudicate_case, evaluate)
-  ├── types.py (EvaluationOutcome) ← breaks circular dep
-  ├── step_attributor.py (ErrorType)
-  ├── genome.py (SkillGenome)
+signal_adapter.py (resolve_evolution_state, metric_snapshot, experience_record_from_row)
   ├── promotion_gates.py (MetricSnapshot, ReplayEvidence)
-  └── skill_integration.py (integrated_v35_provider)
+  └── types.py (ExperienceRecord)
 ```
 
 ## Interface Contract

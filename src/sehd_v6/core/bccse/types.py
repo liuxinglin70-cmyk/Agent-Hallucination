@@ -1,7 +1,7 @@
 """BCCSE v5 — Shared type definitions.
 
-Contains dataclasses and type aliases shared between evolution_runner.py
-and proof_evaluator.py. These are kept here to avoid circular imports.
+Contains dataclasses and type aliases shared across the BCCSE evolution
+package. These are kept here to avoid circular imports.
 
 Note: EvolutionStep is defined in evolution_runner.py (not here) because
 it has fields specific to the evolution loop that are not shared.

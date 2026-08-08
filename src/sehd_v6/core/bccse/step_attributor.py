@@ -33,6 +33,7 @@ from .signal_adapter import (
     CoverageReading,
     extract_coverage,
     extract_crs_signal,
+    prediction_state,
     resolve_authoritative_state,
     resolve_evolution_state,
 )
@@ -399,14 +400,7 @@ def runtime_invalid_signal(
     )
 
 
-def _prediction_state(row: Mapping[str, Any]) -> bool | None:
-    """Extract predicted polarity from state string."""
-    state = resolve_evolution_state(row)
-    if state == "verified_error":
-        return True
-    if state == "verified_clean":
-        return False
-    return None  # unresolved
+
 
 
 def _check_step_correct(row: Mapping[str, Any]) -> bool | None:
@@ -1273,7 +1267,7 @@ def attribute_failure(
     - High-confidence verified_clean (defense overwhelming)
     """
     state = resolve_evolution_state(row)
-    predicted = _prediction_state(row)
+    predicted = prediction_state(row)
     prosecution, defense = _extract_coverage(row)
     prosecution_cov, defense_cov = prosecution.score, defense.score
     crs_signal = _extract_crs_scores(row)
@@ -1414,41 +1408,6 @@ def attribute_failure(
             process_diagnostic_applied=process_diagnostic_applied,
         )
     )
-
-    # ================================================================
-    # Reflection type
-    # ================================================================
-    if error_type == ErrorType.CORRECT:
-        reflection_type = ReflectionType.STABLE_SUCCESS
-    elif error_type == ErrorType.FALSE_POSITIVE:
-        reflection_type = ReflectionType.SKILL_DEFECT
-    elif error_type in (
-        ErrorType.UNRESOLVED_SHOULD_ERROR,
-        ErrorType.UNRESOLVED_SHOULD_CLEAN,
-        ErrorType.UNRESOLVED_UNKNOWN,
-        ErrorType.CANDIDATE_MISS,
-    ):
-        reflection_type = ReflectionType.DISCOVERY
-    elif error_type == ErrorType.LOCALIZATION_ERROR:
-        reflection_type = ReflectionType.OPTIMIZATION
-    elif error_type in (
-        ErrorType.CRS_CONTRADICTION,
-        ErrorType.EVIDENCE_INCOMPLETE,
-        ErrorType.BOUNDARY_HESITATION,
-        ErrorType.SIGNAL_UNAVAILABLE,
-    ):
-        reflection_type = ReflectionType.OPTIMIZATION
-    elif error_type in (
-        ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
-        ErrorType.APPEAL_PROSECUTOR_FAILURE,
-        ErrorType.APPEAL_DEFENDER_FAILURE,
-        ErrorType.APPEAL_COVERAGE_MISMATCH,
-    ):
-        # A named stage failed to produce the output its contract requires:
-        # the skill text for that stage is deficient, not merely suboptimal.
-        reflection_type = ReflectionType.SKILL_DEFECT
-    else:
-        reflection_type = ReflectionType.OPTIMIZATION
 
     return _build_attribution_signal(
         row=row, error_type=error_type, state=state,
