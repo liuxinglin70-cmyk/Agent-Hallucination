@@ -3473,6 +3473,109 @@ def _persist_progress(
     )
 
 
+def _record_gate_event(
+    step: EvolutionStep, *,
+    gate_event_ledger: GateEventLedger, steps: list[Any],
+) -> None:
+    """Project one evolution step into the audited gate ledger (P5).
+
+    Pure telemetry: the event records a decision the gate has already
+    made, so it can never influence that decision.  Resume is idempotent
+    on the stable event_id; no provider call is added.
+    """
+    episode_id = ""
+    attempt_id = ""
+    if isinstance(step.episode, Mapping):
+        episode_id = str(step.episode.get("episode_id") or "")
+        attempts = step.episode.get("attempts") or ()
+        if attempts and isinstance(attempts[-1], Mapping):
+            attempt_id = str(attempts[-1].get("attempt_id") or "")
+    proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
+    operation = str(proposal.get("operation") or "")
+    artifact = str(proposal.get("target_module") or "")
+    attribution = step.attribution if isinstance(step.attribution, Mapping) else {}
+    layer = str(attribution.get("layer") or "")
+    # The promotion contract needs the actual gate reasons to classify
+    # hard reject codes (P5/P7); every step records them under its own
+    # fitness_check keys, so they are aggregated here from the
+    # deterministic authority fields instead of one optional key that
+    # no construction site ever wrote.
+    fitness = step.fitness_check if isinstance(step.fitness_check, Mapping) else {}
+    reasons: list[str] = []
+    for key in ("reject_reasons", "retry_reason", "runtime_error",
+                "mutation_error", "rollback_reason"):
+        value = fitness.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            reasons.extend(str(item) for item in value)
+        elif str(value):
+            reasons.append(str(value))
+    assessment = fitness.get("assessment")
+    if isinstance(assessment, Mapping):
+        reasons.extend(
+            str(item)
+            for item in (assessment.get("reasons") or ())
+            if str(item)
+        )
+    l2 = fitness.get("l2_policy")
+    if isinstance(l2, Mapping) and str(l2.get("reason") or ""):
+        reasons.append(str(l2["reason"]))
+    try:
+        decision = promote(
+            layer=layer or "l1",
+            artifact=artifact,
+            legacy_decision=step.gate_decision,
+            decision_authority=(
+                AUTHORITY_L2_POLICY if layer == LAYER_L2
+                else AUTHORITY_L1_FITNESS
+            ),
+            reasons=reasons,
+        )
+    except ValueError:
+        # A non-gate step (e.g. halted) is still audited, with an empty
+        # grade; it never reaches the promotion vocabulary.
+        decision = None
+    # Stable event identity (§11.4): a step is identified by its case
+    # slot only.  The gate_decision is deliberately excluded because a
+    # provisional step is later committed in place to accept_batch by
+    # flush_shadow_batch; keying on the decision would record the same
+    # logical step twice and break resume idempotence.  An interrupted +
+    # resumed run reproduces the same event_id for the same logical step
+    # and never double-writes.
+    # ``len(steps)`` at record time is the monotonic logical-step ordinal;
+    # it is stable across an interrupt+resume because the steps list is
+    # restored from the checkpoint before processing continues.
+    observation_id = (
+        f"{step.case_id}:{step.case_index}:{len(steps)}"
+    )
+    try:
+        event = GateEvent(
+            schema_version=GATE_EVENT_SCHEMA_VERSION,
+            event_id=gate_event_id(
+                attempt_id="",
+                episode_id="",
+                decision_kind="",
+                observation_id=observation_id,
+            ),
+            subject_id=str(step.case_id),
+            episode_id=episode_id,
+            attempt_id=attempt_id,
+            layer=layer,
+            artifact=artifact,
+            operation=operation,
+            stage=str(step.trigger_source or ""),
+            legacy_decision=str(step.gate_decision or ""),
+            evidence_grade=(decision.evidence_grade if decision else "skip"),
+            activation_state=(decision.activation_state if decision else ""),
+            hard_reject_codes=(decision.hard_reject_codes if decision else ()),
+            quality_reason_codes=(decision.quality_reason_codes if decision else ()),
+        )
+    except ValueError:
+        return
+    gate_event_ledger.record(event)
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -4011,110 +4114,11 @@ def run_online_evolution(
             non_l1_failure_attributions=non_l1_failure_attributions,
         ), next_case_index, status)
 
-    def _record_gate_event(step: EvolutionStep) -> None:
-        """Project one evolution step into the audited gate ledger (P5).
-
-        Pure telemetry: the event records a decision the gate has already
-        made, so it can never influence that decision.  Resume is idempotent
-        on the stable event_id; no provider call is added.
-        """
-        episode_id = ""
-        attempt_id = ""
-        if isinstance(step.episode, Mapping):
-            episode_id = str(step.episode.get("episode_id") or "")
-            attempts = step.episode.get("attempts") or ()
-            if attempts and isinstance(attempts[-1], Mapping):
-                attempt_id = str(attempts[-1].get("attempt_id") or "")
-        proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
-        operation = str(proposal.get("operation") or "")
-        artifact = str(proposal.get("target_module") or "")
-        attribution = step.attribution if isinstance(step.attribution, Mapping) else {}
-        layer = str(attribution.get("layer") or "")
-        # The promotion contract needs the actual gate reasons to classify
-        # hard reject codes (P5/P7); every step records them under its own
-        # fitness_check keys, so they are aggregated here from the
-        # deterministic authority fields instead of one optional key that
-        # no construction site ever wrote.
-        fitness = step.fitness_check if isinstance(step.fitness_check, Mapping) else {}
-        reasons: list[str] = []
-        for key in ("reject_reasons", "retry_reason", "runtime_error",
-                    "mutation_error", "rollback_reason"):
-            value = fitness.get(key)
-            if value is None:
-                continue
-            if isinstance(value, (list, tuple)):
-                reasons.extend(str(item) for item in value)
-            elif str(value):
-                reasons.append(str(value))
-        assessment = fitness.get("assessment")
-        if isinstance(assessment, Mapping):
-            reasons.extend(
-                str(item)
-                for item in (assessment.get("reasons") or ())
-                if str(item)
-            )
-        l2 = fitness.get("l2_policy")
-        if isinstance(l2, Mapping) and str(l2.get("reason") or ""):
-            reasons.append(str(l2["reason"]))
-        try:
-            decision = promote(
-                layer=layer or "l1",
-                artifact=artifact,
-                legacy_decision=step.gate_decision,
-                decision_authority=(
-                    AUTHORITY_L2_POLICY if layer == LAYER_L2
-                    else AUTHORITY_L1_FITNESS
-                ),
-                reasons=reasons,
-            )
-        except ValueError:
-            # A non-gate step (e.g. halted) is still audited, with an empty
-            # grade; it never reaches the promotion vocabulary.
-            decision = None
-        # Stable event identity (§11.4): a step is identified by its case
-        # slot only.  The gate_decision is deliberately excluded because a
-        # provisional step is later committed in place to accept_batch by
-        # flush_shadow_batch; keying on the decision would record the same
-        # logical step twice and break resume idempotence.  An interrupted +
-        # resumed run reproduces the same event_id for the same logical step
-        # and never double-writes.
-        # ``len(steps)`` at record time is the monotonic logical-step ordinal;
-        # it is stable across an interrupt+resume because the steps list is
-        # restored from the checkpoint before processing continues.
-        observation_id = (
-            f"{step.case_id}:{step.case_index}:{len(steps)}"
-        )
-        try:
-            event = GateEvent(
-                schema_version=GATE_EVENT_SCHEMA_VERSION,
-                event_id=gate_event_id(
-                    attempt_id="",
-                    episode_id="",
-                    decision_kind="",
-                    observation_id=observation_id,
-                ),
-                subject_id=str(step.case_id),
-                episode_id=episode_id,
-                attempt_id=attempt_id,
-                layer=layer,
-                artifact=artifact,
-                operation=operation,
-                stage=str(step.trigger_source or ""),
-                legacy_decision=str(step.gate_decision or ""),
-                evidence_grade=(decision.evidence_grade if decision else "skip"),
-                activation_state=(decision.activation_state if decision else ""),
-                hard_reject_codes=(decision.hard_reject_codes if decision else ()),
-                quality_reason_codes=(decision.quality_reason_codes if decision else ()),
-            )
-        except ValueError:
-            return
-        gate_event_ledger.record(event)
-
     def record_step(step: EvolutionStep, *, next_case_index: int) -> None:
         step.attempt_index = active_attempt_index
         step.episode = active_episode_payload
         steps.append(step)
-        _record_gate_event(step)
+        _record_gate_event(step, gate_event_ledger=gate_event_ledger, steps=steps)
         persist_progress(next_case_index)
 
     def record_attempt(
