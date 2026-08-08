@@ -3292,6 +3292,187 @@ def _run_counted_detection(
     return result
 
 
+@dataclass
+class _PersistenceContext:
+    """Run state that ``_persist_progress`` snapshots into the checkpoints."""
+
+    output_dir: Path
+    run_id: str
+    evolution_case_ids: Sequence[str]
+    records: Mapping[str, dict[str, Any]]
+    config: dict[str, Any]
+    gate: Any
+    champion_genome: SkillGenome
+    current_genome: SkillGenome
+    stable_genome: SkillGenome
+    policy_genome: PolicyGenome
+    stable_policy_genome: PolicyGenome
+    causal_memory: Any
+    gate_event_ledger: GateEventLedger
+    steps: list[Any]
+    provisional_edits: list[Any]
+    accepted_edits_history: list[dict[str, Any]]
+    batch_history: list[dict[str, Any]]
+    probe_history: list[dict[str, Any]]
+    baseline_canary_audit: list[dict[str, Any]]
+    registered_canary_ids: tuple[str, ...]
+    budget_usage: dict[str, int]
+    rollback_reason: str
+    stable_canaries: dict[str, dict[str, Any]]
+    stable_canaries_checkpoint: dict[str, dict[str, Any]]
+    stable_memory_payload: dict[str, Any]
+    stable_history_length: int
+    pending_probe_step_indexes: list[int]
+    pending_probe_commits: list[PendingProbeCommit]
+    active_attempt_index: int
+    mutation_retry_feedback: dict[str, list[str]]
+    rejected_source_proposals: dict[str, list[dict[str, Any]]]
+    rejected_buffer: list[RejectedEditEntry]
+    runtime_invalid_cases: int
+    runtime_error_categories: dict[str, int]
+    last_probe_accepted_count: int
+    last_probe_triggered_count: int
+    stable_cases: int
+    triggered_cases: int
+    edits_accepted: int
+    edits_rejected: int
+    l2_policy_accepts: int
+    l2_policy_audit: list[dict[str, Any]]
+    stable_l2_policy_accepts: int
+    abstention_ladder_used: set[str]
+    contrast_replay_registry: dict[str, list[dict[str, Any]]]
+    rejected_policy_summaries: list[str]
+    localization_bias_signals: list[dict[str, Any]]
+    non_l1_failure_attributions: list[dict[str, Any]]
+
+
+def _persist_progress(
+    ctx: _PersistenceContext, next_case_index: int, status: str = "in_progress",
+) -> None:
+    pending_probe_payloads = []
+    for item in ctx.pending_probe_commits:
+        certificate_index = next(
+            (
+                index for index, certificate in enumerate(ctx.gate.certificates)
+                if certificate is item.certificate
+            ),
+            None,
+        )
+        if certificate_index is None:
+            continue
+        pending_probe_payloads.append({
+            "case_id": item.case_id,
+            "case_index": item.case_index,
+            "edit": item.edit.to_dict(),
+            "certificate_index": certificate_index,
+            "step_index": item.step_index,
+        })
+    rejected_buffer_payloads = []
+    for entry in ctx.rejected_buffer:
+        proposal = entry.proposal
+        rejected_buffer_payloads.append({
+            "proposal": {
+                "target_module": str(proposal.target_module),
+                "operation": (
+                    proposal.operation.value
+                    if isinstance(proposal.operation, SkillOp)
+                    else str(proposal.operation)
+                ),
+                "content": str(proposal.content),
+            },
+            "regressed_cases": list(entry.regressed_cases),
+            "budget_consumed": entry.budget_consumed,
+            "reject_reasons": list(entry.reject_reasons),
+            "rejection_stage": entry.rejection_stage,
+            "observed_effect": entry.observed_effect,
+            "observable_deltas": list(entry.observable_deltas),
+        })
+    _atomic_write_json(
+        ctx.output_dir / "champion_checkpoint.json",
+        ctx.champion_genome.to_dict(),
+    )
+    _atomic_write_json(
+        ctx.output_dir / "shadow_checkpoint.json",
+        ctx.current_genome.to_dict(),
+    )
+    _atomic_write_json(
+        ctx.output_dir / "evolution_checkpoint.json",
+        {
+            "schema_version": "agenthallu.bccse_v5_checkpoint.v5",
+            "run_id": ctx.run_id,
+            "status": status,
+            "next_case_index": next_case_index,
+            "evolution_case_count": len(ctx.evolution_case_ids),
+            "evolution_case_ids": list(ctx.evolution_case_ids),
+            "input_content_hash": packet.stable_hash(
+                {case_id: ctx.records[case_id] for case_id in ctx.evolution_case_ids}
+            ),
+            "config_hash": packet.stable_hash(ctx.config),
+            "genome_hash": ctx.champion_genome.content_hash,
+            "champion_genome_hash": ctx.champion_genome.content_hash,
+            "shadow_genome_hash": ctx.current_genome.content_hash,
+            "provisional_edit_count": len(ctx.provisional_edits),
+            "steps": [step.to_dict() for step in ctx.steps],
+            "gate_summary": ctx.gate.summary(),
+            "accepted_edits_history": ctx.accepted_edits_history,
+            "batch_history": ctx.batch_history,
+            "probe_history": ctx.probe_history,
+            "baseline_canary_audit": ctx.baseline_canary_audit,
+            "canary_case_ids": list(ctx.registered_canary_ids),
+            "budget_usage": dict(ctx.budget_usage),
+            "rollback_reason": ctx.rollback_reason,
+            "stable_genome_hash": ctx.stable_genome.content_hash,
+            "stable_genome_payload": ctx.stable_genome.to_dict(),
+            "stable_canaries": dict(ctx.stable_canaries),
+            "stable_canaries_checkpoint": dict(ctx.stable_canaries_checkpoint),
+            "stable_memory_payload": ctx.stable_memory_payload,
+            "stable_history_length": ctx.stable_history_length,
+            "pending_probe_step_indexes": list(ctx.pending_probe_step_indexes),
+            "pending_probe_commits": pending_probe_payloads,
+            "active_attempt_index": ctx.active_attempt_index,
+            "mutation_retry_feedback": ctx.mutation_retry_feedback,
+            "rejected_source_proposals": ctx.rejected_source_proposals,
+            "rejected_buffer": rejected_buffer_payloads,
+            "runtime_invalid_cases": ctx.runtime_invalid_cases,
+            "runtime_error_categories": ctx.runtime_error_categories,
+            "last_probe_accepted_count": ctx.last_probe_accepted_count,
+            "last_probe_triggered_count": ctx.last_probe_triggered_count,
+            "counters": {
+                "stable_cases": ctx.stable_cases,
+                "triggered_cases": ctx.triggered_cases,
+                "edits_accepted": ctx.edits_accepted,
+                "edits_rejected": ctx.edits_rejected,
+                "runtime_invalid_cases": ctx.runtime_invalid_cases,
+            },
+            "policy_genome": ctx.policy_genome.to_dict(),
+            "l2_policy_accepts": ctx.l2_policy_accepts,
+            "gate_events": ctx.gate_event_ledger.to_list(),
+            "l2_policy_audit": list(ctx.l2_policy_audit),
+            # Probe rollback anchors and the in-memory evolution context
+            # that a resume must reproduce exactly (behavior invariants
+            # like the once-per-source abstention ladder, plus the
+            # audit telemetry of the processed prefix).
+            "stable_policy_genome_payload": ctx.stable_policy_genome.to_dict(),
+            "stable_policy_genome_hash": ctx.stable_policy_genome.content_hash,
+            "stable_memory_hash": _payload_hash(ctx.stable_memory_payload),
+            "stable_l2_policy_accepts": ctx.stable_l2_policy_accepts,
+            "abstention_ladder_used": sorted(ctx.abstention_ladder_used),
+            "contrast_registry": {
+                str(hallucination_type): list(rows)
+                for hallucination_type, rows in ctx.contrast_replay_registry.items()
+            },
+            "rejected_policy_summaries": list(ctx.rejected_policy_summaries),
+            "localization_bias_signals": list(ctx.localization_bias_signals),
+            "non_l1_failure_attributions": list(ctx.non_l1_failure_attributions),
+            "updated_at": time.time(),
+        },
+    )
+    _atomic_write_json(
+        ctx.output_dir / "htc_tes_experience_memory.json",
+        ctx.causal_memory.to_dict(),
+    )
+
+
 def _save_evolution_results(
     *, output_dir: Path, result: OnlineEvolutionResult,
     champion_genome: SkillGenome, policy_genome: PolicyGenome,
@@ -3790,128 +3971,45 @@ def run_online_evolution(
         )
 
     def persist_progress(next_case_index: int, status: str = "in_progress") -> None:
-        pending_probe_payloads = []
-        for item in pending_probe_commits:
-            certificate_index = next(
-                (
-                    index for index, certificate in enumerate(gate.certificates)
-                    if certificate is item.certificate
-                ),
-                None,
-            )
-            if certificate_index is None:
-                continue
-            pending_probe_payloads.append({
-                "case_id": item.case_id,
-                "case_index": item.case_index,
-                "edit": item.edit.to_dict(),
-                "certificate_index": certificate_index,
-                "step_index": item.step_index,
-            })
-        rejected_buffer_payloads = []
-        for entry in rejected_buffer:
-            proposal = entry.proposal
-            rejected_buffer_payloads.append({
-                "proposal": {
-                    "target_module": str(proposal.target_module),
-                    "operation": (
-                        proposal.operation.value
-                        if isinstance(proposal.operation, SkillOp)
-                        else str(proposal.operation)
-                    ),
-                    "content": str(proposal.content),
-                },
-                "regressed_cases": list(entry.regressed_cases),
-                "budget_consumed": entry.budget_consumed,
-                "reject_reasons": list(entry.reject_reasons),
-                "rejection_stage": entry.rejection_stage,
-                "observed_effect": entry.observed_effect,
-                "observable_deltas": list(entry.observable_deltas),
-            })
-        _atomic_write_json(
-            output_dir / "champion_checkpoint.json",
-            champion_genome.to_dict(),
-        )
-        _atomic_write_json(
-            output_dir / "shadow_checkpoint.json",
-            current_genome.to_dict(),
-        )
-        _atomic_write_json(
-            output_dir / "evolution_checkpoint.json",
-            {
-                "schema_version": "agenthallu.bccse_v5_checkpoint.v5",
-                "run_id": run_id,
-                "status": status,
-                "next_case_index": next_case_index,
-                "evolution_case_count": len(evolution_case_ids),
-                "evolution_case_ids": list(evolution_case_ids),
-                "input_content_hash": packet.stable_hash(
-                    {case_id: records[case_id] for case_id in evolution_case_ids}
-                ),
-                "config_hash": packet.stable_hash(config),
-                "genome_hash": champion_genome.content_hash,
-                "champion_genome_hash": champion_genome.content_hash,
-                "shadow_genome_hash": current_genome.content_hash,
-                "provisional_edit_count": len(provisional_edits),
-                "steps": [step.to_dict() for step in steps],
-                "gate_summary": gate.summary(),
-                "accepted_edits_history": accepted_edits_history,
-                "batch_history": batch_history,
-                "probe_history": probe_history,
-                "baseline_canary_audit": baseline_canary_audit,
-                "canary_case_ids": list(registered_canary_ids),
-                "budget_usage": dict(budget_usage),
-                "rollback_reason": rollback_reason,
-                "stable_genome_hash": stable_genome.content_hash,
-                "stable_genome_payload": stable_genome.to_dict(),
-                "stable_canaries": dict(stable_canaries),
-                "stable_canaries_checkpoint": dict(stable_canaries_checkpoint),
-                "stable_memory_payload": stable_memory_payload,
-                "stable_history_length": stable_history_length,
-                "pending_probe_step_indexes": list(pending_probe_step_indexes),
-                "pending_probe_commits": pending_probe_payloads,
-                "active_attempt_index": active_attempt_index,
-                "mutation_retry_feedback": mutation_retry_feedback,
-                "rejected_source_proposals": rejected_source_proposals,
-                "rejected_buffer": rejected_buffer_payloads,
-                "runtime_invalid_cases": runtime_invalid_cases,
-                "runtime_error_categories": runtime_error_categories,
-                "last_probe_accepted_count": last_probe_accepted_count,
-                "last_probe_triggered_count": last_probe_triggered_count,
-                "counters": {
-                    "stable_cases": stable_cases,
-                    "triggered_cases": triggered_cases,
-                    "edits_accepted": edits_accepted,
-                    "edits_rejected": edits_rejected,
-                    "runtime_invalid_cases": runtime_invalid_cases,
-                },
-                "policy_genome": policy_genome.to_dict(),
-                "l2_policy_accepts": l2_policy_accepts,
-                "gate_events": gate_event_ledger.to_list(),
-                "l2_policy_audit": list(l2_policy_audit),
-                # Probe rollback anchors and the in-memory evolution context
-                # that a resume must reproduce exactly (behavior invariants
-                # like the once-per-source abstention ladder, plus the
-                # audit telemetry of the processed prefix).
-                "stable_policy_genome_payload": stable_policy_genome.to_dict(),
-                "stable_policy_genome_hash": stable_policy_genome.content_hash,
-                "stable_memory_hash": _payload_hash(stable_memory_payload),
-                "stable_l2_policy_accepts": stable_l2_policy_accepts,
-                "abstention_ladder_used": sorted(abstention_ladder_used),
-                "contrast_registry": {
-                    str(hallucination_type): list(rows)
-                    for hallucination_type, rows in contrast_replay_registry.items()
-                },
-                "rejected_policy_summaries": list(rejected_policy_summaries),
-                "localization_bias_signals": list(localization_bias_signals),
-                "non_l1_failure_attributions": list(non_l1_failure_attributions),
-                "updated_at": time.time(),
-            },
-        )
-        _atomic_write_json(
-            output_dir / "htc_tes_experience_memory.json",
-            causal_memory.to_dict(),
-        )
+        _persist_progress(_PersistenceContext(
+            output_dir=output_dir, run_id=run_id,
+            evolution_case_ids=evolution_case_ids, records=records,
+            config=config, gate=gate, champion_genome=champion_genome,
+            current_genome=current_genome, stable_genome=stable_genome,
+            policy_genome=policy_genome,
+            stable_policy_genome=stable_policy_genome,
+            causal_memory=causal_memory, gate_event_ledger=gate_event_ledger,
+            steps=steps, provisional_edits=provisional_edits,
+            accepted_edits_history=accepted_edits_history,
+            batch_history=batch_history, probe_history=probe_history,
+            baseline_canary_audit=baseline_canary_audit,
+            registered_canary_ids=registered_canary_ids,
+            budget_usage=budget_usage, rollback_reason=rollback_reason,
+            stable_canaries=stable_canaries,
+            stable_canaries_checkpoint=stable_canaries_checkpoint,
+            stable_memory_payload=stable_memory_payload,
+            stable_history_length=stable_history_length,
+            pending_probe_step_indexes=pending_probe_step_indexes,
+            pending_probe_commits=pending_probe_commits,
+            active_attempt_index=active_attempt_index,
+            mutation_retry_feedback=mutation_retry_feedback,
+            rejected_source_proposals=rejected_source_proposals,
+            rejected_buffer=rejected_buffer,
+            runtime_invalid_cases=runtime_invalid_cases,
+            runtime_error_categories=runtime_error_categories,
+            last_probe_accepted_count=last_probe_accepted_count,
+            last_probe_triggered_count=last_probe_triggered_count,
+            stable_cases=stable_cases, triggered_cases=triggered_cases,
+            edits_accepted=edits_accepted, edits_rejected=edits_rejected,
+            l2_policy_accepts=l2_policy_accepts,
+            l2_policy_audit=l2_policy_audit,
+            stable_l2_policy_accepts=stable_l2_policy_accepts,
+            abstention_ladder_used=abstention_ladder_used,
+            contrast_replay_registry=contrast_replay_registry,
+            rejected_policy_summaries=rejected_policy_summaries,
+            localization_bias_signals=localization_bias_signals,
+            non_l1_failure_attributions=non_l1_failure_attributions,
+        ), next_case_index, status)
 
     def _record_gate_event(step: EvolutionStep) -> None:
         """Project one evolution step into the audited gate ledger (P5).
