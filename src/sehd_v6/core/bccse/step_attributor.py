@@ -828,56 +828,285 @@ def _detect_boundary_hesitation(
     return False
 
 
-def attribute_failure(
-    row: Mapping[str, Any],
-    *,
-    use_gold: bool = False,
-    gold_reflection: bool = False,
+def _build_attribution_signal(
+    *, row: Mapping[str, Any], error_type: ErrorType, state: str,
+    trigger_source: TriggerSource,
+    target_module: str, secondary_module: str,
+    prosecution: CoverageReading, defense: CoverageReading,
+    crs_signal: CRSSignal, crs_scores: dict[str, float],
+    consensus_gate: bool, candidate_count: int,
+    diagnostics: dict[str, Any], quarantined_count: int,
+    process_diagnostic_applied: bool,
+    has_gold: bool, gold: bool | None, gold_reflection: bool,
+    step_correct: bool,
+    prosecution_cov: float | None, defense_cov: float | None,
 ) -> AttributionSignal:
-    """Perform causal process reflection on a single detection result.
+    """Assemble the final AttributionSignal from classified results.
 
-    Self-supervised mode (use_gold=False):
-        Uses only pipeline internal signals to determine if reflection
-        should be triggered. Does NOT require gold labels.
-
-    Gold-enhanced mode (use_gold=True, explicit opt-in):
-        Additionally uses gold labels for more precise error classification.
-        Gold label NEVER enters skill content — only used for signal routing.
-
-    Trigger conditions (any one triggers reflection):
-    1. state == "unresolved"
-    2. CRS internal contradiction
-    3. Evidence chain incomplete (coverage abnormally low)
-    4. Boundary hesitation (prosecution ≈ defense)
-    5. Gold mismatch (optional enhancement)
-
-    NOT triggered:
-    - High-confidence verified_error (all CRS dimensions consistently high)
-    - High-confidence verified_clean (defense overwhelming)
+    Why this function exists: attribute_failure accumulates evidence parts
+    and confidence levels through a series of conditional branches, then
+    flattens them into the signal schema. Extracting the assembly keeps
+    the classification logic readable and makes the evidence contract
+    testable in isolation.
     """
-    state = resolve_evolution_state(row)
-    predicted = _prediction_state(row)
-    prosecution, defense = _extract_coverage(row)
-    prosecution_cov, defense_cov = prosecution.score, defense.score
-    crs_signal = _extract_crs_scores(row)
-    crs_scores = crs_signal.scores
-    consensus_gate = bool(
-        (row.get("proof_adjudication") or {}).get("consensus_gate_applied")
+    def coverage_text(value: float | None) -> str:
+        return "unavailable" if value is None else f"{value:.2f}"
+
+    evidence_parts = [
+        f"state={state}",
+        f"trigger={trigger_source.value}",
+        f"prosecution_coverage={coverage_text(prosecution_cov)}",
+        f"defense_coverage={coverage_text(defense_cov)}",
+        f"prosecution_coverage_state={prosecution.state or 'unavailable'}",
+        f"defense_coverage_state={defense.state or 'unavailable'}",
+        f"candidates={candidate_count}",
+        f"consensus_gate={'applied' if consensus_gate else 'not_applied'}",
+    ]
+    if crs_scores:
+        crs_str = ",".join(f"{k}={v:.2f}" for k, v in crs_scores.items())
+        evidence_parts.append(f"crs=[{crs_str}]")
+        evidence_parts.append(f"crs_aggregate={crs_signal.aggregate:.3f}")
+        evidence_parts.append(f"crs_source={crs_signal.source}")
+    if has_gold:
+        # gold 极性已由 reflection prompt 中受控的 gold_section 通道披露
+        # （附带 "diagnostic reference only" 使用规则）。evidence_summary 会被
+        # 原样拼入 user prompt，不得在此重复 gold 极性字面量（不变式 #3：
+        # gold 不得进入 skill/prompt 内容，除非经由审计过、规则受限的通道）。
+        evidence_parts.append("supervision=gold_enhanced")
+    else:
+        evidence_parts.append("supervision=self_supervised")
+    if state == "unresolved":
+        evidence_parts.append("detector_abstained_due_to_insufficient_evidence")
+    if error_type == ErrorType.FALSE_POSITIVE:
+        evidence_parts.append("defense_boundary_insufficient_to_protect_clean_case")
+    if error_type == ErrorType.LOCALIZATION_ERROR:
+        gold_steps = row.get("gold_steps") or []
+        # 只报告数量，绝不序列化具体 gold 步骤值，避免反思 prompt 被植入
+        # 标注答案（不变式 #3）；数量被显式测试锁定为允许披露（count is
+        # fine; values are not）。
+        evidence_parts.append(
+            f"step_mismatch:predicted={row.get('responsible_step')}_gold_step_count={len(gold_steps)}"
+        )
+    if error_type == ErrorType.CRS_CONTRADICTION:
+        evidence_parts.append("crs_dimensions_contradict_final_decision")
+    if process_diagnostic_applied:
+        evidence_parts.append("process_diagnostic=applied")
+    localization_status = str(
+        diagnostics.get("localization_status") or "not_applicable"
     )
-    candidate_count = _count_candidates(row)
+    appeal_status = str(diagnostics.get("appeal_status") or "not_required")
+    if localization_status != "not_applicable":
+        evidence_parts.append(f"localization_status={localization_status}")
+    if appeal_status != "not_required":
+        evidence_parts.append(f"appeal_status={appeal_status}")
+    if quarantined_count:
+        evidence_parts.append(
+            f"focused_quarantined_candidates={quarantined_count}"
+        )
 
-    # Gold is a strict opt-in. In self-supervised mode it is not read into
-    # attribution, summaries, candidate routing, or localization checks.
-    raw_has_gold = "gold_label" in row and row.get("gold_label") is not None
-    has_gold = bool(use_gold and raw_has_gold)
-    if has_gold and not isinstance(row["gold_label"], bool):
-        raise ValueError("gold_label must be bool in gold-enhanced mode")
-    gold: bool | None = bool(row["gold_label"]) if has_gold else None
-    step_correct = _check_step_correct(row) if has_gold else False
+    # Attribution confidence (v5.3): high for definite error types,
+    # medium for gold-directed unresolved and CRS/boundary signals,
+    # low for unresolved_unknown and unavailable signals.
+    if error_type in (ErrorType.FALSE_POSITIVE, ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+                      ErrorType.FALSE_NEGATIVE_CLEAN, ErrorType.LOCALIZATION_ERROR):
+        attribution_confidence = "high"
+    elif error_type in (ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
+                        ErrorType.APPEAL_PROSECUTOR_FAILURE,
+                        ErrorType.APPEAL_DEFENDER_FAILURE,
+                        ErrorType.APPEAL_COVERAGE_MISMATCH,
+                        ErrorType.LOCALIZATION_AMBIGUOUS):
+        # The detector reported exactly which stage broke; the root-cause
+        # module follows from the pipeline structure, not from inference.
+        attribution_confidence = "high"
+    elif error_type in (ErrorType.UNRESOLVED_SHOULD_ERROR,
+                        ErrorType.UNRESOLVED_SHOULD_CLEAN,
+                        ErrorType.CRS_CONTRADICTION,
+                        ErrorType.BOUNDARY_HESITATION):
+        # Gold direction is known -> attribution is more reliable
+        attribution_confidence = "medium"
+    else:
+        attribution_confidence = "low"
 
-    # ================================================================
-    # Self-supervised trigger detection
-    # ================================================================
+    return AttributionSignal(
+        error_type=error_type,
+        target_module=target_module,
+        secondary_module=secondary_module,
+        attribution_confidence=attribution_confidence,
+        reflection_type=_resolve_reflection_type(error_type),
+        trigger_source=trigger_source,
+        evidence_summary=" | ".join(evidence_parts),
+        prosecution_coverage=prosecution_cov,
+        defense_coverage=defense_cov,
+        prosecution_coverage_state=prosecution.state,
+        defense_coverage_state=defense.state,
+        coverage_quantitative=prosecution.quantitative and defense.quantitative,
+        crs_scores=crs_scores,
+        crs_aggregate=crs_signal.aggregate,
+        crs_source=crs_signal.source,
+        crs_complete=crs_signal.complete,
+        consensus_gate_applied=consensus_gate,
+        candidate_count=candidate_count,
+        state=state,
+        gold_label=gold,
+        has_gold=has_gold,
+        gold_enhanced=has_gold,
+        gold_reflection=bool(gold_reflection and has_gold),
+        responsible_step_correct=bool(step_correct),
+        localization_status=localization_status,
+        appeal_status=appeal_status,
+        focused_quarantined_candidate_count=quarantined_count,
+        process_diagnostic_applied=process_diagnostic_applied,
+        runtime_valid=row.get("runtime_valid") is not False,
+    )
+
+
+def _resolve_reflection_type(error_type: ErrorType) -> ReflectionType:
+    """Map an error type to the reflection strategy that should repair it."""
+    if error_type == ErrorType.CORRECT:
+        return ReflectionType.STABLE_SUCCESS
+    if error_type == ErrorType.FALSE_POSITIVE:
+        return ReflectionType.SKILL_DEFECT
+    if error_type in (
+        ErrorType.UNRESOLVED_SHOULD_ERROR,
+        ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        ErrorType.UNRESOLVED_UNKNOWN,
+        ErrorType.CANDIDATE_MISS,
+    ):
+        return ReflectionType.DISCOVERY
+    if error_type == ErrorType.LOCALIZATION_ERROR:
+        return ReflectionType.OPTIMIZATION
+    if error_type in (
+        ErrorType.CRS_CONTRADICTION,
+        ErrorType.EVIDENCE_INCOMPLETE,
+        ErrorType.BOUNDARY_HESITATION,
+        ErrorType.SIGNAL_UNAVAILABLE,
+    ):
+        return ReflectionType.OPTIMIZATION
+    if error_type in (
+        ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
+        ErrorType.APPEAL_PROSECUTOR_FAILURE,
+        ErrorType.APPEAL_DEFENDER_FAILURE,
+        ErrorType.APPEAL_COVERAGE_MISMATCH,
+    ):
+        # A named stage failed to produce the output its contract requires:
+        # the skill text for that stage is deficient, not merely suboptimal.
+        return ReflectionType.SKILL_DEFECT
+    return ReflectionType.OPTIMIZATION
+
+
+def _resolve_module_attribution(
+    *, row: Mapping[str, Any], error_type: ErrorType, state: str,
+    prosecution: CoverageReading, defense: CoverageReading,
+    candidate_count: int,
+    gold_polarity_locked: bool,
+    gold_verified_correct: bool,
+    diagnostic_finding: tuple[ErrorType, TriggerSource] | None,
+    process_diagnostic_applied: bool,
+) -> tuple[str, str, bool]:
+    """Route an error type to the responsible genome module.
+
+    Returns (target_module, secondary_module, process_diagnostic_applied).
+    Gold polarity selects the failure side; coverage states refine the owner
+    when the process is already complete.
+    """
+    target_module = ERROR_MODULE_MAP.get(error_type, "evidence_obligation")
+    secondary_module = ERROR_MODULE_SECONDARY.get(error_type, "abstention_rule")
+
+    # v5.6 gold-constrained module routing. Gold polarity selects the failure
+    # side (FP vs FN) but the STATIC error-type map can point at the wrong
+    # owner when the process is already complete. The real defect is wherever
+    # the proof court broke. For example, a FALSE_NEGATIVE_CLEAN whose
+    # prosecution coverage is already complete is NOT an evidence_obligation
+    # failure: the court wrongly accepted a clean verdict despite a complete
+    # error proof, so the defect is abstention/adjudication (or a causal link
+    # that never survived). Coverage states are label-free and authoritative,
+    # so this refines the owner while preserving the gold polarity. The FP
+    # side keeps its documented defense-side default (an FP is a defense
+    # failure); only the FN side is refined because that was the observed
+    # misrouting.
+    if gold_polarity_locked and error_type in {
+        ErrorType.FALSE_NEGATIVE,
+        ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+        ErrorType.FALSE_NEGATIVE_CLEAN,
+    }:
+        routed = _route_gold_locked_owner(
+            state=state,
+            prosecution=prosecution,
+            defense=defense,
+            default_module=target_module,
+            default_secondary=secondary_module,
+        )
+        target_module, secondary_module = routed
+
+    # Gold keeps polarity AND its primary module (an FP is a defense failure,
+    # not a localization failure). Diagnostics only supply the partner module
+    # so the repair prompt names both the gold failure and the process defect.
+    gold_diagnostic_secondary = None
+    if (
+        gold_polarity_locked
+        and not gold_verified_correct
+        and diagnostic_finding is not None
+    ):
+        diagnostic_module = ERROR_MODULE_MAP.get(diagnostic_finding[0])
+        if diagnostic_module is not None and diagnostic_module != target_module:
+            secondary_module = diagnostic_module
+            gold_diagnostic_secondary = diagnostic_module
+            process_diagnostic_applied = True
+
+    if error_type in {
+        ErrorType.UNRESOLVED_UNKNOWN,
+        ErrorType.UNRESOLVED_SHOULD_ERROR,
+        ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        ErrorType.EVIDENCE_INCOMPLETE,
+        ErrorType.CANDIDATE_MISS,
+        ErrorType.SIGNAL_UNAVAILABLE,
+    }:
+        routed_target, routed_secondary = _route_process_failure(
+            row,
+            state=state,
+            candidate_count=candidate_count,
+            prosecution=prosecution,
+            defense=defense,
+            default_module=target_module,
+            default_secondary=secondary_module,
+        )
+        target_module = routed_target
+        # gold 锁定的 diagnostic partner 必须挺过 coverage 重路由：上方注释
+        # 承诺 "diagnostics only supply the partner module"，故路由出的
+        # secondary 不得覆盖 gold 设定的 diagnostic secondary（不变式 #1）。
+        if gold_diagnostic_secondary is None:
+            secondary_module = routed_secondary
+
+    # Special routing for unresolved with weak defense
+    if error_type == ErrorType.UNRESOLVED_UNKNOWN:
+        defense_cov = defense.score
+        prosecution_cov = prosecution.score
+        if (
+            defense_cov is not None
+            and prosecution_cov is not None
+            and defense_cov < prosecution_cov
+            and defense_cov < COVERAGE_LOW_THRESHOLD
+        ):
+            target_module = "clean_defense_boundary"
+            secondary_module = "abstention_rule"
+
+    return target_module, secondary_module, process_diagnostic_applied
+
+
+def _detect_trigger_and_error_type(
+    *, row: Mapping[str, Any], state: str, predicted: bool | None,
+    prosecution: CoverageReading, defense: CoverageReading,
+    crs_signal: CRSSignal, candidate_count: int,
+    use_gold: bool, has_gold: bool, gold: bool | None,
+    step_correct: bool,
+) -> tuple[TriggerSource, ErrorType, bool]:
+    """Classify the trigger source and error type from pipeline signals.
+
+    Returns (trigger_source, error_type, is_high_confidence). The cascade
+    is ordered: gold polarity > self-supervised triggers > process
+    diagnostics. Gold always wins because an external label is stronger
+    evidence than any detector-internal process signal.
+    """
     trigger_source = TriggerSource.NONE
     error_type = ErrorType.CORRECT
 
@@ -1013,6 +1242,67 @@ def attribute_failure(
         error_type = ErrorType.CANDIDATE_MISS
         trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
 
+    return trigger_source, error_type, is_high_confidence
+
+
+def attribute_failure(
+    row: Mapping[str, Any],
+    *,
+    use_gold: bool = False,
+    gold_reflection: bool = False,
+) -> AttributionSignal:
+    """Perform causal process reflection on a single detection result.
+
+    Self-supervised mode (use_gold=False):
+        Uses only pipeline internal signals to determine if reflection
+        should be triggered. Does NOT require gold labels.
+
+    Gold-enhanced mode (use_gold=True, explicit opt-in):
+        Additionally uses gold labels for more precise error classification.
+        Gold label NEVER enters skill content — only used for signal routing.
+
+    Trigger conditions (any one triggers reflection):
+    1. state == "unresolved"
+    2. CRS internal contradiction
+    3. Evidence chain incomplete (coverage abnormally low)
+    4. Boundary hesitation (prosecution ≈ defense)
+    5. Gold mismatch (optional enhancement)
+
+    NOT triggered:
+    - High-confidence verified_error (all CRS dimensions consistently high)
+    - High-confidence verified_clean (defense overwhelming)
+    """
+    state = resolve_evolution_state(row)
+    predicted = _prediction_state(row)
+    prosecution, defense = _extract_coverage(row)
+    prosecution_cov, defense_cov = prosecution.score, defense.score
+    crs_signal = _extract_crs_scores(row)
+    crs_scores = crs_signal.scores
+    consensus_gate = bool(
+        (row.get("proof_adjudication") or {}).get("consensus_gate_applied")
+    )
+    candidate_count = _count_candidates(row)
+
+    # Gold is a strict opt-in. In self-supervised mode it is not read into
+    # attribution, summaries, candidate routing, or localization checks.
+    raw_has_gold = "gold_label" in row and row.get("gold_label") is not None
+    has_gold = bool(use_gold and raw_has_gold)
+    if has_gold and not isinstance(row["gold_label"], bool):
+        raise ValueError("gold_label must be bool in gold-enhanced mode")
+    gold: bool | None = bool(row["gold_label"]) if has_gold else None
+    step_correct = _check_step_correct(row) if has_gold else False
+
+    # ================================================================
+    # Self-supervised trigger detection
+    # ================================================================
+    trigger_source, error_type, is_high_confidence = _detect_trigger_and_error_type(
+        row=row, state=state, predicted=predicted,
+        prosecution=prosecution, defense=defense,
+        crs_signal=crs_signal, candidate_count=candidate_count,
+        use_gold=use_gold, has_gold=has_gold, gold=gold,
+        step_correct=step_correct,
+    )
+
     # --- Refine unresolved with self-supervised sub-signals ---
     # Note: module routing for these sub-signals happens in
     # ``_route_process_failure`` below; the branches here keep the
@@ -1113,84 +1403,17 @@ def attribute_failure(
     # ================================================================
     # Module attribution
     # ================================================================
-    target_module = ERROR_MODULE_MAP.get(error_type, "evidence_obligation")
-    secondary_module = ERROR_MODULE_SECONDARY.get(error_type, "abstention_rule")
-
-    # v5.6 gold-constrained module routing. Gold polarity selects the failure
-    # side (FP vs FN) but the STATIC error-type map can point at the wrong
-    # owner when the process is already complete. The real defect is wherever
-    # the proof court broke. For example, a FALSE_NEGATIVE_CLEAN whose
-    # prosecution coverage is already complete is NOT an evidence_obligation
-    # failure: the court wrongly accepted a clean verdict despite a complete
-    # error proof, so the defect is abstention/adjudication (or a causal link
-    # that never survived). Coverage states are label-free and authoritative,
-    # so this refines the owner while preserving the gold polarity. The FP
-    # side keeps its documented defense-side default (an FP is a defense
-    # failure); only the FN side is refined because that was the observed
-    # misrouting.
-    if gold_polarity_locked and error_type in {
-        ErrorType.FALSE_NEGATIVE,
-        ErrorType.FALSE_NEGATIVE_UNRESOLVED,
-        ErrorType.FALSE_NEGATIVE_CLEAN,
-    }:
-        routed = _route_gold_locked_owner(
-            state=state,
-            prosecution=prosecution,
-            defense=defense,
-            default_module=target_module,
-            default_secondary=secondary_module,
-        )
-        target_module, secondary_module = routed
-
-    # Gold keeps polarity AND its primary module (an FP is a defense failure,
-    # not a localization failure). Diagnostics only supply the partner module
-    # so the repair prompt names both the gold failure and the process defect.
-    gold_diagnostic_secondary = None
-    if (
-        gold_polarity_locked
-        and not gold_verified_correct
-        and diagnostic_finding is not None
-    ):
-        diagnostic_module = ERROR_MODULE_MAP.get(diagnostic_finding[0])
-        if diagnostic_module is not None and diagnostic_module != target_module:
-            secondary_module = diagnostic_module
-            gold_diagnostic_secondary = diagnostic_module
-            process_diagnostic_applied = True
-
-    if error_type in {
-        ErrorType.UNRESOLVED_UNKNOWN,
-        ErrorType.UNRESOLVED_SHOULD_ERROR,
-        ErrorType.UNRESOLVED_SHOULD_CLEAN,
-        ErrorType.EVIDENCE_INCOMPLETE,
-        ErrorType.CANDIDATE_MISS,
-        ErrorType.SIGNAL_UNAVAILABLE,
-    }:
-        routed_target, routed_secondary = _route_process_failure(
-            row,
-            state=state,
+    target_module, secondary_module, process_diagnostic_applied = (
+        _resolve_module_attribution(
+            row=row, error_type=error_type, state=state,
+            prosecution=prosecution, defense=defense,
             candidate_count=candidate_count,
-            prosecution=prosecution,
-            defense=defense,
-            default_module=target_module,
-            default_secondary=secondary_module,
+            gold_polarity_locked=gold_polarity_locked,
+            gold_verified_correct=gold_verified_correct,
+            diagnostic_finding=diagnostic_finding,
+            process_diagnostic_applied=process_diagnostic_applied,
         )
-        target_module = routed_target
-        # gold 锁定的 diagnostic partner 必须挺过 coverage 重路由：上方注释
-        # 承诺 "diagnostics only supply the partner module"，故路由出的
-        # secondary 不得覆盖 gold 设定的 diagnostic secondary（不变式 #1）。
-        if gold_diagnostic_secondary is None:
-            secondary_module = routed_secondary
-
-    # Special routing for unresolved with weak defense
-    if error_type == ErrorType.UNRESOLVED_UNKNOWN:
-        if (
-            defense_cov is not None
-            and prosecution_cov is not None
-            and defense_cov < prosecution_cov
-            and defense_cov < COVERAGE_LOW_THRESHOLD
-        ):
-            target_module = "clean_defense_boundary"
-            secondary_module = "abstention_rule"
+    )
 
     # ================================================================
     # Reflection type
@@ -1227,119 +1450,18 @@ def attribute_failure(
     else:
         reflection_type = ReflectionType.OPTIMIZATION
 
-    # ================================================================
-    # Evidence summary
-    # ================================================================
-    def coverage_text(value: float | None) -> str:
-        return "unavailable" if value is None else f"{value:.2f}"
-
-    evidence_parts = [
-        f"state={state}",
-        f"trigger={trigger_source.value}",
-        f"prosecution_coverage={coverage_text(prosecution_cov)}",
-        f"defense_coverage={coverage_text(defense_cov)}",
-        f"prosecution_coverage_state={prosecution.state or 'unavailable'}",
-        f"defense_coverage_state={defense.state or 'unavailable'}",
-        f"candidates={candidate_count}",
-        f"consensus_gate={'applied' if consensus_gate else 'not_applied'}",
-    ]
-    if crs_scores:
-        crs_str = ",".join(f"{k}={v:.2f}" for k, v in crs_scores.items())
-        evidence_parts.append(f"crs=[{crs_str}]")
-        evidence_parts.append(f"crs_aggregate={crs_signal.aggregate:.3f}")
-        evidence_parts.append(f"crs_source={crs_signal.source}")
-    if has_gold:
-        # gold 极性已由 reflection prompt 中受控的 gold_section 通道披露
-        # （附带 "diagnostic reference only" 使用规则）。evidence_summary 会被
-        # 原样拼入 user prompt，不得在此重复 gold 极性字面量（不变式 #3：
-        # gold 不得进入 skill/prompt 内容，除非经由审计过、规则受限的通道）。
-        evidence_parts.append("supervision=gold_enhanced")
-    else:
-        evidence_parts.append("supervision=self_supervised")
-    if state == "unresolved":
-        evidence_parts.append("detector_abstained_due_to_insufficient_evidence")
-    if error_type == ErrorType.FALSE_POSITIVE:
-        evidence_parts.append("defense_boundary_insufficient_to_protect_clean_case")
-    if error_type == ErrorType.LOCALIZATION_ERROR:
-        gold_steps = row.get("gold_steps") or []
-        # 只报告数量，绝不序列化具体 gold 步骤值，避免反思 prompt 被植入
-        # 标注答案（不变式 #3）；数量被显式测试锁定为允许披露（count is
-        # fine; values are not）。
-        evidence_parts.append(
-            f"step_mismatch:predicted={row.get('responsible_step')}_gold_step_count={len(gold_steps)}"
-        )
-    if error_type == ErrorType.CRS_CONTRADICTION:
-        evidence_parts.append("crs_dimensions_contradict_final_decision")
-    if process_diagnostic_applied:
-        evidence_parts.append("process_diagnostic=applied")
-    localization_status = str(
-        diagnostics.get("localization_status") or "not_applicable"
-    )
-    appeal_status = str(diagnostics.get("appeal_status") or "not_required")
-    if localization_status != "not_applicable":
-        evidence_parts.append(f"localization_status={localization_status}")
-    if appeal_status != "not_required":
-        evidence_parts.append(f"appeal_status={appeal_status}")
-    if quarantined_count:
-        evidence_parts.append(
-            f"focused_quarantined_candidates={quarantined_count}"
-        )
-
-    # Attribution confidence (v5.3): high for definite error types,
-    # medium for CRS/boundary signals, low for unresolved/unavailable.
-    # Attribution confidence (v5.3): high for definite error types,
-    # medium for gold-directed unresolved and CRS/boundary signals,
-    # low for unresolved_unknown and unavailable signals.
-    if error_type in (ErrorType.FALSE_POSITIVE, ErrorType.FALSE_NEGATIVE_UNRESOLVED,
-                      ErrorType.FALSE_NEGATIVE_CLEAN, ErrorType.LOCALIZATION_ERROR):
-        attribution_confidence = "high"
-    elif error_type in (ErrorType.FOCUSED_CERTIFICATE_QUARANTINE,
-                        ErrorType.APPEAL_PROSECUTOR_FAILURE,
-                        ErrorType.APPEAL_DEFENDER_FAILURE,
-                        ErrorType.APPEAL_COVERAGE_MISMATCH,
-                        ErrorType.LOCALIZATION_AMBIGUOUS):
-        # The detector reported exactly which stage broke; the root-cause
-        # module follows from the pipeline structure, not from inference.
-        attribution_confidence = "high"
-    elif error_type in (ErrorType.UNRESOLVED_SHOULD_ERROR,
-                        ErrorType.UNRESOLVED_SHOULD_CLEAN,
-                        ErrorType.CRS_CONTRADICTION,
-                        ErrorType.BOUNDARY_HESITATION):
-        # Gold direction is known -> attribution is more reliable
-        attribution_confidence = "medium"
-    else:
-        attribution_confidence = "low"
-
-    return AttributionSignal(
-        error_type=error_type,
-        target_module=target_module,
-        secondary_module=secondary_module,
-        attribution_confidence=attribution_confidence,
-        reflection_type=reflection_type,
+    return _build_attribution_signal(
+        row=row, error_type=error_type, state=state,
         trigger_source=trigger_source,
-        evidence_summary=" | ".join(evidence_parts),
-        prosecution_coverage=prosecution_cov,
-        defense_coverage=defense_cov,
-        prosecution_coverage_state=prosecution.state,
-        defense_coverage_state=defense.state,
-        coverage_quantitative=prosecution.quantitative and defense.quantitative,
-        crs_scores=crs_scores,
-        crs_aggregate=crs_signal.aggregate,
-        crs_source=crs_signal.source,
-        crs_complete=crs_signal.complete,
-        consensus_gate_applied=consensus_gate,
+        target_module=target_module, secondary_module=secondary_module,
+        prosecution=prosecution, defense=defense,
+        crs_signal=crs_signal, crs_scores=crs_scores,
+        consensus_gate=consensus_gate,
         candidate_count=candidate_count,
-        state=state,
-        gold_label=gold,
-        has_gold=has_gold,
-        gold_enhanced=has_gold,
-        gold_reflection=bool(gold_reflection and has_gold),
-        responsible_step_correct=bool(step_correct),
-        localization_status=str(
-            diagnostics.get("localization_status") or "not_applicable"
-        ),
-        appeal_status=str(diagnostics.get("appeal_status") or "not_required"),
-        focused_quarantined_candidate_count=quarantined_count,
+        diagnostics=diagnostics,
+        quarantined_count=quarantined_count,
         process_diagnostic_applied=process_diagnostic_applied,
-        runtime_valid=row.get("runtime_valid") is not False,
+        has_gold=has_gold, gold=gold, gold_reflection=gold_reflection,
+        step_correct=step_correct,
+        prosecution_cov=prosecution_cov, defense_cov=defense_cov,
     )
