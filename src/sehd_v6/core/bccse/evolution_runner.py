@@ -2464,6 +2464,322 @@ def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
 # ============================================================
 
 
+def _restore_checkpoint_state(
+    *, resume_from: Path,
+    evolution_case_ids: Sequence[str],
+    records: Mapping[str, dict[str, Any]],
+    config: dict[str, Any],
+    gate, budget_usage: dict[str, int],
+    stable_canaries: dict[str, dict[str, Any]],
+    stable_canaries_checkpoint: dict[str, dict[str, Any]],
+    rejected_buffer: list[RejectedEditEntry],
+    champion_genome: SkillGenome, current_genome: SkillGenome,
+    stable_genome: SkillGenome,
+    policy_genome: PolicyGenome, stable_policy_genome: PolicyGenome,
+    causal_memory,
+) -> dict[str, Any]:
+    """Validate and apply a persisted evolution checkpoint.
+
+    Why this function exists: resuming rebinds ~25 pieces of run state —
+    scalar counters, per-case retry ledgers, the policy genome pair, and the
+    halted-step rewind. The mutable containers (gate summary, budget, canary
+    registries, rejected buffer) are updated in place; everything the caller
+    must rebind to a local is returned in one dict so the work-queue entry
+    point reads as a single state-transfer edge.
+    """
+    checkpoint = load_evolution_checkpoint(Path(resume_from))
+    if not checkpoint:
+        raise FileNotFoundError(
+            f"resume_from set but no evolution_checkpoint.json found in "
+            f"{resume_from}"
+        )
+    checkpoint_case_ids = list(checkpoint.get("evolution_case_ids") or [])
+    if checkpoint_case_ids != list(evolution_case_ids):
+        raise ValueError(
+            "resume_from checkpoint evolution_case_ids do not match the "
+            "supplied evolution_case_ids; cannot resume safely"
+        )
+    checkpoint_input_hash = str(checkpoint.get("input_content_hash") or "")
+    checkpoint_config_hash = str(checkpoint.get("config_hash") or "")
+    current_input_hash = packet.stable_hash(
+        {case_id: records[case_id] for case_id in evolution_case_ids}
+    )
+    current_config_hash = packet.stable_hash(config)
+    if checkpoint_input_hash != current_input_hash:
+        raise ValueError(
+            "resume_from checkpoint input_content_hash does not match the "
+            "supplied records; cannot resume safely"
+        )
+    if checkpoint_config_hash != current_config_hash:
+        raise ValueError(
+            "resume_from checkpoint config_hash does not match the "
+            "supplied detector config; cannot resume safely"
+        )
+    restored = _restore_state_from_checkpoint(
+        checkpoint,
+        champion_genome=champion_genome,
+        current_genome=current_genome,
+        stable_genome=stable_genome,
+        experience_memory=causal_memory,
+        evolution_case_ids=evolution_case_ids,
+    )
+    steps = [
+        EvolutionStep.from_dict(step_payload)
+        for step_payload in (restored.get("steps") or [])
+        if isinstance(step_payload, Mapping)
+    ]
+    for key, value in dict(restored.get("budget_usage") or {}).items():
+        if key in budget_usage and isinstance(value, (int, float)):
+            budget_usage[key] = value
+    gate.restore_summary(restored.get("gate_summary") or {})
+    stable_canaries.update(restored.get("stable_canaries") or {})
+    stable_canaries_checkpoint.update(
+        restored.get("stable_canaries_checkpoint") or {}
+    )
+    restored_counters = dict(restored.get("counters") or {})
+    restored_stable_memory = restored.get("stable_memory_payload") or {}
+    stable_memory_payload = (
+        dict(restored_stable_memory) if restored_stable_memory else {}
+    )
+    active_attempt_index = int(restored.get("active_attempt_index") or 0)
+    pending_probe_step_indexes = list(
+        restored.get("pending_probe_step_indexes") or []
+    )
+    pending_probe_commits: list[PendingProbeCommit] = []
+    for pending in restored.get("pending_probe_commits") or ():
+        if not isinstance(pending, Mapping):
+            continue
+        try:
+            certificate_index = int(pending.get("certificate_index"))
+            certificate = gate.certificates[certificate_index]
+            pending_probe_commits.append(PendingProbeCommit(
+                case_id=str(pending.get("case_id") or ""),
+                case_index=int(pending.get("case_index") or 0),
+                edit=SkillEdit.from_dict(dict(pending["edit"])),
+                certificate=certificate,
+                step_index=int(pending.get("step_index") or 0),
+            ))
+        except (KeyError, TypeError, ValueError, IndexError):
+            pending_probe_commits = []
+            pending_probe_step_indexes = []
+            break
+    for entry in restored.get("rejected_buffer") or ():
+        if not isinstance(entry, Mapping):
+            continue
+        proposal_data = entry.get("proposal") or {}
+        if not isinstance(proposal_data, Mapping):
+            continue
+        proposal = EditProposal(
+            target_module=str(proposal_data.get("target_module") or ""),
+            operation=str(proposal_data.get("operation") or ""),
+            target_clause_id="",
+            content=str(proposal_data.get("content") or ""),
+            preconditions=(),
+            rationale="",
+            reflection_type="",
+            source_case_id="",
+        )
+        rejected_buffer.append(RejectedEditEntry(
+            proposal=proposal,
+            regressed_cases=[
+                str(value) for value in (entry.get("regressed_cases") or ())
+            ],
+            budget_consumed=int(entry.get("budget_consumed") or 0),
+            reject_reasons=[
+                str(value) for value in (entry.get("reject_reasons") or ())
+            ],
+            rejection_stage=str(entry.get("rejection_stage") or "structural_gate"),
+            observed_effect=str(entry.get("observed_effect") or ""),
+            observable_deltas=tuple(
+                str(value) for value in (entry.get("observable_deltas") or ())
+            ),
+        ))
+    restored_policy_payload = checkpoint.get("policy_genome")
+    if (
+        isinstance(restored_policy_payload, Mapping)
+        and restored_policy_payload.get("items")
+    ):
+        policy_genome = PolicyGenome.from_dict(dict(restored_policy_payload))
+        # Restored policy items re-enter the deterministic evaluator on
+        # the next detection, so a corrupt or vocabulary-drifted payload
+        # fails closed here instead of silently skewing adjudication.
+        persisted_policy_hash = str(
+            restored_policy_payload.get("content_hash") or ""
+        )
+        if (
+            persisted_policy_hash
+            and persisted_policy_hash != policy_genome.content_hash
+        ):
+            raise ValueError(
+                "checkpoint policy genome hash does not match its content"
+            )
+        for restored_item in policy_genome.items:
+            item_ok, item_reason = _validate_item_contract(restored_item)
+            if not item_ok:
+                raise ValueError(
+                    "checkpoint policy item "
+                    f"{restored_item.item_id!r} failed the closed "
+                    f"vocabulary contract: {item_reason}"
+                )
+    l2_policy_accepts = int(checkpoint.get("l2_policy_accepts") or 0)
+    gate_event_ledger = GateEventLedger.from_list(
+        checkpoint.get("gate_events") or ()
+    )
+    # The probe rollback anchor resumes from the last probe-stable policy
+    # snapshot; checkpoints predating the snapshot field treat the
+    # restored policy genome itself as the stable point.
+    restored_stable_policy_payload = checkpoint.get(
+        "stable_policy_genome_payload"
+    )
+    if (
+        isinstance(restored_stable_policy_payload, Mapping)
+        and restored_stable_policy_payload.get("items") is not None
+    ):
+        stable_policy_genome = PolicyGenome.from_dict(
+            dict(restored_stable_policy_payload)
+        )
+        stable_l2_policy_accepts = int(
+            checkpoint.get("stable_l2_policy_accepts") or 0
+        )
+    else:
+        stable_policy_genome = policy_genome.clone()
+        stable_l2_policy_accepts = l2_policy_accepts
+    l2_policy_audit = [
+        dict(entry) for entry in (checkpoint.get("l2_policy_audit") or ())
+        if isinstance(entry, Mapping)
+    ]
+    resume_next_case_index = int(restored.get("next_case_index") or 0)
+    # v5.9b: cases skipped by a halt/convergence were persisted as
+    # "halted" placeholder steps with next_case_index advanced past
+    # them, which made a resume treat them as processed and drop them
+    # forever. Rewind over any trailing unprocessed placeholder steps so
+    # the queue re-examines them under the restored champion genome.
+    rewound = 0
+    while steps and (
+        steps[-1].gate_decision == "halted"
+        or steps[-1].detection_state == "skipped"
+    ):
+        skipped_step = steps.pop()
+        rewound += 1
+        resume_next_case_index = min(
+            resume_next_case_index, skipped_step.case_index,
+        )
+    if rewound:
+        gate.reset_convergence()
+        print(
+            f"[resume] rewinding {rewound} halted/skipped placeholder "
+            f"step(s); work queue restarts at case index "
+            f"{resume_next_case_index}"
+        )
+    # A step still marked provisional at checkpoint time lost its shadow
+    # edit above (uncommitted shadows are never restored), so finalize
+    # the audit record instead of leaving it open forever.
+    for step in steps:
+        if step.gate_decision == "provisional":
+            step.gate_decision = "rollback_resume"
+            step.mutation_applied = None
+    if (
+        steps
+        and resume_next_case_index == steps[-1].case_index
+        and steps[-1].gate_decision.startswith("retry_")
+    ):
+        active_attempt_index = max(
+            active_attempt_index,
+            steps[-1].attempt_index + 1,
+        )
+    if not stable_memory_payload:
+        stable_memory_payload = causal_memory.to_dict()
+    provisional_count = int(checkpoint.get("provisional_edit_count") or 0)
+    shadow_hash = str(checkpoint.get("shadow_genome_hash") or "")
+    champion_hash = str(checkpoint.get("champion_genome_hash") or "")
+    if provisional_count > 0 or (shadow_hash and shadow_hash != champion_hash):
+        print(
+            f"[resume] checkpoint held {provisional_count} uncommitted "
+            f"shadow edit(s); reverting to the last committed champion "
+            f"(shadow evidence was not persisted)"
+        )
+    return {
+        "steps": steps,
+        "accepted_edits_history": list(restored["accepted_edits_history"]),
+        "batch_history": list(restored["batch_history"]),
+        "probe_history": list(restored["probe_history"]),
+        "baseline_canary_audit": list(restored["baseline_canary_audit"]),
+        "rollback_reason": str(restored.get("rollback_reason") or ""),
+        "pending_probe_step_indexes": pending_probe_step_indexes,
+        "pending_probe_commits": pending_probe_commits,
+        "stable_cases": int(restored_counters.get("stable_cases") or 0),
+        "triggered_cases": int(restored_counters.get("triggered_cases") or 0),
+        "edits_accepted": int(restored_counters.get("edits_accepted") or 0),
+        "edits_rejected": int(restored_counters.get("edits_rejected") or 0),
+        "stable_memory_payload": stable_memory_payload,
+        "stable_history_length": int(restored.get("stable_history_length") or 0),
+        "last_probe_accepted_count": int(
+            restored.get("last_probe_accepted_count") or 0
+        ),
+        "last_probe_triggered_count": int(
+            restored.get("last_probe_triggered_count") or 0
+        ),
+        "active_attempt_index": active_attempt_index,
+        "mutation_retry_feedback": {
+            str(case_id): [str(value) for value in values]
+            for case_id, values in (
+                restored.get("mutation_retry_feedback") or {}
+            ).items()
+            if isinstance(values, list)
+        },
+        "rejected_source_proposals": {
+            str(case_id): [dict(value) for value in values]
+            for case_id, values in (
+                restored.get("rejected_source_proposals") or {}
+            ).items()
+            if isinstance(values, list)
+        },
+        "runtime_invalid_cases": int(restored.get("runtime_invalid_cases") or 0),
+        "runtime_error_categories": {
+            str(category): int(count)
+            for category, count in (
+                restored.get("runtime_error_categories") or {}
+            ).items()
+        },
+        "policy_genome": policy_genome,
+        "l2_policy_accepts": l2_policy_accepts,
+        "gate_event_ledger": gate_event_ledger,
+        "stable_policy_genome": stable_policy_genome,
+        "stable_l2_policy_accepts": stable_l2_policy_accepts,
+        "abstention_ladder_used": {
+            str(value)
+            for value in (checkpoint.get("abstention_ladder_used") or ())
+        },
+        "contrast_replay_registry": {
+            str(hallucination_type): [
+                dict(row)
+                for row in (rows or ())
+                if isinstance(row, Mapping)
+            ]
+            for hallucination_type, rows in (
+                checkpoint.get("contrast_registry") or {}
+            ).items()
+        },
+        "rejected_policy_summaries": [
+            str(value)
+            for value in (checkpoint.get("rejected_policy_summaries") or ())
+        ][-20:],
+        "localization_bias_signals": [
+            dict(value)
+            for value in (checkpoint.get("localization_bias_signals") or ())
+            if isinstance(value, Mapping)
+        ],
+        "non_l1_failure_attributions": [
+            dict(value)
+            for value in (checkpoint.get("non_l1_failure_attributions") or ())
+            if isinstance(value, Mapping)
+        ],
+        "l2_policy_audit": l2_policy_audit,
+        "resume_next_case_index": resume_next_case_index,
+        "run_id": str(checkpoint.get("run_id") or ""),
+    }
+
+
 def _llm_no_conflict_gate(
     new_rule: str,
     existing_rules: Sequence[str],
@@ -3153,290 +3469,55 @@ def run_online_evolution(
     # ---- v5.4: optional resume from a persisted checkpoint ----
     resume_next_case_index = 0
     if resume_from is not None:
-        checkpoint = load_evolution_checkpoint(Path(resume_from))
-        if not checkpoint:
-            raise FileNotFoundError(
-                f"resume_from set but no evolution_checkpoint.json found in "
-                f"{resume_from}"
-            )
-        checkpoint_case_ids = list(checkpoint.get("evolution_case_ids") or [])
-        if checkpoint_case_ids != list(evolution_case_ids):
-            raise ValueError(
-                "resume_from checkpoint evolution_case_ids do not match the "
-                "supplied evolution_case_ids; cannot resume safely"
-            )
-        checkpoint_input_hash = str(checkpoint.get("input_content_hash") or "")
-        checkpoint_config_hash = str(checkpoint.get("config_hash") or "")
-        current_input_hash = packet.stable_hash(
-            {case_id: records[case_id] for case_id in evolution_case_ids}
-        )
-        current_config_hash = packet.stable_hash(config)
-        if checkpoint_input_hash != current_input_hash:
-            raise ValueError(
-                "resume_from checkpoint input_content_hash does not match the "
-                "supplied records; cannot resume safely"
-            )
-        if checkpoint_config_hash != current_config_hash:
-            raise ValueError(
-                "resume_from checkpoint config_hash does not match the "
-                "supplied detector config; cannot resume safely"
-            )
-        restored = _restore_state_from_checkpoint(
-            checkpoint,
-            champion_genome=champion_genome,
-            current_genome=current_genome,
-            stable_genome=stable_genome,
-            experience_memory=causal_memory,
+        resumed = _restore_checkpoint_state(
+            resume_from=Path(resume_from),
             evolution_case_ids=evolution_case_ids,
+            records=records, config=config,
+            gate=gate, budget_usage=budget_usage,
+            stable_canaries=stable_canaries,
+            stable_canaries_checkpoint=stable_canaries_checkpoint,
+            rejected_buffer=rejected_buffer,
+            champion_genome=champion_genome, current_genome=current_genome,
+            stable_genome=stable_genome,
+            policy_genome=policy_genome,
+            stable_policy_genome=stable_policy_genome,
+            causal_memory=causal_memory,
         )
-        steps = [
-            EvolutionStep.from_dict(step_payload)
-            for step_payload in (restored.get("steps") or [])
-            if isinstance(step_payload, Mapping)
-        ]  # type: ignore[assignment]
-        accepted_edits_history = list(restored["accepted_edits_history"])  # type: ignore[assignment]
-        batch_history = list(restored["batch_history"])  # type: ignore[assignment]
-        probe_history = list(restored["probe_history"])  # type: ignore[assignment]
-        baseline_canary_audit = list(restored["baseline_canary_audit"])  # type: ignore[assignment]
-        restored_budget = dict(restored.get("budget_usage") or {})
-        for key, value in restored_budget.items():
-            if key in budget_usage and isinstance(value, (int, float)):
-                budget_usage[key] = value
-        rollback_reason = str(restored.get("rollback_reason") or "")
-        pending_probe_step_indexes = list(
-            restored.get("pending_probe_step_indexes") or []
-        )
-        restored_counters = dict(restored.get("counters") or {})
-        stable_cases = int(restored_counters.get("stable_cases") or 0)
-        triggered_cases = int(restored_counters.get("triggered_cases") or 0)
-        edits_accepted = int(restored_counters.get("edits_accepted") or 0)
-        edits_rejected = int(restored_counters.get("edits_rejected") or 0)
-        gate.restore_summary(restored.get("gate_summary") or {})
-        stable_canaries.update(restored.get("stable_canaries") or {})
-        stable_canaries_checkpoint.update(
-            restored.get("stable_canaries_checkpoint") or {}
-        )
-        restored_stable_memory = restored.get("stable_memory_payload") or {}
-        if restored_stable_memory:
-            stable_memory_payload = dict(restored_stable_memory)
-        stable_history_length = int(restored.get("stable_history_length") or 0)
-        last_probe_accepted_count = int(
-            restored.get("last_probe_accepted_count") or 0
-        )
-        last_probe_triggered_count = int(
-            restored.get("last_probe_triggered_count") or 0
-        )
-        active_attempt_index = int(restored.get("active_attempt_index") or 0)
-        mutation_retry_feedback = {
-            str(case_id): [str(value) for value in values]
-            for case_id, values in (
-                restored.get("mutation_retry_feedback") or {}
-            ).items()
-            if isinstance(values, list)
-        }
-        rejected_source_proposals = {
-            str(case_id): [dict(value) for value in values]
-            for case_id, values in (
-                restored.get("rejected_source_proposals") or {}
-            ).items()
-            if isinstance(values, list)
-        }
-        runtime_invalid_cases = int(
-            restored.get("runtime_invalid_cases") or 0
-        )
-        runtime_error_categories = {
-            str(category): int(count)
-            for category, count in (
-                restored.get("runtime_error_categories") or {}
-            ).items()
-        }
-        pending_probe_commits = []
-        for pending in restored.get("pending_probe_commits") or ():
-            if not isinstance(pending, Mapping):
-                continue
-            try:
-                certificate_index = int(pending.get("certificate_index"))
-                certificate = gate.certificates[certificate_index]
-                pending_probe_commits.append(PendingProbeCommit(
-                    case_id=str(pending.get("case_id") or ""),
-                    case_index=int(pending.get("case_index") or 0),
-                    edit=SkillEdit.from_dict(dict(pending["edit"])),
-                    certificate=certificate,
-                    step_index=int(pending.get("step_index") or 0),
-                ))
-            except (KeyError, TypeError, ValueError, IndexError):
-                pending_probe_commits = []
-                pending_probe_step_indexes = []
-                break
-        restored_rejected_buffer = restored.get("rejected_buffer") or ()
-        for entry in restored_rejected_buffer:
-            if not isinstance(entry, Mapping):
-                continue
-            proposal_data = entry.get("proposal") or {}
-            if not isinstance(proposal_data, Mapping):
-                continue
-            proposal = EditProposal(
-                target_module=str(proposal_data.get("target_module") or ""),
-                operation=str(proposal_data.get("operation") or ""),
-                target_clause_id="",
-                content=str(proposal_data.get("content") or ""),
-                preconditions=(),
-                rationale="",
-                reflection_type="",
-                source_case_id="",
-            )
-            rejected_buffer.append(RejectedEditEntry(
-                proposal=proposal,
-                regressed_cases=[
-                    str(value) for value in (entry.get("regressed_cases") or ())
-                ],
-                budget_consumed=int(entry.get("budget_consumed") or 0),
-                reject_reasons=[
-                    str(value) for value in (entry.get("reject_reasons") or ())
-                ],
-                rejection_stage=str(entry.get("rejection_stage") or "structural_gate"),
-                observed_effect=str(entry.get("observed_effect") or ""),
-                observable_deltas=tuple(
-                    str(value) for value in (entry.get("observable_deltas") or ())
-                ),
-            ))
-        restored_policy_payload = checkpoint.get("policy_genome")
-        if (
-            isinstance(restored_policy_payload, Mapping)
-            and restored_policy_payload.get("items")
-        ):
-            policy_genome = PolicyGenome.from_dict(dict(restored_policy_payload))
-            # Restored policy items re-enter the deterministic evaluator on
-            # the next detection, so a corrupt or vocabulary-drifted payload
-            # fails closed here instead of silently skewing adjudication.
-            persisted_policy_hash = str(
-                restored_policy_payload.get("content_hash") or ""
-            )
-            if (
-                persisted_policy_hash
-                and persisted_policy_hash != policy_genome.content_hash
-            ):
-                raise ValueError(
-                    "checkpoint policy genome hash does not match its content"
-                )
-            for restored_item in policy_genome.items:
-                item_ok, item_reason = _validate_item_contract(restored_item)
-                if not item_ok:
-                    raise ValueError(
-                        "checkpoint policy item "
-                        f"{restored_item.item_id!r} failed the closed "
-                        f"vocabulary contract: {item_reason}"
-                    )
-        l2_policy_accepts = int(checkpoint.get("l2_policy_accepts") or 0)
-        gate_event_ledger = GateEventLedger.from_list(
-            checkpoint.get("gate_events") or ()
-        )
-        # The probe rollback anchor resumes from the last probe-stable policy
-        # snapshot; checkpoints predating the snapshot field treat the
-        # restored policy genome itself as the stable point.
-        restored_stable_policy_payload = checkpoint.get(
-            "stable_policy_genome_payload"
-        )
-        if (
-            isinstance(restored_stable_policy_payload, Mapping)
-            and restored_stable_policy_payload.get("items") is not None
-        ):
-            stable_policy_genome = PolicyGenome.from_dict(
-                dict(restored_stable_policy_payload)
-            )
-            stable_l2_policy_accepts = int(
-                checkpoint.get("stable_l2_policy_accepts") or 0
-            )
-        else:
-            stable_policy_genome = policy_genome.clone()
-            stable_l2_policy_accepts = l2_policy_accepts
-        abstention_ladder_used = {
-            str(value)
-            for value in (checkpoint.get("abstention_ladder_used") or ())
-        }
-        restored_contrast_registry = checkpoint.get("contrast_registry") or {}
-        contrast_replay_registry = {
-            str(hallucination_type): [
-                dict(row)
-                for row in (rows or ())
-                if isinstance(row, Mapping)
-            ]
-            for hallucination_type, rows in restored_contrast_registry.items()
-        }
-        rejected_policy_summaries = [
-            str(value)
-            for value in (checkpoint.get("rejected_policy_summaries") or ())
-        ][-20:]
-        localization_bias_signals = [
-            dict(value)
-            for value in (checkpoint.get("localization_bias_signals") or ())
-            if isinstance(value, Mapping)
-        ]
-        non_l1_failure_attributions = [
-            dict(value)
-            for value in (
-                checkpoint.get("non_l1_failure_attributions") or ()
-            )
-            if isinstance(value, Mapping)
-        ]
-        restored_policy_audit = checkpoint.get("l2_policy_audit")
-        if isinstance(restored_policy_audit, list):
-            l2_policy_audit = [
-                dict(entry) for entry in restored_policy_audit
-                if isinstance(entry, Mapping)
-            ]
-        resume_next_case_index = int(restored.get("next_case_index") or 0)
-        # v5.9b: cases skipped by a halt/convergence were persisted as
-        # "halted" placeholder steps with next_case_index advanced past
-        # them, which made a resume treat them as processed and drop them
-        # forever. Rewind over any trailing unprocessed placeholder steps so
-        # the queue re-examines them under the restored champion genome.
-        rewound = 0
-        while steps and (
-            steps[-1].gate_decision == "halted"
-            or steps[-1].detection_state == "skipped"
-        ):
-            skipped_step = steps.pop()
-            rewound += 1
-            resume_next_case_index = min(
-                resume_next_case_index, skipped_step.case_index,
-            )
-        if rewound:
-            gate.reset_convergence()
-            print(
-                f"[resume] rewinding {rewound} halted/skipped placeholder "
-                f"step(s); work queue restarts at case index "
-                f"{resume_next_case_index}"
-            )
-        # A step still marked provisional at checkpoint time lost its shadow
-        # edit above (uncommitted shadows are never restored), so finalize
-        # the audit record instead of leaving it open forever.
-        for step in steps:
-            if step.gate_decision == "provisional":
-                step.gate_decision = "rollback_resume"
-                step.mutation_applied = None
-        if (
-            steps
-            and resume_next_case_index == steps[-1].case_index
-            and steps[-1].gate_decision.startswith("retry_")
-        ):
-            active_attempt_index = max(
-                active_attempt_index,
-                steps[-1].attempt_index + 1,
-            )
-        if not stable_memory_payload:
-            stable_memory_payload = causal_memory.to_dict()
+        steps = resumed["steps"]
+        accepted_edits_history = resumed["accepted_edits_history"]
+        batch_history = resumed["batch_history"]
+        probe_history = resumed["probe_history"]
+        baseline_canary_audit = resumed["baseline_canary_audit"]
+        rollback_reason = resumed["rollback_reason"]
+        pending_probe_step_indexes = resumed["pending_probe_step_indexes"]
+        pending_probe_commits = resumed["pending_probe_commits"]
+        stable_cases = resumed["stable_cases"]
+        triggered_cases = resumed["triggered_cases"]
+        edits_accepted = resumed["edits_accepted"]
+        edits_rejected = resumed["edits_rejected"]
+        stable_memory_payload = resumed["stable_memory_payload"]
+        stable_history_length = resumed["stable_history_length"]
+        last_probe_accepted_count = resumed["last_probe_accepted_count"]
+        last_probe_triggered_count = resumed["last_probe_triggered_count"]
+        active_attempt_index = resumed["active_attempt_index"]
+        mutation_retry_feedback = resumed["mutation_retry_feedback"]
+        rejected_source_proposals = resumed["rejected_source_proposals"]
+        runtime_invalid_cases = resumed["runtime_invalid_cases"]
+        runtime_error_categories = resumed["runtime_error_categories"]
+        policy_genome = resumed["policy_genome"]
+        l2_policy_accepts = resumed["l2_policy_accepts"]
+        gate_event_ledger = resumed["gate_event_ledger"]
+        stable_policy_genome = resumed["stable_policy_genome"]
+        stable_l2_policy_accepts = resumed["stable_l2_policy_accepts"]
+        abstention_ladder_used = resumed["abstention_ladder_used"]
+        contrast_replay_registry = resumed["contrast_replay_registry"]
+        rejected_policy_summaries = resumed["rejected_policy_summaries"]
+        localization_bias_signals = resumed["localization_bias_signals"]
+        non_l1_failure_attributions = resumed["non_l1_failure_attributions"]
+        l2_policy_audit = resumed["l2_policy_audit"]
+        resume_next_case_index = resumed["resume_next_case_index"]
         if run_id is None:
-            run_id = str(checkpoint.get("run_id") or run_id or "")
-        provisional_count = int(checkpoint.get("provisional_edit_count") or 0)
-        shadow_hash = str(checkpoint.get("shadow_genome_hash") or "")
-        champion_hash = str(checkpoint.get("champion_genome_hash") or "")
-        if provisional_count > 0 or (shadow_hash and shadow_hash != champion_hash):
-            print(
-                f"[resume] checkpoint held {provisional_count} uncommitted "
-                f"shadow edit(s); reverting to the last committed champion "
-                f"(shadow evidence was not persisted)"
-            )
+            run_id = resumed["run_id"] or None
         print(
             f"[resume] restored checkpoint from {resume_from}: "
             f"next_case_index={resume_next_case_index}, "
