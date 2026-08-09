@@ -3820,6 +3820,16 @@ def _run_registry_reflection_impl(
             "reason": select_reason,
         })
         return
+    if select_reason:
+        # The model's intended edit was dropped fail-closed (invalid
+        # precondition or params); the registration itself survives, but the
+        # audit must distinguish "no intent supplied" from "invalid intent
+        # supplied" so the promotion chain never re-derives a broken edit.
+        l2_registry_registrations.append({
+            "outcome": "intent_dropped",
+            "target": candidate.target,
+            "reason": select_reason,
+        })
     try:
         edit_kwargs = compile_registration_candidate(
             candidate, policy_genome.registry,
@@ -4840,20 +4850,33 @@ def _run_l2_policy_case_impl(
         boundary_authority_valid=boundary_authority_valid,
     )
     facts_summary = asdict(facts)
-    # P3B: pending registry entries accumulate independent observations
-    # on every subsequent L2 case; an entry that clears the evidence
-    # threshold and stays applicable is promoted to working (enabled)
-    # here, before this case's planning reads the vocabulary.
-    if any(
-        entry.required_validation == REGISTRY_REQUIRED_VALIDATION
-        and entry.status == PENDING_STATUS_PENDING
-        for entry in state.policy_genome.pending_queue
+    # The plan is the single authority for "no registered runtime action":
+    # the classifier names the L2 symptom, the planner decides whether a
+    # registered action can repair it.  Promotion and registration are
+    # keyed on that plan decision (the classifier's raw reason code never
+    # equals REGISTRATION_REASON_NO_ACTION), so the plan is computed once
+    # before the registry chain reads the vocabulary.
+    plan = plan_policy_candidates(
+        attribution=attribution,
+        genome=state.policy_genome,
+    )
+    # P3B: pending registry entries accumulate independent observations on
+    # every no-registered-action L2 case; an entry that clears the evidence
+    # threshold and stays applicable is promoted to working (enabled) here,
+    # before the promoted-intent lookup reads the queue.
+    if (
+        plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION
+        and any(
+            entry.required_validation == REGISTRY_REQUIRED_VALIDATION
+            and entry.status == PENDING_STATUS_PENDING
+            for entry in state.policy_genome.pending_queue
+        )
     ):
         for promotion_row in promote_pending_registry_entries(
             genome=state.policy_genome,
             facts=facts,
             case_id=case_id,
-            reason_code=attribution.reason_code,
+            reason_code=plan.route_result,
         ):
             if promotion_row["outcome"] in ("promoted", "rejected"):
                 l2_registry_registrations.append(promotion_row)
@@ -5042,10 +5065,6 @@ def _run_l2_policy_case_impl(
         finish("skip_no_policy", reason="no_mutation_route")
         return
 
-    plan = plan_policy_candidates(
-        attribution=attribution,
-        genome=state.policy_genome,
-    )
     planned_candidates = plan.candidates
     if not planned_candidates:
         if plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION:
@@ -5062,8 +5081,15 @@ def _run_l2_policy_case_impl(
                 )
                 planned_candidates = promoted
             else:
+                # The registry chain is keyed on the plan route decision
+                # (REGISTRATION_REASON_NO_ACTION), never on the classifier's
+                # raw L2 reason code, which is a symptom name and can never
+                # open the vocabulary planner.
                 run_registry_reflection(
-                    attribution=attribution,
+                    attribution=replace(
+                        attribution,
+                        reason_code=ROUTE_NO_REGISTERED_RUNTIME_ACTION,
+                    ),
                     facts_summary=facts_summary,
                     case_id=case_id,
                 )

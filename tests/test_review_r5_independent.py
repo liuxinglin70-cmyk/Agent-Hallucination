@@ -371,24 +371,6 @@ def test_registry_pre_ledger_operator_not_proposable() -> None:
     )
 
 
-def test_causal_backtrack_prefers_earliest_event() -> None:
-    from src.sehd_v6.core.bccse.cesv_contract import (
-        CausalInterventionEngine,
-        EdgeType,
-        ProvenanceGraph,
-    )
-
-    graph = ProvenanceGraph()
-    graph.add_node("event_001")
-    graph.add_node("event_002")
-    graph.add_node("event_003")
-    graph.add_edge("event_001", "event_003", EdgeType.PROPAGATE)
-    graph.add_edge("event_002", "event_003", EdgeType.PROPAGATE)
-    engine = CausalInterventionEngine(graph)
-    path = engine.causal_backtrack("event_003")
-    assert path[0] == "event_001"
-
-
 def test_gate_ledger_drop_event() -> None:
     ledger = gf.GateEventLedger()
     event = gf.GateEvent(

@@ -58,6 +58,18 @@ OUTCOME_VALIDATIONS = frozenset({
     OUTCOME_INCONCLUSIVE,
 })
 
+
+def _mechanism_key(signature: Any) -> tuple[str, ...]:
+    """Normalize a mechanism signature to its tuple key form.
+
+    ``aggregate_gate_experience`` always produces tuples, but persisted or
+    hand-built experiences may carry a bare string; both must hash to the
+    same per-mechanism bucket so evidence never splits across representations.
+    """
+    if isinstance(signature, str):
+        return (signature,)
+    return tuple(str(value) for value in (signature or ()))
+
 # Follow-up status for a GateExperience (closed).
 FOLLOW_UP_PENDING = "pending"
 FOLLOW_UP_VALIDATED = "validated"
@@ -397,19 +409,26 @@ def evaluate_commit_evidence(
     Returns an audit row rather than a bare bool so the decision — and the
     exact evidence count behind it — is always persisted, whether the
     candidate commits or stays in shadow.
+
+    Independent reproduction is per mechanism class: occurrences of the
+    evidence codes only accumulate within ONE mechanism signature, so a
+    pattern that repeats on the same mechanism class reaches the threshold
+    while scattered single occurrences across unrelated mechanisms never
+    sum into a commit.  Development-probe validations carry no mechanism
+    signature (each probe is its own independent validation) and count
+    globally.
     """
     sources = COMMIT_EVIDENCE_SOURCES.get(edit.target, ())
-    observed = 0
-    for code in sources:
-        observed += sum(
-            1
-            for experience in experiences
-            for seen in experience.feedback_codes
-            if seen == code
-        )
-        observed += sum(
-            1 for validation in validations if validation.outcome == code
-        )
+    per_mechanism: dict[tuple[str, ...], int] = {}
+    for experience in experiences:
+        for code in sources:
+            if code in experience.feedback_codes:
+                signature = _mechanism_key(experience.mechanism_signature)
+                per_mechanism[signature] = per_mechanism.get(signature, 0) + 1
+    observed = max(per_mechanism.values(), default=0)
+    observed += sum(
+        1 for validation in validations if validation.outcome in sources
+    )
 
     threshold = max(1, int(min_evidence))
     if edit.operation not in AUTO_COMMITTABLE_OPERATIONS:
@@ -428,6 +447,10 @@ def evaluate_commit_evidence(
         "evidence_codes": list(sources),
         "evidence_observed": observed,
         "evidence_required": threshold,
+        "evidence_by_mechanism": [
+            {"mechanism_signature": list(signature), "observed": count}
+            for signature, count in sorted(per_mechanism.items())
+        ],
         "committed": not blocked,
         "blocked_reason": blocked,
     }

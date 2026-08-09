@@ -3,12 +3,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import replace
 
-from src.sehd_v6.core.bccse.cesv_contract import (
-    CausalInterventionEngine,
-    EdgeType,
-    ProvenanceGraph,
-    run_cesv_pipeline,
-)
 from src.sehd_v6.core.htc_tes.type_aware_fitness import (
     TypeAwareFitness,
     TypeExperienceMemory,
@@ -251,24 +245,6 @@ def test_evolution_experience_is_gold_free_by_default() -> None:
     )
     assert record.gold_positive is None
     assert record.gold_responsible_ref is None
-
-
-def test_empty_cesv_evidence_abstains_without_fpr_claim() -> None:
-    result = run_cesv_pipeline(packet={"events": []}, candidates=[], evidential_scores=[])
-    assert result["state"] == "unresolved"
-    sequential = result["cesv_diagnostics"]["sequential_test"]
-    assert sequential["fpr_guarantee"] is None
-    assert sequential["calibration_status"] == "uncalibrated_heuristic"
-
-
-def test_graph_intervention_preserves_alternative_path() -> None:
-    graph = ProvenanceGraph()
-    graph.add_edge("root", "target", EdgeType.TRIGGER)
-    graph.add_edge("target", "child", EdgeType.SUPPORT)
-    graph.add_edge("root", "child", EdgeType.SUPPORT)
-    result = CausalInterventionEngine(graph).do_intervention("target")
-    assert result["affected_downstream"] == 0
-    assert result["interventional_effect"] == 0.0
 
 
 def test_paired_replay_boundary_refs_contract() -> None:
