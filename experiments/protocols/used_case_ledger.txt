@@ -432,3 +432,15 @@ Magentic_One/067
 OpenDeepSearch/007
 OpenManus/004
 OpenManus/055
+
+# --- batch03 R12 (2026-08-10, 10 cases, stratified; atomic-verifier prosecution-only routes + path-qualified effect binding) ---
+BFCL/047
+BFCL/120
+Camel/002
+OpenDeepSearch/030
+OpenDeepSearch/065
+OpenDeepSearch/079
+OpenManus/019
+SmolAgents/041
+SmolAgents/063
+SmolAgents/089
