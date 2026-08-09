@@ -254,6 +254,10 @@ _POSTCONDITION_CHECKS = frozenset({
     "origin_not_selected",
     "responsible_origin_present",
     "later_origin_not_selected",
+    "route_assignment_present",
+    "qualification_positive",
+    "qualification_not_positive",
+    "verification_state_present",
 })
 
 # output_object -> result surface row access.  ``verification_certificate``
@@ -271,6 +275,7 @@ _OBJECT_SURFACE_KEYS: Mapping[str, tuple[str, ...]] = {
     "causal_certificate_or_boundary": (
         "propagations", "counterfactual_rankings",
     ),
+    "candidate_qualification": ("qualifications",),
 }
 
 
@@ -399,6 +404,60 @@ def evaluate_action_spec_postcondition(
         satisfied = bool(rows)
         return satisfied, (
             "causal_findings_present" if satisfied else "no_causal_findings"
+        )
+
+    if postcondition == "route_assignment_present":
+        # The candidate was routed to a verifier: the qualification surface
+        # must carry assignment rows (candidate + responsibility states).
+        rows = _surface_rows(result, spec.output_object)
+        if rows is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        satisfied = any(
+            str(row.get("candidate_id") or "")
+            and any(
+                str(row.get(field) or "")
+                for field in ("violation_state", "actor_state", "boundary_state")
+            )
+            for row in rows
+        )
+        return satisfied, (
+            "route_assignment_present" if satisfied else "route_assignment_absent"
+        )
+
+    if postcondition in ("qualification_positive", "qualification_not_positive"):
+        # The qualification declares whether a candidate passed to
+        # verification: positive = at least one verified_violation row.
+        rows = _surface_rows(result, spec.output_object)
+        if rows is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        positive = any(
+            str(row.get("violation_state") or "") == "verified_violation"
+            for row in rows
+        )
+        satisfied = positive if postcondition == "qualification_positive" else not positive
+        return satisfied, (
+            "qualification_positive" if satisfied else "qualification_not_positive"
+        )
+
+    if postcondition == "verification_state_present":
+        # The atomic verification produced a verdict state on the
+        # certificate surface: at least one certificate carries a causal
+        # status from the closed vocabulary.
+        rows = _surface_rows(result, spec.output_object)
+        if rows is None:
+            return False, f"unobservable_in_result:{spec.output_object}"
+        satisfied = any(
+            str(row.get("benchmark_causal_status") or "") in {
+                "causes_incorrect_result",
+                "propagates_to_incorrect_result",
+                "process_only",
+                "unresolved",
+            }
+            for row in rows
+        )
+        return satisfied, (
+            "verification_state_present"
+            if satisfied else "verification_state_absent"
         )
 
     if postcondition == "responsible_origin_present":

@@ -320,21 +320,6 @@ def select_policy_candidate(
     return None, "response_not_in_planned_candidates"
 
 
-def _sanitize_rejected_summary(value: str) -> str:
-    """Keep policy feedback categorical before it enters the next prompt."""
-    import re
-
-    text = " ".join(str(value or "").split())
-    text = re.sub(
-        r"\b(?:case|source)[_/ -][A-Za-z0-9_.:/-]+",
-        "[case]",
-        text,
-        flags=re.IGNORECASE,
-    )
-    text = re.sub(r"\b[A-Za-z][A-Za-z0-9_.-]*/\d+\b", "[case]", text)
-    return text[:1200]
-
-
 def current_policy_text(genome: PolicyGenome) -> str:
     """Render the policy genome as one addressable line per item.
 

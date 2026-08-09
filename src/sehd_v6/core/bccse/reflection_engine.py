@@ -525,20 +525,6 @@ listed for the target module in runtime_output_contracts.
             "it is audit metadata only and never changes admission.\n"
         )
 
-    # Build rejected edits section
-    rejected_info = ""
-    if rejected_buffer:
-        rejected_lines = [
-            f"  - {r.proposal.target_module}/{r.proposal.operation}: "
-            f"\"{_sanitize_rejected_content_echo(r.proposal.content)}\" -> REJECTED "
-            f"({r.feedback_summary()})"
-            for r in rejected_buffer[-5:]
-        ]
-        rejected_info = (
-            "\n## Previously Rejected Edits (DO NOT repeat these)\n"
-            + "\n".join(rejected_lines)
-        )
-
     # Accepted edits summary (diversity guidance)
     accepted_section = ""
     if accepted_edits_summary:
@@ -701,7 +687,7 @@ listed for the target module in runtime_output_contracts.
         analysis = analyze_negative_feedback(rejected_buffer)
         negative_feedback_section = format_negative_feedback_for_prompt(analysis)
 
-    # 保留原有的 rejected_info 用于测试兼容性
+    # Rejected edits section (bounded to the most recent five)
     rejected_info = ""
     if rejected_buffer:
         rejected_lines = [

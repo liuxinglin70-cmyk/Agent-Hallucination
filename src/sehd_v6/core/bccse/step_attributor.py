@@ -807,21 +807,6 @@ def _detect_evidence_incomplete(
     return False
 
 
-def _detect_boundary_hesitation(
-    prosecution: CoverageReading, defense: CoverageReading, state: str
-) -> bool:
-    """RETIRED (v5.4): always False.
-
-    The v3.5 proof court emits only categorical coverage states
-    (complete/incomplete/unresolved), never quantitative scores, so a
-    score-gap "hesitation" check could never fire in production. The
-    function is kept as a non-operational stub so that historical
-    attribution records mentioning the trigger remain interpretable;
-    it is no longer wired into the trigger cascade.
-    """
-    return False
-
-
 def _build_attribution_signal(
     *, row: Mapping[str, Any], error_type: ErrorType, state: str,
     trigger_source: TriggerSource,
@@ -1090,16 +1075,16 @@ def _resolve_module_attribution(
 def _detect_trigger_and_error_type(
     *, row: Mapping[str, Any], state: str, predicted: bool | None,
     prosecution: CoverageReading, defense: CoverageReading,
-    crs_signal: CRSSignal, candidate_count: int,
+    crs_signal: CRSSignal,
     use_gold: bool, has_gold: bool, gold: bool | None,
     step_correct: bool,
-) -> tuple[TriggerSource, ErrorType, bool]:
+) -> tuple[TriggerSource, ErrorType]:
     """Classify the trigger source and error type from pipeline signals.
 
-    Returns (trigger_source, error_type, is_high_confidence). The cascade
-    is ordered: gold polarity > self-supervised triggers > process
-    diagnostics. Gold always wins because an external label is stronger
-    evidence than any detector-internal process signal.
+    Returns (trigger_source, error_type). The cascade is ordered: gold
+    polarity > self-supervised triggers > process diagnostics. Gold always
+    wins because an external label is stronger evidence than any
+    detector-internal process signal.
     """
     trigger_source = TriggerSource.NONE
     error_type = ErrorType.CORRECT
@@ -1221,22 +1206,12 @@ def _detect_trigger_and_error_type(
         # coverage readings the v3.5 proof court never emits, so the
         # trigger was unreachable in production.
 
-    # --- Additional: candidate miss detection ---
-    # This self-supervised enhancement must never overwrite a gold-derived
-    # trigger/error class: a gold-confirmed localization error (Trigger 3)
-    # with an empty census is still a localization error, not a candidate
-    # miss, and the audit must reflect the real trigger source.
-    if (
-        has_gold
-        and error_type != ErrorType.CORRECT
-        and candidate_count == 0
-        and gold is True
-        and trigger_source == TriggerSource.NONE
-    ):
-        error_type = ErrorType.CANDIDATE_MISS
-        trigger_source = TriggerSource.EVIDENCE_INCOMPLETE
+    # A gold-confirmed localization error (Trigger 3) with an empty census
+    # stays a localization error: every non-CORRECT error type above carries
+    # its own trigger source, so no candidate-miss overwrite is reachable
+    # (a NONE trigger_source always implies error_type == CORRECT).
 
-    return trigger_source, error_type, is_high_confidence
+    return trigger_source, error_type
 
 
 def attribute_failure(
@@ -1289,34 +1264,13 @@ def attribute_failure(
     # ================================================================
     # Self-supervised trigger detection
     # ================================================================
-    trigger_source, error_type, is_high_confidence = _detect_trigger_and_error_type(
+    trigger_source, error_type = _detect_trigger_and_error_type(
         row=row, state=state, predicted=predicted,
         prosecution=prosecution, defense=defense,
-        crs_signal=crs_signal, candidate_count=candidate_count,
+        crs_signal=crs_signal,
         use_gold=use_gold, has_gold=has_gold, gold=gold,
         step_correct=step_correct,
     )
-
-    # --- Refine unresolved with self-supervised sub-signals ---
-    # Note: module routing for these sub-signals happens in
-    # ``_route_process_failure`` below; the branches here keep the
-    # UNRESOLVED_UNKNOWN error type and only document the expected route.
-    if error_type == ErrorType.UNRESOLVED_UNKNOWN:
-        # Further attribute unresolved cases by internal signals
-        if (
-            prosecution_cov is not None
-            and defense_cov is not None
-            and prosecution_cov < COVERAGE_LOW_THRESHOLD
-            and defense_cov < COVERAGE_LOW_THRESHOLD
-        ):
-            # Both weak → abstention rule too conservative
-            error_type = ErrorType.UNRESOLVED_UNKNOWN  # keep, but target abstention
-        elif prosecution_cov is not None and prosecution_cov < COVERAGE_LOW_THRESHOLD:
-            pass  # prosecution weak → evidence_obligation (default)
-        elif defense_cov is not None and defense_cov < COVERAGE_LOW_THRESHOLD:
-            # Defense weak → routed to clean_defense_boundary in
-            # ``_route_process_failure`` / the weak-defense special route.
-            error_type = ErrorType.UNRESOLVED_UNKNOWN
 
     # ================================================================
     # Process diagnostics (v5.5)

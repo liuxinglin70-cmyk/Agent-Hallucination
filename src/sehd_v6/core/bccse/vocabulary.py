@@ -28,6 +28,30 @@ ALLOWED_VERDICTS: dict[str, frozenset[str]] = {
 
 LOCAL_NEGATION_MODULES: frozenset[str] = frozenset({"causal_link_test"})
 
+# Single source of truth for the verdict-emission and local-negation
+# vocabularies.  Both the free-text gate (genome.validate_runtime_rule) and
+# the slot-contract gate (rule_contract.validate_rule_spec) enforce verdict
+# permission with these exact patterns; a split vocabulary let a phrasing
+# pass one gate and fail the other, silently changing module authority by
+# rule form.  The set covers the English slot render plus the Chinese
+# legacy free-text forms.
+FINAL_VERDICT_RE = re.compile(
+    r"判定为\s*(clean|error|unresolved)|"
+    r"直接输出\s*(clean|error|unresolved)|"
+    r"(?:return|output|classify as|label as)\s+(clean|error|unresolved)\b|"
+    r"(?:treat|regard|consider|deem)\s+[^,，。；;]{0,40}\s+as\s+(clean|error|unresolved)\b|"
+    r"(?:视为|视作|当作|认定为|判别为)\s*(clean|error|unresolved)|"
+    r"应判(?:定为|为)?\s*(clean|error|unresolved)|"
+    r"结论(?:为|是)\s*(clean|error|unresolved)",
+    re.IGNORECASE,
+)
+
+LOCAL_NEGATION_RE = re.compile(
+    r"\b(?:does|do|did|will|would|can|could|should|may|might) not hold\b|"
+    r"不成立|不应视为|不足以构成|非因果|因果链不成立|不构成因果",
+    re.IGNORECASE,
+)
+
 FORBIDDEN_CONTENT_MARKERS = frozenset({
     "case_id", "source_id", "agent_id", "model_id",
     "gold_explanation_text", "outer_metric", "outer_error",

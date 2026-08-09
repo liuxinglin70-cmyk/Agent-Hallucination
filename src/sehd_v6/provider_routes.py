@@ -116,13 +116,14 @@ def resolve_provider_route(
         resolved["model"] = OFFICIAL_MODEL
 
     # Keep an explicitly configured deployment credential fail-closed. Only a
-    # route with no selector can use the official default environment.
+    # route with no selector and no explicit key can use the official default
+    # environment. An explicit per-route/purpose selector is the
+    # highest-precedence key source; it must never be silently replaced by the
+    # official default below (a user-supplied selector would be dead
+    # otherwise).
     selected_key_env = str(resolved.get("api_key_environment") or "")
     explicit_key_selector = _env_value(env, ordered, "API_KEY_ENV")
     if explicit_key_selector:
-        # An explicit per-route/purpose selector is the highest-precedence
-        # key source; it must never be silently replaced by the official
-        # default below (a user-supplied selector would be dead otherwise).
         if not _ENV_NAME.fullmatch(explicit_key_selector):
             raise ValueError(
                 f"Invalid provider api-key environment name: "
@@ -131,17 +132,8 @@ def resolve_provider_route(
         resolved["api_key_environment"] = explicit_key_selector
     elif (
         not selected_key_env
-        and env.get("DEEPSEEK_API_KEY")
         and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT
     ):
-        resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    elif not selected_key_env and str(resolved.get("endpoint") or "").rstrip("/") == OFFICIAL_ENDPOINT:
-        resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    elif selected_key_env == OFFICIAL_API_KEY_ENV:
-        resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
-    if not resolved.get("api_key_environment") and str(
-        resolved.get("endpoint") or ""
-    ).rstrip("/") == OFFICIAL_ENDPOINT:
         resolved["api_key_environment"] = OFFICIAL_API_KEY_ENV
     return resolved
 

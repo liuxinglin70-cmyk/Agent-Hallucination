@@ -370,16 +370,17 @@ class HallucinationTypeClassifier:
         # 1c. State × coverage structural signal
         state = resolve_evolution_state(detection_result)
         if state == "unresolved":
-            # The signal-side aggregate defaults to 0.0 when NO CRS signal
-            # exists, so a bare 0.0 must never be treated as a real low score
-            # (it would systematically label every CRS-less unresolved case
-            # as CONTEXTUAL). Only trust the signal-side aggregate when the
-            # per-dimension CRS scores are actually present; otherwise fall
-            # back to the parsed evidential scores, whose polarity is
-            # inverted (low average = anomalous).
-            crs_scores_present = bool(signal_dict.get("crs_scores"))
+            # The signal-side aggregate is trusted only for a COMPLETE CRS
+            # reading: the 0.5-uncertainty sentinel (no native CRS and no
+            # usable certificate -> every dimension 0.5, aggregate exactly
+            # 0.5) carries no information and must not vote.  A bare 0.0
+            # aggregate (missing signal) must also never be treated as a
+            # real low score.  Only complete readings vote; otherwise the
+            # parsed evidential scores, whose polarity is inverted (low
+            # average = anomalous), decide.
+            crs_complete = bool(signal_dict.get("crs_complete"))
             raw_aggregate = signal_dict.get("crs_aggregate")
-            if crs_scores_present and isinstance(raw_aggregate, (int, float)):
+            if crs_complete and isinstance(raw_aggregate, (int, float)):
                 crs_agg: float | None = float(raw_aggregate)
                 if crs_agg > 0.4:
                     add_score(

@@ -360,7 +360,16 @@ def _merge_prosecutions(
         event_order.get(str(row.get("origin_event_id") or ""), 10**9),
         str(row.get("certificate_id") or ""),
     ))
+    # The court caps certificate lists at 32 and a truncated merge would
+    # silently drop valid certificates while the coverage still claims
+    # "complete", so an overflow degrades coverage fail-closed exactly like
+    # the focused-prosecution overflow (proof_engine) does.
+    truncated = len(output) > 32
     return {
-        "coverage_state": str((initial or {}).get("coverage_state") or "unresolved"),
+        "coverage_state": (
+            "incomplete"
+            if truncated
+            else str((initial or {}).get("coverage_state") or "unresolved")
+        ),
         "candidates": output[:32],
     }

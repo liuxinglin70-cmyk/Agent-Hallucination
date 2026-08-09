@@ -1205,14 +1205,16 @@ def test_p0_mocked_loop_l1_accept_path(tmp_path, monkeypatch, addressable_l1_fai
         monkeypatch, detections=_p0_detections(),
     )
     result = _run_p0_loop(tmp_path, tmp_path / "l1_out", run_id="p0_l1")
-    # source1 is repaired by its candidate replay; source2 is never fixed,
-    # so its replay shows no effect and the edit is rejected on both
-    # bounded attempts.
+    # source1 is repaired by its candidate replay. source2's first proposal
+    # duplicates the rule source1 just accepted, so the structural gate
+    # rejects it before replay (duplicate discipline) and the retry's
+    # distinct proposal shows no effect and is rejected on the second
+    # bounded attempt.
     assert result.edits_accepted == 1
     assert result.edits_rejected == 2
     decisions = [step.gate_decision for step in result.steps]
     assert decisions == [
-        "accept_batch", "retry_fitness_no_effect", "reject_fitness_no_effect",
+        "accept_batch", "retry_structural", "reject_fitness_no_effect",
     ]
     # Every mutation call was answered by the offline responder; the
     # detector stub saw the canary, both observations and both replays.

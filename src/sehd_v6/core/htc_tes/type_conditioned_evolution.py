@@ -122,6 +122,30 @@ _DIRECTION_TYPE_GUIDANCE: dict[str, dict[HallucinationType, str]] = {
         HallucinationType.CONTEXTUAL: "When agent's response is clearly off-topic or out-of-context, create error candidate",
         HallucinationType.UNKNOWN: "When detector identifies clear failure pattern, create error candidate",
     },
+    "unresolved_to_error": {
+        HallucinationType.FACTUAL: "When the unresolved case shows an unsupported claim, complete the evidence chain toward error",
+        HallucinationType.INSTRUCTIONAL: "When the unresolved case shows an instruction breach, complete the evidence chain toward error",
+        HallucinationType.TOOL: "When the unresolved case shows a tool misuse, complete the evidence chain toward error",
+        HallucinationType.REASONING: "When the unresolved case shows a broken inference, complete the causal chain toward error",
+        HallucinationType.OMISSION: "When the unresolved case shows a consequential omission, complete the evidence toward error",
+        HallucinationType.ADOPTION: "When the unresolved case shows unverified adoption, complete the evidence toward error",
+        HallucinationType.CONTEXTUAL: "When the unresolved case shows a context breach, complete the evidence toward error",
+        HallucinationType.UNKNOWN: "When the unresolved case carries a clear failure pattern, complete the evidence toward error",
+    },
+    "unresolved_to_clean": {
+        HallucinationType.FACTUAL: "When the unresolved claim is actually supported, complete the defense toward clean",
+        HallucinationType.INSTRUCTIONAL: "When the unresolved behavior actually followed instructions, complete the defense toward clean",
+        HallucinationType.TOOL: "When the unresolved tool use was actually valid, complete the defense toward clean",
+        HallucinationType.REASONING: "When the unresolved reasoning is actually sound, complete the defense toward clean",
+        HallucinationType.OMISSION: "When the unresolved step was actually not required, complete the defense toward clean",
+        HallucinationType.ADOPTION: "When the unresolved adoption was actually verified, complete the defense toward clean",
+        HallucinationType.CONTEXTUAL: "When the unresolved response is actually in context, complete the defense toward clean",
+        HallucinationType.UNKNOWN: "When the unresolved case actually shows no defect, complete the defense toward clean",
+    },
+    "no_evolution": {
+        htype: "Detection is already aligned; only tighten process evidence if it is demonstrably weak."
+        for htype in HallucinationType
+    },
 }
 
 

@@ -486,6 +486,10 @@ def validate_policy_edit(
         if not valid:
             return False, reason
         replacement_key = _identity_key(edit.new_item)
+        # A modify that reproduces the item it replaces is a no-op edit that
+        # would still reset its fitness metadata; reject it up front.
+        if replacement_key == _identity_key(genome.items[edit.item_index]):
+            return False, "semantically_equivalent_item"
         if replacement_key in {
             _identity_key(item)
             for index, item in enumerate(genome.items)

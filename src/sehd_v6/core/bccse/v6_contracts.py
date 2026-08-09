@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from .genome import MODULE_IDS, MODULE_STAGE
+from .genome import MODULE_IDS
 
 # ============================================================
 # Evolvable layers
@@ -92,47 +92,54 @@ def build_adjudication_facts(
     quarantined_errors = court_result.get("quarantined_error_certificate_ids") or []
     quarantined_defenses = court_result.get("quarantined_defense_certificate_ids") or []
     required_count = nonnegative_int(court_result.get("required_candidate_count"))
-    # v6.1 扩展：从审计记录中推导隔离原因分布
+    # v6.1 扩展：从审计记录中推导隔离原因分布。The classification keys are
+    # the actual failed-checks names emitted by validate_error_certificate
+    # (proof_contract_v3) and validate_defense_certificate (proof_contract_v3_4);
+    # the vocabulary is derived from those validators, not invented here.
+    _SCHEMA_FAIL_CHECKS = frozenset({
+        "required_fields", "certificate_id", "source_candidate",
+        "target_candidate", "target_origin", "origin", "claim_kind",
+        "norm_source", "breach_type", "impact_kind", "recovery_state",
+        "benchmark_causal_status", "defense_type", "rationale",
+        "agent_control", "impact_events",
+    })
+    _EVIDENCE_FAIL_CHECKS = frozenset({
+        "norm_evidence", "violation_evidence", "agent_control_evidence",
+        "impact_evidence", "recovery_evidence", "benchmark_causal_evidence",
+        "evidence",
+    })
+    _CAUSAL_FAIL_CHECKS = frozenset({
+        "ordered_chain", "agent_control_evidence_binding",
+        "impact_evidence_binding", "benchmark_causal_evidence_binding",
+    })
     quarantine_schema_mismatch = 0
     quarantine_evidence_missing = 0
     quarantine_causal_broken = 0
     quarantine_other = 0
-    
+
+    def _bucket_failed_checks(failed: Any) -> None:
+        nonlocal quarantine_schema_mismatch, quarantine_evidence_missing
+        nonlocal quarantine_causal_broken, quarantine_other
+        if not isinstance(failed, (list, tuple)):
+            quarantine_other += 1
+            return
+        failed_set = {str(f) for f in failed}
+        if failed_set & _SCHEMA_FAIL_CHECKS:
+            quarantine_schema_mismatch += 1
+        elif failed_set & _EVIDENCE_FAIL_CHECKS:
+            quarantine_evidence_missing += 1
+        elif failed_set & _CAUSAL_FAIL_CHECKS:
+            quarantine_causal_broken += 1
+        else:
+            quarantine_other += 1
+
     for audit in court_result.get("error_audits") or []:
-        if not isinstance(audit, Mapping):
-            continue
-        if str(audit.get("decision") or "") == "pass":
-            continue
-        failed = audit.get("failed_checks") or []
-        if not isinstance(failed, (list, tuple)):
-            continue
-        failed_set = {str(f) for f in failed}
-        if "schema_validation" in failed_set or "required_fields" in failed_set:
-            quarantine_schema_mismatch += 1
-        elif "evidence_refs" in failed_set or "evidence_quality" in failed_set:
-            quarantine_evidence_missing += 1
-        elif "causal_chain" in failed_set or "propagation" in failed_set:
-            quarantine_causal_broken += 1
-        else:
-            quarantine_other += 1
-    
+        if isinstance(audit, Mapping) and str(audit.get("decision") or "") != "pass":
+            _bucket_failed_checks(audit.get("failed_checks"))
+
     for audit in court_result.get("defense_audits") or []:
-        if not isinstance(audit, Mapping):
-            continue
-        if str(audit.get("decision") or "") == "pass":
-            continue
-        failed = audit.get("failed_checks") or []
-        if not isinstance(failed, (list, tuple)):
-            continue
-        failed_set = {str(f) for f in failed}
-        if "schema_validation" in failed_set or "required_fields" in failed_set:
-            quarantine_schema_mismatch += 1
-        elif "evidence_refs" in failed_set or "evidence_quality" in failed_set:
-            quarantine_evidence_missing += 1
-        elif "causal_chain" in failed_set or "propagation" in failed_set:
-            quarantine_causal_broken += 1
-        else:
-            quarantine_other += 1
+        if isinstance(audit, Mapping) and str(audit.get("decision") or "") != "pass":
+            _bucket_failed_checks(audit.get("failed_checks"))
 
     return AdjudicationFacts(
         prosecution_coverage=str(court_result.get("prosecution_coverage") or ""),
@@ -376,6 +383,3 @@ class FailureAttribution:
 # within the owning module's charter. Structural validation lives in
 # ``rule_contract``; the charter (allowed surfaces per module) lives in
 # ``module_charter``. Both consume these shared anchors.
-
-RULE_SLOTS = ("condition", "action", "evidence_anchor")
-MODULE_STAGE_BY_ID: dict[str, str] = dict(MODULE_STAGE)

@@ -1,25 +1,13 @@
-"""BCCSE v5 — Promotion gates and metric structures.
+"""BCCSE v5 — Promotion metric structures.
 
-Defines the G1 structural checks used in the mutation metamorphic test,
-plus MetricSnapshot and ReplayEvidence dataclasses used by the evaluator.
+Defines MetricSnapshot and ReplayEvidence dataclasses used by the
+evaluator.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-
-
-G1_CHECKS = frozenset({
-    "no_event_references",
-    "no_internal_state_leaks",
-    "no_llm_chain_injection",
-    "no_claim_target_overlap",
-    "no_responsibility_diversion",
-    "no_negative_boundary_gaming",
-    "process_only_not_official_positive",
-    "external_observation_not_agent_origin",
-})
 
 
 @dataclass

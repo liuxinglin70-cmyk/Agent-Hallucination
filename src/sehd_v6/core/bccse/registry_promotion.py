@@ -127,8 +127,13 @@ def promote_pending_registry_entries(
     audit: list[dict[str, Any]] = []
     if reason_code != REGISTRATION_REASON_NO_ACTION:
         return audit
-    registry = genome.registry or L2_REGISTRY
     for entry in list(genome.pending_queue):
+        # Re-read the genome's registry each iteration: a promotion rebinds
+        # ``genome.registry``, and the next candidate must be evaluated
+        # against the promoted state or the second enable would be based on
+        # a stale registry (its audit and content hash would silently drop
+        # the first promotion).
+        registry = genome.registry or L2_REGISTRY
         if entry.required_validation != REGISTRY_REQUIRED_VALIDATION:
             continue
         if entry.status != PENDING_STATUS_PENDING:

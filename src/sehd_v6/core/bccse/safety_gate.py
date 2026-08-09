@@ -542,13 +542,16 @@ class StructuralGate:
                 break
 
         # --- Layer 8: Rule quality — condition diversity ---
-        # Prevent too many rules starting with the same condition prefix
+        # Prevent too many rules starting with the same condition prefix.
+        # A modify_rule must not count the rule it replaces (its prefix
+        # trivially matches until the replacement lands).
         if operation in {"add_rule", "modify_rule"} and module is not None:
             # Extract condition prefix (first clause before comma or period)
             prefix = content.split("，")[0].split(",")[0][:20]
             same_prefix_count = sum(
-                1 for r in module.rules
-                if r.split("，")[0].split(",")[0][:20] == prefix
+                1 for index, r in enumerate(module.rules)
+                if index != rule_index
+                and r.split("，")[0].split(",")[0][:20] == prefix
             )
             if same_prefix_count >= self.config.max_same_prefix_rules:
                 reject_reasons.append(

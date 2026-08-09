@@ -16,7 +16,6 @@ from typing import Any
 from . import contract_v1 as v1
 
 
-QUALIFICATION_STATES = {"qualified", "verified_clean", "unresolved"}
 CASE_STATES = {"verified_error", "verified_clean", "unresolved"}
 
 QUALIFICATION_FIELDS = {

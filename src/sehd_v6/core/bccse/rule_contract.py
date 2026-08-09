@@ -16,8 +16,10 @@ from typing import Any
 
 from .vocabulary import (
     ALLOWED_VERDICTS,
+    FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
     LOCAL_NEGATION_MODULES,
+    LOCAL_NEGATION_RE,
     MODULE_IDS,
     semantic_overlap,
     validate_feature_description,
@@ -49,26 +51,12 @@ _CONDITION_CONJUNCTION_RE = re.compile(
 )
 
 # Action splitters: any of these means the rule prescribes several actions,
-# which the evolution loop cannot credit/blame individually.
+# which the evolution loop cannot credit/blame individually.  Slot actions
+# are a single ``opcode: target`` by contract; the ``and`` form catches a
+# natural-language double action before the opcode check labels it.
 _ACTION_SPLIT_RE = re.compile(
     r";|\bthen also\b|\band then\b|\band\b|然后|同时|并且|以及|并随后",
     re.IGNORECASE,
-)
-
-# Verdict permission is an authority check, not a shape guess, so it uses a
-# small closed set of English verdict-emission phrasings (why: only these
-# phrasings commit the detector to a final label; anything weaker is process
-# guidance and stays module-agnostic).
-_FINAL_VERDICT_RE = re.compile(
-    r"(?:return|output|classify as|label as)\s+(clean|error|unresolved)\b|"
-    r"(?:treat|regard|consider|deem)\s+[^,.;]{0,40}\s+as\s+"
-    r"(clean|error|unresolved)\b"
-)
-
-# Local negation weakens the prosecution without emitting a final verdict;
-# only causal_link_test owns that authority in the proof court.
-_LOCAL_NEGATION_RE = re.compile(
-    r"\b(?:does|do|did|will|would|can|could|should|may|might) not hold\b"
 )
 
 # Action-slot pollution patterns. Why a local copy instead of routing the
@@ -248,13 +236,13 @@ def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
     # Authority gates run on the rendered text because that is exactly what
     # the provider will see.
     rendered = render_rule(spec).lower()
-    verdict_match = _FINAL_VERDICT_RE.search(rendered)
+    verdict_match = FINAL_VERDICT_RE.search(rendered)
     if verdict_match:
         verdict = next(g for g in verdict_match.groups() if g)
         allowed = ALLOWED_VERDICTS.get(spec.module_id, frozenset())
         if verdict not in allowed:
             return False, f"verdict_not_allowed:{verdict}_for_{spec.module_id}"
-    elif _LOCAL_NEGATION_RE.search(rendered):
+    elif LOCAL_NEGATION_RE.search(rendered):
         if spec.module_id not in LOCAL_NEGATION_MODULES:
             return False, f"local_negation_not_allowed_for_{spec.module_id}"
 

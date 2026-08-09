@@ -47,7 +47,7 @@ from .step_attributor import (
 )
 from .fitness import FitnessAssessment, assess_source_fitness, task_state_score
 from .safety_gate import StructuralGate, create_structural_gate
-from .promotion_gates import G1_CHECKS, MetricSnapshot, ReplayEvidence
+from .promotion_gates import MetricSnapshot, ReplayEvidence
 # NOTE: ``evolution_runner`` is NOT imported here. It imports ``htc_tes``,
 # which imports back into this package; importing it eagerly would make the
 # package cycle order-dependent (see module docstring). Its public symbols
@@ -88,7 +88,6 @@ __all__ = [
     "StructuralGate",
     "create_structural_gate",
     # Promotion
-    "G1_CHECKS",
     "MetricSnapshot",
     "ReplayEvidence",
     # Evolution

@@ -180,6 +180,17 @@ class TypeExperienceMemory:
                     outcome_counts.get(str(outcome), 0) + 1
                 )
                 duplicate.metadata["outcome_counts"] = outcome_counts
+            # The decisive/process facts describe the LATEST observation of
+            # this mechanism: keeping the first snapshot would let the
+            # decisive-accuracy metric score one stale judgment for every
+            # repeated observation of the same signature.
+            for key in ("decisive", "direction_correct", "process_state"):
+                if key in metadata:
+                    duplicate.metadata[key] = metadata[key]
+            if "decisive_correct" in metadata:
+                duplicate.metadata["decisive_correct"] = metadata[
+                    "decisive_correct"
+                ]
             duplicate.timestamp = time.time()
             duplicate.type_confidence = max(
                 duplicate.type_confidence,
@@ -674,9 +685,7 @@ class TypeAwareFitness:
             module_targeted = target_module
         else:
             module_targeted = str(
-                type_result.evidence.get("module_signal")
-                or type_result.evidence.get("target_module")
-                or "unknown"
+                type_result.evidence.get("module_signal") or "unknown"
             )
         strategy = self._infer_strategy(detection_after, module_targeted)
         feature_description = (
@@ -825,10 +834,16 @@ class TypeAwareFitness:
     ) -> bool | None:
         """Check if the after-state is a correct decisive judgment.
 
-        For ``no_evolution`` direction, there is no intended target state,
-        so we cannot call the after-state "correct" — return False to be
-        conservative. The three-state process evaluation will then classify
-        state changes under no_evolution as regression, not improvement.
+        Only directions that NAME a target polarity can be scored: the
+        after-state is ``True`` when it lands on the named pole and
+        ``False`` when it lands on the opposite pole.  A direction without
+        a target pole (``unresolved_to_decisive``, ``process_repair``,
+        ``no_evolution``) returns ``None`` so the judgment is excluded
+        from decisive-accuracy scoring instead of being counted as wrong —
+        self-supervised mode has no correctness authority, and a
+        no-direction edit makes no correctness claim.  The three-state
+        process evaluation treats ``None`` as directional evidence, never
+        as an improvement.
         """
         if after_state == "unresolved":
             return False
@@ -840,10 +855,7 @@ class TypeAwareFitness:
             return after_state == "verified_clean"
         elif direction == "unresolved_to_error":
             return after_state == "verified_error"
-        elif direction == "unresolved_to_decisive":
-            return None
-        # no_evolution or unknown direction: conservative — not correct.
-        return False
+        return None
 
     def _compute_decisive_accuracy(
         self, hallucination_type: HallucinationType

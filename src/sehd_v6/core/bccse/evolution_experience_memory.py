@@ -45,6 +45,7 @@ META_REVIEW_KEYS = (
     "gate_experiences",
     "outcome_validations",
     "meta_state",
+    "meta_commit_audit",
     "pending_validation_queue",
     "efficiency_profile",
     "drift_snapshots",
@@ -128,6 +129,13 @@ def _attempt_evidence_fields(attempt: FailureAttempt) -> int:
     )
 
 
+def _tolerant_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 @dataclass
 class Representative:
     completeness: str
@@ -155,8 +163,8 @@ class Representative:
     def from_dict(cls, value: Mapping[str, Any]) -> "Representative":
         return cls(
             completeness=str(value.get("completeness") or "partial"),
-            evidence_fields=int(value.get("evidence_fields") or 0),
-            sequence=int(value.get("sequence") or 0),
+            evidence_fields=_tolerant_int(value.get("evidence_fields")),
+            sequence=_tolerant_int(value.get("sequence")),
             episode_id=str(value.get("episode_id") or ""),
             causal_slice=dict(value.get("causal_slice") or {}),
             action_spec=dict(value.get("action_spec") or {}),
@@ -224,12 +232,12 @@ class MechanismEntry:
     def from_dict(cls, value: Mapping[str, Any]) -> "MechanismEntry":
         entry = cls(
             signature=tuple(str(item) for item in value.get("signature") or ()),
-            observation_count=int(value.get("observation_count") or 0),
+            observation_count=_tolerant_int(value.get("observation_count")),
             outcome_counts={
-                str(key): int(count)
+                str(key): _tolerant_int(count)
                 for key, count in dict(value.get("outcome_counts") or {}).items()
             },
-            last_sequence=int(value.get("last_sequence") or 0),
+            last_sequence=_tolerant_int(value.get("last_sequence")),
         )
         for key in _SLOT_KEYS:
             rep_payload = value.get("representatives") or {}

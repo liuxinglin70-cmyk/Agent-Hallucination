@@ -126,12 +126,6 @@ def _coverage_rank(signal: AttributionSignal, side: str) -> float:
     return COVERAGE_STATE_SCORE.get(str(state or ""), 0.0)
 
 
-def _candidate_rows(row: Mapping[str, Any]) -> int:
-    payload = row.get("combined_prosecution") or row.get("prosecution") or {}
-    candidates = payload.get("candidates") if isinstance(payload, Mapping) else []
-    return len(candidates or [])
-
-
 def _certificate_rows(row: Mapping[str, Any], kind: str) -> list[Mapping[str, Any]]:
     keys = (
         ("combined_prosecution", "prosecution")
@@ -499,12 +493,14 @@ def assess_source_fitness(
     # A verdict-preserving edit that degrades the origin is still a
     # regression: downstream repair depends on the responsible step, and
     # the module_local_score below only sees it when the edit happened to
-    # target earliest_origin_tiebreak.  Under gold supervision the task score
-    # above already decided the direction, so this guard applies only when the
-    # verdict did not move (a wrong verdict retreating to unresolved must not
-    # be rejected for losing an origin that the retreat invalidates).
+    # target earliest_origin_tiebreak.  The guard applies only when the
+    # verdict did not move: a wrong verdict retreating to unresolved must
+    # not be rejected for losing an origin that the retreat invalidates,
+    # and a failure closure (triggered -> stable) must not be demoted to
+    # a regression for the same reason.
     if (
-        _responsible_step_present(before_result or {})
+        before.state == after.state
+        and _responsible_step_present(before_result or {})
         and not _responsible_step_present(after_result or {})
     ):
         return FitnessAssessment("worse", ("responsible_step_lost",))

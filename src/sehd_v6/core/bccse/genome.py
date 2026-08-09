@@ -30,8 +30,10 @@ from typing import Any, Mapping
 
 from .vocabulary import (
     ALLOWED_VERDICTS,
+    FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
     LOCAL_NEGATION_MODULES,
+    LOCAL_NEGATION_RE,
     MODULE_IDS,
     semantic_overlap,
     validate_feature_description,
@@ -300,19 +302,26 @@ def validate_runtime_rule(
     )
     if not has_if_then:
         return False, "not_if_then_instruction"
-    if re.search(r"(?:^|[\s（(])(?:0|1|2|3)[.)、]|首先|其次|然后|最后", normalized):
+    # A numbered list marker is (0|1|2|3) followed by a list punctuation;
+    # a decimal like "2.5" is a value, not a step marker.
+    if re.search(r"(?:^|[\s（(])(?:0|1|2|3)[.)、](?!\d)|首先|其次|然后|最后", normalized):
         return False, "multi_step_pseudocode"
-    condition = normalized.split("时", 1)[0]
-    if lowered.startswith(("when ", "if ")) or normalized.startswith("如果"):
+    # Parse the condition/action boundary fail-closed: a form whose boundary
+    # cannot be determined unambiguously (no comma, no terminal ``时``) is
+    # rejected instead of silently truncating on an in-word ``时`` (e.g.
+    # ``当时间戳缺失时保留证据`` must not yield condition=``当``).
+    condition = normalized
+    if lowered.startswith(("when ", "if ")):
         condition = re.split(r"[,，]", normalized, maxsplit=1)[0]
-    elif normalized.startswith("当"):
-        # ``当…时`` boundary: only accept a ``时`` followed by punctuation or
-        # end-of-string as the condition terminator. A plain ``split("时")``
-        # truncates on in-word ``时`` (e.g. ``当时间戳缺失时`` -> ``当``),
-        # corrupting the condition and the action boundary derived from it.
+    elif normalized.startswith(("当", "如果")):
         boundary = re.search(r"时(?=[，,。；;：:\s]|$)", normalized)
         if boundary:
             condition = normalized[: boundary.start() + 1]
+        else:
+            comma = re.search(r"[,，]", normalized)
+            if not comma:
+                return False, "not_if_then_instruction"
+            condition = normalized[: comma.start()]
     conjunctions = re.findall(
         r"且|并且|以及|或|\band\b|\bor\b",
         condition.lower(),
@@ -373,20 +382,12 @@ def validate_runtime_rule(
     if re.search(r"\b[a-z][a-z_]+/\d+\b|https?://", lowered):
         return False, "case_specific_pattern"
     # --- Verdict permission (layered, v5.3 optimization) ---
-    # Detect final verdict emission (clean/error/unresolved).
-    # v5.4 fix: the baseline's own "treat ... as clean" phrasing bypassed
-    # this check, letting verdict semantics leak into modules without
-    # verdict permission. Verdict-equivalent phrasings are now covered.
-    final_verdict_re = (
-        r"判定为\s*(clean|error|unresolved)|"
-        r"直接输出\s*(clean|error|unresolved)|"
-        r"(?:return|classify as|label as)\s+(clean|error|unresolved)\b|"
-        r"(?:treat|regard|consider|deem)\s+[^,，。；;]{0,40}\s+as\s+(clean|error|unresolved)\b|"
-        r"(?:视为|视作|当作|认定为|判别为)\s*(clean|error|unresolved)|"
-        r"应判(?:定为|为)?\s*(clean|error|unresolved)|"
-        r"结论(?:为|是)\s*(clean|error|unresolved)"
-    )
-    verdict_search = re.search(final_verdict_re, lowered)
+    # Detect final verdict emission (clean/error/unresolved).  The shared
+    # FINAL_VERDICT_RE / LOCAL_NEGATION_RE vocabulary is the single source
+    # of truth for both the free-text gate here and the slot-contract gate
+    # in rule_contract, so a phrasing cannot pass one gate and fail the
+    # other by rule form.
+    verdict_search = FINAL_VERDICT_RE.search(lowered)
     if verdict_search:
         verdict = next(g for g in verdict_search.groups() if g)
         allowed = ALLOWED_VERDICTS.get(target_module, frozenset())
@@ -395,8 +396,7 @@ def validate_runtime_rule(
     else:
         # Detect local negation (weaker than final verdict)
         # e.g. "causal link does not hold" — weakens prosecution
-        negation_re = r"不成立|不应视为|不足以构成|非因果|因果链不成立|不构成因果"
-        if re.search(negation_re, normalized) and target_module not in LOCAL_NEGATION_MODULES:
+        if LOCAL_NEGATION_RE.search(normalized) and target_module not in LOCAL_NEGATION_MODULES:
             return False, f"local_negation_not_allowed_for_{target_module}"
     return True, ""
 
@@ -873,6 +873,17 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         )
         if not valid_rule:
             return False, rule_reason
+        # A modification that reproduces the rule it replaces is rejected
+        # here so the structural gate and apply_edit speak one contract:
+        # apply_edit raises semantically_equivalent on the same overlap.
+        self_overlap = semantic_overlap(
+            module.rules[edit.rule_index], edit.new_content,
+        )
+        if self_overlap >= DEDUP_HIGH_THRESHOLD:
+            return False, (
+                f"semantically_equivalent: overlap {self_overlap:.2f} "
+                f">= {DEDUP_HIGH_THRESHOLD} with the rule being modified"
+            )
         for index, existing_rule in enumerate(module.rules):
             if index == edit.rule_index:
                 continue

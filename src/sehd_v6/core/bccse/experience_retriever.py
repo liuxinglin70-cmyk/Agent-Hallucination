@@ -176,6 +176,34 @@ def _similarity(a: FailurePattern, b: FailurePattern) -> float:
     return min(1.0, score)
 
 
+def _matched_signature_indices(
+    entry: MechanismEntry, episode: FailureEpisode,
+) -> tuple[int, ...]:
+    """Signature positions where a shape-matched entry really agrees.
+
+    The signature fact order is fixed by ``build_mechanism_signature``
+    (layer, artifact, reason_code, evolution_direction, candidate_kind,
+    consumer), which ``_reference_for`` mirrors when it projects shared
+    facts.  A Level-2 shape match may agree on nothing but the failure
+    shape; presenting only the agreeing positions keeps the projection
+    honest instead of claiming a full signature match.
+    """
+    slice_payload = episode.causal_slice
+    current = (
+        str(episode.attribution.get("layer") or ""),
+        str(episode.attribution.get("artifact") or ""),
+        str(episode.attribution.get("reason_code") or ""),
+        str(episode.detection.get("evolution_direction") or ""),
+        str(slice_payload.candidate_kind or ""),
+        str(slice_payload.consumer or ""),
+    )
+    return tuple(
+        index
+        for index, value in enumerate(current)
+        if index < len(entry.signature) and entry.signature[index] == value
+    )
+
+
 def retrieve_structured_experience(
     episode: FailureEpisode,
     memory: EvolutionExperienceMemory,
@@ -201,18 +229,20 @@ def retrieve_structured_experience(
     if exact_refs:
         matches = []
         for ref in exact_refs:
+            accepted = bool(
+                ref.local_outcome
+                and ref.local_outcome.get("decision", "").startswith("accept")
+            )
             match = ExperienceMatch(
                 pattern=current_pattern,
                 similarity_score=1.0,
                 successful_interventions=(
-                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome})
-                    if ref.local_outcome and ref.local_outcome.get("decision", "").startswith("accept")
-                    else ()
+                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                    if accepted else ()
                 ),
                 failed_interventions=(
-                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome})
-                    if ref.local_outcome and not ref.local_outcome.get("decision", "").startswith("accept")
-                    else ()
+                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                    if not accepted else ()
                 ),
                 retrieval_path="exact",
             )
@@ -247,21 +277,29 @@ def retrieve_structured_experience(
         scored.sort(key=lambda x: -x[0])
         results = []
         for sim, entry in scored[:max_results]:
-            # Retrieve representative for this entry
-            refs = memory._refs_for_entry(entry, episode, episode.episode_id)
+            # Level 2 is a shape-similarity match, not a signature match: the
+            # shared-facts projection must only claim the signature positions
+            # that actually agree with the current episode, or the prompt
+            # would overstate agreement with an unrelated mechanism.
+            refs = memory._refs_for_entry(
+                entry, episode, episode.episode_id,
+                level=_matched_signature_indices(entry, episode),
+            )
             for ref in refs:
+                accepted = bool(
+                    ref.local_outcome
+                    and ref.local_outcome.get("decision", "").startswith("accept")
+                )
                 results.append(ExperienceMatch(
                     pattern=current_pattern,
                     similarity_score=sim,
                     successful_interventions=(
-                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome})
-                        if ref.local_outcome and ref.local_outcome.get("decision", "").startswith("accept")
-                        else ()
+                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                        if accepted else ()
                     ),
                     failed_interventions=(
-                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome})
-                        if ref.local_outcome and not ref.local_outcome.get("decision", "").startswith("accept")
-                        else ()
+                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                        if not accepted else ()
                     ),
                     retrieval_path="shape_context",
                 ))
@@ -290,8 +328,8 @@ def format_experience_for_prompt(
         if match.successful_interventions:
             lines.append("    <successful_interventions>")
             for intervention in match.successful_interventions[:2]:
-                action = intervention.get("action_spec", {})
-                outcome = intervention.get("outcome", {})
+                action = intervention.get("action_spec") or {}
+                outcome = intervention.get("outcome") or {}
                 lines.append("      <intervention>")
                 lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
                 lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
@@ -301,8 +339,8 @@ def format_experience_for_prompt(
         if match.failed_interventions:
             lines.append("    <failed_interventions>")
             for intervention in match.failed_interventions[:2]:
-                action = intervention.get("action_spec", {})
-                outcome = intervention.get("outcome", {})
+                action = intervention.get("action_spec") or {}
+                outcome = intervention.get("outcome") or {}
                 lines.append("      <intervention>")
                 lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
                 lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
