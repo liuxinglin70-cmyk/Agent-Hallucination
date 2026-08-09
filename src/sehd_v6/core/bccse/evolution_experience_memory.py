@@ -73,7 +73,13 @@ _DEDUP_LEDGER_LIMIT = 1024
 _DEDUP_ID_PREFIX = 16
 
 
-def _episode_signature(episode: FailureEpisode) -> tuple[str, ...]:
+def episode_signature(episode: FailureEpisode) -> tuple[str, ...]:
+    """Structural cross-case key of one episode.
+
+    The single derivation of the mechanism signature from an episode: the
+    memory stores it as the entry key and the retriever derives the query
+    pattern from it, so both sides always compare the same vocabulary.
+    """
     slice_payload = episode.causal_slice
     fields = sorted(set([*slice_payload.missing_fields, *slice_payload.malformed_fields]))
     return build_mechanism_signature(
@@ -259,7 +265,7 @@ class EvolutionExperienceMemory:
         return self._sequence
 
     def _entry_for(self, episode: FailureEpisode) -> MechanismEntry:
-        signature = _episode_signature(episode)
+        signature = episode_signature(episode)
         entry = self._entries.get(signature)
         if entry is None:
             entry = MechanismEntry(signature=signature)
@@ -426,7 +432,7 @@ class EvolutionExperienceMemory:
         then no history.  Within a level the candidates are consulted in
         deterministic order until one yields usable references.
         """
-        signature = _episode_signature(episode)
+        signature = episode_signature(episode)
         exact = self._entries.get(signature)
         if exact is not None:
             refs = self._refs_for_entry(exact, episode, exclude_episode_id)

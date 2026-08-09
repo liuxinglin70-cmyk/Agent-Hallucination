@@ -315,10 +315,14 @@ def generate_meta_edit_candidates(
     # Candidate targets are the same registered targets the commit gate
     # knows (COMMIT_EVIDENCE_SOURCES); enumerate them from that table so a
     # new evidence-backed target becomes a candidate without a second
-    # hard-coded mapping here.
+    # hard-coded mapping here.  Only GUIDANCE_TOKENS targets are proposed as
+    # add-guidance candidates: a ranking preference in the table
+    # (action_shape_previously_effective) is owned by the OP_ENABLE_RANKING
+    # branch below and would fail validate_meta_edit as a guidance token.
     for target, evidence_codes in sorted(COMMIT_EVIDENCE_SOURCES.items()):
         if (
-            any(feedback_counts.get(code, 0) >= 1 for code in evidence_codes)
+            target in GUIDANCE_TOKENS
+            and any(feedback_counts.get(code, 0) >= 1 for code in evidence_codes)
             and target not in state.guidance_tokens
         ):
             candidates.append(MetaEdit(
@@ -328,40 +332,11 @@ def generate_meta_edit_candidates(
                 rationale=f"recurring {evidence_codes[0]}",
             ))
     # v6.1 扩展：从负反馈生成反向指导
-    for validation in validations:
-        if validation.outcome == OUTCOME_CONTRADICTS_ACCEPT:
-            # 分析被拒绝的干预类型，生成避免策略
-            for evidence in validation.evidence:
-                if "action_shape" in evidence:
-                    token = "avoid_action_shape_previously_failed"
-                    if token not in state.guidance_tokens:
-                        candidates.append(MetaEdit(
-                            edit_id=_next_id(OP_ADD_GUIDANCE, token),
-                            operation=OP_ADD_GUIDANCE,
-                            target=token,
-                            rationale=f"contradicts_accept: {evidence}",
-                        ))
-                elif "ownership" in evidence or "scope" in evidence:
-                    token = "avoid_scope_or_ownership_mismatch"
-                    if token not in state.guidance_tokens:
-                        candidates.append(MetaEdit(
-                            edit_id=_next_id(OP_ADD_GUIDANCE, token),
-                            operation=OP_ADD_GUIDANCE,
-                            target=token,
-                            rationale=f"contradicts_accept: {evidence}",
-                        ))
-        elif validation.outcome == OUTCOME_SUPPORTS_REJECT:
-            # 从支持拒绝的验证中提取避免模式
-            for evidence in validation.evidence:
-                if "unowned" in evidence or "output" in evidence:
-                    token = "avoid_unowned_output_target"
-                    if token not in state.guidance_tokens:
-                        candidates.append(MetaEdit(
-                            edit_id=_next_id(OP_ADD_GUIDANCE, token),
-                            operation=OP_ADD_GUIDANCE,
-                            target=token,
-                            rationale=f"supports_reject: {evidence}",
-                        ))
+    # ``classify_outcome`` never emits OUTCOME_CONTRADICTS_ACCEPT, and the
+    # production probe path records only ``("development_probe",)`` as
+    # evidence, so no validation can reach the token branches below.  The
+    # supported-reject signal stays observable through the drift snapshot
+    # and the commit-evidence gate; token generation is not invented here.
     # An exact false reject on a mechanism -> enable the effectiveness
     # ranking signal so similar candidates rank higher next time.
     has_exact_false_reject = any(

@@ -625,7 +625,7 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
     )
     case_count = len(rows)
     unresolved = 0
-    judged_positive = judged_negative = 0
+    gold_positive = gold_negative = 0
     tp = fp = fn = tn = step_correct = 0
     for row in rows:
         predicted = _scoreable_state(row)
@@ -637,7 +637,7 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
             continue
         if predicted and gold:
             tp += 1
-            judged_positive += 1
+            gold_positive += 1
             gold_steps = {str(item) for item in row.get("gold_steps") or ()}
             responsible = row.get("occurrence_responsible_step")
             if responsible is None:
@@ -649,23 +649,26 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
             )
         elif predicted:
             fp += 1
-            judged_positive += 1
+            gold_negative += 1
         elif gold:
             fn += 1
-            judged_negative += 1
+            gold_positive += 1
         else:
             tn += 1
-            judged_negative += 1
+            gold_negative += 1
 
     valid_outputs = case_count - unresolved
+    # Precision uses predicted-side totals; recall / FPR / step accuracy use
+    # gold-side totals (tp+fn / fp+tn), so recall is not precision under a
+    # different name.
     precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / judged_positive if judged_positive else 0.0
+    recall = tp / gold_positive if gold_positive else 0.0
     hallucination_f1 = (
         2 * precision * recall / (precision + recall)
         if precision + recall else 0.0
     )
     clean_precision = tn / (tn + fn) if tn + fn else 0.0
-    clean_recall = tn / judged_negative if judged_negative else 0.0
+    clean_recall = tn / gold_negative if gold_negative else 0.0
     clean_f1 = (
         2 * clean_precision * clean_recall / (clean_precision + clean_recall)
         if clean_precision + clean_recall else 0.0
@@ -674,9 +677,9 @@ def metric_snapshot(rows: Sequence[Mapping[str, Any]]) -> MetricSnapshot:
         macro_f1=(hallucination_f1 + clean_f1) / 2,
         precision=precision,
         hallucination_recall=recall,
-        clean_fpr=fp / judged_negative if judged_negative else 0.0,
+        clean_fpr=fp / gold_negative if gold_negative else 0.0,
         responsible_step_accuracy=(
-            step_correct / judged_positive if judged_positive else 0.0
+            step_correct / gold_positive if gold_positive else 0.0
         ),
         valid_output_rate=valid_outputs / case_count if case_count else 0.0,
         unresolved_rate=unresolved / case_count if case_count else 0.0,

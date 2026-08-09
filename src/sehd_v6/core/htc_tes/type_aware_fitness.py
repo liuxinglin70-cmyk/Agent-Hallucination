@@ -139,6 +139,12 @@ class TypeExperienceMemory:
             str(metadata.get("operation") or ""),
         )
         entries = self._experiences[hallucination_type]
+        # The merge contract (below) is a per-signature outcome distribution:
+        # a repeated signature with a different gate DECISION (accepted vs
+        # rejected at a later stage) must update the success/failure
+        # evidence.  detection_improved stays part of the identity: it is
+        # the observable direction the experience is about, and flipping it
+        # is a different experience, not the same one with a new outcome.
         duplicate = next(
             (
                 entry for entry in reversed(entries)

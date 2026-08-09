@@ -59,7 +59,7 @@ def project_for_evolution(result: Mapping[str, Any]) -> EvolutionDetection:
     proof = result.get("proof_adjudication")
     proof = proof if isinstance(proof, Mapping) else {}
     prosecution = result.get("combined_prosecution") or result.get("prosecution") or {}
-    defense = result.get("combined_defense") or result.get("defense") or {}
+    defense = result.get("defense") or {}
     census = result.get("census") or []
     if not isinstance(prosecution, Mapping) or not isinstance(defense, Mapping):
         raise ValueError("detector proof sides must be objects")

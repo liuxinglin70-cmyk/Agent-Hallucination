@@ -32,6 +32,7 @@ from typing import Any, Mapping
 from .v6_contracts import FailureAttribution, validate_policy_params
 from .vocabulary_registry import (
     L2_REGISTRY,
+    POLICY_STAGE_POST_LEDGER,
     RegistryDslError,
     VocabularyRegistry,
     compile_predicate_dsl,
@@ -171,6 +172,7 @@ def _court_operators(registry: VocabularyRegistry) -> dict[str, Any]:
         for name in registry.all_operator_names()
         if registry.raw_operator(name) is not None
         and registry.raw_operator(name).runtime_owner == "court"
+        and registry.raw_operator(name).policy_stage == POLICY_STAGE_POST_LEDGER
     }
 
 

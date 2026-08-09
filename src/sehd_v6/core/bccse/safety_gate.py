@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from .genome import (
+    BASELINE_RULE_TEXT,
     MODULE_IDS,
     SkillOp,
     SkillGenome,
@@ -144,6 +145,11 @@ class StructuralGate:
     def is_halted(self) -> bool:
         """Whether evolution should stop."""
         return self._halted
+
+    @property
+    def converged(self) -> bool:
+        """Whether the no-edit convergence window terminated the run."""
+        return self._converged
 
     @property
     def halt_reason(self) -> str:
@@ -407,11 +413,9 @@ class StructuralGate:
                         f"{len(module.rules)}"
                     )
                 else:
-                    from .genome import create_baseline_genome
-
-                    baseline_rules = create_baseline_genome().modules[
-                        target_module
-                    ].rules
+                    baseline_rules = BASELINE_RULE_TEXT.get(
+                        target_module, ()
+                    )
                     if module.rules[rule_index] in baseline_rules:
                         reject_reasons.append("immutable_baseline_rule")
                     elif module.is_rule_protected(rule_index):

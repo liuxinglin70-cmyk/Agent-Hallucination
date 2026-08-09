@@ -417,8 +417,10 @@ class CausalInterventionEngine:
             ]
             if not propagate_sources:
                 break
-            # Follow the earliest source (closest to root)
-            source = propagate_sources[0]
+            # Follow the earliest source (closest to root): event ids are
+            # zero-padded ordinals, so the lexicographic minimum is the
+            # earliest trajectory event, not the first inserted edge.
+            source = min(propagate_sources)
             path.append(source)
             visited.add(source)
             current = source

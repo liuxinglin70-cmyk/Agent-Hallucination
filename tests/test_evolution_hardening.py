@@ -4996,11 +4996,24 @@ def test_collect_rule_effects_trace_binds_rules_to_fields() -> None:
 def test_localization_bias_signal_terminal_fallback() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
+    # The bias claim requires proof that the responsible step sits at the
+    # trajectory's terminal edge: without the last audited step the signal
+    # stays empty rather than guessing.
     assert runner._localization_bias_signal({
         "state": "verified_error",
         "localization_status": "failed_temporal_fallback",
         "responsible_step": 12,
-    }) == "terminal_step_bias"
+    }) == ""
+    assert runner._localization_bias_signal({
+        "state": "verified_error",
+        "localization_status": "failed_temporal_fallback",
+        "responsible_step": 12,
+    }, last_audited_step=12) == "terminal_step_bias"
+    assert runner._localization_bias_signal({
+        "state": "verified_error",
+        "localization_status": "failed_temporal_fallback",
+        "responsible_step": 12,
+    }, last_audited_step=20) == ""
 
 
 def test_localization_bias_signal_silent_on_complete_localization() -> None:

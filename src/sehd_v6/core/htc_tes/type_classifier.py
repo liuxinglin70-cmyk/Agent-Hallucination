@@ -154,12 +154,15 @@ _CONTEXTUAL_PATTERNS = [
 ]
 
 # Error type to hallucination type mapping.
-# ErrorType has 16 values; CORRECT is skipped (no hallucination).
+# ErrorType has 21 values; CORRECT is skipped (no hallucination).
 # 语义映射说明：
 # - false_positive: 误报（clean 被判 error），多为边界过严 → CONTEXTUAL/INSTRUCTIONAL
 # - false_negative*: 漏检 error，多为遗漏或证据不足 → OMISSION/FACTUAL
 # - unresolved_should_error: 应判 error 但 abstained → OMISSION
 # - unresolved_should_clean: 应判 clean 但 abstained → CONTEXTUAL
+# - focused_certificate_quarantine: 证据链被隔离、无法定案 → TOOL
+# - appeal_*_failure / coverage_mismatch: 上诉阶段证据对抗失效 → TOOL
+# - localization_ambiguous: 定位模糊（多个候选源）→ REASONING
 _ERROR_TYPE_TO_HALLUCINATION: dict[str, HallucinationType] = {
     "false_positive": HallucinationType.CONTEXTUAL,
     "false_negative": HallucinationType.OMISSION,
@@ -176,6 +179,11 @@ _ERROR_TYPE_TO_HALLUCINATION: dict[str, HallucinationType] = {
     "evidence_incomplete": HallucinationType.FACTUAL,
     "boundary_hesitation": HallucinationType.CONTEXTUAL,
     "signal_unavailable": HallucinationType.UNKNOWN,
+    "focused_certificate_quarantine": HallucinationType.TOOL,
+    "appeal_prosecutor_failure": HallucinationType.TOOL,
+    "appeal_defender_failure": HallucinationType.TOOL,
+    "appeal_coverage_mismatch": HallucinationType.TOOL,
+    "localization_ambiguous": HallucinationType.REASONING,
 }
 
 # Error types that carry NO information about the hallucination type.
@@ -332,7 +340,10 @@ class HallucinationTypeClassifier:
         # independent of whether the attributor could determine WHY.
 
         # 1a. Candidate nature analysis (claim/action/omission patterns)
-        candidates = detection_result.get("census") or []
+        candidates = [
+            row for row in (detection_result.get("census") or [])
+            if isinstance(row, Mapping)
+        ]
         if candidates:
             candidate_types = self._analyze_candidates(candidates)
             for htype, count in candidate_types.items():
@@ -513,7 +524,12 @@ class HallucinationTypeClassifier:
     def _analyze_candidates(
         self, candidates: Sequence[Mapping[str, Any]]
     ) -> dict[HallucinationType, int]:
-        """Analyze candidate nature to infer hallucination types."""
+        """Analyze candidate nature to infer hallucination types.
+
+        The counts are cue-counts, not candidate-counts: the kind/axes rules
+        and the claim-text pattern rules are independent evidence views of
+        the same candidate, and both may legitimately vote for one type.
+        """
         type_counts: dict[HallucinationType, int] = Counter()
 
         for candidate in candidates:

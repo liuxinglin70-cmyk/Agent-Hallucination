@@ -77,12 +77,20 @@ def aggregate_replicas(
     state = aggregate_states(replica_states, policy=policy)
     if invalid_replicas:
         state = UNRESOLVED
+    # Unanimity means agreement on a decisive outcome: a set of replicas
+    # that all abstain reports the same state but has no decisive verdict
+    # to be unanimous about.
+    unanimous = (
+        len(set(replica_states)) == 1
+        and replica_states[0] != UNRESOLVED
+        and not invalid_replicas
+    )
     return {
         "state": state,
         "policy": policy,
         "replica_count": len(predictions),
         "invalid_replica_indexes": invalid_replicas,
         "replica_states": replica_states,
-        "unanimous": len(set(replica_states)) == 1 and not invalid_replicas,
+        "unanimous": unanimous,
         "runtime_valid": not invalid_replicas,
     }

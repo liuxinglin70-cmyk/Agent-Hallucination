@@ -440,7 +440,6 @@ def assess_source_fitness(
     after: AttributionSignal,
     *,
     target_module: str,
-    operation: str = "add_rule",
     before_result: Mapping[str, Any] | None = None,
     after_result: Mapping[str, Any] | None = None,
     gold_label: bool | None = None,

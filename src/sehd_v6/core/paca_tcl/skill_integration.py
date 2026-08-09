@@ -3,11 +3,6 @@
 The adapter maps the eight typed genome modules onto PACA-TCL's three runtime
 stages without changing the v3.5 proof-court decision rules or CRS weights.
 Typed clauses are appended at provider boundaries as auditable constraints.
-
-CESV remains an auxiliary graph enhancement only: PROPAGATE backtracking feeds
-``earliest_origin_tiebreak`` and deterministic do-intervention diagnostics feed
-``causal_link_test``.  Neither signal replaces PACA-TCL components or changes
-the registered official/auxiliary accounting.
 """
 
 from __future__ import annotations
@@ -166,58 +161,6 @@ class CompiledPacaSkill:
         }
 
 
-@dataclass(frozen=True)
-class CausalLinkDiagnostic:
-    """CESV do-intervention evidence routed to ``causal_link_test``."""
-
-    candidate_id: str
-    observed_origin: str
-    propagate_root: str
-    propagate_path: tuple[str, ...]
-    interventional_effect: float
-    affected_downstream: int
-    total_downstream: int
-    causal_link_supported: bool
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "candidate_id": self.candidate_id,
-            "observed_origin": self.observed_origin,
-            "propagate_root": self.propagate_root,
-            "propagate_path": list(self.propagate_path),
-            "interventional_effect": self.interventional_effect,
-            "affected_downstream": self.affected_downstream,
-            "total_downstream": self.total_downstream,
-            "causal_link_supported": self.causal_link_supported,
-        }
-
-
-@dataclass(frozen=True)
-class CesvSkillEnhancement:
-    """Auxiliary CESV graph outputs consumed by the two L5 modules."""
-
-    earliest_origin_tiebreak: Mapping[str, str]
-    causal_link_test: Mapping[str, CausalLinkDiagnostic]
-    counterfactual_rankings: Mapping[str, Mapping[str, Any]]
-    official_decision_override: bool = False
-    crs_weight_changed: bool = False
-    schema_version: str = "agenthallu.cesv_skill_enhancement.v4"
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.schema_version,
-            "earliest_origin_tiebreak": dict(self.earliest_origin_tiebreak),
-            "causal_link_test": {
-                key: value.to_dict() for key, value in self.causal_link_test.items()
-            },
-            "counterfactual_rankings": {
-                key: dict(value) for key, value in self.counterfactual_rankings.items()
-            },
-            "official_decision_override": self.official_decision_override,
-            "crs_weight_changed": self.crs_weight_changed,
-        }
-
-
 def _stable_hash(value: Any) -> str:
     text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -225,18 +168,6 @@ def _stable_hash(value: Any) -> str:
 
 # Module display names for natural language injection
 MODULE_DISPLAY_NAMES_LOCAL: dict[str, str] = MODULE_DISPLAY_NAMES
-
-
-def _compile_module(module: SkillModule) -> list[str]:
-    """Compile a module's rules into natural language behavioral instructions."""
-    if not module.active or not module.rules:
-        return []
-
-    display_name = MODULE_DISPLAY_NAMES_LOCAL.get(module.module_id, module.module_id)
-    rows = []
-    for rule in module.rules:
-        rows.append(f"【{display_name}】{rule}")
-    return rows
 
 
 def _compile_module_delta(

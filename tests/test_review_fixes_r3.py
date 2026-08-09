@@ -59,7 +59,7 @@ def test_r30_contrast_replay_exception_increments_counter() -> None:
     # The increment belongs to the contrast replay handler: it must sit
     # between the replay call and the fail-open audit row, otherwise the
     # neighbour gate's unreliability is still unobservable.
-    handler_start = source.index('except Exception as exc:\n                            inverted = False')
+    handler_start = source.index('except Exception as exc:\n                        inverted = False')
     handler_end = source.index('"runtime_error"', handler_start)
     assert handler_start < source.index(marker) < handler_end
 
@@ -73,7 +73,7 @@ def test_r30_contrast_gate_stays_fail_open() -> None:
     """
     source = inspect.getsource(evolution_runner.EvolutionLoop)
     handler = source[
-        source.index('except Exception as exc:\n                            inverted = False'):
+        source.index('except Exception as exc:\n                        inverted = False'):
     ]
     handler = handler[: handler.index('fitness_audit["contrast_replay"]')]
     assert "inverted = False" in handler

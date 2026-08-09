@@ -854,7 +854,7 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             return False, (
                 f"rule_index_out_of_range: {edit.rule_index} >= {len(module.rules)}"
             )
-        baseline_rules = create_baseline_genome().modules[edit.target_module].rules
+        baseline_rules = BASELINE_RULE_TEXT.get(edit.target_module, ())
         if module.rules and module.rules[edit.rule_index] in baseline_rules:
             return False, "immutable_baseline_rule"
         # Protected modify check (v5.3): evolved rules that passed fitness
@@ -894,7 +894,7 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             return False, "invalid_rule_index"
         if edit.rule_index >= len(module.rules):
             return False, f"rule_index_out_of_range: {edit.rule_index} >= {len(module.rules)}"
-        baseline_rules = create_baseline_genome().modules[edit.target_module].rules
+        baseline_rules = BASELINE_RULE_TEXT.get(edit.target_module, ())
         if module.rules[edit.rule_index] in baseline_rules:
             return False, "immutable_baseline_rule"
         if module.is_rule_protected(edit.rule_index):
@@ -992,6 +992,49 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
 # Baseline Genome Factory
 # ============================================================
 
+# Immutable baseline rule text, the single source of truth for the
+# proof-court-native baseline (PACA-TCL v3.5 does not expose continuous CRS
+# to runtime providers; baseline rules mention only trajectory and
+# certificate evidence the receiving stage can observe).  Hot validation
+# paths (validate_edit, the structural gate, reflection module displays)
+# consult this constant directly instead of rebuilding a full genome, and
+# create_baseline_genome() builds fresh mutable genomes from it.
+BASELINE_RULE_TEXT: Mapping[str, tuple[str, ...]] = {
+    "candidate_trigger": (
+        "When an unsupported claim or action affects a later result, create one candidate at its earliest observable origin.",
+        "When a tool failure is explicitly recovered before impact, do not create an error candidate from that failure alone.",
+    ),
+    "evidence_obligation": (
+        "When cited evidence proves norm, breach, agent control, impact, and counterfactual link, support the error.",
+        "When any causal-chain field is missing, treat the evidence as incomplete.",
+    ),
+    "candidate_to_verifier_route": (
+        "When a candidate is a claim, action, omission, or adoption, route it to the matching verifier.",
+    ),
+    "atomic_verifier_instruction": (
+        "When verifying a candidate, test it independently against cited trajectory events.",
+        "When cited events do not establish the claimed causal chain, reject the certificate.",
+    ),
+    "clean_defense_boundary": (
+        "When tool output directly supports the agent claim, treat that claim as clean.",
+        "When the agent acknowledges and repairs a tool failure before impact, treat the failure as clean.",
+        "When a deviation is authorized by the user or forced by the environment, do not attribute it to the agent.",
+        "When an error is fully corrected before downstream impact, treat it as clean.",
+    ),
+    "causal_link_test": (
+        "When correcting an origin would prevent the incorrect result, treat that origin as causal.",
+        "When an error lacks cited propagation to benchmark impact, reject the causal link.",
+    ),
+    "earliest_origin_tiebreak": (
+        "When multiple origins are causally sufficient, select the earliest cited event.",
+    ),
+    "abstention_rule": (
+        "When neither a complete causal error proof nor a complete clean defense is established, return unresolved.",
+        "When a complete clean defense defeats every error candidate, return clean.",
+    ),
+}
+
+
 def create_baseline_genome() -> SkillGenome:
     """Create a proof-court-native, immutable baseline Skill genome.
 
@@ -1000,62 +1043,8 @@ def create_baseline_genome() -> SkillGenome:
     certificate evidence that the receiving stage can actually observe.
     """
     modules = {
-        "candidate_trigger": SkillModule(
-            module_id="candidate_trigger",
-            rules=[
-                "When an unsupported claim or action affects a later result, create one candidate at its earliest observable origin.",
-                "When a tool failure is explicitly recovered before impact, do not create an error candidate from that failure alone.",
-            ],
-        ),
-        "evidence_obligation": SkillModule(
-            module_id="evidence_obligation",
-            rules=[
-                "When cited evidence proves norm, breach, agent control, impact, and counterfactual link, support the error.",
-                "When any causal-chain field is missing, treat the evidence as incomplete.",
-            ],
-        ),
-        "candidate_to_verifier_route": SkillModule(
-            module_id="candidate_to_verifier_route",
-            rules=[
-                "When a candidate is a claim, action, omission, or adoption, route it to the matching verifier.",
-            ],
-        ),
-        "atomic_verifier_instruction": SkillModule(
-            module_id="atomic_verifier_instruction",
-            rules=[
-                "When verifying a candidate, test it independently against cited trajectory events.",
-                "When cited events do not establish the claimed causal chain, reject the certificate.",
-            ],
-        ),
-        "clean_defense_boundary": SkillModule(
-            module_id="clean_defense_boundary",
-            rules=[
-                "When tool output directly supports the agent claim, treat that claim as clean.",
-                "When the agent acknowledges and repairs a tool failure before impact, treat the failure as clean.",
-                "When a deviation is authorized by the user or forced by the environment, do not attribute it to the agent.",
-                "When an error is fully corrected before downstream impact, treat it as clean.",
-            ],
-        ),
-        "causal_link_test": SkillModule(
-            module_id="causal_link_test",
-            rules=[
-                "When correcting an origin would prevent the incorrect result, treat that origin as causal.",
-                "When an error lacks cited propagation to benchmark impact, reject the causal link.",
-            ],
-        ),
-        "earliest_origin_tiebreak": SkillModule(
-            module_id="earliest_origin_tiebreak",
-            rules=[
-                "When multiple origins are causally sufficient, select the earliest cited event.",
-            ],
-        ),
-        "abstention_rule": SkillModule(
-            module_id="abstention_rule",
-            rules=[
-                "When neither a complete causal error proof nor a complete clean defense is established, return unresolved.",
-                "When a complete clean defense defeats every error candidate, return clean.",
-            ],
-        ),
+        module_id: SkillModule(module_id=module_id, rules=list(rules))
+        for module_id, rules in BASELINE_RULE_TEXT.items()
     }
     genome = SkillGenome(
         genome_id="baseline_paca_tcl_v3_5_proof_native",

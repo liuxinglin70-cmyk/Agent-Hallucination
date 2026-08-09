@@ -281,7 +281,10 @@ def _run_focused_prosecution_for_candidate(
         }
         return [], [], provider_meta
     if not certificates:
-        # Provider determined no error — this is a valid "no prosecution" result
+        # Provider determined no error — this is a valid "no prosecution" result.
+        # The flag name must never end in "_error" (the coverage classifier
+        # treats any meta key with that suffix as a provider crash).
+        provider_meta["no_error_declared_flag"] = True
         return [], [], provider_meta
 
     # Validate each certificate
@@ -344,6 +347,7 @@ def _run_focused_prosecution_for_candidate(
             # The provider retracted after quarantine feedback; this is an
             # explicit no-error decision, not a quarantined certificate.
             provider_meta.pop("all_quarantined", None)
+            provider_meta["no_error_declared_flag"] = True
             break
 
         for cert in certificates:
@@ -477,13 +481,14 @@ def _appeal_trigger_calibrator_v35(
       but every round was structurally invalid, v3.5.2: reported through
       ``focused_prosecution_metas``)
     - quarantined defense certificate
-    - base-v2 verified_error origin
 
     Priority 1:
     - unresolved causal link (process_only/unresolved benchmark_causal_status)
     - non-dominating insufficient_evidence defense
 
     DELETED from v3.4 (priority 2-3):
+    - base-v2 verified_error origin (a base-layer responsible event is
+      diagnostic context, not by itself an appeal trigger)
     - earliest-origin conflict (was priority 2)
     - candidate coverage hole (was priority 2)
     - evidence-authority mismatch (was priority 3)
@@ -1980,11 +1985,13 @@ def _build_adjudication_output(
                 1 for meta in (providers.get("focused_prosecution") or {}).values()
                 if isinstance(meta, dict) and meta.get("all_quarantined")
             ),
-            # v3.5.1-D3: distinguish LLM-empty (explicit no-error) from LLM-crash (provider error)
+            # v3.5.1-D3: distinguish LLM-empty (declared no-error) from LLM-crash (provider error).
+            # The flag is set by the focused-prosecution run itself when the
+            # provider returns an empty certificate set, so a
+            # certificate-producing candidate can never count as "no-error".
             "focused_prosecution_explicit_no_error_count": sum(
                 1 for meta in (providers.get("focused_prosecution") or {}).values()
-                if isinstance(meta, dict) and "round1" in meta
-                and not any(k.endswith("_error") for k in meta)
+                if isinstance(meta, dict) and meta.get("no_error_declared_flag")
             ),
             "focused_prosecution_provider_error_count": sum(
                 1 for meta in (providers.get("focused_prosecution") or {}).values()
@@ -2077,9 +2084,6 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "causal_chain_validity": (
             causal_valid / causal_predicted if causal_predicted else None
         ),
-        "causal_error_certificate_validity": (
-            causal_valid / causal_predicted if causal_predicted else None
-        ),
         "causal_chain_validity_defined": bool(causal_predicted),
         "causal_chain_validity_denominator": causal_predicted,
         "predicted_causal_error_certificate_count": causal_predicted,
@@ -2091,11 +2095,11 @@ def evaluate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "defense_type_counts": dict(defenses), "quarantined_error_certificate_count": q_error,
         "quarantined_defense_certificate_count": q_defense,
         "construct_view_status_counts": dict(construct_states),
-        "construct_candidate_acceptance_rate": construct_accepted / construct_raw if construct_raw else 1.0,
+        "construct_candidate_acceptance_rate": construct_accepted / construct_raw if construct_raw else None,
         "construct_axis_normalization_count": construct_normalized,
-        "error_certificate_acceptance_rate": (total_error - q_error) / total_error if total_error else 1.0,
-        "defense_certificate_acceptance_rate": (total_defense - q_defense) / total_defense if total_defense else 1.0,
-        "required_candidate_resolution_rate": resolved_candidates / required_candidates if required_candidates else 1.0,
+        "error_certificate_acceptance_rate": (total_error - q_error) / total_error if total_error else None,
+        "defense_certificate_acceptance_rate": (total_defense - q_defense) / total_defense if total_defense else None,
+        "required_candidate_resolution_rate": resolved_candidates / required_candidates if required_candidates else None,
         "appeal_candidate_count": appeal_candidates_total,
         "appeal_prosecutor_certificate_count": appeal_pros_certs_total,
         "appeal_defender_certificate_count": appeal_def_certs_total,

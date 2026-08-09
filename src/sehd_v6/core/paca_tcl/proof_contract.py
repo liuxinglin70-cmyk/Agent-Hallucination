@@ -313,15 +313,17 @@ def _merge_appeal_defense(
     *, appeal_defense: dict[str, Any], packet: dict[str, Any],
     candidate_origins: dict[str, str],
     valid_defenses: list[dict[str, Any]],
+    d_rows: list[dict[str, Any]],
     d_audits: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Merge appeal defense certificates into the defense pool.
 
     Why this function exists: the appeal defender produces a second defense
     bundle that must be validated, deduplicated against the base defense,
     and merged with dominance rules before the court can proceed. The merge
-    logic is self-contained and has no side effects beyond the two lists it
-    returns.
+    logic is self-contained and has no side effects beyond the three lists
+    it returns (rows and audits stay aligned so quarantine bookkeeping can
+    zip them without silently truncating).
     """
     ad_coverage, ad_rows = _validate_top(appeal_defense)
     ad_audits = [
@@ -358,7 +360,8 @@ def _merge_appeal_defense(
             valid_defenses.append(row)
             seen_defense_keys.add(key)
     d_audits = [*d_audits, *ad_audits]
-    return valid_defenses, d_audits
+    d_rows = [*d_rows, *ad_rows]
+    return valid_defenses, d_rows, d_audits
 
 
 # ============================================================
@@ -394,7 +397,7 @@ def _run_deterministic_prechecks(
             )
         else:
             continue
-        result = check(row, packet)
+        result = check(row)
         results[str(row["certificate_id"])] = result
         if result["decision"] == trigger and result.get("defense_type"):
             target_id = str(row["source_candidate_id"])
@@ -566,7 +569,10 @@ def _resolve_terminal_state(
     positive_candidates = {str(row["source_candidate_id"]) for row in surviving}
 
     coverage_complete = p_coverage == d_coverage == "complete" and not invalid_count
-    candidate_terminal = set(required) <= clean_covered | auxiliary_candidates | positive_candidates
+    # Surviving certificates are empty in every branch that consumes
+    # candidate_terminal (the clean/unresolved decision paths), so they
+    # cannot contribute to the coverage-complete check.
+    candidate_terminal = set(required) <= clean_covered | auxiliary_candidates
     if surviving:
         # v3.5 H3: TWO-PHASE LOCALIZATION
         winner = select_earliest_origin_counterfactual(
@@ -846,11 +852,12 @@ def adjudicate_proof_court(
 
     # v3.4: merge appeal defender into defense pool (preserved)
     if appeal_defense is not None:
-        valid_defenses, d_audits = _merge_appeal_defense(
+        valid_defenses, d_rows, d_audits = _merge_appeal_defense(
             appeal_defense=appeal_defense,
             packet=packet,
             candidate_origins=candidate_origins,
             valid_defenses=valid_defenses,
+            d_rows=d_rows,
             d_audits=d_audits,
         )
 

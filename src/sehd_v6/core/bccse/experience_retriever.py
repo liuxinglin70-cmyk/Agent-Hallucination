@@ -12,7 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from .evolution_experience_memory import EvolutionExperienceMemory, MechanismEntry
+from .evolution_experience_memory import (
+    EvolutionExperienceMemory,
+    MechanismEntry,
+    episode_signature,
+)
 from .failure_episode import (
     CausalSlice,
     FailureEpisode,
@@ -99,11 +103,14 @@ def extract_failure_pattern(episode: FailureEpisode) -> FailurePattern:
     """Extract a structured failure pattern from one FailureEpisode.
 
     The pattern is deterministic: same episode always yields the same pattern.
-    No case identity, gold, or raw trajectory text participates.
+    No case identity, gold, or raw trajectory text participates. The
+    mechanism-signature component is derived with the shared episode
+    signature (the same key the memory stores entries under), so the query
+    and the index always speak the same vocabulary.
     """
     return _pattern_from_slice(
         episode.causal_slice,
-        tuple(str(v) for v in episode.attribution.get("mechanism_signature", ())),
+        episode_signature(episode),
     )
 
 
@@ -212,56 +219,34 @@ def retrieve_structured_experience(
             matches.append(match)
         return matches[:max_results]
 
-    # Level 2: shape + context similarity（带索引优化）
-    # 使用分层索引限制检索范围，避免全量遍历
-    shape_matches: list[tuple[float, Any]] = []
+    # Level 2: shape + context similarity over the whole mechanism index.
+    # Every entry is scored with the same deterministic similarity; the
+    # top matches win.  No prefiltering: an entry is either a real match or
+    # it is not, and a substring guess over signature elements is not a
+    # shape match — it silently empties the first pass and lets arbitrary
+    # lower-scoring entries win.
     entries = list(memory.entries())
-    
-    # 索引优化：按 failure_shape 和 causal_position 预过滤
-    target_shape = current_pattern.failure_shape
-    target_position = current_pattern.causal_position
-    
-    # 第一轮：精确形状+位置匹配
-    for entry in entries:
-        # 从签名中提取形状和位置信息（如果签名包含这些信息）
-        entry_sig = entry.signature
-        # 签名格式: (layer, artifact, reason_code, direction, candidate_kind, consumer, fields...)
-        # 检查是否有匹配的元素
-        if len(entry_sig) >= 2:
-            # 快速预过滤：检查签名的前几个元素是否匹配
-            sig_match = any(
-                target_shape in str(elem) or target_position in str(elem)
-                for elem in entry_sig[:3]
-            )
-            if not sig_match:
-                continue
 
+    scored: list[tuple[float, Any]] = []
+    for entry in entries:
         sim = _similarity(current_pattern, _entry_pattern(entry))
         if sim > 0.3:
-            shape_matches.append((sim, entry))
+            scored.append((sim, entry))
 
-    # 如果预过滤后结果太少，放宽条件
-    if len(shape_matches) < max_results:
+    # If the strict pass is too thin, widen to a lower bound rather than
+    # mixing two different match definitions in one result set.
+    if len(scored) < max_results:
         for entry in entries:
-            if any(entry is e for _, e in shape_matches):
-                continue  # 跳过已匹配的
+            if any(entry is e for _, e in scored):
+                continue
             sim = _similarity(current_pattern, _entry_pattern(entry))
-            if sim > 0.2:  # 放宽阈值
-                shape_matches.append((sim, entry))
-    
-    # 去重并排序
-    seen = set()
-    unique_matches = []
-    for sim, entry in shape_matches:
-        if id(entry) not in seen:
-            seen.add(id(entry))
-            unique_matches.append((sim, entry))
-    shape_matches = unique_matches
+            if sim > 0.2:
+                scored.append((sim, entry))
 
-    if shape_matches:
-        shape_matches.sort(key=lambda x: -x[0])
+    if scored:
+        scored.sort(key=lambda x: -x[0])
         results = []
-        for sim, entry in shape_matches[:max_results]:
+        for sim, entry in scored[:max_results]:
             # Retrieve representative for this entry
             refs = memory._refs_for_entry(entry, episode, episode.episode_id)
             for ref in refs:

@@ -16,7 +16,7 @@ import threading
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -128,10 +128,9 @@ def _provider_repair_call(
     route: dict[str, Any],
     api_key: str,
     payload: bytes,
-    repair_user: str,
-    repair_system: str,
     cache_dir: Path,
     request_hash: str,
+    request_timeout: int | None = None,
 ) -> dict[str, Any] | None:
     """One bounded repair provider call for a truncated JSON response.
 
@@ -157,7 +156,13 @@ def _provider_repair_call(
         method="POST",
     )
     try:
-        repair_timeout = max(1, int(route.get("timeout_seconds", 120)))
+        # The repair must stay inside the same total-timeout deadline as the
+        # original attempt: a fresh full window would let a run exceed its
+        # declared budget by one extra repair call.
+        repair_timeout = max(
+            1,
+            int(request_timeout or route.get("timeout_seconds", 120)),
+        )
         with DIRECT_PROVIDER_OPENER.open(req, timeout=repair_timeout) as response:
             raw = response.read()
         value = json.loads(raw.decode("utf-8"))
@@ -274,43 +279,72 @@ def load_paca_census(
     source = cache_root / private_ref(case_id, "p0_") / "paca_v1_canary_results.json"
     if not source.is_file():
         return [], {"status": "missing", "path": str(source)}
-    value = read_json(source)
-    outputs = value.get("outputs") or {}
-    raw_candidates = (outputs.get("stage1_scanning") or {}).get("candidates")
+    try:
+        value = read_json(source)
+    except Exception as exc:
+        # A corrupt or unreadable cache must not kill the whole detection:
+        # the callers fall back to the provider census on any non-complete
+        # audit, which is exactly the intended degraded path.
+        return [], {
+            "status": "invalid", "path": str(source),
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:300],
+        }
+    try:
+        outputs = value.get("outputs") or {}
+        if not isinstance(outputs, Mapping):
+            return [], {"status": "invalid", "path": str(source)}
+        stage1 = outputs.get("stage1_scanning")
+        raw_candidates = (
+            stage1.get("candidates") if isinstance(stage1, Mapping) else None
+        )
+    except Exception as exc:
+        return [], {
+            "status": "invalid", "path": str(source),
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:300],
+        }
     if not isinstance(raw_candidates, list):
         return [], {"status": "invalid", "path": str(source)}
-    converted: list[dict[str, Any]] = []
-    for index, row in enumerate(raw_candidates, start=1):
-        if not isinstance(row, dict):
-            continue
-        origin = _event_for_source_step(built, row.get("root_step_id"))
-        if not origin:
-            continue
-        dependencies = []
-        for step in row.get("information_dependencies") or []:
-            ref = _event_for_source_step(built, step)
-            if ref and ref not in dependencies:
-                dependencies.append(ref)
-        converted.append({
-            "candidate_id": f"paca_candidate_{index:03d}",
-            "origin_hypothesis_event_id": origin,
-            "trigger_event_id": origin,
-            "axes": [str(row.get("hallucination_dimension") or "F")],
-            "candidate_kind": str(row.get("candidate_kind") or "unmatched"),
-            "claim_or_commitment": str(row.get("information_introduced") or row.get("observation") or "candidate deviation"),
-            "dependency_event_ids": dependencies,
-            "module_tag": str(row.get("module_tag") or "Unknown"),
-            "observation": str(row.get("observation") or ""),
-            "is_decision_point": _parse_bool(row.get("is_decision_point", False)),
-            "source_step_id": next(
-                (
-                    event.get("source_step_id")
-                    for event in built["events"]
-                    if str(event.get("event_id")) == origin
+    try:
+        converted: list[dict[str, Any]] = []
+        for index, row in enumerate(raw_candidates, start=1):
+            if not isinstance(row, dict):
+                continue
+            origin = _event_for_source_step(built, row.get("root_step_id"))
+            if not origin:
+                continue
+            dependencies = []
+            for step in row.get("information_dependencies") or []:
+                ref = _event_for_source_step(built, step)
+                if ref and ref not in dependencies:
+                    dependencies.append(ref)
+            converted.append({
+                "candidate_id": f"paca_candidate_{index:03d}",
+                "origin_hypothesis_event_id": origin,
+                "trigger_event_id": origin,
+                "axes": [str(row.get("hallucination_dimension") or "F")],
+                "candidate_kind": str(row.get("candidate_kind") or "unmatched"),
+                "claim_or_commitment": str(row.get("information_introduced") or row.get("observation") or "candidate deviation"),
+                "dependency_event_ids": dependencies,
+                "module_tag": str(row.get("module_tag") or "Unknown"),
+                "observation": str(row.get("observation") or ""),
+                "is_decision_point": _parse_bool(row.get("is_decision_point", False)),
+                "source_step_id": next(
+                    (
+                        event.get("source_step_id")
+                        for event in built["events"]
+                        if str(event.get("event_id")) == origin
+                    ),
+                    None,
                 ),
-                None,
-            ),
-        })
+            })
+    except Exception as exc:
+        return [], {
+            "status": "invalid", "path": str(source),
+            "error_type": type(exc).__name__,
+            "error": str(exc)[:300],
+        }
     return converted, {
         "status": "complete" if len(converted) == len(raw_candidates) else "partial",
         "raw_candidate_count": len(raw_candidates),
@@ -378,10 +412,9 @@ def provider_call_with_schema(
     route = dict(route)
     if not route.get("_provider_route_resolved"):
         route = resolve_provider_route(route, purpose=purpose)
-    else:
-        # Config routes may be shared by worker threads; canonicalize a copy
-        # so transport preparation never mutates the frozen config object.
-        route = dict(route)
+    # Config routes may be shared by worker threads; transport preparation
+    # must never mutate the frozen config object, so the copy above is
+    # always the working instance.
     transport_purpose = str(route.get("_provider_purpose") or purpose)
     try:
         route["model"] = canonical_model_name(str(route.get("model") or ""))
@@ -524,16 +557,16 @@ def provider_call_with_schema(
                 # differs). The repair re-sends the same system prompt with a
                 # compact instruction asking for strict JSON continuation.
                 # Failure remains fail-closed: the original error is raised.
-                repair_body, repair_target = _provider_repair_payload(
+                repair_body, _repair_user = _provider_repair_payload(
                     payload, system, user,
                 )
                 try:
                     transport_attempts += 1
                     repair_value = _provider_repair_call(
                         route=route, api_key=api_key,
-                        payload=repair_body, repair_user=user,
-                        repair_system=system,
+                        payload=repair_body,
                         cache_dir=cache_dir, request_hash=request_hash,
+                        request_timeout=request_timeout,
                     )
                 except Exception as exc:
                     raise ValueError(

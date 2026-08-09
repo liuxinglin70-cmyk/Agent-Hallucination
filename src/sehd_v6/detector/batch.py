@@ -179,6 +179,7 @@ def run_batch(
     output_dir: Path, max_parallel: int = 10, resume: bool = True,
     genome: Any | None = None, genome_source: str | None = None,
     policy_genome: Any | None = None,
+    census_root: Path | None = None,
 ) -> dict[str, Any]:
     """Detect independent trajectories concurrently with hash-bound resume."""
     if max_parallel < 1:
@@ -219,6 +220,8 @@ def run_batch(
                 "record": record, "config": config, "case_id": case_id,
                 "output_dir": case_dir / "trace",
             }
+            if census_root is not None:
+                detect_kwargs["census_root"] = census_root
             if genome is not None:
                 detect_kwargs["genome"] = genome
                 detect_kwargs["genome_source"] = genome_source
@@ -348,15 +351,16 @@ def _all_routes_deterministic(config: Mapping[str, Any]) -> bool:
     Detector routes live as top-level ``*_route`` keys. With all routes
     deterministic, k replicas collapse into k identical cache copies, so
     replica diversity is impossible without an explicit temperature change.
+    A missing temperature means the transport default (0), so an unset
+    temperature counts as deterministic — the shipped config sets none, and
+    requesting replicas on it must degrade rather than burn identical calls.
     """
     temperatures = [
         route.get("temperature")
         for name, route in config.items()
         if name.endswith("_route") and isinstance(route, Mapping)
     ]
-    return bool(temperatures) and all(
-        temperature in (0, 0.0, None) for temperature in temperatures
-    )
+    return all(temperature in (0, 0.0, None) for temperature in temperatures)
 
 
 def run_replicated_batch(

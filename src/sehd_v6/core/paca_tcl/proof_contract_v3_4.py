@@ -129,7 +129,7 @@ def _is_numerical_discrepancy(rationale: str, breach_type: str, norm_source: str
 
 
 def check_materiality(
-    error_certificate: dict[str, Any], _packet: dict[str, Any] | None = None,
+    error_certificate: dict[str, Any],
 ) -> dict[str, Any]:
     """Deterministic materiality check for numerical/equivalence errors.
 
@@ -191,7 +191,7 @@ def check_materiality(
 # ============================================================
 
 def check_commitment(
-    error_certificate: dict[str, Any], packet: dict[str, Any],
+    error_certificate: dict[str, Any],
 ) -> dict[str, Any]:
     """Deterministic commitment/impact boundary check.
 
@@ -442,7 +442,7 @@ def adjudicate_proof_court(
     if apply_materiality_check:
         for row in valid_errors:
             if str(row.get("breach_type") or "") == "contradiction":
-                result = check_materiality(row, packet)
+                result = check_materiality(row)
                 materiality_results[str(row["certificate_id"])] = result
                 # If immaterial, inject a defense that can defeat this error
                 if result["decision"] == "immaterial_difference" and result.get("defense_type"):
@@ -462,7 +462,7 @@ def adjudicate_proof_court(
     if apply_commitment_check:
         for row in valid_errors:
             if str(row.get("breach_type") or "") == "invalid_action":
-                result = check_commitment(row, packet)
+                result = check_commitment(row)
                 commitment_results[str(row["certificate_id"])] = result
                 if result["decision"] == "rejected_attempt" and result.get("defense_type"):
                     target_id = str(row["source_candidate_id"])

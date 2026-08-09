@@ -299,6 +299,21 @@ class GateEventLedger:
         self._ids.add(event.event_id)
         return True
 
+    def drop_event(self, event_id: str) -> bool:
+        """Remove one recorded event; returns True when it was present.
+
+        Resume rewind uses this to purge ledger events of placeholder
+        steps that were popped back into the work queue; a re-recorded
+        decision must not coexist with the phantom "halted" entry.
+        """
+        if event_id not in self._ids:
+            return False
+        self.events = [
+            event for event in self.events if event.event_id != event_id
+        ]
+        self._ids.discard(event_id)
+        return True
+
     def to_list(self) -> list[dict[str, Any]]:
         return [event.to_dict() for event in self.events]
 

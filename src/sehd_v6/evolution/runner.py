@@ -75,6 +75,12 @@ def load_records(path: Path) -> dict[str, dict[str, Any]]:
             raise ValueError("record file must contain an object")
         if "history" in value:
             rows = [value]
+        elif "record" in value and "case_id" in value:
+            # The JSONL wrapper line shape given as a plain JSON object:
+            # {"case_id": "...", "record": {...}} is one wrapped record,
+            # never a case_id -> record mapping (which would silently
+            # produce a two-record mapping keyed "case_id"/"record").
+            rows = [value]
         elif value and all(isinstance(item, dict) for item in value.values()):
             return {str(key): dict(item) for key, item in value.items()}
         else:
@@ -189,9 +195,10 @@ def run_evolution(
         mutation_route: Optional reflection/mutation route.  When omitted the
             official default (``SEHD_MUTATION_*``) is used.
         pro_mutation_route: Optional deeper-diagnosis route, used only when
-            a source exhausts its bounded Flash attempts with a categorical
-            no-edit outcome; one Pro attempt is then allowed on the same
-            source. It must be passed explicitly to enable escalation — when
+            the primary pass ends in a categorical no-candidate outcome and
+            the bounded Flash diagnosis cannot produce an executable owner;
+            one Pro diagnosis attempt is then allowed on the same source.
+            It must be passed explicitly to enable escalation — when
             omitted no Pro escalation happens.
         initial_genome: Optional audited genome to continue evolving.
         initial_policy_genome: Optional audited L2 adjudication-policy genome
@@ -233,6 +240,8 @@ def run_evolution(
     """
     if isinstance(records, Path):
         records = load_records(records)
+    elif isinstance(records, str):
+        records = load_records(Path(records))
     else:
         if not records:
             raise ValueError("records must not be empty")
@@ -273,11 +282,11 @@ def run_evolution(
             if explicit is None:
                 continue
             explicit_path = (
-                Path(explicit)
+                Path(explicit).resolve()
                 if isinstance(explicit, (str, Path))
                 else None
             )
-            if explicit_path != inherited_path:
+            if explicit_path != inherited_path.resolve():
                 raise ValueError(
                     f"{label} conflicts with the inherited state manifest; "
                     f"inheritance is the single complete state source"

@@ -351,6 +351,7 @@ def main() -> int:
             max_parallel=args.max_parallel, resume=not args.no_resume,
             genome=genome, genome_source=genome_source,
             policy_genome=policy_genome,
+            census_root=args.census_root,
         )
         print(args.output_dir / "summary.json")
         return 0 if summary["failed_case_count"] == 0 else 2

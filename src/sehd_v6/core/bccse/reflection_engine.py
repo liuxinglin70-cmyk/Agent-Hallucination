@@ -286,6 +286,7 @@ def build_causal_reflection_prompt(
     # v6.1 扩展：结构化经验检索与负反馈分析
     experience_memory: Any = None,
     negative_feedback_analysis: Any = None,
+    episode: Any = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -680,14 +681,12 @@ listed for the target module in runtime_output_contracts.
 
     # v6.1 扩展：结构化经验检索（替代浅层历史提示）
     experience_section = ""
-    if experience_memory is not None and episode_projection is not None:
+    if experience_memory is not None and episode is not None:
         try:
-            episode_dict = episode_projection.get("episode", {})
-            if episode_dict:
-                matches = retrieve_structured_experience(
-                    episode_projection, experience_memory, max_results=2
-                )
-                experience_section = format_experience_for_prompt(matches)
+            matches = retrieve_structured_experience(
+                episode, experience_memory, max_results=2,
+            )
+            experience_section = format_experience_for_prompt(matches)
         except Exception:
             experience_section = ""
 
@@ -1108,15 +1107,15 @@ def sanitize_diagnosis(
 def format_skill_context_for_llm(genome_modules: dict, target_module: str) -> str:
     """Show only the attributed module and mark immutable rule indices."""
     from .genome import (
+        BASELINE_RULE_TEXT,
         MODULE_CAPACITY,
         MODULE_DISPLAY_NAMES,
-        create_baseline_genome,
     )
 
     mod = genome_modules.get(target_module)
     if not mod or not mod.active:
         return "(target module unavailable)"
-    baseline_rules = create_baseline_genome().modules[target_module].rules
+    baseline_rules = BASELINE_RULE_TEXT.get(target_module, ())
     display = MODULE_DISPLAY_NAMES.get(target_module, target_module)
     capacity = MODULE_CAPACITY.get(target_module, 4)
     current = len(mod.rules)
@@ -1332,9 +1331,9 @@ def build_capacity_guidance(genome_modules: dict, target_module: str) -> str:
     which modules have space, so it can always produce a valid edit.
     """
     from .genome import (
+        BASELINE_RULE_TEXT,
         MODULE_CAPACITY,
         MODULE_DISPLAY_NAMES,
-        create_baseline_genome,
     )
 
     target_mod = genome_modules.get(target_module)
@@ -1355,7 +1354,7 @@ def build_capacity_guidance(genome_modules: dict, target_module: str) -> str:
         lines.append(f"注意：归因模块 [{display}]({target_module}) 已满 ({current}/{capacity})。")
         lines.append("不能使用 add_rule，只能修改明确标为 evolvable 的规则。")
         lines.append("")
-        baseline_rules = create_baseline_genome().modules[target_module].rules
+        baseline_rules = BASELINE_RULE_TEXT.get(target_module, ())
         editable = []
         for i, rule in enumerate(target_mod.rules):
             if rule not in baseline_rules:

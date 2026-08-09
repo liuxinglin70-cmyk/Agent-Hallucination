@@ -176,8 +176,6 @@ def _apply_construct_authority(
     """Fail closed while retaining a separately established occurrence ledger."""
     authoritative, reasons = _construct_authority(construct_audit)
     existing_reasons = list(proof.get("authority_failure_reasons") or [])
-    if authoritative and proof.get("decision_authority") == "invalid":
-        return proof, False, existing_reasons
     if authoritative:
         return {
             **proof,
