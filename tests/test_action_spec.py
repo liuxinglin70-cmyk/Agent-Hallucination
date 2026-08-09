@@ -35,6 +35,24 @@ def test_action_spec_is_the_effect_contract_source() -> None:
     }
 
 
+def test_atomic_verifier_routes_are_prosecution_only() -> None:
+    """R12: the atomic verifier audits error candidates; its quarantine
+    observable is the prosecution-side quarantined-error set.  Defense
+    surfaces must never receive its actions, or a quarantine rule makes the
+    defender quarantine its own certificates on a gold-clean FP case
+    (SmolAgents/029: defense 1.0->0.3, local_score 5.3->7.0)."""
+    for operation, target in (("quarantine_certificate", "certificate_id"),
+                              ("require_evidence_field", "norm_evidence_refs")):
+        spec = compile_action_spec(
+            "atomic_verifier_instruction",
+            f"{operation}: {target}",
+        )
+        assert "defense_route" not in spec.route_ids
+        assert "appeal_defender_route" not in spec.route_ids
+        assert {"qualification_route", "focused_prosecution_route",
+                "appeal_prosecutor_route"} <= set(spec.route_ids)
+
+
 def test_opcode_cannot_target_an_unrelated_route_field() -> None:
     try:
         compile_action_spec(
@@ -282,6 +300,22 @@ def test_field_binding_accepts_the_singular_plural_pair_in_both_directions() -> 
     assert not _field_binds_output_field("candidate", "evidence")
     assert not _field_binds_output_field("", "candidate")
     assert not _field_binds_output_field("candidates", "")
+
+
+def test_field_binding_accepts_path_qualified_reports() -> None:
+    """R12: providers report path-qualified fields (``candidates[0].
+    certificate_id``) as the output the rule affected; the trailing segment
+    names the ActionSpec field unambiguously and must bind.  A bare
+    collection key (``candidates``) stays unbound: it does not name the
+    certificate-id field."""
+    from src.sehd_v6.core.bccse.evolution_runner import (
+        _field_binds_output_field,
+    )
+
+    assert _field_binds_output_field("candidates[0].certificate_id", "certificate_id")
+    assert _field_binds_output_field("rows[2].certificate_id", "certificate_id")
+    assert not _field_binds_output_field("candidates", "certificate_id")
+    assert not _field_binds_output_field("certificate_id.bogus", "certificate_id")
 
 # ============================================================
 # D1: deterministic postcondition evaluation

@@ -27,9 +27,18 @@ MODULE_ROUTE_IDS: Mapping[str, tuple[str, ...]] = {
         "appeal_prosecutor_route",
     ),
     "candidate_to_verifier_route": ("qualification_route",),
+    # The atomic verifier audits ERROR candidates only: its output object is
+    # ``verification_certificate`` and its quarantine observable is the proof
+    # court's prosecution-side ``quarantined_error_certificate_ids``.  Defense
+    # routes therefore cannot execute its actions coherently — a quarantine
+    # rule injected there makes the defender quarantine its own certificates,
+    # which collapses defense coverage on a gold-clean case and moves the
+    # module score against the gold polarity (observed on SmolAgents/029:
+    # defense 1.0->0.3, local_score 5.3->7.0 on an FP).  Defense-side
+    # verification stays owned by ``clean_defense_boundary``.
     "atomic_verifier_instruction": (
-        "qualification_route", "focused_prosecution_route", "defense_route",
-        "appeal_prosecutor_route", "appeal_defender_route",
+        "qualification_route", "focused_prosecution_route",
+        "appeal_prosecutor_route",
     ),
     "clean_defense_boundary": (
         "defense_route", "appeal_defender_route", "boundary_route",

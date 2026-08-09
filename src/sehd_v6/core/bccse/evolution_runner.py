@@ -1546,12 +1546,16 @@ def _field_binds_output_field(reported: str, expected: str) -> bool:
     ``output_field`` is the singular object name from the opcode operand
     (e.g. ``candidate``). These name the same executable output in two
     vocabularies, so exact matches and the singular/plural pair both bind.
+    A path-qualified report (e.g. ``candidates[0].certificate_id``) names
+    the field unambiguously and binds through its trailing field segment.
     """
     if not expected or not reported:
         return False
     if reported == expected:
         return True
-    return reported == f"{expected}s" or expected == f"{reported}s"
+    if reported == f"{expected}s" or expected == f"{reported}s":
+        return True
+    return reported.endswith(f".{expected}")
 
 
 def _attribute_intervention_fitness(
