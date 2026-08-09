@@ -534,6 +534,19 @@ def _classify_replay_no_effect(
     return "output_changed_then_quarantined"
 
 
+def _evict_stable_canaries(
+    stable_canaries: dict[str, dict[str, Any]], canary_limit: int,
+) -> None:
+    """Bound the stable-canary pool with FIFO eviction.
+
+    The bound is deliberate, not a retention strategy: _selected_canaries
+    re-ranks the surviving anchors by (genome, edit) hash at selection time,
+    so the eviction order cannot bias which anchors a regression check sees.
+    """
+    while len(stable_canaries) > max(8, canary_limit * 4):
+        stable_canaries.pop(next(iter(stable_canaries)))
+
+
 def _rule_in_trace(rule_id: str, trace: Any) -> bool:
     """Whether a stable rule id appears in an injected/applied rule trace."""
     if not rule_id:
@@ -4457,12 +4470,7 @@ def _flush_shadow_batch_impl(
                 and not bool(_source_after.get("should_evolve"))
             ):
                 stable_canaries[item.case_id] = _shadow_result
-                # FIFO eviction is a deliberate bound, not a retention
-                # strategy: _selected_canaries re-ranks the surviving anchors
-                # by (genome, edit) hash at selection time, so the eviction
-                # order cannot bias which anchors a regression check sees.
-                while len(stable_canaries) > max(8, canary_limit * 4):
-                    stable_canaries.pop(next(iter(stable_canaries)))
+                _evict_stable_canaries(stable_canaries, canary_limit)
             step = steps[item.step_index]
             step.gate_decision = "accept_batch"
             step.mutation_applied = item.edit.to_dict()
@@ -6174,12 +6182,7 @@ class EvolutionLoop:
                 if self.active_attempt_index == 0:
                     self.state.stable_cases += 1
                 self.stable_canaries[case_id] = detection_result
-                # FIFO eviction is a deliberate bound, not a retention
-                # strategy: _selected_canaries re-ranks the surviving anchors
-                # by (genome, edit) hash at selection time, so the eviction
-                # order cannot bias which anchors a regression check sees.
-                while len(self.stable_canaries) > max(8, self.canary_limit * 4):
-                    self.stable_canaries.pop(next(iter(self.stable_canaries)))
+                _evict_stable_canaries(self.stable_canaries, self.canary_limit)
                 if not self.pending_probe_commits:
                     self.state.stable_canaries_checkpoint = dict(self.stable_canaries)
                 # Register the stable case as a counter-case anchor: the same

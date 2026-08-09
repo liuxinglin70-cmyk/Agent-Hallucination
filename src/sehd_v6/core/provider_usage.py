@@ -24,7 +24,6 @@ from typing import Any, Mapping, Sequence
 SCHEMA_VERSION = "sehd.provider_usage_ledger.v1"
 
 COST_UNAVAILABLE = "unavailable"
-COST_ESTIMATED = "estimated"
 
 
 def _nonnegative_int(value: Any) -> int:
