@@ -455,3 +455,14 @@ Camel/081
 Magentic_One/036
 Octotools/034
 OpenManus/067
+# --- batch05 R13-verify (2026-08-10, 10 fresh stratified cases; FP ownership fix generalizes, gold gate verified both directions) ---
+BFCL/069
+BFCL/093
+BFCL/100
+BFCL/124
+Magentic_One/066
+OpenDeepSearch/048
+OpenDeepSearch/091
+OpenManus/013
+OpenManus/097
+SmolAgents/057
