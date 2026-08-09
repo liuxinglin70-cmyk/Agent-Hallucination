@@ -420,3 +420,15 @@ OpenManus/084
 SmolAgents/027
 SmolAgents/029
 SmolAgents/062
+
+# --- batch02 R10 (2026-08-09, 10 cases, stratified; post transport/thinking fix, zero hangs) ---
+BFCL/009
+BFCL/019
+BFCL/020
+BFCL/045
+BFCL/151
+Magentic_One/031
+Magentic_One/067
+OpenDeepSearch/007
+OpenManus/004
+OpenManus/055
