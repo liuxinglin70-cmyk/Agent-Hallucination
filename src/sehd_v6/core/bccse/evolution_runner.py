@@ -34,7 +34,6 @@ from ..paca_tcl.skill_integration import integrated_v35_provider
 from ..paca_tcl.basic_runner import (
     json_object_provider_call,
     write_json,
-    write_jsonl,
 )
 from ..provider_usage import ProviderUsageLedger
 from ...utils import ocse_packet as packet
@@ -62,13 +61,10 @@ from .genome import (
     SkillOp,
     apply_edit,
     create_baseline_genome,
-    validate_edit,
     _detect_rule_direction,
-    MODULE_IDS,
     FITNESS_STATUS_NONE,
     FITNESS_STATUS_WEAK,
     FITNESS_STATUS_STRONG,
-    OBSERVABLE_FIELDS,
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
     sanitize_expected_effect_contract,
@@ -87,11 +83,10 @@ from .fitness import (
     observable_process_delta,
     task_state_score,
 )
-from .safety_gate import GateCertificate, StructuralGate, create_structural_gate
+from .safety_gate import GateCertificate, create_structural_gate
 from .failure_classifier import classify_failure
 from .step_attributor import (
     AttributionSignal,
-    TriggerSource,
     attribute_failure,
     runtime_invalid_signal,
 )
@@ -151,8 +146,6 @@ from .meta_skill import (
 )
 from .module_charter import validate_action_surface
 from .policy_genome import (
-    FITNESS_STATUS_STRONG,
-    FITNESS_STATUS_WEAK,
     PENDING_STATUS_PENDING,
     PolicyEdit,
     PolicyGenome,
@@ -163,6 +156,7 @@ from .policy_genome import (
     validate_policy_edit,
 )
 from .policy_reflection import (
+    PolicyPlan,
     build_policy_selection_prompt,
     plan_policy_candidates,
     select_policy_candidate,
@@ -5545,7 +5539,7 @@ class EvolutionLoop:
         print(f"[{self.run_id}] Starting online evolution: {len(self.evolution_case_ids)} cases")
         print(f"  Config: use_gold={self.use_gold}, cooldown={self.module_cooldown}, "
               f"max_edits={self.max_total_edits}, convergence_window={self.convergence_window}")
-        print(f"  HTC-TES v3: type-conditioned evolution enabled")
+        print("  HTC-TES v3: type-conditioned evolution enabled")
 
 
         # Seed independent label-free anchors before processing the evolution
@@ -7058,7 +7052,6 @@ class EvolutionLoop:
             )
 
             if not accepted:
-                repairable_certificate = cert
                 retry_scheduled = False
                 # v5.6: semantic overlap is generation feedback, not permission to
                 # synthesize a compound rule. Automatic cross-module merge changed

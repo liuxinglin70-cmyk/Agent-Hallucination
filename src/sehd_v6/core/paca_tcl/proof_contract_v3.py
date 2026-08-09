@@ -8,7 +8,6 @@ the final rule.
 
 from __future__ import annotations
 
-from collections import Counter
 from typing import Any
 
 from . import contract_v1 as v1

@@ -35,7 +35,6 @@ from .action_spec import render_action_spec_contract
 from .failure_episode import EVALUATOR_ONLY_KEYS
 from .step_attributor import (
     AttributionSignal,
-    TriggerSource,
 )
 from .signal_adapter import resolve_evolution_state
 # v6.1 扩展：结构化经验检索与负反馈分析
@@ -682,19 +681,14 @@ listed for the target module in runtime_output_contracts.
     # v6.1 扩展：结构化经验检索（替代浅层历史提示）
     experience_section = ""
     if experience_memory is not None and episode_projection is not None:
-        # 从 episode_projection 重建 FailureEpisode 用于检索
-        from .failure_episode import FailureEpisode, CausalSlice, ActionEnvelope
         try:
-            # 尝试从 projection 中提取结构化信息
             episode_dict = episode_projection.get("episode", {})
             if episode_dict:
-                # 使用结构化经验检索
                 matches = retrieve_structured_experience(
                     episode_projection, experience_memory, max_results=2
                 )
                 experience_section = format_experience_for_prompt(matches)
         except Exception:
-            # 检索失败时静默回退到无经验状态
             experience_section = ""
 
     # v6.1 扩展：负反馈深度分析（替代表面化的拒绝列表）
@@ -1089,8 +1083,8 @@ def sanitize_diagnosis(
             str(hint.get("condition") or ""),
             str(hint.get("action") or ""),
         )).lower()
-        for field, patterns in _EMPTY_CLAIM_PATTERNS:
-            actual = balance.get(field)
+        for fact_field, patterns in _EMPTY_CLAIM_PATTERNS:
+            actual = balance.get(fact_field)
             if (
                 isinstance(actual, int) and actual > 0
                 and any(pattern in claim_text for pattern in patterns)
@@ -1099,7 +1093,7 @@ def sanitize_diagnosis(
                 bounded["owner_module"] = None
                 bounded.pop("intervention_hint", None)
                 bounded["remap_reason"] = (
-                    f"condition_contradicts_trace:{field}={actual}"
+                    f"condition_contradicts_trace:{fact_field}={actual}"
                 )
                 return bounded
     hint = parsed.get("intervention_hint")

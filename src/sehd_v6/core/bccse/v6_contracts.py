@@ -68,7 +68,6 @@ L1_ARTIFACTS = frozenset(MODULE_IDS)
 # import surface. ``build_adjudication_facts`` below derives the snapshot
 # from one proof-court result.
 from .vocabulary_registry import (  # noqa: E402
-    POLICY_STAGE_POST_LEDGER,
     AdjudicationFacts,
 )
 

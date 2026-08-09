@@ -27,8 +27,6 @@ from ..bccse.v6_contracts import (
 )
 from ..bccse.vocabulary_registry import (
     L2_REGISTRY,
-    POLICY_STAGE_POST_LEDGER,
-    POLICY_STAGE_PRE_LEDGER,
 )
 
 ACTION_RESTORE_AUDITED_CONSENSUS = "restore_audited_consensus"

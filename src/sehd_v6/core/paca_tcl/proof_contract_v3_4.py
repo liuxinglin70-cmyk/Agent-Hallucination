@@ -141,7 +141,6 @@ def check_materiality(
     breach_type = str(error_certificate.get("breach_type") or "")
     norm_source = str(error_certificate.get("norm_source") or "")
     rationale = str(error_certificate.get("rationale") or "")
-    impact_kind = str(error_certificate.get("impact_kind") or "")
 
     # Only apply materiality check to numerical contradictions
     if not _is_numerical_discrepancy(rationale, breach_type, norm_source):

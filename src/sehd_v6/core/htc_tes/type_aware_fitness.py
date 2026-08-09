@@ -21,7 +21,7 @@ from __future__ import annotations
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from .type_classifier import HallucinationType, TypeClassificationResult
 from ..bccse.genome import (

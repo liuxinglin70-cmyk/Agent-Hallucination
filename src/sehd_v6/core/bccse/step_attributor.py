@@ -25,8 +25,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
 
-from .genome import MODULE_IDS
-
 from .signal_adapter import (
     CRS_WEIGHTS,
     CRSSignal,
@@ -37,6 +35,8 @@ from .signal_adapter import (
     resolve_authoritative_state,
     resolve_evolution_state,
 )
+# Re-export for legacy importers (kept as a stable public alias).
+resolve_authoritative_state = resolve_authoritative_state  # noqa: F811
 
 
 class ErrorType(str, Enum):

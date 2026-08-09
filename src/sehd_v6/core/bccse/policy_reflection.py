@@ -16,15 +16,13 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from .v6_contracts import (
     ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
-    COVERAGE_DOWNGRADE_STATES,
     FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
     POLICY_ROUTES,
-    POLICY_SIDES,
     ROUTE_CANDIDATE_ALREADY_PRESENT,
     ROUTE_ENGINE_LEVEL_INTERVENTION_REQUIRED,
     ROUTE_EXECUTED,

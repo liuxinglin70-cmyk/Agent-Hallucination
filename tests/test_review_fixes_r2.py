@@ -55,9 +55,6 @@ from src.sehd_v6.core.bccse.safety_gate import (
 )
 from src.sehd_v6.core.htc_tes.type_classifier import HallucinationTypeClassifier
 from src.sehd_v6.core.bccse.signal_adapter import metric_snapshot
-from src.sehd_v6.core.paca_tcl.policy_evaluator import (
-    POLICY_STAGE_PRE_LEDGER,
-)
 from src.sehd_v6.detector import batch
 
 from tests.fixtures.causal_evolution import (

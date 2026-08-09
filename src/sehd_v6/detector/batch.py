@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..core.paca_tcl.detector import FORBIDDEN_INPUT_FIELDS, detect_record
-from ..utils.ocse_packet import canonical_json, stable_hash
+from ..utils.ocse_packet import stable_hash
 from .replica_aggregation import POLICIES, aggregate_replicas
 
 

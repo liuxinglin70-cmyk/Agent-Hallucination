@@ -29,13 +29,11 @@ Architecture:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
 from .type_classifier import (
     HallucinationType,
-    TypeClassificationResult,
 )
-from ..bccse.genome import normalize_type_confidence
 
 
 # Type to module routing table: which modules are primary targets per type
@@ -175,7 +173,6 @@ class TypeConditionedEvolution:
         candidate must still fall inside the attributor's bounded modules.
         """
         attributed = tuple(dict.fromkeys(str(module) for module in attribution_modules))
-        allowed = set(attributed)
         typed_modules = set(
             self.get_target_modules(hallucination_type, primary=True)
             + self.get_target_modules(hallucination_type, primary=False)

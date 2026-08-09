@@ -18,7 +18,6 @@ from typing import Any, Mapping
 
 from ..core.bccse.evolution_runner import (
     OnlineEvolutionResult,
-    load_evolution_checkpoint,
     run_online_evolution,
 )
 from ..core.bccse.genome import SkillGenome

@@ -26,10 +26,10 @@ from .basic_runner import (
     json_object_provider_call, _addressable_refs,
 )
 from .proof_engine_v3_4 import (
-    CONSTRUCT_CENSUS_SYSTEM, CONSTRUCT_AXIS_ALIASES,
+    CONSTRUCT_CENSUS_SYSTEM,
     DEFENSE_SYSTEM,
     _normalize_construct_value, _deterministic_process_census, _union_census,
-    _required_origins, _required_candidates, _proof_runtime_valid, _proof_user,
+    _required_candidates, _proof_runtime_valid, _proof_user,
     _merge_prosecutions,
     _construct_authority, _apply_construct_authority,
     _occurrence_first_rows, _causal_certificate_counts,

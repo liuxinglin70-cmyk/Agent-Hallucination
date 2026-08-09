@@ -8,8 +8,8 @@ the same trap* — without ever exposing case identity or gold labels.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, Sequence
 
 # Avoid circular import: RejectedEditEntry is defined in reflection_engine,
 # which imports this module. We use Any for type hints and import lazily
@@ -250,7 +250,7 @@ def format_negative_feedback_for_prompt(
         lines.append(f"  <insight severity=\"{insight.severity}\">")
         lines.append(f"    <root_cause>{insight.root_cause}</root_cause>")
         lines.append(f"    <how_to_avoid>{insight.how_to_avoid}</how_to_avoid>")
-        lines.append(f"  </insight>")
+        lines.append("  </insight>")
 
     lines.append("</negative_feedback_analysis>")
 

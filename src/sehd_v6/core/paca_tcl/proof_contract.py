@@ -26,22 +26,11 @@ from __future__ import annotations
 
 from collections import Counter
 import math
-from typing import Any, Sequence
+from typing import Any, Sequence, TYPE_CHECKING
 
-from . import contract_v1 as v1
 from .proof_contract_v3 import _address_space, validate_error_certificate
 from .proof_contract_v3_4 import (
-    BREACH_TYPES,
-    CLAIM_KINDS,
-    COVERAGE_STATES,
-    DEFENSE_FIELDS,
-    DEFENSE_TYPES,
     DOMINATING_DEFENSES,
-    ERROR_FIELDS,
-    IMPACT_KINDS,
-    NORM_SOURCES,
-    RECOVERY_STATES,
-    BENCHMARK_CAUSAL_STATES,
     check_commitment,
     check_materiality,
     route_evidence_authority,
@@ -49,6 +38,13 @@ from .proof_contract_v3_4 import (
     _defense_dominates,
     _validate_top,
 )
+
+if TYPE_CHECKING:
+    from ..bccse.v6_contracts import PolicyItem
+else:
+    # Runtime placeholder so ``typing.get_type_hints`` can resolve the
+    # annotation without importing the bccse package into the detector path.
+    PolicyItem = Any  # type: ignore[misc,assignment]
 
 
 # ============================================================

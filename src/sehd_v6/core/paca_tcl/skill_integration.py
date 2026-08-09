@@ -19,9 +19,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
+from typing import Any, Iterator, Mapping, Protocol
 
-from ..bccse import cesv_contract as cesv
 from ..bccse.genome import (
     MODULE_IDS,
     MODULE_DISPLAY_NAMES,

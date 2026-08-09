@@ -24,7 +24,7 @@ Schema: ``sehd.promotion_decision.v1``.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 SCHEMA_VERSION = "sehd.promotion_decision.v1"

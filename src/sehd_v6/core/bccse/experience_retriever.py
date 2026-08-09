@@ -9,8 +9,8 @@ identity, gold labels, or raw trajectories.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, Sequence
 
 from .evolution_experience_memory import EvolutionExperienceMemory, MechanismEntry
 from .failure_episode import (
@@ -307,23 +307,23 @@ def format_experience_for_prompt(
             for intervention in match.successful_interventions[:2]:
                 action = intervention.get("action_spec", {})
                 outcome = intervention.get("outcome", {})
-                lines.append(f"      <intervention>")
+                lines.append("      <intervention>")
                 lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
                 lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
                 lines.append(f"        <outcome>{outcome.get('decision', 'unknown')}</outcome>")
-                lines.append(f"      </intervention>")
+                lines.append("      </intervention>")
             lines.append("    </successful_interventions>")
         if match.failed_interventions:
             lines.append("    <failed_interventions>")
             for intervention in match.failed_interventions[:2]:
                 action = intervention.get("action_spec", {})
                 outcome = intervention.get("outcome", {})
-                lines.append(f"      <intervention>")
+                lines.append("      <intervention>")
                 lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
                 lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
                 lines.append(f"        <outcome>{outcome.get('decision', 'unknown')}</outcome>")
                 lines.append(f"        <no_effect_reason>{outcome.get('no_effect_reason', '')}</no_effect_reason>")
-                lines.append(f"      </intervention>")
+                lines.append("      </intervention>")
             lines.append("    </failed_interventions>")
         lines.append("  </match>")
     lines.append("</structured_experience>")
