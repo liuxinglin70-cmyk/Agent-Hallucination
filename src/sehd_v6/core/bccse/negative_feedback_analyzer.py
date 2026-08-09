@@ -172,6 +172,10 @@ def analyze_negative_feedback(
     insights: list[NegativeFeedbackInsight] = []
     stage_counts: dict[str, int] = {}
     cause_counts: dict[str, int] = {}
+    # Most severe observation per root cause: priorities must reflect the
+    # worst item, not the arbitrary first one that caused it.
+    priority_order = {"critical": 0, "moderate": 1, "minor": 2}
+    cause_severity: dict[str, int] = {}
 
     for rejected in rejected_buffer:
         root_cause = _classify_root_cause(rejected)
@@ -180,6 +184,9 @@ def analyze_negative_feedback(
 
         stage_counts[stage] = stage_counts.get(stage, 0) + 1
         cause_counts[root_cause] = cause_counts.get(root_cause, 0) + 1
+        cause_severity[root_cause] = min(
+            cause_severity.get(root_cause, 3), priority_order[severity],
+        )
 
         # Pattern signature: closed-vocabulary tag for prompt use
         pattern = f"{stage}:{root_cause}"
@@ -199,13 +206,9 @@ def analyze_negative_feedback(
     most_common_cause = max(cause_counts, key=cause_counts.get, default="")
 
     # Avoidance priorities: ordered by severity and frequency
-    priority_order = {"critical": 0, "moderate": 1, "minor": 2}
     unique_causes = sorted(
         cause_counts.items(),
-        key=lambda x: (priority_order.get(
-            _severity_for(next(r for r in rejected_buffer if _classify_root_cause(r) == x[0])),
-            3
-        ), -x[1]),
+        key=lambda x: (cause_severity[x[0]], -x[1]),
     )
     avoidance_priorities = tuple(
         _avoidance_strategy(cause) for cause, _ in unique_causes[:3]

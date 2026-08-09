@@ -61,7 +61,6 @@ NO_EFFECT_REASONS = frozenset({
     "provider_did_not_apply_action",
     "output_changed_then_removed_or_quarantined",
     "provider_output_changed_but_downstream_invariant",
-    "expected_delta_observed",
     "unresolved_no_effect",
 })
 
@@ -96,6 +95,11 @@ def episode_signature(episode: FailureEpisode) -> tuple[str, ...]:
 
 def _slot_for(attempt: FailureAttempt) -> str | None:
     decision = str(attempt.decision or "")
+    if attempt.no_effect_reason in NO_EFFECT_REASONS:
+        # An accepted-but-ineffective attempt (e.g. a policy accepted
+        # without a terminal-state change) is a no-effect observation;
+        # the accept alone must not claim the effective slot.
+        return "no_effect"
     if decision.startswith("accept"):
         return "effective"
     if decision in ("no_edit", "unaddressable", "no_proposal",
@@ -107,8 +111,6 @@ def _slot_for(attempt: FailureAttempt) -> str | None:
         "structural_reject", "retry_invalid_mutation", "skip_invalid_mutation",
     ) or attempt.structural_result == "invalid_mutation":
         return "structural_reject"
-    if attempt.no_effect_reason in NO_EFFECT_REASONS:
-        return "no_effect"
     if decision.startswith("reject") or decision.startswith("rollback"):
         # ``rollback_batch`` / ``rollback_probe`` / ``rollback_resume`` carry
         # the same negative learning signal as a reject: without this clause

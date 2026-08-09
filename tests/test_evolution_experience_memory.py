@@ -260,7 +260,13 @@ def test_statistics_accumulate() -> None:
     entry = memory.entries()[0]
     assert entry.observation_count == 1  # dedup by episode id
     memory.upsert_attempt(episode, _attempt(decision="reject_fitness_no_effect"))
-    memory.upsert_attempt(episode, _attempt(decision="accept_batch"))
+    memory.upsert_attempt(
+        episode,
+        _attempt(
+            decision="accept_batch",
+            no_effect_reason="expected_delta_observed",
+        ),
+    )
     entry = memory.entries()[0]
     assert entry.outcome_counts == {
         "reject_fitness_no_effect": 1,
@@ -320,9 +326,25 @@ def test_no_effect_vocabulary_is_closed() -> None:
         "provider_did_not_apply_action",
         "output_changed_then_removed_or_quarantined",
         "provider_output_changed_but_downstream_invariant",
-        "expected_delta_observed",
         "unresolved_no_effect",
     }
+
+
+def test_accepted_but_ineffective_attempt_lands_in_no_effect_slot() -> None:
+    memory = EvolutionExperienceMemory()
+    episode = _episode()
+    memory.upsert_attempt(episode, _attempt(
+        decision="accept_policy",
+        no_effect_reason="provider_output_changed_but_downstream_invariant",
+    ))
+    entry = memory.entries()[0]
+    assert entry.representatives["no_effect"] is not None
+    assert entry.representatives.get("effective") is None
+    refs = memory.retrieve(
+        episode=_episode(record_key="case_other"),
+        exclude_episode_id="x",
+    )
+    assert refs and refs[0].local_outcome["decision"] == "accept_policy"
 
 
 def test_reference_contains_shared_and_private_facts() -> None:

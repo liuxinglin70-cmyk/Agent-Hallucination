@@ -383,9 +383,34 @@ def test_disable_excludes_entry_from_active_views() -> None:
 
 
 def test_baseline_entries_cannot_be_disabled() -> None:
-    with pytest.raises(ValueError, match="baseline entry cannot be disabled"):
+    with pytest.raises(ValueError, match="only registered entries can be disabled"):
         apply_registry_edit(
             L2_REGISTRY, operation="disable",
+            target="all_candidates_quarantined",
+        )
+
+
+def test_pending_entries_cannot_be_disabled() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    with pytest.raises(ValueError, match="only registered entries can be disabled"):
+        apply_registry_edit(
+            registry, operation="disable",
+            target="quarantined_error_count_nonzero",
+        )
+
+
+def test_active_entries_cannot_be_enabled_again() -> None:
+    registry = _register_pending(L2_REGISTRY)
+    promoted = apply_registry_edit(
+        registry, operation="enable", target="quarantined_error_count_nonzero",
+    )
+    with pytest.raises(ValueError, match="only pending/disabled entries can be enabled"):
+        apply_registry_edit(
+            promoted, operation="enable", target="quarantined_error_count_nonzero",
+        )
+    with pytest.raises(ValueError, match="only pending/disabled entries can be enabled"):
+        apply_registry_edit(
+            L2_REGISTRY, operation="enable",
             target="all_candidates_quarantined",
         )
 

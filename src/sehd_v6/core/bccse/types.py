@@ -9,32 +9,8 @@ it has fields specific to the evolution loop that are not shared.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from typing import Any
-
-
-@dataclass
-class EvaluationOutcome:
-    """Result of an evaluation run on a genome against a set of cases."""
-
-    metrics: dict[str, Any]
-    experience_records: tuple = ()
-    per_case_correct: dict[str, bool] = field(default_factory=dict)
-    provider_payload_hashes: tuple = ()
-    evaluation_id: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "metrics": self.metrics,
-            "experience_records": [
-                r.to_dict() if hasattr(r, "to_dict") else r
-                for r in self.experience_records
-            ],
-            "per_case_correct": self.per_case_correct,
-            "provider_payload_hashes": list(self.provider_payload_hashes),
-            "evaluation_id": self.evaluation_id,
-        }
 
 
 @dataclass
@@ -81,31 +57,3 @@ class ExperienceRecord:
             "latency_seconds": self.latency_seconds,
             "metadata": self.metadata,
         }
-
-
-@dataclass
-class ReplayEpisode:
-    """A single paired-replay evaluation input (anonymous)."""
-
-    record_key: str
-    error_type: str
-    support_refs: tuple = ()
-    boundary_refs: tuple = ()
-    candidate_origin_refs: tuple = ()
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "record_key": self.record_key,
-            "error_type": self.error_type,
-            "support_refs": list(self.support_refs),
-            "boundary_refs": list(self.boundary_refs),
-            "candidate_origin_refs": list(self.candidate_origin_refs),
-            "metadata": self.metadata,
-        }
-
-
-def anonymous_ref(record: ExperienceRecord, salt: str = "") -> str:
-    """Produce an anonymized reference key for an experience record."""
-    payload = f"{record.record_key}|{record.partition}|{salt}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

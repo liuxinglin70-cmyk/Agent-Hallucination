@@ -406,10 +406,16 @@ def _expected_effect_audit(
         dir_tokens = direction_tokens.get(cdir, ())
         for token in observable_delta_tokens:
             lowered_token = token.lower()
-            if prefixes and any(token.startswith(p) for p in prefixes):
-                contract_field_observed = True
-                if dir_tokens and any(d in lowered_token for d in dir_tokens):
-                    contract_direction_observed = True
+            # Direction is only meaningful on the contracted field's own
+            # tokens; a token of another field must not satisfy it (the
+            # field may have moved the opposite way).
+            if not prefixes or not any(
+                token.startswith(p) for p in prefixes
+            ):
+                continue
+            contract_field_observed = True
+            if dir_tokens and any(d in lowered_token for d in dir_tokens):
+                contract_direction_observed = True
         # sanitize_expected_effect_contract only admits observable_field
         # values from OBSERVABLE_FIELDS, which is exactly the field_prefixes
         # key set, so ``prefixes`` is always non-empty here.
@@ -1328,6 +1334,12 @@ def _classify_mutation_failure(reason: str) -> str:
     cache key differs from the initial attempt.
     """
     text = str(reason or "")
+    if text.startswith("all_candidates_prevalidation_rejected:"):
+        # The prevalidation reason is a deterministic closed category
+        # (``rule_spec:missing_slots`` etc.), so it is safe to carry into
+        # the retry prompt — without it the retry repeats the same defect.
+        detail = text[len("all_candidates_prevalidation_rejected:"):]
+        return detail if detail else "mutation_invalid_schema"
     if text.startswith("single_reflection_runtime_error"):
         return "mutation_provider_exception"
     if "operation=" in text and "content_length=0" in text:
@@ -4134,6 +4146,37 @@ def _save_evolution_results(
           f"(effective: {type_coverage['effective_coverage']:.1%})")
 
 
+def _shadow_commit_eligible(
+    decision: str,
+    *,
+    fitness_use_gold: bool,
+    canary_audits: Sequence[Mapping[str, Any]],
+) -> bool:
+    """Single admission/commit predicate for the reversible shadow batch.
+
+    Label-free directional evidence may advance the reversible working
+    genome only when an independent sampled canary proves process
+    non-regression. It remains explicitly provisional: the commit never
+    grants it protected fitness status (protection is reserved for
+    gold-assisted edits) and the run result keeps final_champion_claim=False
+    until an external authority scores it. Independent canaries protect
+    known behavior; they do not establish that a newly decisive verdict is
+    correct. The main loop and flush must share this predicate, or an edit
+    is admitted only to be rolled back — wasting the replay and counting a
+    no-edit against the convergence window.
+    """
+    if decision in {"strong_improvement", "local_improvement"}:
+        return True
+    return (
+        not fitness_use_gold
+        and decision == "directional_evidence"
+        and bool(canary_audits)
+        and all(
+            bool(audit.get("preserved")) for audit in canary_audits
+        )
+    )
+
+
 def _flush_shadow_batch_impl(
     *, next_case_index: int, force: bool = False,
     state: _RunState, provisional_edits: list[ProvisionalEdit],
@@ -4196,26 +4239,10 @@ def _flush_shadow_batch_impl(
     accepted_indices: list[int] = []
     rejected_indices: list[int] = []
     for i, dec in enumerate(decisions):
-        # Label-free directional evidence may advance the reversible
-        # working genome only when an independent sampled canary proves
-        # process non-regression. It remains explicitly provisional: the
-        # commit never grants it protected fitness status (protection is
-        # reserved for gold-assisted edits) and the run result keeps
-        # final_champion_claim=False until an external authority scores
-        # it. Independent canaries protect known behavior; they do not
-        # establish that a newly decisive verdict is correct.
-        label_free_provisional = (
-            not fitness_use_gold
-            and dec == "directional_evidence"
-            and bool(provisional_edits[i].canary_audits)
-            and all(
-                bool(audit.get("preserved"))
-                for audit in provisional_edits[i].canary_audits
-            )
-        )
-        if (
-            dec in {"strong_improvement", "local_improvement"}
-            or label_free_provisional
+        if _shadow_commit_eligible(
+            dec,
+            fitness_use_gold=fitness_use_gold,
+            canary_audits=provisional_edits[i].canary_audits,
         ):
             accepted_indices.append(i)
         else:
@@ -4227,12 +4254,7 @@ def _flush_shadow_batch_impl(
     # experience telemetry) are appended to runtime_errors below and surface
     # in the batch audit and rejected-entry rejection_stage; they cannot
     # influence this pre-commit decision because they do not exist yet.
-    audit_complete = len(source_audits) == len(provisional_edits)
-    if not audit_complete:
-        passed = False
-        accepted_indices = []
-        rejected_indices = list(range(len(provisional_edits)))
-    elif not accepted_indices:
+    if not accepted_indices:
         # All edits worse or no acceptable edits
         passed = False
     else:
@@ -5045,13 +5067,14 @@ def _run_l2_policy_case_impl(
                     facts_summary=facts_summary,
                     case_id=case_id,
                 )
-        finish(
-            "skip_no_policy",
-            reason=plan.route_result,
-            route=plan.route_result,
-            feedback=plan.feedback_code,
-        )
-        return accepted_outcome
+        if not planned_candidates:
+            finish(
+                "skip_no_policy",
+                reason=plan.route_result,
+                route=plan.route_result,
+                feedback=plan.feedback_code,
+            )
+            return accepted_outcome
     # P7.4: bounded cross-case Meta guidance informs the selection
     # without enlarging the candidate set or touching the gate.  Only
     # inject when the Meta state actually carries guidance, so an empty
@@ -5919,7 +5942,7 @@ class EvolutionLoop:
             if self.active_attempt_index > 0:
                 self.budget_usage["mutation_retry_attempts"] += 1
             # --- Check halt (including convergence) ---
-            if self.gate.is_halted or getattr(self.gate, "_converged", False):
+            if self.gate.is_halted or self.gate.converged:
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -6311,21 +6334,6 @@ class EvolutionLoop:
                     ),
                 })
             type_allowed_modules = (attribution_owner,)
-            if not type_allowed_modules:
-                self.gate.record_no_edit()
-                self.record_step(EvolutionStep(
-                    case_id=case_id, case_index=idx,
-                    trigger_source=signal.trigger_source.value,
-                    attribution=signal.to_dict(), edit_proposal={
-                        "operation": "no_edit",
-                        "reason": "type_attribution_route_intersection_empty",
-                        "hallucination_type": type_result.primary_type.value,
-                    }, mutation_applied=None, gate_decision="skip_route_conflict",
-                    genome_hash_before=genome_before,
-                    genome_hash_after=self.state.current_genome.content_hash,
-                    detection_state=detection_state, timestamp=time.time(),
-                ), next_case_index=idx + 1)
-                continue
             type_guidance = self.type_evolution.generate_type_guidance(
                 type_result.primary_type,
                 evolution_direction,
@@ -7183,9 +7191,19 @@ class EvolutionLoop:
                     None,
                 )
                 if merge_reason is not None and edit.operation == "add_rule":
-                    self.mutation_retry_feedback.setdefault(case_id, []).append(
+                    # The ``structural:`` marker is required for the hard
+                    # constraint and the repeated-category cooldown; without
+                    # it the retry prompt never carries the overlap
+                    # constraint and the same defect can repeat.
+                    feedback = self.mutation_retry_feedback.setdefault(
+                        case_id, []
+                    )
+                    marker = (
+                        "structural:"
                         "semantic_overlap_requires_distinct_discriminator"
                     )
+                    if marker not in feedback:
+                        feedback.append(marker)
                     retry_scheduled = (
                         self.mutation_route is not None
                         and self.active_attempt_index + 1 < self.max_mutation_attempts_per_case
@@ -7652,27 +7670,18 @@ class EvolutionLoop:
                 after_result=candidate_result,
             )
             fitness_audit["expected_effect_contract"] = effect_audit
-            directional_canary_support = (
-                assessment.evidence_only
-                and bool(canary_audit)
-                and not canary_regressions
-                and all(bool(audit.get("preserved")) for audit in canary_audit)
+            # Admission uses the same predicate as the flush commit (see
+            # ``_shadow_commit_eligible``); a directional edit that the
+            # commit would roll back must not enter the shadow genome.
+            shadow_admissible = _shadow_commit_eligible(
+                assessment.decision,
+                fitness_use_gold=self.fitness_use_gold,
+                canary_audits=canary_audit,
             )
-            if directional_canary_support:
-                fitness_audit["directional_evidence_canary_preserved"] = True
+            if shadow_admissible:
+                if assessment.decision == "directional_evidence":
+                    fitness_audit["directional_evidence_canary_preserved"] = True
                 fitness_audit["shadow_admissible"] = True
-            # T6: self-supervised provisional acceptance path. A directional
-            # source replay (trigger closed, NOT worse, NOT no_effect) may be
-            # admitted when the LLM no-conflict gate was actually consulted
-            # and returned "pass". Canary regression has already rewritten
-            # the assessment to "worse" above, so this can never fire on a
-            # canary regression. ``no_effect`` and ``worse`` decisions are
-            # excluded by the strict equality check on "directional_evidence".
-            provisional_accept_eligible = (
-                not self.fitness_use_gold
-                and assessment.decision == "directional_evidence"
-                and conflict_gate_passed
-            )
             # v5.8 mechanism 2: contrastive replay acceptance.  When the edit
             # would otherwise be admitted, replay it once on the nearest
             # stable same-type neighbour; a contrast inversion (polarity
@@ -7682,10 +7691,7 @@ class EvolutionLoop:
             # verdict authority.  Costs at most one detector call per
             # otherwise-accepted edit.
             contrast_audit: dict[str, Any] | None = None
-            if (
-                (assessment.passed or provisional_accept_eligible)
-                and not canary_regressions
-            ):
+            if shadow_admissible and not canary_regressions:
                 neighbor = _select_contrast_neighbor(
                     self.contrast_replay_registry.get(
                         type_result.primary_type.value, ()
@@ -7760,8 +7766,7 @@ class EvolutionLoop:
                         fitness_audit["assessment"] = assessment.to_dict()
                         fitness_audit["passed"] = False
                         fitness_audit["shadow_admissible"] = False
-                        provisional_accept_eligible = False
-                        directional_canary_support = False
+                        shadow_admissible = False
                         print(
                             f"  [{idx}] CONTRAST_INVERSION {case_id}: "
                             f"neighbour {neighbor_id} flipped "
@@ -7778,14 +7783,7 @@ class EvolutionLoop:
                     "ran": conflict_gate_ran,
                 }
             )
-            if provisional_accept_eligible:
-                fitness_audit["provisional_accept"] = True
-                fitness_audit["shadow_admissible"] = True
-            if (
-                not assessment.passed
-                and not directional_canary_support
-                and not provisional_accept_eligible
-            ):
+            if not shadow_admissible:
                 typed_assessment = self.type_fitness.assess_edit(
                     source_case_id=case_id,
                     hallucination_type=type_result.primary_type,

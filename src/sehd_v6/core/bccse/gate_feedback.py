@@ -319,14 +319,20 @@ class GateEventLedger:
 
     @classmethod
     def from_list(cls, rows: Sequence[Mapping[str, Any]]) -> "GateEventLedger":
-        """Rebuild the ledger from persisted rows.  Fail-closed: a malformed
-        or schema-unknown row raises instead of being silently dropped, so a
-        resume never loses an audited decision."""
+        """Rebuild the ledger from persisted rows.  Fail-closed: a malformed,
+        schema-unknown or duplicated row raises instead of being silently
+        dropped, so a resume never loses or double-records an audited
+        decision."""
         ledger = cls()
         for row in rows or ():
             if not isinstance(row, Mapping):
                 raise ValueError("gate event row must be an object")
             event = GateEvent.from_dict(row)
+            if event.event_id in ledger._ids:
+                raise ValueError(
+                    f"duplicated gate event id in persisted rows: "
+                    f"{event.event_id!r}"
+                )
             ledger.events.append(event)
             ledger._ids.add(event.event_id)
         return ledger

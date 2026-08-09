@@ -771,13 +771,21 @@ def extract_intervention_candidates(
         return [], "mutation response is not an object"
     raw = response.get("candidates")
     if isinstance(raw, list):
-        candidates = [
-            dict(value) for value in raw
-            if isinstance(value, Mapping) and _candidate_shape_valid(value)
-        ]
-        return _deduplicate_candidates(candidates, limit), str(
-            response.get("no_edit_rationale") or ""
-        )[:300]
+        candidates: list[dict[str, Any]] = []
+        no_edit_rationale = str(response.get("no_edit_rationale") or "")[:300]
+        for value in raw:
+            if not isinstance(value, Mapping):
+                continue
+            # An abstention inside the array is not a candidate: surface it
+            # as the no-edit rationale (first one wins) instead of letting
+            # the critic select a no-op "edit".
+            if str(value.get("operation") or "").strip() == "no_edit":
+                if not no_edit_rationale:
+                    no_edit_rationale = str(value.get("rationale") or "")[:300]
+                continue
+            if _candidate_shape_valid(value):
+                candidates.append(dict(value))
+        return _deduplicate_candidates(candidates, limit), no_edit_rationale
     if str(response.get("operation") or "") == "no_edit":
         return [], str(response.get("rationale") or "")[:300]
     return ([dict(response)], "") if _candidate_shape_valid(response) else (

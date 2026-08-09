@@ -47,6 +47,7 @@ from typing import Any, Callable, Mapping
 # can never share an execution path.
 POLICY_STAGE_POST_LEDGER = "post_ledger"
 POLICY_STAGE_PRE_LEDGER = "pre_ledger"
+POLICY_STAGES = frozenset({POLICY_STAGE_POST_LEDGER, POLICY_STAGE_PRE_LEDGER})
 
 
 @dataclass(frozen=True)
@@ -670,6 +671,8 @@ _DSL_ALLOWED_STRINGS = frozenset({
     "not_applicable", "failed_temporal_fallback",
     # v6.1: quarantine reason categories from court audit failed_checks
     "schema_mismatch", "evidence_missing", "causal_broken",
+    # policy-stage values the registry's own operators emit
+    "post_ledger", "pre_ledger",
 })
 
 
@@ -854,12 +857,26 @@ def _predicate_from_dict(data: Mapping[str, Any]) -> PredicateEntry:
     # Loading recompiles the predicate from its canonical DSL (never from a
     # persisted callable), so a drifted or uncompilable payload fails closed.
     evaluate = compile_predicate_dsl(name, dsl)
+    # facts_whitelist and compiled_digest are derived facts of the DSL; a
+    # payload whose persisted copies disagree with the recompile drifted.
+    derived_whitelist = predicate_facts_whitelist(dsl)
+    derived_digest = hashlib.sha256(
+        f"{COMPILER_VERSION}:{name}:{dsl}".encode("utf-8")
+    ).hexdigest()
+    persisted_whitelist = tuple(data.get("facts_whitelist") or ())
+    persisted_digest = str(data.get("compiled_digest") or "")
+    if persisted_whitelist and persisted_whitelist != derived_whitelist:
+        raise ValueError(
+            f"facts_whitelist drift for predicate: {name!r}"
+        )
+    if persisted_digest and persisted_digest != derived_digest:
+        raise ValueError(f"compiled_digest drift for predicate: {name!r}")
     return PredicateEntry(
         name=name,
         canonical_ast=dict(data.get("canonical_ast") or {"dsl": dsl}),
         canonical_dsl=dsl,
-        facts_whitelist=tuple(data.get("facts_whitelist") or ()),
-        compiled_digest=str(data.get("compiled_digest") or ""),
+        facts_whitelist=derived_whitelist,
+        compiled_digest=derived_digest,
         registered_generation=int(data.get("registered_generation") or 0),
         status=status,
         evaluate=evaluate,
@@ -867,10 +884,13 @@ def _predicate_from_dict(data: Mapping[str, Any]) -> PredicateEntry:
 
 
 def _operator_from_dict(data: Mapping[str, Any]) -> ActionOperator:
+    policy_stage = str(data.get("policy_stage") or "")
+    if policy_stage and policy_stage not in POLICY_STAGES:
+        raise ValueError(f"unknown policy_stage: {policy_stage!r}")
     return ActionOperator(
         operator=str(data.get("operator") or ""),
         params_schema=tuple(data.get("params_schema") or ()),
-        policy_stage=str(data.get("policy_stage") or ""),
+        policy_stage=policy_stage,
         runtime_owner=str(data.get("runtime_owner") or ""),
     )
 
@@ -1019,11 +1039,24 @@ def apply_registry_edit(
         entry = predicates.get(target) or instances.get(target)
         if entry is None:
             raise ValueError(f"unknown registry entry: {target}")
-        if entry.status == STATUS_BASELINE and operation == "disable":
-            raise ValueError(f"baseline entry cannot be disabled: {target}")
-        new_status = (
-            STATUS_DISABLED if operation == "disable" else STATUS_REGISTERED
-        )
+        if operation == "disable":
+            # Only a working entry can be switched off; disabling a pending
+            # shadow entry would be a no-op audited as if it mattered.
+            if entry.status != STATUS_REGISTERED:
+                raise ValueError(
+                    f"only registered entries can be disabled: {target} "
+                    f"(status={entry.status})"
+                )
+            new_status = STATUS_DISABLED
+        else:
+            # Only a shadow or switched-off entry can be promoted to
+            # working; re-enabling an active entry is a no-op audit edit.
+            if entry.status not in (STATUS_PENDING, STATUS_DISABLED):
+                raise ValueError(
+                    f"only pending/disabled entries can be enabled: {target} "
+                    f"(status={entry.status})"
+                )
+            new_status = STATUS_REGISTERED
         replacement = replace(entry, status=new_status)
         if isinstance(replacement, PredicateEntry):
             predicates[target] = replacement

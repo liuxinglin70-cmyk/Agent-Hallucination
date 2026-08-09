@@ -627,7 +627,7 @@ evolution/runner.py (run_evolution)
         ├── reflection_engine.py (build_causal_reflection_prompt)
         ├── fitness.py (assess_source_fitness)
         ├── safety_gate.py (StructuralGate)
-        ├── types.py (EvaluationOutcome, ExperienceRecord) ← breaks circular dep
+        ├── types.py (ExperienceRecord) ← breaks circular dep
         ├── promotion_gates.py (MetricSnapshot, ReplayEvidence)
         └── htc_tes/ (HallucinationTypeClassifier, TypeConditionedEvolution, TypeAwareFitness)
                 └── type_classifier.py::_normalize_signal() ← accepts AttributionSignal | Mapping

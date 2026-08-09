@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .evolution_experience_memory import (
+    NO_EFFECT_REASONS,
     EvolutionExperienceMemory,
     MechanismEntry,
     episode_signature,
@@ -204,6 +205,18 @@ def _matched_signature_indices(
     )
 
 
+def _is_effective_attempt(outcome: Mapping[str, Any] | None) -> bool:
+    """An accept carrying a recorded no-effect reason is a failed
+    intervention: the outcome shape proves the edit did not move the
+    terminal state, so the prompt must render it as a failure (with its
+    no_effect_reason) instead of a success precedent."""
+    if not outcome:
+        return False
+    if not str(outcome.get("decision") or "").startswith("accept"):
+        return False
+    return str(outcome.get("no_effect_reason") or "") not in NO_EFFECT_REASONS
+
+
 def retrieve_structured_experience(
     episode: FailureEpisode,
     memory: EvolutionExperienceMemory,
@@ -229,10 +242,7 @@ def retrieve_structured_experience(
     if exact_refs:
         matches = []
         for ref in exact_refs:
-            accepted = bool(
-                ref.local_outcome
-                and ref.local_outcome.get("decision", "").startswith("accept")
-            )
+            accepted = _is_effective_attempt(ref.local_outcome)
             match = ExperienceMatch(
                 pattern=current_pattern,
                 similarity_score=1.0,
@@ -286,10 +296,7 @@ def retrieve_structured_experience(
                 level=_matched_signature_indices(entry, episode),
             )
             for ref in refs:
-                accepted = bool(
-                    ref.local_outcome
-                    and ref.local_outcome.get("decision", "").startswith("accept")
-                )
+                accepted = _is_effective_attempt(ref.local_outcome)
                 results.append(ExperienceMatch(
                     pattern=current_pattern,
                     similarity_score=sim,

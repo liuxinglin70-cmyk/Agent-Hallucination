@@ -127,6 +127,22 @@ def _ordered_chain(candidate: dict[str, Any], event_order: dict[str, int]) -> bo
     )
 
 
+def _evidence_denied_by_state(state: str, row: Mapping[str, Any]) -> bool:
+    """Evidence lists may not cite events the propagation state denies.
+
+    ``no_consumption`` means nothing was consumed, impacted or recovered;
+    ``recovered_before_impact`` means impact never happened.  A row in
+    either state carrying the corresponding evidence refs contradicts
+    itself (the provider prompt requires ``[]`` for non-applicable lists).
+    """
+    if state == "no_consumption":
+        return bool(row.get("consumption_evidence_refs") or
+                    row.get("impact_evidence_refs"))
+    if state == "recovered_before_impact":
+        return bool(row.get("impact_evidence_refs"))
+    return False
+
+
 def validate_candidate(candidate: dict[str, Any], packet: dict[str, Any]) -> dict[str, Any]:
     """Validate syntax, addressability, and temporal invariants for one row."""
 
@@ -194,6 +210,9 @@ def validate_candidate(candidate: dict[str, Any], packet: dict[str, Any]) -> dic
         "recovery_evidence": _evidence_refs(candidate.get("recovery_evidence_refs"), addressable, nonempty=recovery is not None),
         "ordered_causal_chain": chain_ordered,
         "propagation_consistent": propagation_consistent,
+        "evidence_denied_by_state": not _evidence_denied_by_state(
+            propagation, candidate,
+        ),
         "impacted_has_surface": not impacted or bool(surfaces),
         "nonimpacted_has_no_surface": impacted or not surfaces,
         "residual_consistent": not candidate.get("residual_impact") or propagation in {"impacted_then_recovered", "unrecovered_impact"},

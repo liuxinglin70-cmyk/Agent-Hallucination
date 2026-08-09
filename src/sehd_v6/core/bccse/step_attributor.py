@@ -264,7 +264,9 @@ class AttributionSignal:
     appeal_status: str = "not_required"
     focused_quarantined_candidate_count: int = 0
     process_diagnostic_applied: bool = False
-    runtime_valid: bool = True
+    # Tri-state, matching signal_adapter: only an explicit True is valid;
+    # an absent row key is "unknown", never evidence of a clean run.
+    runtime_valid: bool | None = None
     # v5.5: when True this signal records an observation only. The detector
     # never produced an authoritative verdict, so the signal must never be
     # used as evolution, fitness, or correctness evidence.
@@ -935,7 +937,7 @@ def _build_attribution_signal(
         appeal_status=appeal_status,
         focused_quarantined_candidate_count=quarantined_count,
         process_diagnostic_applied=process_diagnostic_applied,
-        runtime_valid=row.get("runtime_valid") is not False,
+        runtime_valid=row.get("runtime_valid"),
     )
 
 

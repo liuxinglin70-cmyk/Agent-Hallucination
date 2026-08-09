@@ -16,12 +16,7 @@ keeps this package's public API unchanged and makes both orders valid.
 
 from typing import Any
 
-from .types import (
-    EvaluationOutcome,
-    ExperienceRecord,
-    ReplayEpisode,
-    anonymous_ref,
-)
+from .types import ExperienceRecord
 from .genome import (
     MODULE_IDS,
     MODULE_DISPLAY_NAMES,
@@ -55,10 +50,7 @@ from .promotion_gates import MetricSnapshot, ReplayEvidence
 
 __all__ = [
     # Types
-    "EvaluationOutcome",
     "ExperienceRecord",
-    "ReplayEpisode",
-    "anonymous_ref",
     # Genome
     "MODULE_IDS",
     "MODULE_DISPLAY_NAMES",

@@ -14,9 +14,8 @@ Ownership boundaries (from the causal-experience contract):
 - legal actions come only from module_charter + ActionSpec registry;
 - evaluator/gold fields never enter the prompt projection.
 
-The paired-replay input type that used to be called ``FailureEpisode`` is
-``ReplayEpisode`` (see types.py); this class is the causal episode and has
-no overlap with it.
+The paired-replay path that once fed the batch evaluator is gone; this
+class is the causal episode and the single skill-formation record.
 """
 
 from __future__ import annotations

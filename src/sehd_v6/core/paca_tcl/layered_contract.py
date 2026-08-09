@@ -147,6 +147,7 @@ def validate_propagation(row: dict[str, Any], origin_event_id: str, packet: dict
         "impact_surfaces": isinstance(surfaces, list) and set(map(str, surfaces)) <= v1.IMPACT_SURFACES,
         "ordered_causal_chain": chain_ordered,
         "propagation_consistent": consistent,
+        "evidence_denied_by_state": not v1._evidence_denied_by_state(state, row),
         "impacted_has_surface": not impacted or bool(surfaces),
         "nonimpacted_has_no_surface": impacted or not surfaces,
         "residual_consistent": not row.get("residual_impact") or impacted,
