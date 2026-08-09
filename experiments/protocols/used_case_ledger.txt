@@ -444,3 +444,14 @@ OpenManus/019
 SmolAgents/041
 SmolAgents/063
 SmolAgents/089
+# --- batch04 R13 (2026-08-10, 10 cases, stratified; FP ownership fix: evidence-based defense-side owner, quarantine re-owning removed after no-effect replays) ---
+BFCL/084
+BFCL/086
+BFCL/133
+BFCL/141
+BFCL/142
+Camel/079
+Camel/081
+Magentic_One/036
+Octotools/034
+OpenManus/067
