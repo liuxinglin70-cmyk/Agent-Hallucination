@@ -170,12 +170,18 @@ def provider_thinking_control(
 ) -> dict[str, str] | None:
     """Resolve a bounded thinking toggle for strict JSON provider calls.
 
-    DeepSeek V4 defaults to thinking mode. Small mutation requests can spend
-    their entire output budget in ``reasoning_content`` and return an empty
-    final ``content``, which the JSON transport previously misclassified as a
-    malformed skill. Mutation/reflection-family calls (including the L2
-    closed-vocabulary policy reflection) therefore default to the official
-    non-thinking mode; an explicit route setting still wins.
+    DeepSeek V4 defaults to thinking mode, and the gateway honors that
+    default regardless of which deployment fronts it: an unconstrained
+    mutation request can spend nearly its entire output budget in
+    ``reasoning_content`` (observed: ~4500 reasoning tokens against a ~980
+    token answer on the autodl.art gateway). When the reasoning occasionally
+    crosses the budget the response is truncated before any ``content`` is
+    emitted (``finish_reason=length``, empty body), which the strict-JSON
+    transport then fail-closes as an unparseable response. The mutation/
+    reflection family (including the L2 closed-vocabulary policy reflection)
+    produces strict machine-readable JSON and never needs chain-of-thought,
+    so it defaults to non-thinking mode for any DeepSeek V4 model on any
+    gateway; an explicit route setting still wins.
     """
     configured = route.get("thinking")
     if isinstance(configured, Mapping):
@@ -186,7 +192,6 @@ def provider_thinking_control(
         if value not in {"enabled", "disabled"}:
             raise ValueError("provider thinking mode must be enabled or disabled")
         return {"type": value}
-    endpoint = str(route.get("endpoint") or "").rstrip("/")
     model = str(route.get("model") or "").lower()
     if (
         purpose
@@ -197,7 +202,6 @@ def provider_thinking_control(
             "policy_reflection",
             "reflection_pro",
         }
-        and endpoint == OFFICIAL_ENDPOINT
         and model.startswith("deepseek-v4-")
     ):
         return {"type": "disabled"}

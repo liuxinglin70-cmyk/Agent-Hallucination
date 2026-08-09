@@ -408,3 +408,15 @@ OpenDeepSearch/082
 BFCL/005
 # --- D1 postcondition real-result verification (2026-08-07, single case) ---
 BFCL/006
+
+# --- batch01 R10 (2026-08-09, 10 cases, stratified; transport read1 drain + gateway-agnostic thinking-disable fix) ---
+BFCL/026
+BFCL/115
+Camel/011
+Camel/028
+Camel/086
+Magentic_One/018
+OpenManus/084
+SmolAgents/027
+SmolAgents/029
+SmolAgents/062

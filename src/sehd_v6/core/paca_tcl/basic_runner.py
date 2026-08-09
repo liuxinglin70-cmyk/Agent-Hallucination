@@ -41,6 +41,63 @@ load_local_env()
 DIRECT_PROVIDER_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
 
 
+def _read_response_body(response: Any, budget_seconds: int) -> bytes:
+    """Read one provider response body to EOF under a hard monotonic deadline.
+
+    ``OpenerDirector.open(timeout=...)`` only bounds a single socket
+    operation; a provider that streams a slow or stalled body keeps a plain
+    ``response.read()`` blocking past the configured total-timeout deadline,
+    which silently hangs a concurrent worker (observed in 10-way batches:
+    cases stuck for 30+ minutes with all retry/backoff machinery bypassed).
+
+    The body is accumulated in bounded chunks: ``HTTPResponse.read1``
+    performs at most one raw ``recv`` per call (it returns as soon as one
+    network chunk is available rather than filling the requested size), so we
+    loop on it until it returns ``b""`` at genuine EOF. Before each chunk the
+    underlying socket timeout is recomputed from the remaining budget, which
+    makes the total deadline authoritative for the whole body instead of only
+    the connect/first-byte window; a stalled read then surfaces as
+    ``TimeoutError``/``OSError`` and feeds the normal retry machinery.
+
+    The socket is resolved once up front: after the first ``read1`` the
+    ``HTTPResponse`` may clear its ``fp`` reference, so re-deriving it (or
+    falling back to ``response.read()``) mid-loop would both lose the chunk
+    already buffered and mis-read the remainder. The reader always drains to
+    EOF so no partially-read body is ever mistaken for an empty one.
+    """
+    deadline = time.monotonic() + max(1, int(budget_seconds))
+    # Resolve the underlying socket once. ``response.fp`` is a
+    # ``BufferedReader``; the real socket lives at ``fp.raw._sock`` (or
+    # ``fp._sock`` on some versions). When no socket is reachable the per-chunk
+    # ``settimeout`` is simply skipped and the opener timeout still applies.
+    fp = getattr(response, "fp", None)
+    sock = getattr(fp, "raw", None)
+    sock = getattr(sock, "_sock", None) or getattr(fp, "_sock", None)
+    can_timeout = sock is not None and hasattr(sock, "settimeout")
+
+    chunks: list[bytes] = []
+    if not hasattr(response, "read1"):
+        # A plain file-like body without ``read1`` (e.g. an in-memory buffer)
+        # is already bounded in memory; a single ``read()`` drains it and the
+        # deadline machinery adds nothing.
+        return response.read()
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                "provider response body read exceeded the total timeout budget"
+            )
+        if can_timeout:
+            try:
+                sock.settimeout(max(1, int(remaining)))
+            except OSError:
+                pass
+        chunk = response.read1(65536)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
 # ============================================================
 # 全局缓存基础设施（v3.5.1 效率优化）
 #
@@ -164,7 +221,7 @@ def _provider_repair_call(
             int(request_timeout or route.get("timeout_seconds", 120)),
         )
         with DIRECT_PROVIDER_OPENER.open(req, timeout=repair_timeout) as response:
-            raw = response.read()
+            raw = _read_response_body(response, repair_timeout)
         value = json.loads(raw.decode("utf-8"))
         content = value["choices"][0]["message"].get("content")
         if not isinstance(content, str) or not content.strip():
@@ -536,7 +593,7 @@ def provider_call_with_schema(
             )
             started = time.time()
             with DIRECT_PROVIDER_OPENER.open(req, timeout=request_timeout) as response:
-                raw = response.read()
+                raw = _read_response_body(response, request_timeout)
             value = json.loads(raw.decode("utf-8"))
             choice = value["choices"][0]
             message = choice["message"]

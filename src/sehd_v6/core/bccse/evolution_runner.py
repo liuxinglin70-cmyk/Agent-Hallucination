@@ -1118,6 +1118,19 @@ def _attribute_failure(
             pool = frozenset()
         if pool is not None and owner not in pool:
             return "", attribution.reason_code, attribution
+        # Executability gate (owns the FP localization dead-end): an FP
+        # already carries a terminal ``verified_error`` verdict, so the
+        # responsible-step tiebreak has no surviving causal origins left to
+        # re-rank — routing a ``responsible_step_missing`` owner there is a
+        # structurally unexecutable edit (replays stay ``not_executed``).
+        # The repair that can actually relax a wrong error verdict lives on
+        # the defense/boundary surface, so re-own the hypothesis there.
+        if (
+            fp_side
+            and attribution.reason_code == "responsible_step_missing"
+            and owner == "earliest_origin_tiebreak"
+        ):
+            owner = "clean_defense_boundary"
         return owner, attribution.reason_code, attribution
     if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
         non_l1_failure_attributions.append({

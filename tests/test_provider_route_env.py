@@ -86,6 +86,21 @@ def test_official_v4_mutation_defaults_to_non_thinking_json_mode():
     assert provider_thinking_control(
         {**route, "thinking": "enabled"}, purpose="mutation"
     ) == {"type": "enabled"}
+    # The non-thinking default is gateway-agnostic: the autodl.art deployment
+    # honors the same thinking default and can exhaust the output budget in
+    # reasoning, so a non-official endpoint must not re-enable it.
+    assert provider_thinking_control(
+        {**route, "endpoint": "https://www.autodl.art/api/v1"},
+        purpose="mutation",
+    ) == {"type": "disabled"}
+    assert provider_thinking_control(
+        {**route, "endpoint": "https://www.autodl.art/api/v1"},
+        purpose="reflection_pro",
+    ) == {"type": "disabled"}
+    # Non-V4 models keep their own reasoning defaults.
+    assert provider_thinking_control(
+        {**route, "model": "some-other-model"}, purpose="mutation"
+    ) is None
 
 
 def test_official_detector_config_bounds_strict_judge_json_routes():

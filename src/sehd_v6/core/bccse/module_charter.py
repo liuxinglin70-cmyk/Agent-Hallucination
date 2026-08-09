@@ -473,7 +473,8 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
         "emit_defense_certificate": ("certificate_id",),
         "emit_boundary_finding": ("state", "responsible_event_id"),
         "require_evidence_field": (
-            "evidence_refs", "target_candidate_id", "target_origin_event_id",
+            "evidence", "evidence_refs", "target_candidate_id",
+            "target_origin_event_id",
         ),
     },
     "causal_link_test": {
