@@ -415,8 +415,12 @@ def evaluate_commit_evidence(
     pattern that repeats on the same mechanism class reaches the threshold
     while scattered single occurrences across unrelated mechanisms never
     sum into a commit.  Development-probe validations carry no mechanism
-    signature (each probe is its own independent validation) and count
-    globally.
+    signature and count globally: the only validation outcome that can
+    reach a commit target is exact_false_reject, which classify_outcome
+    already gates per case on same-canonical-intervention + independent
+    development validation + positive effect + no regression — a strictly
+    stronger bar than a fuzzy experience occurrence, so cross-mechanism
+    accumulation of such validations is sound rather than a loophole.
     """
     sources = COMMIT_EVIDENCE_SOURCES.get(edit.target, ())
     per_mechanism: dict[tuple[str, ...], int] = {}

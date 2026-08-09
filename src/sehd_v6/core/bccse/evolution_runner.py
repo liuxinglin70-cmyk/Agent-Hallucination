@@ -3791,24 +3791,36 @@ def _run_registry_reflection_impl(
     )
     if not candidates:
         return
+    # One bounded retry on transport/parse failure, symmetric with
+    # max_mutation_attempts_per_case=2 on the L1/L2 proposal paths: a
+    # single provider wobble must not silently forfeit the only call that
+    # can extend the vocabulary.  Identical prompts hit the provider
+    # cache, so the retry costs nothing after a post-cache failure.
     system_prompt, user_prompt = build_registry_selection_prompt(
         attribution=attribution,
         facts_summary=facts_summary,
         candidates=candidates,
     )
-    try:
-        parsed, _meta = run_mutation_call(
-            route=mutation_route,
-            purpose=PURPOSE_REGISTRY_REFLECTION,
-            system=system_prompt,
-            user=user_prompt,
-            cache_dir=output_dir / "mutation_cache" / "registry_reflection",
-        )
-    except Exception as exc:
+    parsed: Any = None
+    last_exc: Exception | None = None
+    for _attempt in range(2):
+        try:
+            parsed, _meta = run_mutation_call(
+                route=mutation_route,
+                purpose=PURPOSE_REGISTRY_REFLECTION,
+                system=system_prompt,
+                user=user_prompt,
+                cache_dir=output_dir / "mutation_cache" / "registry_reflection",
+            )
+            last_exc = None
+            break
+        except Exception as exc:  # provider transport/parse failure — retried
+            last_exc = exc
+    if last_exc is not None:
         # A failed reflection call is audited, never silent.
         l2_registry_registrations.append({
             "outcome": "reflection_call_failed",
-            "reason": f"{type(exc).__name__}:{str(exc)[:200]}",
+            "reason": f"{type(last_exc).__name__}:{str(last_exc)[:200]}",
         })
         return
     candidate, select_reason = select_registry_candidate(
@@ -4863,7 +4875,12 @@ def _run_l2_policy_case_impl(
     # P3B: pending registry entries accumulate independent observations on
     # every no-registered-action L2 case; an entry that clears the evidence
     # threshold and stays applicable is promoted to working (enabled) here,
-    # before the promoted-intent lookup reads the queue.
+    # before the promoted-intent lookup reads the queue.  This accumulation
+    # deliberately runs for stable-source cases too: an observation only
+    # feeds the promotion evidence ledger, and the v5.9b invariant (a
+    # stable case never advances the convergence streak / halts a run) is
+    # enforced separately in finish() via gate.record_no_edit, which is the
+    # single authority for that invariant.
     if (
         plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION
         and any(
@@ -4977,9 +4994,20 @@ def _run_l2_policy_case_impl(
             applied=bool(
                 isinstance(replay, Mapping)
                 and isinstance(replay.get("proof_adjudication"), Mapping)
-                and bool(
-                    (replay["proof_adjudication"].get("policy_evaluation") or {})
-                    .get("fired")
+                and any(
+                    isinstance(row, Mapping)
+                    and str(row.get("item_id") or "") == (
+                        str(proposal_edit.new_item.item_id)
+                        if proposal_edit is not None
+                        and proposal_edit.new_item is not None
+                        else ""
+                    )
+                    for row in (
+                        (
+                            replay["proof_adjudication"]
+                            .get("policy_evaluation") or {}
+                        ).get("fired") or ()
+                    )
                 )
             ),
             observable_delta=(
@@ -5118,19 +5146,31 @@ def _run_l2_policy_case_impl(
         candidates=planned_candidates,
         meta_guidance=meta_guidance,
     )
-    try:
-        parsed, _meta = run_mutation_call(
-            route=mutation_route,
-            purpose="policy_reflection",
-            system=system_prompt,
-            user=user_prompt,
-            cache_dir=output_dir / "mutation_cache" / "policy_reflection",
-        )
-    except Exception as exc:
+    # One bounded retry on transport/parse failure, symmetric with the L1
+    # proposal budget (max_mutation_attempts_per_case defaults to 2): a
+    # single provider wobble must not silently forfeit the case's only L2
+    # repair attempt.  Identical prompts hit the provider cache, so the
+    # retry costs nothing after a post-cache failure.
+    parsed: Any = None
+    reflection_exc: Exception | None = None
+    for _attempt in range(2):
+        try:
+            parsed, _meta = run_mutation_call(
+                route=mutation_route,
+                purpose="policy_reflection",
+                system=system_prompt,
+                user=user_prompt,
+                cache_dir=output_dir / "mutation_cache" / "policy_reflection",
+            )
+            reflection_exc = None
+            break
+        except Exception as exc:  # provider transport/parse failure — retried
+            reflection_exc = exc
+    if reflection_exc is not None:
         finish(
             "skip_no_policy",
-            reason=f"reflection_call_failed:{type(exc).__name__}: "
-            f"{str(exc)[:300]}",
+            reason=f"reflection_call_failed:{type(reflection_exc).__name__}: "
+            f"{str(reflection_exc)[:300]}",
         )
         return
     proposed_edit, parse_reason = select_policy_candidate(
@@ -5259,8 +5299,21 @@ def _run_l2_policy_case_impl(
         )
         no_effect_reason = "removed_item_did_not_move_the_terminal_edge"
     else:
-        effect_ok = bool(fired) and (state_changed or coverage_changed)
-        no_effect_reason = "policy_did_not_move_the_terminal_edge"
+        # The proposal must own the effect: an add/modify is justified only
+        # when the proposed item itself fired in the candidate replay (the
+        # same binding the skip path already applies), not when any
+        # pre-existing item happened to fire.  This mirrors the REMOVE_ITEM
+        # binding above and keeps the audit's applied flag honest.
+        proposal_fired = any(
+            isinstance(row, Mapping)
+            and str(row.get("item_id") or "") == proposal_item_id
+            for row in fired
+        )
+        effect_ok = proposal_fired and (state_changed or coverage_changed)
+        no_effect_reason = (
+            "policy_did_not_move_the_terminal_edge"
+            if proposal_fired else "proposed_item_did_not_fire"
+        )
     if not effect_ok:
         finish(
             "reject_policy_no_effect",

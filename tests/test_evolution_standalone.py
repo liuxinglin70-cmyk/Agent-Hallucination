@@ -1225,9 +1225,12 @@ def test_p0_mocked_loop_l1_accept_path(tmp_path, monkeypatch, addressable_l1_fai
 def test_p0_mocked_loop_l2_policy_accept_path(tmp_path, monkeypatch, addressable_l1_failure):
     def replay(*, case_id, genome, policy_genome):
         payload = p0.hollow_defense()
+        # The effect gate binds the replay's fired row to the proposal's
+        # own item_id (runner-assigned, carried on the candidate genome).
+        fired_item = policy_genome.items[-1]
         payload["proof_adjudication"]["policy_evaluation"] = {
             "fired": [{
-                "item_id": "policy_fixture",
+                "item_id": fired_item.item_id,
                 "precondition": "defense_coverage_complete_and_zero_certificates",
                 "action": "invalidate_coverage_claim",
                 "params": {"side": "defense"},

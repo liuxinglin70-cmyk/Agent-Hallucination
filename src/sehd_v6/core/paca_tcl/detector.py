@@ -36,7 +36,6 @@ REQUIRED_ROUTES = (
 )
 DETECTOR_SCHEMA_VERSION = "agenthallu.paca_tcl_detector_config.v3_5"
 FORBIDDEN_INPUT_FIELDS = ocse_packet.EVALUATOR_ONLY_FIELDS
-FORBIDDEN_OUTPUT_FIELDS = FORBIDDEN_INPUT_FIELDS
 
 
 def _forbidden_field_hits(value: Any) -> set[str]:

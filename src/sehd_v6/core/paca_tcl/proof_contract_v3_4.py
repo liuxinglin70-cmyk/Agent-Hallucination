@@ -64,15 +64,6 @@ DEFENSE_FIELDS = {
 # Module 1: Evidence-Authority Router (deterministic)
 # ============================================================
 
-EVIDENCE_AUTHORITY_ROUTES = {
-    "math": "Deterministic/mathematical verifier: checks numerical equivalence, rounding tolerance, algebraic equivalence, recomputation-verifiable relationships.",
-    "tool_state": "Tool-contract/state verifier: distinguishes rejected attempt from committed state change from persistent external state from irreversible impact.",
-    "retrieval_source": "Retrieval/source verifier: distinguishes source unavailable from not observed from contradicted by source from fabricated content.",
-    "instruction_context": "Instruction/context verifier: requires explicit constraint citation and agent-controlled behavior reference; no inferring violation from undesirable outcome.",
-    "general": "General verifier: applies to unsupported_commitment, redundant_repetition, and other breach types not covered by specialized routes.",
-}
-
-
 def route_evidence_authority(error_certificate: dict[str, Any]) -> str:
     """Route an error certificate to its evidence-authority verifier type."""
     breach_type = str(error_certificate.get("breach_type") or "")

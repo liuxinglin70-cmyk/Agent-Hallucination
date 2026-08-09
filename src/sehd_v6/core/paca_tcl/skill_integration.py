@@ -26,10 +26,6 @@ from ..bccse.genome import (
 from ..bccse.action_spec import MODULE_ROUTE_IDS, sanitize_action_spec
 
 
-FROZEN_CRS_CLAUSE = (
-    "score(factuality=0.35, counterfactual=0.15, recovery=0.20, "
-    "process=0.20, scope=0.10)"
-)
 _PATCH_LOCK = threading.RLock()
 
 

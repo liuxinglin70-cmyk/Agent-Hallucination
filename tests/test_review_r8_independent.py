@@ -349,12 +349,19 @@ def _l2_source_detection() -> dict[str, Any]:
     }
 
 
-def _l2_policy_replay() -> dict[str, Any]:
+def _l2_policy_replay(policy_genome: Any = None) -> dict[str, Any]:
+    """The promoted intent fires in the candidate replay.  R9 binds the
+    effect gate to the proposal's own item_id; the runner assigns that id
+    (``policy_<uuid8>``) and passes the candidate genome here, so the fired
+    row references its last item instead of a hard-coded id."""
+    item_id = ""
+    if policy_genome is not None and getattr(policy_genome, "items", None):
+        item_id = str(policy_genome.items[-1].item_id)
     result = _l2_source_detection()
     result["state"] = "verified_error"
     result["proof_adjudication"]["state"] = "verified_error"
     result["proof_adjudication"]["policy_evaluation"] = {
-        "fired": [{"item_id": "policy_edit_promoted_intent"}],
+        "fired": [{"item_id": item_id}],
         "skipped": [],
         "effective_prosecution_coverage": "complete",
         "effective_defense_coverage": "incomplete",
@@ -488,7 +495,7 @@ def test_l2_registry_chain_registers_promotes_and_commits(
         policy_genome=None, policy_scope="working",
     ) -> dict[str, Any]:
         if policy_genome is not None:
-            return _l2_policy_replay()
+            return _l2_policy_replay(policy_genome)
         return _l2_source_detection()
 
     monkeypatch.setattr(runner, "_run_detection_with_genome", detector_stub)

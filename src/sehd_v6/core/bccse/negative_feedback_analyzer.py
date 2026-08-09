@@ -50,17 +50,6 @@ ROOT_CAUSE_DUPLICATE_RULE = "duplicate_rule"
 ROOT_CAUSE_BASELINE_VIOLATION = "baseline_violation"
 ROOT_CAUSE_UNKNOWN = "unknown"
 
-_ROOT_CAUSES = frozenset({
-    ROOT_CAUSE_SCHEMA_MISMATCH,
-    ROOT_CAUSE_UNOWNED_TARGET,
-    ROOT_CAUSE_CONDITION_OVERLOAD,
-    ROOT_CAUSE_NO_OBSERVABLE_EFFECT,
-    ROOT_CAUSE_GOLD_LEAKAGE,
-    ROOT_CAUSE_DUPLICATE_RULE,
-    ROOT_CAUSE_BASELINE_VIOLATION,
-    ROOT_CAUSE_UNKNOWN,
-})
-
 
 def _classify_root_cause(rejected: RejectedEditEntry) -> str:
     """Map one rejected edit to its root cause (closed vocabulary).

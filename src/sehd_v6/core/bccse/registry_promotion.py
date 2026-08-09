@@ -31,7 +31,11 @@ from .policy_genome import (
     PolicyOp,
 )
 from .registry_reflection import REGISTRATION_REASON_NO_ACTION
-from .v6_contracts import PolicyItem, validate_policy_params
+from .v6_contracts import (
+    POLICY_GENOME_CAPACITY,
+    PolicyItem,
+    validate_policy_params,
+)
 from .vocabulary_registry import (
     L2_REGISTRY,
     AdjudicationFacts,
@@ -201,7 +205,13 @@ def promoted_intent_candidates(
     against the genome's registry at proposal time (an entry whose
     vocabulary drifted, or whose intent never became active, contributes
     nothing), and the candidate is deduplicated against the existing items.
+    A full genome surfaces no candidate at all: an add_item the capacity
+    gate could only reject must never reach the reflection prompt, so the
+    capacity check lives here at proposal time instead of being paid for
+    with a replayed-and-rejected reflection round.
     """
+    if genome.total_items >= POLICY_GENOME_CAPACITY:
+        return ()
     registry = genome.registry or L2_REGISTRY
     existing = {
         (item.precondition, item.action, tuple(sorted(item.params.items())))

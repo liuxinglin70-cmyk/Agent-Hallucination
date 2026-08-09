@@ -107,7 +107,6 @@ REASON_APPEAL_PENDING = "appeal_pending_blocked"
 REASON_APPEAL_FAILED = "appeal_failed_with_errors"
 REASON_LOCALIZATION_FALLBACK = "localization_temporal_fallback"
 REASON_RESPONSIBLE_STEP_MISSING = "responsible_step_missing"
-REASON_CASCADING_FAILURE = "cascading_failure"
 REASON_QUARANTINE_PATTERN = "quarantine_pattern_dominant"
 
 
