@@ -393,6 +393,14 @@ allowed modules:
 - verdict unresolved/error + quarantined_error_certificates>0: error evidence
   was built but failed validation; atomic_verifier_instruction or
   evidence_obligation owns the repair.
+- verdict error + surviving_error_certificates>0 and the defense side is
+  already established: the error certificates are over-convicting a case the
+  defense could not clear, so the executable fix is to QUARANTINE or tighten
+  the offending error certificate (atomic_verifier_instruction) or to demand
+  stronger cited evidence before an error certificate stands
+  (evidence_obligation). Do NOT add more defense/boundary records here: the
+  defense side is already complete, so another defense record cannot move any
+  observable and only restates what already lost.
 - verdict clean/unresolved + zero candidates or zero certificates on the
   decisive side: candidate_trigger or candidate_to_verifier_route owns the
   missing emission.

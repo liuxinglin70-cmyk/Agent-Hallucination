@@ -1093,6 +1093,15 @@ def _attribute_failure(
     )
     fn_side = bool(gold_label) and state == "verified_clean"
     fp_side = gold_label is False and state == "verified_error"
+    # Surviving (valid, unquarantined) error certificates are the over-convicting
+    # evidence on an FP: they are the one thing a quarantine/tighten edit can
+    # observably remove. Read the count once so the executability gate below can
+    # tell an executable FP repair (certificates exist to quarantine) from a
+    # structurally unexecutable one (no surviving certificate, defense saturated).
+    surviving_error_ids = adjudication.get("surviving_error_certificate_ids")
+    surviving_error_count = (
+        len(surviving_error_ids) if isinstance(surviving_error_ids, (list, tuple)) else 0
+    )
     provider_artifacts = project_provider_artifacts(
         detection_result=detection_result,
         signal=signal,
@@ -1118,18 +1127,27 @@ def _attribute_failure(
             pool = frozenset()
         if pool is not None and owner not in pool:
             return "", attribution.reason_code, attribution
-        # Executability gate (owns the FP localization dead-end): an FP
-        # already carries a terminal ``verified_error`` verdict, so the
-        # responsible-step tiebreak has no surviving causal origins left to
-        # re-rank — routing a ``responsible_step_missing`` owner there is a
-        # structurally unexecutable edit (replays stay ``not_executed``).
-        # The repair that can actually relax a wrong error verdict lives on
-        # the defense/boundary surface, so re-own the hypothesis there.
-        if (
+        # Executability gate (owns the FP dead-end): every FP-polarity module
+        # scores "up" — it adds a defense certificate, raises prosecution, or
+        # re-ranks an origin. A false positive is instead fixed by *lowering*
+        # the conviction: quarantining a surviving error certificate is the one
+        # action that observably moves the court off a wrong ``verified_error``
+        # (``valid_error_certificate_count`` drops on a gold-clean case). When
+        # such a certificate exists, re-own the hypothesis to
+        # ``atomic_verifier_instruction`` — the only module with a polarity-safe
+        # ``quarantine_certificate`` surface — instead of a saturated
+        # defense-side module whose score is already at its ceiling.
+        if fp_side and surviving_error_count > 0:
+            owner = "atomic_verifier_instruction"
+        elif (
             fp_side
             and attribution.reason_code == "responsible_step_missing"
             and owner == "earliest_origin_tiebreak"
         ):
+            # No surviving certificate to quarantine (defense saturated, court
+            # already terminal): the responsible-step tiebreak has no surviving
+            # causal origins left to re-rank either, so fall back to the
+            # defense/boundary surface as the least-unexecutable owner.
             owner = "clean_defense_boundary"
         return owner, attribution.reason_code, attribution
     if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
