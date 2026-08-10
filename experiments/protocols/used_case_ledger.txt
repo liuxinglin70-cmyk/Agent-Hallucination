@@ -504,3 +504,15 @@ Camel/074
 Magentic_One/049
 OpenDeepSearch/019
 OpenDeepSearch/090
+
+# --- batch10 R17 (2026-08-10, 10 fresh stratified cases; withdraw-corruptible-quarantine repair surface) ---
+BFCL/012
+BFCL/135
+Camel/060
+Magentic_One/004
+Magentic_One/063
+OpenDeepSearch/033
+OpenDeepSearch/071
+OpenManus/011
+OpenManus/059
+OpenManus/081
