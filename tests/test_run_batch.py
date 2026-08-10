@@ -147,3 +147,192 @@ def test_run_case_makes_cross_run_cache_policy_explicit(
     )
     assert observed["command"][observed["command"].index("--canary-limit") + 1] == "3"
     assert outcome["returncode"] == 0
+
+
+def _write_case_output(
+    output_dir: Path, *,
+    total_cases: int = 1,
+    triggered: int = 1,
+    stable: int = 0,
+    runtime_invalid: int = 0,
+    edits_accepted: int = 0,
+    edits_rejected: int = 0,
+    l2_accepts: int = 0,
+    l2_audits: list[dict] | None = None,
+    detector_calls: int = 1,
+    mutation_calls: int = 0,
+    policy_replays: int = 0,
+) -> None:
+    """Write minimal evolution_result.json for summarize_case to read."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    l2_audits = l2_audits or []
+    l2_rejects = sum(
+        1 for a in l2_audits if str(a.get("decision", "")).startswith("reject")
+    )
+    l2_skips = sum(
+        1 for a in l2_audits if str(a.get("decision", "")).startswith("skip")
+    )
+    payload = {
+        "total_cases": total_cases,
+        "triggered_cases": triggered,
+        "stable_cases": stable,
+        "runtime_invalid_cases": runtime_invalid,
+        "edits_accepted": edits_accepted,
+        "edits_rejected": edits_rejected,
+        "halted": False,
+        "halt_reason": "",
+        "evolution_audit": {
+            "l2_policy_audit": l2_audits,
+            "l2_policy_accepts": l2_accepts,
+            "rejection_summary": {"by_reason": {}, "by_stage": {}, "by_decision": {}},
+            "detector_calls": detector_calls,
+            "mutation_calls": mutation_calls,
+            "mutation_errors": 0,
+            "mutation_cache_hits": 0,
+            "mutation_transport_attempts": 0,
+            "mutation_repairs": 0,
+            "mutation_retry_attempts": 0,
+            "mutation_budget_exhausted": 0,
+            "provider_calls": detector_calls,
+            "source_replays": 0,
+            "policy_replays": policy_replays,
+            "policy_replay_errors": 0,
+            "contrast_replays": 0,
+            "contrast_replay_errors": 0,
+            "probe_cases": 0,
+            "total_provider_calls": detector_calls + mutation_calls,
+        },
+    }
+    (output_dir / "evolution_result.json").write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
+    # suppress unused-variable warnings for computed counters
+    _ = l2_rejects + l2_skips
+
+
+def test_summarize_case_includes_l2_runtime_and_budget_fields(
+    tmp_path: Path,
+) -> None:
+    """summarize_case must surface total_cases, runtime_invalid_cases,
+    l2 counts, rejection_summary, and budget — not just the old
+    triggered/edits/stable subset (P2-E)."""
+    output = tmp_path / "case" / "output"
+    _write_case_output(
+        output,
+        total_cases=1, triggered=1, runtime_invalid=0,
+        edits_accepted=0, edits_rejected=0,
+        l2_accepts=1,
+        l2_audits=[
+            {"decision": "accept_policy", "reason": ""},
+            {"decision": "reject_policy_fitness",
+             "reason": "state_change_against_gold_polarity"},
+        ],
+        detector_calls=5, mutation_calls=1, policy_replays=2,
+    )
+    summary = run_batch.summarize_case("case", output)
+    assert summary["total_cases"] == 1
+    assert summary["runtime_invalid_cases"] == 0
+    assert summary["l2_policy_accepts"] == 1
+    assert summary["l2_policy_rejects"] == 1
+    assert "rejection_summary" in summary
+    assert isinstance(summary["budget"], dict)
+    assert summary["budget"]["detector_calls"] == 5
+    assert summary["budget"]["policy_replays"] == 2
+
+
+def test_build_batch_totals_aggregates_counts_and_checks_invariant(
+    tmp_path: Path,
+) -> None:
+    """The batch-level totals aggregate per-case counters and verify the
+    count invariant total = triggered + stable + runtime_invalid (P2-E)."""
+    output_a = tmp_path / "a" / "output"
+    output_b = tmp_path / "b" / "output"
+    _write_case_output(
+        output_a, total_cases=1, triggered=1, stable=0,
+        l2_accepts=1, detector_calls=3, policy_replays=1,
+    )
+    _write_case_output(
+        output_b, total_cases=1, triggered=0, stable=1,
+        l2_audits=[{"decision": "reject_policy_no_effect", "reason": "x"}],
+        detector_calls=2, policy_replays=1,
+    )
+    cases = [
+        run_batch.summarize_case("a", output_a),
+        run_batch.summarize_case("b", output_b),
+    ]
+    totals = run_batch._build_batch_totals(cases)
+    assert totals["total_cases"] == 2
+    assert totals["triggered_cases"] == 1
+    assert totals["stable_cases"] == 1
+    assert totals["runtime_invalid_cases"] == 0
+    assert totals["l2_policy_accepts"] == 1
+    assert totals["l2_policy_rejects"] == 1
+    assert totals["count_invariant_ok"] is True
+    assert totals["budget"]["detector_calls"] == 5
+    assert totals["budget"]["policy_replays"] == 2
+
+
+def test_build_batch_totals_detects_broken_invariant(tmp_path: Path) -> None:
+    """A broken count invariant (total != triggered + stable + runtime_invalid)
+    is surfaced as count_invariant_ok=False."""
+    output = tmp_path / "case" / "output"
+    _write_case_output(
+        output, total_cases=1, triggered=1, stable=1, runtime_invalid=0,
+    )
+    cases = [run_batch.summarize_case("case", output)]
+    totals = run_batch._build_batch_totals(cases)
+    assert totals["count_invariant_ok"] is False
+
+
+def test_batch_report_includes_totals_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The batch_report.json written by main() includes a ``totals`` block
+    with L2/runtime/budget aggregates and the count invariant (P2-E)."""
+    pool = {
+        "BFCL/001": {"path": "one", "hallucination": True},
+        "Camel/002": {"path": "two", "hallucination": False},
+    }
+    results_root = tmp_path / "results"
+    monkeypatch.setattr(run_batch, "RESULTS_ROOT", results_root)
+    monkeypatch.setattr(run_batch, "LOGS_ROOT", tmp_path / "logs")
+    monkeypatch.setattr(run_batch, "pool_index", lambda: pool)
+    monkeypatch.setattr(run_batch, "load_used_cases", lambda: set())
+
+    def fake_run_case(case_id, record_path, batch_dir, log_dir, *args, **kwargs):
+        case_output = batch_dir / case_id.replace("/", "__") / "output"
+        _write_case_output(
+            case_output,
+            total_cases=1,
+            triggered=1 if case_id == "BFCL/001" else 0,
+            stable=0 if case_id == "BFCL/001" else 1,
+            l2_audits=[{"decision": "reject_policy_no_effect", "reason": "x"}]
+            if case_id == "BFCL/001" else [],
+            detector_calls=2,
+        )
+        return {
+            "case_id": case_id,
+            "returncode": 0,
+            "elapsed_seconds": 0.0,
+            "log": "unused.log",
+            "output_dir": str(case_output),
+        }
+
+    monkeypatch.setattr(run_batch, "run_case", fake_run_case)
+    monkeypatch.setattr(sys, "argv", [
+        "run_batch.py", "--batch-index", "98", "--size", "2",
+        "--workers", "2",
+    ])
+    assert run_batch.main() == 0
+    report = json.loads(
+        (results_root / "batch98" / "batch_report.json").read_text("utf-8")
+    )
+    assert "totals" in report
+    totals = report["totals"]
+    assert totals["total_cases"] == 2
+    assert totals["triggered_cases"] == 1
+    assert totals["stable_cases"] == 1
+    assert totals["l2_policy_rejects"] == 1
+    assert totals["count_invariant_ok"] is True
+    assert totals["budget"]["detector_calls"] == 4
+

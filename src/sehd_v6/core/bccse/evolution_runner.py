@@ -110,6 +110,9 @@ from .signal_adapter import (
     resolve_evolution_state,
 )
 from .v6_contracts import (
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+    ACTION_DOWNGRADE_COVERAGE,
+    ACTION_INVALIDATE_COVERAGE_CLAIM,
     FEEDBACK_POLICY_ROUTE_UNAVAILABLE,
     LAYER_DETECTOR,
     LAYER_L1,
@@ -762,29 +765,101 @@ def _cross_case_no_effect_duplicate(
     return False
 
 
+def _classify_rejection_stage(reasons: Sequence[str]) -> str:
+    """Map a set of reject reasons onto the closed rejection-stage vocabulary.
+
+    Single owner for both StructuralGate certificates and L1 fitness / L2
+    policy reject steps, so the same reason lands in the same stage
+    regardless of which surface produced it.
+    """
+    if any("runtime" in value or "apply_edit_failed" in value for value in reasons):
+        return "runtime"
+    if any("llm_conflict" in value for value in reasons):
+        return "conflict"
+    if any(
+        "no_effect" in value or "did_not_fire" in value or "did_not_move" in value
+        for value in reasons
+    ):
+        return "evidence_no_effect"
+    if any(
+        "directional_evidence" in value or "without_gold" in value
+        or "unscorable" in value
+        for value in reasons
+    ):
+        return "evidence_unverified"
+    if any(
+        "worse" in value or "regression" in value or "against_gold" in value
+        for value in reasons
+    ):
+        return "regression"
+    return "structural"
+
+
+def _step_rejection_reasons(fitness: Mapping[str, Any]) -> list[str]:
+    """Collect every closed-vocabulary reason a reject-class step recorded."""
+    reasons: list[str] = []
+    for key in ("reject_reasons", "retry_reason"):
+        value = fitness.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            reasons.extend(str(item) for item in value if str(item))
+        elif str(value):
+            reasons.append(str(value))
+    assessment = fitness.get("assessment")
+    if isinstance(assessment, Mapping):
+        reasons.extend(
+            str(item) for item in (assessment.get("reasons") or ())
+            if str(item)
+        )
+    l2 = fitness.get("l2_policy")
+    if isinstance(l2, Mapping):
+        if str(l2.get("reason") or ""):
+            reasons.append(str(l2["reason"]))
+        if str(l2.get("feedback_code") or ""):
+            reasons.append(str(l2["feedback_code"]))
+    return reasons
+
+
+# L1 structural rejections are already covered by StructuralGate certificates,
+# so they are excluded from the per-step aggregation to avoid double-counting.
+_L1_STRUCTURAL_REJECT_DECISIONS = frozenset({"reject", "structural_reject"})
+
+
 def _build_rejection_summary(
     gate_summary: Mapping[str, Any],
     steps: Sequence[EvolutionStep],
 ) -> dict[str, Any]:
-    """Separate legality, evidence, regression and runtime rejection causes."""
+    """Separate legality, evidence, regression and runtime rejection causes.
+
+    StructuralGate certificates contribute L1 structural rejections; the
+    per-step pass contributes L1 fitness and L2 policy rejections (whose
+    reasons live in ``fitness_check`` / ``l2_policy`` and were previously
+    invisible to this summary).  ``by_decision`` is unchanged for
+    backward compatibility with existing batch reports.
+    """
     reason_counts: dict[str, int] = {}
     stage_counts: dict[str, int] = {}
     for certificate in gate_summary.get("certificates") or ():
         if certificate.get("decision") != "reject":
             continue
         reasons = [str(value) for value in certificate.get("reject_reasons") or ()]
-        if any("runtime" in value or "apply_edit_failed" in value for value in reasons):
-            stage = "runtime"
-        elif any("llm_conflict" in value for value in reasons):
-            stage = "conflict"
-        elif any("no_effect" in value for value in reasons):
-            stage = "evidence_no_effect"
-        elif any("directional_evidence" in value for value in reasons):
-            stage = "evidence_unverified"
-        elif any("worse" in value or "regression" in value for value in reasons):
-            stage = "regression"
-        else:
-            stage = "structural"
+        stage = _classify_rejection_stage(reasons)
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        for reason in reasons:
+            key = reason.split(":", 1)[0]
+            reason_counts[key] = reason_counts.get(key, 0) + 1
+    for step in steps:
+        decision = str(step.gate_decision or "")
+        if not decision.startswith("reject"):
+            continue
+        if decision in _L1_STRUCTURAL_REJECT_DECISIONS:
+            continue
+        fitness = step.fitness_check if isinstance(step.fitness_check, Mapping) else {}
+        reasons = _step_rejection_reasons(fitness)
+        if not reasons:
+            continue
+        stage = _classify_rejection_stage(reasons)
         stage_counts[stage] = stage_counts.get(stage, 0) + 1
         for reason in reasons:
             key = reason.split(":", 1)[0]
@@ -1139,6 +1214,11 @@ def _allowed_l1_modules(signal: Any, attribution_owner: str) -> tuple[str, ...]:
     for process_module in _signal_process_modules(signal):
         if process_module not in modules:
             modules.append(process_module)
+    # Defense coverage is already complete: another clean_defense_boundary
+    # emission cannot move any observable surface, so the saturation point
+    # is abstention_rule, not a further boundary finding.
+    if getattr(signal, "defense_coverage_state", None) == "complete":
+        modules = [m for m in modules if m != "clean_defense_boundary"]
     return tuple(modules)
 
 
@@ -1298,6 +1378,43 @@ def _prevalidate_candidate(
             ):
                 return "invalid_intervention_contract:field_shape_mismatch"
     return None
+
+
+# The L2 selection prompt is gold-free, so gold constrains candidates only
+# through this deterministic mirror of policy_evaluator's terminal
+# transition. ``side`` is None for the parameterless boundary consumption.
+# Only the error-gold direction is filtered: batch01-10 observed cleanward
+# candidates burning proposal+replay on error-gold cases (5/5
+# state_change_against_gold_polarity rejects), while clean-gold
+# anti-candidates never appeared and stay on the replay fitness gate.
+_ANTI_GOLD_ACTIONS_ON_ERROR_GOLD: frozenset[tuple[str, str | None]] = frozenset({
+    (ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY, None),
+    (ACTION_INVALIDATE_COVERAGE_CLAIM, "prosecution"),
+    (ACTION_DOWNGRADE_COVERAGE, "prosecution"),
+})
+
+
+def _filter_policy_candidates_by_gold(
+    candidates: Sequence["PolicyEdit"], gold_label: bool | None,
+) -> list["PolicyEdit"]:
+    """Drop closed-vocabulary policy candidates whose runtime effect moves
+    the terminal toward clean on an error-gold case, before the selection
+    prompt is built. Gold-free runs (None) and clean-gold cases return the
+    candidates unchanged: the L2 prompt stays label-free by construction
+    and the replay fitness gate owns the clean-gold direction."""
+    if gold_label is not True:
+        return list(candidates)
+    kept: list[PolicyEdit] = []
+    for candidate in candidates:
+        item = candidate.new_item
+        if item is None:
+            kept.append(candidate)
+            continue
+        side = item.params.get("side") if item.params else None
+        if (item.action, side) in _ANTI_GOLD_ACTIONS_ON_ERROR_GOLD:
+            continue
+        kept.append(candidate)
+    return kept
 
 
 def _generation_module_requirement(
@@ -3885,7 +4002,7 @@ def _persist_progress(
             },
             "policy_genome": ctx.policy_genome.to_dict(),
             "l2_policy_accepts": ctx.l2_policy_accepts,
-            "gate_events": ctx.gate_event_ledger.to_list(),
+            "gate_events": _build_gate_event_ledger(ctx.steps).to_list(),
             "l2_policy_audit": list(ctx.l2_policy_audit),
             # Probe rollback anchors and the in-memory evolution context
             # that a resume must reproduce exactly (behavior invariants
@@ -4011,23 +4128,93 @@ def _l2_promotion_evidence(
     )
 
 
-def _record_gate_event(
+def _project_execution_trace(
     step: EvolutionStep, *,
-    gate_event_ledger: GateEventLedger, steps: list[Any],
-) -> None:
-    """Project one evolution step into the audited gate ledger (P5).
+    final_attempt: Mapping[str, Any] | None,
+    l2_policy: Mapping[str, Any] | None,
+) -> str:
+    """Project a step's execution outcome onto the TRACE_CLASSES vocabulary.
+
+    Deterministic and total: runtime-invalid decisions map to
+    ``runtime_invalid``; proposal-less steps map to ``no_proposal``; L2
+    proposals resolve to ``fired``/``skipped`` from the replay's
+    policy_evaluation; L1 proposals fall back to the final attempt's
+    compiled/applied flags.
+    """
+    decision = str(step.gate_decision or "")
+    if decision in ("skip_runtime_invalid", "reject_policy_replay_error"):
+        return "runtime_invalid"
+    proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
+    if not proposal.get("operation"):
+        return "no_proposal"
+    if l2_policy is not None:
+        policy_eval = l2_policy.get("policy_evaluation") or {}
+        new_item = proposal.get("new_item")
+        proposal_item_id = (
+            str(new_item.get("item_id") or "")
+            if isinstance(new_item, Mapping) else ""
+        )
+        if proposal_item_id:
+            for row in (policy_eval.get("fired") or ()):
+                if isinstance(row, Mapping) and str(
+                    row.get("item_id") or ""
+                ) == proposal_item_id:
+                    return "fired"
+            for row in (policy_eval.get("skipped") or ()):
+                if isinstance(row, Mapping) and str(
+                    row.get("item_id") or ""
+                ) == proposal_item_id:
+                    return "skipped"
+    if isinstance(final_attempt, Mapping):
+        if final_attempt.get("applied"):
+            return "applied"
+        if final_attempt.get("compiled"):
+            return "compiled"
+    return "no_proposal"
+
+
+def _project_delta_class(
+    deltas: Sequence[Any], *, downstream: bool,
+) -> str:
+    """Project observable/court delta tuples onto the DELTA_CLASSES vocabulary.
+
+    A delta containing a terminal-state transition (``state:`` or ``->``)
+    maps to ``terminal``; any other non-empty delta maps to ``local``
+    (observable) or ``downstream`` (court); empty maps to ``none``.
+    """
+    values = [str(d) for d in deltas or () if str(d)]
+    if any("state:" in d or "->" in d for d in values):
+        return "terminal"
+    if values:
+        return "downstream" if downstream else "local"
+    return "none"
+
+
+def _project_gate_event(
+    step: EvolutionStep, *, step_ordinal: int,
+) -> GateEvent | None:
+    """Project one evolution step into its audited GateEvent.
 
     Pure telemetry: the event records a decision the gate has already
-    made, so it can never influence that decision.  Resume is idempotent
-    on the stable event_id; no provider call is added.
+    made, so it can never influence that decision.  Reads the step's
+    final state — including any in-place commit from ``provisional`` to
+    ``accept_batch`` by ``flush_shadow_batch`` — so the event reflects
+    the final decision, not the provisional one captured at step time.
+
+    Identity follows proposal authority (§11.4): a step that made a
+    proposal is keyed by its ``attempt_id`` (or ``episode_id`` when no
+    attempt landed); proposal-less placeholder steps fall back to the
+    observation slot, which resume rewind uses to drop phantom events.
     """
     episode_id = ""
     attempt_id = ""
+    final_attempt: Mapping[str, Any] | None = None
     if isinstance(step.episode, Mapping):
         episode_id = str(step.episode.get("episode_id") or "")
         attempts = step.episode.get("attempts") or ()
         if attempts and isinstance(attempts[-1], Mapping):
             attempt_id = str(attempts[-1].get("attempt_id") or "")
+            final_attempt = attempts[-1]
     proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
     operation = str(proposal.get("operation") or "")
     attribution = step.attribution if isinstance(step.attribution, Mapping) else {}
@@ -4062,22 +4249,23 @@ def _record_gate_event(
             if str(item)
         )
     l2 = fitness.get("l2_policy")
+    l2_policy = l2 if isinstance(l2, Mapping) else None
     l2_evidence: PromotionEvidence | None = None
-    if isinstance(l2, Mapping):
-        if str(l2.get("reason") or ""):
-            reasons.append(str(l2["reason"]))
+    if l2_policy is not None:
+        if str(l2_policy.get("reason") or ""):
+            reasons.append(str(l2_policy["reason"]))
         # The L2 audit's closed-vocabulary feedback code (e.g.
         # policy_route_unavailable) must reach the fuzzy evidence mapping,
         # or the Meta loop's evidence gate can never observe the L2
         # outcomes it was built for.
-        if str(l2.get("feedback_code") or ""):
-            reasons.append(str(l2["feedback_code"]))
+        if str(l2_policy.get("feedback_code") or ""):
+            reasons.append(str(l2_policy["feedback_code"]))
         # The L2 accept path already validated the evidence: it only reaches
         # accept_policy when the proposed item fired, the terminal state
         # changed, the gold task score improved, and no canary regressed.
         # Package those measured facts into PromotionEvidence so the grade
         # reflects the actual replay outcome instead of defaulting to weak.
-        l2_evidence = _l2_promotion_evidence(l2, step)
+        l2_evidence = _l2_promotion_evidence(l2_policy, step)
     try:
         decision = promote(
             layer=layer or "l1",
@@ -4094,28 +4282,21 @@ def _record_gate_event(
         # A non-gate step (e.g. halted) is still audited, with an empty
         # grade; it never reaches the promotion vocabulary.
         decision = None
-    # Stable event identity (§11.4): a step is identified by its case
-    # slot only.  The gate_decision is deliberately excluded because a
-    # provisional step is later committed in place to accept_batch by
-    # flush_shadow_batch; keying on the decision would record the same
-    # logical step twice and break resume idempotence.  An interrupted +
-    # resumed run reproduces the same event_id for the same logical step
-    # and never double-writes.
-    # ``len(steps)`` at record time is the monotonic logical-step ordinal;
-    # it is stable across an interrupt+resume because the steps list is
-    # restored from the checkpoint before processing continues.
-    observation_id = (
-        f"{step.case_id}:{step.case_index}:{len(steps)}"
-    )
+    has_proposal = bool(operation)
+    observation_id = f"{step.case_id}:{step.case_index}:{step_ordinal}"
+    if has_proposal and attempt_id:
+        event_id = gate_event_id(attempt_id=attempt_id)
+    elif has_proposal and episode_id:
+        event_id = gate_event_id(
+            episode_id=episode_id,
+            decision_kind=str(step.gate_decision or ""),
+        )
+    else:
+        event_id = gate_event_id(observation_id=observation_id)
     try:
-        event = GateEvent(
+        return GateEvent(
             schema_version=GATE_EVENT_SCHEMA_VERSION,
-            event_id=gate_event_id(
-                attempt_id="",
-                episode_id="",
-                decision_kind="",
-                observation_id=observation_id,
-            ),
+            event_id=event_id,
             subject_id=str(step.case_id),
             episode_id=episode_id,
             attempt_id=attempt_id,
@@ -4128,10 +4309,60 @@ def _record_gate_event(
             activation_state=(decision.activation_state if decision else ""),
             hard_reject_codes=(decision.hard_reject_codes if decision else ()),
             quality_reason_codes=(decision.quality_reason_codes if decision else ()),
+            execution_trace_class=_project_execution_trace(
+                step, final_attempt=final_attempt, l2_policy=l2_policy,
+            ),
+            observable_delta_class=_project_delta_class(
+                (final_attempt.get("observable_delta") or ())
+                if final_attempt else (),
+                downstream=False,
+            ),
+            downstream_delta_class=_project_delta_class(
+                (final_attempt.get("downstream_court_delta") or ())
+                if final_attempt else (),
+                downstream=True,
+            ),
         )
     except ValueError:
-        return
-    gate_event_ledger.record(event)
+        return None
+
+
+def _build_gate_event_ledger(
+    steps: Sequence[EvolutionStep],
+) -> GateEventLedger:
+    """Deterministically rebuild the gate-event ledger from final steps.
+
+    Single projection authority: both ``_persist_progress`` (checkpoint
+    writes) and ``_finalize`` (Meta Review) read from this rebuild, so
+    the persisted and consumed ledger always reflects each step's final
+    state — including in-place commits from ``provisional`` to
+    ``accept_batch`` — instead of the stale snapshot captured at record
+    time.  Resume stays idempotent because the projection is a pure
+    function of the steps list: the same steps always yield the same
+    event identities and sequencing.
+    """
+    ledger = GateEventLedger()
+    for index, step in enumerate(steps):
+        event = _project_gate_event(step, step_ordinal=index + 1)
+        if event is not None:
+            ledger.record(event)
+    return ledger
+
+
+def _record_gate_event(
+    step: EvolutionStep, *,
+    gate_event_ledger: GateEventLedger, steps: list[Any],
+) -> None:
+    """Append one step's gate event to the live (in-memory) ledger.
+
+    The live ledger is an incremental buffer used by resume rewind; the
+    authoritative projection is ``_build_gate_event_ledger``, which
+    ``_persist_progress`` and ``_finalize`` read instead.  Recording here
+    keeps the live ledger current for the resume ``drop_event`` path.
+    """
+    event = _project_gate_event(step, step_ordinal=len(steps))
+    if event is not None:
+        gate_event_ledger.record(event)
 
 
 def _record_attempt(
@@ -5333,6 +5564,7 @@ def _run_l2_policy_case_impl(
             if promotion_row["outcome"] in ("promoted", "rejected"):
                 l2_registry_registrations.append(promotion_row)
     proposal_edit: PolicyEdit | None = None
+    candidate_genome: PolicyGenome | None = None
     route_result = ""
     feedback_code = ""
 
@@ -5389,6 +5621,10 @@ def _run_l2_policy_case_impl(
             "facts": facts_summary,
             "proposal": proposal_edit.to_dict() if proposal_edit else None,
             "policy_genome_hash": state.policy_genome.content_hash,
+            "candidate_policy_genome_hash": (
+                candidate_genome.content_hash
+                if candidate_genome is not None else ""
+            ),
             "configured_canary_count": len(registered_canary_ids),
             "stable_registered_canary_count": len(promotion_canaries),
             "canary_cases": len(policy_canary_audit),
@@ -5615,6 +5851,21 @@ def _run_l2_policy_case_impl(
                 feedback=plan.feedback_code,
             )
             return accepted_outcome
+    # The L2 selection prompt is gold-free by design, so gold can only
+    # constrain candidates deterministically before the prompt is built.
+    planned_candidates = _filter_policy_candidates_by_gold(
+        planned_candidates,
+        _fitness_gold_label(
+            case_id, records=records, fitness_use_gold=fitness_use_gold,
+        ),
+    )
+    if not planned_candidates:
+        finish(
+            "skip_no_policy",
+            reason="all_candidates_filtered_anti_gold",
+            route=plan.route_result,
+        )
+        return accepted_outcome
     # P7.4: bounded cross-case Meta guidance informs the selection
     # without enlarging the candidate set or touching the gate.  Only
     # inject when the Meta state actually carries guidance, so an empty
@@ -8897,9 +9148,14 @@ class EvolutionLoop:
         # the audited gate events into GateExperience rows, enumerate shadow
         # MetaEdit candidates, build a reporting-only drift snapshot, and persist
         # the meta configuration back into the single meta_review authority.
+        # The Meta loop reads the deterministic gate-event projection, not
+        # the live incremental ledger, so it sees each step's final
+        # decision/grade/trace instead of the provisional snapshot captured
+        # at record time (P1-A/P1-B).
+        gate_event_ledger = _build_gate_event_ledger(self.steps)
         aggregated_experiences = [
             aggregate_gate_experience(event, sequence=event.sequence)
-            for event in self.gate_event_ledger.events
+            for event in gate_event_ledger.events
         ]
         gate_experiences = [experience.to_dict() for experience in aggregated_experiences]
         # P7.2: development-probe audits become OutcomeValidation rows.  A probe

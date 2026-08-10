@@ -7522,3 +7522,583 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
     )
     assert reject_entry["route_result"] == "candidate_blocked_by_protection"
     assert reject_entry["feedback_code"] == "policy_route_unavailable"
+
+
+# ============================================================
+# P1-A/P1-B: GateEvent final-decision write-back + execution/delta projection
+# ============================================================
+
+
+def test_build_gate_event_ledger_projects_final_decision_not_provisional() -> None:
+    """The deterministic ledger rebuild reflects the final gate decision,
+    not the provisional snapshot captured at step time.
+
+    A step committed in place from ``provisional`` to ``accept_batch`` by
+    ``flush_shadow_batch`` must produce a GateEvent whose
+    ``legacy_decision`` is ``accept_batch`` with a real grade/activation —
+    never the stale ``provisional`` / ``conditional`` / ``pending``.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.gate_feedback import GateEventLedger
+
+    step = runner.EvolutionStep(
+        case_id="OpenManus/084",
+        case_index=0,
+        trigger_source="unresolved",
+        attribution={"layer": "l1_fitness_gate",
+                     "artifact": "evidence_obligation"},
+        edit_proposal={
+            "operation": "add_rule",
+            "target_module": "evidence_obligation",
+        },
+        mutation_applied={"target_module": "evidence_obligation"},
+        gate_decision="accept_batch",
+        genome_hash_before="a",
+        genome_hash_after="b",
+        detection_state="unresolved",
+        timestamp=0.0,
+        episode={
+            "episode_id": "ep_084",
+            "attempts": [{
+                "attempt_id": "att_084_final",
+                "decision": "accept_batch",
+                "compiled": True,
+                "injected": True,
+                "applied": True,
+                "observable_delta": ["state:unresolved->verified_error"],
+                "downstream_court_delta": ["state:unresolved->verified_error"],
+            }],
+        },
+    )
+    ledger = runner._build_gate_event_ledger([step])
+    assert len(ledger.events) == 1
+    event = ledger.events[0]
+    assert event.legacy_decision == "accept_batch"
+    assert event.evidence_grade != "conditional"
+    assert event.activation_state != "pending"
+    assert event.execution_trace_class != "no_proposal"
+    assert event.observable_delta_class == "terminal"
+    assert event.downstream_delta_class == "terminal"
+
+
+def test_build_gate_event_ledger_l2_accept_has_fired_trace_and_terminal_delta() -> None:
+    """An L2 accept_policy event must carry ``fired`` execution trace and a
+    terminal delta — never the ``no_proposal`` / ``none`` defaults that
+    every event had before the fix (P1-B)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    step = runner.EvolutionStep(
+        case_id="Magentic_One/004",
+        case_index=0,
+        trigger_source="l2_policy_reflection",
+        attribution={"layer": "l2_adjudication_policy",
+                     "artifact": "boundary_consumption_policy"},
+        edit_proposal={
+            "operation": "add_item",
+            "new_item": {"item_id": "policy_67786202",
+                         "action": "consume_verified_clean_boundary"},
+        },
+        mutation_applied=None,
+        gate_decision="accept_policy",
+        genome_hash_before="a",
+        genome_hash_after="b",
+        detection_state="unresolved",
+        timestamp=0.0,
+        fitness_check={"l2_policy": {
+            "decision": "accept_policy",
+            "replay_state": "verified_clean",
+            "canary_regressions": [],
+            "canary_audit": [{"case_id": "anchor", "preserved": True}],
+            "policy_evaluation": {
+                "fired": [{"item_id": "policy_67786202"}],
+            },
+        }},
+        episode={
+            "episode_id": "ep_004",
+            "attempts": [{
+                "attempt_id": "att_004",
+                "decision": "accept_policy",
+                "compiled": True,
+                "injected": True,
+                "applied": True,
+                "observable_delta": ["state:unresolved->verified_clean"],
+                "downstream_court_delta": [],
+            }],
+        },
+    )
+    ledger = runner._build_gate_event_ledger([step])
+    event = ledger.events[0]
+    assert event.execution_trace_class == "fired"
+    assert event.observable_delta_class == "terminal"
+    assert event.legacy_decision == "accept_policy"
+
+
+def test_build_gate_event_ledger_skip_step_uses_observation_slot_identity() -> None:
+    """A proposal-less skip/halt step falls back to observation-slot identity,
+    which resume rewind relies on for ``drop_event`` (P1-A identity boundary)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.gate_feedback import gate_event_id
+
+    step = runner.EvolutionStep(
+        case_id="case/001",
+        case_index=0,
+        trigger_source="halted",
+        attribution=None,
+        edit_proposal=None,
+        mutation_applied=None,
+        gate_decision="halted",
+        genome_hash_before="a",
+        genome_hash_after="a",
+        detection_state="skipped",
+        timestamp=0.0,
+    )
+    ledger = runner._build_gate_event_ledger([step])
+    event = ledger.events[0]
+    expected_id = gate_event_id(observation_id="case/001:0:1")
+    assert event.event_id == expected_id
+    assert event.execution_trace_class == "no_proposal"
+
+
+def test_runner_checkpoint_gate_events_match_final_step_decisions(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    """End-to-end: the persisted checkpoint's gate_events reflect each step's
+    final ``gate_decision``, and accept-class events are never
+    ``no_proposal`` (P1-A + P1-B integration)."""
+    import json
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        return {
+            "state": "unresolved", "runtime_valid": True,
+            "decision_authority": "authoritative", "census": [],
+        }
+
+    def mutation(**kwargs):
+        return {
+            "target_module": "evidence_obligation",
+            "operation": "add_rule",
+            "condition": "cited evidence proves norm breach and agent control",
+            "action": "require_evidence_field: impact_evidence_refs",
+            "evidence_anchor": "rewritten baseline rule",
+            "rationale": "add evidence requirement",
+            "feature_description": "evidence field requirement",
+            "expected_effect": "causal field coverage increases",
+            "expected_effect_contract": {
+                "observable_field": "causal_field_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "cited evidence is incomplete",
+            },
+        }, {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner, "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            "unresolved"
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={}, output_dir=tmp_path, census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        reflection_candidate_count=1,
+        run_id="gate_events_final",
+    )
+
+    checkpoint = json.loads(
+        (tmp_path / "evolution_checkpoint.json").read_text(encoding="utf-8")
+    )
+    steps = checkpoint.get("steps") or []
+    gate_events = checkpoint.get("gate_events") or []
+    assert gate_events, "every terminal gate decision must produce a GateEvent"
+
+    # Every gate event's legacy_decision must match the corresponding step's
+    # final gate_decision (P1-A).
+    step_decisions = {s.get("case_index"): s.get("gate_decision") for s in steps}
+    for event in gate_events:
+        case_index = event.get("case_index") if "case_index" in event else None
+        if case_index is not None and case_index in step_decisions:
+            assert event["legacy_decision"] == step_decisions[case_index], (
+                f"gate event decision {event['legacy_decision']!r} != "
+                f"step decision {step_decisions[case_index]!r}"
+            )
+
+    # No accept-class event may carry no_proposal (P1-B).
+    for event in gate_events:
+        if str(event.get("legacy_decision", "")).startswith("accept"):
+            assert event["execution_trace_class"] != "no_proposal", (
+                f"accept event {event['legacy_decision']!r} has "
+                f"execution_trace_class=no_proposal"
+            )
+
+
+# ============================================================
+# P1-C: L2 reject candidate policy genome hash
+# ============================================================
+
+
+def test_l2_reject_audit_records_candidate_policy_genome_hash(
+    tmp_path, monkeypatch,
+) -> None:
+    """Every L2 reject audit entry must carry ``candidate_policy_genome_hash``
+    equal to ``apply_policy_edit(working, proposal).content_hash`` — the hash
+    of the genome that was actually replayed, not the working genome's hash
+    (P1-C)."""
+    from src.sehd_v6.core.bccse.policy_genome import (
+        PolicyEdit, PolicyOp, apply_policy_edit, create_baseline_policy_genome,
+    )
+
+    source_detector, mutation, signal_for = _hollow_defense_fixture()
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "unresolved",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "valid_error_certificate_count": 0,
+            "valid_defense_certificate_count": 0,
+        }
+        if policy_genome is not None:
+            item = policy_genome.items[0]
+            adjudication = {
+                **adjudication,
+                "policy_evaluation": {
+                    "fired": [],
+                    "skipped": [
+                        {"item_id": item.item_id,
+                         "reason": "runtime_precondition_not_satisfied"},
+                    ],
+                },
+            }
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_candidate_hash",
+    )
+
+    audit = result.evolution_audit
+    reject_entries = [
+        e for e in audit["l2_policy_audit"]
+        if str(e.get("decision", "")).startswith("reject")
+    ]
+    assert reject_entries, "the loop must produce at least one L2 reject"
+    for entry in reject_entries:
+        assert "candidate_policy_genome_hash" in entry, (
+            "L2 reject audit must carry candidate_policy_genome_hash"
+        )
+        candidate_hash = entry["candidate_policy_genome_hash"]
+        assert candidate_hash, (
+            "candidate_policy_genome_hash must be non-empty for a replayed reject"
+        )
+        # The candidate hash must differ from the working genome hash
+        # (the working genome has no items; the candidate has one).
+        assert candidate_hash != entry["policy_genome_hash"], (
+            "candidate_policy_genome_hash must not equal the working "
+            "policy_genome_hash"
+        )
+
+
+def test_l2_skip_no_policy_has_empty_candidate_hash(
+    tmp_path, monkeypatch,
+) -> None:
+    """An L2 skip_no_policy (no proposal) must carry an empty
+    ``candidate_policy_genome_hash`` — no candidate was ever created."""
+    source_detector, mutation, signal_for = _hollow_defense_fixture()
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        adjudication = {
+            "state": "unresolved",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "none",
+            "valid_error_certificate_count": 1,
+            "consensus_gate_applied": True,
+            "consensus_gate_blocked_ids": ["cert_blocked"],
+        }
+        return {
+            "state": "unresolved",
+            "runtime_valid": True,
+            "census": [],
+            "proof_adjudication": adjudication,
+        }
+
+    def mutation(**kwargs):
+        return {
+            "precondition": "consensus_gate_blocked_nonempty",
+            "action": "emit_telemetry_only",
+            "params": {},
+            "rationale": "observe gate blocking",
+        }, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: replace(
+                _signal(str(result["state"])),
+                attribution_confidence="low",
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_skip_hash",
+    )
+
+    audit = result.evolution_audit
+    skip_entries = [
+        e for e in audit["l2_policy_audit"]
+        if e.get("decision") == "skip_no_policy"
+    ]
+    assert skip_entries, "the loop must produce a skip_no_policy"
+    for entry in skip_entries:
+        assert entry.get("candidate_policy_genome_hash") == "", (
+            "skip_no_policy must have an empty candidate_policy_genome_hash"
+        )
+
+
+# ============================================================
+# P1-D: rejection_summary includes L2 reason/stage
+# ============================================================
+
+
+def test_rejection_summary_includes_l2_policy_reasons() -> None:
+    """L2 reject reasons must appear in ``by_reason`` and ``by_stage`` —
+    they were previously invisible because ``_build_rejection_summary`` only
+    walked StructuralGate certificates (P1-D)."""
+    from src.sehd_v6.core.bccse.evolution_runner import _build_rejection_summary
+
+    l2_reject_step = type("S", (), {
+        "gate_decision": "reject_policy_fitness",
+        "fitness_check": {"l2_policy": {
+            "decision": "reject_policy_fitness",
+            "reason": "state_change_against_gold_polarity",
+            "feedback_code": "",
+        }},
+    })()
+    summary = _build_rejection_summary({"certificates": []}, [l2_reject_step])
+    assert "state_change_against_gold_polarity" in summary["by_reason"]
+    assert summary["by_stage"].get("regression") == 1
+
+
+def test_rejection_summary_includes_l2_no_effect_and_runtime_stages() -> None:
+    """L2 no-effect and runtime-invalid rejects map to the correct stages."""
+    from src.sehd_v6.core.bccse.evolution_runner import _build_rejection_summary
+
+    steps = [
+        type("S", (), {
+            "gate_decision": "reject_policy_no_effect",
+            "fitness_check": {"l2_policy": {
+                "reason": "proposed_item_did_not_fire",
+            }},
+        })(),
+        type("S", (), {
+            "gate_decision": "reject_policy_replay_error",
+            "fitness_check": {"l2_policy": {
+                "reason": "replay_runtime_invalid:RuntimeError",
+            }},
+        })(),
+    ]
+    summary = _build_rejection_summary({"certificates": []}, steps)
+    assert summary["by_reason"].get("proposed_item_did_not_fire") == 1
+    assert summary["by_reason"].get("replay_runtime_invalid") == 1
+    assert summary["by_stage"].get("evidence_no_effect") == 1
+    assert summary["by_stage"].get("runtime") == 1
+
+
+def test_rejection_summary_does_not_double_count_l1_structural() -> None:
+    """An L1 structural reject is counted once (from the certificate), not
+    twice (certificate + step reasons)."""
+    from src.sehd_v6.core.bccse.evolution_runner import _build_rejection_summary
+
+    gate_summary = {
+        "certificates": [{
+            "decision": "reject",
+            "reject_reasons": ["invalid_schema:bad_rule"],
+        }],
+    }
+    l1_step = type("S", (), {
+        "gate_decision": "structural_reject",
+        "fitness_check": {"reject_reasons": ["invalid_schema:bad_rule"]},
+    })()
+    summary = _build_rejection_summary(gate_summary, [l1_step])
+    assert summary["by_reason"].get("invalid_schema") == 1
+    assert summary["by_stage"].get("structural") == 1
+
+
+def test_allowed_l1_modules_drops_saturated_clean_defense_boundary() -> None:
+    """A complete defense coverage saturates clean_defense_boundary: a
+    further boundary emission cannot move any observable surface, so the
+    module leaves the executable owner set on a cleanward failure."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        secondary_module="clean_defense_boundary",
+        defense_coverage_state="complete",
+    )
+    assert runner._allowed_l1_modules(signal, "abstention_rule") == (
+        "abstention_rule",
+    )
+
+
+def test_allowed_l1_modules_keeps_unsaturated_clean_defense_boundary() -> None:
+    """Incomplete coverage means clean_defense_boundary can still move the
+    verdict, so it stays in the executable owner set."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        secondary_module="clean_defense_boundary",
+        defense_coverage_state="incomplete",
+    )
+    assert runner._allowed_l1_modules(signal, "abstention_rule") == (
+        "abstention_rule", "clean_defense_boundary",
+    )
+
+
+def test_allowed_l1_modules_keeps_secondary_when_coverage_unknown() -> None:
+    """A signal without defense_coverage_state keeps clean_defense_boundary:
+    saturation is opt-in via getattr, never a surprise AttributeError."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        secondary_module="clean_defense_boundary",
+    )
+    assert runner._allowed_l1_modules(signal, "abstention_rule") == (
+        "abstention_rule", "clean_defense_boundary",
+    )
+
+
+def _anti_gold_policy_candidate(action: str, params: dict) -> "PolicyEdit":
+    from src.sehd_v6.core.bccse.policy_genome import PolicyEdit, PolicyOp
+    from src.sehd_v6.core.bccse.v6_contracts import PolicyItem
+
+    return PolicyEdit(
+        edit_id="edit_probe",
+        operation=PolicyOp.ADD_ITEM.value,
+        new_item=PolicyItem(
+            item_id="policy_probe",
+            precondition="probe_precondition",
+            action=action,
+            params=dict(params),
+            rationale="probe",
+        ),
+        rationale="probe",
+        source_case_id="case_probe",
+    )
+
+
+def test_filter_policy_candidates_by_gold_removes_clean_boundary_on_error_gold() -> None:
+    """consume_verified_clean_boundary forces the terminal to verified_clean,
+    which is anti-gold on gold=True (error), so it is dropped before the
+    selection prompt is built. A gold-free run (None) leaves it untouched so
+    the L2 prompt stays label-free by construction."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import (
+        ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+    )
+
+    candidate = _anti_gold_policy_candidate(
+        ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY, {},
+    )
+    assert runner._filter_policy_candidates_by_gold([candidate], True) == []
+    assert runner._filter_policy_candidates_by_gold([candidate], None) == [
+        candidate
+    ]
+
+
+def test_filter_policy_candidates_by_gold_keeps_clean_boundary_on_clean_gold() -> None:
+    """On gold=False (clean), consuming the verified-clean boundary moves the
+    terminal toward the gold polarity, so the candidate is kept."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import (
+        ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+    )
+
+    candidate = _anti_gold_policy_candidate(
+        ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY, {},
+    )
+    assert runner._filter_policy_candidates_by_gold([candidate], False) == [
+        candidate
+    ]
+
+
+def test_filter_policy_candidates_by_gold_removes_prosecution_weakening_on_error_gold() -> None:
+    """invalidate_coverage_claim with side=prosecution weakens the
+    prosecution, moving the verdict toward clean: anti-gold on gold=True
+    (dropped) and untouched on gold=False — the clean-gold direction has no
+    observed waste and stays on the replay fitness gate."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import (
+        ACTION_INVALIDATE_COVERAGE_CLAIM,
+    )
+
+    candidate = _anti_gold_policy_candidate(
+        ACTION_INVALIDATE_COVERAGE_CLAIM, {"side": "prosecution"},
+    )
+    assert runner._filter_policy_candidates_by_gold([candidate], True) == []
+    assert runner._filter_policy_candidates_by_gold([candidate], False) == [
+        candidate
+    ]
+    defense_candidate = _anti_gold_policy_candidate(
+        ACTION_INVALIDATE_COVERAGE_CLAIM, {"side": "defense"},
+    )
+    assert runner._filter_policy_candidates_by_gold(
+        [defense_candidate], False,
+    ) == [defense_candidate]
+
+
+def test_prevalidate_candidate_rejects_unowned_observable_field() -> None:
+    """A remove_rule contract whose observable_field is not owned by the
+    target module is rejected at prevalidation. This locks the existing
+    ownership gate against silent erosion (no new runtime code here)."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    candidate = {
+        "target_module": "abstention_rule",
+        "operation": "remove_rule",
+        "rule_index": 0,
+        "expected_effect_contract": {
+            "observable_field": "prosecution_certificates",
+            "expected_direction": "decrease",
+            "expected_scope": "all_cases",
+            "trigger_condition": "prosecution over-convicts a clean case",
+        },
+    }
+    reason = runner._prevalidate_candidate(candidate, ["abstention_rule"])
+    assert reason is not None
+    assert reason.startswith("invalid_intervention_contract:field_not_owned")
+

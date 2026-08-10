@@ -197,17 +197,94 @@ def run_case(case_id: str, record_path: str, batch_dir: Path, log_dir: Path,
     }
 
 
+_BUDGET_FIELDS = (
+    "detector_calls", "mutation_calls", "mutation_errors",
+    "mutation_cache_hits", "mutation_transport_attempts",
+    "mutation_repairs", "mutation_retry_attempts",
+    "mutation_budget_exhausted", "provider_calls",
+    "source_replays", "policy_replays", "policy_replay_errors",
+    "contrast_replays", "contrast_replay_errors",
+    "probe_cases", "total_provider_calls",
+)
+
+
+def _sum_int(values: list[object]) -> int:
+    """Sum integer-like values, ignoring None and non-numeric entries."""
+    total = 0
+    for value in values:
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            total += int(value)
+    return total
+
+
+def _build_batch_totals(cases: list[dict[str, object]]) -> dict[str, object]:
+    """Aggregate per-case counters into batch-level totals with invariants.
+
+    The count invariant ``total = triggered + stable + runtime_invalid``
+    is checked here so a missing or mis-credited case is visible from the
+    batch report alone, without re-deriving it from the per-case audit.
+    """
+    totals: dict[str, object] = {
+        "total_cases": _sum_int([c.get("total_cases") for c in cases]),
+        "triggered_cases": _sum_int([c.get("triggered_cases") for c in cases]),
+        "stable_cases": _sum_int([c.get("stable_cases") for c in cases]),
+        "runtime_invalid_cases": _sum_int(
+            [c.get("runtime_invalid_cases") for c in cases]
+        ),
+        "edits_accepted": _sum_int([c.get("edits_accepted") for c in cases]),
+        "edits_rejected": _sum_int([c.get("edits_rejected") for c in cases]),
+        "l2_policy_accepts": _sum_int([c.get("l2_policy_accepts") for c in cases]),
+        "l2_policy_rejects": _sum_int([c.get("l2_policy_rejects") for c in cases]),
+        "l2_policy_skips": _sum_int([c.get("l2_policy_skips") for c in cases]),
+    }
+    budget_totals: dict[str, int] = {}
+    for case in cases:
+        budget = case.get("budget")
+        if not isinstance(budget, dict):
+            continue
+        for field in _BUDGET_FIELDS:
+            value = budget.get(field)
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                budget_totals[field] = budget_totals.get(field, 0) + int(value)
+    totals["budget"] = budget_totals
+    expected = (
+        int(totals["triggered_cases"])
+        + int(totals["stable_cases"])
+        + int(totals["runtime_invalid_cases"])
+    )
+    totals["count_invariant_ok"] = int(totals["total_cases"]) == expected
+    return totals
+
+
 def summarize_case(case_id: str, output_dir: Path) -> dict[str, object]:
     summary: dict[str, object] = {"case_id": case_id}
     result_path = output_dir / "evolution_result.json"
     if result_path.exists():
         payload = json.loads(result_path.read_text(encoding="utf-8"))
-        for key in ("triggered_cases", "edits_accepted", "edits_rejected",
-                    "stable_cases", "halted", "halt_reason"):
+        for key in ("total_cases", "triggered_cases", "edits_accepted",
+                    "edits_rejected", "stable_cases", "runtime_invalid_cases",
+                    "halted", "halt_reason"):
             summary[key] = payload.get(key)
         audit = payload.get("evolution_audit") or {}
         summary["attributions"] = audit.get("attributions") or []
         summary["l2_policy_audit"] = audit.get("l2_policy_audit") or []
+        summary["l2_policy_accepts"] = audit.get("l2_policy_accepts")
+        l2_decisions = {}
+        for entry in summary["l2_policy_audit"]:
+            decision = str(entry.get("decision") or "")
+            prefix = decision.split("_", 1)[0] if decision else ""
+            if prefix in ("accept", "reject", "skip"):
+                l2_decisions[prefix] = l2_decisions.get(prefix, 0) + 1
+        summary["l2_policy_rejects"] = l2_decisions.get("reject", 0)
+        summary["l2_policy_skips"] = l2_decisions.get("skip", 0)
+        summary["rejection_summary"] = audit.get("rejection_summary") or {}
+        summary["budget"] = {
+            field: audit.get(field) for field in _BUDGET_FIELDS
+        }
     genome_path = output_dir / "champion_genome.json"
     if genome_path.exists():
         genome = json.loads(genome_path.read_text(encoding="utf-8"))
@@ -382,6 +459,10 @@ def main() -> int:
             print(f"[done] {outcome['case_id']} rc={outcome['returncode']} "
                   f"elapsed={outcome['elapsed_seconds']}s")
 
+    cases = [
+        summarize_case(cid, batch_dir / cid.replace("/", "__") / "output")
+        for cid in case_ids
+    ]
     report = {
         "batch": batch_name,
         "protocol": {
@@ -398,10 +479,8 @@ def main() -> int:
         },
         "case_ids": case_ids,
         "outcomes": sorted(outcomes, key=lambda o: str(o["case_id"])),
-        "cases": [
-            summarize_case(cid, batch_dir / cid.replace("/", "__") / "output")
-            for cid in case_ids
-        ],
+        "cases": cases,
+        "totals": _build_batch_totals(cases),
     }
     report_path = batch_dir / "batch_report.json"
     report_path.write_text(
