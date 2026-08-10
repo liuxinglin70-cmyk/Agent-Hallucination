@@ -139,6 +139,7 @@ from .gate_feedback import (
 from .promotion_contract import (
     AUTHORITY_L1_FITNESS,
     AUTHORITY_L2_POLICY,
+    PromotionEvidence,
     promote,
 )
 from .meta_review import (
@@ -495,27 +496,43 @@ def _enforce_expected_effect_observation(
     effect_audit: Mapping[str, Any],
     causal_execution_status: str,
 ) -> FitnessAssessment:
-    """Bidirectional enforcement of the ActionSpec effect contract.
+    """Enforce the ActionSpec effect contract under a gold-label authority.
 
-    Downgrade (preserved): when an edit passed fitness but its ActionSpec
-    target field did not move, demote to ``no_effect`` — the rule compiled
-    but its execution obligation was not met.
+    Authority hierarchy for whether an edit's declared effect was observed:
 
-    Upgrade (NEW): when an edit was scored ``no_effect`` by the
-    module-local-score gate but the ActionSpec target field *did* move in
-    the expected direction, promote to ``directional_evidence``.  The
-    module-local score (e.g. ``min(prosecution, defense)`` for
-    ``evidence_obligation``) measures coverage *ranks*, which stay
-    ``incomplete`` when a freshly-emitted certificate is quarantined by the
-    proof court.  That quarantine is a downstream module's verdict, not
-    evidence that the edited module's rule was inert.  The effect audit
-    already records whether the contracted field (e.g.
-    ``causal_field_coverage``) increased; honoring that observation gives
-    the evolution loop a real gradient to climb instead of rejecting every
-    edit whose intermediate output was neutralized by a later stage.
+      1. Gold task score (external ground truth).  When a gold label is
+         available the task score ranks the verdict against the label
+         (wrong=0, unresolved=1, correct=2).  A movement toward correct
+         *is* the effect the edit exists to produce, and it outranks every
+         internal signal because the detector's own output is the very thing
+         being edited.
+      2. Contract telemetry (self-referential).  The before/after fields the
+         audit reads are produced by the detector under edit, so they are
+         corroboration only and may never overrule a gold verdict.
+
+    Two invariants follow directly:
+
+    * A gold-verified task improvement is never downgraded.  If the verdict
+      moved toward the gold label, the effect was observed at the task level;
+      the instrumented contract field failing to move is an instrumentation
+      gap, not proof the rule was inert.
+    * In gold mode a ``no_effect`` is never promoted to
+      ``directional_evidence``.  Promoting on the strength of the detector's
+      own output changes is self-certifying — the gold label already said the
+      verdict did not improve, and internal telemetry cannot rehabilitate
+      that.  The promotion path exists only for self-supervised mode, where
+      telemetry is the sole available gradient.
     """
+    gold_active = assessment.task_score_before is not None
+    gold_task_improved = (
+        gold_active
+        and assessment.task_score_after is not None
+        and assessment.task_score_after > assessment.task_score_before
+    )
+
     if (
-        str(causal_execution_status or "") == "executed"
+        not gold_task_improved
+        and str(causal_execution_status or "") == "executed"
         and (assessment.passed or assessment.evidence_only)
         and str(effect_audit.get("status") or "") != "observed"
     ):
@@ -527,6 +544,10 @@ def _enforce_expected_effect_observation(
             assessment.local_score_before,
             assessment.local_score_after,
         )
+
+    if gold_active:
+        return assessment
+
     if (
         assessment.decision == "no_effect"
         and str(effect_audit.get("status") or "") == "observed"
@@ -3907,6 +3928,72 @@ class _RunState:
     stable_cases: int = 0
 
 
+def _l2_promotion_evidence(
+    l2_audit: Mapping[str, Any], step: EvolutionStep,
+) -> PromotionEvidence:
+    """Distill the measured L2 replay facts into a PromotionEvidence.
+
+    The L2 accept path already enforced every safety check before reaching
+    ``accept_policy``: the proposed item must have fired, the terminal
+    state must have changed toward the gold label, and no canary may have
+    regressed.  Those facts live in the audit entry but were never forwarded
+    to ``promote()``, so every accept was graded ``weak`` regardless of how
+    strong the measured evidence was.  This function reads the same audit
+    fields the accept path wrote and packages them so the grade reflects
+    reality.
+    """
+    proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
+    proposal_item_id = ""
+    new_item = proposal.get("new_item")
+    if isinstance(new_item, Mapping):
+        proposal_item_id = str(new_item.get("item_id") or "")
+
+    policy_eval = l2_audit.get("policy_evaluation")
+    if not isinstance(policy_eval, Mapping):
+        policy_eval = {}
+
+    fired_rows = policy_eval.get("fired") or []
+    execution_established = bool(
+        proposal_item_id
+        and any(
+            isinstance(row, Mapping)
+            and str(row.get("item_id") or "") == proposal_item_id
+            for row in fired_rows
+        )
+    )
+
+    replay_state = str(l2_audit.get("replay_state") or "")
+    detection_state = str(step.detection_state or "")
+    terminal_effect = bool(replay_state and replay_state != detection_state)
+
+    canary_regressions = l2_audit.get("canary_regressions") or []
+    canary_audit = l2_audit.get("canary_audit") or []
+    non_regression = (
+        not canary_regressions
+        and all(
+            isinstance(row, Mapping) and row.get("preserved") is not False
+            for row in canary_audit
+        )
+        if canary_audit
+        else True
+    )
+
+    # The L2 path only accepts a state change when gold was available and
+    # the task score improved (evolution_runner.py:5674-5698).  An accepted
+    # state-changing L2 edit therefore carries a gold-polarity verification
+    # by construction.  A state-preserving accept (coverage-only) carries no
+    # terminal evidence and stays weak.
+    gold_polarity = terminal_effect and str(step.gate_decision) == "accept_policy"
+
+    return PromotionEvidence(
+        execution_established=execution_established,
+        terminal_effect=terminal_effect,
+        gold_polarity=gold_polarity,
+        independent_effect=None,
+        non_regression=non_regression,
+    )
+
+
 def _record_gate_event(
     step: EvolutionStep, *,
     gate_event_ledger: GateEventLedger, steps: list[Any],
@@ -3958,6 +4045,7 @@ def _record_gate_event(
             if str(item)
         )
     l2 = fitness.get("l2_policy")
+    l2_evidence: PromotionEvidence | None = None
     if isinstance(l2, Mapping):
         if str(l2.get("reason") or ""):
             reasons.append(str(l2["reason"]))
@@ -3967,6 +4055,12 @@ def _record_gate_event(
         # outcomes it was built for.
         if str(l2.get("feedback_code") or ""):
             reasons.append(str(l2["feedback_code"]))
+        # The L2 accept path already validated the evidence: it only reaches
+        # accept_policy when the proposed item fired, the terminal state
+        # changed, the gold task score improved, and no canary regressed.
+        # Package those measured facts into PromotionEvidence so the grade
+        # reflects the actual replay outcome instead of defaulting to weak.
+        l2_evidence = _l2_promotion_evidence(l2, step)
     try:
         decision = promote(
             layer=layer or "l1",
@@ -3977,6 +4071,7 @@ def _record_gate_event(
                 else AUTHORITY_L1_FITNESS
             ),
             reasons=reasons,
+            evidence=l2_evidence,
         )
     except ValueError:
         # A non-gate step (e.g. halted) is still audited, with an empty
@@ -5288,6 +5383,14 @@ def _run_l2_policy_case_impl(
             audit_entry.get("replay_state") or detection_state
         )
         state_improved = accepted and replay_state_value != detection_state
+        if state_improved:
+            # A gold-verified terminal-state change is a real, committed
+            # improvement: the accept path (evolution_runner.py:5749-5767)
+            # already confirmed the gold task score moved toward the label
+            # and no canary regressed.  Count it alongside L1 edits so the
+            # run's ``edits_accepted`` reflects every surface that improved
+            # detection, not just the L1 skill genome.
+            state.edits_accepted += 1
         policy_operation = (
             str(proposal_edit.operation) if proposal_edit else "no_proposal"
         )

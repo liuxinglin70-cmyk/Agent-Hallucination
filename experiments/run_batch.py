@@ -211,10 +211,32 @@ def summarize_case(case_id: str, output_dir: Path) -> dict[str, object]:
     genome_path = output_dir / "champion_genome.json"
     if genome_path.exists():
         genome = json.loads(genome_path.read_text(encoding="utf-8"))
-        rules = genome.get("rules") or {}
-        summary["genome_rule_count"] = sum(
-            len(entries) for entries in rules.values()
-        ) if isinstance(rules, dict) else None
+        modules = genome.get("modules") or {}
+        evolved_rules = {
+            module_id: [
+                rule.get("feature_description")
+                for rule in (module.get("rule_meta") or [])
+                if not rule.get("is_baseline")
+            ]
+            for module_id, module in modules.items()
+            if isinstance(module, dict)
+        }
+        evolved_rules = {
+            module_id: descriptions
+            for module_id, descriptions in evolved_rules.items()
+            if descriptions
+        }
+        summary["genome_evolved_rule_count"] = sum(
+            len(descriptions) for descriptions in evolved_rules.values()
+        )
+        summary["genome_evolved_rules"] = evolved_rules
+    policy_path = output_dir / "policy_genome.json"
+    if policy_path.exists():
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        items = policy.get("items") or []
+        summary["policy_item_count"] = (
+            len(items) if isinstance(items, list) else None
+        )
     memory_path = output_dir / "htc_tes_experience_memory.json"
     if memory_path.exists():
         memory = json.loads(memory_path.read_text(encoding="utf-8"))

@@ -4933,6 +4933,65 @@ def test_expected_effect_must_be_observed_before_promotion() -> None:
     ) is assessment
 
 
+def test_gold_task_improvement_survives_missing_contract_telemetry() -> None:
+    """A gold-verified verdict improvement is the authoritative effect.
+
+    Reproduces the OpenDeepSearch/059 step-0 failure: the verdict moved
+    toward the gold label (task 0->1) yet the contract telemetry field did
+    not register, so the old gate downgraded a real fix to ``no_effect`` and
+    killed it.  The gold task score outranks self-referential telemetry.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.fitness import FitnessAssessment
+
+    improved = FitnessAssessment(
+        "local_improvement",
+        ("gold_assisted_task_score_improved",),
+        0,
+        1,
+        7.0,
+        6.0,
+    )
+
+    result = runner._enforce_expected_effect_observation(
+        improved,
+        {"status": "not_observed", "target_output_changed": False},
+        "executed",
+    )
+    assert result is improved
+
+
+def test_gold_mode_no_effect_is_not_promoted_by_self_referential_telemetry() -> None:
+    """In gold mode a no_effect cannot be rehabilitated by the detector's
+    own output changes.
+
+    Reproduces the OpenDeepSearch/059 step-1 failure: the verdict did not
+    move toward the gold label (task 0->0), so assess_source_fitness scored
+    ``no_effect``; the old gate then promoted it to
+    ``directional_evidence`` purely on the detector's own telemetry — a
+    self-certifying promotion.  When a gold label is present it is the
+    ground truth and blocks the upgrade.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.fitness import FitnessAssessment
+
+    no_effect = FitnessAssessment(
+        "no_effect",
+        ("no_measurable_target_local_change",),
+        0,
+        0,
+        5.0,
+        5.0,
+    )
+
+    result = runner._enforce_expected_effect_observation(
+        no_effect,
+        {"status": "observed", "target_output_changed": True},
+        "executed",
+    )
+    assert result is no_effect
+
+
 def test_retry_prevalidation_rejects_a_repeated_no_effect_action_surface() -> None:
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
@@ -6526,8 +6585,9 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert checkpoint["stable_l2_policy_accepts"] == 0
 
     # The L1 skill surface stayed untouched: the L2 case never entered the
-    # SkillEdit path.
-    assert result.edits_accepted == 0
+    # SkillEdit path.  The gold-verified terminal-state change is still a
+    # committed improvement, so edits_accepted counts the L2 accept.
+    assert result.edits_accepted == 1
     assert result.champion_genome.generation == 0
     assert all(
         step.trigger_source == "l2_policy_reflection" for step in result.steps
@@ -6540,6 +6600,125 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     experience = memory["type_experience_memory"]["types"]["unknown"][0]
     assert experience["metadata"]["outcome_stage"] == "l2_policy_replay"
     assert experience["metadata"]["outcome"] == "improved"
+
+
+def test_l2_gold_verified_accept_is_graded_strong_not_weak() -> None:
+    """A gold-verified L2 accept with a terminal-state change must earn a
+    ``strong`` evidence grade, not ``weak``.
+
+    Reproduces the batch08 BFCL/134 failure: the L2 policy edit moved the
+    verdict from wrong to correct (gold-verified), but ``_record_gate_event``
+    called ``promote()`` without forwarding the measured replay evidence,
+    so every accept defaulted to ``weak``.  The fix packages the L2 audit's
+    execution/terminal/gold/canary facts into a ``PromotionEvidence`` so
+    ``promote()`` can grade them accurately.
+    """
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.promotion_contract import (
+        GRADE_STRONG,
+        ACTIVATION_DEPLOYABLE,
+        AUTHORITY_L2_POLICY,
+        promote,
+    )
+
+    step = runner.EvolutionStep(
+        case_id="BFCL/134",
+        case_index=0,
+        trigger_source="l2_policy_reflection",
+        attribution={"layer": "l2_adjudication_policy",
+                     "artifact": "boundary_consumption_policy"},
+        edit_proposal={
+            "operation": "add_item",
+            "new_item": {"item_id": "policy_46e5e82c",
+                         "action": "consume_verified_clean_boundary"},
+        },
+        mutation_applied=None,
+        gate_decision="accept_policy",
+        genome_hash_before="a",
+        genome_hash_after="b",
+        detection_state="unresolved",
+        timestamp=0.0,
+        fitness_check={"l2_policy": {
+            "decision": "accept_policy",
+            "replay_state": "verified_clean",
+            "canary_regressions": [],
+            "canary_audit": [{"case_id": "BFCL/011", "preserved": True}],
+            "policy_evaluation": {
+                "fired": [{"item_id": "policy_46e5e82c"}],
+            },
+        }},
+    )
+    l2_audit = step.fitness_check["l2_policy"]
+    evidence = runner._l2_promotion_evidence(l2_audit, step)
+    assert evidence.execution_established is True
+    assert evidence.terminal_effect is True
+    assert evidence.gold_polarity is True
+    assert evidence.non_regression is True
+
+    decision = promote(
+        layer="l2_adjudication_policy",
+        artifact="boundary_consumption_policy",
+        legacy_decision="accept_policy",
+        decision_authority=AUTHORITY_L2_POLICY,
+        reasons=(),
+        evidence=evidence,
+    )
+    assert decision.evidence_grade == GRADE_STRONG
+    assert decision.activation_state == ACTIVATION_DEPLOYABLE
+
+
+def test_l2_coverage_only_accept_stays_weak() -> None:
+    """An L2 accept that did not move the terminal state (coverage-only)
+    must stay ``weak`` — the gold polarity was never verified."""
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.promotion_contract import (
+        GRADE_WEAK,
+        ACTIVATION_WORKING,
+        AUTHORITY_L2_POLICY,
+        promote,
+    )
+
+    step = runner.EvolutionStep(
+        case_id="X/001",
+        case_index=0,
+        trigger_source="l2_policy_reflection",
+        attribution={"layer": "l2_adjudication_policy",
+                     "artifact": "coverage_validity_policy"},
+        edit_proposal={
+            "operation": "add_item",
+            "new_item": {"item_id": "policy_abc", "action": "invalidate"},
+        },
+        mutation_applied=None,
+        gate_decision="accept_policy",
+        genome_hash_before="a",
+        genome_hash_after="b",
+        detection_state="unresolved",
+        timestamp=0.0,
+        fitness_check={"l2_policy": {
+            "decision": "accept_policy",
+            "replay_state": "unresolved",
+            "canary_regressions": [],
+            "canary_audit": [],
+            "policy_evaluation": {
+                "fired": [{"item_id": "policy_abc"}],
+            },
+        }},
+    )
+    l2_audit = step.fitness_check["l2_policy"]
+    evidence = runner._l2_promotion_evidence(l2_audit, step)
+    assert evidence.terminal_effect is False
+    assert evidence.gold_polarity is False
+
+    decision = promote(
+        layer="l2_adjudication_policy",
+        artifact="coverage_validity_policy",
+        legacy_decision="accept_policy",
+        decision_authority=AUTHORITY_L2_POLICY,
+        reasons=(),
+        evidence=evidence,
+    )
+    assert decision.evidence_grade == GRADE_WEAK
+    assert decision.activation_state == ACTIVATION_WORKING
 
 
 def test_l2_admits_source_improvement_without_a_stable_registered_canary(

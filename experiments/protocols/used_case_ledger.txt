@@ -493,3 +493,14 @@ BFCL/011
 BFCL/022
 BFCL/033
 BFCL/053
+# --- batch08 R16 (2026-08-10, 10 fresh stratified cases; gold-authority effect enforcement + L2 evidence grading + L2 edits_accepted) ---
+BFCL/007
+BFCL/095
+BFCL/134
+BFCL/139
+Camel/017
+Camel/066
+Camel/074
+Magentic_One/049
+OpenDeepSearch/019
+OpenDeepSearch/090
