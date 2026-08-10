@@ -477,6 +477,17 @@ OpenManus/078
 SmolAgents/016
 SmolAgents/075
 SmolAgents/079
+# --- batch07 R15-verify (2026-08-10, 10 fresh stratified cases; 5-fix gold admission validated on new data, 2 L1 rules accepted) ---
+BFCL/079
+BFCL/111
+BFCL/118
+Camel/025
+Camel/032
+Camel/068
+Camel/084
+OpenDeepSearch/011
+OpenDeepSearch/059
+SmolAgents/080
 # --- recovery safety canary v1 (2026-08-10, evaluator-only; never evolution sources) ---
 BFCL/011
 BFCL/022
