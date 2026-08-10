@@ -26,6 +26,10 @@ def main() -> int:
         help="JSON mapping or JSONL of raw trajectories",
     )
     parser.add_argument(
+        "--canary-records", type=Path, default=None,
+        help="optional disjoint records used only for non-regression replay",
+    )
+    parser.add_argument(
         "--config", type=Path, required=True,
         help="detector config; provider routes are resolved from env",
     )
@@ -83,6 +87,7 @@ def main() -> int:
 
     result = run_evolution(
         records=args.records,
+        canary_records=args.canary_records,
         detector_config=args.config,
         output_dir=args.output_dir,
         census_root=args.census_root,

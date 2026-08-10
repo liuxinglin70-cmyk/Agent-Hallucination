@@ -31,10 +31,14 @@ from .module_charter import (
     MODULE_OBSERVABLE_FIELDS,
     render_charter_text,
 )
-from .action_spec import render_action_spec_contract
+from .action_spec import (
+    render_action_spec_contract,
+    render_direction_action_contract,
+)
 from .failure_episode import EVALUATOR_ONLY_KEYS
 from .step_attributor import (
     AttributionSignal,
+    ErrorType,
 )
 from .signal_adapter import resolve_evolution_state
 # v6.1 扩展：结构化经验检索与负反馈分析
@@ -341,6 +345,24 @@ def build_causal_reflection_prompt(
         f"    {render_action_spec_contract(module)}"
         for module in allowed_modules
     )
+    if signal.error_type in {
+        ErrorType.FALSE_POSITIVE,
+        ErrorType.UNRESOLVED_SHOULD_CLEAN,
+    }:
+        action_direction = "error_to_clean"
+    elif signal.error_type in {
+        ErrorType.FALSE_NEGATIVE,
+        ErrorType.FALSE_NEGATIVE_CLEAN,
+        ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+        ErrorType.UNRESOLVED_SHOULD_ERROR,
+    }:
+        action_direction = "clean_to_error"
+    else:
+        action_direction = ""
+    direction_action_contract = render_direction_action_contract(
+        action_direction,
+        allowed_modules,
+    )
 
     system = """You are the BCCSE v5 causal-process reflection engine.
 
@@ -514,6 +536,16 @@ listed for the target module in runtime_output_contracts.
     system += """
 </module_charters>
 """
+    if direction_action_contract:
+        contract_name = action_direction.upper()
+        system += (
+            f"\n{contract_name} ACTION CONTRACT (binding): the action opcode MUST "
+            "be one of the entries listed for the selected target_module. "
+            "The listed opcodes are the sole actions compatible with this "
+            "training direction.\n"
+            + direction_action_contract
+            + "\n"
+        )
     if candidate_count > 1:
         system += (
             "\nCollaborative generation mode is active. Return one JSON object "
@@ -852,12 +884,18 @@ def build_intervention_critic_prompt(
     """Build a selection prompt for a critic that cannot rewrite rules."""
     if len(candidates) < 2:
         raise ValueError("critic requires at least two candidates")
+    action_contracts = "\n".join(
+        f"[{module}]\n{render_action_spec_contract(module)}"
+        for module in allowed_target_modules
+    )
     system = (
         "You are the BCCSE intervention critic. Do not generate or rewrite "
         "rules. Select the candidate most likely to change the observed runtime "
         "output through its declared owner. Reject unowned fields, restated "
         "rules, multiple actions, or non-observable triggers. This is replay "
-        "prioritization, not a correctness vote. Return JSON only."
+        "prioritization, not a correctness vote. Every candidate already passed "
+        "the deterministic action contract; use ACTION_CONTRACTS as the sole "
+        "authority for whether an operation/target is owned. Return JSON only."
     )
     user = (
         "RUNTIME_OBSERVATION="
@@ -865,6 +903,7 @@ def build_intervention_critic_prompt(
         + "\nCURRENT_SKILL=" + current_skill_text[:6000]
         + "\nALLOWED_MODULES="
         + json.dumps(list(allowed_target_modules), ensure_ascii=False)
+        + "\nACTION_CONTRACTS=\n" + action_contracts
         + "\nCANDIDATES="
         + json.dumps([dict(value) for value in candidates[:5]], ensure_ascii=False, sort_keys=True)
         + '\nReturn {"decision":"select","selected_index":0,"reason":"..."} '

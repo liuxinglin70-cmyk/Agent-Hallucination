@@ -690,8 +690,9 @@ def _route_gold_locked_owner(
       prosecution is incomplete, evidence construction is the defect. If
       defense is the only complete side, the court over-deferred to it.
     - FP (error verdict, gold=clean): if defense is already complete, the
-      court wrongly issued error despite a complete defense. That is an
-      abstention/adjudication failure, not a boundary-formation failure.
+      defense surface is saturated. Surviving error evidence must be bounded
+      at the prosecution evidence or atomic verification surface. If defense
+      is incomplete, defense construction remains the owner.
 
     The ``default_module`` from the error-type map is used only as a fallback.
     """
@@ -710,7 +711,7 @@ def _route_gold_locked_owner(
     if state == "verified_error":
         # FP side: gold says a clean case was wrongly condemned.
         if defense.state in {"complete"}:
-            return "abstention_rule", "clean_defense_boundary"
+            return "evidence_obligation", "atomic_verifier_instruction"
         if defense.state in {"incomplete", "unresolved"}:
             return default_module or "clean_defense_boundary", "abstention_rule"
         return "clean_defense_boundary", "abstention_rule"
@@ -993,19 +994,11 @@ def _resolve_module_attribution(
     target_module = ERROR_MODULE_MAP.get(error_type, "evidence_obligation")
     secondary_module = ERROR_MODULE_SECONDARY.get(error_type, "abstention_rule")
 
-    # v5.6 gold-constrained module routing. Gold polarity selects the failure
-    # side (FP vs FN) but the STATIC error-type map can point at the wrong
-    # owner when the process is already complete. The real defect is wherever
-    # the proof court broke. For example, a FALSE_NEGATIVE_CLEAN whose
-    # prosecution coverage is already complete is NOT an evidence_obligation
-    # failure: the court wrongly accepted a clean verdict despite a complete
-    # error proof, so the defect is abstention/adjudication (or a causal link
-    # that never survived). Coverage states are label-free and authoritative,
-    # so this refines the owner while preserving the gold polarity. The FP
-    # side keeps its documented defense-side default (an FP is a defense
-    # failure); only the FN side is refined because that was the observed
-    # misrouting.
+    # Gold selects the wrong outcome side; label-free coverage identifies the
+    # first unsatisfied process contract on that side. This prevents a static
+    # error-type default from targeting a surface that is already complete.
     if gold_polarity_locked and error_type in {
+        ErrorType.FALSE_POSITIVE,
         ErrorType.FALSE_NEGATIVE,
         ErrorType.FALSE_NEGATIVE_UNRESOLVED,
         ErrorType.FALSE_NEGATIVE_CLEAN,
@@ -1019,16 +1012,25 @@ def _resolve_module_attribution(
         )
         target_module, secondary_module = routed
 
-    # Gold keeps polarity AND its primary module (an FP is a defense failure,
-    # not a localization failure). Diagnostics only supply the partner module
-    # so the repair prompt names both the gold failure and the process defect.
+    # Diagnostics may supply a partner module without changing gold polarity.
+    # Localization diagnostics are undefined for a false positive: a clean
+    # gold case has no responsible hallucination origin to rank.
     gold_diagnostic_secondary = None
     if (
         gold_polarity_locked
         and not gold_verified_correct
         and diagnostic_finding is not None
     ):
-        diagnostic_module = ERROR_MODULE_MAP.get(diagnostic_finding[0])
+        diagnostic_type = diagnostic_finding[0]
+        diagnostic_module = (
+            None
+            if error_type is ErrorType.FALSE_POSITIVE
+            and diagnostic_type in {
+                ErrorType.LOCALIZATION_ERROR,
+                ErrorType.LOCALIZATION_AMBIGUOUS,
+            }
+            else ERROR_MODULE_MAP.get(diagnostic_type)
+        )
         if diagnostic_module is not None and diagnostic_module != target_module:
             secondary_module = diagnostic_module
             gold_diagnostic_secondary = diagnostic_module

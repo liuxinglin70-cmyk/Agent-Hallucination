@@ -385,6 +385,8 @@ def test_framework_health_final_e2e(
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     def l2_replay(*, case_id, genome, policy_genome):
+        if case_id == "anchor":
+            return p0.stable_anchor_detection()
         payload = p0.hollow_defense()
         item = policy_genome.items[-1]
         payload["state"] = "unresolved"

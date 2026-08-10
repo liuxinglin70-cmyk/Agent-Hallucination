@@ -1,5 +1,7 @@
 """Tests for the L1 Skill rule slot contract (rule_contract)."""
 
+import pytest
+
 from src.sehd_v6.core.bccse.genome import (
     DEDUP_HIGH_THRESHOLD,
     DEDUP_LOW_THRESHOLD,
@@ -117,6 +119,28 @@ def test_plain_action_conjunction_is_rejected():
     )
     assert not ok
     assert reason == "multiple_actions"
+
+
+@pytest.mark.parametrize(
+    "field_value",
+    (
+        "event_001 lacks counterfactual evidence",
+        "v3_candidate_001 lacks counterfactual evidence",
+        "appeal_error_001 lacks counterfactual evidence",
+    ),
+)
+def test_instance_ids_are_rejected_from_rule_conditions(field_value: str):
+    ok, reason = validate_rule_spec(_spec(condition=field_value))
+    assert not ok
+    assert reason.startswith("condition:rule_prompt_or_case_pollution")
+
+
+def test_instance_ids_are_rejected_from_rule_actions():
+    ok, reason = validate_rule_spec(
+        _spec(action="require_evidence_field: event_001")
+    )
+    assert not ok
+    assert reason == "action:rule_instance_id_pollution"
 
 
 def test_cross_module_action_surface_is_rejected():

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from dataclasses import replace
 
 import pytest
 
@@ -185,6 +186,35 @@ def test_standalone_evolution_accepts_mapping_input(tmp_path, offline_evolution)
 
     assert result.total_cases == 2
     assert (tmp_path / "out2" / "champion_genome.json").is_file()
+
+
+def test_standalone_canaries_are_replayed_but_never_evolution_sources(
+    tmp_path, offline_evolution,
+) -> None:
+    result = run_evolution(
+        records={"source": {"history": []}},
+        canary_records={"stable": {"history": []}},
+        detector_config=_write_config(tmp_path),
+        output_dir=tmp_path / "with_canary",
+        canary_limit=1,
+    )
+
+    assert result.total_cases == 1
+    assert [row["case_id"] for row in result.evolution_audit[
+        "baseline_canary_audit"
+    ]] == ["stable"]
+    assert result.evolution_audit["baseline_canary_audit"][0]["admitted"] is True
+    assert result.steps[0].fitness_check["canary_cases"] == 1
+
+
+def test_standalone_rejects_canary_source_overlap(tmp_path) -> None:
+    with pytest.raises(ValueError, match="must be disjoint"):
+        run_evolution(
+            records={"same": {}},
+            canary_records={"same": {}},
+            detector_config=_write_config(tmp_path),
+            output_dir=tmp_path / "overlap",
+        )
 
 
 def test_standalone_evolution_without_credential_skips_mutation_provider(
@@ -530,6 +560,73 @@ def test_online_evolution_diagnosis_unlocks_no_edit_deadlock(
     assert result.edits_accepted == 1
 
 
+def test_public_evolution_default_uses_independent_hypothesis_search() -> None:
+    from src.sehd_v6.evolution.runner import DEFAULT_REFLECTION_CANDIDATES
+
+    assert DEFAULT_REFLECTION_CANDIDATES == 4
+
+
+def test_critic_prompt_uses_executable_action_contract_as_owner_authority() -> None:
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        build_intervention_critic_prompt,
+    )
+
+    candidates = [
+        {
+            "target_module": "evidence_obligation",
+            "operation": "add_rule",
+            "condition": "a certificate lacks impact evidence",
+            "action": "keep_coverage_incomplete: coverage_state",
+        },
+        {
+            "target_module": "atomic_verifier_instruction",
+            "operation": "add_rule",
+            "condition": "a certificate is unsupported",
+            "action": "quarantine_certificate: certificate_id",
+        },
+    ]
+
+    system, user = build_intervention_critic_prompt(
+        candidates=candidates,
+        runtime_observation={},
+        current_skill_text="",
+        allowed_target_modules=(
+            "evidence_obligation", "atomic_verifier_instruction",
+        ),
+    )
+
+    assert "sole authority" in system
+    assert "ACTION_CONTRACTS=" in user
+    assert "quarantine_certificate" in user
+    assert "certificate_id" in user
+
+
+def test_false_positive_reflection_prompt_binds_reverse_direction_actions() -> None:
+    from src.sehd_v6.core.bccse.reflection_engine import (
+        build_causal_reflection_prompt,
+    )
+
+    signal = replace(
+        _signal("verified_error"),
+        error_type=ErrorType.FALSE_POSITIVE,
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+    )
+
+    system, _user = build_causal_reflection_prompt(
+        signal=signal,
+        current_skill_text="",
+        detection_context="",
+        allowed_target_modules=(
+            "evidence_obligation", "atomic_verifier_instruction",
+        ),
+    )
+
+    assert "ERROR_TO_CLEAN ACTION CONTRACT (binding)" in system
+    assert "evidence_obligation: keep_coverage_incomplete" in system
+    assert "atomic_verifier_instruction: quarantine_certificate" in system
+
+
 def test_online_evolution_diagnosis_downgrades_illegal_owner(
     tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
@@ -710,9 +807,8 @@ def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
     ]
     assert len(rejected_steps) == 2
     assert all(
-        str(step.fitness_check.get("mutation_error") or "").startswith(
-            "rule_spec:condition_overload"
-        )
+        "rule_spec:condition_overload"
+        in str(step.fitness_check.get("mutation_error") or "")
         for step in rejected_steps
     )
     # The first attempt schedules a bounded retry with structured feedback
@@ -720,6 +816,74 @@ def test_condition_overload_is_rejected_and_fed_back_for_rewrite(
     assert rejected_steps[0].fitness_check.get("retry_scheduled") is True
     assert rejected_steps[0].fitness_check.get("retry_failure_category")
     assert rejected_steps[1].fitness_check.get("retry_scheduled") is False
+    assert rejected_steps[0].episode["episode_id"] == (
+        rejected_steps[1].episode["episode_id"]
+    )
+    assert len(rejected_steps[0].episode["attempts"]) == 1
+    assert len(rejected_steps[1].episode["attempts"]) == 2
+
+
+def test_stable_retry_clears_the_prior_failure_episode(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    detector_calls = 0
+
+    def detector(**kwargs):
+        nonlocal detector_calls
+        detector_calls += 1
+        return {
+            "state": "unresolved" if detector_calls == 1 else "verified_clean",
+            "runtime_valid": True,
+            "decision_authority": "authoritative",
+            "census": [],
+        }
+
+    def mutation(**kwargs):
+        return {
+            "target_module": "evidence_obligation",
+            "operation": "add_rule",
+            "condition": "the claim lacks support and the tool failed and output diverged",
+            "action": "require_evidence_field: impact_evidence_refs",
+            "evidence_anchor": "invalid overloaded condition",
+            "feature_description": "invalid overloaded condition",
+            "expected_effect": "prosecution evidence coverage increases",
+            "expected_effect_contract": {
+                "observable_field": "prosecution_coverage",
+                "expected_direction": "increase",
+                "expected_scope": "all_cases",
+                "trigger_condition": "prosecution evidence is incomplete",
+            },
+        }, {"cache_hit": False}
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(runner, "json_object_provider_call", mutation)
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        records={"source": {}},
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        reflection_candidate_count=1,
+        run_id="stable_retry_clears_episode",
+    )
+
+    assert [step.gate_decision for step in result.steps] == [
+        "retry_invalid_mutation",
+        "skip_stable",
+    ]
+    assert result.steps[0].episode is not None
+    assert result.steps[1].episode is None
 
 
 def test_resume_rewinds_halted_placeholder_steps(
@@ -1224,6 +1388,8 @@ def test_p0_mocked_loop_l1_accept_path(tmp_path, monkeypatch, addressable_l1_fai
 
 def test_p0_mocked_loop_l2_policy_accept_path(tmp_path, monkeypatch, addressable_l1_failure):
     def replay(*, case_id, genome, policy_genome):
+        if case_id == "anchor":
+            return p0.stable_anchor_detection()
         payload = p0.hollow_defense()
         # The effect gate binds the replay's fired row to the proposal's
         # own item_id (runner-assigned, carried on the candidate genome).
@@ -1261,6 +1427,9 @@ def test_p0_mocked_loop_l2_policy_accept_path(tmp_path, monkeypatch, addressable
     ]
     assert [step.gate_decision for step in l2_steps] == ["accept_policy"]
     assert result.policy_genome.total_items == 1
+    l2_audit = result.evolution_audit["l2_policy_audit"][0]
+    assert l2_audit["canary_cases"] == 1
+    assert l2_audit["canary_audit"][0]["preserved"] is True
 
 
 def test_p0_runtime_invalid_fixture_is_diagnostic_only(tmp_path, monkeypatch, addressable_l1_failure):

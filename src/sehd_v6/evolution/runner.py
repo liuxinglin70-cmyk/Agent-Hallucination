@@ -35,7 +35,7 @@ from .state_manifest import (
 # Single source of truth for the independent reflection sample count: the
 # public API and the CLI share this default so one knob cannot drift into
 # two different "default" run costs.
-DEFAULT_REFLECTION_CANDIDATES = 1
+DEFAULT_REFLECTION_CANDIDATES = 4
 
 
 def default_mutation_route() -> dict[str, Any]:
@@ -94,6 +94,25 @@ def load_records(path: Path) -> dict[str, dict[str, Any]]:
         if case_id in records:
             raise ValueError(f"duplicate case_id: {case_id}")
         records[case_id] = dict(record)
+    return records
+
+
+def _coerce_record_source(
+    value: Mapping[str, Mapping[str, Any]] | Path | str,
+    *,
+    source_name: str,
+) -> dict[str, dict[str, Any]]:
+    """Normalize one named record source through the public loader contract."""
+    if isinstance(value, (Path, str)):
+        records = load_records(Path(value))
+    else:
+        if not value:
+            raise ValueError(f"{source_name} must not be empty")
+        if not all(isinstance(record, Mapping) for record in value.values()):
+            raise ValueError(f"{source_name} values must be objects")
+        records = {str(key): dict(record) for key, record in value.items()}
+    if not records:
+        raise ValueError(f"{source_name} must not be empty")
     return records
 
 
@@ -156,6 +175,7 @@ def _load_initial_policy_genome(
 def run_evolution(
     *,
     records: Mapping[str, Mapping[str, Any]] | Path,
+    canary_records: Mapping[str, Mapping[str, Any]] | Path | None = None,
     detector_config: Path | Mapping[str, Any],
     output_dir: Path,
     census_root: Path | None = None,
@@ -185,6 +205,9 @@ def run_evolution(
             JSONL file (see ``load_records``).  Evaluator-only fields such as
             ``gold_label`` may be present for the optional gold-enhanced mode;
             they are stripped before every detector call.
+        canary_records: Optional disjoint records used only for pre-registered
+            non-regression replay. They never enter ``evolution_case_ids`` and
+            therefore cannot generate edits or experience credit.
         detector_config: Detector config path or resolved route mapping.
         output_dir: Artifact directory.  The runner writes
             ``evolution_result.json``, ``champion_genome.json`` and
@@ -238,18 +261,23 @@ def run_evolution(
     Returns:
         OnlineEvolutionResult with the champion genome and audit trail.
     """
-    if isinstance(records, Path):
-        records = load_records(records)
-    elif isinstance(records, str):
-        records = load_records(Path(records))
-    else:
-        if not records:
-            raise ValueError("records must not be empty")
-        if not all(isinstance(record, Mapping) for record in records.values()):
-            raise ValueError("record values must be objects")
-        records = {str(key): dict(record) for key, record in records.items()}
-    if not records:
-        raise ValueError("records must not be empty")
+    evolution_records = _coerce_record_source(
+        records, source_name="records",
+    )
+    resolved_canary_records = (
+        _coerce_record_source(canary_records, source_name="canary_records")
+        if canary_records is not None
+        else {}
+    )
+    overlapping_ids = sorted(
+        set(evolution_records).intersection(resolved_canary_records)
+    )
+    if overlapping_ids:
+        raise ValueError(
+            "canary_records must be disjoint from evolution records: "
+            + ", ".join(overlapping_ids)
+        )
+    all_records = {**evolution_records, **resolved_canary_records}
 
     if isinstance(detector_config, Path):
         config = resolve_detector_config(
@@ -310,8 +338,8 @@ def run_evolution(
         experience_memory_path = inherited_memory
 
     result = run_online_evolution(
-        evolution_case_ids=list(records),
-        records=records,
+        evolution_case_ids=list(evolution_records),
+        records=all_records,
         config=config,
         output_dir=Path(output_dir),
         census_root=Path(census_root) if census_root is not None else None,
@@ -328,7 +356,7 @@ def run_evolution(
             if experience_memory_path is not None else None
         ),
         canary_limit=canary_limit,
-        canary_case_ids=(),
+        canary_case_ids=tuple(resolved_canary_records),
         validation_probe_every=0,
         probe_ids=(),
         probe_limit=0,

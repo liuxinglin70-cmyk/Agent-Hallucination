@@ -1425,6 +1425,67 @@ def test_label_free_run_fails_before_mutation_when_registered_canary_is_unstable
     assert mutation_calls == 0
 
 
+def test_gold_l1_rejects_source_improvement_without_a_stable_registered_canary(
+    tmp_path, monkeypatch, addressable_l1_failure,
+) -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    def detector(*, genome, case_id, **kwargs):
+        return {
+            "state": (
+                "verified_clean"
+                if case_id == "source" and genome.generation else "unresolved"
+            ),
+            "runtime_valid": True,
+            "census": [],
+        }
+
+    monkeypatch.setattr(runner, "_run_detection_with_genome", detector)
+    monkeypatch.setattr(
+        runner,
+        "attribute_failure",
+        lambda result, use_gold=False, gold_reflection=False: _signal(
+            str(result["state"])
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "json_object_provider_call",
+        lambda **kwargs: (_slots_response(), {}),
+    )
+
+    result = runner.run_online_evolution(
+        evolution_case_ids=("source",),
+        canary_case_ids=("anchor",),
+        records={
+            "source": {"gold_label": False},
+            "anchor": {"gold_label": False},
+        },
+        config={},
+        output_dir=tmp_path,
+        census_root=tmp_path,
+        mutation_route={"model": "DeepSeek-V4-Flash"},
+        fitness_use_gold=True,
+        max_mutation_attempts_per_case=1,
+        run_id="gold_unstable_anchor",
+    )
+
+    baseline_canary = result.evolution_audit["baseline_canary_audit"][0]
+    assert baseline_canary["case_id"] == "anchor"
+    assert baseline_canary["admitted"] is False
+    assert baseline_canary["state"] == "unresolved"
+    assert baseline_canary["should_evolve"] is True
+    assert result.edits_accepted == 0
+    step = result.steps[0]
+    assert step.gate_decision == "reject_fitness_no_effect"
+    assert step.fitness_check["assessment"]["reasons"] == [
+        "independent_canary_unavailable"
+    ]
+    assert step.fitness_check["configured_canary_count"] == 1
+    assert step.fitness_check["stable_registered_canary_count"] == 0
+    assert step.fitness_check["canary_cases"] == 0
+
+
 def test_no_gold_local_process_gain_stays_unprotected_provisional(
     tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
@@ -2140,11 +2201,11 @@ def test_complete_localization_does_not_trigger_diagnostic() -> None:
 
 
 def test_gold_false_positive_polarity_outranks_process_diagnostic() -> None:
-    """Gold FP keeps its polarity AND its defense-side primary module.
+    """Gold FP keeps its polarity and targets the unsatisfied process side.
 
-    A process diagnostic may only contribute the partner module: blaming
-    earliest_origin_tiebreak for a false positive would send the mutation
-    to a module that cannot fix a wrong verdict.
+    Complete defense proves that generating more defense is not the repair.
+    A localization diagnostic is inapplicable because a clean case has no
+    responsible hallucination origin.
     """
     row = _diagnostic_row(localization_status="failed_temporal_fallback")
     row["gold_label"] = False
@@ -2152,10 +2213,21 @@ def test_gold_false_positive_polarity_outranks_process_diagnostic() -> None:
 
     assert signal.error_type is ErrorType.FALSE_POSITIVE
     assert signal.trigger_source is TriggerSource.GOLD_MISMATCH
+    assert signal.target_module == "evidence_obligation"
+    assert signal.secondary_module == "atomic_verifier_instruction"
+    assert signal.process_diagnostic_applied is False
+
+
+def test_gold_false_positive_incomplete_defense_stays_on_defense_surface() -> None:
+    row = _diagnostic_row()
+    row["proof_adjudication"]["defense_coverage"] = "incomplete"
+    row["gold_label"] = False
+
+    signal = attribute_failure(row, use_gold=True)
+
+    assert signal.error_type is ErrorType.FALSE_POSITIVE
     assert signal.target_module == "clean_defense_boundary"
-    # Diagnostics still surface the observed process defect as secondary.
-    assert signal.secondary_module == "earliest_origin_tiebreak"
-    assert signal.process_diagnostic_applied is True
+    assert signal.secondary_module == "abstention_rule"
 
 
 def test_gold_false_negative_polarity_survives_quarantine_diagnostic() -> None:
@@ -4624,7 +4696,7 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
             ),
         )
 
-    _patch_classifier("candidate_trigger", "provider_artifact_missing")
+    _patch_classifier("earliest_origin_tiebreak", "provider_artifact_missing")
     owner, _reason, _attribution = runner._attribute_failure(
         signal=_fp_signal(),
         detection_result={},
@@ -4642,6 +4714,305 @@ def test_attribute_failure_fp_polarity_gate_drops_out_of_pool_owner(
         non_l1_failure_attributions=[],
     )
     assert owner == "clean_defense_boundary"
+
+
+def test_attribute_failure_fp_localization_uses_polarity_process_owner(
+    monkeypatch,
+) -> None:
+    """Localization telemetry cannot own a gold-clean false positive."""
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import LAYER_L1, FailureAttribution
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    monkeypatch.setattr(
+        runner,
+        "classify_failure",
+        lambda record: FailureAttribution(
+            layer=LAYER_L1,
+            artifact="earliest_origin_tiebreak",
+            reason_code="responsible_step_missing",
+            evidence={"terminal_state": "verified_error"},
+        ),
+    )
+    signal = SimpleNamespace(
+        state="verified_error",
+        target_module="evidence_obligation",
+        secondary_module="atomic_verifier_instruction",
+        gold_label=False,
+        has_gold=True,
+    )
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={},
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="case_fp_localization",
+        non_l1_failure_attributions=[],
+    )
+
+    assert owner == "evidence_obligation"
+    assert reason == "responsible_step_missing"
+    assert attribution.artifact == "evidence_obligation"
+    assert attribution.evidence["classified_artifact"] == "earliest_origin_tiebreak"
+    assert attribution.evidence["owner_resolution"] == "gold_polarity_process_owner"
+
+
+def test_candidate_prevalidation_uses_complete_rule_contract() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    candidate = {
+        "target_module": "candidate_trigger",
+        "operation": "add_rule",
+        "condition": "a provider candidate artifact is absent",
+        "action": "emit_candidate: candidate",
+        "evidence_anchor": "x" * 241,
+    }
+
+    reason = runner._prevalidate_candidate(candidate, ["candidate_trigger"])
+
+    assert reason == "rule_spec:evidence_anchor_too_long"
+
+
+def test_candidate_prevalidation_rejects_unobservable_runtime_condition() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    candidate = {
+        "target_module": "abstention_rule",
+        "operation": "add_rule",
+        "condition": "prosecution_coverage is incomplete",
+        "action": "emit_boundary_finding: state",
+        "evidence_anchor": "incomplete prosecution evidence",
+    }
+
+    reason = runner._prevalidate_candidate(
+        candidate,
+        ["abstention_rule", "clean_defense_boundary"],
+    )
+
+    assert reason == (
+        "runtime_rule_contract:forbidden_runtime_marker:prosecution_coverage"
+    )
+
+
+def test_false_positive_prevalidation_rejects_prosecution_strengthening() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    strengthen = {
+        "target_module": "atomic_verifier_instruction",
+        "operation": "add_rule",
+        "condition": "an error certificate omits cited trajectory evidence",
+        "action": "require_evidence_field: evidence_refs",
+        "evidence_anchor": "certificate evidence omission",
+    }
+    quarantine = {
+        **strengthen,
+        "action": "quarantine_certificate: certificate_id",
+    }
+
+    reason = runner._prevalidate_candidate(
+        strengthen,
+        ["evidence_obligation", "atomic_verifier_instruction"],
+        error_type=ErrorType.FALSE_POSITIVE,
+    )
+
+    assert reason == (
+        "action_polarity_mismatch:error_to_clean:"
+        "atomic_verifier_instruction:require_evidence_field"
+    )
+    assert runner._prevalidate_candidate(
+        quarantine,
+        ["evidence_obligation", "atomic_verifier_instruction"],
+        error_type=ErrorType.FALSE_POSITIVE,
+    ) is None
+
+
+def test_false_positive_evidence_action_must_keep_prosecution_open() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    candidate = {
+        "target_module": "evidence_obligation",
+        "operation": "add_rule",
+        "condition": "an error certificate lacks cited impact evidence",
+        "action": "keep_coverage_incomplete: coverage_state",
+        "evidence_anchor": "missing cited impact evidence",
+    }
+
+    assert runner._prevalidate_candidate(
+        candidate,
+        ["evidence_obligation", "atomic_verifier_instruction"],
+        error_type=ErrorType.FALSE_POSITIVE,
+    ) is None
+
+
+def test_unresolved_should_error_rejects_clean_defense_actions() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    clean_strengthening = {
+        "target_module": "clean_defense_boundary",
+        "operation": "add_rule",
+        "condition": "a defense certificate lacks cited support",
+        "action": "require_evidence_field: evidence_refs",
+        "evidence_anchor": "unsupported defense certificate",
+    }
+    prosecution_strengthening = {
+        **clean_strengthening,
+        "target_module": "evidence_obligation",
+        "action": "require_evidence_field: impact_evidence_refs",
+    }
+
+    reason = runner._prevalidate_candidate(
+        clean_strengthening,
+        ["evidence_obligation", "clean_defense_boundary"],
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+    )
+
+    assert reason == (
+        "action_polarity_mismatch:clean_to_error:"
+        "clean_defense_boundary:require_evidence_field"
+    )
+    assert runner._prevalidate_candidate(
+        prosecution_strengthening,
+        ["evidence_obligation", "clean_defense_boundary"],
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+    ) is None
+
+
+def test_unresolved_should_error_excludes_clean_secondary_owner() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+        secondary_module="clean_defense_boundary",
+    )
+
+    assert runner._allowed_l1_modules(signal, "evidence_obligation") == (
+        "evidence_obligation",
+    )
+
+
+def test_expected_effect_must_be_observed_before_promotion() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.fitness import FitnessAssessment
+
+    assessment = FitnessAssessment(
+        "local_improvement",
+        ("module_local_score_improved",),
+        1,
+        1,
+        7.0,
+        6.0,
+    )
+
+    rejected = runner._enforce_expected_effect_observation(
+        assessment,
+        {"status": "not_observed"},
+        "executed",
+    )
+
+    assert rejected.decision == "no_effect"
+    assert rejected.reasons == ("expected_effect_not_observed",)
+    assert runner._enforce_expected_effect_observation(
+        assessment,
+        {"status": "observed"},
+        "executed",
+    ) is assessment
+    assert runner._enforce_expected_effect_observation(
+        assessment,
+        {"status": "not_observed"},
+        "not_instrumented",
+    ) is assessment
+
+
+def test_retry_prevalidation_rejects_a_repeated_no_effect_action_surface() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    candidate = {
+        "target_module": "evidence_obligation",
+        "operation": "add_rule",
+        "condition": "an error certificate lacks cited impact evidence",
+        "action": "keep_coverage_incomplete: coverage_state",
+        "evidence_anchor": "missing cited impact evidence",
+    }
+
+    reason = runner._prevalidate_candidate(
+        candidate,
+        ["evidence_obligation", "atomic_verifier_instruction"],
+        error_type=ErrorType.FALSE_POSITIVE,
+        blocked_action_surfaces=((
+            "evidence_obligation", "keep_coverage_incomplete",
+        ),),
+    )
+
+    assert reason == (
+        "repeated_no_effect_action_surface:"
+        "evidence_obligation:keep_coverage_incomplete"
+    )
+
+
+def test_independent_generation_covers_each_legal_owner_before_free_search() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    owners = ("evidence_obligation", "atomic_verifier_instruction")
+
+    assert runner._generation_module_requirement(owners, 0) == owners[0]
+    assert runner._generation_module_requirement(owners, 1) == owners[1]
+    assert runner._generation_module_requirement(owners, 2) == owners[0]
+    assert runner._generation_module_requirement(
+        owners, 2, covered_modules=(owners[0],),
+    ) == owners[1]
+    assert runner._generation_module_requirement(
+        owners, 2, covered_modules=owners,
+    ) == ""
+    assert runner._generation_module_requirement((owners[0],), 0) == ""
+
+
+def test_false_positive_episode_and_reflection_share_both_legal_owners() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.FALSE_POSITIVE,
+        secondary_module="atomic_verifier_instruction",
+    )
+
+    assert runner._allowed_l1_modules(signal, "evidence_obligation") == (
+        "evidence_obligation", "atomic_verifier_instruction",
+    )
+
+
+def test_gold_unresolved_episode_and_reflection_share_both_legal_owners() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signal = SimpleNamespace(
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        secondary_module="clean_defense_boundary",
+    )
+
+    assert runner._allowed_l1_modules(signal, "abstention_rule") == (
+        "abstention_rule", "clean_defense_boundary",
+    )
+
+
+def test_candidate_direction_signature_exposes_module_operation_and_action() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+
+    signature = runner._candidate_direction_signature({
+        "target_module": "atomic_verifier_instruction",
+        "operation": "add_rule",
+        "action": "quarantine_certificate: certificate_id",
+    })
+
+    assert signature == (
+        "atomic_verifier_instruction|add_rule|"
+        "quarantine_certificate: certificate_id"
+    )
 
 
 def test_attribute_failure_unresolved_quarantine_total_is_diagnostic_only() -> None:
@@ -4682,6 +5053,217 @@ def test_attribute_failure_no_failure_shape_returns_empty() -> None:
     assert owner == ""
     assert reason == "no_failure_shape"
     assert l2_telemetry == []
+
+
+def test_gold_unresolved_no_shape_uses_process_owner() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="clean_defense_boundary",
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        gold_label=False,
+        has_gold=True,
+    )
+    telemetry: list[dict] = []
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={"proof_adjudication": {"state": "unresolved"}},
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="clean_unresolved",
+        non_l1_failure_attributions=telemetry,
+    )
+
+    assert owner == "abstention_rule"
+    assert reason == "no_failure_shape"
+    assert attribution.layer == "l1_provider_rule"
+    assert attribution.evidence["owner_resolution"] == "gold_unresolved_process_owner"
+    assert telemetry == []
+
+
+def test_gold_unresolved_consensus_without_runtime_action_uses_process_owner() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="evidence_obligation",
+        secondary_module="abstention_rule",
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+        gold_label=True,
+        has_gold=True,
+    )
+    telemetry: list[dict] = []
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {
+                "state": "unresolved",
+                "consensus_gate_applied": True,
+                "consensus_gate_blocked_ids": ["certificate"],
+            },
+        },
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="error_unresolved",
+        non_l1_failure_attributions=telemetry,
+    )
+
+    assert owner == "evidence_obligation"
+    assert reason == "consensus_gate_blocked"
+    assert attribution.layer == "l1_provider_rule"
+    assert attribution.evidence["classified_artifact"] == "consensus_gate_policy"
+    assert telemetry == []
+
+
+def test_gold_error_unresolved_rejects_clean_boundary_policy_direction() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="evidence_obligation",
+        secondary_module="abstention_rule",
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+        gold_label=True,
+        has_gold=True,
+    )
+    telemetry: list[dict] = []
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {"state": "unresolved"},
+            "boundary_path": {"state": "verified_clean"},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="error_with_clean_boundary",
+        non_l1_failure_attributions=telemetry,
+    )
+
+    assert owner == "evidence_obligation"
+    assert reason == "boundary_terminal_conflict"
+    assert attribution.layer == "l1_provider_rule"
+    assert attribution.evidence["classified_artifact"] == "boundary_consumption_policy"
+    assert telemetry == []
+
+
+def test_gold_error_unresolved_uses_compatible_secondary_process_owner() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="atomic_verifier_instruction",
+        error_type=ErrorType.UNRESOLVED_SHOULD_ERROR,
+        gold_label=True,
+        has_gold=True,
+    )
+    telemetry: list[dict] = []
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {"state": "unresolved"},
+            "boundary_path": {"state": "verified_clean"},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="error_with_incompatible_primary_owner",
+        non_l1_failure_attributions=telemetry,
+    )
+
+    assert owner == "atomic_verifier_instruction"
+    assert reason == "boundary_terminal_conflict"
+    assert attribution.artifact == "atomic_verifier_instruction"
+    assert attribution.evidence["classified_artifact"] == (
+        "boundary_consumption_policy"
+    )
+    assert runner._allowed_l1_modules(signal, owner) == (
+        "atomic_verifier_instruction",
+    )
+    assert telemetry == []
+
+
+def test_gold_clean_unresolved_keeps_compatible_clean_boundary_policy() -> None:
+    from types import SimpleNamespace
+
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.htc_tes.type_classifier import HallucinationType
+
+    signal = SimpleNamespace(
+        state="unresolved",
+        target_module="abstention_rule",
+        secondary_module="clean_defense_boundary",
+        error_type=ErrorType.UNRESOLVED_SHOULD_CLEAN,
+        gold_label=False,
+        has_gold=True,
+    )
+    telemetry: list[dict] = []
+
+    owner, reason, attribution = runner._attribute_failure(
+        signal=signal,
+        detection_result={
+            "proof_adjudication": {"state": "unresolved"},
+            "boundary_path": {"state": "verified_clean"},
+        },
+        primary_type=HallucinationType.UNKNOWN,
+        case_id="clean_with_clean_boundary",
+        non_l1_failure_attributions=telemetry,
+    )
+
+    assert owner == ""
+    assert reason == "boundary_terminal_conflict"
+    assert attribution.layer == "l2_adjudication_policy"
+    assert [row["artifact"] for row in telemetry] == [
+        "boundary_consumption_policy"
+    ]
+
+
+def test_retry_episode_identity_requires_same_owner_reason_and_direction() -> None:
+    from src.sehd_v6.core.bccse import evolution_runner as runner
+    from src.sehd_v6.core.bccse.v6_contracts import FailureAttribution, LAYER_L1
+
+    episode = {
+        "episode_id": "episode",
+        "attribution": {
+            "layer": LAYER_L1,
+            "owner_module": "evidence_obligation",
+            "reason_code": "responsible_step_missing",
+        },
+        "detection": {"evolution_direction": "error_to_clean"},
+    }
+    same = FailureAttribution(
+        layer=LAYER_L1,
+        artifact="evidence_obligation",
+        reason_code="responsible_step_missing",
+        evidence={},
+    )
+    changed_owner = FailureAttribution(
+        layer=LAYER_L1,
+        artifact="abstention_rule",
+        reason_code="responsible_step_missing",
+        evidence={},
+    )
+
+    assert runner._episode_matches_failure(episode, same, "error_to_clean")
+    assert not runner._episode_matches_failure(
+        episode, changed_owner, "error_to_clean"
+    )
+    assert not runner._episode_matches_failure(
+        episode, same, "unresolved_to_clean"
+    )
 
 
 def test_attribute_failure_prosecution_gap_routes_evidence_obligation() -> None:
@@ -5954,6 +6536,96 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert experience["metadata"]["outcome"] == "improved"
 
 
+def test_l2_rejects_source_improvement_without_a_stable_registered_canary(
+    tmp_path, monkeypatch,
+) -> None:
+    source_detector, mutation, signal_for = _hollow_defense_fixture()
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return {
+                "state": "unresolved",
+                "runtime_valid": True,
+                "census": [],
+            }
+        return source_detector(
+            genome=genome,
+            case_id=case_id,
+            policy_genome=policy_genome,
+            **kwargs,
+        )
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records={
+            "source": {"gold_label": True},
+            "anchor": {"gold_label": False},
+        },
+        run_id="l2_unstable_anchor",
+        fitness_use_gold=True,
+    )
+
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_fitness"
+    ]
+    entry = result.evolution_audit["l2_policy_audit"][0]
+    assert entry["reason"] == "independent_canary_unavailable"
+    assert entry["configured_canary_count"] == 1
+    assert entry["canary_cases"] == 0
+    assert result.evolution_audit["policy_genome"]["items"] == []
+
+
+def test_l2_rejects_policy_that_regresses_a_stable_canary(
+    tmp_path, monkeypatch,
+) -> None:
+    source_detector, mutation, signal_for = _hollow_defense_fixture()
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return {
+                "state": (
+                    "verified_error" if policy_genome is not None
+                    else "verified_clean"
+                ),
+                "runtime_valid": True,
+                "census": [],
+            }
+        return source_detector(
+            genome=genome,
+            case_id=case_id,
+            policy_genome=policy_genome,
+            **kwargs,
+        )
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=signal_for,
+        records={
+            "source": {"gold_label": True},
+            "anchor": {"gold_label": False},
+        },
+        run_id="l2_canary_regression",
+        fitness_use_gold=True,
+    )
+
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_fitness"
+    ]
+    entry = result.evolution_audit["l2_policy_audit"][0]
+    assert entry["reason"] == "stable_canary_regression:anchor"
+    assert entry["canary_cases"] == 1
+    assert entry["canary_regressions"] == ["anchor"]
+    assert entry["canary_audit"][0]["preserved"] is False
+    assert result.evolution_audit["policy_genome"]["items"] == []
+
+
 def test_l2_coverage_only_change_is_accepted_without_gold(
     tmp_path, monkeypatch,
 ) -> None:
@@ -6578,6 +7250,3 @@ def test_l2_gold_verified_policy_is_protected_from_removal(
     )
     assert reject_entry["route_result"] == "candidate_blocked_by_protection"
     assert reject_entry["feedback_code"] == "policy_route_unavailable"
-
-
-

@@ -9,7 +9,7 @@ does not invent execution semantics or a separate expected-effect story.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from .module_charter import (
     MODULE_ACTION_OPCODES,
@@ -110,6 +110,56 @@ _MODULE_OPERATION_EFFECT: Mapping[tuple[str, str], tuple[str, str]] = {
         "atomic_verifier_instruction", "require_evidence_field",
     ): ("causal_field_coverage", "increase"),
 }
+
+# Operations whose runtime effect can move an over-conviction toward clean.
+# Generation guidance and admission validation consume this same table so the
+# model cannot be told that an operation is legal while the gate rejects it.
+ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
+    "evidence_obligation": frozenset({"keep_coverage_incomplete"}),
+    "atomic_verifier_instruction": frozenset({"quarantine_certificate"}),
+    "clean_defense_boundary": frozenset({
+        "emit_defense_certificate", "emit_boundary_finding",
+        "require_evidence_field",
+    }),
+    "abstention_rule": frozenset({"emit_boundary_finding"}),
+    "causal_link_test": frozenset({"reject_non_causal_origin"}),
+    "candidate_trigger": frozenset({"suppress_candidate"}),
+    "candidate_to_verifier_route": frozenset({"hold_candidate_qualification"}),
+}
+
+CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
+    "candidate_trigger": frozenset({"emit_candidate", "emit_origin_census"}),
+    "evidence_obligation": frozenset({
+        "require_evidence_field", "populate_evidence_field",
+        "emit_error_certificate",
+    }),
+    "candidate_to_verifier_route": frozenset({
+        "route_candidate_to_verifier", "qualify_candidate",
+    }),
+    "atomic_verifier_instruction": frozenset({
+        "verify_violation", "emit_certificate", "require_evidence_field",
+    }),
+    "causal_link_test": frozenset({"test_causal_link", "populate_impact_chain"}),
+    "earliest_origin_tiebreak": frozenset({"select_earliest_origin"}),
+}
+
+
+def render_direction_action_contract(
+    direction: str, modules: Sequence[str],
+) -> str:
+    """Render the executable opcode subset for one task direction."""
+    if direction in {"error_to_clean", "unresolved_to_clean"}:
+        contract = ERROR_TO_CLEAN_ACTIONS
+    elif direction in {"clean_to_error", "unresolved_to_error"}:
+        contract = CLEAN_TO_ERROR_ACTIONS
+    else:
+        return ""
+    lines = []
+    for module in modules:
+        actions = sorted(contract.get(str(module), frozenset()))
+        if actions:
+            lines.append(f"- {module}: " + ", ".join(actions))
+    return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -519,15 +569,18 @@ def classify_execution_evidence(
             "postcondition_satisfied": False,
             "postcondition_detail": "action_spec_absent",
         }
-    satisfied, detail = evaluate_action_spec_postcondition(spec, result)
     if not observable_moved:
-        execution_class = "no_observable_movement"
-    else:
-        execution_class = (
-            "postcondition_satisfied"
-            if satisfied
-            else "postcondition_not_satisfied"
-        )
+        return {
+            "execution_class": "no_observable_movement",
+            "postcondition_satisfied": False,
+            "postcondition_detail": "no_observable_movement",
+        }
+    satisfied, detail = evaluate_action_spec_postcondition(spec, result)
+    execution_class = (
+        "postcondition_satisfied"
+        if satisfied
+        else "postcondition_not_satisfied"
+    )
     return {
         "execution_class": execution_class,
         "postcondition_satisfied": satisfied,

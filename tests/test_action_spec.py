@@ -35,6 +35,48 @@ def test_action_spec_is_the_effect_contract_source() -> None:
     }
 
 
+def test_error_to_clean_action_contract_is_single_sourced() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        ERROR_TO_CLEAN_ACTIONS,
+        render_direction_action_contract,
+    )
+
+    rendered = render_direction_action_contract(
+        "error_to_clean",
+        ("evidence_obligation", "atomic_verifier_instruction"),
+    )
+
+    assert ERROR_TO_CLEAN_ACTIONS["evidence_obligation"] == frozenset({
+        "keep_coverage_incomplete",
+    })
+    assert ERROR_TO_CLEAN_ACTIONS["atomic_verifier_instruction"] == frozenset({
+        "quarantine_certificate",
+    })
+    assert "evidence_obligation: keep_coverage_incomplete" in rendered
+    assert "atomic_verifier_instruction: quarantine_certificate" in rendered
+
+
+def test_clean_to_error_action_contract_excludes_clean_strengthening() -> None:
+    from src.sehd_v6.core.bccse.action_spec import (
+        CLEAN_TO_ERROR_ACTIONS,
+        render_direction_action_contract,
+    )
+
+    rendered = render_direction_action_contract(
+        "unresolved_to_error",
+        ("evidence_obligation", "clean_defense_boundary"),
+    )
+
+    assert CLEAN_TO_ERROR_ACTIONS["evidence_obligation"] == frozenset({
+        "require_evidence_field",
+        "populate_evidence_field",
+        "emit_error_certificate",
+    })
+    assert "clean_defense_boundary" not in CLEAN_TO_ERROR_ACTIONS
+    assert "evidence_obligation: emit_error_certificate" in rendered
+    assert "clean_defense_boundary" not in rendered
+
+
 def test_atomic_verifier_routes_are_prosecution_only() -> None:
     """R12: the atomic verifier audits error candidates; its quarantine
     observable is the prosecution-side quarantined-error set.  Defense
@@ -555,8 +597,12 @@ def test_classify_execution_evidence_taxonomy() -> None:
     assert unmet["execution_class"] == "postcondition_not_satisfied"
     assert unmet["postcondition_satisfied"] is False
 
-    unmoved = classify_execution_evidence(spec, {}, False)
+    unmoved = classify_execution_evidence(
+        spec, {"paca_census": [{"candidate_id": "already-present"}]}, False,
+    )
     assert unmoved["execution_class"] == "no_observable_movement"
+    assert unmoved["postcondition_satisfied"] is False
+    assert unmoved["postcondition_detail"] == "no_observable_movement"
 
     nospec = classify_execution_evidence(None, {}, True)
     assert nospec["execution_class"] == "action_spec_absent"

@@ -14,6 +14,7 @@ experiments/progress/
 experiments/results/
 experiments/logs/
 experiments/*.py
+!experiments/run_batch.py
 experiments/protocols/*
 !experiments/protocols/README.md
 !experiments/protocols/used_case_ledger.txt

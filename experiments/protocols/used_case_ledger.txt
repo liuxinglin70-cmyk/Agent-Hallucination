@@ -466,3 +466,19 @@ OpenDeepSearch/091
 OpenManus/013
 OpenManus/097
 SmolAgents/057
+# --- batch06 R14 (2026-08-10, 10 fresh gold single-case experiments; directional ActionSpec and causal-effect admission) ---
+BFCL/077
+BFCL/106
+BFCL/121
+Camel/027
+Camel/029
+Magentic_One/039
+OpenManus/078
+SmolAgents/016
+SmolAgents/075
+SmolAgents/079
+# --- recovery safety canary v1 (2026-08-10, evaluator-only; never evolution sources) ---
+BFCL/011
+BFCL/022
+BFCL/033
+BFCL/053

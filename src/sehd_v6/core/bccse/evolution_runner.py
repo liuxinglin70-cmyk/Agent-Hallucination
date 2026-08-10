@@ -60,6 +60,7 @@ from .genome import (
     SkillEdit,
     SkillGenome,
     SkillOp,
+    validate_runtime_rule,
     apply_edit,
     create_baseline_genome,
     _detect_rule_direction,
@@ -74,6 +75,8 @@ from .genome import (
 from .rule_contract import RuleSpec, render_rule, validate_rule_spec
 from .action_spec import (
     ActionSpec,
+    CLEAN_TO_ERROR_ACTIONS,
+    ERROR_TO_CLEAN_ACTIONS,
     classify_execution_evidence,
     compile_action_spec,
     sanitize_action_spec,
@@ -85,7 +88,12 @@ from .fitness import (
     task_state_score,
 )
 from .safety_gate import GateCertificate, create_structural_gate
-from .failure_classifier import classify_failure
+from .failure_classifier import (
+    REASON_BOUNDARY_CONFLICT,
+    REASON_CONSENSUS_BLOCKED,
+    REASON_NO_FAILURE_SHAPE,
+    classify_failure,
+)
 from .step_attributor import (
     AttributionSignal,
     ErrorType,
@@ -103,6 +111,7 @@ from .v6_contracts import (
     LAYER_DETECTOR,
     LAYER_L1,
     LAYER_L2,
+    LAYER_NONE,
     ROUTE_CANDIDATE_BLOCKED_BY_PROTECTION,
     ROUTE_EXECUTED,
     ROUTE_NO_REGISTERED_RUNTIME_ACTION,
@@ -146,7 +155,6 @@ from .meta_skill import (
     MetaSkillState,
     create_baseline_meta_skill,
 )
-from .module_charter import validate_action_surface
 from .policy_genome import (
     PENDING_STATUS_PENDING,
     PolicyEdit,
@@ -455,8 +463,13 @@ def _expected_effect_audit(
         if isinstance(action_spec, Mapping) and action_spec
         else None
     )
+    expected_output_moved = (
+        contract_field_observed and contract_direction_observed
+        if contract
+        else bool(observable_delta_tokens)
+    )
     execution_evidence = classify_execution_evidence(
-        spec, after_result or {}, bool(observable_delta_tokens),
+        spec, after_result or {}, expected_output_moved,
     )
     return {
         "expected": expected,
@@ -470,11 +483,33 @@ def _expected_effect_audit(
         "observed_decision": assessment.decision,
         "observed_reasons": list(assessment.reasons),
         "observable_deltas": observable_delta_tokens,
-        "target_output_changed": bool(observable_delta_tokens),
+        "target_output_changed": expected_output_moved,
         "local_score_before": assessment.local_score_before,
         "local_score_after": assessment.local_score_after,
         "execution_evidence": execution_evidence,
     }
+
+
+def _enforce_expected_effect_observation(
+    assessment: FitnessAssessment,
+    effect_audit: Mapping[str, Any],
+    causal_execution_status: str,
+) -> FitnessAssessment:
+    """Require the ActionSpec field and direction to move before promotion."""
+    if (
+        str(causal_execution_status or "") == "executed"
+        and (assessment.passed or assessment.evidence_only)
+        and str(effect_audit.get("status") or "") != "observed"
+    ):
+        return FitnessAssessment(
+            "no_effect",
+            ("expected_effect_not_observed",),
+            assessment.task_score_before,
+            assessment.task_score_after,
+            assessment.local_score_before,
+            assessment.local_score_after,
+        )
+    return assessment
 
 
 def _classify_replay_no_effect(
@@ -968,15 +1003,101 @@ def _build_mutation_retry_feedback(
 # verdict error) may only be owned by modules that can relax or bound the
 # error claim. Structural invariant: failure attribution never crosses the
 # gold polarity side.
-_FN_POLARITY_MODULES = frozenset({
-    "candidate_trigger", "evidence_obligation", "candidate_to_verifier_route",
-    "atomic_verifier_instruction", "causal_link_test", "abstention_rule",
-    "clean_defense_boundary",
+_FN_POLARITY_MODULES = frozenset(CLEAN_TO_ERROR_ACTIONS)
+_FP_POLARITY_MODULES = frozenset(ERROR_TO_CLEAN_ACTIONS)
+
+_ERRORWARD_ERROR_TYPES = frozenset({
+    ErrorType.FALSE_NEGATIVE,
+    ErrorType.FALSE_NEGATIVE_CLEAN,
+    ErrorType.FALSE_NEGATIVE_UNRESOLVED,
+    ErrorType.UNRESOLVED_SHOULD_ERROR,
 })
-_FP_POLARITY_MODULES = frozenset({
-    "clean_defense_boundary", "abstention_rule", "causal_link_test",
-    "earliest_origin_tiebreak", "evidence_obligation",
+_CLEANWARD_ERROR_TYPES = frozenset({
+    ErrorType.FALSE_POSITIVE,
+    ErrorType.UNRESOLVED_SHOULD_CLEAN,
 })
+
+
+def _signal_polarity_pool(signal: Any) -> frozenset[str] | None:
+    """Return the editable module side required by the failure direction."""
+    error_type = getattr(signal, "error_type", None)
+    if error_type in _ERRORWARD_ERROR_TYPES:
+        return _FN_POLARITY_MODULES
+    if error_type in _CLEANWARD_ERROR_TYPES:
+        return _FP_POLARITY_MODULES
+    if error_type is not None:
+        return None
+
+    gold_label = getattr(signal, "gold_label", None)
+    state = str(getattr(signal, "state", "") or "")
+    if gold_label is True and state in {"verified_clean", "unresolved"}:
+        return _FN_POLARITY_MODULES
+    if gold_label is False and state in {"verified_error", "unresolved"}:
+        return _FP_POLARITY_MODULES
+    return None
+
+
+def _signal_process_modules(signal: Any) -> tuple[str, ...]:
+    """Resolve the ordered, direction-compatible process-owner hypotheses."""
+    polarity_pool = _signal_polarity_pool(signal)
+    if polarity_pool is None:
+        return ()
+    modules: list[str] = []
+    for candidate in (
+        str(getattr(signal, "target_module", "") or ""),
+        str(getattr(signal, "secondary_module", "") or ""),
+    ):
+        if (
+            candidate in MODULE_IDS
+            and candidate not in modules
+            and candidate in polarity_pool
+        ):
+            modules.append(candidate)
+    return tuple(modules)
+
+
+def _signal_process_owner(signal: Any) -> str:
+    """Return the first process owner that can move the verdict toward gold."""
+    modules = _signal_process_modules(signal)
+    return modules[0] if modules else ""
+
+
+def _allowed_l1_modules(signal: Any, attribution_owner: str) -> tuple[str, ...]:
+    """Return the executable owner set shared by episodes and reflection."""
+    modules = [str(attribution_owner)] if str(attribution_owner) else []
+    for process_module in _signal_process_modules(signal):
+        if process_module not in modules:
+            modules.append(process_module)
+    return tuple(modules)
+
+
+def _episode_matches_failure(
+    episode_payload: Mapping[str, Any] | None,
+    attribution: FailureAttribution,
+    evolution_direction: str,
+) -> bool:
+    """Whether a retry still addresses the same causal failure identity."""
+    if not isinstance(episode_payload, Mapping) or "episode_id" not in episode_payload:
+        return False
+    prior_attribution = episode_payload.get("attribution") or {}
+    prior_detection = episode_payload.get("detection") or {}
+    if not isinstance(prior_attribution, Mapping) or not isinstance(
+        prior_detection, Mapping
+    ):
+        return False
+    prior_owner = str(
+        prior_attribution.get("owner_module")
+        or prior_attribution.get("artifact")
+        or ""
+    )
+    return (
+        str(prior_attribution.get("layer") or "") == attribution.layer
+        and prior_owner == attribution.artifact
+        and str(prior_attribution.get("reason_code") or "")
+        == attribution.reason_code
+        and str(prior_detection.get("evolution_direction") or "")
+        == str(evolution_direction or "")
+    )
 
 
 def _policy_rejection_signature(
@@ -1008,6 +1129,9 @@ def _policy_rejection_signature(
 def _prevalidate_candidate(
     candidate: Mapping[str, Any],
     allowed_modules: Sequence[str],
+    *,
+    error_type: ErrorType | None = None,
+    blocked_action_surfaces: Sequence[tuple[str, str]] = (),
 ) -> str | None:
     """Return the reject reason for a candidate that cannot pass the
     admission gate, or None when it is structurally eligible.
@@ -1033,11 +1157,56 @@ def _prevalidate_candidate(
     ):
         return "rule_spec:missing_slots"
     if operation in {"add_rule", "modify_rule"}:
-        action_ok, action_reason = validate_action_surface(
-            target_module, str(candidate.get("action") or ""),
+        condition = str(candidate.get("condition") or "")
+        action = str(candidate.get("action") or "")
+        evidence_anchor = str(candidate.get("evidence_anchor") or "")
+        rendered = render_rule(RuleSpec(
+            condition=condition,
+            action=action,
+            evidence_anchor=evidence_anchor,
+            module_id=target_module,
+            direction="process",
+        ))
+        spec_ok, spec_reason = validate_rule_spec(RuleSpec(
+            condition=condition,
+            action=action,
+            evidence_anchor=evidence_anchor,
+            module_id=target_module,
+            direction=_detect_rule_direction(rendered),
+        ))
+        if not spec_ok:
+            return f"rule_spec:{spec_reason}"
+        runtime_ok, runtime_reason = validate_runtime_rule(
+            rendered,
+            target_module,
+            condition_scope=condition,
         )
-        if not action_ok:
-            return f"rule_spec:{action_reason}"
+        if not runtime_ok:
+            return f"runtime_rule_contract:{runtime_reason}"
+        try:
+            action_spec = compile_action_spec(target_module, action)
+        except (KeyError, ValueError) as exc:
+            return f"action_spec:{exc}"
+        if error_type in _CLEANWARD_ERROR_TYPES:
+            direction = "error_to_clean"
+            allowed_operations = ERROR_TO_CLEAN_ACTIONS.get(target_module, frozenset())
+        elif error_type in _ERRORWARD_ERROR_TYPES:
+            direction = "clean_to_error"
+            allowed_operations = CLEAN_TO_ERROR_ACTIONS.get(target_module, frozenset())
+        else:
+            direction = ""
+            allowed_operations = frozenset()
+        if direction:
+            if action_spec.operation not in allowed_operations:
+                return (
+                    f"action_polarity_mismatch:{direction}:"
+                    f"{target_module}:{action_spec.operation}"
+                )
+        if (target_module, action_spec.operation) in set(blocked_action_surfaces):
+            return (
+                "repeated_no_effect_action_surface:"
+                f"{target_module}:{action_spec.operation}"
+            )
     if operation == "remove_rule":
         # Only the free-form remove path keeps a volunteered contract; slot
         # rules compile their contract from the action slot downstream.
@@ -1058,6 +1227,37 @@ def _prevalidate_candidate(
             ):
                 return "invalid_intervention_contract:field_shape_mismatch"
     return None
+
+
+def _generation_module_requirement(
+    allowed_modules: Sequence[str],
+    generation_index: int,
+    covered_modules: Sequence[str] = (),
+) -> str:
+    """Assign the first independent samples to distinct legal owners.
+
+    A multi-owner failure needs at least one hypothesis from each owner before
+    the critic compares candidates. Additional samples remain unconstrained so
+    they can explore a genuinely different intervention on either surface.
+    """
+    if len(allowed_modules) <= 1 or generation_index < 0:
+        return ""
+    if generation_index < len(allowed_modules):
+        return str(allowed_modules[generation_index])
+    covered = {str(module) for module in covered_modules}
+    for module in allowed_modules:
+        if str(module) not in covered:
+            return str(module)
+    return ""
+
+
+def _candidate_direction_signature(candidate: Mapping[str, Any]) -> str:
+    """Return the validated intervention surface used for round diversity."""
+    return "|".join((
+        str(candidate.get("target_module") or ""),
+        str(candidate.get("operation") or ""),
+        str(candidate.get("action") or ""),
+    ))
 
 
 def _attribute_failure(
@@ -1105,14 +1305,69 @@ def _attribute_failure(
         "boundary_path_state": boundary_path_state,
         "provider_artifacts": provider_artifacts,
     })
+    signal_owner = _signal_process_owner(signal)
+    gold_supervised_unresolved = (
+        state == "unresolved"
+        and isinstance(gold_label, bool)
+        and signal_owner in MODULE_IDS
+    )
+    if gold_supervised_unresolved and (
+        (
+            attribution.layer == LAYER_NONE
+            and attribution.reason_code == REASON_NO_FAILURE_SHAPE
+        )
+        or (
+            attribution.layer == LAYER_L2
+            and attribution.reason_code == REASON_CONSENSUS_BLOCKED
+        )
+        or (
+            attribution.layer == LAYER_L2
+            and attribution.reason_code == REASON_BOUNDARY_CONFLICT
+            and gold_label is True
+        )
+    ):
+        attribution = FailureAttribution(
+            layer=LAYER_L1,
+            artifact=signal_owner,
+            reason_code=attribution.reason_code,
+            evidence={
+                **attribution.evidence,
+                "classified_layer": attribution.layer,
+                "classified_artifact": attribution.artifact,
+                "owner_resolution": "gold_unresolved_process_owner",
+            },
+        )
     if attribution.layer == LAYER_L1:
         owner = attribution.artifact
+        # Provider integrity and quarantine evidence name a concrete broken
+        # artifact and retain ownership. Localization-only diagnoses do not:
+        # on a gold mismatch the polarity-aware process signal owns the edit.
+        if (
+            (fn_side or fp_side)
+            and attribution.reason_code not in {
+                "provider_artifact_missing",
+                "provider_artifact_malformed",
+                "quarantine_pattern_dominant",
+            }
+        ):
+            if signal_owner in MODULE_IDS:
+                attribution = FailureAttribution(
+                    layer=LAYER_L1,
+                    artifact=signal_owner,
+                    reason_code=attribution.reason_code,
+                    evidence={
+                        **attribution.evidence,
+                        "classified_artifact": owner,
+                        "owner_resolution": "gold_polarity_process_owner",
+                    },
+                )
+                owner = signal_owner
         # Polarity gate: a hypothesis that crosses the gold side would
         # evolve the detector against the ground truth, so it is dropped.
         # Unresolved terminals carry no polarity and are accepted as-is.
-        if fn_side:
+        if fn_side or (state == "unresolved" and gold_label is True):
             pool: frozenset[str] | None = _FN_POLARITY_MODULES
-        elif fp_side:
+        elif fp_side or (state == "unresolved" and gold_label is False):
             pool = _FP_POLARITY_MODULES
         elif state == "unresolved":
             pool = None
@@ -1120,15 +1375,6 @@ def _attribute_failure(
             pool = frozenset()
         if pool is not None and owner not in pool:
             return "", attribution.reason_code, attribution
-        if (
-            fp_side
-            and attribution.reason_code == "responsible_step_missing"
-            and owner == "earliest_origin_tiebreak"
-        ):
-            # The responsible-step tiebreak has no surviving causal origins
-            # left to re-rank on a case the court already convicted, so the
-            # defense/boundary surface is the least-unexecutable owner.
-            owner = "clean_defense_boundary"
         return owner, attribution.reason_code, attribution
     if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
         non_l1_failure_attributions.append({
@@ -4825,6 +5071,8 @@ def _run_l2_policy_case_impl(
     mutation_route: dict[str, Any] | None,
     gate: Any, records: Mapping[str, dict[str, Any]], output_dir: Path,
     type_fitness: Any, fitness_use_gold: bool,
+    stable_canaries: dict[str, dict[str, Any]],
+    registered_canary_ids: Sequence[str], canary_limit: int,
     l2_policy_audit: list[dict[str, Any]],
     l2_registry_registrations: list[dict[str, Any]],
     rejected_policy_summaries: list[str],
@@ -4852,6 +5100,17 @@ def _run_l2_policy_case_impl(
     been established.
     """
     accepted_outcome = False
+    policy_canary_audit: list[dict[str, Any]] = []
+    policy_canary_regressions: list[str] = []
+    policy_canary_results: dict[str, dict[str, Any]] = {}
+    promotion_canaries = (
+        {
+            canary_id: stable_canaries[canary_id]
+            for canary_id in registered_canary_ids
+            if canary_id in stable_canaries
+        }
+        if registered_canary_ids else stable_canaries
+    )
 
     attribution = FailureAttribution(
         layer=str(l2_attribution.get("layer") or LAYER_L2),
@@ -4962,6 +5221,11 @@ def _run_l2_policy_case_impl(
             "facts": facts_summary,
             "proposal": proposal_edit.to_dict() if proposal_edit else None,
             "policy_genome_hash": state.policy_genome.content_hash,
+            "configured_canary_count": len(registered_canary_ids),
+            "stable_registered_canary_count": len(promotion_canaries),
+            "canary_cases": len(policy_canary_audit),
+            "canary_audit": list(policy_canary_audit),
+            "canary_regressions": list(policy_canary_regressions),
         }
         if isinstance(replay, Mapping):
             replay_adjudication = replay.get("proof_adjudication") or {}
@@ -5364,6 +5628,52 @@ def _run_l2_policy_case_impl(
                 replay=replay_result,
             )
             return
+    if registered_canary_ids and not promotion_canaries:
+        finish(
+            "reject_policy_fitness",
+            reason="independent_canary_unavailable",
+            replay=replay_result,
+        )
+        return
+    for canary_id, parent_canary in list(promotion_canaries.items())[:canary_limit]:
+        try:
+            child_canary = run_detection(
+                budget_kind="canary",
+                genome=state.current_genome,
+                case_id=canary_id,
+                output_path=(
+                    output_dir / "policy_replays"
+                    / f"{idx:04d}_{case_id.replace('/', '_')}"
+                    / "canaries" / canary_id.replace("/", "_")
+                ),
+                policy_genome=candidate_genome,
+                policy_scope=None,
+            )
+            preserved, audit = _canary_preserved(
+                parent_canary, child_canary,
+            )
+            policy_canary_audit.append({"case_id": canary_id, **audit})
+            if preserved:
+                policy_canary_results[canary_id] = child_canary
+            else:
+                policy_canary_regressions.append(canary_id)
+        except Exception as exc:
+            policy_canary_regressions.append(canary_id)
+            policy_canary_audit.append({
+                "case_id": canary_id,
+                "preserved": False,
+                "error": f"{type(exc).__name__}:{exc}",
+            })
+    if policy_canary_regressions:
+        finish(
+            "reject_policy_fitness",
+            reason=(
+                "stable_canary_regression:"
+                + ",".join(policy_canary_regressions)
+            ),
+            replay=replay_result,
+        )
+        return
     if operation != PolicyOp.REMOVE_ITEM.value:
         accepted_index = (
             proposal_edit.item_index
@@ -5386,6 +5696,7 @@ def _run_l2_policy_case_impl(
             accepted_meta["fitness_status"] = FITNESS_STATUS_WEAK
         candidate_genome.set_item_meta(accepted_index, accepted_meta)
     state.policy_genome = candidate_genome
+    stable_canaries.update(policy_canary_results)
     finish("accept_policy", replay=replay_result)
     return accepted_outcome
 
@@ -5777,6 +6088,11 @@ class EvolutionLoop:
                     output_path=(
                         self.output_dir / "baseline_canaries" / canary_id.replace("/", "_")
                     ),
+                    policy_genome=(
+                        self.state.policy_genome
+                        if self.state.policy_genome.items_for_scope("working")
+                        else None
+                    ),
                 )
                 canary_signal = _attribution_for_result(
                     canary_result, canary_id, records=self.records,
@@ -5947,6 +6263,9 @@ class EvolutionLoop:
             state=self.state, mutation_route=self.mutation_route, gate=self.gate,
             records=self.records, output_dir=self.output_dir,
             type_fitness=self.type_fitness, fitness_use_gold=self.fitness_use_gold,
+            stable_canaries=self.stable_canaries,
+            registered_canary_ids=self.registered_canary_ids,
+            canary_limit=self.canary_limit,
             l2_policy_audit=self.l2_policy_audit,
             l2_registry_registrations=self.l2_registry_registrations,
             rejected_policy_summaries=self.rejected_policy_summaries,
@@ -6032,7 +6351,17 @@ class EvolutionLoop:
             )
         while self.source_work_queue:
             idx, case_id, self.active_attempt_index = self.source_work_queue.popleft()
-            self.state.active_episode_payload = None
+            prior_episode_payload = None
+            if self.active_attempt_index > 0:
+                for prior_step in reversed(self.steps):
+                    if (
+                        prior_step.case_id == case_id
+                        and isinstance(prior_step.episode, Mapping)
+                        and "episode_id" in prior_step.episode
+                    ):
+                        prior_episode_payload = dict(prior_step.episode)
+                        break
+            self.state.active_episode_payload = prior_episode_payload
             if self.active_attempt_index > 0:
                 self.budget_usage["mutation_retry_attempts"] += 1
             # --- Check halt (including convergence) ---
@@ -6178,25 +6507,45 @@ class EvolutionLoop:
             # It is built once from the authoritative attribution and travels
             # with every step of this case; the reflection proposal is not yet
             # influenced by it (Phase 1 wiring only).
-            episode_payload: dict[str, Any] | None = None
-            if signal.should_evolve and classifier_attribution.layer == LAYER_L1:
-                try:
-                    episode_payload = build_failure_episode(
-                        detection_result=detection_result,
-                        signal=signal,
-                        attribution=classifier_attribution,
-                        evolution_direction=evolution_direction,
-                        record_key=case_id,
-                        allowed_modules=(attribution_owner,),
-                    ).to_dict()
-                except UnaddressableFailure as exc:
-                    episode_payload = {"unaddressable": str(exc)}
-            if episode_payload is not None and "episode_id" in episode_payload:
+            episode_payload: dict[str, Any] | None = (
+                dict(self.state.active_episode_payload)
+                if _episode_matches_failure(
+                    self.state.active_episode_payload,
+                    classifier_attribution,
+                    evolution_direction,
+                )
+                else None
+            )
+            episode_is_new = False
+            if (
+                signal.should_evolve
+                and classifier_attribution.layer == LAYER_L1
+                and attribution_owner
+            ):
+                if episode_payload is None:
+                    try:
+                        episode_payload = build_failure_episode(
+                            detection_result=detection_result,
+                            signal=signal,
+                            attribution=classifier_attribution,
+                            evolution_direction=evolution_direction,
+                            record_key=case_id,
+                            allowed_modules=_allowed_l1_modules(
+                                signal, attribution_owner,
+                            ),
+                        ).to_dict()
+                        episode_is_new = True
+                    except UnaddressableFailure as exc:
+                        episode_payload = {"unaddressable": str(exc)}
+            if (
+                episode_is_new
+                and episode_payload is not None
+                and "episode_id" in episode_payload
+            ):
                 self.causal_memory.upsert_observation(
                     FailureEpisode.from_dict(episode_payload)
                 )
-            if episode_payload is not None:
-                self.state.active_episode_payload = episode_payload
+            self.state.active_episode_payload = episode_payload
             l2_attribution = next(
                 (
                     entry for entry in reversed(self.non_l1_failure_attributions)
@@ -6407,10 +6756,10 @@ class EvolutionLoop:
                 print(f"  [{idx}] SKIP_MUTATION_BUDGET_EXHAUSTED {case_id}")
                 continue
 
-            # A provider artifact has exactly one registered owner.  The step
-            # attributor's primary/secondary modules remain diagnostic context,
-            # but they cannot enter the executable route: editing a downstream
-            # fallback cannot repair the missing or malformed owned artifact.
+            # A concrete malformed or missing provider artifact has one owner.
+            # A gold-clean false positive additionally exposes the paired
+            # verifier surface because an over-convicting certificate can be
+            # repaired either at evidence construction or atomic verification.
             print(
                 f"    [ATTR] owner hypothesis: {attribution_owner} via "
                 f"{attribution_reason}"
@@ -6427,18 +6776,10 @@ class EvolutionLoop:
                         detection_result.get("responsible_step")
                     ),
                 })
-            type_allowed_modules = (attribution_owner,)
-            if (
-                getattr(signal, "error_type", None) == ErrorType.FALSE_POSITIVE
-                and str(getattr(signal, "secondary_module", "") or "")
-                and signal.secondary_module != attribution_owner
-                and signal.secondary_module in MODULE_IDS
-            ):
-                # A false positive is a conviction the defense failed to rebut:
-                # the reflection may repair either the defense surface (defeat
-                # the over-conviction with a boundary certificate) or the
-                # verifier surface (quarantine the over-convicting certificate).
-                type_allowed_modules = (attribution_owner, signal.secondary_module)
+            # Explore every polarity-compatible surface recorded in the same
+            # episode action envelope. The independent generation scheduler
+            # assigns an initial candidate to each owner before critic ranking.
+            type_allowed_modules = _allowed_l1_modules(signal, attribution_owner)
             type_guidance = self.type_evolution.generate_type_guidance(
                 type_result.primary_type,
                 evolution_direction,
@@ -6539,6 +6880,17 @@ class EvolutionLoop:
                 current_episode = None
                 if self.state.active_episode_payload is not None and "episode_id" in self.state.active_episode_payload:
                     current_episode = FailureEpisode.from_dict(self.state.active_episode_payload)
+                blocked_action_surfaces = tuple(
+                    (
+                        attempt.target_module,
+                        str(attempt.action_spec.get("operation") or ""),
+                    )
+                    for attempt in (
+                        current_episode.attempts if current_episode is not None else ()
+                    )
+                    if "no_effect" in attempt.decision
+                    and str(attempt.action_spec.get("operation") or "")
+                )
                 history_refs = (
                     self.causal_memory.retrieve(
                         episode=current_episode,
@@ -6615,8 +6967,17 @@ class EvolutionLoop:
                     primary_cache_hits: list[bool] = []
                     mutation_provider_unavailable = False
                     round_reject_categories: list[str] = []
+                    round_direction_signatures: list[str] = []
                     generated_count = 0
                     for generation_index in range(self.reflection_candidate_count):
+                        required_module = _generation_module_requirement(
+                            allowed_modules,
+                            generation_index,
+                            tuple(
+                                str(candidate.get("target_module") or "")
+                                for candidate in candidates
+                            ),
+                        )
                         generation_user = (
                             user_prompt
                             + f"\n<independent_generation index=\"{generation_index}\">"
@@ -6624,6 +6985,20 @@ class EvolutionLoop:
                             "a previous direction. The index is orchestration metadata, "
                             "not rule content.</independent_generation>"
                         )
+                        if required_module:
+                            generation_user += (
+                                "\n[OWNER COVERAGE CONTRACT]\n"
+                                f"This independent sample must use target_module="
+                                f"{required_module}. Produce no candidate for another "
+                                "module; return no_edit if this owner has no executable "
+                                "intervention."
+                            )
+                        if round_direction_signatures:
+                            generation_user += (
+                                "\n[VALID DIRECTIONS ALREADY SAMPLED]\n- "
+                                + "\n- ".join(round_direction_signatures)
+                                + "\nUse a different module/action surface or return no_edit."
+                            )
                         if round_reject_categories:
                             # Carry the deterministic reject categories of earlier
                             # indices into the next generation so the same defect
@@ -6651,10 +7026,16 @@ class EvolutionLoop:
                         generated_count += len(generated_candidates)
                         for candidate in generated_candidates:
                             prevalidate_reason = _prevalidate_candidate(
-                                candidate, allowed_modules,
+                                candidate,
+                                allowed_modules,
+                                error_type=getattr(signal, "error_type", None),
+                                blocked_action_surfaces=blocked_action_surfaces,
                             )
                             if prevalidate_reason is None:
                                 candidates.append(candidate)
+                                round_direction_signatures.append(
+                                    _candidate_direction_signature(candidate)
+                                )
                             else:
                                 round_reject_categories.append(prevalidate_reason)
                         if generated_no_edit:
@@ -7676,10 +8057,31 @@ class EvolutionLoop:
 
             canary_audit: list[dict[str, Any]] = []
             canary_regressions: list[str] = []
-            if (assessment.passed or assessment.evidence_only) and self.stable_canaries:
+            promotion_canaries = (
+                {
+                    canary_id: self.stable_canaries[canary_id]
+                    for canary_id in self.registered_canary_ids
+                    if canary_id in self.stable_canaries
+                }
+                if self.registered_canary_ids else self.stable_canaries
+            )
+            if (
+                (assessment.passed or assessment.evidence_only)
+                and self.registered_canary_ids
+                and not promotion_canaries
+            ):
+                assessment = FitnessAssessment(
+                    "no_effect",
+                    ("independent_canary_unavailable",),
+                    assessment.task_score_before,
+                    assessment.task_score_after,
+                    assessment.local_score_before,
+                    assessment.local_score_after,
+                )
+            if (assessment.passed or assessment.evidence_only) and promotion_canaries:
                 canary_root = replay_root / "canaries"
                 for canary_id, parent_canary in _selected_canaries(
-                    edit, stable_canaries=self.stable_canaries,
+                    edit, stable_canaries=promotion_canaries,
                     canary_limit=self.canary_limit,
                     genome_content_hash=self.state.current_genome.content_hash,
                 ):
@@ -7747,6 +8149,8 @@ class EvolutionLoop:
                 ),
                 "commit_validation": "single_source_replay_plus_sampled_canaries",
                 "source_replays": 1,
+                "configured_canary_count": len(self.registered_canary_ids),
+                "stable_registered_canary_count": len(promotion_canaries),
                 "canary_cases": len(canary_audit),
                 "probe_cases": 0,
                 "provider_calls": 1 + len(canary_audit),
@@ -7775,6 +8179,18 @@ class EvolutionLoop:
                 after_result=candidate_result,
             )
             fitness_audit["expected_effect_contract"] = effect_audit
+            decision_before_effect_gate = assessment.decision
+            assessment = _enforce_expected_effect_observation(
+                assessment,
+                effect_audit,
+                str(causal_execution_audit.get("status") or ""),
+            )
+            fitness_audit["assessment"] = assessment.to_dict()
+            fitness_audit["passed"] = assessment.passed
+            if assessment.decision != decision_before_effect_gate:
+                fitness_audit["no_effect_classification"] = (
+                    "expected_effect_not_observed"
+                )
             # Admission uses the same predicate as the flush commit (see
             # ``_shadow_commit_eligible``); a directional edit that the
             # commit would roll back must not enter the shadow genome.
@@ -8034,6 +8450,9 @@ class EvolutionLoop:
                         edit.operation.value
                         if isinstance(edit.operation, SkillOp)
                         else str(edit.operation)
+                    ),
+                    "action_operation": str(
+                        (edit.action_spec or {}).get("operation") or ""
                     ),
                     # Store the full rule text: the retry-deduplication gate
                     # compares bigram overlap against this content, and a

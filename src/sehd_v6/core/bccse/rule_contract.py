@@ -18,6 +18,7 @@ from .vocabulary import (
     ALLOWED_VERDICTS,
     FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
+    INSTANCE_ID_RE,
     LOCAL_NEGATION_MODULES,
     LOCAL_NEGATION_RE,
     MODULE_IDS,
@@ -233,6 +234,8 @@ def validate_rule_spec(spec: RuleSpec) -> tuple[bool, str]:
             return False, f"action:rule_forbidden_content:{marker}"
     if _ACTION_POISON_RE.search(lowered_action):
         return False, "action:rule_prompt_or_case_pollution"
+    if INSTANCE_ID_RE.search(lowered_action):
+        return False, "action:rule_instance_id_pollution"
     # Authority gates run on the rendered text because that is exactly what
     # the provider will see.
     rendered = render_rule(spec).lower()

@@ -58,6 +58,9 @@ FORBIDDEN_CONTENT_MARKERS = frozenset({
     "example_specific_fact", "continuous_threshold_search",
 })
 
+INSTANCE_ID_PATTERN = r"\b(?:[a-z][a-z0-9]*[-_])+\d+\b"
+INSTANCE_ID_RE = re.compile(INSTANCE_ID_PATTERN, re.IGNORECASE)
+
 _FEATURE_POISON_PATTERNS = (
     r"https?://",
     r"\b(?:case|source|agent|model)[-_ ]?id\b",
@@ -75,6 +78,7 @@ _FEATURE_POISON_PATTERNS = (
     r"\b(?:instruction|prompt)\s*:",
     r"^(?:ignore|follow|output|return|write|add|remove|modify|delete|always|never|must)\b",
     r"\b[a-z][a-z_]+/\d+\b",
+    INSTANCE_ID_PATTERN,
 )
 
 

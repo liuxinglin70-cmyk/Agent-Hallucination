@@ -264,6 +264,23 @@ def test_priority_malformed_artifact_beats_consensus_blocked():
     assert result.reason_code == "provider_artifact_malformed"
 
 
+def test_priority_executable_boundary_conflict_beats_consensus_telemetry():
+    record = _record(
+        boundary_path_state="verified_clean",
+        adjudication=_court(
+            state="unresolved",
+            consensus_gate_applied=True,
+            consensus_gate_blocked_ids=["cand-1"],
+        ),
+    )
+
+    result = classify_failure(record)
+
+    assert result.layer == contracts.LAYER_L2
+    assert result.artifact == contracts.L2_ARTIFACT_BOUNDARY_CONSUMPTION
+    assert result.reason_code == "boundary_terminal_conflict"
+
+
 def test_priority_l2_rule_beats_fall_through():
     record = _record(adjudication=_court(
         state="unresolved",

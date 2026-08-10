@@ -338,6 +338,9 @@ def test_abstention_rule_reaches_boundary_provider() -> None:
     )
     assert "return clean" in captured["system"]
     assert "rule_effects" in captured["system"]
+    assert "Return a top-level rule_effects array even when it is empty" in (
+        captured["system"]
+    )
     assert "abstention_rule" in meta["bccse_injected_modules"]
     assert meta["bccse_injected_rule_ids"] == [
         rule_id for rule_id, _rule in compiled.delta_rule_ids["abstention_rule"]
@@ -1207,7 +1210,7 @@ def test_invalid_slot_candidate_yields_no_edit_not_free_text(
     # gate (verdict authority); both must name the rejection.
     mutation_error = result.steps[0].fitness_check["mutation_error"]
     assert (
-        mutation_error.startswith("rule_spec:verdict_not_allowed")
+        "rule_spec:verdict_not_allowed" in mutation_error
         or "forbidden_action_surface" in mutation_error
     )
     assert result.champion_genome.edits_applied == []

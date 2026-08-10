@@ -32,6 +32,7 @@ from .vocabulary import (
     ALLOWED_VERDICTS,
     FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
+    INSTANCE_ID_RE,
     LOCAL_NEGATION_MODULES,
     LOCAL_NEGATION_RE,
     MODULE_IDS,
@@ -379,7 +380,10 @@ def validate_runtime_rule(
     for marker in _state_leak_markers:
         if marker in lowered:
             return False, f"forbidden_runtime_marker:{marker}"
-    if re.search(r"\b[a-z][a-z_]+/\d+\b|https?://", lowered):
+    if (
+        re.search(r"\b[a-z][a-z_]+/\d+\b|https?://", lowered)
+        or INSTANCE_ID_RE.search(lowered)
+    ):
         return False, "case_specific_pattern"
     # --- Verdict permission (layered, v5.3 optimization) ---
     # Detect final verdict emission (clean/error/unresolved).  The shared

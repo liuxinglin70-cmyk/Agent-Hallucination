@@ -46,11 +46,11 @@ Classification rules (priority order)
    ``ARTIFACT_OWNER`` (``module_hint`` wins when it is a registered
    module id). Reason: ``provider_artifact_missing`` /
    ``provider_artifact_malformed``.
-2. Consensus gate blocked nonempty -> L2, ``consensus_gate_policy``.
-3. Either side claims coverage=complete with zero valid certificates
-   on that side -> L2, ``coverage_validity_policy``.
-4. Boundary path verified_clean but terminal unresolved -> L2,
+2. Boundary path verified_clean but terminal unresolved -> L2,
    ``boundary_consumption_policy``.
+3. Consensus gate blocked nonempty -> L2, ``consensus_gate_policy``.
+4. Either side claims coverage=complete with zero valid certificates
+   on that side -> L2, ``coverage_validity_policy``.
 5. Fall-through: unresolved terminal -> ``no_actionable``; terminal
    verdict present but internally inconsistent ->
    ``detector_layer_out_of_scope``; otherwise ``no_actionable``.
@@ -203,7 +203,21 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             },
         )
 
-    # Rule 2 — consensus gate blocked live candidates. The gate is a
+    # Rule 2 — a verified-clean boundary is the closest executable
+    # cause of an unresolved terminal. It takes priority over upstream gate
+    # telemetry because the registered policy can consume this exact state.
+    if L2_PREDICATES["boundary_state_conflicts_with_terminal"](facts):
+        return _attr(
+            LAYER_L2,
+            L2_ARTIFACT_BOUNDARY_CONSUMPTION,
+            REASON_BOUNDARY_CONFLICT,
+            {
+                "boundary_path_state": facts.boundary_path_state,
+                "terminal_state": facts.terminal_state,
+            },
+        )
+
+    # Rule 3 — consensus gate blocked live candidates. The gate is a
     # protection mechanism: blocking low-confidence candidates only becomes
     # an L2 failure when the court cannot reach a verdict because of it. A
     # gate that filtered candidates yet still produced a verdict is the
@@ -222,7 +236,7 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             },
         )
 
-    # Rule 3 — hollow "complete" coverage: both sides go through the
+    # Rule 4 — hollow "complete" coverage: both sides go through the
     # registered predicates, so the vocabulary stays single-sourced.
     if L2_PREDICATES["defense_coverage_complete_and_zero_certificates"](facts):
         return _attr(
@@ -245,19 +259,7 @@ def classify_failure(record: dict[str, Any]) -> FailureAttribution:
             },
         )
 
-    # Rule 4 — boundary path result not consumed by the terminal state.
-    if L2_PREDICATES["boundary_state_conflicts_with_terminal"](facts):
-        return _attr(
-            LAYER_L2,
-            L2_ARTIFACT_BOUNDARY_CONSUMPTION,
-            REASON_BOUNDARY_CONFLICT,
-            {
-                "boundary_path_state": facts.boundary_path_state,
-                "terminal_state": facts.terminal_state,
-            },
-        )
-
-    # Rule 4.1 — v6.1: appeal pending blocked terminal.
+    # Rule 4.1 — appeal pending blocked terminal.
     if L2_PREDICATES["appeal_pending_and_terminal_unresolved"](facts):
         return _attr(
             LAYER_L2,

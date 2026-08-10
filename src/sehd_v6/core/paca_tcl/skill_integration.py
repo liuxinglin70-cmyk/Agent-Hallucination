@@ -431,13 +431,16 @@ def make_skill_aware_provider(
                 "For each applicable action_spec, enforce its operation on the "
                 "named output_object/output_field before returning JSON. The "
                 "postcondition is an output obligation, not explanatory text.",
-            ])
-            lines.extend([
                 "",
-                "如果本输出实际应用了上述某条进化规则（方括号中的规则 id），"
-                "请在 JSON 顶层添加 rule_effects 数组，每项为 "
-                '{"rule_id":"<id>","output_fields":["<该规则影响的输出字段>"]}；'
-                "未应用则省略该字段。",
+                "Execution telemetry is required whenever evolved rules are "
+                "injected. Return a top-level rule_effects array even when it is "
+                "empty. For every rule whose condition influenced this output, "
+                "add exactly {\"rule_id\":\"<injected id>\",\"output_fields\":"
+                "[\"<actual JSON field changed by the rule>\"]}. Never report a "
+                "rule that did not influence the output.",
+                "只要注入了进化规则，就必须返回顶层 rule_effects 数组；未应用任何规则时"
+                "返回空数组。实际影响输出的每条规则必须记录准确的规则 id 和发生变化的"
+                "JSON 字段，不得报告未影响输出的规则。",
             ])
         fragment_text = "\n".join(lines)
         fragment_hash = hashlib.sha256(fragment_text.encode("utf-8")).hexdigest()
