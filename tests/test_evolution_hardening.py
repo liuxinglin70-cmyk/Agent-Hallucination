@@ -1425,9 +1425,17 @@ def test_label_free_run_fails_before_mutation_when_registered_canary_is_unstable
     assert mutation_calls == 0
 
 
-def test_gold_l1_rejects_source_improvement_without_a_stable_registered_canary(
+def test_gold_l1_admits_source_improvement_without_a_stable_registered_canary(
     tmp_path, monkeypatch, addressable_l1_failure,
 ) -> None:
+    """Gold-assisted strong improvement is admitted even without stable canaries.
+
+    The gold label is a stronger correctness signal than canary stability.
+    When the base detector cannot resolve canary cases (all unstable), the
+    canary gate must not block edits whose task score the gold label
+    confirms. The reversible shadow genome and contrast replay remain as
+    overfitting guards.
+    """
     from src.sehd_v6.core.bccse import evolution_runner as runner
 
     def detector(*, genome, case_id, **kwargs):
@@ -1475,12 +1483,10 @@ def test_gold_l1_rejects_source_improvement_without_a_stable_registered_canary(
     assert baseline_canary["admitted"] is False
     assert baseline_canary["state"] == "unresolved"
     assert baseline_canary["should_evolve"] is True
-    assert result.edits_accepted == 0
+    assert result.edits_accepted == 1
     step = result.steps[0]
-    assert step.gate_decision == "reject_fitness_no_effect"
-    assert step.fitness_check["assessment"]["reasons"] == [
-        "independent_canary_unavailable"
-    ]
+    assert step.gate_decision == "accept_batch"
+    assert step.fitness_check["assessment"]["decision"] == "strong_improvement"
     assert step.fitness_check["configured_canary_count"] == 1
     assert step.fitness_check["stable_registered_canary_count"] == 0
     assert step.fitness_check["canary_cases"] == 0
@@ -6536,9 +6542,17 @@ def test_l2_gold_aligned_policy_is_accepted_and_persisted(
     assert experience["metadata"]["outcome"] == "improved"
 
 
-def test_l2_rejects_source_improvement_without_a_stable_registered_canary(
+def test_l2_admits_source_improvement_without_a_stable_registered_canary(
     tmp_path, monkeypatch,
 ) -> None:
+    """Gold-assisted L2 improvement is admitted without a stable canary.
+
+    When the gold label confirms the policy's terminal move, the canary
+    gate must not block acceptance: the gold label is a stronger
+    correctness signal than canary stability, and blocking all L2
+    policies when canaries are unstable prevents any policy-level
+    evolution on a weak base detector.
+    """
     source_detector, mutation, signal_for = _hollow_defense_fixture()
 
     def detector(*, genome, case_id, policy_genome=None, **kwargs):
@@ -6570,13 +6584,13 @@ def test_l2_rejects_source_improvement_without_a_stable_registered_canary(
     )
 
     assert [step.gate_decision for step in result.steps] == [
-        "reject_policy_fitness"
+        "accept_policy"
     ]
     entry = result.evolution_audit["l2_policy_audit"][0]
-    assert entry["reason"] == "independent_canary_unavailable"
+    assert entry["decision"] == "accept_policy"
     assert entry["configured_canary_count"] == 1
     assert entry["canary_cases"] == 0
-    assert result.evolution_audit["policy_genome"]["items"] == []
+    assert len(result.evolution_audit["policy_genome"]["items"]) >= 1
 
 
 def test_l2_rejects_policy_that_regresses_a_stable_canary(

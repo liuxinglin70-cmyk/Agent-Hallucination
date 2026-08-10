@@ -393,12 +393,17 @@ def test_attribution_runtime_valid_true_stays_true() -> None:
 def test_shadow_commit_eligibility_single_source() -> None:
     canary_preserved = ({"preserved": True},)
     canary_regressed = ({"preserved": False},)
-    # Gold mode: directional evidence never commits, even with preserved
-    # canaries (protection requires gold-assisted correctness).
+    # Gold mode: directional evidence commits because the gold label
+    # confirms the direction; fitness protection is still weak, not
+    # strong, so later evolution can revise the edit.
     assert _shadow_commit_eligible(
         "directional_evidence",
         fitness_use_gold=True, canary_audits=canary_preserved,
-    ) is False
+    ) is True
+    assert _shadow_commit_eligible(
+        "directional_evidence",
+        fitness_use_gold=True, canary_audits=(),
+    ) is True
     # Label-free: directional evidence commits only with preserved canaries.
     assert _shadow_commit_eligible(
         "directional_evidence",

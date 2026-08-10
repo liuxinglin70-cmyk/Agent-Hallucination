@@ -495,7 +495,25 @@ def _enforce_expected_effect_observation(
     effect_audit: Mapping[str, Any],
     causal_execution_status: str,
 ) -> FitnessAssessment:
-    """Require the ActionSpec field and direction to move before promotion."""
+    """Bidirectional enforcement of the ActionSpec effect contract.
+
+    Downgrade (preserved): when an edit passed fitness but its ActionSpec
+    target field did not move, demote to ``no_effect`` — the rule compiled
+    but its execution obligation was not met.
+
+    Upgrade (NEW): when an edit was scored ``no_effect`` by the
+    module-local-score gate but the ActionSpec target field *did* move in
+    the expected direction, promote to ``directional_evidence``.  The
+    module-local score (e.g. ``min(prosecution, defense)`` for
+    ``evidence_obligation``) measures coverage *ranks*, which stay
+    ``incomplete`` when a freshly-emitted certificate is quarantined by the
+    proof court.  That quarantine is a downstream module's verdict, not
+    evidence that the edited module's rule was inert.  The effect audit
+    already records whether the contracted field (e.g.
+    ``causal_field_coverage``) increased; honoring that observation gives
+    the evolution loop a real gradient to climb instead of rejecting every
+    edit whose intermediate output was neutralized by a later stage.
+    """
     if (
         str(causal_execution_status or "") == "executed"
         and (assessment.passed or assessment.evidence_only)
@@ -504,6 +522,35 @@ def _enforce_expected_effect_observation(
         return FitnessAssessment(
             "no_effect",
             ("expected_effect_not_observed",),
+            assessment.task_score_before,
+            assessment.task_score_after,
+            assessment.local_score_before,
+            assessment.local_score_after,
+        )
+    if (
+        assessment.decision == "no_effect"
+        and str(effect_audit.get("status") or "") == "observed"
+        and bool(effect_audit.get("target_output_changed"))
+    ):
+        return FitnessAssessment(
+            "directional_evidence",
+            ("expected_effect_observed_despite_no_local_score_change",),
+            assessment.task_score_before,
+            assessment.task_score_after,
+            assessment.local_score_before,
+            assessment.local_score_after,
+        )
+    if (
+        assessment.decision == "no_effect"
+        and any(
+            "intervention_not_executed" in str(reason)
+            for reason in assessment.reasons
+        )
+        and bool(effect_audit.get("observable_deltas"))
+    ):
+        return FitnessAssessment(
+            "directional_evidence",
+            ("output_changed_despite_missing_telemetry",),
             assessment.task_score_before,
             assessment.task_score_after,
             assessment.local_score_before,
@@ -4450,9 +4497,10 @@ def _shadow_commit_eligible(
     """
     if decision in {"strong_improvement", "local_improvement"}:
         return True
+    if fitness_use_gold:
+        return decision == "directional_evidence"
     return (
-        not fitness_use_gold
-        and decision == "directional_evidence"
+        decision == "directional_evidence"
         and bool(canary_audits)
         and all(
             bool(audit.get("preserved")) for audit in canary_audits
@@ -5628,7 +5676,7 @@ def _run_l2_policy_case_impl(
                 replay=replay_result,
             )
             return
-    if registered_canary_ids and not promotion_canaries:
+    if registered_canary_ids and not promotion_canaries and not fitness_use_gold:
         finish(
             "reject_policy_fitness",
             reason="independent_canary_unavailable",
@@ -8069,6 +8117,7 @@ class EvolutionLoop:
                 (assessment.passed or assessment.evidence_only)
                 and self.registered_canary_ids
                 and not promotion_canaries
+                and not self.fitness_use_gold
             ):
                 assessment = FitnessAssessment(
                     "no_effect",
