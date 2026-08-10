@@ -116,6 +116,8 @@ docs/
 │   └── SELF_EVOLUTION_FRAMEWORK_REVIEW.md  # evolution loop implementation contract
 ├── technical/                 # technical documentation
 │   ├── DETECTION_EVOLUTION_FLOW.md   # detection-to-evolution data flow
+│   ├── REVIEW_R5_ANALYSIS.md         # R5 mechanism-effectiveness audit
+│   ├── REVIEW_R15_SUMMARY.md         # R10–R15 iteration arc + gold-admission fixes
 │   └── SEHD_V6_FRAMEWORK_VISUAL.md   # framework visual overview
 ├── papers/                    # reference paper index (README tracked)
 │   └── raw/                   # paper files (local-only, git-ignored)
