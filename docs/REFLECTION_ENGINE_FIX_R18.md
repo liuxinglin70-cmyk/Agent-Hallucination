@@ -4,6 +4,7 @@
 > 前置：R17 已提交（`5bdd4f3`），965 tests 全绿；batch10 已完成（10 案例 / 6 触发 / 1 接受 / 4 stable），batch11 因外部中断未完成（已从结果树清理，案例未入账本）
 > 问题域：L2 `boundary_terminal_conflict` 错误集的集中爆发与 L2 策略修复的低接受率
 > 责任：接续 R18 的人应优先读本文件第 2 节（已实证的错误集），再按第 5 节启动复现
+> **R18 P0 已实现**（`8e2a1f3`）：`replay_runtime_invalid` 已可诊断（见第 7 节），P1 已评估并暂缓（见第 8 节）。测试 966 全绿。
 
 ---
 
@@ -68,13 +69,15 @@ batch10（10 案例，6 触发）中 **5 个触发案例归因于 `boundary_term
 
 ## 3. 建议的 R18 修复方向（按优先级）
 
-### 3.1 [P0] `replay_runtime_invalid` 必须可诊断
+### 3.1 [P0] `replay_runtime_invalid` 必须可诊断 — **已实现（`8e2a1f3`）**
 - `evolution_runner.py:5675`：`finish("reject_policy_fitness", reason=f"replay_runtime_invalid:{type(exc).__name__}")` 只记录类型名。**应把 `str(exc)` 与 traceback 一并持久化**到 `l2_policy_audit`（`finish` 的 `audit_entry` 构造在 5372-5387，新增 `replay_error_detail` 字段，或把异常消息拼进 `reason`），并把该判决分类为独立类别（如 `reject_policy_replay_error`），与真正的策略无效区分开。
 - 复现路径：batch10 的 BFCL/012、Magentic_One/063。先修这个，才能看到 RuntimeError 的真实来源（可能来自 detector 某 route 在 policy replay 下崩，或 canary 检测崩溃被吞）。
+- 实现要点见第 7 节。**注意：离线复现（复用 batch10 的 `shared_cache` 全局缓存）两个案例都能正常跑完并产出 `verified_clean`**，说明崩溃是 batch 实跑（`--provider-cache-mode fresh` + 10 并发 + 限速 endpoint）下的供应商传输/限速失败，异常在崩溃点被吞掉——这正是 P0 修复要暴露的真实来源。下一个 batch 实跑才能确认其具体分类。
 
-### 3.2 [P1] `boundary_terminal_conflict` 的向-error 策略面
+### 3.2 [P1] `boundary_terminal_conflict` 的向-error 策略面 — **已评估，暂缓**
 - `policy_reflection.py:133`（`reason == "boundary_terminal_conflict"` 分支）与 `policy_evaluator.py:156-197`（`consume_verified_clean_boundary`）只有向 clean 的算子。gold=True 的同类案例（OpenManus/011）没有可生成的合法修复。
 - 需要评估：是否引入对偶算子（如 `reject_unconsumed_clean_boundary` / `require_surviving_error_on_conflict`），使归因在 gold 极性相反时仍能表达修复方向。注意与 `consume_verified_clean_boundary` 的 fail-closed guards 对称设计。
+- R18 评估结论（见第 8 节）：暂缓，等 batch11 数据再定。
 
 ### 3.3 [P2] 跨案例策略记忆（与 L1 同一根因）
 - `run_batch.py:run_case` 以独立 subprocess 运行，未传共享 `policy_genome` / experience memory。`boundary_terminal_conflict` 的修复经验（无论成败）不会传递给后续案例。
@@ -159,3 +162,35 @@ python -m src.sehd_v6.evolution --records experiments/results/batch10/BFCL__012/
 - R18 的第一优先事项是 **P0：`replay_runtime_invalid` 可诊断化**，之后才能判断 `boundary_terminal_conflict` 的修复面是否足够。
 - 每批次完成（结果落盘）后按惯例 git 提交并追加 `used_case_ledger.txt`。
 - 复用本文件的检查脚本思路：`experiments/results/batchNN` 逐案例读 `l2_policy.attribution.reason_code`、`gate_decision`、`provider_usage_ledger.totals.by_purpose`，用 `detector:policy:*` 调用计数区分"replay 真发生"与"replay 崩溃"。
+
+---
+
+## 7. R18 P0 实现记录（`8e2a1f3`，966 tests 全绿）
+
+`replay_runtime_invalid` 的可诊断化在 `_run_l2_policy_case_impl` 崩溃点实现，全部改动落在真实逐案例自进化循环内：
+
+- **崩溃点（`evolution_runner.py:5712`）**：`except Exception as exc` 现在构造 `replay_error_detail = f"{type(exc).__name__}: {exc}"`，`reason` 用 `classify_runtime_error`（`step_attributor.py:340`）折叠成有界分类，例如 `replay_runtime_invalid:provider_rate_limit` / `:provider_timeout` / `:provider_transport` / `:detector_contract`，而不再是裸 `RuntimeError`。
+- **`finish()` 新参数 `replay_error_detail` / `replay_error_traceback`**：分别写入 `l2_policy_audit` 条目，并 `_atomic_write_json` 落盘 `output/runtime_failures/{idx:04d}_l2_policy_replay.json`（`schema_version=agenthallu.bccse_l2_replay_failure.v1`，含 `error`、`error_category`、`traceback`、`claim_scope=diagnostic_only_not_evolution_evidence`），镜像 L1 的 runtime-failure 契约。
+- **独立判决类 `reject_policy_replay_error`**（`promotion_contract.py` `_REJECT_DECISIONS`，GRADE_REJECT/ACTIVATION_NONE），与 `reject_policy_fitness` 区分：`by_decision` / `by_reason` / `by_stage` 统计不再把基础设施故障计入"策略无效"。
+- **语义与 v5.9b `runtime_invalid` 对称**：replay error 不推进收敛 streak（`gate.record_no_edit()` 跳过）、不进 `rejected_policy_summaries`（不教模型规避一个因基础设施而失败的 edit）、不增 `edits_rejected`（L2 路径本来就不增），并新增预算计数器 `budget_usage["policy_replay_errors"]`。resume 安全：`policy_replay_errors` 在默认预算字典中初始化，旧 checkpoint 恢复时保持 0。
+- **回归测试**：`test_l2_replay_runtime_error_is_persisted_and_classified`（`test_evolution_hardening.py`）冻结完整契约——decision、有界 reason、detail/traceback 持久化、JSON 落盘、0 接受/0 拒绝、策略未提交、`policy_replay_errors==1`。
+
+### 7.1 复现结论（重要）
+
+用 batch10 的 `shared_cache`（复用 provider 缓存）离线重跑 BFCL/012 与 Magentic_One/063 的候选 replay，**两个案例都正常产出 `verified_clean`，无异常**。这证明：崩溃不是候选策略本身的问题（不是 `consume_verified_clean_boundary` 的缺陷），而是 batch 实跑环境（`--provider-cache-mode fresh` 禁用跨运行缓存 + 10 并发 + AutoDL 限速 endpoint）下的供应商传输/限速失败，且该失败在崩溃点被只记类型名的旧代码吞掉。修复后下一个 batch 实跑即可从 `l2_policy_audit.reason` 与 `runtime_failures/*_l2_policy_replay.json` 直接读出真实分类。
+
+### 7.2 batch11 说明
+
+batch11 本次**未运行**（外部决定暂缓），`experiments/results/batch11` 已再次清理；其 10 个候选案例（BFCL/108, Camel/009, Camel/041, Magentic_One/053/064/065, Octotools/021, OpenDeepSearch/064, OpenManus/087, SmolAgents/008）仍未入账本，保留在可用池中。启动命令见 §5.2。
+
+---
+
+## 8. R18 P1 评估结论：向-error 算子暂缓
+
+`boundary_terminal_conflict` 归因下引入"向 error"的对偶算子，经评估**暂缓**，理由如下：
+
+1. **batch10 的 gold=True 案例（OpenManus/011）被 gold 极性 gate 正确拒绝**（`state_change_against_gold_polarity`）。框架阻止了把真阳性误判为干净的干净方向修复——这是 gate 在正确工作，不是策略面缺陷。
+2. **不存在可满足的、无 gold 泄漏的向-error 算子**。L2 策略是静态规则，按确定性求值，不能感知逐案例 gold；把 gold 编进策略即泄漏。gold=True 场景下 `boundary_terminal_conflict` 的根因是**确定性 boundary 路径对真阳性案例产出了 `verified_clean`**——这是 boundary 路径 / L1 skill 规则缺陷，不属于 L2 terminal-state 表面能表达的修复。
+3. **`surviving_error_count > 0` 已经让 `consume_verified_clean_boundary` fail-closed**（`policy_evaluator.py:156-197` 的 guards），"有幸存 error 时不得向 clean 移动"已强制，无需新算子。
+4. batch10 其余 3 个 boundary 拒绝的真实原因是 replay-error（2，已由 P0 修复并可诊断）与 canary 回归（1）——即便多给一个候选也不会改变任何判决。
+5. **决策**：等 batch11 实跑数据。若 gold=True 的 boundary 案例再次出现且能证明存在被框架错过的合法修复，再引入对偶算子；否则维持现状（gold gate 就是该场景的正确裁决器）。
