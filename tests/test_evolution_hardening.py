@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from contextlib import contextmanager
 from dataclasses import replace
@@ -6382,6 +6383,84 @@ def test_l2_boundary_consume_repair_is_proposed_and_accepted(
     assert audit["policy_genome"]["items"][0]["action"] == (
         "consume_verified_clean_boundary"
     )
+
+
+def test_l2_replay_runtime_error_is_persisted_and_classified(
+    tmp_path, monkeypatch,
+) -> None:
+    """A policy replay that raises is diagnosed, not masked.
+
+    The batch10 failures (BFCL/012, Magentic_One/063) were recorded as a
+    bare ``replay_runtime_invalid:RuntimeError`` — no message, no traceback,
+    and the rejection was folded into reject_policy_fitness statistics as if
+    the policy were invalid.  This regression freezes the R18 contract: the
+    replay error becomes its own decision class, the audit entry persists the
+    raw message and full traceback, a bounded runtime category lands in the
+    reason, a runtime-failure record is written to disk,     and the infrastructure
+    failure never counts as a fruitless no-edit or a rejected policy.
+    """
+    from tests.fixtures import meta_skill_evolution as p0
+
+    policy_replays: list = []
+
+    def detector(*, genome, case_id, policy_genome=None, **kwargs):
+        if case_id == "anchor":
+            return _anchor_clean_result()
+        detection = p0.boundary_conflict_with_surviving_error()
+        if policy_genome is not None:
+            policy_replays.append(case_id)
+            raise RuntimeError("upstream 429 rate limit exceeded")
+        return detection
+
+    mutation_calls: list[dict] = []
+
+    def mutation(**kwargs):
+        mutation_calls.append(kwargs)
+        return {"candidate_index": 0, "reason": "consume the clean boundary"}, {}
+
+    result = _run_l2_loop(
+        tmp_path,
+        monkeypatch,
+        detector=detector,
+        mutation=mutation,
+        signal_for=(
+            lambda result, use_gold=False, gold_reflection=False: _signal(
+                str(result["state"])
+            )
+        ),
+        records={"source": {}, "anchor": {}},
+        run_id="l2_replay_error_diagnosed",
+    )
+
+    assert len(mutation_calls) == 1
+    assert policy_replays == ["source"]
+    audit = result.evolution_audit
+    assert [step.gate_decision for step in result.steps] == [
+        "reject_policy_replay_error",
+    ]
+    assert audit["l2_policy_accepts"] == 0
+    entry = audit["l2_policy_audit"][0]
+    assert entry["decision"] == "reject_policy_replay_error"
+    assert entry["reason"] == "replay_runtime_invalid:provider_rate_limit"
+    assert entry["replay_error_detail"] == (
+        "RuntimeError: upstream 429 rate limit exceeded"
+    )
+    assert "Traceback (most recent call last)" in entry["replay_error_traceback"]
+    # The infra failure is not counted as a rejected edit nor a fruitless
+    # reflection; nothing was committed to the policy genome.
+    assert audit["policy_replay_errors"] == 1
+    assert result.edits_accepted == 0
+    assert result.edits_rejected == 0
+    assert audit["policy_genome"]["items"] == []
+    # The failure record mirrors the L1 runtime-failure contract on disk.
+    record = json.loads(
+        (tmp_path / "runtime_failures" / "0000_l2_policy_replay.json")
+        .read_text(encoding="utf-8")
+    )
+    assert record["error_category"] == "provider_rate_limit"
+    assert record["error"] == "RuntimeError: upstream 429 rate limit exceeded"
+    assert "Traceback (most recent call last)" in record["traceback"]
+    assert record["claim_scope"] == "diagnostic_only_not_evolution_evidence"
 
 
 def test_l2_boundary_consume_surviving_error_fails_closed_in_runner(

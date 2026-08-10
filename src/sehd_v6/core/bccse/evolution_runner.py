@@ -23,6 +23,7 @@ import json
 import hashlib
 import os
 import time
+import traceback
 import uuid
 from collections import deque
 from dataclasses import asdict, dataclass, field, replace
@@ -99,6 +100,7 @@ from .step_attributor import (
     AttributionSignal,
     ErrorType,
     attribute_failure,
+    classify_runtime_error,
     runtime_invalid_signal,
 )
 from .signal_adapter import (
@@ -5234,6 +5236,7 @@ def _run_l2_policy_case_impl(
     l2_policy_audit: list[dict[str, Any]],
     l2_registry_registrations: list[dict[str, Any]],
     rejected_policy_summaries: list[str],
+    budget_usage: dict[str, int],
     run_detection: Any, run_mutation_call: Any,
     record_attempt: Any, record_step: Any,
     run_registry_reflection: Any,
@@ -5340,6 +5343,8 @@ def _run_l2_policy_case_impl(
         replay: Mapping[str, Any] | None = None,
         route: str = "",
         feedback: str = "",
+        replay_error_detail: str = "",
+        replay_error_traceback: str = "",
     ) -> None:
         nonlocal accepted_outcome
         nonlocal route_result, feedback_code
@@ -5349,6 +5354,7 @@ def _run_l2_policy_case_impl(
         )
         feedback_code = feedback or feedback_code
         accepted_outcome = accepted
+        replay_error = decision == "reject_policy_replay_error"
         if accepted:
             state.l2_policy_accepts += 1
             gate.reset_convergence()
@@ -5358,17 +5364,21 @@ def _run_l2_policy_case_impl(
             # A stable-source L2 attribution must not push the streak:
             # the case was not a trigger and v5.9b forbids stable cases
             # from halting a run.
-            if not stable_source:
+            # A policy replay that raised before any verdict is an
+            # infrastructure failure, not fruitless reflection: symmetric
+            # with v5.9b's runtime_invalid rule, it neither advances the
+            # streak nor teaches the next reflection to avoid the edit.
+            if not stable_source and not replay_error:
                 gate.record_no_edit()
-            # The rejection carries the proposal's closed-vocabulary
-            # semantic signature so the next policy reflection can
-            # recognise and avoid the same ineffective edit.
-            rejected_policy_summaries.append(
-                _policy_rejection_signature(
-                    decision, reason, proposal_edit,
+            if replay_error:
+                budget_usage["policy_replay_errors"] += 1
+            if not replay_error:
+                rejected_policy_summaries.append(
+                    _policy_rejection_signature(
+                        decision, reason, proposal_edit,
+                    )
                 )
-            )
-            del rejected_policy_summaries[:-20]
+                del rejected_policy_summaries[:-20]
         audit_entry: dict[str, Any] = {
             "case_id": case_id,
             "decision": decision,
@@ -5385,6 +5395,10 @@ def _run_l2_policy_case_impl(
             "canary_audit": list(policy_canary_audit),
             "canary_regressions": list(policy_canary_regressions),
         }
+        if replay_error_detail:
+            audit_entry["replay_error_detail"] = replay_error_detail
+        if replay_error_traceback:
+            audit_entry["replay_error_traceback"] = replay_error_traceback
         if isinstance(replay, Mapping):
             replay_adjudication = replay.get("proof_adjudication") or {}
             if not isinstance(replay_adjudication, Mapping):
@@ -5394,6 +5408,33 @@ def _run_l2_policy_case_impl(
             )
             audit_entry["replay_state"] = resolve_evolution_state(replay)
         l2_policy_audit.append(audit_entry)
+        if replay_error_detail:
+            # The policy replay never returned a verdict, so the failure
+            # gets its own on-disk record mirroring the L1 runtime-failure
+            # contract: the audit entry carries the bounded reason and the
+            # detail, and the file keeps the full traceback next to it.
+            _atomic_write_json(
+                output_dir / "runtime_failures" / f"{idx:04d}_l2_policy_replay.json",
+                {
+                    "schema_version": "agenthallu.bccse_l2_replay_failure.v1",
+                    "case_id": case_id,
+                    "case_index": idx,
+                    "genome_hash": state.current_genome.content_hash,
+                    "policy_edit_id": (
+                        str(proposal_edit.edit_id) if proposal_edit else ""
+                    ),
+                    "policy_action": (
+                        str(proposal_edit.new_item.action)
+                        if proposal_edit and proposal_edit.new_item else ""
+                    ),
+                    "error": replay_error_detail,
+                    "error_category": classify_runtime_error(replay_error_detail),
+                    "traceback": replay_error_traceback,
+                    "decision": decision,
+                    "reason": reason,
+                    "claim_scope": "diagnostic_only_not_evolution_evidence",
+                },
+            )
         replay_state_value = str(
             audit_entry.get("replay_state") or detection_state
         )
@@ -5670,9 +5711,20 @@ def _run_l2_policy_case_impl(
             policy_scope=None,
         )
     except Exception as exc:
+        # A policy replay that raises before returning any verdict is an
+        # infrastructure failure, not a policy-fitness verdict.  Classify it
+        # into a bounded category (provider rate limit, timeout, transport,
+        # detector contract, ...) for the reason, persist the raw message and
+        # full traceback in the audit entry and a runtime-failure record, and
+        # gate it as its own decision so rejection statistics are never
+        # polluted by infra noise.
+        replay_error_detail = f"{type(exc).__name__}: {exc}"
         finish(
-            "reject_policy_fitness",
-            reason=f"replay_runtime_invalid:{type(exc).__name__}",
+            "reject_policy_replay_error",
+            reason=f"replay_runtime_invalid:"
+            f"{classify_runtime_error(replay_error_detail)}",
+            replay_error_detail=replay_error_detail,
+            replay_error_traceback=traceback.format_exc(),
         )
         return
     replay_state = resolve_evolution_state(replay_result)
@@ -6022,6 +6074,11 @@ class EvolutionLoop:
             # authority), so without this counter a provider outage would silently
             # disable the guard for every edit it touched.
             "contrast_replay_errors": 0,
+            # An L2 policy replay that raised before returning a verdict: the
+            # proposal was structurally valid but never ran to a measurable
+            # outcome, so its failure must not be counted as policy fitness
+            # evidence (see reject_policy_replay_error).
+            "policy_replay_errors": 0,
         }
         # P0.2: structured per-logical-call ledger. The counters above stay the
         # budget authority; the ledger adds the per-call token/transport/cache
@@ -6435,6 +6492,7 @@ class EvolutionLoop:
             l2_policy_audit=self.l2_policy_audit,
             l2_registry_registrations=self.l2_registry_registrations,
             rejected_policy_summaries=self.rejected_policy_summaries,
+            budget_usage=self.budget_usage,
             run_detection=self.run_detection,
             run_mutation_call=self.run_mutation_call,
             record_attempt=self.record_attempt, record_step=self.record_step,

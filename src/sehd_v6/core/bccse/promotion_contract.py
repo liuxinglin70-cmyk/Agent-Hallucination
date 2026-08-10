@@ -146,6 +146,7 @@ _REJECT_DECISIONS = frozenset({
     "reject_fitness_runtime",
     "reject_policy_fitness",
     "reject_policy_no_effect",
+    "reject_policy_replay_error",
     "structural_reject",
     "rollback_batch",
     "rollback_probe",

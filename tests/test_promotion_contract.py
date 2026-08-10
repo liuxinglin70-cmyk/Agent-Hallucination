@@ -68,6 +68,7 @@ LEGACY_CATALOGUE = {
     "reject_fitness_runtime": (GRADE_REJECT, ACTIVATION_NONE),
     "reject_policy_fitness": (GRADE_REJECT, ACTIVATION_NONE),
     "reject_policy_no_effect": (GRADE_REJECT, ACTIVATION_NONE),
+    "reject_policy_replay_error": (GRADE_REJECT, ACTIVATION_NONE),
     "structural_reject": (GRADE_REJECT, ACTIVATION_NONE),
     "rollback_batch": (GRADE_REJECT, ACTIVATION_NONE),
     "rollback_probe": (GRADE_REJECT, ACTIVATION_NONE),
