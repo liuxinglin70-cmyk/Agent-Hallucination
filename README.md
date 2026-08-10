@@ -69,9 +69,8 @@ in themselves.
    Progress reports must show concrete intermediate experiment outputs, not
    only framework descriptions.
 
-Experiment protocols under `experiments/protocols/` must state how they
-comply with this section; reviews check compliance before results are
-accepted.
+Experiment protocols must state how they comply with this section; reviews
+check compliance before results are accepted.
 
 ## Layout
 
@@ -88,22 +87,16 @@ SEHD v6
 │   ├── provider_routes.py
 │   ├── env_loader.py
 │   └── utils/            #   OCSE packet utilities
-├── docs/                 # ② documentation: design, technical, papers
-│   ├── design/
-│   ├── technical/
-│   ├── papers/           #   paper index (raw paper files local-only)
-│   ├── notes/            #   local-only notes
-│   └── visualization/    #   local-only diagrams
-├── datasets/             # ③ raw datasets (local-only, git-ignored)
-└── experiments/          # ④ experiment workspace
-    └── protocols/        #   README + used-case ledger (tracked);
-                          #   all run artifacts local-only, git-ignored
+├── docs/                 # ② documentation: design, technical, academic
+│   ├── design/           #   detector + evolution architecture
+│   └── technical/        #   detection-to-evolution data flow
+└── datasets/             # ③ raw datasets (local-only, git-ignored)
 ```
 
 Experiment protocols (partitioning, manifests, execution authorization,
 development probes, evaluation gates) are deliberately not part of the
-framework code.  They belong under `experiments/protocols/` and may be
-re-added as a layer on top of the standalone detector and evolution modules.
+framework code.  They live outside this repository and may be re-added as a
+layer on top of the standalone detector and evolution modules.
 
 ## Documentation Map
 
@@ -116,13 +109,7 @@ docs/
 │   └── SELF_EVOLUTION_FRAMEWORK_REVIEW.md  # evolution loop implementation contract
 ├── technical/                 # technical documentation
 │   ├── DETECTION_EVOLUTION_FLOW.md   # detection-to-evolution data flow
-│   ├── REVIEW_R5_ANALYSIS.md         # R5 mechanism-effectiveness audit
-│   ├── REVIEW_R15_SUMMARY.md         # R10–R15 iteration arc + gold-admission fixes
 │   └── SEHD_V6_FRAMEWORK_VISUAL.md   # framework visual overview
-├── papers/                    # reference paper index (README tracked)
-│   └── raw/                   # paper files (local-only, git-ignored)
-├── notes/                     # personal notes (local-only)
-└── visualization/             # diagrams and visualizations (local-only)
 ```
 
 Module-level documentation lives beside the code:
@@ -130,8 +117,6 @@ Module-level documentation lives beside the code:
 - `src/sehd_v6/detector/README.md` — standalone detector API
 - `src/sehd_v6/evolution/README.md` — standalone self-evolution API
 - `datasets/README.md` — raw dataset layout and record format
-- `experiments/README.md` — experiment workspace guide
-- `experiments/protocols/README.md` — protocol records and used-case ledger
 
 ## Development Guidelines
 
@@ -144,11 +129,9 @@ follow these rules:
    Partitions, manifests, execution authorization, development probes,
    evaluation gates and dataset splits must not be added to
    `src/sehd_v6/detector`, `src/sehd_v6/evolution` or `src/sehd_v6/core`.
-2. **Experiments live in `experiments/`.**  Protocol records and the
-   used-case ledger are tracked under `experiments/protocols/` (see its
-   README); run scripts, dataset builds and run orchestration are local-only
-   artifacts under `experiments/`, and consume the framework modules through
-   their public APIs:
+2. **Experiments live outside the repository.**  Protocol records, run
+   scripts, dataset builds and run orchestration stay out of the repo and
+   consume the framework modules through their public APIs:
    - `detect_record()` / `load_detector_config()` from `src/sehd_v6.detector`
    - `run_evolution()` / `load_records()` from `src/sehd_v6.evolution`
 3. **Keep the framework callable standalone.**  The framework must remain
@@ -157,21 +140,22 @@ follow these rules:
 4. **Shared improvements belong in the framework; experiment-specific
    behavior belongs in the experiment.**  If an experiment needs a new
    framework capability, add it as a generic API in the framework and
-   implement the experiment-specific policy in `experiments/protocols/`.
+   implement the experiment-specific policy in the experiment layer, kept
+   outside the repository.
 
 ## Caches and Logs
 
-Experiment runs keep their caches and logs under `experiments/` so the
-framework never depends on a fixed system path.  Conventional locations:
+Experiment runs keep their caches and logs in a local workspace outside the
+repository so the framework never depends on a fixed system path.  The
+global provider cache is configured with `PACA_GLOBAL_CACHE_ROOT`:
 
-- `experiments/cache/provider/` — global provider cache.  Point the framework
-  at it with `PACA_GLOBAL_CACHE_ROOT=experiments/cache/provider`.
-- `experiments/logs/` — run logs.
-- `experiments/results/<run>/` — per-run artifacts; the framework writes its
-  `shared_cache/` and route caches inside each run's output directory.
+```text
+PACA_GLOBAL_CACHE_ROOT=<local-workspace>/cache/provider
+```
 
-These directories are git-ignored, created on demand by runs, and safe to
-delete between runs.
+Per-run caches (`shared_cache`, provider route caches) are written by the
+framework inside each run's output directory.  All of these are local-only
+and safe to delete between runs.
 
 ## Core Methodology
 
@@ -546,8 +530,8 @@ python -m src.sehd_v6.evolution \
 
 The standalone evolution module does not require partitions, manifests,
 development probes, pre-registered canaries, execution authorization, or a
-census cache. Those are experiment protocols and live under `experiments/`,
-not in the framework loop.
+census cache. Those are experiment protocols and live outside the
+repository, not in the framework loop.
 
 Provider routes are loaded from the repository-root `.env` (or the process
 environment; process values win). No credential value is written to code or
@@ -569,8 +553,8 @@ SEHD_JUDGE_ENDPOINT=...
 ```
 
 Raw datasets belong in `datasets/` (see `datasets/README.md`). Experiment
-progress, results and logs belong in `experiments/` (local-only,
-git-ignored).
+progress, results and logs belong in a local workspace outside the
+repository.
 
 ## Public API
 
@@ -671,8 +655,8 @@ path (which passes `AttributionSignal` objects) to work without manual
 
 Experiment protocols (partitions, probes, final-holdout roles, authorization
 flags) are intentionally removed from the framework code. They can be re-added
-as a layer under `experiments/` on top of the standalone detector and
-evolution modules.
+as a layer on top of the standalone detector and evolution modules, kept
+outside the repository.
 
 ## License
 
