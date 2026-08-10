@@ -28,14 +28,14 @@ MODULE_ROUTE_IDS: Mapping[str, tuple[str, ...]] = {
     ),
     "candidate_to_verifier_route": ("qualification_route",),
     # The atomic verifier audits ERROR candidates only: its output object is
-    # ``verification_certificate`` and its quarantine observable is the proof
-    # court's prosecution-side ``quarantined_error_certificate_ids``.  Defense
-    # routes therefore cannot execute its actions coherently — a quarantine
-    # rule injected there makes the defender quarantine its own certificates,
-    # which collapses defense coverage on a gold-clean case and moves the
-    # module score against the gold polarity (observed on SmolAgents/029:
-    # defense 1.0->0.3, local_score 5.3->7.0 on an FP).  Defense-side
-    # verification stays owned by ``clean_defense_boundary``.
+    # ``verification_certificate`` and its observable is the proof court's
+    # prosecution-side certificate surface.  Defense routes therefore cannot
+    # execute its actions coherently — a withhold rule injected there makes
+    # the defender decline its own certificates, which collapses defense
+    # coverage on a gold-clean case and moves the module score against the
+    # gold polarity (observed on SmolAgents/029: defense 1.0->0.3,
+    # local_score 5.3->7.0 on an FP).  Defense-side verification stays owned
+    # by ``clean_defense_boundary``.
     "atomic_verifier_instruction": (
         "qualification_route", "focused_prosecution_route",
         "appeal_prosecutor_route",
@@ -74,7 +74,7 @@ _OPERATION_POSTCONDITION: Mapping[str, str] = {
     "qualify_candidate": "qualification_positive",
     "hold_candidate_qualification": "qualification_not_positive",
     "verify_violation": "verification_state_present",
-    "quarantine_certificate": "object_quarantined",
+    "withhold_certificate": "error_certificate_absent",
     "emit_certificate": "object_present",
     "emit_defense_certificate": "object_present",
     "emit_boundary_finding": "field_present",
@@ -89,7 +89,7 @@ _MODULE_EFFECT: Mapping[str, tuple[str, str]] = {
     "candidate_trigger": ("candidate_count", "increase"),
     "evidence_obligation": ("causal_field_coverage", "increase"),
     "candidate_to_verifier_route": ("prosecution_certificates", "increase"),
-    "atomic_verifier_instruction": ("quarantined_certificates", "increase"),
+    "atomic_verifier_instruction": ("prosecution_certificates", "increase"),
     "clean_defense_boundary": ("defense_certificates", "increase"),
     "causal_link_test": ("causal_field_coverage", "increase"),
     "earliest_origin_tiebreak": ("responsible_step", "shift"),
@@ -100,7 +100,7 @@ _OPERATION_EFFECT: Mapping[str, tuple[str, str]] = {
     "suppress_candidate": ("candidate_count", "decrease"),
     "keep_coverage_incomplete": ("prosecution_coverage", "opened"),
     "hold_candidate_qualification": ("prosecution_certificates", "decrease"),
-    "quarantine_certificate": ("quarantined_certificates", "increase"),
+    "withhold_certificate": ("prosecution_certificates", "decrease"),
     "reject_non_causal_origin": ("responsible_step", "removed"),
     "suppress_later_origin": ("responsible_step", "shift"),
 }
@@ -116,7 +116,7 @@ _MODULE_OPERATION_EFFECT: Mapping[tuple[str, str], tuple[str, str]] = {
 # model cannot be told that an operation is legal while the gate rejects it.
 ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
     "evidence_obligation": frozenset({"keep_coverage_incomplete"}),
-    "atomic_verifier_instruction": frozenset({"quarantine_certificate"}),
+    "atomic_verifier_instruction": frozenset({"withhold_certificate"}),
     "clean_defense_boundary": frozenset({
         "emit_defense_certificate", "emit_boundary_finding",
         "require_evidence_field",
@@ -308,7 +308,7 @@ _POSTCONDITION_CHECKS = frozenset({
     "field_present",
     "field_nonempty",
     "coverage_not_complete",
-    "object_quarantined",
+    "error_certificate_absent",
     "causal_status_present",
     "origin_not_selected",
     "responsible_origin_present",
@@ -430,30 +430,27 @@ def evaluate_action_spec_postcondition(
             "coverage_not_complete" if satisfied else "coverage_complete"
         )
 
-    if postcondition == "object_quarantined":
-        proof = result.get("proof_adjudication") or {}
-        if not isinstance(proof, Mapping):
+    if postcondition == "error_certificate_absent":
+        proof = result.get("proof_adjudication")
+        if not isinstance(proof, Mapping) or not proof:
             return False, "proof_adjudication_absent"
-        # The quarantine obligation acts on the module's certificate
-        # surface; the spec names the certificate-id FIELD, not a concrete
-        # value, so the deterministic check is the side's quarantined set
-        # being non-empty (the observable ``quarantined_certificates``
-        # contract).  An empty set means the provider quarantined nothing.
-        quarantined_ids_key = {
-            "error_certificate": "quarantined_error_certificate_ids",
-            "verification_certificate": "quarantined_error_certificate_ids",
-            "defense_certificate_or_boundary": (
-                "quarantined_defense_certificate_ids"
-            ),
-        }.get(spec.output_object)
-        if quarantined_ids_key is None:
-            return False, f"unobservable_in_result:{spec.output_object}"
-        quarantined = proof.get(quarantined_ids_key) or []
-        satisfied = (
-            isinstance(quarantined, list) and len(quarantined) > 0
-        )
+        # Withholding is the atomic verifier's error_to_clean repair: the
+        # verifier declines to certify, so no error certificate survives the
+        # court.  The observable is the surviving set, NOT the quarantined
+        # set — quarantine is the court's audit rejecting a malformed
+        # artifact, a provider-corruption signal that no rule should aim to
+        # produce.  A withheld certificate leaves the prosecution surface
+        # empty; a certificate that survives means the verifier still
+        # certified and the repair did not run.  A court that never reported
+        # the surviving set cannot witness the obligation, so it fails
+        # closed rather than reading absence as success.
+        surviving = proof.get("surviving_error_certificate_ids")
+        if not isinstance(surviving, list):
+            return False, "surviving_certificates_unreported"
+        satisfied = len(surviving) == 0
         return satisfied, (
-            "object_quarantined" if satisfied else "object_not_quarantined"
+            "error_certificate_absent" if satisfied
+            else "error_certificate_survived"
         )
 
     if postcondition == "causal_status_present":
@@ -557,23 +554,25 @@ def classify_execution_evidence(
     """Classify the execution evidence of one edit on one replay result.
 
     The closed execution classes implement the D1 acceptance taxonomy:
-    an edit that moved an observable output either satisfied its declared
-    output obligation (``postcondition_satisfied``) or did not
-    (``postcondition_not_satisfied``); an edit with no observable movement
-    reports ``no_observable_movement``; an edit without an ActionSpec
-    reports ``action_spec_absent``.
+    an edit whose declared output obligation holds on the result reports
+    ``postcondition_satisfied``; one whose obligation fails reports
+    ``postcondition_not_satisfied``; an edit without an ActionSpec reports
+    ``action_spec_absent``.
+
+    The postcondition is evaluated whenever a spec is present.  It reads the
+    result surface directly, so it is the authoritative evidence and must
+    not be gated behind ``observable_moved`` — that flag comes from matching
+    contract tokens against the delta vocabulary, and a lexical miss there
+    would otherwise discard a verified result-level obligation.  The flag is
+    still reported, because an obligation that holds without any observable
+    movement may have already held before the edit.
     """
     if spec is None:
         return {
             "execution_class": "action_spec_absent",
             "postcondition_satisfied": False,
             "postcondition_detail": "action_spec_absent",
-        }
-    if not observable_moved:
-        return {
-            "execution_class": "no_observable_movement",
-            "postcondition_satisfied": False,
-            "postcondition_detail": "no_observable_movement",
+            "observable_moved": bool(observable_moved),
         }
     satisfied, detail = evaluate_action_spec_postcondition(spec, result)
     execution_class = (
@@ -585,4 +584,5 @@ def classify_execution_evidence(
         "execution_class": execution_class,
         "postcondition_satisfied": satisfied,
         "postcondition_detail": detail,
+        "observable_moved": bool(observable_moved),
     }

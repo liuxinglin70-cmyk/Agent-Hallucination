@@ -50,10 +50,10 @@ def test_error_to_clean_action_contract_is_single_sourced() -> None:
         "keep_coverage_incomplete",
     })
     assert ERROR_TO_CLEAN_ACTIONS["atomic_verifier_instruction"] == frozenset({
-        "quarantine_certificate",
+        "withhold_certificate",
     })
     assert "evidence_obligation: keep_coverage_incomplete" in rendered
-    assert "atomic_verifier_instruction: quarantine_certificate" in rendered
+    assert "atomic_verifier_instruction: withhold_certificate" in rendered
 
 
 def test_clean_to_error_action_contract_excludes_clean_strengthening() -> None:
@@ -78,12 +78,12 @@ def test_clean_to_error_action_contract_excludes_clean_strengthening() -> None:
 
 
 def test_atomic_verifier_routes_are_prosecution_only() -> None:
-    """R12: the atomic verifier audits error candidates; its quarantine
-    observable is the prosecution-side quarantined-error set.  Defense
-    surfaces must never receive its actions, or a quarantine rule makes the
-    defender quarantine its own certificates on a gold-clean FP case
+    """R12: the atomic verifier audits error candidates; its observable is
+    the prosecution-side certificate surface.  Defense surfaces must never
+    receive its actions, or a withhold rule makes the defender decline its
+    own certificates on a gold-clean FP case
     (SmolAgents/029: defense 1.0->0.3, local_score 5.3->7.0)."""
-    for operation, target in (("quarantine_certificate", "certificate_id"),
+    for operation, target in (("withhold_certificate", "certificate_id"),
                               ("require_evidence_field", "norm_evidence_refs")):
         spec = compile_action_spec(
             "atomic_verifier_instruction",
@@ -99,22 +99,22 @@ def test_opcode_cannot_target_an_unrelated_route_field() -> None:
     try:
         compile_action_spec(
             "atomic_verifier_instruction",
-            "quarantine_certificate: evidence_refs",
+            "withhold_certificate: evidence_refs",
         )
     except ValueError as exc:
         assert str(exc) == (
             "action_target_not_owned_by_operation:"
-            "quarantine_certificate:evidence_refs"
+            "withhold_certificate:evidence_refs"
         )
     else:
-        raise AssertionError("quarantine accepted an evidence-array operand")
+        raise AssertionError("withhold accepted an evidence-array operand")
 
 
 def test_action_spec_round_trips_with_the_rule_genome() -> None:
     baseline = create_baseline_genome()
     spec = compile_action_spec(
         "atomic_verifier_instruction",
-        "quarantine_certificate: certificate_id",
+        "withhold_certificate: certificate_id",
     )
     edit = SkillEdit(
         edit_id="edit_action_spec",
@@ -122,11 +122,11 @@ def test_action_spec_round_trips_with_the_rule_genome() -> None:
         operation="add_rule",
         new_content=(
             "When a certificate has no cited trajectory evidence, "
-            "quarantine the certificate: certificate_id."
+            "withhold the certificate: certificate_id."
         ),
         rule_slots={
             "condition": "a certificate has no cited trajectory evidence",
-            "action": "quarantine_certificate: certificate_id",
+            "action": "withhold_certificate: certificate_id",
             "evidence_anchor": "certificate without cited evidence",
         },
         action_spec=spec.to_dict(),
@@ -148,7 +148,7 @@ def test_rule_slots_cannot_persist_a_different_action_spec() -> None:
     baseline = create_baseline_genome()
     actual = compile_action_spec(
         "atomic_verifier_instruction",
-        "quarantine_certificate: certificate_id",
+        "withhold_certificate: certificate_id",
     )
     different = compile_action_spec(
         "atomic_verifier_instruction",
@@ -160,11 +160,11 @@ def test_rule_slots_cannot_persist_a_different_action_spec() -> None:
         operation="add_rule",
         new_content=(
             "When a certificate has no cited trajectory evidence, "
-            "quarantine the certificate: certificate_id."
+            "withhold the certificate: certificate_id."
         ),
         rule_slots={
             "condition": "a certificate has no cited trajectory evidence",
-            "action": "quarantine_certificate: certificate_id",
+            "action": "withhold_certificate: certificate_id",
             "evidence_anchor": "certificate without cited evidence",
         },
         action_spec=different.to_dict(),
@@ -180,12 +180,12 @@ def test_rule_slots_cannot_persist_a_different_action_spec() -> None:
 def test_rule_removal_derives_the_inverse_observable_effect() -> None:
     spec = compile_action_spec(
         "atomic_verifier_instruction",
-        "quarantine_certificate: certificate_id",
+        "withhold_certificate: certificate_id",
     )
 
     assert spec.removal_effect_contract("certificate lacks evidence") == {
-        "observable_field": "quarantined_certificates",
-        "expected_direction": "decrease",
+        "observable_field": "prosecution_certificates",
+        "expected_direction": "increase",
         "expected_scope": "all_cases",
         "trigger_condition": "certificate lacks evidence",
     }
@@ -227,7 +227,7 @@ def test_experience_preserves_the_executed_action_trajectory() -> None:
 def test_unexecuted_action_cannot_inherit_replay_improvement() -> None:
     spec = compile_action_spec(
         "atomic_verifier_instruction",
-        "quarantine_certificate: certificate_id",
+        "withhold_certificate: certificate_id",
     )
     edit = SkillEdit(
         edit_id="edit_unexecuted",
@@ -452,34 +452,44 @@ def test_postcondition_coverage_not_complete() -> None:
     assert not satisfied and detail == "coverage_complete"
 
 
-def test_postcondition_quarantine_and_fail_closed_surfaces() -> None:
+def test_postcondition_withhold_and_fail_closed_surfaces() -> None:
     from src.sehd_v6.core.bccse.action_spec import (
         evaluate_action_spec_postcondition,
     )
 
-    # The quarantine obligation of atomic_verifier_instruction maps to the
-    # proof court's quarantined-error set (the verifier's certificates are
-    # the prosecution certificate surface).
-    quarantine_spec = compile_action_spec(
-        "atomic_verifier_instruction", "quarantine_certificate: certificate_id",
+    # Withholding is the atomic verifier's error_to_clean repair: the court
+    # must be left with no SURVIVING error certificate.  Court quarantine is
+    # deliberately not the observable — it marks a malformed artifact the
+    # audit rejected, which is provider corruption rather than a repair.
+    withhold_spec = compile_action_spec(
+        "atomic_verifier_instruction", "withhold_certificate: certificate_id",
     )
-    assert quarantine_spec.postcondition == "object_quarantined"
+    assert withhold_spec.postcondition == "error_certificate_absent"
     satisfied, detail = evaluate_action_spec_postcondition(
-        quarantine_spec,
-        {"proof_adjudication": {"quarantined_error_certificate_ids": ["c1"]}},
+        withhold_spec,
+        {"proof_adjudication": {"surviving_error_certificate_ids": []}},
     )
-    assert satisfied and detail == "object_quarantined"
+    assert satisfied and detail == "error_certificate_absent"
     satisfied, detail = evaluate_action_spec_postcondition(
-        quarantine_spec,
-        {"proof_adjudication": {"quarantined_error_certificate_ids": []}},
+        withhold_spec,
+        {"proof_adjudication": {"surviving_error_certificate_ids": ["c1"]}},
     )
-    assert not satisfied and detail == "object_not_quarantined"
+    assert not satisfied and detail == "error_certificate_survived"
+    # A certificate the court quarantined for being malformed is NOT a
+    # withheld certificate: nothing survived, so the repair still counts,
+    # but the quarantine set itself never decides the outcome.
     satisfied, detail = evaluate_action_spec_postcondition(
-        quarantine_spec, {},
+        withhold_spec,
+        {
+            "proof_adjudication": {
+                "surviving_error_certificate_ids": [],
+                "quarantined_error_certificate_ids": ["c1"],
+            }
+        },
     )
-    assert not satisfied and detail == "object_not_quarantined"
+    assert satisfied and detail == "error_certificate_absent"
     satisfied, detail = evaluate_action_spec_postcondition(
-        quarantine_spec, {"proof_adjudication": "bogus"},
+        withhold_spec, {"proof_adjudication": "bogus"},
     )
     assert not satisfied and detail == "proof_adjudication_absent"
 
@@ -597,12 +607,18 @@ def test_classify_execution_evidence_taxonomy() -> None:
     assert unmet["execution_class"] == "postcondition_not_satisfied"
     assert unmet["postcondition_satisfied"] is False
 
+    # The postcondition is authoritative and is evaluated even when the
+    # contract-token match found no movement: an obligation that holds on
+    # the result surface is evidence, and a lexical miss in the delta
+    # vocabulary must not discard it.  The flag is still reported so a
+    # caller can tell an obligation that already held from one the edit
+    # produced.
     unmoved = classify_execution_evidence(
         spec, {"paca_census": [{"candidate_id": "already-present"}]}, False,
     )
-    assert unmoved["execution_class"] == "no_observable_movement"
-    assert unmoved["postcondition_satisfied"] is False
-    assert unmoved["postcondition_detail"] == "no_observable_movement"
+    assert unmoved["execution_class"] == "postcondition_satisfied"
+    assert unmoved["postcondition_satisfied"] is True
+    assert unmoved["observable_moved"] is False
 
     nospec = classify_execution_evidence(None, {}, True)
     assert nospec["execution_class"] == "action_spec_absent"
@@ -631,3 +647,151 @@ def test_expected_effect_audit_carries_execution_evidence() -> None:
     assert evidence["execution_class"] == "action_spec_absent" or (
         evidence["postcondition_satisfied"] in (True, False)
     )
+
+
+def test_court_quarantine_is_not_an_error_to_clean_repair() -> None:
+    """R17: the retired ``quarantine_certificate`` opcode was unsatisfiable.
+
+    ``quarantined_error_certificate_ids`` is populated by the proof court's
+    schema audit rejecting a malformed certificate, so the only way to
+    satisfy the old ``object_quarantined`` postcondition was for the
+    provider to emit corrupt output.  On the four batch08 FP cases the set
+    was empty (``error:0,defense:0``) precisely because the provider emitted
+    well-formed certificates, and every such repair scored not_executed.
+    """
+    from src.sehd_v6.core.bccse.action_spec import (
+        ERROR_TO_CLEAN_ACTIONS,
+        _POSTCONDITION_CHECKS,
+    )
+    from src.sehd_v6.core.bccse.module_charter import (
+        MODULE_ACTION_OPCODES,
+        MODULE_OPERATION_TARGETS,
+    )
+
+    opcodes = {
+        operation
+        for operation, _template
+        in MODULE_ACTION_OPCODES["atomic_verifier_instruction"]
+    }
+    assert "quarantine_certificate" not in opcodes
+    assert "quarantine_certificate" not in MODULE_OPERATION_TARGETS[
+        "atomic_verifier_instruction"
+    ]
+    assert "object_quarantined" not in _POSTCONDITION_CHECKS
+    assert ERROR_TO_CLEAN_ACTIONS["atomic_verifier_instruction"] == frozenset(
+        {"withhold_certificate"}
+    )
+
+
+def test_withheld_certificate_is_executed_without_provider_telemetry() -> None:
+    """Mode A (BFCL/095, BFCL/134): the provider returns no rule_effects.
+
+    Execution evidence must come from the deterministic postcondition on the
+    replay result, so a repair that actually cleared the prosecution surface
+    is credited even though the model reported nothing.
+    """
+    spec = compile_action_spec(
+        "atomic_verifier_instruction", "withhold_certificate: certificate_id",
+    )
+    edit = SkillEdit(
+        edit_id="edit_mode_a",
+        target_module="atomic_verifier_instruction",
+        operation="add_rule",
+        action_spec=spec.to_dict(),
+    )
+
+    _assessment, audit = _attribute_intervention_fitness(
+        FitnessAssessment("strong_improvement", ("task_score_improved",)),
+        edit=edit,
+        result={
+            "compiled_rule_trace": {
+                "atomic_verifier_instruction": [{"rule_id": "rule_a"}],
+            },
+            "injected_rule_trace": {"focused_prosecution_route": ["rule_a"]},
+            "applied_rule_trace": {},
+            "rule_effects_trace": {},
+            "proof_adjudication": {"surviving_error_certificate_ids": []},
+        },
+    )
+
+    assert audit["status"] == "executed"
+    assert audit["executed_rule_ids"] == ["rule_a"]
+    assert audit["postcondition_detail"] == "error_certificate_absent"
+
+
+def test_withheld_certificate_is_executed_despite_field_name_mismatch() -> None:
+    """Mode B (Camel/017, Magentic/049): the provider self-reports the JSON
+    collection key (``candidates``) rather than the ActionSpec output field
+    (``certificate_id``).
+
+    Lexical field binding is a fallback, so it must not veto result-level
+    evidence: the postcondition decides.
+    """
+    spec = compile_action_spec(
+        "atomic_verifier_instruction", "withhold_certificate: certificate_id",
+    )
+    edit = SkillEdit(
+        edit_id="edit_mode_b",
+        target_module="atomic_verifier_instruction",
+        operation="add_rule",
+        action_spec=spec.to_dict(),
+    )
+
+    _assessment, audit = _attribute_intervention_fitness(
+        FitnessAssessment("strong_improvement", ("task_score_improved",)),
+        edit=edit,
+        result={
+            "compiled_rule_trace": {
+                "atomic_verifier_instruction": [{"rule_id": "rule_b"}],
+            },
+            "injected_rule_trace": {"focused_prosecution_route": ["rule_b"]},
+            "applied_rule_trace": {"focused_prosecution_route": ["rule_b"]},
+            "rule_effects_trace": {
+                "focused_prosecution_route": [
+                    {"output_fields": ["candidates"], "rule_id": "rule_b"},
+                ],
+            },
+            "proof_adjudication": {"surviving_error_certificate_ids": []},
+        },
+    )
+
+    assert audit["status"] == "executed"
+    assert audit["executed_rule_ids"] == ["rule_b"]
+
+
+def test_surviving_certificate_keeps_the_repair_unexecuted() -> None:
+    """The postcondition is evidence, not a rubber stamp: a certificate that
+    survived the court means the verifier still certified the error."""
+    spec = compile_action_spec(
+        "atomic_verifier_instruction", "withhold_certificate: certificate_id",
+    )
+    edit = SkillEdit(
+        edit_id="edit_survived",
+        target_module="atomic_verifier_instruction",
+        operation="add_rule",
+        action_spec=spec.to_dict(),
+    )
+
+    assessment, audit = _attribute_intervention_fitness(
+        FitnessAssessment("strong_improvement", ("task_score_improved",)),
+        edit=edit,
+        result={
+            "compiled_rule_trace": {
+                "atomic_verifier_instruction": [{"rule_id": "rule_c"}],
+            },
+            "injected_rule_trace": {"focused_prosecution_route": ["rule_c"]},
+            "applied_rule_trace": {"focused_prosecution_route": ["rule_c"]},
+            "rule_effects_trace": {
+                "focused_prosecution_route": [
+                    {"output_fields": ["candidates"], "rule_id": "rule_c"},
+                ],
+            },
+            "proof_adjudication": {
+                "surviving_error_certificate_ids": ["cert_1"],
+            },
+        },
+    )
+
+    assert audit["status"] == "not_executed"
+    assert assessment.decision == "no_effect"
+    assert assessment.reasons == ("intervention_not_executed",)

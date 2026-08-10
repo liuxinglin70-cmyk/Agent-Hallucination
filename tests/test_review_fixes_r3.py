@@ -636,8 +636,11 @@ def test_r40_expected_effect_audit_verifies_postcondition() -> None:
     )
     audit = _expected_effect_audit(edit, assessment, after_result={})
     evidence = audit["execution_evidence"]
-    assert evidence["execution_class"] == "no_observable_movement"
+    # An empty result cannot witness the emit obligation, so it fails closed
+    # on the postcondition itself rather than on the absence of movement.
+    assert evidence["execution_class"] == "postcondition_not_satisfied"
     assert evidence["postcondition_satisfied"] is False
+    assert evidence["observable_moved"] is False
     from tests.fixtures.causal_evolution import signal_for
 
     audit_moved = _expected_effect_audit(

@@ -582,7 +582,7 @@ def test_critic_prompt_uses_executable_action_contract_as_owner_authority() -> N
             "target_module": "atomic_verifier_instruction",
             "operation": "add_rule",
             "condition": "a certificate is unsupported",
-            "action": "quarantine_certificate: certificate_id",
+            "action": "withhold_certificate: certificate_id",
         },
     ]
 
@@ -597,7 +597,7 @@ def test_critic_prompt_uses_executable_action_contract_as_owner_authority() -> N
 
     assert "sole authority" in system
     assert "ACTION_CONTRACTS=" in user
-    assert "quarantine_certificate" in user
+    assert "withhold_certificate" in user
     assert "certificate_id" in user
 
 
@@ -624,7 +624,7 @@ def test_false_positive_reflection_prompt_binds_reverse_direction_actions() -> N
 
     assert "ERROR_TO_CLEAN ACTION CONTRACT (binding)" in system
     assert "evidence_obligation: keep_coverage_incomplete" in system
-    assert "atomic_verifier_instruction: quarantine_certificate" in system
+    assert "atomic_verifier_instruction: withhold_certificate" in system
 
 
 def test_online_evolution_diagnosis_downgrades_illegal_owner(

@@ -322,7 +322,7 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "atomic_verifier_instruction": (
         ("verify_violation", "verify the violation against the norm"),
-        ("quarantine_certificate", "quarantine the certificate"),
+        ("withhold_certificate", "withhold the certificate"),
         ("emit_certificate", "emit the certificate"),
         ("require_evidence_field", "require the cited evidence field"),
     ),
@@ -396,7 +396,7 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
         "target_local_score",
     ),
     "atomic_verifier_instruction": (
-        "quarantined_certificates", "causal_field_coverage",
+        "prosecution_certificates", "causal_field_coverage",
         "target_local_score",
     ),
     "clean_defense_boundary": (
@@ -458,7 +458,7 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
             "violation_evidence_refs", "agent_control_evidence_refs",
             "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
         ),
-        "quarantine_certificate": ("certificate_id",),
+        "withhold_certificate": ("certificate_id",),
         "emit_certificate": ("certificate_id",),
         "require_evidence_field": (
             "positive_evidence_refs", "actor_evidence_refs",

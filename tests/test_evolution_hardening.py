@@ -4812,9 +4812,9 @@ def test_false_positive_prevalidation_rejects_prosecution_strengthening() -> Non
         "action": "require_evidence_field: evidence_refs",
         "evidence_anchor": "certificate evidence omission",
     }
-    quarantine = {
+    withhold = {
         **strengthen,
-        "action": "quarantine_certificate: certificate_id",
+        "action": "withhold_certificate: certificate_id",
     }
 
     reason = runner._prevalidate_candidate(
@@ -4828,7 +4828,7 @@ def test_false_positive_prevalidation_rejects_prosecution_strengthening() -> Non
         "atomic_verifier_instruction:require_evidence_field"
     )
     assert runner._prevalidate_candidate(
-        quarantine,
+        withhold,
         ["evidence_obligation", "atomic_verifier_instruction"],
         error_type=ErrorType.FALSE_POSITIVE,
     ) is None

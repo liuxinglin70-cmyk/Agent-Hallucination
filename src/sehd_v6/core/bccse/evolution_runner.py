@@ -79,6 +79,7 @@ from .action_spec import (
     ERROR_TO_CLEAN_ACTIONS,
     classify_execution_evidence,
     compile_action_spec,
+    evaluate_action_spec_postcondition,
     sanitize_action_spec,
 )
 from .fitness import (
@@ -1862,12 +1863,17 @@ def _attribute_intervention_fitness(
 
     Aggregate detector movement is not causal evidence by itself because a
     provider replay may vary even when it ignores the evolved instruction.
-    New ActionSpec-backed rules therefore earn fitness only when their stable
-    rule id is injected, reported as applied, and bound to the ActionSpec's
-    output field. The binding is vocabulary-tolerant: the provider reports
-    the JSON key it affected (``candidates``), which may be the plural of the
-    ActionSpec's singular output field (``candidate``). Older uninstrumented
-    detector adapters remain readable.
+
+    Execution evidence is ranked by authority.  The rule's compiled
+    ActionSpec declares a postcondition that is checked deterministically
+    against the replay result; when that obligation is met, the rule
+    executed regardless of what the provider said about itself.  Provider
+    self-report (``rule_effects_trace`` field names) is advisory telemetry
+    and only decides the outcome when the postcondition cannot be evaluated
+    against the result surface — a model that reports the JSON collection
+    key it touched (``candidates``) instead of the ActionSpec's operand
+    (``certificate_id``) must not have a real repair thrown away, and a
+    model that reports nothing at all must not either.
     """
     action_spec = sanitize_action_spec(edit.action_spec)
     compiled = result.get("compiled_rule_trace")
@@ -1911,7 +1917,14 @@ def _attribute_intervention_fitness(
                     )
                 ):
                     effect_ids.add(str(entry.get("rule_id") or ""))
-    executed_ids = sorted(rule_ids & applied_ids & effect_ids)
+    postcondition_met, postcondition_detail = (
+        evaluate_action_spec_postcondition(
+            ActionSpec.from_dict(action_spec), result,
+        )
+    )
+    executed_ids = sorted(
+        rule_ids if postcondition_met else rule_ids & applied_ids & effect_ids
+    )
     audit = {
         "status": "executed" if executed_ids else "not_executed",
         "compiled_rule_ids": sorted(rule_ids),
@@ -1919,6 +1932,8 @@ def _attribute_intervention_fitness(
         "effect_rule_ids": sorted(rule_ids & effect_ids),
         "expected_output_field": expected_field,
         "executed_rule_ids": executed_ids,
+        "postcondition_satisfied": postcondition_met,
+        "postcondition_detail": postcondition_detail,
     }
     if executed_ids or not (assessment.passed or assessment.evidence_only):
         return assessment, audit
