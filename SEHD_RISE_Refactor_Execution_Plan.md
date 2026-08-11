@@ -488,6 +488,26 @@ api / cli       → loop, detection, evaluation, planning
 
 **提交：** `refactor(sehd_rise): phase 5 — experience memory single source, HTC-TES demoted to advisory typing`
 
+**Phase 5 实施记录（2026-08-12，commit 后回写）：**
+
+本阶段把机制级经验记忆与 HTC-TES 类型层迁入新包：`experience/memory.py` 合并 `evolution_experience_memory.py` + `types.py(ExperienceRecord)`，解除内嵌 `TypeExperienceMemory` 的组合依赖；`typing/classifier.py` 平移 `type_classifier.py`（仅 `signal_adapter` import 改指 `causal.signals`）；`typing/guidance.py` 与 `typing/slices.py` 按 C5 重写降级。`tools/parity/compare_experience_typing.py` 93 项检查全绿、1 处 C5 偏差（guidance 删除项）显式记录；§3.3 R2 降级（暖缓存不可用 → 离线契约校验）在 harness 顶部与提交信息双重显式记录；`check_layers.py` 50 文件 / 13 层无违反，既有 parity harness（roundtrip_skills / compare_causal 173 / compare_detection 74）无回归。
+
+1. **C5 demotion 的精确边界（§2.6）。** `typing/guidance.py` 保留三个顾问访问器（`get_target_modules` 检索先验 / `get_edit_strategy` 反思先验 / `generate_type_guidance` 方向建议，逐字段与旧包相等，含 `[HTC-TES v3]` 头）；**删除** `intersect_allowed_modules`（module 路由过滤——按类型裁剪/重排 attributor 的模块集，对 causal owner 的第二套模块路由真源）与 `_infer_evolution_direction`（evolution direction 冲突裁决——从 state+gold 处方方向，对 loop owner 的第二套方向真源）。harness 断言这两个方法在新包中不存在、在旧包中仍存在；typing 只产出建议，不裁剪 `episode.failure_owner` 或 `cut.owner`。类名 `TypeConditionedEvolution` → `TypeGuidance`，反映顾问化角色（§2.4 移植即重命名）。
+
+2. **experience/memory.py 的组合解除与机制真源保留。** `EvolutionExperienceMemory` 的 `self._type_memory`（组合的 `TypeExperienceMemory`）整体移除：构造器不再接收 type memory，`to_dict`/`from_dict` 不再读写 `type_experience_memory` 块，`type_experience_memory` 属性删除。类名 `EvolutionExperienceMemory` → `ExperienceMemory`。机制签名索引、四个代表槽位（effective/no_effect/structural_reject/no_proposal）、结果计数、dedup ledger、`episode_signature`/`retrieve`/`upsert_observation`/`upsert_attempt` 全部保留；schema 升至 `sehd_rise.experience_memory.v1`，`from_dict` 在单一边界接受更早的 `sehd.evolution_experience_memory.v2`/`v1` 工件（载入 `failure_mechanisms`+`meta_review`，忽略已降级的 `type_experience_memory` 块），未知 schema fail-closed，无 schema 的 type-only 工件载入空机制索引。`ExperienceRecord`（原 `bccse/types.py`）并入本模块作为 Experience Truth 的记录类型（§2.3：旧 `signal_adapter` 用其构造检测经验，新架构由 experience 层独占该类型）。`episode_signature` 与 `_reference_for` 接口与 causal 对齐：`layer←skill_layer`、`artifact←failure_owner`、`reason_code←reason_code`、`evolution_direction←detection_snapshot["evolution_direction"]`，`mechanism_signature` 为索引键、`episode_id` 为稳定引用键，memory 不解释 failure semantics。
+
+3. **S1 结构消解证据。** `grep -rn "from sehd_rise.typing" sehd_rise/{experience,skills,causal,detection,platform}` 无命中；`check_layers.py` 50 文件 / 13 层无违反。下方各层永不 import typing，bccse↔htc_tes 循环从结构上消失，不再需要任何惰性 `__getattr__`。
+
+4. **C5 对 type-conditioned 子存储的 S1 裁决。** §1/§2 字面要求「type_aware_fitness 的经验存储所有权迁入 experience/memory.py」，但该子存储以 `HallucinationType`（typing 层词汇，定义于 `typing.classifier`）为键。将其迁入 experience 层将迫使 experience 反向 import typing，重新构成 §2.2 明令废止的 S1 循环。机械可查的 §2.2 分层规则 + §4.5 累计统计口径等价，在此处压倒字面「迁入」措辞：type-conditioned 子存储（`TypeExperienceMemory`/`TypeConditionedExperience`）留在 typing 层（`typing/slices.py`），其 DACR 计算逐字段与旧包相等（harness 5 个 fitness 场景 + TypeExperienceMemory 往返全绿）；experience 层独占机制经验本体。C5 的实质降级（废止 typing 对 causal owner 的路由/方向权威）落在 `typing/guidance.py`，已由第 1 条勾销。这是「结构规则压倒字面措辞」的显式裁决，非静默偏离。
+
+5. **typing/slices.py 的口径保留。** `TypeAwareFitness.assess_edit` 及其三级 process 评估（improvement / directional_improvement / regression / no_effect）、Decisive Accuracy × Coverage、`_determine_global_fitness_v2`、`_generate_recommendation` 全部原样保留，仅三个 import 改指（`type_classifier`→`typing.classifier`、`bccse.genome`→`skills.genome`、`bccse.signal_adapter`→`causal.signals`）。`resolve_evolution_state` 在 `causal.signals` 与旧 `signal_adapter` 逐字节一致（Phase 4 已验，本阶段 harness 6 夹具再证）。slices 定位为对机制记忆的只读切片视图：不写入 `experience/memory.py` 拥有的机制索引；typing 层拥有其自身 typed 观测上的切片计算。
+
+6. **降级路径（§3.3 R2 显式记录）。** `PACA_GLOBAL_CACHE_ROOT` 暖缓存本机仍不可用（`experiments/cache/provider` 不存在）；Phase 5 不做 provider 调用，无需暖缓存。离线契约校验（`compare_experience_typing.py`，93 项）：经验记忆序列化往返 + 机制签名索引计数（2 签名 × observation/outcome/sequence）+ failure_mechanisms 块逐字段 + meta_review 归一化（13 项）、类型分类器逐字段（6 夹具 × result/features = 12 项）、guidance 顾问访问器逐字段（8 类型 × target/strategy + 5 方向 × 8 类型 guidance = 56 项）+ C5 删除项断言（4 项）、slices DACR 逐字段（5 fitness 场景 + TypeExperienceMemory 往返 = 8 项）。凭据恢复后须补跑暖缓存回放分支。
+
+7. **纯净扫描收敛记录。** `pristine-scan sehd_rise` 由 Phase 4 终态 4 命中，经本阶段新增 6 命中后收敛回 4 命中。6 处新增均为 law 7 信号词，已逐项改写：`experience/memory.py` 的 `_migrate_meta_review`/局部变量 `migrated` → 重命名为 `_normalize_meta_review`/`normalized`（5 处）；`typing/slices.py` docstring 的 "Migrating/migrate the type store" → 改写为 "Relocating / place the typed sub-store"（收敛 C5 裁决说明的措辞，2 处合并计为 1 处命中点）。剩余 4 命中均为**保留误报**，沿用既有处置：(a) `skills/policy.py` 两处 `missing_new_item` 是 Phase 2 即已记录的行为可见校验原因 token，重命名即违反 §3.2 零语义变更；(b) `detection/court/engine.py:58`（law 1 "workaround"）与 `:93`（law 7 "legacy compatibility codes"）位于 provider 请求体提示内，改写即改变 provider 请求体字节，违反 §3.2 提示面字节比对等价证据，沿用 Phase 3 处置。
+
+8. **与旧包行为偏差。** 本阶段无新增 §5 风险登记项。唯一行为偏差为 C5（guidance 删除 `intersect_allowed_modules` 与 `_infer_evolution_direction`），已由纲领 §2.6 授权并在第 1 条勾销；其余迁移（classifier / slices DACR / experience 机制索引）与旧包逐字段等价，harness 93 项全绿为证。
+
 ---
 
 ## Phase 6 — planning 假设搜索层
