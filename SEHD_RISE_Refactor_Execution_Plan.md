@@ -416,6 +416,16 @@ api / cli       → loop, detection, evaluation, planning
 
 **提交：** `refactor(sehd_rise): phase 3 — detection layer, five-generation court chain merged`
 
+**Phase 3 实施记录（2026-08-12，commit 后回写）：**
+
+本阶段把 paca_tcl 检测层完整平移进新包，五代（v1→v2→v3→v3.4→v3.5）契约链合并为单代自包含模块，三代（layered/proof_v3_4/proof）引擎合并为单文件。检测语义零变更由 `tools/parity/compare_detection.py` 74 项检查逐项证实；结构上 `detection → {platform, skills}` 分层无环（41 文件 / 13 层），S2（core→app 反向依赖）由同层 `batch.py` 收编消解，S4（词汇循环）由 `court/audit.py` 反向 import `skills.vocabulary.contracts` 打开死结。
+
+1. **五代合并方式。** `court/contract.py` 以 v3.5 契约为主干，把被依赖的辅助逻辑内联为单文件内部结构：v1 的 `_address_space`/`validate_candidate`/`adjudicate_ledger`、v2 的 `_event_refs`/`_evidence_refs`/`_ordered_chain`/`adjudicate_candidate_path`/`merge_case_paths`、v3 的 `validate_error_certificate`（被 v3.4/v3.5 直接复用）、v3.4 的对称上诉支持（`_defense_dominates` 扩展 DEFENSE_TYPES、`_validate_top`、`check_materiality`/`check_commitment`）全部就位。v3.4 自己的 `adjudicate_proof_court` 被 v3.5 重写取代、不被任何 live 路径依赖，故不迁移（这是"被依赖辅助"的精确边界）。单一 `DEFENSE_TYPES` = v3.4 扩展集，`DOMINATING_DEFENSES = DEFENSE_TYPES - {"insufficient_evidence"}`。
+2. **三代引擎合并方式。** `court/engine.py` 同样以 v3.5 为主干，v2 基座（`adjudicate_layered_case` + `_provider_user` + `_validate_boundary`）与 v3.4 上诉子系统被继承的部分内联。三套 runner 给予语义命名：`adjudicate_ledger_case`/`evaluate_ledger_rows`（v1 单一账本）、`adjudicate_layered_case`/`evaluate_layered_rows`（v2 分层）、`adjudicate_case`/`evaluate`（v3.5 主路径）。injection 的唯一补丁点收编为 engine 单模块（`engine.provider_call` / `engine.json_object_provider_call`），一次 patch 即覆盖 v2/v3.5 两条 provider 边界。
+3. **§2.2 共享词汇归属裁决落地。** 审计词汇常量 `ERROR/DEFENSE_CHECK_FIELDS`、`*_RELATIONAL_INVARIANTS`、`*_INVARIANT_TARGETS` 已随 Phase 2 落在 `skills/vocabulary/contracts.py`；本阶段 `court/audit.py` 反向 import 它（作为单一翻译拥有者重新暴露 `project_audit_failures` + 六张表），`contract.py` 与 `policy.py` 只经 audit/contracts 间接消费，`skills → detection` 的死结方向反转。
+4. **降级路径（§3.3 R2 显式记录）。** `PACA_GLOBAL_CACHE_ROOT` 暖缓存在本机不可用（`experiments/cache/provider` 不存在）；provider 字节一致性回放本次未执行，改为离线契约校验：packet build（10 夹具逐条）、证书校验器（pass/quarantine × error/defense/focused）、全法庭 adjudication（6 合成场景覆盖 verified_error / verified_clean / unresolved-quarantined / unresolved-incomplete / counterfactual-root-selection / appeal-merge-consensus-gate）、L2 政策执行器（`build_adjudication_facts` 字段相等 + `evaluate_policies` 10 条政策项动作序列相等 + `evaluate_pre_ledger_policies` 相等）、**provider 请求面字节比对**（14 段系统提示 + 12 段用户提示 + 7 个纯辅助函数全部逐字节相等——这是暖缓存命中率的事前等价证据，因为提示字节一致即意味着相同输入下请求体必然一致）、证书身份指纹、副本聚合。凭据恢复后须补跑 `compare_detection.py` 暖缓存分支（自动检测缓存可用性即切换）。
+5. **纯净扫描收敛记录。** `pristine-scan sehd_rise` 5 命中→4。`injection.py:722` "Thread-safety note:" 改写为 "Thread-safety constraint:" 收敛（law 2）。剩余 4 命中均为**保留误报**：(a) `engine.py:58` SINGLE_LEDGER_SYSTEM 提示内 "workaround is not automatically recovery" 与 `engine.py:93` CONSTRUCT_CENSUS_SYSTEM 提示内 "exact legacy compatibility codes" —— 改写即改变 provider 请求体字节，违反 §3.2 零语义变更，已用 §3.3 提示面字节比对证实与冻结参考逐字节一致（old==new，74 项全绿）；(b) `skills/policy.py` 两处 `missing_new_item` 是 Phase 2 即已记录的行为可见校验原因 token，重命名即违反零语义变更，沿用 Phase 2 处置。此说明即收敛记录。
+
 ---
 
 ## Phase 4 — causal 因果修复层（新核心权威）★ 语义变更 C1/C2/C3/C4/C6
