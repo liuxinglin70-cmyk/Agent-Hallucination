@@ -373,6 +373,16 @@ api / cli       → loop, detection, evaluation, planning
 
 **提交：** `refactor(sehd_rise): phase 2 — skills data models and closed vocabulary`
 
+**Phase 2 实施记录（2026-08-12，commit 后回写）：**
+
+本阶段落地时对映射表做了三处结构裁决，均为满足 §2.2 分层规则与"skills 不含流程逻辑"之必需，行为等价已由 `tools/parity/roundtrip_skills.py` 42 项检查逐项证实：
+
+1. **`MODULE_STAGE` 归位 `skills/vocabulary/contracts.py`。** 现状中该表定义在 `genome.py`，`module_charter` import 它形成 `charters → genome` 环；新包把它与 `MODULE_IDS` 同住词汇真源，`genome.py`/`charters.py` 均自 contracts 导入。与此同类的 `ALLOWED_VERDICTS` 本就已在 `vocabulary.py`。
+2. **`action_spec.py` 按归属拆分。** 编译/数据/词汇半子（`ActionSpec`、`compile_action_spec`/`sanitize_action_spec`/`render_action_spec_contract`、route/postcondition/effect 常量表、`MODULE_ROUTE_IDS`/`MODULE_OUTPUT_OBJECT`、`ERROR_TO_CLEAN_ACTIONS`/`CLEAN_TO_ERROR_ACTIONS`、`render_direction_action_contract`）落 `skills/action.py`——genome 的槽校验在加载期即调用 `sanitize_action_spec`，skills 若依赖 execution 便违反分层；后置条件求值半子（`evaluate_action_spec_postcondition`/`classify_execution_evidence` 等，约 530 行，只消费检测结果）留给 Phase 7 `execution/action.py`。
+3. **`FailureAttribution` 改为结构化 Protocol。** 本层 `skills/vocabulary/evolution.py`（= registry_reflection 合并）仅消费归因的 `reason_code`/`layer`/`to_dict()`；统一归因对象属 Phase 4 `causal/episode.py`（Skills 层不得向上依赖）。用 `Protocol` 声明本层所需形状，Phase 4 实现自动满足。
+
+**纯净扫描收敛记录：** `pristine-scan sehd_rise` 8 命中→0。5 处措辞命中按纪律改写（"Replaces the legacy free-text…"/"backward-compatible"/"NOTE:"/registry.py:34 注释以 "class…" 开头触发 commented-code 规则）；`policy.py` 两处 `missing_new_item` 为**保留误报**——该 token 是行为可见的校验原因，已用等价性证据证实与冻结参考逐字节一致（`old==new==(False, "missing_new_item")`），重命名即违反 §3 零语义变更，故不改写，此说明即收敛记录。
+
 ---
 
 ## Phase 3 — detection 检测层（Proof Court 平移与五代链合并）
