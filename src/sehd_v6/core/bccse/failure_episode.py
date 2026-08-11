@@ -25,15 +25,156 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from .action_spec import MODULE_OUTPUT_OBJECT, MODULE_ROUTE_IDS
+from .action_spec import (
+    CLEAN_TO_ERROR_ACTIONS,
+    ERROR_TO_CLEAN_ACTIONS,
+    MODULE_OUTPUT_OBJECT,
+    MODULE_ROUTE_IDS,
+    compile_action_spec,
+)
 from .module_charter import (
     MODULE_ACTION_OPCODES,
     MODULE_OBSERVABLE_FIELDS,
     MODULE_OPERATION_TARGETS,
 )
 from .v6_contracts import LAYER_L1, LAYER_L2, FailureAttribution
+from ..paca_tcl.audit_contract import (
+    DEFENSE_CHECK_FIELDS,
+    DEFENSE_RELATIONAL_INVARIANTS,
+    ERROR_CHECK_FIELDS,
+    ERROR_RELATIONAL_INVARIANTS,
+)
 
 SCHEMA_VERSION = "sehd.failure_episode.v1"
+
+# Synthesized-field reason codes (Fix #2): whose executable field is canonical
+# for the failure shape rather than carried on the artifact frontier. Each
+# entry maps reason_code -> (owner_module, field). The quarantine reason's
+# owner is overridden to evidence_obligation when dominant_reason ==
+# "evidence_missing" (see ``_compile_repair_frontier``).
+_SYNTHESIZED_FIELD_REASONS: dict[str, tuple[str, str]] = {
+    "localization_temporal_fallback": (
+        "earliest_origin_tiebreak", "responsible_event_id",
+    ),
+    "responsible_step_missing": (
+        "earliest_origin_tiebreak", "responsible_event_id",
+    ),
+    "quarantine_pattern_dominant": (
+        "atomic_verifier_instruction", "certificate_id",
+    ),
+}
+
+
+# ============================================================
+# MechanismRepairPlan (Fix #4): framework-compiled execution semantics
+# ============================================================
+
+
+@dataclass(frozen=True)
+class MechanismRepairPlan:
+    """Framework-compiled repair plan for one proof-cut edge.
+
+    The framework compiles the execution semantics (owner / route / output
+    object / output field / postcondition / legal operations) from the
+    selected repair edge + evolution direction. The reflection model only
+    needs to choose an edge (repair_edge_id), select an operation from the
+    legal_operations enum, and propose a mechanism hypothesis (condition +
+    condition_spec + evidence_anchor + feature_description).
+
+    When ``legal_operations`` has exactly one entry, the framework
+    auto-selects it (``auto_selected_operation``) and the LLM does not need
+    to generate the operation field.
+    """
+
+    edge_id: str
+    owner_module: str
+    route: str
+    output_object: str
+    output_field: str
+    blocking_predicate: str
+    observed: str
+    required: str
+    legal_operations: tuple[str, ...]
+    auto_selected_operation: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "edge_id": self.edge_id,
+            "owner_module": self.owner_module,
+            "route": self.route,
+            "output_object": self.output_object,
+            "output_field": self.output_field,
+            "blocking_predicate": self.blocking_predicate,
+            "observed": self.observed,
+            "required": self.required,
+            "legal_operations": list(self.legal_operations),
+            "auto_selected_operation": self.auto_selected_operation,
+        }
+
+
+def _direction_legal_operations(
+    module: str, evolution_direction: str,
+) -> tuple[str, ...]:
+    """Return the direction-filtered legal operation set for a module."""
+    if str(evolution_direction).endswith("_to_error"):
+        actions = CLEAN_TO_ERROR_ACTIONS.get(module, frozenset())
+    elif str(evolution_direction).endswith("_to_clean"):
+        actions = ERROR_TO_CLEAN_ACTIONS.get(module, frozenset())
+    else:
+        # No direction filter: all registered opcodes for the module.
+        actions = frozenset(
+            opcode for opcode, _ in MODULE_ACTION_OPCODES.get(module, ())
+        )
+    return tuple(sorted(actions))
+
+
+def compile_mechanism_repair_plans(
+    episode: "FailureEpisode",
+    allowed_modules: Sequence[str],
+    evolution_direction: str,
+) -> tuple[MechanismRepairPlan, ...]:
+    """Compile a MechanismRepairPlan for each executable repair edge.
+
+    The framework compiles owner / route / output_object / output_field /
+    legal_operations from the edge + direction. The reflection model only
+    chooses an edge and an operation from the legal enum; it does not
+    re-generate the framework-known execution vocabulary.
+
+    Edges whose owner is not in ``allowed_modules`` or whose field is not
+    executable in the given direction are skipped (they cannot compile a
+    plan).
+    """
+    plans: list[MechanismRepairPlan] = []
+    legal_module_set = set(str(value) for value in allowed_modules)
+    for edge in episode.causal_slice.repair_frontier:
+        owner = str(edge.owner_module)
+        if owner not in legal_module_set:
+            continue
+        field = str(edge.field)
+        legal_ops = _direction_legal_operations(owner, evolution_direction)
+        # Filter to operations whose target set includes the edge's field.
+        executable_ops = tuple(
+            op for op in legal_ops
+            if field in MODULE_OPERATION_TARGETS.get(owner, {}).get(op, ())
+        )
+        if not executable_ops:
+            continue
+        routes = MODULE_ROUTE_IDS.get(owner, ())
+        auto_op = executable_ops[0] if len(executable_ops) == 1 else ""
+        plans.append(MechanismRepairPlan(
+            edge_id=str(edge.edge_id),
+            owner_module=owner,
+            route=routes[0] if routes else MODULE_OUTPUT_OBJECT.get(owner, owner),
+            output_object=MODULE_OUTPUT_OBJECT.get(owner, owner),
+            output_field=field,
+            blocking_predicate=str(edge.blocking_predicate),
+            observed=str(edge.observed),
+            required=str(edge.required),
+            legal_operations=executable_ops,
+            auto_selected_operation=auto_op,
+        ))
+    return tuple(plans)
+
 
 _EVIDENCE_REF_KEYS = (
     "evidence_refs", "support_refs", "boundary_refs", "origin_refs",
@@ -70,6 +211,30 @@ class FailureEdge:
     consumer: str
     observed: str
     required: str
+    owner_module: str = ""
+    source_artifact_id: str = ""
+    blocking_predicate: str = ""
+    edge_id: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.edge_id:
+            payload = {
+                "producer_route": self.producer_route,
+                "output_object": self.output_object,
+                "field": self.field,
+                "consumer": self.consumer,
+                "owner_module": self.owner_module,
+                "source_artifact_id": self.source_artifact_id,
+                "blocking_predicate": self.blocking_predicate,
+            }
+            text = json.dumps(
+                payload, sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            object.__setattr__(
+                self, "edge_id",
+                "edge_" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12],
+            )
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -79,6 +244,10 @@ class FailureEdge:
             "consumer": self.consumer,
             "observed": self.observed,
             "required": self.required,
+            "owner_module": self.owner_module,
+            "source_artifact_id": self.source_artifact_id,
+            "blocking_predicate": self.blocking_predicate,
+            "edge_id": self.edge_id,
         }
 
     @classmethod
@@ -90,6 +259,10 @@ class FailureEdge:
             consumer=str(value.get("consumer") or ""),
             observed=str(value.get("observed") or ""),
             required=str(value.get("required") or ""),
+            owner_module=str(value.get("owner_module") or ""),
+            source_artifact_id=str(value.get("source_artifact_id") or ""),
+            blocking_predicate=str(value.get("blocking_predicate") or ""),
+            edge_id=str(value.get("edge_id") or ""),
         )
 
 
@@ -113,6 +286,7 @@ class CausalSlice:
     failure_edge: FailureEdge | None
     evidence_refs: tuple[str, ...]
     completeness: str
+    repair_frontier: tuple[FailureEdge, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -135,6 +309,9 @@ class CausalSlice:
                 self.failure_edge.to_dict()
                 if self.failure_edge is not None else None
             ),
+            "repair_frontier": [
+                item.to_dict() for item in self.repair_frontier
+            ],
             "evidence_refs": list(self.evidence_refs),
             "completeness": self.completeness,
         }
@@ -142,6 +319,18 @@ class CausalSlice:
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "CausalSlice":
         edge = value.get("failure_edge")
+        raw_frontier = value.get("repair_frontier")
+        frontier = tuple(
+            FailureEdge.from_dict(dict(item))
+            for item in raw_frontier or ()
+            if isinstance(item, Mapping)
+        )
+        legacy_edge = (
+            FailureEdge.from_dict(dict(edge))
+            if isinstance(edge, Mapping) else None
+        )
+        if not frontier and legacy_edge is not None:
+            frontier = (legacy_edge,)
         return cls(
             candidate_id=str(value.get("candidate_id") or ""),
             candidate_kind=str(value.get("candidate_kind") or ""),
@@ -170,14 +359,12 @@ class CausalSlice:
             quarantine_state=str(value.get("quarantine_state") or ""),
             coverage_state=str(value.get("coverage_state") or ""),
             court_effect=str(value.get("court_effect") or ""),
-            failure_edge=(
-                FailureEdge.from_dict(dict(edge))
-                if isinstance(edge, Mapping) else None
-            ),
+            failure_edge=legacy_edge or (frontier[0] if frontier else None),
             evidence_refs=tuple(
                 str(item) for item in value.get("evidence_refs") or ()
             ),
             completeness=str(value.get("completeness") or "partial"),
+            repair_frontier=frontier,
         )
 
 
@@ -331,6 +518,7 @@ class HistoricalEpisodeReference:
     shared_facts: dict[str, Any]
     current_only_facts: dict[str, Any]
     historical_only_facts: dict[str, Any]
+    rule_condition: str
     action_spec: dict[str, Any] | None
     local_outcome: dict[str, Any] | None
 
@@ -341,6 +529,7 @@ class HistoricalEpisodeReference:
             "shared_facts": dict(self.shared_facts),
             "current_only_facts": dict(self.current_only_facts),
             "historical_only_facts": dict(self.historical_only_facts),
+            "rule_condition": self.rule_condition,
             "action_spec": dict(self.action_spec or {}),
             "local_outcome": dict(self.local_outcome or {}),
         }
@@ -403,6 +592,8 @@ def project_provider_artifacts(
         *,
         malformed: bool,
         missing: list[str],
+        failed_fields: Sequence[str] = (),
+        failed_invariants: Sequence[str] = (),
         artifact_id: str = "",
         source: str = "",
     ) -> None:
@@ -412,6 +603,19 @@ def project_provider_artifacts(
             "malformed": malformed,
             "missing_fields": missing,
         }
+        normalized_failed_fields = sorted({
+            str(name) for name in failed_fields if str(name)
+        })
+        normalized_failed_invariants = sorted({
+            str(name) for name in failed_invariants if str(name)
+        })
+        # Additive typed evidence is emitted only when present.  This keeps
+        # legacy artifact projections byte-compatible without sacrificing the
+        # new distinction for relational failures.
+        if normalized_failed_fields:
+            artifact["failed_fields"] = normalized_failed_fields
+        if normalized_failed_invariants:
+            artifact["failed_invariants"] = normalized_failed_invariants
         if artifact_id:
             artifact["artifact_id"] = artifact_id
         if source:
@@ -459,17 +663,88 @@ def project_provider_artifacts(
                 continue
             if str(audit.get("decision") or "") == "pass":
                 continue
-            failed = audit.get("failed_checks")
-            if isinstance(failed, list):
-                missing_fields = sorted(set(
-                    str(name) for name in failed
-                    if name != "required_fields"
-                ))
-                if missing_fields:
+            failed_fields = audit.get("failed_fields")
+            missing_from_audit = audit.get("missing_fields")
+            failed_invariants = audit.get("failed_invariants")
+            # Single migration boundary for pre-contract cached detections:
+            # old audits carried only predicate labels.  Re-project them via
+            # the same typed contract rather than reviving the old error of
+            # treating check names as JSON fields.
+            if not isinstance(failed_fields, list):
+                legacy_checks = audit.get("failed_checks")
+                if isinstance(legacy_checks, list):
+                    check_fields = (
+                        ERROR_CHECK_FIELDS
+                        if kind == "error_certificate" else DEFENSE_CHECK_FIELDS
+                    )
+                    relational = (
+                        ERROR_RELATIONAL_INVARIANTS
+                        if kind == "error_certificate"
+                        else DEFENSE_RELATIONAL_INVARIANTS
+                    )
+                    semantic_fields = sorted({
+                        str(field)
+                        for check in legacy_checks
+                        for field in check_fields.get(str(check), ())
+                    })
+                    registered_fields = {
+                        str(field)
+                        for fields in check_fields.values()
+                        for field in fields
+                    }
+                    direct_fields = sorted({
+                        str(check) for check in legacy_checks
+                        if str(check) in registered_fields
+                    })
+                    failed_fields = semantic_fields
+                    failed_invariants = sorted({
+                        str(check) for check in legacy_checks
+                        if str(check) in relational
+                    })
+                    artifact_id = str(
+                        audit.get("certificate_id")
+                        or audit.get("candidate_id")
+                        or ""
+                    )
+                    row = next(
+                        (
+                            item for item in _candidate_rows(detection_result, kind)
+                            if str(
+                                item.get("certificate_id")
+                                or item.get("candidate_id")
+                                or ""
+                            ) == artifact_id
+                        ),
+                        {},
+                    )
+                    # Some pre-contract audits used provider field names
+                    # directly as checks.  Accept only registered fields, and
+                    # call them missing only when the addressed row proves it.
+                    missing_from_audit = [
+                        field for field in direct_fields
+                        if row.get(field) in (None, "", [], {})
+                    ]
+            if isinstance(failed_fields, list):
+                participating_fields = sorted({
+                    str(name) for name in failed_fields if str(name)
+                })
+                missing_fields = (
+                    sorted({
+                        str(name) for name in missing_from_audit if str(name)
+                    })
+                    if isinstance(missing_from_audit, list) else []
+                )
+                invariants = (
+                    sorted({str(name) for name in failed_invariants if str(name)})
+                    if isinstance(failed_invariants, list) else []
+                )
+                if missing_fields or participating_fields or invariants:
                     add(
                         kind,
                         malformed=True,
                         missing=missing_fields,
+                        failed_fields=participating_fields,
+                        failed_invariants=invariants,
                         artifact_id=str(
                             audit.get("certificate_id")
                             or audit.get("candidate_id")
@@ -587,11 +862,89 @@ def build_runtime_observation(
             return 0
 
     surviving_ids = proof.get("surviving_error_certificate_ids")
+    surviving_id_set = (
+        {str(value) for value in surviving_ids}
+        if isinstance(surviving_ids, (list, tuple))
+        else set()
+    )
     surviving_error_certificates = (
-        len(surviving_ids)
+        len(surviving_id_set)
         if isinstance(surviving_ids, (list, tuple))
         else max(len(prosecution) - _id_count("quarantined_error_certificate_ids"), 0)
     )
+
+    # Verdict-carrier projection (first-principles fix C): the proof court
+    # already names the certificate(s) that actually carry the verdict
+    # (``surviving_error_certificate_ids`` for an error verdict; the
+    # ``winning_error_certificate_id`` fields for both appeal and construct
+    # adjudication). The reflection LLM previously saw only an aggregate
+    # count ``surviving_error_certificates=N`` and routinely targeted a
+    # non-carrier witness certificate, producing an edit that the verifier
+    # faithfully applied but that left the verdict unchanged
+    # (``intervention_not_executed`` because another carrier survived).
+    # Surfacing the carrier identity forces reflection to target a
+    # certificate that, once withheld, actually moves the verdict.
+    #
+    # Witness certificates identify non-surviving prosecution rows so the
+    # LLM understands which evidence the court already disregarded and is
+    # therefore inert to withhold.
+    def _carrier_descriptor(row: Mapping[str, Any]) -> dict[str, Any]:
+        candidate_id = str(row.get("source_candidate_id") or "")
+        census_row = next(
+            (
+                entry for entry in (detection_result.get("census") or [])
+                if isinstance(entry, Mapping)
+                and str(entry.get("candidate_id") or "") == candidate_id
+            ),
+            None,
+        )
+        return {
+            "certificate_id": str(row.get("certificate_id") or ""),
+            "source_candidate_id": candidate_id,
+            "breach_type": str(row.get("breach_type") or ""),
+            "claim_kind": str(row.get("claim_kind") or ""),
+            "candidate_kind": str(
+                (census_row or {}).get("candidate_kind") or ""
+            ),
+            "origin_event_id": str(row.get("origin_event_id") or ""),
+        }
+
+    verdict_state = detection_result.get("state")
+    winning_error_certificate_id = str(
+        proof.get("winning_error_certificate_id") or ""
+    )
+    verdict_carriers: list[dict[str, Any]] = []
+    witness_certificates: list[dict[str, Any]] = []
+    if verdict_state == "verified_error":
+        for row in prosecution:
+            certificate_id = str(row.get("certificate_id") or "")
+            if not certificate_id:
+                continue
+            descriptor = _carrier_descriptor(row)
+            if certificate_id in surviving_id_set:
+                verdict_carriers.append(descriptor)
+            else:
+                witness_certificates.append(descriptor)
+        # The court may report a winning certificate id that is not in the
+        # combined list (e.g. when only the focused or appeal surface carried
+        # it); fall back to a minimal name-only descriptor so the prompt
+        # still identifies the carrier.
+        if (
+            winning_error_certificate_id
+            and not any(
+                str(carrier.get("certificate_id") or "")
+                == winning_error_certificate_id
+                for carrier in verdict_carriers
+            )
+        ):
+            verdict_carriers.append({
+                "certificate_id": winning_error_certificate_id,
+                "source_candidate_id": "",
+                "breach_type": "",
+                "claim_kind": "",
+                "candidate_kind": "",
+                "origin_event_id": "",
+            })
 
     court_balance = {
         "surviving_error_certificates": max(
@@ -612,8 +965,25 @@ def build_runtime_observation(
         ),
         "positive_candidates": _id_count("positive_candidate_ids"),
         "consensus_gate_blocked": _id_count("consensus_gate_blocked_ids"),
-        "verdict_state": detection_result.get("state"),
+        "verdict_state": verdict_state,
+        "verdict_carriers": verdict_carriers,
+        "witness_certificates": witness_certificates,
     }
+    raw_terminal_basis = proof.get("terminal_basis")
+    terminal_basis = (
+        {
+            "state": str(raw_terminal_basis.get("state") or ""),
+            "decisive_facts": dict(
+                raw_terminal_basis.get("decisive_facts") or {}
+            ),
+            "blocking_facts": [
+                dict(item)
+                for item in raw_terminal_basis.get("blocking_facts") or ()
+                if isinstance(item, Mapping)
+            ][:8],
+        }
+        if isinstance(raw_terminal_basis, Mapping) else {}
+    )
     field_presence = {
         "candidate_count": len(detection_result.get("census") or []),
         "prosecution_certificates": len(prosecution),
@@ -635,6 +1005,14 @@ def build_runtime_observation(
         },
         "observed_fields": field_presence,
         "court_balance": court_balance,
+        "terminal_basis": terminal_basis,
+        "runtime_condition_features": {
+            str(route): [dict(item) for item in rows[:8] if isinstance(item, Mapping)]
+            for route, rows in dict(
+                detection_result.get("condition_feature_trace") or {}
+            ).items()
+            if isinstance(rows, list)
+        },
         "non_empty_evidence": {
             "census": field_presence["candidate_count"] > 0,
             "prosecution": bool(prosecution),
@@ -649,10 +1027,18 @@ def build_runtime_observation(
         },
         "module_output_ownership": owner_fields,
         "instruction": (
-            "Select one observed missing or malformed output field owned by the "
-            "target module. Do not claim an effect on fields outside its ownership. "
-            "diagnostic_gap primary/secondary modules are attribution hints; the "
-            "allowed module set is authoritative."
+            "Select one observed missing or malformed output field owned by "
+            "the target module. terminal_basis is the proof court's exact "
+            "decision fact set; select a failure that participates in one of "
+            "its blocking facts instead of guessing from aggregate counts. "
+            "Do not claim an effect on fields outside its "
+            "ownership. diagnostic_gap primary/secondary modules are "
+            "attribution hints; the allowed module set is authoritative. "
+            "When court_balance.verdict_carriers is non-empty, an "
+            "error_to_clean (FP / unresolved_should_clean) edit MUST move "
+            "at least one listed carrier; witholding only a witness "
+            "certificate in court_balance.witness_certificates has zero "
+            "observable verdict effect and is rejected as no-effect."
         ),
     }
 
@@ -895,66 +1281,232 @@ def _downstream_consumption(
     }
 
 
-def _first_repairable_edge(
+def _direction_operations(
+    *,
+    module: str,
+    evolution_direction: str,
+) -> frozenset[str]:
+    if str(evolution_direction).endswith("_to_error"):
+        return CLEAN_TO_ERROR_ACTIONS.get(module, frozenset())
+    if str(evolution_direction).endswith("_to_clean"):
+        return ERROR_TO_CLEAN_ACTIONS.get(module, frozenset())
+    return frozenset(MODULE_OPERATION_TARGETS.get(module, {}))
+
+
+def _field_is_executable(
+    *, module: str, field: str, evolution_direction: str,
+) -> bool:
+    operations = _direction_operations(
+        module=module, evolution_direction=evolution_direction,
+    )
+    return any(
+        operation in operations and field in targets
+        for operation, targets in MODULE_OPERATION_TARGETS.get(module, {}).items()
+    )
+
+
+def _terminal_blocking_predicates(
+    detection_result: Mapping[str, Any],
+) -> tuple[str, ...]:
+    proof = detection_result.get("proof_adjudication")
+    if not isinstance(proof, Mapping):
+        proof = detection_result.get("adjudication")
+    if not isinstance(proof, Mapping):
+        return ()
+    terminal_basis = proof.get("terminal_basis")
+    if not isinstance(terminal_basis, Mapping):
+        return ()
+    return tuple(
+        str(item.get("predicate") or "")
+        for item in terminal_basis.get("blocking_facts") or ()
+        if isinstance(item, Mapping) and str(item.get("predicate") or "")
+    )
+
+
+def _artifact_blocking_predicate(
+    kind: str, blocking_predicates: Sequence[str],
+) -> str:
+    preferred = {
+        "candidate": "required_candidates_terminal",
+        "error_certificate": "prosecution_coverage_complete",
+        "defense_certificate": "defense_coverage_complete",
+    }.get(kind, "")
+    if preferred in blocking_predicates:
+        return preferred
+    return "provider_artifact_integrity"
+
+
+def _quarantine_audit_fields(
+    detection_result: Mapping[str, Any], owner: str,
+) -> list[str]:
+    """Extract executable provider fields from the quarantined audit(s) in the
+    detection result, mapped through the registered check->field contract.
+
+    Returns the participating provider fields for the first non-pass audit
+    whose failed_checks map to registered fields for the given owner's side
+    (error vs defense). Empty when no audit is available — the caller then
+    falls back to the canonical synthesized field.
+    """
+    proof = detection_result.get("proof_adjudication")
+    if not isinstance(proof, Mapping) or not proof:
+        proof = detection_result.get("adjudication")
+    if not isinstance(proof, Mapping) or not proof:
+        return []
+    is_error_side = owner in (
+        "atomic_verifier_instruction", "evidence_obligation",
+        "candidate_trigger", "candidate_to_verifier_route",
+    )
+    check_fields = ERROR_CHECK_FIELDS if is_error_side else DEFENSE_CHECK_FIELDS
+    for audit_key in ("error_audits", "defense_audits"):
+        audits = proof.get(audit_key)
+        if not isinstance(audits, list):
+            continue
+        for audit in audits:
+            if not isinstance(audit, Mapping):
+                continue
+            if str(audit.get("decision") or "") == "pass":
+                continue
+            failed_checks = audit.get("failed_checks")
+            if not isinstance(failed_checks, (list, tuple)):
+                continue
+            fields: list[str] = []
+            for check in failed_checks:
+                participating = check_fields.get(str(check), ())
+                fields.extend(str(name) for name in participating)
+            if fields:
+                return sorted(set(fields))
+    return []
+
+
+def _compile_repair_frontier(
     *,
     layer: str,
     artifact: str,
     reason_code: str,
-    candidate_kind: str,
-    missing_fields: Sequence[str],
-    malformed_fields: Sequence[str],
+    evidence: Mapping[str, Any],
+    detection_result: Mapping[str, Any],
     downstream: Mapping[str, str],
-) -> FailureEdge | None:
-    routes = MODULE_ROUTE_IDS.get(artifact, ())
-    output_object = (
-        MODULE_OUTPUT_OBJECT.get(artifact, artifact)
-        if layer == LAYER_L1 else artifact
-    )
-    producer = routes[0] if routes else output_object
+    legal_modules: Sequence[str],
+    evolution_direction: str,
+) -> tuple[tuple[FailureEdge, ...], tuple[str, ...]]:
+    """Compile all executable edges participating in the terminal proof cut.
+
+    The result is independent of provider-artifact list order. Each edge owns
+    its producer module and stable id, so a proposal must explicitly choose
+    one edge instead of inheriting the classifier's first match.
+    """
     consumer = str(downstream.get("consumer") or "proof_court")
     if layer == LAYER_L2:
-        return FailureEdge(
+        edge = FailureEdge(
             producer_route="policy_evaluator",
             output_object=artifact,
             field=reason_code,
             consumer=consumer,
-            observed=(
-                str(downstream.get("qualification_state") or "unresolved")
-            ),
+            observed=str(downstream.get("qualification_state") or "unresolved"),
             required="not_blocked",
+            blocking_predicate=reason_code,
         )
-    if reason_code == "provider_artifact_missing":
-        return FailureEdge(
-            producer_route=producer,
-            output_object=output_object,
-            field=missing_fields[0] if missing_fields else output_object,
-            consumer=consumer,
-            observed="absent",
-            required="present",
+        return (edge,), ()
+
+    raw_frontier = evidence.get("artifact_frontier")
+    rows = (
+        [dict(item) for item in raw_frontier if isinstance(item, Mapping)]
+        if isinstance(raw_frontier, list) else []
+    )
+    if not rows:
+        rows = [dict(evidence)]
+    blocking_predicates = _terminal_blocking_predicates(detection_result)
+    rejected_fields: list[str] = []
+    edges: list[FailureEdge] = []
+    legal_module_set = set(str(value) for value in legal_modules)
+    for row in rows:
+        owner = str(
+            row.get("owner_module") or row.get("module_hint") or artifact
         )
-    if reason_code == "provider_artifact_malformed":
-        return FailureEdge(
-            producer_route=producer,
-            output_object=output_object,
-            field=(
-                malformed_fields[0]
-                if malformed_fields
-                else (missing_fields[0] if missing_fields else "well_formedness")
-            ),
-            consumer=consumer,
-            observed="malformed",
-            required="well_formed",
-        )
-    if str(downstream.get("court_effect") or "") == "provider_output_unconsumed":
-        return FailureEdge(
-            producer_route=producer,
-            output_object=output_object,
-            field=output_object,
-            consumer=consumer,
-            observed="emitted_but_unconsumed",
-            required="moves_court_edge",
-        )
-    return None
+        if owner not in legal_module_set:
+            continue
+        kind = str(row.get("kind") or evidence.get("kind") or "")
+        field_values: list[str] = []
+        if reason_code == "provider_artifact_missing":
+            raw_fields = row.get("missing_fields")
+            if isinstance(raw_fields, (list, tuple, set, frozenset)):
+                field_values.extend(str(value) for value in raw_fields)
+        elif reason_code == "provider_artifact_malformed":
+            for key in ("failed_invariants", "failed_fields", "missing_fields"):
+                raw_fields = row.get(key)
+                if isinstance(raw_fields, (list, tuple, set, frozenset)):
+                    field_values.extend(str(value) for value in raw_fields)
+        elif reason_code in _SYNTHESIZED_FIELD_REASONS:
+            # Synthesized-field reasons (localization fallback, responsible
+            # step missing, quarantine pattern dominant): the executable field
+            # is canonical for the failure shape, not carried on the artifact
+            # frontier.  The owner may differ from the artifact owner when the
+            # classifier routed by failure shape (e.g. quarantine evidence
+            # missing -> evidence_obligation).
+            synth_owner, synth_field = _SYNTHESIZED_FIELD_REASONS[reason_code]
+            if reason_code == "quarantine_pattern_dominant":
+                dominant = str(evidence.get("dominant_reason") or "")
+                if dominant == "evidence_missing":
+                    synth_owner = "evidence_obligation"
+                # Prefer the actual failed-check field from the quarantined
+                # audit over the canonical fallback (certificate_id), so the
+                # edge is semantically bound to the violated check.
+                audit_fields = _quarantine_audit_fields(
+                    detection_result, synth_owner,
+                )
+                if audit_fields:
+                    field_values.extend(audit_fields)
+                    synth_field = None
+            # Use the synthesized owner if the row did not carry one; this
+            # lets the frontier compile even when evidence has no
+            # artifact_frontier (the gold-unresolved rewrap path).
+            if owner not in legal_module_set and synth_owner in legal_module_set:
+                owner = synth_owner
+            if synth_field is not None:
+                field_values.append(synth_field)
+        if not field_values and str(downstream.get("court_effect") or "") == "provider_output_unconsumed":
+            field_values.append(MODULE_OUTPUT_OBJECT.get(owner, owner))
+        for raw_field in field_values:
+            field = "certificate_id" if raw_field == "certificate" else raw_field
+            if not _field_is_executable(
+                module=owner, field=field,
+                evolution_direction=evolution_direction,
+            ):
+                rejected_fields.append(f"{owner}:{field}")
+                continue
+            routes = MODULE_ROUTE_IDS.get(owner, ())
+            edges.append(FailureEdge(
+                producer_route=routes[0] if routes else MODULE_OUTPUT_OBJECT.get(owner, owner),
+                output_object=MODULE_OUTPUT_OBJECT.get(owner, owner),
+                field=field,
+                consumer=consumer,
+                observed=(
+                    "absent" if reason_code in (
+                        "provider_artifact_missing",
+                        "localization_temporal_fallback",
+                        "responsible_step_missing",
+                    )
+                    else "malformed"
+                ),
+                required=(
+                    "present" if reason_code in (
+                        "provider_artifact_missing",
+                        "localization_temporal_fallback",
+                        "responsible_step_missing",
+                    )
+                    else "well_formed"
+                ),
+                owner_module=owner,
+                source_artifact_id=str(row.get("artifact_id") or ""),
+                blocking_predicate=_artifact_blocking_predicate(
+                    kind, blocking_predicates,
+                ),
+            ))
+    dedup = {edge.edge_id: edge for edge in edges}
+    frontier = tuple(
+        dedup[key] for key in sorted(dedup)
+    )
+    return frontier, tuple(sorted(set(rejected_fields)))
 
 
 def build_failure_episode(
@@ -988,27 +1540,65 @@ def build_failure_episode(
         attribution=attribution,
     )
 
-    raw_missing = evidence.get("missing_fields")
+    frontier_evidence = (
+        [item for item in evidence.get("artifact_frontier") or () if isinstance(item, Mapping)]
+        if isinstance(evidence.get("artifact_frontier"), list) else []
+    )
+    raw_missing = [
+        value
+        for row in ([evidence, *frontier_evidence])
+        for value in (
+            row.get("missing_fields")
+            if isinstance(row.get("missing_fields"), (list, tuple, set, frozenset))
+            else ()
+        )
+    ]
     if not isinstance(raw_missing, (list, tuple, set, frozenset)):
         # A string value would be expanded into its characters by
         # ``_sorted_dedup``; normalize non-sequence evidence defensively.
         raw_missing = ()
+    # Keep the detector's original diagnostic vocabulary in the causal slice
+    # so persisted episodes remain lossless and backward-compatible.  Legacy
+    # aliases are normalized only at the executable edge, where the field must
+    # belong to the registered ActionSpec vocabulary.
     missing_fields = _sorted_dedup(raw_missing)
-    malformed_fields = missing_fields if attribution.reason_code == "provider_artifact_malformed" else ()
+    executable_missing_fields = _sorted_dedup(
+        "certificate_id" if str(value) == "certificate" else value
+        for value in missing_fields
+    )
+    raw_invariants = [
+        value
+        for row in ([evidence, *frontier_evidence])
+        for value in (
+            row.get("failed_invariants")
+            if isinstance(row.get("failed_invariants"), (list, tuple, set, frozenset))
+            else ()
+        )
+    ]
+    failed_invariants = _sorted_dedup(raw_invariants)
+    raw_failed_fields = [
+        value
+        for row in ([evidence, *frontier_evidence])
+        for value in (
+            row.get("failed_fields")
+            if isinstance(row.get("failed_fields"), (list, tuple, set, frozenset))
+            else ()
+        )
+    ]
+    if not raw_failed_fields:
+        raw_failed_fields = (
+            executable_missing_fields
+            if attribution.reason_code == "provider_artifact_malformed" else ()
+        )
+    failed_fields = _sorted_dedup(raw_failed_fields)
+    malformed_fields = (
+        failed_fields
+        if attribution.reason_code == "provider_artifact_malformed" else ()
+    )
 
     downstream = _downstream_consumption(
         detection_result=detection_result,
         layer=layer,
-    )
-
-    edge = _first_repairable_edge(
-        layer=layer,
-        artifact=artifact,
-        reason_code=attribution.reason_code,
-        candidate_kind=candidate_kind,
-        missing_fields=missing_fields,
-        malformed_fields=malformed_fields,
-        downstream=downstream,
     )
 
     legal_modules = tuple(dict.fromkeys(str(value) for value in allowed_modules))
@@ -1034,6 +1624,24 @@ def build_failure_episode(
         legal_output_fields=legal_output_fields,
         legal_observables=legal_observables,
     )
+    repair_frontier, rejected_frontier_fields = _compile_repair_frontier(
+        layer=layer,
+        artifact=artifact,
+        reason_code=attribution.reason_code,
+        evidence=evidence,
+        detection_result=detection_result,
+        downstream=downstream,
+        legal_modules=legal_modules,
+        evolution_direction=evolution_direction,
+    )
+    edge = repair_frontier[0] if repair_frontier else None
+    if layer == LAYER_L1 and not repair_frontier:
+        if rejected_frontier_fields:
+            raise UnaddressableFailure(
+                "failure_edge_outside_action_vocabulary:"
+                + ",".join(rejected_frontier_fields)
+            )
+        raise UnaddressableFailure("repair_frontier_empty")
 
     detection_snapshot = {
         "state": str(getattr(signal, "state", "") or detection_result.get("state") or ""),
@@ -1084,6 +1692,7 @@ def build_failure_episode(
         failure_edge=edge,
         evidence_refs=evidence_refs,
         completeness=completeness,
+        repair_frontier=repair_frontier,
     )
 
     identity_payload = {
@@ -1145,10 +1754,9 @@ def project_failure_episode_for_prompt(
             "coverage_state": slice_payload.coverage_state,
             "court_effect": slice_payload.court_effect,
         },
-        "failure_edge": (
-            slice_payload.failure_edge.to_dict()
-            if slice_payload.failure_edge is not None else None
-        ),
+        "repair_frontier": [
+            edge.to_dict() for edge in slice_payload.repair_frontier
+        ],
         "evidence_refs": list(slice_payload.evidence_refs),
         "completeness": slice_payload.completeness,
         "action_envelope": episode.action_envelope.to_dict(),
@@ -1180,6 +1788,16 @@ def validate_failure_episode(
         return False, "missing_fields_not_normalized"
     if list(slice_payload.malformed_fields) != sorted(set(slice_payload.malformed_fields)):
         return False, "malformed_fields_not_normalized"
+    frontier_ids = [edge.edge_id for edge in slice_payload.repair_frontier]
+    if len(frontier_ids) != len(set(frontier_ids)):
+        return False, "repair_frontier_duplicate_edges"
+    if (
+        slice_payload.failure_edge is not None
+        and slice_payload.repair_frontier
+        and slice_payload.failure_edge.edge_id
+        != slice_payload.repair_frontier[0].edge_id
+    ):
+        return False, "failure_edge_not_frontier_primary"
     identity_payload = {
         "schema_version": episode.schema_version,
         "record_key": episode.record_key,

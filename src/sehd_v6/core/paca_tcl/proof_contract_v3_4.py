@@ -21,6 +21,11 @@ from collections import Counter
 from typing import Any
 
 from . import contract_v1 as v1
+from .audit_contract import (
+    DEFENSE_CHECK_FIELDS,
+    DEFENSE_RELATIONAL_INVARIANTS,
+    project_audit_failures,
+)
 
 
 COVERAGE_STATES = v1.COVERAGE_STATES
@@ -279,7 +284,19 @@ def validate_defense_certificate(
         "rationale": bool(str(row.get("rationale") or "").strip()),
     }
     failed = sorted(name for name, passed in checks.items() if not passed)
-    return {"decision": "pass" if not failed else "quarantine", "failed_checks": failed, "checks": checks}
+    repair_projection = project_audit_failures(
+        row=row,
+        failed_checks=failed,
+        required_fields=DEFENSE_FIELDS,
+        check_fields=DEFENSE_CHECK_FIELDS,
+        relational_invariants=DEFENSE_RELATIONAL_INVARIANTS,
+    )
+    return {
+        "decision": "pass" if not failed else "quarantine",
+        "failed_checks": failed,
+        **repair_projection,
+        "checks": checks,
+    }
 
 
 # ============================================================

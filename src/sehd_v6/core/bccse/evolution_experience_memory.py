@@ -32,6 +32,7 @@ from .failure_episode import (
     HistoricalEpisodeReference,
     build_mechanism_signature,
 )
+from .genome import validate_runtime_rule
 from ..htc_tes.type_aware_fitness import TypeExperienceMemory
 
 SCHEMA_VERSION = "sehd.evolution_experience_memory.v2"
@@ -61,6 +62,8 @@ NO_EFFECT_REASONS = frozenset({
     "provider_did_not_apply_action",
     "output_changed_then_removed_or_quarantined",
     "provider_output_changed_but_downstream_invariant",
+    "route_not_reached",
+    "candidate_not_injected",
     "unresolved_no_effect",
 })
 
@@ -136,6 +139,28 @@ def _tolerant_int(value: Any) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _validated_rule_condition(representative: "Representative") -> str:
+    """Recover the reusable discriminator from an admitted historical rule.
+
+    Structural rejects are deliberately excluded: their text has not crossed
+    the runtime rule contract and must not become prompt memory.  Valid rules
+    are reduced to the bounded condition clause; action semantics stay in the
+    typed ActionSpec beside it.
+    """
+    outcome = representative.outcome or {}
+    if str(outcome.get("structural_result") or "") != "accepted":
+        return ""
+    action_spec = representative.action_spec or {}
+    module_id = str(action_spec.get("module_id") or "")
+    rule_text = " ".join(str(representative.rule_text or "").split())
+    valid, _reason = validate_runtime_rule(rule_text, module_id)
+    if not valid or not rule_text.lower().startswith(("when ", "if ")):
+        return ""
+    head = rule_text.split(",", 1)[0]
+    condition = head.split(" ", 1)[1] if " " in head else ""
+    return condition.strip()[:320]
 
 
 @dataclass
@@ -380,6 +405,7 @@ class EvolutionExperienceMemory:
                     set(history_fields).difference(current_fields)
                 ),
             },
+            rule_condition=_validated_rule_condition(representative),
             action_spec=(
                 dict(representative.action_spec)
                 if representative.action_spec else None

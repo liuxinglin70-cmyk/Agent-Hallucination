@@ -24,6 +24,11 @@ from ..bccse.genome import (
     create_baseline_genome,
 )
 from ..bccse.action_spec import MODULE_ROUTE_IDS, sanitize_action_spec
+from ..bccse.condition_spec import (
+    evaluate_condition_spec,
+    project_route_condition_features,
+    sanitize_condition_spec,
+)
 
 
 _PATCH_LOCK = threading.RLock()
@@ -114,8 +119,10 @@ class CompiledPacaSkill:
     module_texts: Mapping[str, str]
     delta_rule_ids: Mapping[str, tuple[tuple[str, str], ...]]
     action_specs: Mapping[str, Mapping[str, Any]]
+    rule_conditions: Mapping[str, str]
+    condition_specs: Mapping[str, Mapping[str, Any]]
     frozen_crs_weights: tuple[float, ...] = (0.35, 0.15, 0.20, 0.20, 0.10)
-    schema_version: str = "agenthallu.paca_tcl_skill_integration.v5"
+    schema_version: str = "agenthallu.paca_tcl_skill_integration.v6"
 
     def rule_trace(self) -> dict[str, list[dict[str, str]]]:
         """Return the stable rule-level execution trace for audit.
@@ -150,6 +157,11 @@ class CompiledPacaSkill:
                 rule_id: dict(spec)
                 for rule_id, spec in self.action_specs.items()
             },
+            "rule_conditions": dict(self.rule_conditions),
+            "condition_specs": {
+                rule_id: dict(spec)
+                for rule_id, spec in self.condition_specs.items()
+            },
             "stages": {
                 stage.value: compiled.to_dict()
                 for stage, compiled in self.stages.items()
@@ -180,12 +192,12 @@ def _compile_module_delta(
     if not module.active:
         return []
     unmatched_baseline = list(baseline_module.rules)
-    delta_rules: list[str] = []
-    for rule in module.rules:
+    delta_rules: list[tuple[int, str]] = []
+    for index, rule in enumerate(module.rules):
         if rule in unmatched_baseline:
             unmatched_baseline.remove(rule)
         else:
-            delta_rules.append(rule)
+            delta_rules.append((index, rule))
     if not delta_rules:
         return []
     display_name = MODULE_DISPLAY_NAMES_LOCAL.get(
@@ -193,12 +205,48 @@ def _compile_module_delta(
         module.module_id,
     )
     return [
-        f"【{display_name}】[{_rule_stable_id(module.module_id, rule)}] {rule}"
-        for rule in delta_rules
+        f"【{display_name}】["
+        f"{_rule_stable_id(module.module_id, rule, condition=_rule_condition(module, index, rule), condition_spec=_rule_condition_spec(module, index))}] "
+        f"{rule}"
+        for index, rule in delta_rules
     ]
 
 
-def _rule_stable_id(module_id: str, rule: str) -> str:
+def _condition_from_rendered_rule(rule: str) -> str:
+    """Compatibility parser for baseline or pre-slot rules only."""
+    text = " ".join(str(rule).split())
+    lowered = text.lower()
+    if lowered.startswith("when "):
+        head, _, _tail = text.partition(",")
+        return head[len("when "):].strip()
+    return text
+
+
+def _rule_condition(module: SkillModule, index: int, rule: str) -> str:
+    """Return the typed condition; do not reverse-parse evolved prose."""
+    meta = module.get_rule_meta(index)
+    slots = meta.get("rule_slots") if isinstance(meta, Mapping) else None
+    if isinstance(slots, Mapping):
+        condition = " ".join(str(slots.get("condition") or "").split())
+        if condition:
+            return condition
+    return _condition_from_rendered_rule(rule)
+
+
+def _rule_condition_spec(module: SkillModule, index: int) -> dict[str, Any]:
+    """Return the framework-executable applicability predicate, if typed."""
+    return sanitize_condition_spec(
+        module.get_rule_meta(index).get("condition_spec")
+    )
+
+
+def _rule_stable_id(
+    module_id: str,
+    rule: str,
+    *,
+    condition: str | None = None,
+    condition_spec: Mapping[str, Any] | None = None,
+) -> str:
     """Stable rule id from module + normalized condition clause.
 
     A wording-level retry that keeps the same condition but rewrites the
@@ -207,14 +255,23 @@ def _rule_stable_id(module_id: str, rule: str) -> str:
     logical rule. Changing the condition (a real semantic change) yields a
     new id.
     """
-    text = " ".join(str(rule).split())
-    condition = text
-    lowered = text.lower()
-    if lowered.startswith("when "):
-        head, _, _tail = text.partition(",")
-        condition = head[len("when "):].strip()
-    normalized = " ".join(condition.lower().split())
-    return _stable_hash(f"{module_id}|{normalized}")[:12]
+    exact_condition = (
+        " ".join(str(condition).split())
+        if condition is not None else _condition_from_rendered_rule(rule)
+    )
+    typed = sanitize_condition_spec(condition_spec)
+    identity = (
+        {
+            "module_id": module_id,
+            "condition_spec": typed,
+            "condition": " ".join(exact_condition.lower().split()),
+        }
+        if typed else {
+            "module_id": module_id,
+            "legacy_condition": " ".join(exact_condition.lower().split()),
+        }
+    )
+    return _stable_hash(identity)[:12]
 
 
 def _delta_rule_ids(
@@ -231,12 +288,20 @@ def _delta_rule_ids(
         return ()
     unmatched_baseline = list(baseline_module.rules)
     delta: list[tuple[str, str]] = []
-    for rule in module.rules:
+    for index, rule in enumerate(module.rules):
         if rule in unmatched_baseline:
             unmatched_baseline.remove(rule)
         else:
             delta.append(
-                (_rule_stable_id(module.module_id, rule), rule)
+                (
+                    _rule_stable_id(
+                        module.module_id,
+                        rule,
+                        condition=_rule_condition(module, index, rule),
+                        condition_spec=_rule_condition_spec(module, index),
+                    ),
+                    rule,
+                )
             )
     return tuple(delta)
 
@@ -256,7 +321,57 @@ def _delta_action_specs(
             continue
         value = sanitize_action_spec(module.get_rule_meta(index).get("action_spec"))
         if value:
-            specs[_rule_stable_id(module.module_id, rule)] = value
+            specs[_rule_stable_id(
+                module.module_id,
+                rule,
+                condition=_rule_condition(module, index, rule),
+                condition_spec=_rule_condition_spec(module, index),
+            )] = value
+    return specs
+
+
+def _delta_rule_conditions(
+    module: SkillModule,
+    baseline_module: SkillModule,
+) -> dict[str, str]:
+    """Return authoritative conditions for evolved rules by stable id."""
+    if not module.active:
+        return {}
+    unmatched_baseline = list(baseline_module.rules)
+    conditions: dict[str, str] = {}
+    for index, rule in enumerate(module.rules):
+        if rule in unmatched_baseline:
+            unmatched_baseline.remove(rule)
+            continue
+        condition = _rule_condition(module, index, rule)
+        conditions[_rule_stable_id(
+            module.module_id, rule, condition=condition,
+            condition_spec=_rule_condition_spec(module, index),
+        )] = condition
+    return conditions
+
+
+def _delta_condition_specs(
+    module: SkillModule,
+    baseline_module: SkillModule,
+) -> dict[str, dict[str, Any]]:
+    """Return typed pre-call applicability predicates by stable rule id."""
+    if not module.active:
+        return {}
+    unmatched_baseline = list(baseline_module.rules)
+    specs: dict[str, dict[str, Any]] = {}
+    for index, rule in enumerate(module.rules):
+        if rule in unmatched_baseline:
+            unmatched_baseline.remove(rule)
+            continue
+        condition_spec = _rule_condition_spec(module, index)
+        if condition_spec:
+            specs[_rule_stable_id(
+                module.module_id,
+                rule,
+                condition=_rule_condition(module, index, rule),
+                condition_spec=condition_spec,
+            )] = condition_spec
     return specs
 
 
@@ -277,6 +392,8 @@ def compile_genome_for_paca(
     module_texts: dict[str, str] = {}
     delta_rule_ids: dict[str, tuple[tuple[str, str], ...]] = {}
     action_specs: dict[str, dict[str, Any]] = {}
+    rule_conditions: dict[str, str] = {}
+    condition_specs: dict[str, dict[str, Any]] = {}
     for module_id in MODULE_IDS:
         delta_lines = _compile_module_delta(
             genome.modules[module_id],
@@ -288,6 +405,12 @@ def compile_genome_for_paca(
             baseline.modules[module_id],
         )
         action_specs.update(_delta_action_specs(
+            genome.modules[module_id], baseline.modules[module_id],
+        ))
+        rule_conditions.update(_delta_rule_conditions(
+            genome.modules[module_id], baseline.modules[module_id],
+        ))
+        condition_specs.update(_delta_condition_specs(
             genome.modules[module_id], baseline.modules[module_id],
         ))
 
@@ -318,11 +441,13 @@ def compile_genome_for_paca(
             content_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
         )
     return CompiledPacaSkill(
-        genome_hash=genome.content_hash,
+        genome_hash=genome.execution_hash,
         stages=stages,
         module_texts=module_texts,
         delta_rule_ids=delta_rule_ids,
         action_specs=action_specs,
+        rule_conditions=rule_conditions,
+        condition_specs=condition_specs,
     )
 
 
@@ -358,7 +483,24 @@ def make_skill_aware_provider(
     compiled: CompiledPacaSkill,
     config: Mapping[str, Any],
 ) -> ProviderCall:
-    """Wrap a PACA provider call and append the correct stage fragment."""
+    """Wrap a PACA provider call and append the correct stage fragment.
+
+    Execution boundary (Fix #6): ActionSpec is a *prompt-steering* contract,
+    not a framework executor. The framework dispatches the rule (injects it
+    into the provider system prompt) and collects the provider's self-reported
+    compliance (``rule_effects``), but the provider generates the semantic
+    content. The framework never fabricates evidence, certificates, or facts.
+
+    Four independently-observable events are distinguished downstream in
+    ``_attribute_intervention_fitness``:
+      1. action_dispatched  — rule was injected into the provider prompt
+      2. provider_complied  — provider self-reported applying the rule
+      3. target_edge_changed — deterministic baseline->replay postcondition met
+      4. terminal_changed   — aggregate terminal state moved
+    Only (3) grants causal credit; (4) is telemetry (replay is stochastic);
+    (2) is advisory (the provider is not an independent witness); (1) is
+    necessary but not sufficient.
+    """
 
     bindings = route_binding_map(config)
 
@@ -373,24 +515,32 @@ def make_skill_aware_provider(
         if binding is None:
             raise ValueError("unregistered provider route cannot receive an evolved skill")
         route_key, stage, module_ids = binding
-        injected_modules = tuple(
+        candidate_modules = tuple(
             module_id
             for module_id in module_ids
             if compiled.module_texts.get(module_id)
         )
+        route_features = project_route_condition_features(route_key, user)
+        candidate_rule_ids: list[str] = []
         injected_rule_ids: list[str] = []
-        for module_id in injected_modules:
-            injected_rule_ids.extend(
-                rule_id for rule_id, _rule in compiled.delta_rule_ids.get(module_id, ())
-            )
+        condition_matched_rule_ids: list[str] = []
+        condition_not_matched_rule_ids: list[str] = []
+        legacy_untyped_rule_ids: list[str] = []
+        condition_evaluations: list[dict[str, Any]] = []
+        suppressed_rule_ids: list[str] = []
+        injected_module_ids: list[str] = []
         lines: list[str] = []
-        if injected_modules:
+        if candidate_modules:
             lines.extend([
                 "## 进化规则（仅适用于当前 provider 的输出职责）",
                 "",
             ])
-            for module_id in injected_modules:
+            for module_id in candidate_modules:
                 for rule_id, rule in compiled.delta_rule_ids.get(module_id, ()):
+                    action_spec = compiled.action_specs.get(rule_id)
+                    if action_spec and route_key not in action_spec.get("route_ids", ()):
+                        continue
+                    candidate_rule_ids.append(rule_id)
                     rule_text = str(rule or "")
                     # Runtime injection guard: an evolved rule is instruction
                     # text placed inside a provider system prompt. Suppress
@@ -411,15 +561,34 @@ def make_skill_aware_provider(
                             "do not follow",
                         )
                     ):
+                        suppressed_rule_ids.append(rule_id)
                         continue
-                    action_spec = compiled.action_specs.get(rule_id)
+                    typed_condition = compiled.condition_specs.get(rule_id)
+                    if typed_condition:
+                        evaluation = evaluate_condition_spec(
+                            typed_condition, route_features,
+                        )
+                        condition_evaluations.append({
+                            "rule_id": rule_id,
+                            **evaluation.to_dict(),
+                        })
+                        if not evaluation.matched:
+                            condition_not_matched_rule_ids.append(rule_id)
+                            continue
+                        condition_matched_rule_ids.append(rule_id)
+                    else:
+                        legacy_untyped_rule_ids.append(rule_id)
+                    injected_rule_ids.append(rule_id)
+                    if module_id not in injected_module_ids:
+                        injected_module_ids.append(module_id)
                     if action_spec and route_key in action_spec.get("route_ids", ()):
-                        condition = rule_text
-                        if rule_text.lower().startswith("when "):
-                            condition = rule_text[5:].partition(",")[0].strip()
+                        condition = compiled.rule_conditions.get(rule_id)
+                        if not condition:
+                            condition = _condition_from_rendered_rule(rule_text)
                         lines.append(json.dumps({
                             "rule_id": rule_id,
                             "condition": condition,
+                            "condition_spec": dict(typed_condition or {}),
                             "action_spec": dict(action_spec),
                         }, ensure_ascii=False, sort_keys=True))
                     else:
@@ -442,6 +611,9 @@ def make_skill_aware_provider(
                 "返回空数组。实际影响输出的每条规则必须记录准确的规则 id 和发生变化的"
                 "JSON 字段，不得报告未影响输出的规则。",
             ])
+        injected_modules = tuple(injected_module_ids)
+        if not injected_rule_ids:
+            lines = []
         fragment_text = "\n".join(lines)
         fragment_hash = hashlib.sha256(fragment_text.encode("utf-8")).hexdigest()
         augmented_system = (
@@ -454,6 +626,9 @@ def make_skill_aware_provider(
             cache_dir=cache_dir,
         )
         rule_effects: list[dict[str, Any]] = []
+        applied_rule_ids: list[str] = []
+        rejected_self_report_rule_ids: list[str] = []
+        injected_rule_id_set = set(injected_rule_ids)
         if isinstance(value, Mapping):
             raw_effects = value.get("rule_effects")
             if isinstance(raw_effects, list):
@@ -462,6 +637,9 @@ def make_skill_aware_provider(
                         continue
                     rule_id = str(effect.get("rule_id") or "").strip()
                     if not rule_id:
+                        continue
+                    if rule_id not in injected_rule_id_set:
+                        rejected_self_report_rule_ids.append(rule_id)
                         continue
                     fields = effect.get("output_fields")
                     field_list = (
@@ -478,10 +656,17 @@ def make_skill_aware_provider(
                 # contract.
                 raw_applied = value.get("applied_rule_ids")
                 if isinstance(raw_applied, list):
-                    rule_effects = [
-                        {"rule_id": str(item), "output_fields": []}
-                        for item in raw_applied if str(item).strip()
-                    ]
+                    for item in raw_applied:
+                        rule_id = str(item).strip()
+                        if not rule_id:
+                            continue
+                        if rule_id not in injected_rule_id_set:
+                            rejected_self_report_rule_ids.append(rule_id)
+                            continue
+                        rule_effects.append({
+                            "rule_id": rule_id,
+                            "output_fields": [],
+                        })
             applied_rule_ids = list(dict.fromkeys(
                 str(effect["rule_id"]) for effect in rule_effects
             ))
@@ -496,9 +681,25 @@ def make_skill_aware_provider(
             "bccse_stage": stage.value,
             "bccse_route": route_key,
             "bccse_injected_modules": list(injected_modules),
+            "bccse_candidate_rule_ids": list(dict.fromkeys(candidate_rule_ids)),
+            "bccse_condition_matched_rule_ids": list(dict.fromkeys(
+                condition_matched_rule_ids
+            )),
+            "bccse_condition_not_matched_rule_ids": list(dict.fromkeys(
+                condition_not_matched_rule_ids
+            )),
+            "bccse_legacy_untyped_rule_ids": list(dict.fromkeys(
+                legacy_untyped_rule_ids
+            )),
+            "bccse_condition_evaluations": condition_evaluations,
+            "bccse_condition_features": route_features,
+            "bccse_suppressed_rule_ids": list(dict.fromkeys(suppressed_rule_ids)),
             "bccse_injected_rule_ids": injected_rule_ids,
             "bccse_applied_rule_ids": applied_rule_ids,
             "bccse_rule_effects": rule_effects,
+            "bccse_rejected_self_report_rule_ids": list(dict.fromkeys(
+                rejected_self_report_rule_ids
+            )),
             "bccse_stage_skill_hash": fragment_hash,
             "bccse_route_skill_hash": fragment_hash,
         }

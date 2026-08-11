@@ -155,24 +155,31 @@ def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
 def resolve_evolution_state(row: Mapping[str, Any]) -> str:
     """Resolve the terminal state consumed by the evolution loop.
 
-    The occurrence ledger is an append-only factual record and intentionally
-    remains unchanged when an L2 policy alters the court's terminal edge.  A
-    policy-aware result therefore needs its terminal ``state`` rather than
-    the occurrence-first state used by external occurrence metrics.
+    The evolution loop must read the COURT'S terminal verdict, not the
+    occurrence ledger.  The occurrence ledger is an append-only factual
+    record ("an incident factually occurred") that intentionally remains
+    unchanged when an L2 policy alters the court's terminal edge, and it
+    can also disagree with the terminal verdict on a plain detection (a
+    court that abstains can still have an occurrence ledger that records
+    the factual error).  Evolution credits gold polarity, triggers and
+    fitness against the terminal edge — e.g. ``unresolved`` with gold=error
+    is an unresolved-FN that must trigger evolution — so a policy-aware
+    result AND every plain detection need the terminal ``state``, never
+    the occurrence-first projection used by external occurrence metrics.
     """
     if decision_authority_invalid(row):
         return "unresolved"
     proof = row.get("proof_adjudication")
     proof = proof if isinstance(proof, Mapping) else {}
-    policy_evaluation = proof.get("policy_evaluation")
-    if isinstance(policy_evaluation, Mapping):
-        for value in (row.get("state"), proof.get("state")):
-            if value in (None, ""):
-                continue
-            normalized = str(value)
-            if normalized not in VALID_DETECTION_STATES:
-                raise ValueError(f"Invalid evolution terminal state: {value!r}")
-            return normalized
+    for value in (row.get("state"), proof.get("state")):
+        if value in (None, ""):
+            continue
+        normalized = str(value)
+        if normalized not in VALID_DETECTION_STATES:
+            raise ValueError(f"Invalid evolution terminal state: {value!r}")
+        return normalized
+    # Terminal fields absent (historical/partial payloads): fall back to the
+    # occurrence-first projection, which is at least a decisive reading.
     return resolve_authoritative_state(row)
 
 

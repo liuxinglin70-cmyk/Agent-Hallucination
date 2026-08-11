@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Sequence
 
+from .certificate_identity import certificate_carrier_movement
 from .module_charter import (
     MODULE_ACTION_OPCODES,
     MODULE_OPERATION_TARGETS,
@@ -68,13 +69,29 @@ _OPERATION_POSTCONDITION: Mapping[str, str] = {
     "emit_origin_census": "object_present",
     "require_evidence_field": "field_nonempty",
     "populate_evidence_field": "field_nonempty",
+    "enforce_certificate_invariant": "certificate_invariant_repaired",
     "emit_error_certificate": "object_present",
     "keep_coverage_incomplete": "coverage_not_complete",
     "route_candidate_to_verifier": "route_assignment_present",
     "qualify_candidate": "qualification_positive",
     "hold_candidate_qualification": "qualification_not_positive",
     "verify_violation": "verification_state_present",
-    "withhold_certificate": "error_certificate_absent",
+    # First-principles fix B: ``withhold_certificate`` semantics are
+    # fingerprint-targeted (the rule removes ONE certificate matching its
+    # condition), not whole-surface (all surviving certificates gone).
+    # The old ``error_certificate_absent`` postcondition required
+    # ``len(surviving_error_certificate_ids) == 0`` which is unreachable
+    # whenever multiple certificates carry the verdict and the rule only
+    # withholds one — the verifier faithfully withheld its targeted
+    # certificate yet the postcondition still reported
+    # ``error_certificate_survived`` and the runner demoted the edit to
+    # ``intervention_not_executed`` even though the proof court's
+    # surviving set shrank (reproduced in probe_fp_run1).
+    # ``targeted_certificate_withheld`` evaluates the rule's actual effect
+    # against any prior surviving id set the postcondition caller can
+    # supply (verifier replay vs the source baseline), and otherwise falls
+    # back to the strict whole-surface check for single-carrier cases.
+    "withhold_certificate": "targeted_certificate_withheld",
     "emit_certificate": "object_present",
     "emit_defense_certificate": "object_present",
     "emit_boundary_finding": "field_present",
@@ -100,7 +117,12 @@ _OPERATION_EFFECT: Mapping[str, tuple[str, str]] = {
     "suppress_candidate": ("candidate_count", "decrease"),
     "keep_coverage_incomplete": ("prosecution_coverage", "opened"),
     "hold_candidate_qualification": ("prosecution_certificates", "decrease"),
-    "withhold_certificate": ("prosecution_certificates", "decrease"),
+    # Claim-level carrier movement, not the whole-surface count: a withhold
+    # removes ONE surviving claim, and positional certificate ids are
+    # re-minted on every provider re-sampling, so only the content
+    # fingerprint surviving set measures the rule's actual effect
+    # (certificate_identity.py).
+    "withhold_certificate": ("surviving_certificates", "decrease"),
     "reject_non_causal_origin": ("responsible_step", "removed"),
     "suppress_later_origin": ("responsible_step", "shift"),
 }
@@ -109,6 +131,18 @@ _MODULE_OPERATION_EFFECT: Mapping[tuple[str, str], tuple[str, str]] = {
     (
         "atomic_verifier_instruction", "require_evidence_field",
     ): ("causal_field_coverage", "increase"),
+    # An emitted error certificate is observable as a NEW claim-level
+    # carrier in the surviving set (same fingerprint identity as
+    # withhold_certificate), not as a whole-surface count shift.
+    (
+        "atomic_verifier_instruction", "emit_certificate",
+    ): ("surviving_certificates", "increase"),
+    (
+        "atomic_verifier_instruction", "enforce_certificate_invariant",
+    ): ("target_certificate_invariant_failure", "decrease"),
+    (
+        "clean_defense_boundary", "enforce_certificate_invariant",
+    ): ("target_certificate_invariant_failure", "decrease"),
 }
 
 # Operations whose runtime effect can move an over-conviction toward clean.
@@ -119,7 +153,7 @@ ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
     "atomic_verifier_instruction": frozenset({"withhold_certificate"}),
     "clean_defense_boundary": frozenset({
         "emit_defense_certificate", "emit_boundary_finding",
-        "require_evidence_field",
+        "require_evidence_field", "enforce_certificate_invariant",
     }),
     "abstention_rule": frozenset({"emit_boundary_finding"}),
     "causal_link_test": frozenset({"reject_non_causal_origin"}),
@@ -138,6 +172,7 @@ CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
     }),
     "atomic_verifier_instruction": frozenset({
         "verify_violation", "emit_certificate", "require_evidence_field",
+        "enforce_certificate_invariant",
     }),
     "causal_link_test": frozenset({"test_causal_link", "populate_impact_chain"}),
     "earliest_origin_tiebreak": frozenset({"select_earliest_origin"}),
@@ -309,6 +344,7 @@ _POSTCONDITION_CHECKS = frozenset({
     "field_nonempty",
     "coverage_not_complete",
     "error_certificate_absent",
+    "targeted_certificate_withheld",
     "causal_status_present",
     "origin_not_selected",
     "responsible_origin_present",
@@ -317,6 +353,7 @@ _POSTCONDITION_CHECKS = frozenset({
     "qualification_positive",
     "qualification_not_positive",
     "verification_state_present",
+    "certificate_invariant_repaired",
 })
 
 # output_object -> result surface row access.  ``verification_certificate``
@@ -374,6 +411,21 @@ def _surface_rows(
     return []
 
 
+def _surface_projection(
+    result: Mapping[str, Any],
+    output_object: str,
+    fields: Sequence[str],
+) -> tuple[tuple[str, ...], ...] | None:
+    """Project an observable surface into a stable before/after signature."""
+    rows = _surface_rows(result, output_object)
+    if rows is None:
+        return None
+    return tuple(sorted(
+        tuple(str(row.get(field) or "") for field in fields)
+        for row in rows
+    ))
+
+
 def _field_obligation_met(
     spec: ActionSpec, result: Mapping[str, Any],
 ) -> tuple[bool, str]:
@@ -389,16 +441,82 @@ def _field_obligation_met(
     return False, "field_obligation_absent"
 
 
+def _field_obligation_count(
+    spec: ActionSpec, result: Mapping[str, Any],
+) -> int | None:
+    rows = _surface_rows(result, spec.output_object)
+    if rows is None:
+        return None
+    if not spec.output_field:
+        return None
+    return sum(
+        1
+        for row in rows
+        if row.get(spec.output_field) not in (None, "", [], {})
+    )
+
+
+def _failed_invariant_count(
+    result: Mapping[str, Any], module_id: str, invariant: str,
+) -> int | None:
+    """Count proof-court audits that fail one named certificate invariant.
+
+    The proof court owns validation truth.  Reflection therefore measures an
+    invariant repair against court audits instead of pretending the invariant
+    is a provider JSON field.
+    """
+    proof = result.get("proof_adjudication")
+    if not isinstance(proof, Mapping):
+        return None
+    audit_key = (
+        "defense_audits"
+        if module_id == "clean_defense_boundary" else "error_audits"
+    )
+    audits = proof.get(audit_key)
+    if not isinstance(audits, list):
+        return None
+    return sum(
+        1
+        for audit in audits
+        if isinstance(audit, Mapping)
+        and invariant in {
+            str(item) for item in audit.get("failed_checks") or ()
+        }
+    )
+
+
 def evaluate_action_spec_postcondition(
     spec: ActionSpec,
     result: Mapping[str, Any],
+    *,
+    baseline_surviving_ids: Sequence[str] | None = None,
+    baseline_result: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str]:
     """Deterministically verify the spec's output obligation on a result.
 
     This is the D1 execution evidence: provider self-report (rule_effects)
     stays advisory telemetry, while a rule's declared postcondition is
     checked against the actual replay result.  Fail-closed — an obligation
-    the result cannot expose is reported unsatisfied, never assumed met.
+    that the result cannot expose is reported unsatisfied, never assumed met.
+
+    ``baseline_result`` carries the full source-baseline detection result
+    (BEFORE the candidate genome ran).  The ``withhold_certificate``
+    postcondition then compares CLAIM-LEVEL carrier fingerprints
+    (``certificate_identity.certificate_carrier_movement``): the rule
+    executed iff at least one baseline carrier claim is no longer surviving
+    in the replay.  Positional certificate ids are re-minted on every
+    provider re-sampling (appeal_error_* <-> initial_error_*), so an id-set
+    comparison reads a pure rename as a removal; the fingerprint comparison
+    is rename-invariant.
+
+    ``baseline_surviving_ids`` is the legacy fallback: only the baseline id
+    list, without the rows needed to resolve claim identity.  The
+    comparison then degrades to the id-set form, which cannot separate a
+    rename from a withhold and is retained only for callers that have no
+    baseline result.  When no baseline at all is available, the
+    postcondition falls back to the strict whole-surface form (zero
+    surviving certificates — the only honest verdict-level claim a
+    single-carrier ``withhold_certificate`` can make without a delta).
     """
     result = result if isinstance(result, Mapping) else {}
     postcondition = spec.postcondition
@@ -409,25 +527,81 @@ def evaluate_action_spec_postcondition(
         rows = _surface_rows(result, spec.output_object)
         if rows is None:
             return False, f"unobservable_in_result:{spec.output_object}"
-        present = bool(rows)
-        # The detail reports what was OBSERVED, so a failed obligation
-        # carries the reason the check failed.
-        satisfied = present if postcondition == "object_present" else not present
-        return satisfied, ("object_present" if present else "object_absent")
+        if baseline_result is None:
+            return False, "baseline_result_required_for_object_transition"
+        before_rows = _surface_rows(baseline_result, spec.output_object)
+        if before_rows is None:
+            return False, f"baseline_unobservable:{spec.output_object}"
+        before_count, after_count = len(before_rows), len(rows)
+        if postcondition == "object_present":
+            satisfied = after_count > before_count
+            return satisfied, (
+                f"object_added:{before_count}->{after_count}"
+                if satisfied else f"object_not_added:{before_count}->{after_count}"
+            )
+        satisfied = after_count < before_count
+        return satisfied, (
+            f"object_removed:{before_count}->{after_count}"
+            if satisfied else f"object_not_removed:{before_count}->{after_count}"
+        )
 
     if postcondition in ("field_present", "field_nonempty"):
         satisfied, detail = _field_obligation_met(spec, result)
-        return satisfied, detail
+        if not satisfied:
+            return False, detail
+        if baseline_result is None:
+            return False, "baseline_result_required_for_field_transition"
+        before_count = _field_obligation_count(spec, baseline_result)
+        after_count = _field_obligation_count(spec, result)
+        if before_count is None or after_count is None:
+            return False, "field_obligation_delta_unobservable"
+        if after_count <= before_count:
+            return False, (
+                f"field_obligation_not_added:{spec.output_field}:"
+                f"{before_count}->{after_count}"
+            )
+        return True, (
+            f"field_obligation_added:{spec.output_field}:"
+            f"{before_count}->{after_count}"
+        )
+
+    if postcondition == "certificate_invariant_repaired":
+        if baseline_result is None:
+            return False, "baseline_result_required_for_invariant_repair"
+        before = _failed_invariant_count(
+            baseline_result, spec.module_id, spec.output_field,
+        )
+        after = _failed_invariant_count(
+            result, spec.module_id, spec.output_field,
+        )
+        if before is None or after is None:
+            return False, "certificate_audits_unreported"
+        satisfied = before > after
+        return satisfied, (
+            f"certificate_invariant_repaired:{spec.output_field}:{before}->{after}"
+            if satisfied else
+            f"certificate_invariant_not_repaired:{spec.output_field}:{before}->{after}"
+        )
 
     if postcondition == "coverage_not_complete":
         proof = result.get("proof_adjudication") or {}
-        if not isinstance(proof, Mapping):
+        if not isinstance(proof, Mapping) or not proof:
             return False, "proof_adjudication_absent"
-        prosecution = str(proof.get("prosecution_coverage") or "")
-        defense = str(proof.get("defense_coverage") or "")
-        satisfied = not (prosecution == "complete" and defense == "complete")
+        if baseline_result is None:
+            return False, "baseline_result_required_for_coverage_transition"
+        baseline_proof = baseline_result.get("proof_adjudication") or {}
+        if not isinstance(baseline_proof, Mapping) or not baseline_proof:
+            return False, "baseline_proof_adjudication_absent"
+        before = str(baseline_proof.get("prosecution_coverage") or "")
+        after = str(proof.get("prosecution_coverage") or "")
+        # ``keep_coverage_incomplete`` is owned by the prosecution-side
+        # evidence module. Defense incompleteness is a foreign surface and
+        # cannot witness that this action executed.
+        satisfied = before == "complete" and after != "complete"
         return satisfied, (
-            "coverage_not_complete" if satisfied else "coverage_complete"
+            f"prosecution_coverage_opened:{before}->{after}"
+            if satisfied else
+            f"prosecution_coverage_not_opened:{before}->{after}"
         )
 
     if postcondition == "error_certificate_absent":
@@ -447,19 +621,110 @@ def evaluate_action_spec_postcondition(
         surviving = proof.get("surviving_error_certificate_ids")
         if not isinstance(surviving, list):
             return False, "surviving_certificates_unreported"
-        satisfied = len(surviving) == 0
+        if baseline_result is None:
+            return False, "baseline_result_required_for_certificate_removal"
+        baseline_proof = baseline_result.get("proof_adjudication")
+        baseline_surviving = (
+            baseline_proof.get("surviving_error_certificate_ids")
+            if isinstance(baseline_proof, Mapping) else None
+        )
+        if not isinstance(baseline_surviving, list):
+            return False, "baseline_surviving_certificates_unreported"
+        satisfied = bool(baseline_surviving) and len(surviving) == 0
         return satisfied, (
             "error_certificate_absent" if satisfied
             else "error_certificate_survived"
+        )
+
+    if postcondition == "targeted_certificate_withheld":
+        # ``withhold_certificate`` semantics are fingerprint-targeted — the
+        # rule removes ONE certificate matching its triggering condition.
+        # The strongest deterministic claim is before-vs-after on the
+        # court's surviving set.  With a full baseline result the comparison
+        # runs on claim-level fingerprints (rename-invariant); with only a
+        # baseline id list it degrades to the positional id-set form, which
+        # cannot separate a rename from a removal; with no baseline at all
+        # it degrades to the whole-surface form (zero surviving
+        # certificates), which is correct for single-carrier cases but
+        # unreachable for a single rule in a multi-carrier case — exactly
+        # why callers must thread the baseline through.
+        proof = result.get("proof_adjudication")
+        if not isinstance(proof, Mapping) or not proof:
+            return False, "proof_adjudication_absent"
+        surviving = proof.get("surviving_error_certificate_ids")
+        if not isinstance(surviving, list):
+            return False, "surviving_certificates_unreported"
+
+        if baseline_result is not None:
+            # Claim-level authority path.  A pure positional rename yields
+            # zero withheld fingerprints, so the postcondition fails closed
+            # exactly when the provider re-minted ids without removing any
+            # claim — the drift pattern the id-set form misread as success.
+            # An unresolvable carrier (row truncated from the merge surface)
+            # fails closed as well: an identity that cannot be verified is
+            # never credited as removed.
+            movement = certificate_carrier_movement(baseline_result, result)
+            if movement is None:
+                return False, "carrier_identity_unreported"
+            if not movement["resolved"]:
+                return False, "carrier_identity_unresolved"
+            withheld = movement["withheld"]
+            if withheld:
+                return True, (
+                    f"targeted_certificate_withheld:{len(withheld)}_claim(s)"
+                )
+            return False, "no_baseline_carrier_withheld"
+
+        surviving_set = {str(value) for value in surviving}
+        if baseline_surviving_ids is not None:
+            baseline_set = {str(value) for value in baseline_surviving_ids}
+            withheld = baseline_set - surviving_set
+            if withheld:
+                return True, (
+                    "targeted_certificate_withheld:"
+                    + ",".join(sorted(withheld)[:8])
+                )
+            if not baseline_set:
+                # No baseline carrier to begin with: the rule fires only if
+                # the replay verifier still emitted no certificates for the
+                # targeted fingerprint observable.  Fall back to the
+                # whole-surface check on the replay side.
+                satisfied = len(surviving_set) == 0
+                return satisfied, (
+                    "targeted_certificate_withheld"
+                    if satisfied else "rule_did_not_remove_any_carrier"
+                )
+            return False, (
+                "no_baseline_carrier_withheld:"
+                + ",".join(sorted(baseline_set & surviving_set)[:8])
+            )
+        # No baseline supplied: fall back to the strict whole-surface form.
+        satisfied = len(surviving_set) == 0
+        return satisfied, (
+            "targeted_certificate_withheld"
+            if satisfied else "error_certificate_survived"
         )
 
     if postcondition == "causal_status_present":
         rows = _surface_rows(result, spec.output_object)
         if rows is None:
             return False, f"unobservable_in_result:{spec.output_object}"
-        satisfied = bool(rows)
+        if baseline_result is None:
+            return False, "baseline_result_required_for_causal_transition"
+        fields = (
+            "candidate_id", "source_candidate_id", "origin_event_id",
+            "propagation_state", "benchmark_causal_status",
+            "causal_sufficiency_score", "is_root_cause",
+        )
+        before = _surface_projection(
+            baseline_result, spec.output_object, fields,
+        )
+        after = _surface_projection(result, spec.output_object, fields)
+        if before is None or after is None:
+            return False, "causal_surface_unobservable"
+        satisfied = bool(rows) and after != before
         return satisfied, (
-            "causal_findings_present" if satisfied else "no_causal_findings"
+            "causal_surface_changed" if satisfied else "causal_surface_unchanged"
         )
 
     if postcondition == "route_assignment_present":
@@ -468,7 +733,7 @@ def evaluate_action_spec_postcondition(
         rows = _surface_rows(result, spec.output_object)
         if rows is None:
             return False, f"unobservable_in_result:{spec.output_object}"
-        satisfied = any(
+        present = any(
             str(row.get("candidate_id") or "")
             and any(
                 str(row.get(field) or "")
@@ -476,8 +741,18 @@ def evaluate_action_spec_postcondition(
             )
             for row in rows
         )
+        if baseline_result is None:
+            return False, "baseline_result_required_for_route_transition"
+        fields = (
+            "candidate_id", "violation_state", "actor_state", "boundary_state",
+        )
+        before = _surface_projection(
+            baseline_result, spec.output_object, fields,
+        )
+        after = _surface_projection(result, spec.output_object, fields)
+        satisfied = present and before is not None and after != before
         return satisfied, (
-            "route_assignment_present" if satisfied else "route_assignment_absent"
+            "route_assignment_changed" if satisfied else "route_assignment_unchanged"
         )
 
     if postcondition in ("qualification_positive", "qualification_not_positive"):
@@ -490,7 +765,20 @@ def evaluate_action_spec_postcondition(
             str(row.get("violation_state") or "") == "verified_violation"
             for row in rows
         )
-        satisfied = positive if postcondition == "qualification_positive" else not positive
+        if baseline_result is None:
+            return False, "baseline_result_required_for_qualification_transition"
+        before_rows = _surface_rows(baseline_result, spec.output_object)
+        if before_rows is None:
+            return False, "baseline_qualification_surface_unobservable"
+        before_positive = any(
+            str(row.get("violation_state") or "") == "verified_violation"
+            for row in before_rows
+        )
+        satisfied = (
+            (not before_positive and positive)
+            if postcondition == "qualification_positive"
+            else (before_positive and not positive)
+        )
         return satisfied, (
             "qualification_positive" if satisfied else "qualification_not_positive"
         )
@@ -502,7 +790,7 @@ def evaluate_action_spec_postcondition(
         rows = _surface_rows(result, spec.output_object)
         if rows is None:
             return False, f"unobservable_in_result:{spec.output_object}"
-        satisfied = any(
+        present = any(
             str(row.get("benchmark_causal_status") or "") in {
                 "causes_incorrect_result",
                 "propagates_to_incorrect_result",
@@ -511,6 +799,16 @@ def evaluate_action_spec_postcondition(
             }
             for row in rows
         )
+        if baseline_result is None:
+            return False, "baseline_result_required_for_verification_transition"
+        fields = (
+            "source_candidate_id", "origin_event_id", "benchmark_causal_status",
+        )
+        before = _surface_projection(
+            baseline_result, spec.output_object, fields,
+        )
+        after = _surface_projection(result, spec.output_object, fields)
+        satisfied = present and before is not None and after != before
         return satisfied, (
             "verification_state_present"
             if satisfied else "verification_state_absent"
@@ -518,7 +816,10 @@ def evaluate_action_spec_postcondition(
 
     if postcondition == "responsible_origin_present":
         responsible = result.get("responsible_event_id")
-        satisfied = bool(responsible)
+        if baseline_result is None:
+            return False, "baseline_result_required_for_origin_transition"
+        before = baseline_result.get("responsible_event_id")
+        satisfied = bool(responsible) and responsible != before
         return satisfied, (
             "responsible_origin_present"
             if satisfied else "responsible_origin_absent"
@@ -532,15 +833,14 @@ def evaluate_action_spec_postcondition(
         # spec cannot carry a concrete rejected id (its target is the
         # responsible_event_id FIELD), so the strongest deterministic claim
         # is the selection evidence.
-        rankings = result.get("counterfactual_rankings")
-        rankings_used = (
-            isinstance(rankings, Mapping) and len(rankings) > 0
-        )
-        responsible = bool(result.get("responsible_event_id"))
-        satisfied = rankings_used and responsible
+        if baseline_result is None:
+            return False, "baseline_result_required_for_origin_transition"
+        before = baseline_result.get("responsible_event_id")
+        after = result.get("responsible_event_id")
+        satisfied = bool(before) and after != before
         return satisfied, (
-            "origin_selection_evidence_present"
-            if satisfied else "origin_selection_evidence_absent"
+            f"responsible_origin_changed:{before}->{after}"
+            if satisfied else f"responsible_origin_unchanged:{before}->{after}"
         )
 
     return False, f"unmapped_postcondition:{postcondition}"
@@ -550,6 +850,9 @@ def classify_execution_evidence(
     spec: ActionSpec | None,
     result: Mapping[str, Any],
     observable_moved: bool,
+    *,
+    baseline_surviving_ids: Sequence[str] | None = None,
+    baseline_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Classify the execution evidence of one edit on one replay result.
 
@@ -574,7 +877,12 @@ def classify_execution_evidence(
             "postcondition_detail": "action_spec_absent",
             "observable_moved": bool(observable_moved),
         }
-    satisfied, detail = evaluate_action_spec_postcondition(spec, result)
+    satisfied, detail = evaluate_action_spec_postcondition(
+        spec,
+        result,
+        baseline_surviving_ids=baseline_surviving_ids,
+        baseline_result=baseline_result,
+    )
     execution_class = (
         "postcondition_satisfied"
         if satisfied

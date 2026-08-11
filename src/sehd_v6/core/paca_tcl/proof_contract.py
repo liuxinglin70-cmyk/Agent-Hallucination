@@ -620,6 +620,66 @@ def _resolve_terminal_state(
             if result.get("defense_type"):
                 all_defense_types.append(str(result["defense_type"]))
 
+    # Machine-readable terminal proof.  The adjudicator used to expose only
+    # aggregate counters, forcing BCCSE to guess a root cause from the first
+    # quarantined row.  These facts are derived from the exact predicates
+    # above and do not participate in the verdict; they make the already-made
+    # decision causally inspectable by reflection and diagnostics.
+    uncovered_candidates = sorted(
+        set(required).difference(clean_covered | auxiliary_candidates)
+    )
+    invalid_error_ids = sorted(
+        str(row.get("certificate_id") or "")
+        for row, audit in zip(p_rows, p_audits)
+        if audit["decision"] != "pass"
+    )
+    invalid_defense_ids = sorted(
+        str(row.get("certificate_id") or "")
+        for row, audit in zip(d_rows, d_audits)
+        if audit["decision"] != "pass"
+    )
+    blocking_facts: list[dict[str, Any]] = []
+    if state == "unresolved":
+        if p_coverage != "complete":
+            blocking_facts.append({
+                "predicate": "prosecution_coverage_complete",
+                "observed": p_coverage,
+                "required": "complete",
+            })
+        if d_coverage != "complete":
+            blocking_facts.append({
+                "predicate": "defense_coverage_complete",
+                "observed": d_coverage,
+                "required": "complete",
+            })
+        if invalid_error_ids:
+            blocking_facts.append({
+                "predicate": "error_certificates_valid",
+                "certificate_ids": invalid_error_ids,
+            })
+        if invalid_defense_ids:
+            blocking_facts.append({
+                "predicate": "defense_certificates_valid",
+                "certificate_ids": invalid_defense_ids,
+            })
+        if uncovered_candidates:
+            blocking_facts.append({
+                "predicate": "required_candidates_terminal",
+                "candidate_ids": uncovered_candidates,
+            })
+    terminal_basis = {
+        "schema_version": "sehd.proof_terminal_basis.v1",
+        "state": state,
+        "decisive_facts": {
+            "surviving_error_certificate_ids": sorted(
+                str(row["certificate_id"]) for row in surviving
+            ),
+            "coverage_complete": coverage_complete,
+            "candidate_terminal": candidate_terminal,
+        },
+        "blocking_facts": blocking_facts,
+    }
+
     result = {
         "state": state,
         "responsible_event_id": responsible,
@@ -694,6 +754,7 @@ def _resolve_terminal_state(
         ],
         "prosecution_coverage": p_coverage,
         "defense_coverage": d_coverage,
+        "terminal_basis": terminal_basis,
         "error_audits": p_audits,
         "defense_audits": d_audits,
         "defense_type_counts": dict(Counter(all_defense_types)),

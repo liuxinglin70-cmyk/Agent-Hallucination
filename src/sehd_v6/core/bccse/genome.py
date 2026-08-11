@@ -149,7 +149,13 @@ OBSERVABLE_FIELDS: tuple[str, ...] = (
     "defense_coverage",
     "prosecution_certificates",
     "defense_certificates",
+    # Claim-level surviving-carrier set (content-fingerprint identity;
+    # rename-invariant).  The observable of fingerprint-targeted operations
+    # (withhold_certificate / emit_certificate).
+    "surviving_certificates",
     "quarantined_certificates",
+    "certificate_invariant_failures",
+    "target_certificate_invariant_failure",
     "causal_field_coverage",
     "responsible_step",
     "localization_status",
@@ -431,6 +437,27 @@ def _sanitize_action_spec(value: Any) -> dict[str, Any]:
 
     return sanitize_action_spec(value)
 
+
+def _sanitize_condition_spec(value: Any) -> dict[str, Any]:
+    from .condition_spec import sanitize_condition_spec
+
+    return sanitize_condition_spec(value)
+
+
+def _sanitize_repair_edge(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    allowed = (
+        "edge_id", "producer_route", "output_object", "field", "consumer",
+        "observed", "required", "owner_module", "source_artifact_id",
+        "blocking_predicate",
+    )
+    return {
+        key: str(value.get(key) or "")
+        for key in allowed
+        if str(value.get(key) or "")
+    }
+
 @dataclass
 class SkillModule:
     """A skill module containing natural language behavioral rules.
@@ -464,6 +491,12 @@ class SkillModule:
                 meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
             if "action_spec" in meta:
                 meta["action_spec"] = _sanitize_action_spec(meta.get("action_spec"))
+            if "condition_spec" in meta:
+                meta["condition_spec"] = _sanitize_condition_spec(
+                    meta.get("condition_spec")
+                )
+            if "repair_edge" in meta:
+                meta["repair_edge"] = _sanitize_repair_edge(meta.get("repair_edge"))
 
     @property
     def capacity(self) -> int:
@@ -498,6 +531,14 @@ class SkillModule:
             normalized["action_spec"] = _sanitize_action_spec(
                 normalized.get("action_spec")
             )
+        if "condition_spec" in normalized:
+            normalized["condition_spec"] = _sanitize_condition_spec(
+                normalized.get("condition_spec")
+            )
+        if "repair_edge" in normalized:
+            normalized["repair_edge"] = _sanitize_repair_edge(
+                normalized.get("repair_edge")
+            )
         self.rule_meta[index] = normalized
 
     def is_rule_protected(self, index: int) -> bool:
@@ -523,6 +564,12 @@ class SkillModule:
                 meta["rule_slots"] = _sanitize_rule_slots(meta.get("rule_slots"))
             if "action_spec" in meta:
                 meta["action_spec"] = _sanitize_action_spec(meta.get("action_spec"))
+            if "condition_spec" in meta:
+                meta["condition_spec"] = _sanitize_condition_spec(
+                    meta.get("condition_spec")
+                )
+            if "repair_edge" in meta:
+                meta["repair_edge"] = _sanitize_repair_edge(meta.get("repair_edge"))
             safe_meta.append(meta)
         return {
             "module_id": self.module_id,
@@ -574,6 +621,8 @@ class SkillEdit:
     expected_effect_contract: dict[str, Any] = field(default_factory=dict)
     rule_slots: dict[str, str] = field(default_factory=dict)
     action_spec: dict[str, Any] = field(default_factory=dict)
+    condition_spec: dict[str, Any] = field(default_factory=dict)
+    repair_edge: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -607,6 +656,8 @@ class SkillEdit:
             ),
             "rule_slots": _sanitize_rule_slots(self.rule_slots),
             "action_spec": _sanitize_action_spec(self.action_spec),
+            "condition_spec": _sanitize_condition_spec(self.condition_spec),
+            "repair_edge": _sanitize_repair_edge(self.repair_edge),
         }
 
     @classmethod
@@ -646,6 +697,8 @@ class SkillEdit:
             ),
             rule_slots=_sanitize_rule_slots(data.get("rule_slots")),
             action_spec=_sanitize_action_spec(data.get("action_spec")),
+            condition_spec=_sanitize_condition_spec(data.get("condition_spec")),
+            repair_edge=_sanitize_repair_edge(data.get("repair_edge")),
         )
 
 
@@ -689,6 +742,52 @@ class SkillGenome:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     @property
+    def execution_hash(self) -> str:
+        """Identity of every genome field that can change provider behavior.
+
+        ``content_hash`` remains the backward-compatible text-lineage id so
+        historical checkpoints do not become unreadable when bookkeeping is
+        updated. Runtime compilation also consumes the typed rule condition
+        and ActionSpec stored in ``rule_meta``; those executable fields must
+        therefore participate in a separate behavior identity. Fitness,
+        provenance and promotion status remain excluded.
+        """
+        state = {
+            "schema_version": "sehd.skill_execution_identity.v2",
+            "modules": {
+                mid: {
+                    "active": self.modules[mid].active,
+                    "rules": list(self.modules[mid].rules),
+                    "executable_rule_meta": [
+                        {
+                            "rule_slots": _sanitize_rule_slots(
+                                self.modules[mid].get_rule_meta(index).get(
+                                    "rule_slots"
+                                )
+                            ),
+                            "action_spec": _sanitize_action_spec(
+                                self.modules[mid].get_rule_meta(index).get(
+                                    "action_spec"
+                                )
+                            ),
+                            "condition_spec": _sanitize_condition_spec(
+                                self.modules[mid].get_rule_meta(index).get(
+                                    "condition_spec"
+                                )
+                            ),
+                        }
+                        for index in range(len(self.modules[mid].rules))
+                    ],
+                }
+                for mid in MODULE_IDS
+            },
+        }
+        text = json.dumps(
+            state, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        )
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    @property
     def total_rules(self) -> int:
         return sum(len(m.rules) for m in self.modules.values())
 
@@ -700,6 +799,7 @@ class SkillGenome:
             "generation": self.generation,
             "edits_applied": [e.to_dict() for e in self.edits_applied],
             "content_hash": self.content_hash,
+            "execution_hash": self.execution_hash,
             "metadata": self.metadata,
         }
 
@@ -788,6 +888,35 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         slots_valid, slots_reason = _validate_persisted_rule_slots(edit)
         if not slots_valid:
             return False, slots_reason
+        if edit.condition_spec:
+            from .condition_spec import validate_condition_spec
+
+            condition_valid, condition_reason = validate_condition_spec(
+                edit.condition_spec
+            )
+            if not condition_valid:
+                return False, condition_reason
+        repair_edge = _sanitize_repair_edge(edit.repair_edge)
+        if repair_edge:
+            if not repair_edge.get("edge_id"):
+                return False, "repair_edge_id_missing"
+            edge_owner = str(repair_edge.get("owner_module") or "")
+            if edge_owner and edge_owner != edit.target_module:
+                return False, "repair_edge_owner_mismatch"
+            persisted_action = _sanitize_action_spec(edit.action_spec)
+            edge_field = str(repair_edge.get("field") or "")
+            output_field = str(persisted_action.get("output_field") or "")
+            repair_targets = {edge_field}
+            from ..paca_tcl.audit_contract import (
+                DEFENSE_CHECK_FIELDS,
+                ERROR_CHECK_FIELDS,
+            )
+            if edit.target_module == "atomic_verifier_instruction":
+                repair_targets.update(ERROR_CHECK_FIELDS.get(edge_field, ()))
+            elif edit.target_module == "clean_defense_boundary":
+                repair_targets.update(DEFENSE_CHECK_FIELDS.get(edge_field, ()))
+            if output_field not in repair_targets:
+                return False, "action_spec_repair_edge_mismatch"
 
     feature_valid, feature_reason = validate_feature_description(
         edit.feature_description
@@ -968,6 +1097,8 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "created_at_generation": new_generation,
         "rule_slots": _sanitize_rule_slots(edit.rule_slots),
         "action_spec": _sanitize_action_spec(edit.action_spec),
+        "condition_spec": _sanitize_condition_spec(edit.condition_spec),
+        "repair_edge": _sanitize_repair_edge(edit.repair_edge),
     }
 
     if edit.operation == SkillOp.ADD_RULE:

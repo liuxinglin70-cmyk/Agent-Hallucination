@@ -14,10 +14,19 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
+from .certificate_identity import (
+    certificate_carrier_movement,
+    certificate_claim_fingerprint,
+    surviving_carrier_fingerprints,
+)
 from .step_attributor import AttributionSignal
 from .signal_adapter import (
     COVERAGE_STATE_SCORE,
     resolve_evolution_state,
+)
+from ..paca_tcl.audit_contract import (
+    DEFENSE_RELATIONAL_INVARIANTS,
+    ERROR_RELATIONAL_INVARIANTS,
 )
 
 
@@ -180,6 +189,85 @@ def _valid_certificate_count(row: Mapping[str, Any], kind: str) -> int:
     )
 
 
+def _surviving_carrier_count(row: Mapping[str, Any]) -> int | None:
+    """Claim-level surviving carrier count, or None when unreported."""
+    fingerprints = surviving_carrier_fingerprints(row)
+    if fingerprints is None:
+        return None
+    return len(fingerprints)
+
+
+def _valid_claim_fingerprints(
+    row: Mapping[str, Any], kind: str = "prosecution",
+) -> frozenset[str] | None:
+    """Claim fingerprints of the court-valid certificates of one side.
+
+    Renames are identity-preserving across re-samplings, so this set — not
+    the row count — is what actually moved when a replay ran.  Returns
+    ``None`` when the result carries no adjudication payload at all, so the
+    caller can keep its legacy count fallback.
+    """
+    proof = row.get("proof_adjudication")
+    if not isinstance(proof, Mapping):
+        return None
+    quarantine_key = (
+        "quarantined_error_certificate_ids"
+        if kind == "prosecution"
+        else "quarantined_defense_certificate_ids"
+    )
+    quarantined = {
+        str(value)
+        for value in (proof.get(quarantine_key) or [])
+    }
+    rows = _certificate_rows(row, kind)
+    if not rows:
+        return frozenset()
+    tokens: set[str] = set()
+    for certificate in rows:
+        cid = str(certificate.get("certificate_id") or "")
+        if cid and cid in quarantined:
+            continue
+        fingerprint = certificate_claim_fingerprint(certificate)
+        # Unidentifiable rows still count as material, under their own id.
+        tokens.add(fingerprint if fingerprint else f"id:{cid or len(tokens)}")
+    return frozenset(tokens)
+
+
+def _prosecution_strength_score(signal: AttributionSignal, row: Mapping[str, Any]) -> float:
+    """Prosecution-side local score, measured at claim level.
+
+    Two verdict-relevant axes, both rename-invariant:
+
+    - emitted valid claims (rows minus quarantined): the material the
+      prosecution laid before the court.  This is the axis an FN-direction
+      repair moves (verify_violation / emit_certificate create claims while
+      the verdict may still be unresolved — a surviving-only count is blind
+      to exactly these repairs).
+    - surviving carrier claims: the certificates the court upholds.  This
+      is the axis an FP-direction withhold moves.
+
+    Positional certificate ids are re-minted on every provider re-sampling
+    (the observed appeal_error_* <-> initial_error_* drift), and the
+    court's whole-surface ``valid_error_certificate_count`` moves whenever
+    the provider reorganizes its census, so neither axis uses positional
+    identity.  Falls back to the legacy court count only when the result
+    carries no adjudication payload.
+    """
+    valid_claims = _valid_claim_fingerprints(row, "prosecution")
+    if valid_claims is None:
+        return float(_valid_certificate_count(row, "prosecution")) + _coverage_rank(
+            signal, "prosecution"
+        )
+    surviving_claims = surviving_carrier_fingerprints(row)
+    surviving_count = (
+        len(surviving_claims) if surviving_claims is not None else 0
+    )
+    return (
+        float(len(valid_claims) + surviving_count)
+        + _coverage_rank(signal, "prosecution")
+    )
+
+
 def _causal_field_score(row: Mapping[str, Any]) -> float:
     certificates = _certificate_rows(row, "prosecution")
     proof = row.get("proof_adjudication") or {}
@@ -208,6 +296,40 @@ def _causal_field_score(row: Mapping[str, Any]) -> float:
 def _responsible_step_present(row: Mapping[str, Any]) -> float:
     value = row.get("responsible_step")
     return 1.0 if value is not None and str(value) != "" else 0.0
+
+
+def _certificate_invariant_failure_count(
+    row: Mapping[str, Any], module: str,
+) -> int | None:
+    proof = row.get("proof_adjudication") or {}
+    if not isinstance(proof, Mapping):
+        return None
+    if module == "atomic_verifier_instruction":
+        audit_key = "error_audits"
+        registered = ERROR_RELATIONAL_INVARIANTS
+    elif module == "clean_defense_boundary":
+        audit_key = "defense_audits"
+        registered = DEFENSE_RELATIONAL_INVARIANTS
+    else:
+        return None
+    audits = proof.get(audit_key)
+    if not isinstance(audits, list):
+        return None
+    total = 0
+    for audit in audits:
+        if not isinstance(audit, Mapping):
+            continue
+        failed_invariants = audit.get("failed_invariants")
+        values = (
+            {str(value) for value in failed_invariants}
+            if isinstance(failed_invariants, list)
+            else {
+                str(value) for value in audit.get("failed_checks") or ()
+                if str(value) in registered
+            }
+        )
+        total += len(values)
+    return total
 
 
 # How much confidence the detector's own localization procedure earned.
@@ -266,9 +388,9 @@ def module_local_score(
         # unbounded candidate growth is intentionally not rewarded.
         return 1.0 if signal.candidate_count > 0 else 0.0
     if module == "candidate_to_verifier_route":
-        return float(_valid_certificate_count(row, "prosecution")) + prosecution
+        return _prosecution_strength_score(signal, row)
     if module == "atomic_verifier_instruction":
-        return float(_valid_certificate_count(row, "prosecution")) + prosecution
+        return _prosecution_strength_score(signal, row)
     if module == "evidence_obligation":
         # A one-sided proof is not progress. Reward the weaker side so that
         # evolution cannot improve this module by starving its challenger.
@@ -377,16 +499,26 @@ def observable_process_delta(
 
     before_result = before_result or {}
     after_result = after_result or {}
+
+    # Certificate counters compare CLAIM-LEVEL valid sets (fingerprints of
+    # non-quarantined rows), not raw row counts: positional re-minting moves
+    # raw counts without moving any claim.
+    def _valid_claim_count(value: Mapping[str, Any], kind: str) -> int:
+        claims = _valid_claim_fingerprints(value, kind)
+        if claims is None:
+            return len(_certificate_rows(value, kind))
+        return len(claims)
+
     counters = (
         (
             "prosecution_certificates",
-            len(_certificate_rows(before_result, "prosecution")),
-            len(_certificate_rows(after_result, "prosecution")),
+            _valid_claim_count(before_result, "prosecution"),
+            _valid_claim_count(after_result, "prosecution"),
         ),
         (
             "defense_certificates",
-            len(_certificate_rows(before_result, "defense")),
-            len(_certificate_rows(after_result, "defense")),
+            _valid_claim_count(before_result, "defense"),
+            _valid_claim_count(after_result, "defense"),
         ),
         (
             "quarantined_certificates",
@@ -398,12 +530,43 @@ def observable_process_delta(
         if old != new:
             changes.append(f"{name}:{'increased' if new > old else 'decreased'}")
 
+    # Claim-level surviving-carrier movement (rename-invariant).  These are
+    # the honest observable for fingerprint-targeted operations
+    # (withhold_certificate / emit_certificate): whole-surface counters above
+    # move whenever the provider reorganizes its census, while a positional
+    # id comparison reads a pure rename as removal/emission.  Tokens are
+    # emitted only when every carrier resolved to a real content
+    # fingerprint — an unresolved identity is never dressed up as movement.
+    if before_result and after_result:
+        movement = certificate_carrier_movement(before_result, after_result)
+        if movement is not None and movement.get("resolved"):
+            if movement["withheld"]:
+                changes.append("surviving_certificates:decreased")
+            if movement["emitted"]:
+                changes.append("surviving_certificates:increased")
+
     before_causal = _causal_field_score(before_result)
     after_causal = _causal_field_score(after_result)
     if after_causal - before_causal > epsilon:
         changes.append("causal_field_coverage:increased")
     elif before_causal - after_causal > epsilon:
         changes.append("causal_field_coverage:decreased")
+
+    before_invariants = _certificate_invariant_failure_count(
+        before_result, target_module,
+    )
+    after_invariants = _certificate_invariant_failure_count(
+        after_result, target_module,
+    )
+    if (
+        before_invariants is not None
+        and after_invariants is not None
+        and before_invariants != after_invariants
+    ):
+        changes.append(
+            "certificate_invariant_failures:"
+            + ("increased" if after_invariants > before_invariants else "decreased")
+        )
 
     before_responsible = bool(_responsible_step_present(before_result))
     after_responsible = bool(_responsible_step_present(after_result))
@@ -632,7 +795,10 @@ def assess_source_fitness(
         )
     if (
         delta < 0
-        and _MODULE_SCORE_GOLD_DIRECTION.get(target_module) is None
+        and (
+            _MODULE_SCORE_GOLD_DIRECTION.get(target_module) is None
+            or gold_label is None
+        )
     ):
         # Neutral-direction module (e.g. candidate_trigger, whose local score
         # only says whether candidates exist): a local-score drop with an
@@ -641,6 +807,22 @@ def assess_source_fitness(
         # Degrade to ``no_effect`` (audited, never a worse veto) instead of a
         # hard regression; gold-assessed task improvements were already
         # returned above, so reaching here means the task score did not move.
+        #
+        # Label-free mode extends the same degradation to direction-annotated
+        # modules (``_MODULE_SCORE_GOLD_DIRECTION`` = True/False): the
+        # direction annotation is only meaningful under a gold label, which
+        # tells the loop which way the score is allowed to move. Without
+        # gold, a score drop is ambiguous — withdrawing an over-convicted
+        # certificate (an error_to_clean repair) lowers
+        # ``valid_error_certificate_count`` exactly as a genuine loss of
+        # error evidence would, and the loop has no authority to pick which.
+        # Hard-rejecting it as ``worse`` therefore silently discards every
+        # label-free FP-direction repair (observed: the same withhold on the
+        # same case scored ``local_improvement`` under gold=false but
+        # ``worse`` under no-gold). Degrading to ``no_effect`` keeps the
+        # ambiguous drop auditable without vetoing a possibly-correct repair;
+        # gold-mode behavior is unchanged (the gold-aware branch above
+        # already returned).
         return FitnessAssessment(
             "no_effect",
             ("neutral_direction_module_local_drop",),

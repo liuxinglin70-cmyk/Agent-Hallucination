@@ -31,6 +31,10 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..paca_tcl import proof_engine as v35
+from ..paca_tcl.audit_contract import (
+    DEFENSE_CHECK_FIELDS,
+    ERROR_CHECK_FIELDS,
+)
 from ..paca_tcl.skill_integration import integrated_v35_provider
 from ..paca_tcl.basic_runner import (
     json_object_provider_call,
@@ -74,6 +78,11 @@ from .genome import (
     validate_expected_effect_contract,
 )
 from .rule_contract import RuleSpec, render_rule, validate_rule_spec
+from .condition_spec import (
+    evaluate_condition_spec,
+    sanitize_condition_spec,
+    validate_condition_spec,
+)
 from .action_spec import (
     ActionSpec,
     CLEAN_TO_ERROR_ACTIONS,
@@ -83,6 +92,7 @@ from .action_spec import (
     evaluate_action_spec_postcondition,
     sanitize_action_spec,
 )
+from .certificate_identity import certificate_carrier_movement
 from .fitness import (
     FitnessAssessment,
     assess_source_fitness,
@@ -94,6 +104,7 @@ from .failure_classifier import (
     REASON_BOUNDARY_CONFLICT,
     REASON_CONSENSUS_BLOCKED,
     REASON_NO_FAILURE_SHAPE,
+    can_compile_repair_obligation,
     classify_failure,
 )
 from .step_attributor import (
@@ -385,6 +396,27 @@ def _expected_effect_audit(
         else ()
     )
     observable_delta_tokens = list(observable_deltas)
+    action_spec = getattr(edit, "action_spec", None)
+    spec = (
+        ActionSpec.from_dict(action_spec)
+        if isinstance(action_spec, Mapping) and action_spec
+        else None
+    )
+    if (
+        spec is not None
+        and spec.postcondition == "certificate_invariant_repaired"
+        and before_result is not None
+        and after_result is not None
+    ):
+        target_repaired, _detail = evaluate_action_spec_postcondition(
+            spec,
+            after_result,
+            baseline_result=before_result,
+        )
+        if target_repaired:
+            observable_delta_tokens.append(
+                "target_certificate_invariant_failure:decreased"
+            )
 
     # ---- v5.4 structured contract path ----
     contract = sanitize_expected_effect_contract(edit.expected_effect_contract)
@@ -402,7 +434,14 @@ def _expected_effect_audit(
             "defense_coverage": ("defense_coverage:",),
             "prosecution_certificates": ("prosecution_certificates:",),
             "defense_certificates": ("defense_certificates:",),
+            "surviving_certificates": ("surviving_certificates:",),
             "quarantined_certificates": ("quarantined_certificates:",),
+            "certificate_invariant_failures": (
+                "certificate_invariant_failures:",
+            ),
+            "target_certificate_invariant_failure": (
+                "target_certificate_invariant_failure:",
+            ),
             "causal_field_coverage": ("causal_field_coverage:",),
             "responsible_step": ("responsible_step:",),
             "localization_status": ("localization_status:",),
@@ -464,19 +503,16 @@ def _expected_effect_audit(
     # carries an output obligation; verify it against the replay result
     # instead of relying on provider self-report.  L2 edits carry no
     # ActionSpec and classify as action_spec_absent.
-    action_spec = getattr(edit, "action_spec", None)
-    spec = (
-        ActionSpec.from_dict(action_spec)
-        if isinstance(action_spec, Mapping) and action_spec
-        else None
-    )
     expected_output_moved = (
         contract_field_observed and contract_direction_observed
         if contract
         else bool(observable_delta_tokens)
     )
     execution_evidence = classify_execution_evidence(
-        spec, after_result or {}, expected_output_moved,
+        spec,
+        after_result or {},
+        expected_output_moved,
+        baseline_result=before_result,
     )
     return {
         "expected": expected,
@@ -502,82 +538,30 @@ def _enforce_expected_effect_observation(
     effect_audit: Mapping[str, Any],
     causal_execution_status: str,
 ) -> FitnessAssessment:
-    """Enforce the ActionSpec effect contract under a gold-label authority.
+    """Use expected-effect telemetry only as an auxiliary gradient.
 
-    Authority hierarchy for whether an edit's declared effect was observed:
-
-      1. Gold task score (external ground truth).  When a gold label is
-         available the task score ranks the verdict against the label
-         (wrong=0, unresolved=1, correct=2).  A movement toward correct
-         *is* the effect the edit exists to produce, and it outranks every
-         internal signal because the detector's own output is the very thing
-         being edited.
-      2. Contract telemetry (self-referential).  The before/after fields the
-         audit reads are produced by the detector under edit, so they are
-         corroboration only and may never overrule a gold verdict.
-
-    Two invariants follow directly:
-
-    * A gold-verified task improvement is never downgraded.  If the verdict
-      moved toward the gold label, the effect was observed at the task level;
-      the instrumented contract field failing to move is an instrumentation
-      gap, not proof the rule was inert.
-    * In gold mode a ``no_effect`` is never promoted to
-      ``directional_evidence``.  Promoting on the strength of the detector's
-      own output changes is self-certifying — the gold label already said the
-      verdict did not improve, and internal telemetry cannot rehabilitate
-      that.  The promotion path exists only for self-supervised mode, where
-      telemetry is the sole available gradient.
+    ``_attribute_intervention_fitness`` is the sole owner of causal credit:
+    it requires a deterministic ActionSpec postcondition or a bound
+    apply/effect trace.  A generic observable contract may corroborate that
+    decision and, in self-supervised mode, upgrade a genuinely executed
+    no-local-score edit.  It may neither veto an already executed passing
+    edit through a proxy metric nor rescue an unexecuted edit whose stochastic
+    replay happened to change other outputs.
     """
     gold_active = assessment.task_score_before is not None
-    gold_task_improved = (
-        gold_active
-        and assessment.task_score_after is not None
-        and assessment.task_score_after > assessment.task_score_before
-    )
-
-    if (
-        not gold_task_improved
-        and str(causal_execution_status or "") == "executed"
-        and (assessment.passed or assessment.evidence_only)
-        and str(effect_audit.get("status") or "") != "observed"
-    ):
-        return FitnessAssessment(
-            "no_effect",
-            ("expected_effect_not_observed",),
-            assessment.task_score_before,
-            assessment.task_score_after,
-            assessment.local_score_before,
-            assessment.local_score_after,
-        )
 
     if gold_active:
         return assessment
 
     if (
         assessment.decision == "no_effect"
+        and str(causal_execution_status or "") == "executed"
         and str(effect_audit.get("status") or "") == "observed"
         and bool(effect_audit.get("target_output_changed"))
     ):
         return FitnessAssessment(
             "directional_evidence",
             ("expected_effect_observed_despite_no_local_score_change",),
-            assessment.task_score_before,
-            assessment.task_score_after,
-            assessment.local_score_before,
-            assessment.local_score_after,
-        )
-    if (
-        assessment.decision == "no_effect"
-        and any(
-            "intervention_not_executed" in str(reason)
-            for reason in assessment.reasons
-        )
-        and bool(effect_audit.get("observable_deltas"))
-    ):
-        return FitnessAssessment(
-            "directional_evidence",
-            ("output_changed_despite_missing_telemetry",),
             assessment.task_score_before,
             assessment.task_score_after,
             assessment.local_score_before,
@@ -691,7 +675,13 @@ def _injected_applied_flags(
     candidate_result = candidate_result or {}
     from ..paca_tcl.skill_integration import _rule_stable_id
 
-    rule_id = _rule_stable_id(edit.target_module, edit.new_content)
+    condition = str(edit.rule_slots.get("condition") or "")
+    rule_id = _rule_stable_id(
+        edit.target_module,
+        edit.new_content,
+        condition=condition or None,
+        condition_spec=edit.condition_spec,
+    )
     injected = _rule_in_trace(
         rule_id, candidate_result.get("injected_rule_trace")
     )
@@ -705,6 +695,7 @@ def _no_effect_reason_for(
     classification: str,
     injected: bool,
     applied: bool,
+    execution_status: str = "",
 ) -> str:
     """Map the replay evidence to the closed no-effect vocabulary.
 
@@ -716,6 +707,12 @@ def _no_effect_reason_for(
         return "output_changed_then_removed_or_quarantined"
     if classification == "provider_output_changed_but_court_invariant":
         return "provider_output_changed_but_downstream_invariant"
+    if execution_status == "condition_not_matched":
+        return "condition_not_matched"
+    if execution_status == "model_ignored_or_action_failed":
+        return "provider_did_not_apply_action"
+    if execution_status in {"route_not_reached", "candidate_not_injected"}:
+        return execution_status
     if not injected:
         return "condition_not_matched"
     if not applied:
@@ -1082,6 +1079,56 @@ _NO_EFFECT_RETRY_GUIDANCE: dict[str, str] = {
 }
 
 
+def _polarity_retry_hint(prior_categories: Sequence[str]) -> dict[str, Any] | None:
+    """Translate a prior polarity-mismatch into a binding "stay on primary"
+    hint so the next attempt does not defensively switch modules.
+
+    First-principles fix A: when attribution routes a gold-locked FP/FN to the
+    primary owner, the LLM has historically picked an opcode of the OPPOSITE
+    polarity (e.g. ``evidence_obligation/require_evidence_field`` for an FP,
+    where ``keep_coverage_incomplete`` was the only cleanward opcode).
+    Prevalidation rejected the cross-polarity pick, and the retry feedback
+    block then suggested "if possible a different owner module" — actively
+    encouraging the LLM to abandon attribution's owner for the secondary.
+    The next attempt therefore lands on the secondary module with a weaker
+    diagnosis, and frequently withholds a witness certificate instead of the
+    verdict carrier.
+
+    This helper parses the deterministic ``action_polarity_mismatch`` category
+    out of ``prior_categories`` (preserved through ``_classify_mutation_failure``
+    because it starts with ``all_candidates_prevalidation_rejected:``) and
+    returns a structured hint carrying the polarity-correct opcode set for
+    the same primary module.  The retry block then binds the LLM to the
+    attribution's primary instead of suggesting it escape to the secondary.
+    """
+    import re as _re
+
+    pattern = _re.compile(
+        r"action_polarity_mismatch:(error_to_clean|clean_to_error):"
+        r"([a-z_]+):([a-z_]+)"
+    )
+    for category in prior_categories:
+        match = pattern.search(str(category or ""))
+        if match is None:
+            continue
+        direction, module, _operation = match.groups()
+        if module not in MODULE_IDS:
+            continue
+        operations = (
+            ERROR_TO_CLEAN_ACTIONS.get(module, frozenset())
+            if direction == "error_to_clean"
+            else CLEAN_TO_ERROR_ACTIONS.get(module, frozenset())
+        )
+        if not operations:
+            continue
+        return {
+            "module": module,
+            "direction": direction,
+            "valid_opcodes": sorted(operations),
+        }
+    return None
+
+
 def _build_mutation_retry_feedback(
     *,
     attempt_index: int,
@@ -1096,20 +1143,53 @@ def _build_mutation_retry_feedback(
     structural defect.  The block also changes the request body (and thus the
     provider cache key) relative to the initial attempt.  Only stable
     case-agnostic categories are used; raw provider text is never echoed.
+
+    First-principles fix A: when a prior attempt was rejected by
+    prevalidation as ``action_polarity_mismatch``, the generic "different
+    owner module" retry language actively encouraged the LLM to abandon
+    attribution's primary owner — which lets it escape to a secondary module
+    with a weaker diagnosis (often resulting in targeting a witness rather
+    than a verdict carrier).  When the polarity hint is available, the retry
+    block instead binds the LLM to the SAME primary module with a polarity-
+    correct opcode list, removing the module-escape escape hatch.
     """
     retry_block: dict[str, Any] = {}
+    polarity_hint = _polarity_retry_hint(prior_categories)
     if prior_categories:
         retry_block["attempt_index"] = attempt_index
         retry_block["previous_failure_categories"] = list(prior_categories)
-        retry_block["required_action"] = (
-            "previous mutation output was structurally "
-            "invalid or had no observable target change; "
-            "return a DIFFERENT valid JSON edit with a distinct "
-            "trigger, a distinct output action, and if possible a "
-            "different owner module, with operation in "
-            "{add_rule,modify_rule,remove_rule,no_edit} and "
-            "non-empty condition/action/evidence_anchor slots"
-        )
+        if polarity_hint is not None:
+            retry_block["required_action"] = (
+                "previous mutation output was rejected for choosing a "
+                "cross-polarity opcode on attribution's primary owner. "
+                "STAY on the attribution-primary module="
+                f"{polarity_hint['module']} and pick an opcode from this "
+                f"{polarity_hint['direction']} list: "
+                f"{', '.join(polarity_hint['valid_opcodes'])}. Do NOT "
+                "switch to a different owner module; the secondary is only "
+                "permissible when the primary has no opcode for this "
+                "direction at all. Return a DIFFERENT valid JSON edit "
+                "with a distinct trigger condition, the polarity-correct "
+                "opcode, and a target_field listed in the module charter; "
+                "operation in {add_rule,modify_rule,remove_rule,no_edit} "
+                "and non-empty condition/action/evidence_anchor slots."
+            )
+            retry_block["polarity_correct_opcodes_for_primary"] = {
+                "module": polarity_hint["module"],
+                "direction": polarity_hint["direction"],
+                "opcodes": polarity_hint["valid_opcodes"],
+            }
+        else:
+            retry_block["required_action"] = (
+                "previous mutation output was structurally "
+                "invalid or had no observable target change; "
+                "return a DIFFERENT valid JSON edit with a distinct "
+                "trigger and a distinct output action (stay on the "
+                "attribution-primary unless its opcode set has nothing "
+                "polarity-correct), with operation in "
+                "{add_rule,modify_rule,remove_rule,no_edit} and "
+                "non-empty condition/action/evidence_anchor slots"
+            )
         hard_constraints = _structural_retry_hard_constraints(prior_categories)
         if hard_constraints:
             retry_block["structural_hard_constraints"] = hard_constraints
@@ -1132,8 +1212,9 @@ def _build_mutation_retry_feedback(
         ]
         retry_block.setdefault("required_action", (
             "return a DIFFERENT valid JSON edit with a distinct "
-            "trigger, a distinct output action, and if possible a "
-            "different owner module"
+            "trigger and a distinct output action; stay on the "
+            "attribution-primary unless its opcode set has nothing "
+            "polarity-correct"
         ))
     if not retry_block:
         return ""
@@ -1208,17 +1289,52 @@ def _signal_process_owner(signal: Any) -> str:
     return modules[0] if modules else ""
 
 
-def _allowed_l1_modules(signal: Any, attribution_owner: str) -> tuple[str, ...]:
-    """Return the executable owner set shared by episodes and reflection."""
+def _allowed_l1_modules(
+    signal: Any,
+    attribution_owner: str,
+    artifact_frontier: Sequence[Mapping[str, Any]] = (),
+) -> tuple[str, ...]:
+    """Return the executable owner set shared by episodes and reflection.
+
+    Owner provenance (Fix #3): the authoritative owner set comes from the
+    proof-cut obligation — the attribution owner and the artifact_frontier
+    owners. Process-signal owners (polarity-based) are added only on the
+    gold-polarity path, where the classifier rewrapped the attribution to a
+    signal owner and the secondary module is a legitimate exploration
+    surface. They are not added as a general state heuristic, because a
+    heuristic owner can shadow or conflict with the proof-cut obligation.
+
+    Defense coverage complete no longer unconditionally removes
+    ``clean_defense_boundary``: if the proof-cut frontier names it as an
+    owner, deleting it would make a legitimate repair edge uncompilable.
+    """
     modules = [str(attribution_owner)] if str(attribution_owner) else []
-    for process_module in _signal_process_modules(signal):
-        if process_module not in modules:
-            modules.append(process_module)
+    frontier_owners: set[str] = set()
+    for artifact in artifact_frontier:
+        owner = str(artifact.get("owner_module") or "")
+        if owner in MODULE_IDS:
+            frontier_owners.add(owner)
+            if owner not in modules:
+                modules.append(owner)
+    # Process-signal owners are a gold-polarity exploration surface, not a
+    # general heuristic. Only add them when the attribution was rewrapped
+    # (gold-polarity path), and only if they don't shadow the proof-cut set.
+    is_gold_polarity = bool(
+        getattr(signal, "has_gold", False)
+        and getattr(signal, "gold_label", None) is not None
+    )
+    if is_gold_polarity:
+        for process_module in _signal_process_modules(signal):
+            if process_module not in modules:
+                modules.append(process_module)
     # Defense coverage is already complete: another clean_defense_boundary
     # emission cannot move any observable surface, so the saturation point
-    # is abstention_rule, not a further boundary finding.
+    # is abstention_rule, not a further boundary finding — UNLESS the
+    # proof-cut frontier explicitly names clean_defense_boundary as an owner,
+    # in which case deleting it would orphan a legitimate repair edge.
     if getattr(signal, "defense_coverage_state", None) == "complete":
-        modules = [m for m in modules if m != "clean_defense_boundary"]
+        if "clean_defense_boundary" not in frontier_owners:
+            modules = [m for m in modules if m != "clean_defense_boundary"]
     return tuple(modules)
 
 
@@ -1277,12 +1393,72 @@ def _policy_rejection_signature(
     return signature[:500]
 
 
+def _normalize_candidate_from_repair_plan(
+    candidate: Mapping[str, Any],
+    repair_frontier: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Fill framework-known execution fields that the reflection model no
+    longer generates (Fix #4).
+
+    With ``MechanismRepairPlan``, the model returns only ``repair_edge_id`` +
+    ``operation`` (+ optional ``output_field``). The framework derives:
+
+    - ``target_module`` = the selected edge's ``owner_module``
+    - ``action`` = f"{operation}: {output_field or edge.field}" (the opcode
+      slot ``compile_action_spec`` accepts)
+
+    A candidate that already carries ``target_module`` and ``action`` (legacy
+    full form) is returned unchanged. A candidate without a selectable edge
+    is returned as-is; ``_prevalidate_candidate`` then rejects it with the
+    existing edge-binding checks.
+    """
+    if not isinstance(candidate, Mapping):
+        return dict(candidate) if isinstance(candidate, dict) else {}
+    normalized = dict(candidate)
+    selected_edge_id = str(normalized.get("repair_edge_id") or "")
+    if not selected_edge_id:
+        return normalized
+    selected_edge = next(
+        (
+            dict(edge) for edge in repair_frontier
+            if str(edge.get("edge_id") or "") == selected_edge_id
+        ),
+        None,
+    )
+    if selected_edge is None:
+        return normalized
+    # 1. target_module from the selected edge's owner.
+    if not str(normalized.get("target_module") or "").strip():
+        edge_owner = str(selected_edge.get("owner_module") or "")
+        if edge_owner:
+            normalized["target_module"] = edge_owner
+    # 2. action from the selected opcode + the edge's field. The model picks
+    #    an opcode from the plan's legal_operations; the framework compiles
+    #    the action slot ``<opcode>: <target>`` that ``compile_action_spec``
+    #    accepts. A legacy candidate that already carries ``action`` is left
+    #    unchanged.
+    edit_operation = str(normalized.get("operation") or "").strip()
+    opcode = str(normalized.get("opcode") or "").strip()
+    if edit_operation in {"add_rule", "modify_rule"} and not str(
+        normalized.get("action") or ""
+    ).strip():
+        if opcode:
+            edge_field = str(normalized.get("output_field") or "") or str(
+                selected_edge.get("field") or ""
+            )
+            if edge_field:
+                normalized["action"] = f"{opcode}: {edge_field}"
+    return normalized
+
+
 def _prevalidate_candidate(
     candidate: Mapping[str, Any],
     allowed_modules: Sequence[str],
     *,
     error_type: ErrorType | None = None,
-    blocked_action_surfaces: Sequence[tuple[str, str]] = (),
+    failure_edge_field: str = "",
+    repair_frontier: Sequence[Mapping[str, Any]] = (),
+    runtime_condition_features: Mapping[str, Any] | None = None,
 ) -> str | None:
     """Return the reject reason for a candidate that cannot pass the
     admission gate, or None when it is structurally eligible.
@@ -1302,12 +1478,52 @@ def _prevalidate_candidate(
         return f"target_module_outside_allowed:{target_module or 'missing'}"
     if operation not in {"add_rule", "modify_rule", "remove_rule"}:
         return f"unknown_operation:{operation or 'missing'}"
+    if operation == "remove_rule":
+        # Fix #8: remove_rule is admissible when it binds to an existing rule
+        # identity and a negative repair obligation on the proof-cut frontier.
+        # A historical Skill that over-triggers or causes a false positive may
+        # be best repaired by removing/narrowing it — that is the minimal
+        # causal fix for the FP direction. The candidate must carry:
+        #   - rule_index: identifies the existing rule to remove
+        #   - repair_edge_id: binds to a frontier edge (the FP's location)
+        #   - expected_effect_contract: the negative repair obligation
+        # When repair_frontier is present, the candidate must name which edge
+        # the removed rule's FP lives on. When no frontier is present (no
+        # active L1 episode), remove_rule is still admissible for legacy rule
+        # cleanup, as long as rule_index is provided.
+        rule_index = candidate.get("rule_index")
+        if rule_index is None:
+            return "remove_rule_missing_rule_index"
+        if repair_frontier:
+            selected_edge_id = str(candidate.get("repair_edge_id") or "")
+            if not selected_edge_id:
+                return "remove_rule_edge_id_missing"
+            selected_edge = next(
+                (
+                    dict(edge) for edge in repair_frontier
+                    if str(edge.get("edge_id") or "") == selected_edge_id
+                ),
+                None,
+            )
+            if selected_edge is None:
+                return f"remove_rule_edge_id_unknown:{selected_edge_id}"
+            edge_owner = str(selected_edge.get("owner_module") or "")
+            if edge_owner and edge_owner != target_module:
+                return (
+                    "remove_rule_edge_owner_mismatch:"
+                    f"{edge_owner}->{target_module}"
+                )
     if operation in {"add_rule", "modify_rule"} and not all(
         str(candidate.get(key) or "").strip()
         for key in ("condition", "action", "evidence_anchor")
     ):
         return "rule_spec:missing_slots"
     if operation in {"add_rule", "modify_rule"}:
+        condition_ok, condition_reason = validate_condition_spec(
+            candidate.get("condition_spec")
+        )
+        if not condition_ok:
+            return condition_reason
         condition = str(candidate.get("condition") or "")
         action = str(candidate.get("action") or "")
         evidence_anchor = str(candidate.get("evidence_anchor") or "")
@@ -1353,11 +1569,76 @@ def _prevalidate_candidate(
                     f"action_polarity_mismatch:{direction}:"
                     f"{target_module}:{action_spec.operation}"
                 )
-        if (target_module, action_spec.operation) in set(blocked_action_surfaces):
-            return (
-                "repeated_no_effect_action_surface:"
-                f"{target_module}:{action_spec.operation}"
+        if repair_frontier:
+            selected_edge_id = str(candidate.get("repair_edge_id") or "")
+            if not selected_edge_id:
+                return "repair_edge_id_missing"
+            selected_edge = next(
+                (
+                    dict(edge) for edge in repair_frontier
+                    if str(edge.get("edge_id") or "") == selected_edge_id
+                ),
+                None,
             )
+            if selected_edge is None:
+                return f"repair_edge_id_unknown:{selected_edge_id}"
+            edge_owner = str(selected_edge.get("owner_module") or "")
+            if edge_owner and edge_owner != target_module:
+                return (
+                    "repair_edge_owner_mismatch:"
+                    f"{edge_owner}->{target_module}"
+                )
+            edge_field = str(selected_edge.get("field") or "")
+            repair_targets = {edge_field}
+            if target_module == "atomic_verifier_instruction":
+                repair_targets.update(
+                    ERROR_CHECK_FIELDS.get(edge_field, ())
+                )
+            elif target_module == "clean_defense_boundary":
+                repair_targets.update(
+                    DEFENSE_CHECK_FIELDS.get(edge_field, ())
+                )
+            if action_spec.output_field not in repair_targets:
+                return (
+                    "action_not_bound_to_repair_edge:"
+                    f"{selected_edge_id}:{edge_field}->{action_spec.output_field}"
+                )
+        elif failure_edge_field:
+            # Read-only migration path for pre-frontier stored episodes.
+            repair_targets = {str(failure_edge_field)}
+            if target_module == "atomic_verifier_instruction":
+                repair_targets.update(
+                    ERROR_CHECK_FIELDS.get(str(failure_edge_field), ())
+                )
+            elif target_module == "clean_defense_boundary":
+                repair_targets.update(
+                    DEFENSE_CHECK_FIELDS.get(str(failure_edge_field), ())
+                )
+            if action_spec.output_field not in repair_targets:
+                return (
+                    "action_not_bound_to_failure_edge:"
+                    f"{failure_edge_field}->{action_spec.output_field}"
+                )
+        source_feature_trace = (
+            runtime_condition_features
+            if isinstance(runtime_condition_features, Mapping) else {}
+        )
+        if source_feature_trace:
+            route_features = [
+                item
+                for route_id in action_spec.route_ids
+                for item in source_feature_trace.get(route_id, ())
+                if isinstance(item, Mapping)
+            ]
+            if not route_features:
+                return "condition_route_not_observed_on_source"
+            if not any(
+                evaluate_condition_spec(
+                    candidate.get("condition_spec"), features,
+                ).matched
+                for features in route_features
+            ):
+                return "condition_not_observed_on_source_route"
     if operation == "remove_rule":
         # Only the free-form remove path keeps a volunteered contract; slot
         # rules compile their contract from the action slot downstream.
@@ -1562,6 +1843,26 @@ def _attribute_failure(
         else:
             pool = frozenset()
         if pool is not None and owner not in pool:
+            return "", attribution.reason_code, attribution
+        # Fix #2 strong invariant: a rewrapped/gold-polarity L1 attribution
+        # that cannot compile an executable repair edge is demoted to NONE,
+        # not passed downstream as "nominally L1 but no execution semantics".
+        # This mirrors the gate inside ``classify_failure`` for the rewrap
+        # path, which bypasses the classifier.
+        if not can_compile_repair_obligation(attribution):
+            attribution = FailureAttribution(
+                layer=LAYER_NONE,
+                artifact="",
+                reason_code="demoted_l1_no_executable_obligation",
+                evidence={
+                    "classified_layer": LAYER_L1,
+                    "classified_artifact": attribution.artifact,
+                    "classified_reason": attribution.reason_code,
+                    "owner_resolution": attribution.evidence.get(
+                        "owner_resolution", ""
+                    ),
+                },
+            )
             return "", attribution.reason_code, attribution
         return owner, attribution.reason_code, attribution
     if attribution.layer in (LAYER_L2, LAYER_DETECTOR):
@@ -1972,27 +2273,144 @@ def _field_binds_output_field(reported: str, expected: str) -> bool:
     return reported.endswith(f".{expected}")
 
 
+def _baseline_surviving_error_certificate_ids(
+    result: Mapping[str, Any] | None,
+) -> tuple[str, ...] | None:
+    """Read the source-baseline ``surviving_error_certificate_ids``.
+
+    Returned to ``_attribute_intervention_fitness`` so the
+    fingerprint-targeted ``withhold_certificate`` postcondition
+    (first-principles fix B) can detect when a targeted certificate was
+    actually withheld from the court's surviving set, instead of demanding
+    the whole surface go to zero.  Returns ``None`` when the baseline
+    never reported a surviving set (older stored artifacts); the
+    postcondition then degrades to the strict whole-surface form.
+    """
+    if not isinstance(result, Mapping):
+        return None
+    proof = result.get("proof_adjudication")
+    if not isinstance(proof, Mapping):
+        return None
+    surviving = proof.get("surviving_error_certificate_ids")
+    if not isinstance(surviving, list):
+        return None
+    return tuple(str(value) for value in surviving if str(value))
+
+
+def _verify_edge_level_counterfactual(
+    repair_edge: Any,
+    baseline_result: Mapping[str, Any] | None,
+    replay_result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify that the selected repair edge's transition actually occurred and
+    its downstream blocking predicate disappeared (Fix #7).
+
+    The module/operation-level postcondition checks an aggregate transition
+    (e.g. ``surviving_certificates:decrease``). An unrelated certificate
+    withhold satisfies the same aggregate. This edge-level check binds the
+    verification to the specific repair edge:
+
+    1. ``blocking_predicate`` from the edge must NOT be present in the replay's
+       ``terminal_basis.blocking_facts``. If it is still blocking, the edge's
+       downstream predicate did not clear — no causal credit.
+    2. When ``source_artifact_id`` is present, the artifact must exist in the
+       replay (it was the target of the repair, not an unrelated object).
+
+    Returns ``{"met": bool, "reason": str, "blocking_predicate": str}``.
+
+    When no ``repair_edge`` is present (e.g. remove_rule or legacy edits), the
+    check passes vacuously — the edge-level constraint only applies to
+    add/modify candidates that selected a repair edge.
+    """
+    edge = (
+        repair_edge if isinstance(repair_edge, Mapping)
+        else {}
+    )
+    if not edge:
+        return {
+            "met": True,
+            "reason": "no_repair_edge_selected",
+            "blocking_predicate": "",
+        }
+    blocking_predicate = str(edge.get("blocking_predicate") or "")
+    # 1. Downstream blocking predicate must have cleared in the replay.
+    if blocking_predicate:
+        replay_proof = replay_result.get("proof_adjudication") or {}
+        if not isinstance(replay_proof, Mapping):
+            replay_proof = replay_result.get("adjudication") or {}
+        if isinstance(replay_proof, Mapping) and replay_proof:
+            terminal_basis = replay_proof.get("terminal_basis") or {}
+            if isinstance(terminal_basis, Mapping) and terminal_basis:
+                replay_blocking = terminal_basis.get("blocking_facts") or []
+                if isinstance(replay_blocking, list):
+                    replay_predicates = {
+                        str(item.get("predicate") or "")
+                        for item in replay_blocking
+                        if isinstance(item, Mapping)
+                    }
+                    if blocking_predicate in replay_predicates:
+                        return {
+                            "met": False,
+                            "reason": (
+                                f"blocking_predicate_still_present:"
+                                f"{blocking_predicate}"
+                            ),
+                            "blocking_predicate": blocking_predicate,
+                        }
+    # 2. source_artifact_id: when present and the artifact ID is findable in
+    # the baseline result, the targeted artifact should still be present in
+    # the replay (it was repaired, not deleted). When the ID is not findable
+    # in either result (the detection summary does not carry individual
+    # artifact IDs), this check is skipped — the blocking_predicate check is
+    # the primary edge-level constraint.
+    source_artifact_id = str(edge.get("source_artifact_id") or "")
+    if source_artifact_id and isinstance(baseline_result, Mapping):
+        baseline_text = json.dumps(baseline_result, default=str)
+        replay_text = json.dumps(replay_result, default=str) if isinstance(
+            replay_result, Mapping
+        ) else ""
+        if source_artifact_id in baseline_text and source_artifact_id not in replay_text:
+            return {
+                "met": False,
+                "reason": f"source_artifact_not_in_replay:{source_artifact_id}",
+                "blocking_predicate": blocking_predicate,
+            }
+    return {
+        "met": True,
+        "reason": "edge_counterfactual_verified",
+        "blocking_predicate": blocking_predicate,
+    }
+
+
 def _attribute_intervention_fitness(
     assessment: FitnessAssessment,
     *,
     edit: SkillEdit,
     result: Mapping[str, Any],
+    baseline_surviving_ids: Sequence[str] | None = None,
+    baseline_result: Mapping[str, Any] | None = None,
 ) -> tuple[FitnessAssessment, dict[str, Any]]:
     """Bind a replay improvement to the compiled intervention that ran.
 
     Aggregate detector movement is not causal evidence by itself because a
     provider replay may vary even when it ignores the evolved instruction.
 
-    Execution evidence is ranked by authority.  The rule's compiled
-    ActionSpec declares a postcondition that is checked deterministically
-    against the replay result; when that obligation is met, the rule
-    executed regardless of what the provider said about itself.  Provider
-    self-report (``rule_effects_trace`` field names) is advisory telemetry
-    and only decides the outcome when the postcondition cannot be evaluated
-    against the result surface — a model that reports the JSON collection
-    key it touched (``candidates``) instead of the ActionSpec's operand
-    (``certificate_id``) must not have a real repair thrown away, and a
-    model that reports nothing at all must not either.
+    The compiled ActionSpec is checked deterministically as a
+    baseline-to-replay transition. Provider self-report
+    (``rule_effects_trace``) remains advisory telemetry only: the model that
+    receives the rule id cannot independently certify its own compliance,
+    so self-report never replaces an unsatisfied or unobservable
+    postcondition.
+
+    ``baseline_result`` is the full source-baseline detection result (before
+    the candidate genome ran).  It lets the ``withhold_certificate``
+    postcondition compare CLAIM-LEVEL carrier fingerprints
+    (rename-invariant) instead of positional certificate ids, which the
+    provider re-mints on every re-sampling (appeal_error_* <->
+    initial_error_*).  ``baseline_surviving_ids`` is the legacy id-list
+    fallback retained for callers without a baseline result; without any
+    baseline the postcondition degrades to a strict whole-surface form that
+    no single-certificate rule can satisfy in a multi-carrier case.
     """
     action_spec = sanitize_action_spec(edit.action_spec)
     compiled = result.get("compiled_rule_trace")
@@ -2016,6 +2434,22 @@ def _attribute_intervention_fitness(
     }
     trace = _experience_intervention_trace(result)
     applied_ids = set(trace["applied_rule_ids"])
+    def traced_ids(key: str) -> set[str]:
+        payload = result.get(key)
+        if not isinstance(payload, Mapping):
+            return set()
+        return {
+            str(rule_id)
+            for values in payload.values()
+            if isinstance(values, Sequence) and not isinstance(values, str)
+            for rule_id in values
+            if str(rule_id)
+        }
+
+    candidate_ids = traced_ids("candidate_rule_trace")
+    condition_matched_ids = traced_ids("condition_matched_rule_trace")
+    condition_not_matched_ids = traced_ids("condition_not_matched_rule_trace")
+    injected_ids = traced_ids("injected_rule_trace")
     expected_field = str(action_spec.get("output_field") or "")
     effect_ids: set[str] = set()
     effects = result.get("rule_effects_trace")
@@ -2039,23 +2473,119 @@ def _attribute_intervention_fitness(
     postcondition_met, postcondition_detail = (
         evaluate_action_spec_postcondition(
             ActionSpec.from_dict(action_spec), result,
+            baseline_surviving_ids=baseline_surviving_ids,
+            baseline_result=baseline_result,
         )
     )
+    # Fix #7: edge-level counterfactual. The module/operation-level
+    # postcondition checks an aggregate transition (e.g.
+    # surviving_certificates:decrease). An unrelated certificate withhold
+    # satisfies the same aggregate transition. The edge-level check binds the
+    # verification to the selected repair edge: (1) the edge's
+    # blocking_predicate must no longer be in the replay's terminal_basis
+    # blocking_facts, and (2) the edge's source_artifact_id (when present)
+    # must have undergone the observed->required transition. Only when both
+    # the aggregate postcondition AND the edge-level counterfactual pass does
+    # the intervention receive causal credit.
+    edge_counterfactual = _verify_edge_level_counterfactual(
+        edit.repair_edge, baseline_result, result,
+    )
+    edge_counterfactual_met = edge_counterfactual["met"]
     executed_ids = sorted(
-        rule_ids if postcondition_met else rule_ids & applied_ids & effect_ids
+        rule_ids if (postcondition_met and edge_counterfactual_met) else ()
+    )
+    carrier_movement = (
+        certificate_carrier_movement(baseline_result, result)
+        if baseline_result is not None
+        else None
+    )
+    if executed_ids:
+        execution_status = "executed"
+    elif not sanitize_condition_spec(edit.condition_spec):
+        execution_status = "not_executed"
+    elif rule_ids & condition_not_matched_ids:
+        execution_status = "condition_not_matched"
+    elif rule_ids & (condition_matched_ids | injected_ids):
+        execution_status = "model_ignored_or_action_failed"
+    elif rule_ids & candidate_ids:
+        execution_status = "candidate_not_injected"
+    else:
+        execution_status = "route_not_reached"
+    # Fix #6: explicit four-event distinction. The previous audit conflated
+    # "dispatched" (rule in prompt), "complied" (provider self-report),
+    # "edge changed" (deterministic postcondition), and "terminal changed"
+    # (aggregate verdict movement) into a single status string. These four
+    # events are independently observable and must not be conflated:
+    #   - action_dispatched: framework put the rule in the provider prompt
+    #   - provider_complied: provider self-reported applying the rule
+    #   - target_edge_changed: deterministic baseline->replay postcondition met
+    #   - terminal_changed: aggregate terminal state moved
+    # Causal credit requires target_edge_changed; terminal_changed alone is
+    # telemetry (provider replay is stochastic). provider_complied is advisory
+    # (the provider is not an independent witness of its own compliance).
+    action_dispatched = bool(rule_ids & injected_ids)
+    provider_complied = bool(rule_ids & applied_ids)
+    target_edge_changed = postcondition_met
+    baseline_terminal = (
+        str(baseline_result.get("state") or "")
+        if isinstance(baseline_result, Mapping) else ""
+    )
+    replay_terminal = str(result.get("state") or "") if isinstance(result, Mapping) else ""
+    terminal_changed = bool(
+        baseline_terminal
+        and replay_terminal
+        and baseline_terminal != replay_terminal
     )
     audit = {
-        "status": "executed" if executed_ids else "not_executed",
+        "status": execution_status,
+        # Four-event distinction (Fix #6).
+        "action_dispatched": action_dispatched,
+        "provider_complied": provider_complied,
+        "target_edge_changed": target_edge_changed,
+        "terminal_changed": terminal_changed,
+        "baseline_terminal": baseline_terminal,
+        "replay_terminal": replay_terminal,
         "compiled_rule_ids": sorted(rule_ids),
+        "candidate_rule_ids": sorted(rule_ids & candidate_ids),
+        "condition_matched_rule_ids": sorted(rule_ids & condition_matched_ids),
+        "condition_not_matched_rule_ids": sorted(
+            rule_ids & condition_not_matched_ids
+        ),
+        "injected_rule_ids": sorted(rule_ids & injected_ids),
         "applied_rule_ids": sorted(rule_ids & applied_ids),
         "effect_rule_ids": sorted(rule_ids & effect_ids),
         "expected_output_field": expected_field,
         "executed_rule_ids": executed_ids,
         "postcondition_satisfied": postcondition_met,
         "postcondition_detail": postcondition_detail,
+        # Fix #7: edge-level counterfactual detail.
+        "edge_counterfactual_met": edge_counterfactual_met,
+        "edge_counterfactual_reason": edge_counterfactual["reason"],
+        "edge_counterfactual_predicate": edge_counterfactual["blocking_predicate"],
+        "baseline_surviving_ids": (
+            list(baseline_surviving_ids)
+            if baseline_surviving_ids is not None else None
+        ),
+        # Claim-level carrier movement (rename-invariant): counts only, so
+        # the audit stays case-agnostic.
+        "carrier_movement": (
+            {
+                "resolved": bool(carrier_movement.get("resolved")),
+                "withheld": len(carrier_movement["withheld"]),
+                "emitted": len(carrier_movement["emitted"]),
+                "before": len(carrier_movement["before"]),
+                "after": len(carrier_movement["after"]),
+            }
+            if carrier_movement is not None else None
+        ),
     }
     if executed_ids or not (assessment.passed or assessment.evidence_only):
         return assessment, audit
+    # Provider replay is stochastic: a gold-correct terminal outcome can
+    # occur while the injected Skill is ignored.  Causal credit therefore
+    # requires the operation's postcondition (or a bound apply/effect trace),
+    # regardless of aggregate task movement.  An unobservable postcondition
+    # is an instrumentation defect to repair, not evidence of execution.
     return FitnessAssessment(
         "no_effect",
         ("intervention_not_executed",),
@@ -2235,6 +2765,24 @@ def _collect_applied_rule_trace(
     return _collect_rule_trace(result, "bccse_applied_rule_ids")
 
 
+def _collect_condition_matched_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    return _collect_rule_trace(result, "bccse_condition_matched_rule_ids")
+
+
+def _collect_condition_not_matched_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    return _collect_rule_trace(result, "bccse_condition_not_matched_rule_ids")
+
+
+def _collect_candidate_rule_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    return _collect_rule_trace(result, "bccse_candidate_rule_ids")
+
+
 def _collect_rule_effects_trace(
     result: Mapping[str, Any],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -2275,6 +2823,34 @@ def _collect_rule_effects_trace(
     return trace
 
 
+def _collect_condition_feature_trace(
+    result: Mapping[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    """Exact pre-call feature projections for every provider invocation."""
+    providers = result.get("providers")
+    if not isinstance(providers, Mapping):
+        return {}
+    trace: dict[str, list[dict[str, Any]]] = {}
+
+    def walk(node: Any) -> None:
+        if isinstance(node, Mapping):
+            features = node.get("bccse_condition_features")
+            if isinstance(features, Mapping):
+                route_key = str(node.get("bccse_route") or "unknown_route")
+                bounded = dict(features)
+                bucket = trace.setdefault(route_key, [])
+                if bounded not in bucket:
+                    bucket.append(bounded)
+            for child in node.values():
+                walk(child)
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+
+    walk(providers)
+    return trace
+
+
 def _run_detection_with_genome(
     genome: SkillGenome,
     case_id: str,
@@ -2306,10 +2882,11 @@ def _run_detection_with_genome(
 
     # Seed genome directory with baseline cache for efficiency.
     # v5.3.4b-D2: 7 cache subdirs are symlinked to a SHARED cache root keyed by
-    # genome.content_hash, so individual-replay and batch-replay of the same genome+case
-    # reuse the same LLM cache (eliminates CRS nondeterminism from fresh LLM calls).
+    # genome.execution_hash, so every field that changes runtime behavior
+    # (rule text, typed condition, ActionSpec) owns a distinct cache namespace
+    # while identical behavior reuses the same LLM responses.
     # genome_dir itself remains the per-run artifacts dir (predictions, ledger, etc.).
-    genome_dir = output_dir / "genomes" / genome.content_hash
+    genome_dir = output_dir / "genomes" / genome.execution_hash
     genome_dir.mkdir(parents=True, exist_ok=True)
     cache_dirs = (
         "layered_v2", "construct_census_cache", "focused_prosecution_cache",
@@ -2385,7 +2962,7 @@ def _run_detection_with_genome(
 
     if shared_cache_root is not None:
         # Use the shared cache root passed by the caller (fixed path, not relative)
-        shared_hash_root = Path(shared_cache_root) / genome.content_hash
+        shared_hash_root = Path(shared_cache_root) / genome.execution_hash
         shared_hash_root.mkdir(parents=True, exist_ok=True)
         marker = shared_hash_root / ".baseline_cache_seeded"
         refresh_cache_seed(
@@ -2443,16 +3020,9 @@ def _run_detection_with_genome(
 
     def invoke() -> dict[str, Any]:
         nonlocal compiled_rule_trace
-        if genome.content_hash == baseline.content_hash:
-            return v35.adjudicate_case(
-                case_id=case_id,
-                record=record,
-                config=config,
-                output_dir=genome_dir,
-                census_root=census_root,
-                policy_items=policy_items,
-                policy_registry=policy_registry,
-            )
+        # Baseline and evolved genomes cross the same wrapper. With no delta
+        # rules it leaves prompts byte-identical and only records the exact
+        # pre-call condition-feature projection needed by reflection.
         with integrated_v35_provider(genome=genome, config=config) as compiled:
             if compiled is not None:
                 compiled_rule_trace = compiled.rule_trace()
@@ -2469,6 +3039,7 @@ def _run_detection_with_genome(
     result = invoke()
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
+    result["condition_feature_trace"] = _collect_condition_feature_trace(result)
     if compiled_rule_trace:
         # Compiled rule trace: which evolved rules exist in this genome.
         # Audit telemetry only; it never participates in a verdict. The
@@ -2477,6 +3048,13 @@ def _run_detection_with_genome(
         result["compiled_rule_trace"] = compiled_rule_trace
         result["injected_rule_trace"] = _collect_injected_rule_trace(result)
         result["applied_rule_trace"] = _collect_applied_rule_trace(result)
+        result["candidate_rule_trace"] = _collect_candidate_rule_trace(result)
+        result["condition_matched_rule_trace"] = (
+            _collect_condition_matched_rule_trace(result)
+        )
+        result["condition_not_matched_rule_trace"] = (
+            _collect_condition_not_matched_rule_trace(result)
+        )
         result["rule_effects_trace"] = _collect_rule_effects_trace(result)
     # Formal evolution must never consume legacy rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
@@ -3669,11 +4247,35 @@ def _build_evolution_result(
 def _canary_preserved(
     parent_result: Mapping[str, Any],
     child_result: Mapping[str, Any],
+    *,
+    use_gold: bool = False,
+    gold_label: bool | None = None,
 ) -> tuple[bool, dict[str, Any]]:
-    """Require both verdict and process stability on a replay anchor."""
+    """Require both verdict and process stability on a replay anchor.
+
+    ``use_gold`` / ``gold_label`` carry the SAME attribution context that
+    registered the anchor (the main loop registers a stable canary from a
+    ``_attribution_for_result(use_gold=self.use_gold)`` signal).  Checking
+    the child with a hard-coded gold-free signal splits the two paths: a
+    gold-correct case (e.g. verified_error with gold=true) is stable under
+    the registering gold context (``should_evolve=False``) but reports
+    ``EVIDENCE_INCOMPLETE`` / ``should_evolve=True`` under a gold-free
+    signal, so every edit that faithfully preserves it is misclassified
+    as a canary regression and rejected (reproduced in probe_run1:
+    BFCL/000 and BFCL/002 replayed byte-identical ``verified_error`` yet
+    reported ``preserved=False``, killing every L2 policy and L1 skill).
+    The replay anchor therefore must be re-checked under the same context
+    that admitted it; callers that registered under gold pass the case
+    gold through so parent and child are judged identically.
+    """
+    parent_payload = dict(parent_result)
+    child_payload = dict(child_result)
+    if use_gold and gold_label is not None:
+        parent_payload["gold_label"] = gold_label
+        child_payload["gold_label"] = gold_label
     try:
-        parent_state = resolve_evolution_state(parent_result)
-        child_state = resolve_evolution_state(child_result)
+        parent_state = resolve_evolution_state(parent_payload)
+        child_state = resolve_evolution_state(child_payload)
     except ValueError as exc:
         # Distinct sentinels, never None: an audit consumer recomputing
         # stability as ``before_state == after_state`` must not read two
@@ -3685,8 +4287,12 @@ def _canary_preserved(
             "error": f"canary_state:{exc}",
         }
     try:
-        parent_signal = attribute_failure(parent_result, use_gold=False)
-        child_signal = attribute_failure(child_result, use_gold=False)
+        parent_signal = attribute_failure(
+            parent_payload, use_gold=use_gold,
+        )
+        child_signal = attribute_failure(
+            child_payload, use_gold=use_gold,
+        )
         parent_triggered = parent_signal.should_evolve
         child_triggered = child_signal.should_evolve
     except Exception as exc:
@@ -3698,7 +4304,7 @@ def _canary_preserved(
         }
     preserved = (
         parent_state == child_state
-        and bool(child_result.get("runtime_valid"))
+        and bool(child_payload.get("runtime_valid"))
         and not parent_triggered
         and not child_triggered
     )
@@ -3707,8 +4313,9 @@ def _canary_preserved(
         "after_state": child_state,
         "before_should_evolve": parent_triggered,
         "after_should_evolve": child_triggered,
-        "runtime_valid": bool(child_result.get("runtime_valid")),
+        "runtime_valid": bool(child_payload.get("runtime_valid")),
         "preserved": preserved,
+        "canary_context": "gold" if use_gold else "label_free",
     }
 
 
@@ -5461,7 +6068,7 @@ def _run_l2_policy_case_impl(
     state: _RunState,
     mutation_route: dict[str, Any] | None,
     gate: Any, records: Mapping[str, dict[str, Any]], output_dir: Path,
-    type_fitness: Any, fitness_use_gold: bool,
+    type_fitness: Any, fitness_use_gold: bool, use_gold: bool,
     stable_canaries: dict[str, dict[str, Any]],
     registered_canary_ids: Sequence[str], canary_limit: int,
     l2_policy_audit: list[dict[str, Any]],
@@ -6120,6 +6727,8 @@ def _run_l2_policy_case_impl(
             )
             preserved, audit = _canary_preserved(
                 parent_canary, child_canary,
+                use_gold=use_gold,
+                gold_label=_evaluator_gold(records[canary_id]),
             )
             policy_canary_audit.append({"case_id": canary_id, **audit})
             if preserved:
@@ -6737,6 +7346,7 @@ class EvolutionLoop:
             state=self.state, mutation_route=self.mutation_route, gate=self.gate,
             records=self.records, output_dir=self.output_dir,
             type_fitness=self.type_fitness, fitness_use_gold=self.fitness_use_gold,
+            use_gold=self.use_gold,
             stable_canaries=self.stable_canaries,
             registered_canary_ids=self.registered_canary_ids,
             canary_limit=self.canary_limit,
@@ -7006,7 +7616,13 @@ class EvolutionLoop:
                             evolution_direction=evolution_direction,
                             record_key=case_id,
                             allowed_modules=_allowed_l1_modules(
-                                signal, attribution_owner,
+                                signal,
+                                attribution_owner,
+                                classifier_attribution.evidence.get(
+                                    "artifact_frontier", ()
+                                ) if isinstance(
+                                    classifier_attribution.evidence, Mapping
+                                ) else (),
                             ),
                         ).to_dict()
                         episode_is_new = True
@@ -7254,7 +7870,12 @@ class EvolutionLoop:
             # Explore every polarity-compatible surface recorded in the same
             # episode action envelope. The independent generation scheduler
             # assigns an initial candidate to each owner before critic ranking.
-            type_allowed_modules = _allowed_l1_modules(signal, attribution_owner)
+            type_allowed_modules = _allowed_l1_modules(
+                signal,
+                attribution_owner,
+                classifier_attribution.evidence.get("artifact_frontier", ())
+                if isinstance(classifier_attribution.evidence, Mapping) else (),
+            )
             type_guidance = self.type_evolution.generate_type_guidance(
                 type_result.primary_type,
                 evolution_direction,
@@ -7287,6 +7908,8 @@ class EvolutionLoop:
             # and hand the structural gate a slot-contract check instead of a
             # free-text shape guess.
             pending_rule_slots: dict[str, Any] | None = None
+            pending_condition_spec: dict[str, Any] = {}
+            pending_repair_edge: dict[str, Any] = {}
             no_edit_reason = ""
             invalid_mutation_reason = ""
             reflection_audit: dict[str, Any] = {
@@ -7355,16 +7978,12 @@ class EvolutionLoop:
                 current_episode = None
                 if self.state.active_episode_payload is not None and "episode_id" in self.state.active_episode_payload:
                     current_episode = FailureEpisode.from_dict(self.state.active_episode_payload)
-                blocked_action_surfaces = tuple(
-                    (
-                        attempt.target_module,
-                        str(attempt.action_spec.get("operation") or ""),
+                repair_frontier_dicts = (
+                    tuple(
+                        edge.to_dict() for edge in
+                        current_episode.causal_slice.repair_frontier
                     )
-                    for attempt in (
-                        current_episode.attempts if current_episode is not None else ()
-                    )
-                    if "no_effect" in attempt.decision
-                    and str(attempt.action_spec.get("operation") or "")
+                    if current_episode is not None else ()
                 )
                 history_refs = (
                     self.causal_memory.retrieve(
@@ -7400,6 +8019,7 @@ class EvolutionLoop:
                     meta_guidance=meta_guidance,
                     episode=current_episode,
                     experience_memory=self.causal_memory,
+                    runtime_observation=runtime_observation,
                 )
 
                 # HTC-TES v3: Append type-conditioned guidance to reflection prompt
@@ -7499,12 +8119,37 @@ class EvolutionLoop:
                             generated, limit=1,
                         )
                         generated_count += len(generated_candidates)
+                        generated_candidates = [
+                            _normalize_candidate_from_repair_plan(
+                                candidate, repair_frontier_dicts,
+                            )
+                            for candidate in generated_candidates
+                        ]
                         for candidate in generated_candidates:
                             prevalidate_reason = _prevalidate_candidate(
                                 candidate,
                                 allowed_modules,
                                 error_type=getattr(signal, "error_type", None),
-                                blocked_action_surfaces=blocked_action_surfaces,
+                                failure_edge_field=(
+                                    current_episode.causal_slice.failure_edge.field
+                                    if current_episode is not None
+                                    and current_episode.causal_slice.failure_edge is not None
+                                    else ""
+                                ),
+                                repair_frontier=(
+                                    tuple(
+                                        edge.to_dict() for edge in
+                                        current_episode.causal_slice.repair_frontier
+                                    )
+                                    if current_episode is not None else ()
+                                ),
+                                runtime_condition_features=(
+                                    runtime_observation.get(
+                                        "runtime_condition_features", {}
+                                    )
+                                    if isinstance(runtime_observation, Mapping)
+                                    else {}
+                                ),
                             )
                             if prevalidate_reason is None:
                                 candidates.append(candidate)
@@ -7643,6 +8288,7 @@ class EvolutionLoop:
                                 targeted_diagnosis=diagnosis,
                                 episode=current_episode,
                                 experience_memory=self.causal_memory,
+                                runtime_observation=runtime_observation,
                             )
                             if self.active_attempt_index > 0:
                                 targeted_system += _build_structural_system_constraints(
@@ -7713,6 +8359,49 @@ class EvolutionLoop:
                     else:
                         parsed = candidates[0] if candidates else {}
                         reflection_audit["selected_index"] = 0
+                    # Fix #4: fill framework-known execution fields (target_module
+                    # + action) for plan-form candidates before final admission.
+                    if parsed:
+                        parsed = _normalize_candidate_from_repair_plan(
+                            parsed, repair_frontier_dicts,
+                        )
+                    final_prevalidation_reason = (
+                        _prevalidate_candidate(
+                            parsed,
+                            allowed_modules,
+                            error_type=getattr(signal, "error_type", None),
+                            failure_edge_field=(
+                                current_episode.causal_slice.failure_edge.field
+                                if current_episode is not None
+                                and current_episode.causal_slice.failure_edge is not None
+                                else ""
+                            ),
+                            repair_frontier=(
+                                tuple(
+                                    edge.to_dict() for edge in
+                                    current_episode.causal_slice.repair_frontier
+                                )
+                                if current_episode is not None else ()
+                            ),
+                            runtime_condition_features=(
+                                runtime_observation.get(
+                                    "runtime_condition_features", {}
+                                )
+                                if isinstance(runtime_observation, Mapping)
+                                else {}
+                            ),
+                        )
+                        if parsed else None
+                    )
+                    if final_prevalidation_reason is not None:
+                        invalid_mutation_reason = (
+                            "selected_candidate_prevalidation_rejected:"
+                            + final_prevalidation_reason
+                        )
+                        reflection_audit["selected_prevalidation_reject"] = (
+                            final_prevalidation_reason
+                        )
+                        parsed = {}
                     raw_target_module = str(parsed.get("target_module") or "")
                     reflection_audit["proposed_target_module"] = raw_target_module or None
                     if raw_target_module and raw_target_module not in allowed_modules:
@@ -7729,6 +8418,21 @@ class EvolutionLoop:
                         reflection_audit["validated_target_module"] = target_module
                     operation = str(parsed.get("operation") or "")
                     rule_index = parsed.get("rule_index")
+                    pending_condition_spec = sanitize_condition_spec(
+                        parsed.get("condition_spec")
+                    )
+                    selected_repair_edge_id = str(
+                        parsed.get("repair_edge_id") or ""
+                    )
+                    if current_episode is not None and selected_repair_edge_id:
+                        pending_repair_edge = next(
+                            (
+                                edge.to_dict()
+                                for edge in current_episode.causal_slice.repair_frontier
+                                if edge.edge_id == selected_repair_edge_id
+                            ),
+                            {},
+                        )
                     # add/modify rules are slot contracts: the LLM supplies typed
                     # slots and the rule text is their deterministic render, so a
                     # shape or authority violation fails here as an invalid
@@ -7953,6 +8657,8 @@ class EvolutionLoop:
                             routing_allowed_modules=tuple(allowed_modules),
                             expected_effect=expected_effect,
                             expected_effect_contract=expected_effect_contract,
+                            condition_spec=pending_condition_spec,
+                            repair_edge=pending_repair_edge,
                         )
                         print(
                             f"    LLM generated: {target_module}/{operation} "
@@ -7982,6 +8688,8 @@ class EvolutionLoop:
                             expected_effect_contract=expected_effect_contract,
                             rule_slots=pending_rule_slots or {},
                             action_spec=pending_action_spec,
+                            condition_spec=pending_condition_spec,
+                            repair_edge=pending_repair_edge,
                         )
                         print(
                             f"    LLM generated: {target_module}/{operation}: "
@@ -8528,6 +9236,12 @@ class EvolutionLoop:
                 assessment,
                 edit=edit,
                 result=candidate_result,
+                baseline_surviving_ids=_baseline_surviving_error_certificate_ids(
+                    detection_result
+                ),
+                # Full baseline result: claim-level carrier fingerprints
+                # make the withhold postcondition rename-invariant.
+                baseline_result=detection_result,
             )
 
             canary_audit: list[dict[str, Any]] = []
@@ -8575,6 +9289,11 @@ class EvolutionLoop:
                         )
                         preserved, audit = _canary_preserved(
                             parent_canary, child_canary,
+                            use_gold=self.use_gold,
+                            gold_label=(
+                                _evaluator_gold(self.records[canary_id])
+                                if self.use_gold else None
+                            ),
                         )
                         canary_audit.append({"case_id": canary_id, **audit})
                         if not preserved:
@@ -8979,7 +9698,10 @@ class EvolutionLoop:
                     applied=applied_flag,
                     observable_delta=effect_audit["observable_deltas"],
                     no_effect_reason=_no_effect_reason_for(
-                        classification, injected_flag, applied_flag,
+                        classification,
+                        injected_flag,
+                        applied_flag,
+                        str(causal_execution_audit.get("status") or ""),
                     ),
                     proposal_content=edit.new_content,
                 )

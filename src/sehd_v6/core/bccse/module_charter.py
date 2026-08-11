@@ -22,6 +22,10 @@ from dataclasses import dataclass
 
 from .vocabulary import ALLOWED_VERDICTS
 from .genome import MODULE_IDS, MODULE_STAGE
+from ..paca_tcl.audit_contract import (
+    DEFENSE_INVARIANT_TARGETS,
+    ERROR_INVARIANT_TARGETS,
+)
 
 
 @dataclass(frozen=True)
@@ -325,11 +329,19 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
         ("withhold_certificate", "withhold the certificate"),
         ("emit_certificate", "emit the certificate"),
         ("require_evidence_field", "require the cited evidence field"),
+        (
+            "enforce_certificate_invariant",
+            "enforce the certificate validation invariant",
+        ),
     ),
     "clean_defense_boundary": (
         ("emit_defense_certificate", "emit a defense certificate"),
         ("emit_boundary_finding", "emit the boundary finding"),
         ("require_evidence_field", "require the cited evidence field"),
+        (
+            "enforce_certificate_invariant",
+            "enforce the certificate validation invariant",
+        ),
     ),
     "causal_link_test": (
         ("test_causal_link", "test the causal link"),
@@ -397,10 +409,16 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
     ),
     "atomic_verifier_instruction": (
         "prosecution_certificates", "causal_field_coverage",
-        "target_local_score",
+        "certificate_invariant_failures",
+        "target_certificate_invariant_failure",
+        # Claim-level surviving carriers — the executable observable of
+        # withhold_certificate / emit_certificate, rename-invariant.
+        "surviving_certificates", "target_local_score",
     ),
     "clean_defense_boundary": (
         "defense_coverage", "defense_certificates", "target_local_score",
+        "certificate_invariant_failures",
+        "target_certificate_invariant_failure",
     ),
     "causal_link_test": (
         "causal_field_coverage", "localization_status", "target_local_score",
@@ -468,6 +486,7 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
             "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
             "evidence_refs",
         ),
+        "enforce_certificate_invariant": ERROR_INVARIANT_TARGETS,
     },
     "clean_defense_boundary": {
         "emit_defense_certificate": ("certificate_id",),
@@ -476,6 +495,7 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
             "evidence", "evidence_refs", "target_candidate_id",
             "target_origin_event_id",
         ),
+        "enforce_certificate_invariant": DEFENSE_INVARIANT_TARGETS,
     },
     "causal_link_test": {
         "test_causal_link": (

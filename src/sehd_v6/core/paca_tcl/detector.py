@@ -297,6 +297,7 @@ def detect_record(
         provenance: dict[str, Any] = {}
         if genome is not None:
             provenance["genome_hash"] = genome.content_hash
+            provenance["genome_execution_hash"] = genome.execution_hash
             provenance["genome_source"] = genome_source
         if policy_genome is not None:
             provenance["policy_genome_hash"] = policy_genome.content_hash

@@ -614,6 +614,7 @@ def _diagnostic_int(diagnostics: Mapping[str, Any], key: str) -> int:
 def _route_process_failure(
     row: Mapping[str, Any],
     *,
+    error_type: ErrorType,
     state: str,
     candidate_count: int,
     prosecution: CoverageReading,
@@ -622,15 +623,15 @@ def _route_process_failure(
     default_secondary: str,
 ) -> tuple[str, str]:
     """Route a process failure to the stage where the trace actually broke."""
-    # v5.3 fix + v5.7 hardening: When defense is already complete, no error
-    # certificate survived, and the output is still unresolved, the root cause
-    # is abstention_rule (defense complete → should be clean). Secondary is
-    # clean_defense_boundary (verify defense is correctly formed). This check
-    # must run BEFORE the candidate_count==0 short-circuit: an abstention
-    # defect is fixable via the abstention_rule module even when the census
-    # found no candidates. A surviving error certificate means the court had
-    # real error evidence, so the case falls through to the routes below.
+    # A complete defense implies an abstention defect only when supervision
+    # explicitly says the unresolved case should be clean.  The old branch
+    # ignored polarity and routed gold-error cases to ``abstention_rule``;
+    # those proposals were then rejected by the FN polarity gate, producing a
+    # deterministic no-edit path.  Unknown/self-supervised unresolved cases
+    # remain fail-closed and follow the actual incomplete process edge.
     if (
+        error_type == ErrorType.UNRESOLVED_SHOULD_CLEAN
+        and
         state == "unresolved"
         and defense.state == "complete"
         and not _has_surviving_error_certificate(row)
@@ -678,6 +679,7 @@ def _route_gold_locked_owner(
     defense: CoverageReading,
     default_module: str,
     default_secondary: str,
+    surviving_error_count: int = 0,
 ) -> tuple[str, str]:
     """Route a gold-locked FP/FN to the stage where the court actually broke.
 
@@ -689,10 +691,24 @@ def _route_gold_locked_owner(
       abstention/adjudication failure, not a missing-evidence failure. If
       prosecution is incomplete, evidence construction is the defect. If
       defense is the only complete side, the court over-deferred to it.
-    - FP (error verdict, gold=clean): if defense is already complete, the
-      defense surface is saturated. Surviving error evidence must be bounded
-      at the prosecution evidence or atomic verification surface. If defense
-      is incomplete, defense construction remains the owner.
+    - FP (error verdict, gold=clean): the only path that can relax a
+      surviving error certificate is the prosecution-side owner
+      (``evidence_obligation`` — keep_coverage_incomplete to demote the
+      verdict to unresolved — or ``atomic_verifier_instruction`` —
+      withhold_certificate on the carrier). Adding more defense
+      certificates does NOT demote a verdict carried by a still-surviving
+      error certificate; in the proof-court's terminal-edge semantics a
+      surviving prosecution certificate upholds ``verified_error`` whatever
+      the defense certificate count is (reproduced in
+      probe_fp_run2_fixed: an ``emit_defense_certificate`` rule fired, the
+      postcondition was satisfied, ``defense_certificates`` were emitted,
+      yet the verdict state remained ``verified_error`` because the carrier
+      ``appeal_error_002`` survived). Therefore: for FP + verified_error,
+      when ``surviving_error_count > 0`` the owner is always the
+      prosecution-side evidence/verifier pair, REGARDLESS of the defense
+      coverage state. Defense coverage being incomplete only matters when
+      no prosecution certificate survived (in which case completing defense
+      could itself drive a clean verdict by blocking the court).
 
     The ``default_module`` from the error-type map is used only as a fallback.
     """
@@ -710,6 +726,13 @@ def _route_gold_locked_owner(
         return "evidence_obligation", "atomic_verifier_instruction"
     if state == "verified_error":
         # FP side: gold says a clean case was wrongly condemned.
+        if surviving_error_count > 0:
+            # A surviving error certificate carries the verdict; the only
+            # way to relax it is the prosecution-side owner that bounds or
+            # withholds the carrier. Defense expansion is inert against a
+            # surviving carrier and must not be attributed as the owner
+            # root-cause even when defense coverage is incomplete/unresolved.
+            return "evidence_obligation", "atomic_verifier_instruction"
         if defense.state in {"complete"}:
             return "evidence_obligation", "atomic_verifier_instruction"
         if defense.state in {"incomplete", "unresolved"}:
@@ -984,6 +1007,7 @@ def _resolve_module_attribution(
     gold_verified_correct: bool,
     diagnostic_finding: tuple[ErrorType, TriggerSource] | None,
     process_diagnostic_applied: bool,
+    surviving_error_count: int = 0,
 ) -> tuple[str, str, bool]:
     """Route an error type to the responsible genome module.
 
@@ -1009,6 +1033,7 @@ def _resolve_module_attribution(
             defense=defense,
             default_module=target_module,
             default_secondary=secondary_module,
+            surviving_error_count=surviving_error_count,
         )
         target_module, secondary_module = routed
 
@@ -1046,6 +1071,7 @@ def _resolve_module_attribution(
     }:
         routed_target, routed_secondary = _route_process_failure(
             row,
+            error_type=error_type,
             state=state,
             candidate_count=candidate_count,
             prosecution=prosecution,
@@ -1355,6 +1381,22 @@ def attribute_failure(
     # ================================================================
     # Module attribution
     # ================================================================
+    # Surviving-error-carrier awareness (first-principles fix for FP
+    # routing): the proof court's terminal verdict on an FP case is
+    # carried by ``proof_adjudication.surviving_error_certificate_ids``.
+    # Whenever at least one carrier survives, defense expansion cannot
+    # demote ``verified_error`` to ``verified_clean`` — the court upholds
+    # the verdict on the surviving carrier regardless of the defense
+    # certificate count. The gold-locked FP router uses this count to
+    # avoid ``clean_defense_boundary`` attribution when defense coverage
+    # is incomplete but a carrier still survives.
+    proof_adjudication = row.get("proof_adjudication") or {}
+    if not isinstance(proof_adjudication, Mapping):
+        proof_adjudication = {}
+    surviving_ids = proof_adjudication.get("surviving_error_certificate_ids")
+    surviving_error_count = (
+        len(surviving_ids) if isinstance(surviving_ids, (list, tuple)) else 0
+    )
     target_module, secondary_module, process_diagnostic_applied = (
         _resolve_module_attribution(
             row=row, error_type=error_type, state=state,
@@ -1364,6 +1406,7 @@ def attribute_failure(
             gold_verified_correct=gold_verified_correct,
             diagnostic_finding=diagnostic_finding,
             process_diagnostic_applied=process_diagnostic_applied,
+            surviving_error_count=surviving_error_count,
         )
     )
 

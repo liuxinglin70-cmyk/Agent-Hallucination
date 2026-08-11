@@ -10,7 +10,8 @@ identity, gold labels, or raw trajectories.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from html import escape
+from typing import Any, Mapping, Sequence
 
 from .evolution_experience_memory import (
     NO_EFFECT_REASONS,
@@ -247,11 +248,19 @@ def retrieve_structured_experience(
                 pattern=current_pattern,
                 similarity_score=1.0,
                 successful_interventions=(
-                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                    ({
+                        "condition": ref.rule_condition,
+                        "action_spec": ref.action_spec,
+                        "outcome": ref.local_outcome,
+                    },)
                     if accepted else ()
                 ),
                 failed_interventions=(
-                    ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                    ({
+                        "condition": ref.rule_condition,
+                        "action_spec": ref.action_spec,
+                        "outcome": ref.local_outcome,
+                    },)
                     if not accepted else ()
                 ),
                 retrieval_path="exact",
@@ -301,11 +310,19 @@ def retrieve_structured_experience(
                     pattern=current_pattern,
                     similarity_score=sim,
                     successful_interventions=(
-                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                        ({
+                            "condition": ref.rule_condition,
+                            "action_spec": ref.action_spec,
+                            "outcome": ref.local_outcome,
+                        },)
                         if accepted else ()
                     ),
                     failed_interventions=(
-                        ({"action_spec": ref.action_spec, "outcome": ref.local_outcome},)
+                        ({
+                            "condition": ref.rule_condition,
+                            "action_spec": ref.action_spec,
+                            "outcome": ref.local_outcome,
+                        },)
                         if not accepted else ()
                     ),
                     retrieval_path="shape_context",
@@ -330,30 +347,50 @@ def format_experience_for_prompt(
         return ""
 
     lines: list[str] = ["<structured_experience>"]
+
+    def emit_intervention(intervention: Mapping[str, Any]) -> None:
+        action = intervention.get("action_spec") or {}
+        outcome = intervention.get("outcome") or {}
+        condition = escape(str(intervention.get("condition") or ""))
+        lines.append("      <intervention>")
+        if condition:
+            lines.append(f"        <condition>{condition}</condition>")
+        lines.append(
+            f"        <module>{escape(str(action.get('module_id') or 'unknown'))}</module>"
+        )
+        lines.append(
+            f"        <action>{escape(str(action.get('operation') or 'unknown'))}</action>"
+        )
+        for tag, key in (
+            ("output_field", "output_field"),
+            ("postcondition", "postcondition"),
+            ("observable_field", "observable_field"),
+            ("expected_direction", "expected_direction"),
+        ):
+            value = str(action.get(key) or "")
+            if value:
+                lines.append(f"        <{tag}>{escape(value)}</{tag}>")
+        lines.append(
+            f"        <outcome>{escape(str(outcome.get('decision') or 'unknown'))}</outcome>"
+        )
+        no_effect = str(outcome.get("no_effect_reason") or "")
+        if no_effect:
+            lines.append(
+                f"        <no_effect_reason>{escape(no_effect)}</no_effect_reason>"
+            )
+        lines.append("      </intervention>")
+
     for index, match in enumerate(matches[:3]):
         lines.append(f"  <match index=\"{index}\" similarity=\"{match.similarity_score:.2f}\" path=\"{match.retrieval_path}\">")
         if match.successful_interventions:
             lines.append("    <successful_interventions>")
             for intervention in match.successful_interventions[:2]:
-                action = intervention.get("action_spec") or {}
-                outcome = intervention.get("outcome") or {}
-                lines.append("      <intervention>")
-                lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
-                lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
-                lines.append(f"        <outcome>{outcome.get('decision', 'unknown')}</outcome>")
-                lines.append("      </intervention>")
+                emit_intervention(intervention)
             lines.append("    </successful_interventions>")
         if match.failed_interventions:
             lines.append("    <failed_interventions>")
             for intervention in match.failed_interventions[:2]:
-                action = intervention.get("action_spec") or {}
-                outcome = intervention.get("outcome") or {}
-                lines.append("      <intervention>")
-                lines.append(f"        <action>{action.get('operation', 'unknown')}</action>")
-                lines.append(f"        <module>{action.get('target_module', 'unknown')}</module>")
-                lines.append(f"        <outcome>{outcome.get('decision', 'unknown')}</outcome>")
-                lines.append(f"        <no_effect_reason>{outcome.get('no_effect_reason', '')}</no_effect_reason>")
-                lines.append("      </intervention>")
+                emit_intervention(intervention)
             lines.append("    </failed_interventions>")
         lines.append("  </match>")
     lines.append("</structured_experience>")

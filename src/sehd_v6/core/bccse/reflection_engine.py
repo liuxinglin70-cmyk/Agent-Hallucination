@@ -36,6 +36,7 @@ from .action_spec import (
     render_direction_action_contract,
 )
 from .failure_episode import EVALUATOR_ONLY_KEYS
+from .condition_spec import render_condition_spec_contract
 from .step_attributor import (
     AttributionSignal,
     ErrorType,
@@ -291,6 +292,7 @@ def build_causal_reflection_prompt(
     experience_memory: Any = None,
     negative_feedback_analysis: Any = None,
     episode: Any = None,
+    runtime_observation: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -319,6 +321,11 @@ def build_causal_reflection_prompt(
             includes pattern-matched successful/failed interventions.
         negative_feedback_analysis: Optional pre-computed negative feedback
             analysis. When not provided, computed from rejected_buffer.
+        runtime_observation: Optional ``failure_episode.build_runtime_observation``
+            projection. Carries ``court_balance.verdict_carriers`` /
+            ``witness_certificates``, which the binding VERDICT-CARRIER RULE
+            names but the episode projection does not contain; merged into
+            ``<structured_runtime_observation>`` when present.
 
     Returns:
         (system_prompt, user_prompt) tuple.
@@ -359,6 +366,53 @@ def build_causal_reflection_prompt(
         action_direction = "clean_to_error"
     else:
         action_direction = ""
+    # Fix #4: framework-compiled MechanismRepairPlans. When the episode is
+    # available, the framework compiles owner / route / output object / output
+    # field / legal operations for each executable repair edge. The model only
+    # selects an edge and an operation from the legal enum; it does not
+    # re-generate the framework-known execution vocabulary. A plan with a
+    # single legal operation auto-selects it (the model must not override it).
+    repair_plans_section = ""
+    if episode is not None:
+        from .failure_episode import compile_mechanism_repair_plans
+        repair_plans = compile_mechanism_repair_plans(
+            episode, allowed_modules, action_direction,
+        )
+        if repair_plans:
+            lines = [
+                "<mechanism_repair_plans framework_compiled=\"true\">",
+                "Each plan names the proof-cut edge the framework compiled.",
+                "Select repair_edge_id and an operation from legal_operations.",
+                "Do not invent target_module or action strings: they are",
+                "derived from the selected plan by the framework.",
+            ]
+            for plan in repair_plans:
+                op_enum = ", ".join(plan.legal_operations)
+                if plan.auto_selected_operation:
+                    lines.append(
+                        f"- edge_id={plan.edge_id} "
+                        f"owner={plan.owner_module} "
+                        f"route={plan.route} "
+                        f"object={plan.output_object} "
+                        f"field={plan.output_field} "
+                        f"observed={plan.observed}->required={plan.required} "
+                        f"legal_operations=[{op_enum}] "
+                        f"AUTO_SELECTED={plan.auto_selected_operation} "
+                        f"(must not be overridden)"
+                    )
+                else:
+                    lines.append(
+                        f"- edge_id={plan.edge_id} "
+                        f"owner={plan.owner_module} "
+                        f"route={plan.route} "
+                        f"object={plan.output_object} "
+                        f"field={plan.output_field} "
+                        f"observed={plan.observed}->required={plan.required} "
+                        f"legal_operations=[{op_enum}] "
+                        f"choose exactly one"
+                    )
+            lines.append("</mechanism_repair_plans>")
+            repair_plans_section = "\n".join(lines) + "\n"
     direction_action_contract = render_direction_action_contract(
         action_direction,
         allowed_modules,
@@ -403,7 +457,19 @@ Use this causal design sequence BEFORE writing a rule:
    measure. If the field is not in the selected module's allowed list, choose
    another allowed module or return no_edit.
 
-Read downstream_consumption and failure_edge inside structured_runtime_observation
+REPAIR-FRONTIER BINDING (mandatory): for an L1 episode, select exactly one
+edge from ``repair_frontier`` and return its ``edge_id`` as repair_edge_id.
+The selected edge's owner_module must equal target_module and the action
+target must repair that edge's exact ``field``. If that field is a registered
+certificate invariant, use the module's invariant-enforcement opcode with
+that same invariant as its target. Do not substitute a nearby evidence field,
+another validation check, or an aggregate score merely because it also moved
+in the trace. A sibling output may improve while leaving the diagnosed causal
+edge unchanged; such a proposal is rejected before replay. You may retry the
+same correct operation with a genuinely different observable condition after
+a no-effect attempt; only near-duplicate rules are forbidden.
+
+Read downstream_consumption and repair_frontier inside structured_runtime_observation
 to locate who carried the verdict, then pick the executable owner inside the
 allowed modules:
 - verdict clean + surviving_error_certificates>0 or defense_certificates>0:
@@ -423,6 +489,25 @@ allowed modules:
   (evidence_obligation). Do NOT add more defense/boundary records here: the
   defense side is already complete, so another defense record cannot move any
   observable and only restates what already lost.
+
+VERDICT-CARRIER RULE (binding): court_balance.verdict_carriers lists, by
+certificate_id, the surviving prosecution certificates that actually carry
+the current error verdict; court_balance.witness_certificates lists the
+prosecution rows the court already disregarded (quarantined, superseded or
+otherwise non-surviving). For an error_to_clean (FP / unresolved_should_clean)
+edit, your withhold_certificate / hold_candidate_qualification / suppress_*
+MUST target a certificate listed in verdict_carriers. Withholding only a
+witness certificate produces zero observable verdict movement because the
+carrier survives untouched; the replay postcondition detects the carrier
+still surviving and rejects the edit as no-effect. There is no exception to
+this rule: even if a witness certificate is malformed, the court has already
+discounted it, so tightening its emission cannot move the verdict. When
+multiple carriers are listed, your one edit may target only one carrier;
+choose the one whose breach_type / candidate_kind best matches a
+trajectory-observable discriminator, and keep the rule general (no
+case-specific identifiers). If no allowed module can target any listed
+carrier, return no_edit — do not fall back to a witness certificate.
+
 - verdict clean/unresolved + zero candidates or zero certificates on the
   decisive side: candidate_trigger or candidate_to_verifier_route owns the
   missing emission.
@@ -524,6 +609,15 @@ condition must describe a situation the target module's provider can
 observe at runtime, and the action must be one of the executable_action_specs
 listed for the target module in runtime_output_contracts.
 
+TYPED APPLICABILITY CONTRACT: the framework decides applicability before the
+provider call. Natural-language condition prose is not executable. Supply one
+closed condition_spec predicate from this registry; an unregistered feature,
+operator or value is rejected, and a false predicate prevents injection.
+The predicate must already evaluate true in runtime_condition_features for at
+least one route named by the selected ActionSpec; otherwise the source cannot
+execute the intervention and the candidate is rejected before replay:
+""" + render_condition_spec_contract() + """
+
 <module_charters>
 """
     # Only the allowed target modules' charters are injected: the model's
@@ -558,7 +652,8 @@ listed for the target module in runtime_output_contracts.
             "Return one edit object or {\"operation\":\"no_edit\","
             "\"rationale\":\"...\"}. An edit object must contain "
             '"target_module", "operation", "rule_index", "condition", '
-            '"action", "evidence_anchor", "feature_description", and '
+            '"condition_spec", "repair_edge_id", "action", '
+            '"evidence_anchor", "feature_description", and '
             '"rationale". '
             "You may optionally include \"diagnosis\" as a nested object "
             'with "failed_output", "owner_module" and "existing_rule_gap"; '
@@ -603,10 +698,45 @@ listed for the target module in runtime_output_contracts.
         crs_section = "\n".join(crs_lines)
 
     observation_section = ""
-    if episode_projection is not None:
+    if episode_projection is not None or runtime_observation is not None:
+        merged_observation: dict[str, Any] = {}
+        if episode_projection is not None:
+            merged_observation.update(episode_projection)
+        # First-principles fix: the binding VERDICT-CARRIER RULE in the
+        # system prompt names ``court_balance.verdict_carriers``, but the
+        # episode projection never carries it — only ``runtime_observation``
+        # (built by ``failure_episode.build_runtime_observation``) does, and
+        # that was previously injected only into the critic / diagnosis
+        # paths. The primary generation pass therefore demanded that the
+        # model target a carrier it could not see: it had to guess the
+        # certificate or retreat to no_edit, and a guessed carrier was
+        # frequently a witness the court already disregarded
+        # (``intervention_not_executed``). The primary prompt now receives
+        # the same carrier projection; the episode projection stays the
+        # structured failure edge (obligation-vs-observed, action envelope),
+        # and ``court_balance`` carries the verdict-carrier identity.
+        if runtime_observation is not None:
+            merged_observation.setdefault("court_balance", {})
+            court_balance = dict(runtime_observation.get("court_balance") or {})
+            merged_observation["court_balance"].update(court_balance)
+            merged_observation.setdefault("observed_fields", {})
+            merged_observation["observed_fields"].update(
+                dict(runtime_observation.get("observed_fields") or {})
+            )
+            merged_observation.setdefault("diagnostic_gap", {})
+            merged_observation["diagnostic_gap"].update(
+                dict(runtime_observation.get("diagnostic_gap") or {})
+            )
+            merged_observation["runtime_condition_features"] = dict(
+                runtime_observation.get("runtime_condition_features") or {}
+            )
+            if runtime_observation.get("terminal_basis"):
+                merged_observation["terminal_basis"] = dict(
+                    runtime_observation.get("terminal_basis") or {}
+                )
         observation_section = (
             "\n<structured_runtime_observation>\n"
-            + json.dumps(episode_projection, ensure_ascii=False, sort_keys=True)
+            + json.dumps(merged_observation, ensure_ascii=False, sort_keys=True)
             + "\n</structured_runtime_observation>\n"
         )
 
@@ -770,6 +900,7 @@ listed for the target module in runtime_output_contracts.
         "<runtime_output_contracts>\n"
         f"{runtime_contract_text}\n"
         "</runtime_output_contracts>\n"
+        f"{repair_plans_section}"
         f"{accepted_section}{capacity_section}{hint_section}{rejected_info}\n"
         "<task>\n"
         "Decide whether a safe general rule is justified by observable "
@@ -788,6 +919,12 @@ listed for the target module in runtime_output_contracts.
             "not paraphrases, and return exactly:\n"
             '{"candidates":[{"target_module":"...","operation":"add_rule",'
             '"rule_index":null,"condition":"...","action":"...",'
+            '"condition_spec":{"schema_version":"sehd.condition_spec.v1",'
+            '"feature_source":"provider_input","feature":"candidate_kind",'
+            '"operator":"contains","value_type":"string","value":"omission",'
+            '"scope":"action_spec_routes",'
+            '"evidence_binding":"pre_call_projection"},'
+            '"repair_edge_id":"edge_...",'
             '"evidence_anchor":"...","feature_description":"...",'
             '"rationale":"..."}],"no_edit_rationale":"..."}\n'
         )
@@ -868,10 +1005,19 @@ def _candidate_shape_valid(candidate: Mapping[str, Any]) -> bool:
         return False
     if operation in {"add_rule", "modify_rule"}:
         # Slot schema: the rule text is a deterministic render of these two
-        # slots, so their presence is the basic-shape contract.
+        # slots. Two admissible shapes (Fix #4):
+        #   - legacy full form: condition + action
+        #   - MechanismRepairPlan form: condition + opcode + repair_edge_id
+        #     (the framework compiles the action slot from opcode + edge field)
         return bool(
             str(candidate.get("condition") or "").strip()
-            and str(candidate.get("action") or "").strip()
+            and (
+                str(candidate.get("action") or "").strip()
+                or (
+                    str(candidate.get("opcode") or "").strip()
+                    and str(candidate.get("repair_edge_id") or "").strip()
+                )
+            )
         )
     return candidate.get("rule_index") is not None
 

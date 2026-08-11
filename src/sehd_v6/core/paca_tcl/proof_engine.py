@@ -65,17 +65,24 @@ CRITICAL RULES:
 All evidence arrays must use exact event/interaction IDs from TRAJECTORY_PACKET. Return JSON only:
 {"coverage_state":"complete|incomplete|unresolved","candidates":[{"certificate_id":"focused_error_001","source_candidate_id":"<the candidate_id>","origin_event_id":"<origin>","claim_kind":"agent_assertion|agent_action|agent_omission|agent_adoption","norm_source":"user_instruction|tool_contract|prior_trajectory_evidence|logical_invariant|external_evidence","norm_evidence_refs":["event_XXX"],"breach_type":"contradiction|fabrication|unsupported_commitment|instruction_violation|invalid_action|consequential_omission|redundant_repetition","violation_evidence_refs":["event_XXX"],"agent_control_event_id":"event_XXX","agent_control_evidence_refs":["event_XXX"],"impact_kind":"final_answer|persistent_external_state|persistent_workspace_state|committed_tool_action|unrecovered_reasoning_dependency|process_debt","impact_event_ids":["event_XXX"],"impact_evidence_refs":["event_XXX"],"recovery_state":"none|post_impact_residual|pre_impact_repaired|unresolved","recovery_evidence_refs":[],"benchmark_causal_status":"causes_incorrect_result|propagates_to_incorrect_result|process_only|unresolved","benchmark_causal_evidence_refs":["event_XXX"],"rationale":"NORM: ... | ORIGIN: ... | CONTROL: ... | PROPAGATION: ... | IMPACT: ... | COUNTERFACTUAL: ..."}]}"""
 
-FOCUSED_PROSECUTION_RETRY_SYSTEM = """You are the focused error-certificate constructor in PACA-TCL v3.5, RETRY ROUND. Your previous certificate was QUARANTINED. You must reconstruct it addressing the specific failures identified below.
+FOCUSED_PROSECUTION_RETRY_SYSTEM = FOCUSED_PROSECUTION_SYSTEM + """
 
-QUARANTINE_FEEDBACK:
-{feedback}
+RETRY ROUND: Your previous response failed the focused output contract. This
+is a fresh, stateless provider call: the complete causal rules and exact JSON
+schema above remain authoritative. Reconstruct the response while addressing
+the specific validator feedback below. Do not emit a causal_graph, nested
+certificate object, prose scaffold, or any schema other than the exact
+top-level coverage_state/candidates schema above.
+
+VALIDATOR_FEEDBACK:
+__VALIDATOR_FEEDBACK__
 
 Reconstruct the certificate for the same FOCUSED_CANDIDATE, fixing ALL identified issues. Follow the same causal chain scaffold:
 1. NORM_IDENTIFICATION → 2. ORIGIN_EVENT → 3. AGENT_CONTROL → 4. PROPAGATION_PATH → 5. IMPACT_ON_RESULT → 6. COUNTERFACTUAL_TEST
 
 If after careful analysis you determine this candidate genuinely does not constitute a verified hallucination, return an empty candidates list — do NOT force a certificate.
 
-All evidence arrays must use exact event/interaction IDs from TRAJECTORY_PACKET. Return JSON only using the same schema as before."""
+You have now reviewed the single supplied candidate, so coverage_state MUST be "complete". If no complete causal error proof exists, return an empty candidates list with coverage_state="complete". All evidence arrays must use exact event/interaction IDs from TRAJECTORY_PACKET. Return JSON only using the exact schema printed above."""
 
 
 # ============================================================
@@ -215,9 +222,9 @@ def _focused_prosecution_user(
 
 def _focused_prosecution_retry_user(
     *, built: dict[str, Any], candidate: dict[str, Any], base: dict[str, Any],
-    feedback: str,
+    feedback: str, previous_response: Mapping[str, Any] | None = None,
 ) -> str:
-    """Build the retry input with quarantine feedback."""
+    """Build a self-contained retry input for a stateless provider call."""
     neutral = {
         "focused_candidate": candidate,
         "quarantine_feedback": feedback,
@@ -228,6 +235,8 @@ def _focused_prosecution_retry_user(
         "TRAJECTORY_PACKET=\n" + packet.canonical_json(built)
         + "\nFOCUSED_CANDIDATE=\n" + packet.canonical_json(candidate)
         + "\nNEUTRAL_EVIDENCE=\n" + packet.canonical_json(neutral)
+        + "\nPREVIOUS_INVALID_RESPONSE=\n"
+        + packet.canonical_json(dict(previous_response or {}))
     )
     for field in ('"is_hallucination"', '"hallucination_step"', '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"'):
         if field in value:
@@ -239,10 +248,13 @@ def _run_focused_prosecution_for_candidate(
     *, candidate: dict[str, Any], built: dict[str, Any], base: dict[str, Any],
     config: dict[str, Any], output_dir: Path, max_retries: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    """Run focused prosecution for a single candidate with iterative refinement.
+    """Run one candidate through a uniform envelope + certificate repair loop.
 
-    Returns:
-        (certificates, audits, provider_meta)
+    A focused call has already reviewed its single candidate.  Therefore an
+    ``incomplete``/``unresolved`` coverage declaration is a repairable output
+    contract failure, not a provider crash and not a semantic no-error
+    decision.  Every attempt is validated by the same state machine; this
+    removes the old asymmetry where only malformed certificates were retried.
     """
     candidate_id = str(candidate.get("candidate_id") or "unknown")
     cache_dir = output_dir / "focused_prosecution_cache" / candidate_id
@@ -250,122 +262,133 @@ def _run_focused_prosecution_for_candidate(
     provider_meta: dict[str, Any] = {}
     if max_retries is None:
         max_retries = max(0, int(config.get("focused_prosecution_retries", 2)))
+    candidate_origins = {
+        candidate_id: str(candidate.get("origin_hypothesis_event_id") or "")
+    }
+    feedback = ""
+    previous_response: dict[str, Any] = {}
+    terminal_status = "contract_incomplete"
 
-    # Round 1: initial focused prosecution
-    user = _focused_prosecution_user(built=built, candidate=candidate, base=base)
-    try:
-        value, meta = provider_call(
-            route=config["focused_prosecution_route"],
-            system=FOCUSED_PROSECUTION_SYSTEM,
-            user=user, cache_dir=cache_dir,
-        )
-        provider_meta["round1"] = meta
-    except Exception as exc:
-        provider_meta["round1_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
-        return [], [], provider_meta
-
-    coverage_state = str(value.get("coverage_state") or "unresolved")
-    certificates = list(value.get("candidates") or [])
-    if coverage_state != "complete":
-        provider_meta["coverage_error"] = {
-            "declared_coverage_state": coverage_state,
-        }
-        return [], [], provider_meta
-    if any(
-        not isinstance(cert, dict)
-        or str(cert.get("source_candidate_id") or "") != candidate_id
-        for cert in certificates
-    ):
-        provider_meta["coverage_error"] = {
-            "error": "focused response contains another candidate",
-        }
-        return [], [], provider_meta
-    if not certificates:
-        # Provider determined no error — this is a valid "no prosecution" result.
-        # The flag name must never end in "_error" (the coverage classifier
-        # treats any meta key with that suffix as a provider crash).
-        provider_meta["no_error_declared_flag"] = True
-        return [], [], provider_meta
-
-    # Validate each certificate
-    candidate_origins = {candidate_id: str(candidate.get("origin_hypothesis_event_id") or "")}
-    for cert in certificates:
-        audit = contract.validate_focused_prosecution(cert, built, candidate_origins)
-        audit["source_candidate_id"] = candidate_id
-        all_audits.append(audit)
-
-    # A mixed valid/quarantined response leaves part of the provider's claimed
-    # proof unresolved. Retry the whole candidate instead of silently dropping
-    # the invalid claim and declaring complete coverage.
-    passed_certs = [
-        cert for cert, audit in zip(certificates, all_audits)
-        if audit["decision"] == "pass"
-    ]
-    if passed_certs and len(passed_certs) == len(certificates):
-        return passed_certs, all_audits, provider_meta
-    provider_meta["all_quarantined"] = True  # round 1 produced certs, none valid
-
-    # All quarantined — iterative refinement loop
-    for retry_round in range(1, max_retries + 1):
-        # Build feedback from the last audit
-        last_audit = all_audits[-1] if all_audits else {}
-        feedback = contract.build_quarantine_feedback(last_audit)
-
-        retry_system = FOCUSED_PROSECUTION_RETRY_SYSTEM.format(feedback=feedback)
-        retry_user = _focused_prosecution_retry_user(
-            built=built, candidate=candidate, base=base, feedback=feedback,
-        )
-        retry_cache = output_dir / "focused_prosecution_cache" / candidate_id / f"retry_{retry_round}"
+    for attempt in range(max_retries + 1):
+        if attempt == 0:
+            system = FOCUSED_PROSECUTION_SYSTEM
+            user = _focused_prosecution_user(
+                built=built, candidate=candidate, base=base,
+            )
+            attempt_key = "round1"
+            attempt_cache = cache_dir
+        else:
+            # Provider calls are stateless.  Re-send the complete output
+            # language instead of referring to a schema that existed only in
+            # the previous call's system prompt.
+            system = FOCUSED_PROSECUTION_RETRY_SYSTEM.replace(
+                "__VALIDATOR_FEEDBACK__", feedback,
+            )
+            user = _focused_prosecution_retry_user(
+                built=built, candidate=candidate, base=base, feedback=feedback,
+                previous_response=previous_response,
+            )
+            attempt_key = f"retry_{attempt}"
+            attempt_cache = cache_dir / attempt_key
 
         try:
             value, meta = provider_call(
                 route=config["focused_prosecution_route"],
-                system=retry_system, user=retry_user, cache_dir=retry_cache,
+                system=system, user=user, cache_dir=attempt_cache,
             )
-            provider_meta[f"retry_{retry_round}"] = meta
+            provider_meta[attempt_key] = meta
         except Exception as exc:
-            provider_meta[f"retry_{retry_round}_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
-            break
+            provider_meta[f"{attempt_key}_error"] = {
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
+            }
+            provider_meta["terminal_status"] = "provider_error"
+            return [], all_audits, provider_meta
 
-        coverage_state = str(value.get("coverage_state") or "unresolved")
-        certificates = list(value.get("candidates") or [])
-        if coverage_state != "complete":
-            provider_meta[f"retry_{retry_round}_coverage_error"] = {
+        if not isinstance(value, Mapping):
+            failure = "response_not_object"
+            certificates: list[Any] = []
+            coverage_state = "unresolved"
+        else:
+            previous_response = dict(value)
+            coverage_state = str(value.get("coverage_state") or "unresolved")
+            raw_certificates = value.get("candidates")
+            certificates = (
+                list(raw_certificates) if isinstance(raw_certificates, list) else []
+            )
+            failure = ""
+            if coverage_state != "complete":
+                failure = "coverage_state_not_complete"
+            elif not isinstance(raw_certificates, list):
+                failure = "candidates_not_list"
+            elif any(
+                not isinstance(cert, Mapping)
+                or str(cert.get("source_candidate_id") or "") != candidate_id
+                for cert in certificates
+            ):
+                failure = "foreign_candidate"
+
+        if failure:
+            error_key = (
+                "coverage_error" if attempt == 0
+                else f"{attempt_key}_coverage_error"
+            )
+            provider_meta[error_key] = {
+                "failure_category": failure,
                 "declared_coverage_state": coverage_state,
             }
-            break
-        if any(
-            not isinstance(cert, dict)
-            or str(cert.get("source_candidate_id") or "") != candidate_id
-            for cert in certificates
-        ):
-            provider_meta[f"retry_{retry_round}_coverage_error"] = {
-                "error": "focused response contains another candidate",
-            }
-            break
+            feedback = (
+                f"OUTPUT_CONTRACT_FAILURE: {failure}. This call reviewed one "
+                "candidate, so set coverage_state=complete. Return an empty "
+                "candidates list when no complete causal proof exists; otherwise "
+                "return certificates only for the supplied candidate."
+            )
+            terminal_status = "contract_incomplete"
+            continue
+
         if not certificates:
-            # The provider retracted after quarantine feedback; this is an
-            # explicit no-error decision, not a quarantined certificate.
             provider_meta.pop("all_quarantined", None)
             provider_meta["no_error_declared_flag"] = True
-            break
+            provider_meta["terminal_status"] = "no_error"
+            return [], all_audits, provider_meta
 
+        attempt_audits: list[dict[str, Any]] = []
         for cert in certificates:
-            audit = contract.validate_focused_prosecution(cert, built, candidate_origins)
+            audit = contract.validate_focused_prosecution(
+                dict(cert), built, candidate_origins,
+            )
             audit["source_candidate_id"] = candidate_id
-            all_audits.append(audit)
-
+            attempt_audits.append(audit)
+        all_audits.extend(attempt_audits)
         passed_certs = [
-            cert for cert, audit in zip(certificates, all_audits[-len(certificates):])
+            dict(cert) for cert, audit in zip(certificates, attempt_audits)
             if audit["decision"] == "pass"
         ]
-        if passed_certs and len(passed_certs) == len(certificates):
+        if len(passed_certs) == len(certificates):
             provider_meta.pop("all_quarantined", None)
+            provider_meta["terminal_status"] = "complete"
             return passed_certs, all_audits, provider_meta
-        provider_meta["all_quarantined"] = True
 
-    # All retries exhausted: only a quarantine-only round can reach this point
-    # with the flag set; any explicit no-error retraction cleared it above.
+        provider_meta["all_quarantined"] = True
+        failed_checks = sorted({
+            str(check)
+            for audit in attempt_audits
+            if audit.get("decision") != "pass"
+            for check in audit.get("failed_checks") or []
+        })
+        missing_stages = sorted({
+            str(stage)
+            for audit in attempt_audits
+            if audit.get("decision") != "pass"
+            for stage in audit.get("missing_chain_stages") or []
+        })
+        feedback = contract.build_quarantine_feedback({
+            "failed_checks": failed_checks,
+            "missing_chain_stages": missing_stages,
+        })
+        terminal_status = "quarantined"
+
+    provider_meta["terminal_status"] = terminal_status
     return [], all_audits, provider_meta
 
 
@@ -433,20 +456,49 @@ def _run_focused_prosecution(
     # it leaves an open structural concern. It must force "incomplete" coverage
     # (fail-closed) and remain appealable via the calibrated trigger.
     all_candidate_ids = {str(c.get("candidate_id") or "") for c in candidates}
+    def focused_status(meta: Any) -> str:
+        if not isinstance(meta, Mapping):
+            return "provider_error"
+        explicit = str(meta.get("terminal_status") or "")
+        if explicit:
+            return explicit
+        # Compatibility for cached/pre-contract provider metadata.
+        if meta.get("all_quarantined"):
+            return "quarantined"
+        if meta.get("no_error_declared_flag"):
+            return "no_error"
+        if any(k.endswith("_error") for k in meta) or "error_type" in meta:
+            return "provider_error"
+        return "complete"
+
+    terminal_statuses = {
+        str(cid): focused_status(meta)
+        for cid, meta in (provider_metas or {}).items()
+    }
     errored_candidates = {
-        str(cid) for cid, meta in (provider_metas or {}).items()
-        if meta and (any(k.endswith("_error") for k in meta) or "error_type" in (meta or {}))
+        cid for cid, status in terminal_statuses.items()
+        if status == "provider_error"
     }
     quarantined_candidates = {
-        str(cid) for cid, meta in (provider_metas or {}).items()
-        if meta and meta.get("all_quarantined")
+        cid for cid, status in terminal_statuses.items()
+        if status == "quarantined"
     }
-    successful_candidates = all_candidate_ids - errored_candidates - quarantined_candidates
+    contract_incomplete_candidates = {
+        cid for cid, status in terminal_statuses.items()
+        if status == "contract_incomplete"
+    }
+    successful_candidates = {
+        cid for cid, status in terminal_statuses.items()
+        if status in {"complete", "no_error"}
+    }
     if errored_candidates:
         # At least one provider call crashed → fail-closed (do not claim complete coverage)
         coverage = "incomplete"
     elif quarantined_candidates:
         # Quarantined-only candidates leave an open structural concern → fail-closed
+        coverage = "incomplete"
+    elif contract_incomplete_candidates:
+        # A bounded retry still could not obtain a completed review.
         coverage = "incomplete"
     # FIX (D5): 集合比较应为相等（==）而非超集（>=）；此处语义是
     # “所有候选均成功”，successful 是 attempted 的子集，>= 仅在相等时
@@ -513,7 +565,11 @@ def _appeal_trigger_calibrator_v35(
     # fate is decided by the court, which may carry the quarantine-exempt
     # routing in a future pre-ledger restore).
     for candidate_id, meta in (focused_prosecution_metas or {}).items():
-        if meta and meta.get("all_quarantined"):
+        if meta and (
+            meta.get("all_quarantined")
+            or str(meta.get("terminal_status") or "")
+            in {"quarantined", "contract_incomplete"}
+        ):
             mark(candidate_id, 0)
 
     # Priority 0: quarantined error certificates
@@ -755,6 +811,205 @@ def _validate_appeal_prosecution_contract_or_retry(
         "required appeal prosecution is incomplete after bounded retry: "
         f"{failure_category} -> {retry_failure}"
     )
+
+
+# ============================================================
+# v3.5.5 — appeal prosecution certificate-level repair
+#
+# The focused prosecutor and appeal defender already receive validator-driven
+# deep repair.  The appeal prosecutor previously stopped at the top-level
+# envelope, so a syntactically complete response with an invalid certificate
+# leaked through to the court and was later misclassified as a genome-learning
+# problem.  This symmetric boundary keeps transient contract compliance inside
+# inference and leaves self-evolution to learn persistent semantic failures.
+# ============================================================
+
+
+def _deep_validate_appeal_prosecution(
+    response: dict[str, Any],
+    *,
+    built: dict[str, Any],
+    required_candidates: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Run the court's error-certificate validator before adjudication."""
+    candidate_origins = {
+        str(row.get("candidate_id") or ""): str(
+            row.get("origin_hypothesis_event_id") or ""
+        )
+        for row in required_candidates
+        if str(row.get("candidate_id") or "")
+    }
+    rows = response.get("candidates") or []
+    if not isinstance(rows, list):
+        return [], [{"failed_checks": ["candidates_not_list"]}]
+    valid_rows: list[dict[str, Any]] = []
+    invalid_audits: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            invalid_audits.append({"failed_checks": ["certificate_not_object"]})
+            continue
+        audit = contract.validate_error_certificate(
+            dict(row), built, candidate_origins,
+        )
+        if audit.get("decision") == "pass":
+            valid_rows.append(dict(row))
+            continue
+        invalid_audits.append({
+            "certificate_id": str(row.get("certificate_id") or ""),
+            "source_candidate_id": str(row.get("source_candidate_id") or ""),
+            "failed_checks": list(audit.get("failed_checks") or []),
+            "missing_fields": list(audit.get("missing_fields") or []),
+            "failed_invariants": list(audit.get("failed_invariants") or []),
+        })
+    return valid_rows, invalid_audits
+
+
+def _appeal_prosecutor_deep_repair_user_v35(
+    *,
+    built: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    base: dict[str, Any],
+    prosecution: dict[str, Any],
+    defense: dict[str, Any],
+    proof: dict[str, Any],
+    invalid_audits: Sequence[Mapping[str, Any]],
+) -> str:
+    """Build bounded, validator-derived feedback for invalid error certs."""
+    base_user = _appeal_prosecutor_user_v35(
+        built=built, candidates=candidates, base=base,
+        prosecution=prosecution, defense=defense, proof=proof,
+    )
+    candidate_by_id = {
+        str(row.get("candidate_id") or ""): row
+        for row in candidates
+        if str(row.get("candidate_id") or "")
+    }
+    addressable_refs = sorted(str(value) for value in _addressable_refs(built))
+    repair_hints = []
+    for audit in invalid_audits:
+        candidate_id = str(audit.get("source_candidate_id") or "")
+        candidate = candidate_by_id.get(candidate_id, {})
+        repair_hints.append({
+            "certificate_id": str(audit.get("certificate_id") or ""),
+            "source_candidate_id": candidate_id,
+            "required_origin_event_id": str(
+                candidate.get("origin_hypothesis_event_id") or ""
+            ),
+            "failed_checks": list(audit.get("failed_checks") or []),
+            "missing_fields": list(audit.get("missing_fields") or []),
+            "failed_invariants": list(audit.get("failed_invariants") or []),
+        })
+    feedback = packet.canonical_json({
+        "repair_required": (
+            "return replacement prosecution certificates only for the listed "
+            "invalid source_candidate_ids; omit a candidate only when the "
+            "prosecution is explicitly retracted after re-evaluation"
+        ),
+        "candidate_repairs": repair_hints,
+        "addressable_trajectory_refs": addressable_refs,
+        "hard_requirements": (
+            "coverage_state must remain complete; reviewed_candidate_ids must "
+            "still list every supplied appeal candidate; every certificate "
+            "field must satisfy the original schema; all event and evidence "
+            "references must be copied exactly from addressable_trajectory_refs; "
+            "origin <= agent_control <= earliest impact in trajectory order"
+        ),
+    })
+    value = base_user + "\nAPPEAL_PROSECUTION_DEEP_REPAIR=\n" + feedback
+    for field in (
+        '"is_hallucination"', '"hallucination_step"', '"gold_label"',
+        '"case_id"', '"source_dir"', '"outer_feedback"',
+    ):
+        if field in value:
+            raise ValueError(
+                "appeal prosecutor deep repair input firewall violation: " + field
+            )
+    return value
+
+
+def _validate_appeal_prosecution_deep_or_repair(
+    response: dict[str, Any],
+    *,
+    built: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    base: dict[str, Any],
+    prosecution: dict[str, Any],
+    defense: dict[str, Any],
+    proof: dict[str, Any],
+    required_candidates: list[dict[str, Any]],
+    allowed_ids: set[str],
+    retry_call: Any,
+    providers: dict[str, Any],
+) -> dict[str, Any]:
+    """Deep-validate appeal prosecution and give it one bounded repair."""
+    valid_rows, invalid_audits = _deep_validate_appeal_prosecution(
+        response, built=built, required_candidates=required_candidates,
+    )
+    if not invalid_audits:
+        providers.setdefault("appeal_prosecutor_deep", {})["status"] = "complete"
+        return response
+
+    invalid_sources = {
+        str(audit.get("source_candidate_id") or "")
+        for audit in invalid_audits
+        if str(audit.get("source_candidate_id") or "")
+    }
+    providers["appeal_prosecutor_deep"] = {
+        "status": "repair_attempted",
+        "invalid_certificate_count": len(invalid_audits),
+        "invalid_source_candidate_ids": sorted(invalid_sources),
+    }
+    try:
+        repair_response, repair_meta = retry_call(invalid_audits)
+    except Exception as exc:
+        providers["appeal_prosecutor_deep"]["outcome"] = (
+            "repair_provider_exception"
+        )
+        providers["appeal_prosecutor_deep"]["error"] = str(exc)[:200]
+        return response
+    providers["appeal_prosecutor_deep"]["repair_meta"] = repair_meta
+
+    top_failure = _classify_appeal_prosecution_failure(
+        response=repair_response, allowed_ids=allowed_ids,
+    )
+    repair_rows, repair_audits = _deep_validate_appeal_prosecution(
+        repair_response, built=built, required_candidates=required_candidates,
+    )
+    unexpected_sources = sorted({
+        str(row.get("source_candidate_id") or "")
+        for row in repair_rows
+        if str(row.get("source_candidate_id") or "") not in invalid_sources
+    })
+    if top_failure is None and not repair_audits and not unexpected_sources:
+        repaired_sources = {
+            str(row.get("source_candidate_id") or "") for row in repair_rows
+        }
+        merged_rows = [
+            row for row in valid_rows
+            if str(row.get("source_candidate_id") or "") not in repaired_sources
+        ]
+        merged_rows.extend(repair_rows)
+        merged = dict(response)
+        merged["candidates"] = merged_rows
+        providers["appeal_prosecutor_deep"].update({
+            "outcome": "repaired",
+            "merged_valid_row_count": len(valid_rows),
+            "merged_repair_row_count": len(repair_rows),
+            "retracted_source_candidate_ids": sorted(
+                invalid_sources.difference(repaired_sources)
+            ),
+        })
+        return merged
+
+    providers["appeal_prosecutor_deep"].update({
+        "outcome": "still_invalid",
+        "top_level_failure": top_failure,
+        "remaining_failed_checks": [
+            audit.get("failed_checks") for audit in repair_audits
+        ],
+        "unexpected_source_candidate_ids": unexpected_sources,
+    })
+    return response
 
 
 # ============================================================
@@ -1407,6 +1662,39 @@ def _run_appeal_phase(
             ),
             providers=providers,
         )
+        # The top-level envelope can be complete while individual error
+        # certificates still violate the proof-court schema (BFCL/004:
+        # ordered_chain).  Repair that transient provider non-compliance at
+        # the inference boundary instead of teaching the genome a validator
+        # rule the court already knows.
+        appeal_prosecution = _validate_appeal_prosecution_deep_or_repair(
+            appeal_prosecution,
+            built=built,
+            candidates=appeal_candidates,
+            base=base,
+            prosecution=prosecution,
+            defense=defense,
+            proof=initial_proof,
+            required_candidates=_required_candidates(base),
+            allowed_ids=allowed_ids,
+            retry_call=lambda invalid_audits: provider_call(
+                route=config["appeal_prosecutor_route"],
+                system=APPEAL_PROSECUTOR_RETRY_SYSTEM_V35,
+                user=_appeal_prosecutor_deep_repair_user_v35(
+                    built=built,
+                    candidates=appeal_candidates,
+                    base=base,
+                    prosecution=prosecution,
+                    defense=defense,
+                    proof=initial_proof,
+                    invalid_audits=invalid_audits,
+                ),
+                cache_dir=(
+                    output_dir / "appeal_prosecutor_cache" / "deep_repair_1"
+                ),
+            ),
+            providers=providers,
+        )
 
         # H2: Informed defender (sees prosecution certificates)
         appeal_defender_user = _appeal_defender_user_v35(
@@ -1996,8 +2284,21 @@ def _build_adjudication_output(
             "focused_prosecution_provider_error_count": sum(
                 1 for meta in (providers.get("focused_prosecution") or {}).values()
                 if isinstance(meta, dict) and (
-                    any(k.endswith("_error") for k in meta) or "error_type" in meta
+                    str(meta.get("terminal_status") or "") == "provider_error"
+                    or (
+                        not meta.get("terminal_status")
+                        and (
+                            any(k.endswith("_error") for k in meta)
+                            or "error_type" in meta
+                        )
+                    )
                 )
+            ),
+            "focused_prosecution_contract_incomplete_count": sum(
+                1 for meta in (providers.get("focused_prosecution") or {}).values()
+                if isinstance(meta, dict)
+                and str(meta.get("terminal_status") or "")
+                == "contract_incomplete"
             ),
             "focused_chain_completeness": proof.get("focused_prosecution_chain_completeness"),
             "consensus_gate_applied": proof.get("consensus_gate_applied", False),
