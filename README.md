@@ -10,8 +10,7 @@ are standalone modules; experiment protocols, data partitioning and
 evaluation gates live outside the framework code.
 
 For framework design and flow documentation see
-[docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md) and
-[docs/technical/DETECTION_EVOLUTION_FLOW.md](docs/technical/DETECTION_EVOLUTION_FLOW.md).
+[docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md).
 
 ## Core Objective and Design Discipline (必读 / Mandatory)
 
@@ -87,9 +86,8 @@ SEHD v6
 │   ├── provider_routes.py
 │   ├── env_loader.py
 │   └── utils/            #   OCSE packet utilities
-├── docs/                 # ② documentation: design, technical, academic
-│   ├── design/           #   detector + evolution architecture
-│   └── technical/        #   detection-to-evolution data flow
+├── docs/                 # ② framework technical design
+│   └── design/           #   detector + evolution architecture
 └── datasets/             # ③ raw datasets (local-only, git-ignored)
 ```
 
@@ -102,14 +100,8 @@ layer on top of the standalone detector and evolution modules.
 
 ```text
 docs/
-├── SEHD_V6_ACADEMIC_DOCUMENT.md      # 学术科研技术文档（本框架的完整学术阐述）
-├── SEHD_V6_FRAMEWORK_VISUALIZATION.md # 框架可视化图谱（10 张 Mermaid 架构图）
-├── design/                    # framework design
-│   ├── TECHNICAL_DESIGN.md    # detector + evolution architecture
-│   └── SELF_EVOLUTION_FRAMEWORK_REVIEW.md  # evolution loop implementation contract
-├── technical/                 # technical documentation
-│   ├── DETECTION_EVOLUTION_FLOW.md   # detection-to-evolution data flow
-│   └── SEHD_V6_FRAMEWORK_VISUAL.md   # framework visual overview
+└── design/
+    └── TECHNICAL_DESIGN.md    # detector + evolution architecture (sole framework doc)
 ```
 
 Module-level documentation lives beside the code:

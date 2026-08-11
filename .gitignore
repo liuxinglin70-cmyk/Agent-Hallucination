@@ -7,22 +7,8 @@ tmp_pull_*/
 tmp_upload_*/
 *.txt
 
-# Experiment workspace (local-only)
-experiments/pytest-*/
-experiments/cache/
-experiments/progress/
-experiments/results/
-experiments/logs/
-experiments/*.py
-!experiments/run_batch.py
-experiments/protocols/*
-!experiments/protocols/README.md
-!experiments/protocols/used_case_ledger.txt
-
-# Documentation workspace (local-only)
-docs/papers/raw/
-docs/notes/
-docs/visualization/
+# Experiment workspace (lives outside the framework repo)
+experiments/
 
 # Raw datasets (large, local-only)
 datasets/raw/
@@ -107,6 +93,15 @@ logs/
 tmp/
 temp/
 *.tmp
+.tmp/
+
+# Development probes & local run artifacts (live outside the repo)
+probe_*.py
+probe_records*.json
+probe_evolution_output*/
+probe_evolution_fn/
+probe_*_out/
+.pytest_tmp_*/
 
 detector_output/
 
