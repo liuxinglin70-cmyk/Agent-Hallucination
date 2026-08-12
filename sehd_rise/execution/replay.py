@@ -242,13 +242,10 @@ def _record_detector_provider_usage(
 
 
 def _run_mutation_call(
-    *, budget_usage: dict[str, int], max_mutation_calls: int,
+    *, budget_usage: dict[str, int],
     provider_usage_ledger: ProviderUsageLedger, **kwargs: Any,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Count attribution/reflection calls separately from detector calls."""
-    if budget_usage["mutation_calls"] >= max_mutation_calls:
-        budget_usage["mutation_budget_exhausted"] += 1
-        raise RuntimeError("mutation_call_budget_exhausted")
     budget_usage["mutation_calls"] += 1
     try:
         parsed, meta = json_object_provider_call(**kwargs)
@@ -278,26 +275,15 @@ def _run_mutation_call(
 def _run_conflict_gate_call(
     *, route: dict[str, Any], system: str, user: str,
     budget_usage: dict[str, int] | None = None,
-    conflict_gate_limit: int | None = None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Provider call for the LLM no-conflict gate (T5).
 
-    The structural gate owns its own budget bookkeeping so a conflict-gate call
-    cannot exhaust the mutation budget (and vice versa): a skipped gate leaves
-    mutation capacity intact, and a mutation burst cannot block the safety gate.
     Returns ``(result, meta)``; the caller fail-closes on any provider
-    exception by treating it as a conflict.
+    exception by treating it as a conflict. When ``budget_usage`` is supplied
+    the call is counted as a conflict-gate call for run telemetry.
     """
     if budget_usage is not None:
-        if (
-            conflict_gate_limit is not None
-            and budget_usage["conflict_gate_calls"] >= conflict_gate_limit
-        ):
-            budget_usage["conflict_gate_budget_exhausted"] = (
-                budget_usage.get("conflict_gate_budget_exhausted", 0) + 1
-            )
-            raise RuntimeError("conflict_gate_budget_exhausted")
         budget_usage["conflict_gate_calls"] += 1
     result, meta = json_object_provider_call(
         route=route,

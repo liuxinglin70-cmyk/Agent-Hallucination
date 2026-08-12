@@ -173,7 +173,6 @@ _REJECT_DECISIONS = frozenset({
 })
 _SKIP_DECISIONS = frozenset({
     "skip_invalid_mutation",
-    "skip_mutation_budget_exhausted",
     "skip_no_edit",
     "skip_no_policy",
     "skip_route_conflict",

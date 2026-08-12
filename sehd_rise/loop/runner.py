@@ -335,7 +335,6 @@ def _llm_no_conflict_gate(
     target_module: str,
     mutation_route: dict[str, Any] | None,
     budget_usage: dict[str, int] | None = None,
-    conflict_gate_limit: int | None = None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[bool, str, list[int], bool]:
     """LLM no-conflict gate (T5): semantic conflict check on a new rule.
@@ -373,7 +372,6 @@ def _llm_no_conflict_gate(
             system=system_prompt,
             user=user_prompt,
             budget_usage=budget_usage,
-            conflict_gate_limit=conflict_gate_limit,
             provider_usage_ledger=provider_usage_ledger,
         )
     except Exception:
@@ -751,8 +749,6 @@ class EvolutionLoop:
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
-    max_mutation_calls: int = 100,
-    max_conflict_gate_calls: int | None = None,
     ) -> None:
         self.evolution_case_ids = list(evolution_case_ids)
         self.records = records
@@ -782,8 +778,6 @@ class EvolutionLoop:
         self.gold_reflection = gold_reflection
         self.probe_experience_record = probe_experience_record
         self.reflection_candidate_count = reflection_candidate_count
-        self.max_mutation_calls = max_mutation_calls
-        self.max_conflict_gate_calls = max_conflict_gate_calls
         # The §2.9 funnel is the single terminal-count authority (C8/C2):
         # every case deposits exactly one outcome here and the final result
         # derives its counters from this funnel, never from the per-step
@@ -800,7 +794,6 @@ class EvolutionLoop:
             evolution_case_ids=self.evolution_case_ids,
             records=self.records,
             reflection_candidate_count=self.reflection_candidate_count,
-            max_mutation_calls=self.max_mutation_calls,
             fitness_batch_size=self.fitness_batch_size,
             canary_limit=self.canary_limit,
             validation_probe_every=self.validation_probe_every,
@@ -852,9 +845,7 @@ class EvolutionLoop:
             "mutation_transport_attempts": 0,
             "mutation_repairs": 0,
             "mutation_retry_attempts": 0,
-            "mutation_budget_exhausted": 0,
             "conflict_gate_calls": 0,
-            "conflict_gate_budget_exhausted": 0,
             "conflict_gate_transport_attempts": 0,
             "conflict_gate_repairs": 0,
             "contrast_replay_errors": 0,
@@ -1119,7 +1110,7 @@ class EvolutionLoop:
     def run_mutation_call(self, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """Count attribution/reflection calls separately from detector calls."""
         return _run_mutation_call(
-            budget_usage=self.budget_usage, max_mutation_calls=self.max_mutation_calls,
+            budget_usage=self.budget_usage,
             provider_usage_ledger=self.provider_usage_ledger, **kwargs,
         )
 
@@ -1583,26 +1574,6 @@ class EvolutionLoop:
                 continue
 
             # L1 provider-rule surface.
-            if self.budget_usage["mutation_calls"] >= self.max_mutation_calls:
-                self.funnel.record(Outcome.BUDGET_EXHAUSTED)
-                self.record_step(EvolutionStep(
-                    case_id=case_id,
-                    case_index=idx,
-                    trigger_source="budget_exhausted",
-                    attribution=signal.to_dict(),
-                    edit_proposal={
-                        "operation": "no_edit",
-                        "reason": "mutation_call_budget_exhausted",
-                    },
-                    mutation_applied=None,
-                    gate_decision=Outcome.BUDGET_EXHAUSTED.value,
-                    genome_hash_before=genome_before,
-                    genome_hash_after=self.state.current_genome.content_hash,
-                    detection_state=detection_state,
-                    timestamp=time.time(),
-                ), next_case_index=idx + 1)
-                print(f"  [{idx}] BUDGET_EXHAUSTED {case_id}")
-                continue
             view = _ReflectionSignalView(signal, cut.owner, cut.reason_code)
             self._run_l1_policy_case(
                 idx=idx, case_id=case_id, detection_result=detection_result,
@@ -3620,7 +3591,6 @@ class EvolutionLoop:
                 target_module=edit.target_module,
                 mutation_route=self.mutation_route,
                 budget_usage=self.budget_usage,
-                conflict_gate_limit=self.max_conflict_gate_calls,
                 provider_usage_ledger=self.provider_usage_ledger,
             )
             conflict_gate_ran = _cg_ran
@@ -4551,7 +4521,6 @@ def run_online_evolution(
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
-    max_mutation_calls: int = 100,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution over the single RepairPlan pipeline.
 
@@ -4593,7 +4562,6 @@ def run_online_evolution(
         gold_reflection=gold_reflection,
         probe_experience_record=probe_experience_record,
         reflection_candidate_count=reflection_candidate_count,
-        max_mutation_calls=max_mutation_calls,
     )
     loop._initialize_state()
     loop.run()

@@ -54,7 +54,6 @@ def validate_evolution_params(
     evolution_case_ids: Sequence[str],
     records: Mapping[str, dict[str, Any]],
     reflection_candidate_count: int,
-    max_mutation_calls: int,
     fitness_batch_size: int,
     canary_limit: int,
     validation_probe_every: int,
@@ -72,8 +71,6 @@ def validate_evolution_params(
         raise ValueError("evolution_case_ids must not be empty")
     if reflection_candidate_count < 1 or reflection_candidate_count > 5:
         raise ValueError("reflection_candidate_count must be between 1 and 5")
-    if max_mutation_calls < 1:
-        raise ValueError("max_mutation_calls must be at least 1")
     if len(evolution_case_ids) != len(set(evolution_case_ids)):
         raise ValueError("evolution_case_ids contains duplicates")
     missing_records = [

@@ -77,7 +77,6 @@ def main() -> int:
         default=DEFAULT_REFLECTION_CANDIDATES,
         help="independent reflection samples per triggered case (1..5)",
     )
-    parser.add_argument("--max-mutation-calls", type=int, default=100)
     parser.add_argument("--canary-limit", type=int, default=2)
     args = parser.parse_args()
 
@@ -102,7 +101,6 @@ def main() -> int:
         convergence_window=args.convergence_window,
         max_mutation_attempts_per_case=args.max_mutation_attempts,
         reflection_candidate_count=args.reflection_candidates,
-        max_mutation_calls=args.max_mutation_calls,
         canary_limit=args.canary_limit,
     )
     summary = {
