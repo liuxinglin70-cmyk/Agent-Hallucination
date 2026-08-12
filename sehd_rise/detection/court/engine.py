@@ -277,22 +277,22 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
 
 def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path) -> dict[str, Any]:
     built = build_packet(record)
+    providers: dict[str, Any] = {}
     try:
         value, meta = provider_call(
             route=config["candidate_fallback_route"], system=candidate_system_prompt(),
             user=candidate_provider_user_prompt(built),
         )
         census, census_audit = validate_provider_census(value, built)
-        candidate_provider = {**meta, "calls": 1, "source": "provider_fallback"}
+        providers["candidate_fallback"] = {**meta, "calls": 1, "source": "provider_fallback"}
     except Exception as exc:
         census, census_audit = [], {"status": "fallback_failed", "error_type": type(exc).__name__, "error": str(exc)[:500]}
-        candidate_provider = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
+        providers["candidate_fallback"] = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
 
     result: dict[str, Any] = {
         "case_ref": private_ref(case_id, "case_"),
-        "census": census, "census_audit": census_audit, "candidate_provider": candidate_provider,
+        "census": census, "census_audit": census_audit,
     }
-    providers: dict[str, Any] = {}
     try:
         if census:
             q_value, providers["qualification"] = provider_call(
