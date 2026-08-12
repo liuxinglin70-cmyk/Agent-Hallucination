@@ -278,7 +278,7 @@ def _run_mutation_call(
 def _run_conflict_gate_call(
     *, route: dict[str, Any], system: str, user: str,
     budget_usage: dict[str, int] | None = None,
-    mutation_call_limit: int | None = None,
+    conflict_gate_limit: int | None = None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Provider call for the LLM no-conflict gate (T5).
@@ -291,14 +291,14 @@ def _run_conflict_gate_call(
     """
     if budget_usage is not None:
         if (
-            mutation_call_limit is not None
-            and budget_usage["mutation_calls"] >= mutation_call_limit
+            conflict_gate_limit is not None
+            and budget_usage["conflict_gate_calls"] >= conflict_gate_limit
         ):
-            budget_usage["mutation_budget_exhausted"] = (
-                budget_usage.get("mutation_budget_exhausted", 0) + 1
+            budget_usage["conflict_gate_budget_exhausted"] = (
+                budget_usage.get("conflict_gate_budget_exhausted", 0) + 1
             )
             raise RuntimeError("conflict_gate_budget_exhausted")
-        budget_usage["mutation_calls"] += 1
+        budget_usage["conflict_gate_calls"] += 1
     result, meta = json_object_provider_call(
         route=route,
         system=system,

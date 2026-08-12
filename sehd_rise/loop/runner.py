@@ -335,7 +335,7 @@ def _llm_no_conflict_gate(
     target_module: str,
     mutation_route: dict[str, Any] | None,
     budget_usage: dict[str, int] | None = None,
-    mutation_call_limit: int | None = None,
+    conflict_gate_limit: int | None = None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[bool, str, list[int], bool]:
     """LLM no-conflict gate (T5): semantic conflict check on a new rule.
@@ -373,18 +373,18 @@ def _llm_no_conflict_gate(
             system=system_prompt,
             user=user_prompt,
             budget_usage=budget_usage,
-            mutation_call_limit=mutation_call_limit,
+            conflict_gate_limit=conflict_gate_limit,
             provider_usage_ledger=provider_usage_ledger,
         )
     except Exception:
         return False, "provider_exception", [], True
     if budget_usage is not None and isinstance(meta, Mapping) and not meta.get("cache_hit"):
-        budget_usage["mutation_transport_attempts"] = (
-            budget_usage.get("mutation_transport_attempts", 0)
+        budget_usage["conflict_gate_transport_attempts"] = (
+            budget_usage.get("conflict_gate_transport_attempts", 0)
             + int(meta.get("transport_attempts") or 0)
         )
-        budget_usage["mutation_repairs"] = (
-            budget_usage.get("mutation_repairs", 0)
+        budget_usage["conflict_gate_repairs"] = (
+            budget_usage.get("conflict_gate_repairs", 0)
             + int(bool(meta.get("repair_used")))
         )
     if not isinstance(result, dict):
@@ -752,6 +752,7 @@ class EvolutionLoop:
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
     max_mutation_calls: int = 100,
+    max_conflict_gate_calls: int | None = None,
     ) -> None:
         self.evolution_case_ids = list(evolution_case_ids)
         self.records = records
@@ -782,6 +783,7 @@ class EvolutionLoop:
         self.probe_experience_record = probe_experience_record
         self.reflection_candidate_count = reflection_candidate_count
         self.max_mutation_calls = max_mutation_calls
+        self.max_conflict_gate_calls = max_conflict_gate_calls
         # The §2.9 funnel is the single terminal-count authority (C8/C2):
         # every case deposits exactly one outcome here and the final result
         # derives its counters from this funnel, never from the per-step
@@ -851,6 +853,10 @@ class EvolutionLoop:
             "mutation_repairs": 0,
             "mutation_retry_attempts": 0,
             "mutation_budget_exhausted": 0,
+            "conflict_gate_calls": 0,
+            "conflict_gate_budget_exhausted": 0,
+            "conflict_gate_transport_attempts": 0,
+            "conflict_gate_repairs": 0,
             "contrast_replay_errors": 0,
             "policy_replay_errors": 0,
         }
@@ -3614,7 +3620,7 @@ class EvolutionLoop:
                 target_module=edit.target_module,
                 mutation_route=self.mutation_route,
                 budget_usage=self.budget_usage,
-                mutation_call_limit=self.max_mutation_calls,
+                conflict_gate_limit=self.max_conflict_gate_calls,
                 provider_usage_ledger=self.provider_usage_ledger,
             )
             conflict_gate_ran = _cg_ran
