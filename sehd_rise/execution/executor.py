@@ -23,7 +23,6 @@ the executor field so the caller never decides the route.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Mapping
 
 from sehd_rise.skills.genome import SkillGenome
@@ -42,7 +41,6 @@ def execute_repair_plan(
     *,
     genome: SkillGenome,
     case_id: str,
-    output_path: Path,
     budget_kind: str,
     budget_usage: dict[str, int],
     records: Mapping[str, dict[str, Any]],
@@ -62,7 +60,7 @@ def execute_repair_plan(
     if plan.executor == EXECUTOR_PROVIDER_BEHAVIOR:
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
-            output_path=output_path, budget_usage=budget_usage,
+            budget_usage=budget_usage,
             records=records, config=config,
             provider_usage_ledger=provider_usage_ledger,
             policy_genome=policy_genome, policy_scope="working",
@@ -74,7 +72,7 @@ def execute_repair_plan(
             )
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
-            output_path=output_path, budget_usage=budget_usage,
+            budget_usage=budget_usage,
             records=records, config=config,
             provider_usage_ledger=provider_usage_ledger,
             policy_genome=policy_genome, policy_scope=None,

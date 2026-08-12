@@ -451,27 +451,33 @@ def compile_genome_for_paca(
 
 def route_binding_map(
     config: Mapping[str, Any],
-) -> dict[int, tuple[str, PacaStage, tuple[str, ...]]]:
-    """Bind each concrete route object to its executable genome modules."""
+) -> dict[str, tuple[str, PacaStage, tuple[str, ...]]]:
+    """Bind each concrete route to its executable genome modules.
+
+    Keyed by the route's ``_provider_route_name`` (stamped by config
+    resolution), never by object identity: identity silently breaks the
+    moment a caller copies a route dict before dispatch, and then a deployed
+    genome raises "unregistered provider route" only on the injection path.
+    """
     stage_by_key = {
         key: stage
         for stage, keys in ROUTE_STAGE_KEYS.items()
         for key in keys
     }
-    result: dict[int, tuple[str, PacaStage, tuple[str, ...]]] = {}
+    result: dict[str, tuple[str, PacaStage, tuple[str, ...]]] = {}
     for key, module_ids in ROUTE_MODULE_IDS.items():
         route = config.get(key)
         if not isinstance(route, dict):
             continue
-        identity = id(route)
         binding = (key, stage_by_key[key], module_ids)
-        existing = result.get(identity)
+        route_name = str(route.get("_provider_route_name") or key)
+        existing = result.get(route_name)
         if existing is not None and existing != binding:
             raise ValueError(
-                f"route object is reused across incompatible bindings: "
+                f"route name is reused across incompatible bindings: "
                 f"{existing[0]} and {key}"
             )
-        result[identity] = binding
+        result[route_name] = binding
     return result
 
 
@@ -508,7 +514,7 @@ def make_skill_aware_provider(
         system: str,
         user: str,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        binding = bindings.get(id(route))
+        binding = bindings.get(str(route.get("_provider_route_name") or ""))
         if binding is None:
             raise ValueError("unregistered provider route cannot receive an evolved skill")
         route_key, stage, module_ids = binding

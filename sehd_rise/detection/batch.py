@@ -217,7 +217,6 @@ def run_batch(
         try:
             detect_kwargs: dict[str, Any] = {
                 "record": record, "config": config, "case_id": case_id,
-                "output_dir": case_dir / "trace",
             }
             if genome is not None:
                 detect_kwargs["genome"] = genome

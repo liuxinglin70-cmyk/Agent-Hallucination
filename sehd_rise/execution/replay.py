@@ -16,7 +16,6 @@ effect/fitness/canary/promotion reading happens in the evaluation layer.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Mapping
 
 from sehd_rise.skills.genome import SkillGenome, create_baseline_genome
@@ -87,7 +86,6 @@ def _run_detection_with_genome(
     case_id: str,
     record: dict[str, Any],
     config: dict[str, Any],
-    output_dir: Path,
     policy_genome: PolicyGenome | None = None,
     policy_scope: str | None = "working",
     provider_usage_ledger: ProviderUsageLedger | None = None,
@@ -104,9 +102,6 @@ def _run_detection_with_genome(
     If genome == baseline, runs plain v3.5 without injection overhead.
     """
     baseline = create_baseline_genome()
-
-    genome_dir = output_dir / "genomes" / genome.execution_hash
-    genome_dir.mkdir(parents=True, exist_ok=True)
 
     # Evolution runs on the working scope: baseline + weak + strong items.
     # Conditional artifacts are not in the genome items (pending queue), and
@@ -148,7 +143,6 @@ def _run_detection_with_genome(
                 case_id=case_id,
                 record=record,
                 config=config,
-                output_dir=genome_dir,
                 policy_items=policy_items,
                 policy_registry=policy_registry,
                 provider_usage_ledger=provider_usage_ledger,
@@ -270,7 +264,7 @@ def _run_conflict_gate_call(
 
 def _run_counted_detection(
     *, budget_kind: str, genome: SkillGenome, case_id: str,
-    output_path: Path, budget_usage: dict[str, int],
+    budget_usage: dict[str, int],
     records: Mapping[str, dict[str, Any]], config: dict[str, Any],
     provider_usage_ledger: ProviderUsageLedger,
     policy_genome: PolicyGenome | None = None,
@@ -298,7 +292,6 @@ def _run_counted_detection(
         case_id=case_id,
         record=_detector_record(records[case_id]),
         config=config,
-        output_dir=output_path,
         provider_usage_ledger=provider_usage_ledger,
         **replay_kwargs,
     )

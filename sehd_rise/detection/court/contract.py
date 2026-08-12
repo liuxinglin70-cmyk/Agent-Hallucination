@@ -1476,18 +1476,23 @@ def _resolve_terminal_state(
     # candidate_terminal (the clean/unresolved decision paths), so they
     # cannot contribute to the coverage-complete check.
     candidate_terminal = set(required) <= clean_covered | auxiliary_candidates
+    # A clean verdict needs complete coverage AND every required candidate
+    # resolved (clean-covered or auxiliary).  A candidate the court could not
+    # resolve must stay unresolved — "no incident occurred" is a clean claim,
+    # never the residual of an unresolved candidate.
+    clean_terminal = coverage_complete and (
+        candidate_terminal or (not required and not valid_errors)
+    )
     if surviving:
         winner = select_earliest_origin_counterfactual(
             surviving, event_order, counterfactual_rankings,
         )
         state, responsible = "verified_error", str(winner["origin_event_id"])
+    elif clean_terminal:
+        state, responsible = "verified_clean", None
+        winner = None
     else:
-        if coverage_complete and candidate_terminal:
-            state, responsible = "verified_clean", None
-        elif coverage_complete and not required and not valid_errors:
-            state, responsible = "verified_clean", None
-        else:
-            state, responsible = "unresolved", None
+        state, responsible = "unresolved", None
         winner = None
 
     impact_status = None
@@ -1504,7 +1509,7 @@ def _resolve_terminal_state(
     )
     occurrence_state = (
         "verified_error" if occurrence_winner is not None
-        else "verified_clean" if coverage_complete
+        else "verified_clean" if clean_terminal
         else "unresolved"
     )
     occurrence_impact_status = None
@@ -1685,13 +1690,14 @@ def _resolve_terminal_state(
     }
 
     # L2 policy hook: policies are structural coverage-validity
-    # interventions, so the evaluator's simplified terminal recomputation is
-    # ignored in favor of this court's own full rule (candidate_terminal /
-    # required / valid_errors are only addressable here). The boundary path
-    # state is an engine-level fact injected by the caller. Policies act on
-    # the terminal edge only: the occurrence ledger records what the
-    # evidence established before policy, so it is intentionally not
-    # recomputed here.
+    # interventions that may shift coverage.  The court owns the terminal
+    # rule (candidate_terminal / required / valid_errors are only
+    # addressable here), so it recomputes the terminal state from the
+    # effective coverages — the evaluator carries no simplified copy. The
+    # boundary path state is an engine-level fact injected by the caller.
+    # Policies act on the terminal edge only: the occurrence ledger records
+    # what the evidence established before policy, so it is intentionally
+    # not recomputed here.
     if policy_items:
         facts = build_adjudication_facts(
             result,
@@ -1732,7 +1738,11 @@ def _resolve_terminal_state(
             # the occurrence ledger is intentionally not recomputed.
             result.setdefault("pre_policy_state", state)
             result["state"] = "verified_clean"
-        result["policy_evaluation"] = evaluation.to_dict()
+        policy_evaluation = evaluation.to_dict()
+        # The court owns the post-policy terminal state; project it onto the
+        # evaluation record so no consumer can read a divergent copy.
+        policy_evaluation["terminal_state"] = result["state"]
+        result["policy_evaluation"] = policy_evaluation
 
     return result
 

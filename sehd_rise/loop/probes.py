@@ -12,7 +12,6 @@ carries a fail-closed, auditable label.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.signals import (
@@ -120,7 +119,7 @@ def _probe_certification_label(
 def _run_development_probe_impl(
     *, reason: str, state: RunState,
     budget_usage: dict[str, int], gate: Any, causal_memory: Any,
-    records: Mapping[str, dict[str, Any]], output_dir: Path,
+    records: Mapping[str, dict[str, Any]],
     probe_history: list[dict[str, Any]], registered_probe_ids: Sequence[str],
     run_detection: Any, steps: list[Any],
     accepted_edits_history: list[dict[str, Any]],
@@ -151,12 +150,6 @@ def _run_development_probe_impl(
                 budget_kind="probe",
                 genome=state.champion_genome,
                 case_id=probe_id,
-                output_path=(
-                    output_dir
-                    / "development_probes"
-                    / f"probe_{len(probe_history):03d}"
-                    / probe_id.replace("/", "_")
-                ),
                 # The probe must measure the detector that subsequent cases
                 # actually run: champion genome plus the accepted L2 policy
                 # surface (working scope).

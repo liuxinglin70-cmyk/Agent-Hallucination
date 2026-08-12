@@ -233,7 +233,6 @@ def load_policy_genome(path: Path, *, expected_hash: str | None = None) -> Any:
 
 def detect_record(
     *, record: dict[str, Any], config: dict[str, Any], case_id: str = "case",
-    output_dir: Path | None = None,
     genome: Any | None = None, genome_source: str | None = None,
     policy_genome: Any | None = None,
     adjudicator: Any | None = None,
@@ -246,7 +245,6 @@ def detect_record(
     the complete two-layer capability.
     """
     validate_record(record)
-    output_dir = Path(output_dir or Path.cwd() / "detector_output")
     # Standalone deployment uses the deployable scope: only baseline and
     # strong items carry measured, independent correctness evidence, so a
     # weak working item never changes a deployed verdict.  Conditional
@@ -262,7 +260,6 @@ def detect_record(
         run_adjudication = adjudicator or adjudicate_case
         result = run_adjudication(
             case_id=case_id, record=record, config=config,
-            output_dir=output_dir,
             **(
                 {
                     "policy_items": policy_items,
@@ -276,7 +273,6 @@ def detect_record(
         with integrated_engine_provider(genome=genome, config=config):
             result = engine.adjudicate_case(
                 case_id=case_id, record=record, config=config,
-                output_dir=output_dir,
                 policy_items=policy_items,
                 policy_registry=policy_registry,
             )
@@ -370,7 +366,6 @@ def main() -> int:
     record = read_json(args.record)
     result = detect_record(
         record=record, config=config, case_id=args.case_id,
-        output_dir=args.output_dir,
         genome=genome, genome_source=genome_source,
         policy_genome=policy_genome,
     )

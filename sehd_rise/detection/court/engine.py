@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.detection.court import contract
@@ -275,7 +274,7 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
     }
 
 
-def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, provider_usage_ledger: ProviderUsageLedger | None = None) -> dict[str, Any]:
+def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], provider_usage_ledger: ProviderUsageLedger | None = None) -> dict[str, Any]:
     built = build_packet(record)
     providers: dict[str, Any] = {}
     try:
@@ -2297,7 +2296,6 @@ def _run_appeal_phase(
 
 def adjudicate_case(
     *, case_id: str, record: dict[str, Any], config: dict[str, Any],
-    output_dir: Path,
     policy_items: Sequence[Mapping[str, Any]] | None = None,
     policy_registry=None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
@@ -2308,7 +2306,6 @@ def adjudicate_case(
     with ThreadPoolExecutor(max_workers=2) as executor:
         base_future = executor.submit(
             adjudicate_layered_case, case_id=case_id, record=record, config=config,
-            output_dir=output_dir / "layered_v2",
             provider_usage_ledger=provider_usage_ledger,
         )
         construct_future = executor.submit(

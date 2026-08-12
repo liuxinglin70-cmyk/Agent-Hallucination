@@ -69,7 +69,6 @@ def main() -> int:
     record = json.loads(Path(args.record).read_text(encoding="utf-8"))
     result = detect_record(
         record=record, config=config, case_id=args.case_id,
-        output_dir=args.output_dir,
         genome=genome, genome_source=genome_source,
         policy_genome=policy_genome,
     )

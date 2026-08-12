@@ -103,13 +103,16 @@ def build_adjudication_facts(
             quarantine_other += 1
             return
         failed_set = {str(f) for f in failed}
+        # One certificate can fail several check families at once; count each
+        # family independently so an earlier bucket never swallows another's
+        # signal in the quarantine-reason distribution.
         if failed_set & _SCHEMA_FAIL_CHECKS:
             quarantine_schema_mismatch += 1
-        elif failed_set & _EVIDENCE_FAIL_CHECKS:
+        if failed_set & _EVIDENCE_FAIL_CHECKS:
             quarantine_evidence_missing += 1
-        elif failed_set & _CAUSAL_FAIL_CHECKS:
+        if failed_set & _CAUSAL_FAIL_CHECKS:
             quarantine_causal_broken += 1
-        else:
+        if not failed_set & (_SCHEMA_FAIL_CHECKS | _EVIDENCE_FAIL_CHECKS | _CAUSAL_FAIL_CHECKS):
             quarantine_other += 1
 
     for audit in court_result.get("error_audits") or []:
@@ -170,7 +173,6 @@ class PolicyEvaluationResult:
     effective_prosecution_coverage: str
     effective_defense_coverage: str
     telemetry: tuple
-    terminal_state: str
     terminal_override: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -181,24 +183,8 @@ class PolicyEvaluationResult:
             "effective_prosecution_coverage": self.effective_prosecution_coverage,
             "effective_defense_coverage": self.effective_defense_coverage,
             "telemetry": [dict(row) for row in self.telemetry],
-            "terminal_state": self.terminal_state,
             "terminal_override": self.terminal_override,
         }
-
-
-def _recompute_terminal_state(
-    surviving_error_count: int,
-    prosecution_coverage: str,
-    defense_coverage: str,
-) -> str:
-    # Simplified recomputation over court-addressable facts only: the
-    # candidate-terminal coverage condition of the full court is not
-    # addressable here; the proof-court policy hook applies the full rule.
-    if surviving_error_count > 0:
-        return "verified_error"
-    if prosecution_coverage == "complete" and defense_coverage == "complete":
-        return "verified_clean"
-    return "unresolved"
 
 
 def evaluate_policies(
@@ -347,14 +333,15 @@ def evaluate_policies(
                 "current_prosecution_coverage": eff_prosecution,
                 "current_defense_coverage": eff_defense,
             })
-            # Asking for more verification downgrades complete coverage to
-            # incomplete, signalling that the current evidence is not enough.
-            scope = params.get("verification_scope", "")
-            if scope == "certificate":
-                if eff_prosecution == "complete":
-                    eff_prosecution = "incomplete"
-                if eff_defense == "complete":
-                    eff_defense = "incomplete"
+            # Asking for more verification — of any scope — means a current
+            # "complete" claim is not yet earned: suspend it to incomplete.
+            # The action carries no side parameter, so the paired
+            # precondition scopes the intent and the suspension applies to
+            # every side still claiming completeness.
+            if eff_prosecution == "complete":
+                eff_prosecution = "incomplete"
+            if eff_defense == "complete":
+                eff_defense = "incomplete"
         elif operator == ACTION_ESCALATE_TO_APPEAL:
             # Telemetry-only: the appeal itself is owned by the calibration
             # path and the court recomputes any terminal edge, so a policy
@@ -382,9 +369,6 @@ def evaluate_policies(
         effective_prosecution_coverage=eff_prosecution,
         effective_defense_coverage=eff_defense,
         telemetry=tuple(telemetry),
-        terminal_state=_recompute_terminal_state(
-            facts.surviving_error_count, eff_prosecution, eff_defense,
-        ),
         terminal_override=terminal_override,
     )
 

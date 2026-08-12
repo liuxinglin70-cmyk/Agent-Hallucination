@@ -1034,10 +1034,6 @@ class EvolutionLoop:
                     budget_kind="canary",
                     genome=self.state.champion_genome,
                     case_id=canary_id,
-                    output_path=(
-                        self.output_dir / "baseline_canaries"
-                        / canary_id.replace("/", "_")
-                    ),
                     policy_genome=(
                         self.state.policy_genome
                         if self.state.policy_genome.items_for_scope("working")
@@ -1091,13 +1087,13 @@ class EvolutionLoop:
 
     def run_detection(self, *,
         budget_kind: str, genome: SkillGenome, case_id: str,
-        output_path: Path, policy_genome: PolicyGenome | None = None,
+        policy_genome: PolicyGenome | None = None,
         policy_scope: str | None = "working",
     ) -> dict[str, Any]:
         """Run one detector call in a counted, label-free envelope."""
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
-            output_path=output_path, budget_usage=self.budget_usage,
+            budget_usage=self.budget_usage,
             records=self.records, config=self.config,
             provider_usage_ledger=self.provider_usage_ledger,
             policy_genome=policy_genome, policy_scope=policy_scope,
@@ -1205,7 +1201,7 @@ class EvolutionLoop:
         return _run_development_probe_impl(
             reason=reason, state=self.state, budget_usage=self.budget_usage,
             gate=self.gate, causal_memory=self.causal_memory,
-            records=self.records, output_dir=self.output_dir,
+            records=self.records,
             probe_history=self.probe_history,
             registered_probe_ids=self.registered_probe_ids,
             run_detection=self.run_detection, steps=self.steps,
@@ -1321,7 +1317,6 @@ class EvolutionLoop:
                     budget_kind="case",
                     genome=self.state.current_genome,
                     case_id=case_id,
-                    output_path=self.output_dir,
                     policy_genome=(
                         self.state.policy_genome
                         if self.state.policy_genome.items_for_scope("working")
@@ -2222,10 +2217,6 @@ class EvolutionLoop:
                 budget_kind="policy",
                 genome=self.state.current_genome,
                 case_id=case_id,
-                output_path=(
-                    self.output_dir / "policy_replays"
-                    / f"{idx:04d}_{case_id.replace('/', '_')}"
-                ),
                 policy_genome=candidate_genome,
                 # Candidate validation must observe the full candidate item
                 # set: a newly proposed item is still fitness_status=none and
@@ -2375,11 +2366,6 @@ class EvolutionLoop:
                     budget_kind="canary",
                     genome=self.state.current_genome,
                     case_id=canary_id,
-                    output_path=(
-                        self.output_dir / "policy_replays"
-                        / f"{idx:04d}_{case_id.replace('/', '_')}"
-                        / "canaries" / canary_id.replace("/", "_")
-                    ),
                     policy_genome=candidate_genome,
                     policy_scope=None,
                 )
@@ -3661,16 +3647,11 @@ class EvolutionLoop:
         # Source replay is mandatory for every edit. ``fitness_check``
         # remains an interface-compatible flag controlling formal promotion
         # semantics, not permission to skip the replay envelope.
-        replay_root = (
-            self.output_dir / "fitness_replay"
-            / f"{idx:03d}_{case_id.replace('/', '_')}"
-        )
         try:
             candidate_result = self.run_detection(
                 budget_kind="source",
                 genome=candidate_genome,
                 case_id=case_id,
-                output_path=replay_root / "source",
                 policy_genome=(
                     self.state.policy_genome
                     if self.state.policy_genome.items_for_scope("working")
@@ -3776,7 +3757,6 @@ class EvolutionLoop:
                 assessment.local_score_after,
             )
         if (assessment.passed or assessment.evidence_only) and promotion_canaries:
-            canary_root = replay_root / "canaries"
             for canary_id, parent_canary in selected_canaries(
                 edit, stable_canaries=promotion_canaries,
                 canary_limit=self.canary_limit,
@@ -3787,7 +3767,6 @@ class EvolutionLoop:
                         budget_kind="canary",
                         genome=candidate_genome,
                         case_id=canary_id,
-                        output_path=canary_root / canary_id.replace("/", "_"),
                         policy_genome=(
                             self.state.policy_genome
                             if self.state.policy_genome.items_for_scope(
@@ -3924,10 +3903,6 @@ class EvolutionLoop:
                         budget_kind="contrast",
                         genome=candidate_genome,
                         case_id=neighbor_id,
-                        output_path=(
-                            replay_root / "contrast"
-                            / neighbor_id.replace("/", "_")
-                        ),
                         policy_genome=(
                             self.state.policy_genome
                             if self.state.policy_genome.items_for_scope(

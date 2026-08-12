@@ -555,7 +555,7 @@ def candidate_provider_user_prompt(built: dict[str, Any]) -> str:
     return user
 
 
-def _responsible_step(event_id: str | None, built: dict[str, Any]) -> int | None:
+def _responsible_step(event_id: str | None, built: dict[str, Any]) -> int | str | None:
     if not event_id:
         return None
     for event in built["events"]:
@@ -563,6 +563,9 @@ def _responsible_step(event_id: str | None, built: dict[str, Any]) -> int | None
             value = event.get("source_step_id")
             if isinstance(value, int):
                 return value
-            text = str(value or "").strip()
-            return int(text) if text.isdigit() else int(event["position"])
+            # Preserve the packet's step value verbatim (string or number):
+            # the ordinal position is provenance, not the source's step
+            # identity, so it must never substitute for a present step.
+            text = "" if value is None else str(value).strip()
+            return text if text else int(event["position"])
     return None
