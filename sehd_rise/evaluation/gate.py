@@ -1,20 +1,10 @@
-"""Structural constraint gate + LLM no-conflict gate for skill evolution.
+"""Structural constraint gate for skill evolution.
 
-Two safety surfaces merged into one module:
-
-1. ``StructuralGate`` — lightweight structural constraints on proposed edits
-   (typed DSL, module targeting, generalization, capacity, cross-module
-   deduplication, state-manipulation firewall). "Structural prevention >
-   post-hoc verification": a rule that violates a structural invariant is
-   rejected before it ever reaches a provider.
-
-2. ``llm_no_conflict_gate`` — a provider consultation that checks whether a new
-   rule semantically conflicts with the target module's existing rules. It runs
-   only with a live credential and is fail-closed (any provider exception or
-   parse failure is a conflict). The provider transport is routed through
-   ``execution.replay._run_conflict_gate_call`` because the evaluation layer may
-   not import detection directly; the gate keeps its own budget bookkeeping so a
-   conflict-gate call cannot exhaust the mutation budget.
+``StructuralGate`` — lightweight structural constraints on proposed edits
+(typed DSL, module targeting, generalization, capacity, cross-module
+deduplication, state-manipulation firewall). "Structural prevention >
+post-hoc verification": a rule that violates a structural invariant is
+rejected before it ever reaches a provider.
 """
 
 from __future__ import annotations
@@ -22,11 +12,8 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from sehd_rise.execution.replay import _run_conflict_gate_call
-from sehd_rise.platform.routes import has_provider_credential
 from sehd_rise.skills.genome import (
     BASELINE_RULE_TEXT,
     DEDUP_HIGH_THRESHOLD,
@@ -667,119 +654,9 @@ def create_structural_gate(
     return StructuralGate(config=config)
 
 
-# ============================================================
-# LLM no-conflict gate (T5)
-# ============================================================
-
-def llm_no_conflict_gate(
-    new_rule: str,
-    existing_rules: Sequence[str],
-    *,
-    target_module: str,
-    mutation_route: dict[str, Any] | None,
-    cache_dir: Path | None = None,
-    budget_usage: dict[str, int] | None = None,
-    mutation_call_limit: int | None = None,
-) -> tuple[bool, str, list[int], bool]:
-    """LLM no-conflict gate (T5).
-
-    Checks whether ``new_rule`` semantically conflicts with the target module's
-    existing rules. Two rules conflict when, under the same trigger conditions,
-    they prescribe contradictory verdicts/actions or one directly negates the
-    other. Mere condition overlap or complementarity is NOT a conflict.
-
-    The gate runs only when a live provider credential is configured, so
-    offline/test runs without a credential skip it (structural dedup still
-    provides the baseline safety). When the gate runs it is fail-closed: any
-    provider exception or parse failure is treated as a conflict, because a
-    safety gate must never default to "pass" on uncertainty.
-
-    Returns ``(passed, reason, conflicting_rule_indices, ran)``. ``ran`` is True
-    only when the LLM was actually consulted; a skipped gate returns
-    ``passed=True`` with ``ran=False`` so callers can distinguish a verified "no
-    conflict" from a gate that could not run.
-    """
-    existing = [rule for rule in existing_rules if rule and rule.strip()]
-    if not existing:
-        return True, "no_existing_rules", [], False
-    if mutation_route is None or not has_provider_credential(mutation_route):
-        return True, "skipped_no_live_route", [], False
-    system_prompt = (
-        "你是规则冲突判定器。判断新增规则是否与目标模块已有规则存在语义冲突。"
-        "冲突指：在相同触发条件下，两条规则给出相互矛盾的判定或动作，或一条规则"
-        "直接否定另一条的结论。仅条件重叠或互补不构成冲突。"
-    )
-    rules_block = "\n".join(
-        f"[{i}] {rule}" for i, rule in enumerate(existing)
-    )
-    user_prompt = (
-        f"【目标模块】{target_module}\n"
-        f"【已有规则】\n{rules_block}\n\n"
-        f"【新增规则】{new_rule}\n\n"
-        "判断新增规则是否与已有规则冲突。仅返回JSON："
-        '{"decision":"pass"或"conflict","reason":"简短理由",'
-        '"conflicting_rule_indices":[冲突的已有规则索引]}'
-    )
-    try:
-        result, _meta = _run_conflict_gate_call(
-            route=mutation_route,
-            system=system_prompt,
-            user=user_prompt,
-            cache_dir=(
-                cache_dir if cache_dir is not None
-                else Path(".conflict_gate_cache")
-            ),
-            budget_usage=budget_usage,
-            mutation_call_limit=mutation_call_limit,
-        )
-    except RuntimeError:
-        # Budget exhaustion surfaces as a distinct closed reason.
-        return False, "conflict_gate_budget_exhausted", [], False
-    except Exception:
-        if budget_usage is not None:
-            budget_usage["mutation_errors"] = (
-                budget_usage.get("mutation_errors", 0) + 1
-            )
-        return False, "provider_exception", [], True
-    if budget_usage is not None and isinstance(_meta, Mapping):
-        if _meta.get("cache_hit"):
-            budget_usage["mutation_cache_hits"] = (
-                budget_usage.get("mutation_cache_hits", 0) + 1
-            )
-        else:
-            # A cache hit served zero network traffic: the cached record carries
-            # the ORIGINAL transport attempts/repair flag, so accumulating them
-            # here would inflate the counters once per replay of the same entry.
-            budget_usage["mutation_transport_attempts"] = (
-                budget_usage.get("mutation_transport_attempts", 0)
-                + int(_meta.get("transport_attempts") or 0)
-            )
-            budget_usage["mutation_repairs"] = (
-                budget_usage.get("mutation_repairs", 0)
-                + int(bool(_meta.get("repair_used")))
-            )
-    if not isinstance(result, dict):
-        return False, "parse_failure", [], True
-    decision = str(result.get("decision", "")).strip().lower()
-    reason = str(result.get("reason", "")).strip() or "llm_conflict"
-    raw_indices = result.get("conflicting_rule_indices", [])
-    if not isinstance(raw_indices, list):
-        raw_indices = []
-    indices: list[int] = []
-    for value in raw_indices:
-        try:
-            indices.append(int(value))
-        except (TypeError, ValueError):
-            continue
-    if decision == "pass":
-        return True, reason, [], True
-    return False, reason, indices, True
-
-
 __all__ = [
     "GateCertificate",
     "GateConfig",
     "StructuralGate",
     "create_structural_gate",
-    "llm_no_conflict_gate",
 ]

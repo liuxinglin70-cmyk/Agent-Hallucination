@@ -11,9 +11,7 @@ from __future__ import annotations
 import hashlib
 import http.client
 import json
-import os
 import random
-import threading
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -89,42 +87,6 @@ def _read_response_body(response: Any, budget_seconds: int) -> bytes:
         chunks.append(chunk)
 
 
-def _global_cache_root() -> Path | None:
-    """Global provider cache root, or None when the cache is disabled.
-
-    The cache is opt-in: unset ``PACA_GLOBAL_CACHE_ROOT`` disables it.  The
-    explicit values ``off`` / ``disabled`` / ``none`` (case-insensitive) also
-    disable it, so a caller can pin the cache off in the process environment
-    even when a ``.env`` file would otherwise re-inject a root through
-    ``load_local_env``.
-    """
-    raw = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
-    if not raw or not raw.strip():
-        return None
-    if str(raw).strip().lower() in {"off", "disabled", "none"}:
-        return None
-    return Path(raw.strip())
-
-
-def _global_cache_path(request_hash: str) -> Path | None:
-    """Global cache file path (two-level sharding to bound directory size)."""
-    root = _global_cache_root()
-    if root is None:
-        return None
-    return root / request_hash[:2] / f"{request_hash}.json"
-
-
-def _local_cache_path(cache_dir: Path, request_hash: str) -> Path:
-    """Run-local provider cache file path.
-
-    ``cache_dir`` is the per-run cache directory supplied by the caller
-    (e.g. ``output_dir / "provider_cache"``).  Two-level directory
-    dispersion matches the global cache layout so both caches share the
-    same sharding scheme.
-    """
-    return Path(cache_dir) / request_hash[:2] / f"{request_hash}.json"
-
-
 def _provider_repair_payload(
     payload: dict[str, Any],
     system: str,
@@ -133,8 +95,7 @@ def _provider_repair_payload(
     """Build a bounded repair request body for truncated JSON.
 
     The repair re-sends the same system prompt with a compact instruction
-    appended to the user prompt, so the canonical body differs from the
-    original request and the cache key differs. Returns (body, user).
+    appended to the user prompt. Returns (body, user).
     """
     repair_user = user + (
         "\n\nJSON_RECOVERY: Your previous response carried no usable JSON "
@@ -156,27 +117,13 @@ def _provider_repair_call(
     route: dict[str, Any],
     api_key: str,
     payload: bytes,
-    cache_dir: Path,
-    request_hash: str,
     request_timeout: int | None = None,
 ) -> dict[str, Any] | None:
     """One bounded repair provider call for a truncated JSON response.
 
-    The repair body has a different cache key, so a repair result is never
-    confused with the original request. Any provider/parse failure returns
-    None, and the caller fail-closes with the original error.
+    Any provider/parse failure returns None, and the caller fail-closes with
+    the original error.
     """
-    repair_hash = hashlib.sha256(
-        b"provider_repair|" + request_hash.encode("utf-8") + payload
-    ).hexdigest()
-    local_target = _local_cache_path(cache_dir, repair_hash)
-    if local_target.is_file():
-        try:
-            cached = read_json(local_target)
-            if cached.get("request_hash") == repair_hash:
-                return cached.get("parsed")
-        except Exception:
-            pass
     req = urlrequest.Request(
         route["endpoint"].rstrip("/") + "/chat/completions",
         data=payload,
@@ -200,37 +147,9 @@ def _provider_repair_call(
         parsed = json.loads(content)
         if not isinstance(parsed, dict):
             return None
-        cached = {
-            "request_hash": repair_hash,
-            "response_hash": hashlib.sha256(raw).hexdigest(),
-            "parsed": parsed,
-            "usage": value.get("usage") or {},
-            "latency_seconds": 0.0,
-            "contains_credentials": False,
-        }
-        try:
-            _atomic_write_cache(local_target, cached)
-        except Exception:
-            pass
         return parsed
     except Exception:
         return None
-
-
-def _atomic_write_cache(path: Path, value: Any) -> None:
-    """Atomic cache write safe under concurrent workers.
-
-    ``os.replace`` makes readers see either the complete previous file or the
-    complete next one; the temporary name carries pid + thread id so two
-    workers never collide on the same staging file.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
-    with open(tmp, "w", encoding="utf-8") as handle:
-        json.dump(value, handle, ensure_ascii=False, sort_keys=True, indent=2)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -270,118 +189,6 @@ def parse_gold_label(value: Any) -> bool:
     return coerced
 
 
-def _event_for_source_step(built: dict[str, Any], step: Any) -> str | None:
-    normalized_step = str(step).strip() if step is not None else None
-    for event in built["events"]:
-        event_step = event.get("source_step_id")
-        if event_step == step or (
-            normalized_step is not None
-            and str(event_step).strip() == normalized_step
-        ):
-            return str(event["event_id"])
-    if normalized_step and normalized_step.isdigit():
-        position = int(normalized_step)
-        if 1 <= position <= len(built["events"]):
-            return str(built["events"][position - 1]["event_id"])
-    return None
-
-
-def _parse_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int) and value in {0, 1}:
-        return bool(value)
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes"}:
-            return True
-        if normalized in {"false", "0", "no", ""}:
-            return False
-    raise ValueError(f"invalid boolean value: {value!r}")
-
-
-def load_paca_census(
-    *, case_id: str, built: dict[str, Any], cache_root: Path | None,
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    if cache_root is None:
-        return [], {"status": "disabled", "reason": "no census cache configured"}
-    source = cache_root / private_ref(case_id, "p0_") / "paca_v1_canary_results.json"
-    if not source.is_file():
-        return [], {"status": "missing", "path": str(source)}
-    try:
-        value = read_json(source)
-    except Exception as exc:
-        # A corrupt or unreadable cache must not kill the whole detection:
-        # the callers fall back to the provider census on any non-complete
-        # audit, which is exactly the intended degraded path.
-        return [], {
-            "status": "invalid", "path": str(source),
-            "error_type": type(exc).__name__,
-            "error": str(exc)[:300],
-        }
-    try:
-        outputs = value.get("outputs") or {}
-        if not isinstance(outputs, Mapping):
-            return [], {"status": "invalid", "path": str(source)}
-        stage1 = outputs.get("stage1_scanning")
-        raw_candidates = (
-            stage1.get("candidates") if isinstance(stage1, Mapping) else None
-        )
-    except Exception as exc:
-        return [], {
-            "status": "invalid", "path": str(source),
-            "error_type": type(exc).__name__,
-            "error": str(exc)[:300],
-        }
-    if not isinstance(raw_candidates, list):
-        return [], {"status": "invalid", "path": str(source)}
-    try:
-        converted: list[dict[str, Any]] = []
-        for index, row in enumerate(raw_candidates, start=1):
-            if not isinstance(row, dict):
-                continue
-            origin = _event_for_source_step(built, row.get("root_step_id"))
-            if not origin:
-                continue
-            dependencies = []
-            for step in row.get("information_dependencies") or []:
-                ref = _event_for_source_step(built, step)
-                if ref and ref not in dependencies:
-                    dependencies.append(ref)
-            converted.append({
-                "candidate_id": f"paca_candidate_{index:03d}",
-                "origin_hypothesis_event_id": origin,
-                "trigger_event_id": origin,
-                "axes": [str(row.get("hallucination_dimension") or "F")],
-                "candidate_kind": str(row.get("candidate_kind") or "unmatched"),
-                "claim_or_commitment": str(row.get("information_introduced") or row.get("observation") or "candidate deviation"),
-                "dependency_event_ids": dependencies,
-                "module_tag": str(row.get("module_tag") or "Unknown"),
-                "observation": str(row.get("observation") or ""),
-                "is_decision_point": _parse_bool(row.get("is_decision_point", False)),
-                "source_step_id": next(
-                    (
-                        event.get("source_step_id")
-                        for event in built["events"]
-                        if str(event.get("event_id")) == origin
-                    ),
-                    None,
-                ),
-            })
-    except Exception as exc:
-        return [], {
-            "status": "invalid", "path": str(source),
-            "error_type": type(exc).__name__,
-            "error": str(exc)[:300],
-        }
-    return converted, {
-        "status": "complete" if len(converted) == len(raw_candidates) else "partial",
-        "raw_candidate_count": len(raw_candidates),
-        "converted_candidate_count": len(converted),
-        "source_hash": stable_hash(raw_candidates),
-    }
-
-
 def candidate_system_prompt() -> str:
     return """You perform PACA-TCL dependency-aware candidate census. Enumerate distinct potential hallucination origins in the complete trajectory without deciding the final label.
 
@@ -392,9 +199,9 @@ Return at most 8 deduplicated candidates and do not force a candidate when none 
 Coverage is complete only after scanning the whole supplied trajectory. Never use dataset identity, source, labels or outside facts."""
 
 
-def provider_call(*, route: dict[str, Any], system: str, user: str, cache_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def provider_call(*, route: dict[str, Any], system: str, user: str) -> tuple[dict[str, Any], dict[str, Any]]:
     return provider_call_with_schema(
-        route=route, system=system, user=user, cache_dir=cache_dir,
+        route=route, system=system, user=user,
         cache_prefix="v1_census", require_candidates=True,
     )
 
@@ -404,7 +211,6 @@ def provider_call_with_schema(
     route: dict[str, Any],
     system: str,
     user: str,
-    cache_dir: Path,
     cache_prefix: str = "v1_census",
     require_candidates: bool = True,
     purpose: str = "detector",
@@ -449,57 +255,10 @@ def provider_call_with_schema(
     if thinking is not None:
         payload["thinking"] = thinking
     body = canonical_json(payload).encode("utf-8")
-    # The cache key carries cache_prefix so two callers issuing an identical
-    # payload under different schema contracts (candidates envelope vs. free
-    # JSON object) can never share a cached response.
+    # The request hash is the ledger/audit identity of one logical request;
+    # cache_prefix keeps identical payloads under different schema contracts
+    # (candidates envelope vs. free JSON object) distinct.
     request_hash = hashlib.sha256(cache_prefix.encode("utf-8") + b"|" + (route["endpoint"] + "|" + route["model"] + "|").encode("utf-8") + body).hexdigest()
-
-    # Run-local cache: reuse responses made inside this run's cache
-    # directory.  This is the cache the evolution runner seeds through
-    # ``genome_dir/<cache_name>`` so replays of the same genome + case
-    # reuse identical provider responses without touching the global cache.
-    local_target = _local_cache_path(cache_dir, request_hash)
-    if local_target.is_file():
-        try:
-            cached = read_json(local_target)
-            if cached.get("request_hash") == request_hash:
-                parsed = cached.get("parsed")
-                if not isinstance(parsed, dict):
-                    raise ValueError("cached provider response is not an object")
-                if require_candidates and not isinstance(parsed.get("candidates"), list):
-                    raise ValueError("cached provider ledger schema invalid")
-                return parsed, {
-                    "cache_hit": True,
-                    "request_hash": request_hash,
-                    "usage": cached.get("usage") or {},
-                    "cache_source": "local",
-                    "transport_attempts": int(cached.get("transport_attempts") or 0),
-                    "repair_used": bool(cached.get("repair_used")),
-                }
-        except Exception:
-            pass  # corrupt cache file: fall through to the provider
-
-    # Global cache lookup: shared across every output_dir of this machine.
-    global_target = _global_cache_path(request_hash)
-    if global_target is not None and global_target.is_file():
-        try:
-            cached = read_json(global_target)
-            if cached.get("request_hash") == request_hash:
-                parsed = cached.get("parsed")
-                if not isinstance(parsed, dict):
-                    raise ValueError("cached provider response is not an object")
-                if require_candidates and not isinstance(parsed.get("candidates"), list):
-                    raise ValueError("cached provider ledger schema invalid")
-                return parsed, {
-                    "cache_hit": True,
-                    "request_hash": request_hash,
-                    "usage": cached.get("usage") or {},
-                    "cache_source": "global",
-                    "transport_attempts": int(cached.get("transport_attempts") or 0),
-                    "repair_used": bool(cached.get("repair_used")),
-                }
-        except Exception:
-            pass  # corrupt cache file: fall through to the provider
 
     api_key = resolve_provider_credential(route, purpose=transport_purpose)
     retries = int(route.get("transport_retries", 2))
@@ -556,9 +315,8 @@ def provider_call_with_schema(
                 parsed = json.loads(usable_content)
             except json.JSONDecodeError:
                 # One bounded provider repair. A response carrying no usable
-                # JSON body is repairable only with a DIFFERENT request body
-                # (cache key differs), re-sending the same system prompt with
-                # a compact continuation instruction. Failure remains
+                # JSON body is retried with a compact continuation instruction
+                # appended to the same system prompt. Failure remains
                 # fail-closed: the original error is raised.
                 repair_body, _repair_user = _provider_repair_payload(
                     payload, system, user,
@@ -568,7 +326,6 @@ def provider_call_with_schema(
                     repair_value = _provider_repair_call(
                         route=route, api_key=api_key,
                         payload=repair_body,
-                        cache_dir=cache_dir, request_hash=request_hash,
                         request_timeout=request_timeout,
                     )
                 except Exception as exc:
@@ -592,31 +349,11 @@ def provider_call_with_schema(
                 raise ValueError("provider response is not a JSON object")
             if require_candidates and not isinstance(parsed.get("candidates"), list):
                 raise ValueError("provider ledger schema invalid: missing candidates")
-            cached = {
-                "request_hash": request_hash,
-                "response_hash": hashlib.sha256(raw).hexdigest(),
-                "parsed": parsed,
-                "usage": value.get("usage") or {},
-                "latency_seconds": time.time() - started,
-                "contains_credentials": False,
-                "transport_attempts": transport_attempts,
-                "repair_used": repair_used,
-            }
-            if global_target is not None:
-                try:
-                    _atomic_write_cache(global_target, cached)
-                except Exception:
-                    pass  # a failed cache write must not break detection
-            try:
-                _atomic_write_cache(local_target, cached)
-            except Exception:
-                pass
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,
-                "usage": cached["usage"],
-                "latency_seconds": cached["latency_seconds"],
-                "cache_source": "local",
+                "usage": value.get("usage") or {},
+                "latency_seconds": time.time() - started,
                 "transport_attempts": transport_attempts,
                 "repair_used": repair_used,
             }
@@ -668,20 +405,18 @@ def json_object_provider_call(
     route: dict[str, Any],
     system: str,
     user: str,
-    cache_dir: Path,
     purpose: str = "detector",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Call a provider for an unconstrained JSON object.
 
-    Some routes do not use the ``candidates`` envelope. Keeping this wrapper
-    beside the cached provider implementation gives those callers the same
-    deterministic transport without pretending they implement a ledger schema.
+    Some routes do not use the ``candidates`` envelope. This wrapper gives
+    those callers the same deterministic transport without pretending they
+    implement a ledger schema.
     """
     return provider_call_with_schema(
         route=route,
         system=system,
         user=user,
-        cache_dir=cache_dir,
         cache_prefix="generic_json_object",
         require_candidates=False,
         purpose=purpose,

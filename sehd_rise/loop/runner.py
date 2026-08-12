@@ -334,7 +334,6 @@ def _llm_no_conflict_gate(
     *,
     target_module: str,
     mutation_route: dict[str, Any] | None,
-    cache_dir: Path | None = None,
     budget_usage: dict[str, int] | None = None,
     mutation_call_limit: int | None = None,
 ) -> tuple[bool, str, list[int], bool]:
@@ -372,26 +371,20 @@ def _llm_no_conflict_gate(
             route=mutation_route,
             system=system_prompt,
             user=user_prompt,
-            cache_dir=cache_dir or Path(".conflict_gate_cache"),
             budget_usage=budget_usage,
             mutation_call_limit=mutation_call_limit,
         )
     except Exception:
         return False, "provider_exception", [], True
-    if budget_usage is not None and isinstance(meta, Mapping):
-        if meta.get("cache_hit"):
-            budget_usage["mutation_cache_hits"] = (
-                budget_usage.get("mutation_cache_hits", 0) + 1
-            )
-        elif not meta.get("cache_hit"):
-            budget_usage["mutation_transport_attempts"] = (
-                budget_usage.get("mutation_transport_attempts", 0)
-                + int(meta.get("transport_attempts") or 0)
-            )
-            budget_usage["mutation_repairs"] = (
-                budget_usage.get("mutation_repairs", 0)
-                + int(bool(meta.get("repair_used")))
-            )
+    if budget_usage is not None and isinstance(meta, Mapping) and not meta.get("cache_hit"):
+        budget_usage["mutation_transport_attempts"] = (
+            budget_usage.get("mutation_transport_attempts", 0)
+            + int(meta.get("transport_attempts") or 0)
+        )
+        budget_usage["mutation_repairs"] = (
+            budget_usage.get("mutation_repairs", 0)
+            + int(bool(meta.get("repair_used")))
+        )
     if not isinstance(result, dict):
         return False, "parse_failure", [], True
     decision = str(result.get("decision", "")).strip().lower()
@@ -450,7 +443,6 @@ def _run_registry_reflection_impl(
                 purpose=PURPOSE_REGISTRY_REFLECTION,
                 system=system_prompt,
                 user=user_prompt,
-                cache_dir=output_dir / "mutation_cache" / "registry_reflection",
             )
             last_exc = None
             break
@@ -733,10 +725,8 @@ class EvolutionLoop:
     records: Mapping[str, dict[str, Any]],
     config: dict[str, Any],
     output_dir: Path,
-    census_root: Path | None = None,
     use_gold: bool = False,
     mutation_route: dict[str, Any] | None = None,
-    baseline_cache_root: Path | None = None,
     module_cooldown: int = 0,
     max_total_edits: int = 200,
     convergence_window: int = 20,
@@ -765,10 +755,8 @@ class EvolutionLoop:
         self.records = records
         self.config = config
         self.output_dir = Path(output_dir)
-        self.census_root = census_root
         self.use_gold = use_gold
         self.mutation_route = mutation_route
-        self.baseline_cache_root = baseline_cache_root
         self.module_cooldown = module_cooldown
         self.max_total_edits = max_total_edits
         self.convergence_window = convergence_window
@@ -828,8 +816,6 @@ class EvolutionLoop:
             )
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.shared_cache_root = self.output_dir / "shared_cache"
-        self.shared_cache_root.mkdir(parents=True, exist_ok=True)
         self.start_time = time.time()
 
         self.champion_genome = (
@@ -1117,9 +1103,7 @@ class EvolutionLoop:
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
             output_path=output_path, budget_usage=self.budget_usage,
-            records=self.records, config=self.config, census_root=self.census_root,
-            baseline_cache_root=self.baseline_cache_root,
-            shared_cache_root=self.shared_cache_root,
+            records=self.records, config=self.config,
             provider_usage_ledger=self.provider_usage_ledger,
             policy_genome=policy_genome, policy_scope=policy_scope,
         )
@@ -2202,10 +2186,6 @@ class EvolutionLoop:
                     purpose="policy_reflection",
                     system=system_prompt,
                     user=user_prompt,
-                    cache_dir=(
-                        self.output_dir / "mutation_cache"
-                        / "policy_reflection"
-                    ),
                 )
                 reflection_exc = None
                 break
@@ -2551,9 +2531,6 @@ class EvolutionLoop:
         allowed_modules = type_allowed_modules
 
         if self.mutation_route is not None:
-            mutation_cache = self.output_dir / "mutation_cache"
-            mutation_cache.mkdir(parents=True, exist_ok=True)
-
             skill_context = "\n\n".join(
                 format_skill_context_for_llm(
                     self.state.current_genome.modules, module,
@@ -2706,7 +2683,6 @@ class EvolutionLoop:
                         purpose="mutation",
                         system=system_prompt,
                         user=generation_user,
-                        cache_dir=mutation_cache / f"candidate_{generation_index}",
                     )
                     primary_cache_hits.append(bool(
                         isinstance(meta, Mapping) and meta.get("cache_hit")
@@ -2784,7 +2760,6 @@ class EvolutionLoop:
                         purpose="reflection_critic",
                         system=critic_system,
                         user=critic_user,
-                        cache_dir=mutation_cache / "critic",
                     )
                     reflection_audit["critic_cache_hit"] = bool(
                         isinstance(_critic_meta, Mapping)
@@ -2833,11 +2808,6 @@ class EvolutionLoop:
                                 purpose=diag_purpose,
                                 system=diag_system,
                                 user=diag_user,
-                                cache_dir=mutation_cache / (
-                                    "diagnosis"
-                                    if diag_purpose == "reflection_diagnosis"
-                                    else "diagnosis_pro"
-                                ),
                             )
                             diagnosis = sanitize_diagnosis(
                                 diag_parsed, allowed_modules,
@@ -2888,11 +2858,6 @@ class EvolutionLoop:
                                 ),
                                 system=targeted_system,
                                 user=targeted_user,
-                                cache_dir=mutation_cache / (
-                                    "targeted"
-                                    if diag_purpose == "reflection_diagnosis"
-                                    else "targeted_pro"
-                                ),
                             )
                             targeted_candidates, targeted_no_edit = (
                                 extract_intervention_candidates(
@@ -3646,7 +3611,6 @@ class EvolutionLoop:
                 _existing_rules,
                 target_module=edit.target_module,
                 mutation_route=self.mutation_route,
-                cache_dir=self.output_dir / "conflict_gate_cache",
                 budget_usage=self.budget_usage,
                 mutation_call_limit=self.max_mutation_calls,
             )
@@ -4554,10 +4518,8 @@ def run_online_evolution(
     records: Mapping[str, dict[str, Any]],
     config: dict[str, Any],
     output_dir: Path,
-    census_root: Path | None = None,
     use_gold: bool = False,
     mutation_route: dict[str, Any] | None = None,
-    baseline_cache_root: Path | None = None,
     module_cooldown: int = 0,
     max_total_edits: int = 200,
     convergence_window: int = 20,
@@ -4598,10 +4560,8 @@ def run_online_evolution(
         records=records,
         config=config,
         output_dir=output_dir,
-        census_root=census_root,
         use_gold=use_gold,
         mutation_route=mutation_route,
-        baseline_cache_root=baseline_cache_root,
         module_cooldown=module_cooldown,
         max_total_edits=max_total_edits,
         convergence_window=convergence_window,

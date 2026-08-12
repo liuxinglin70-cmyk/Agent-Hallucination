@@ -179,7 +179,6 @@ def run_batch(
     output_dir: Path, max_parallel: int = 10, resume: bool = True,
     genome: Any | None = None, genome_source: str | None = None,
     policy_genome: Any | None = None,
-    census_root: Path | None = None,
 ) -> dict[str, Any]:
     """Detect independent trajectories concurrently with hash-bound resume."""
     if max_parallel < 1:
@@ -220,8 +219,6 @@ def run_batch(
                 "record": record, "config": config, "case_id": case_id,
                 "output_dir": case_dir / "trace",
             }
-            if census_root is not None:
-                detect_kwargs["census_root"] = census_root
             if genome is not None:
                 detect_kwargs["genome"] = genome
                 detect_kwargs["genome_source"] = genome_source
@@ -377,11 +374,9 @@ def run_replicated_batch(
 ) -> dict[str, Any]:
     """Run the detector k times per case and aggregate fail-closed.
 
-    Each replica executes under an isolated global provider-cache root so
-    identical payloads do not collapse into one cached response; replicas are
-    strictly serial because ``PACA_GLOBAL_CACHE_ROOT`` is process-global and
-    ``run_batch`` already parallelizes across cases internally. Verdicts are
-    combined with ``aggregate_replicas`` (majority/consensus, fail-closed).
+    Replicas are strictly serial while ``run_batch`` parallelizes across
+    cases internally. Verdicts are combined with ``aggregate_replicas``
+    (majority/consensus, fail-closed).
 
     Degradation guard: when every route is deterministic (temperature 0 or
     unset), requesting replicas > 1 would burn k identical provider calls,
@@ -407,35 +402,23 @@ def run_replicated_batch(
             "requested": replicas,
         }
 
-    original_global_cache = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
     replica_roots: list[Path] = []
-    try:
-        for index in range(effective_replicas):
-            replica_root = output_root / f"replica_{index}"
-            # Isolate the global provider cache per replica so identical
-            # payloads cannot collapse k runs into one cached response.
-            os.environ["PACA_GLOBAL_CACHE_ROOT"] = str(
-                replica_root / "provider_cache"
-            )
-            batch_kwargs: dict[str, Any] = {
-                "records": records,
-                "config": config,
-                "output_dir": replica_root,
-                "max_parallel": max_parallel,
-                "resume": resume,
-            }
-            if genome is not None:
-                batch_kwargs["genome"] = genome
-                batch_kwargs["genome_source"] = genome_source
-            if policy_genome is not None:
-                batch_kwargs["policy_genome"] = policy_genome
-            run_batch(**batch_kwargs)
-            replica_roots.append(replica_root)
-    finally:
-        if original_global_cache is None:
-            os.environ.pop("PACA_GLOBAL_CACHE_ROOT", None)
-        else:
-            os.environ["PACA_GLOBAL_CACHE_ROOT"] = original_global_cache
+    for index in range(effective_replicas):
+        replica_root = output_root / f"replica_{index}"
+        batch_kwargs: dict[str, Any] = {
+            "records": records,
+            "config": config,
+            "output_dir": replica_root,
+            "max_parallel": max_parallel,
+            "resume": resume,
+        }
+        if genome is not None:
+            batch_kwargs["genome"] = genome
+            batch_kwargs["genome_source"] = genome_source
+        if policy_genome is not None:
+            batch_kwargs["policy_genome"] = policy_genome
+        run_batch(**batch_kwargs)
+        replica_roots.append(replica_root)
 
     case_ids = [str(case_id) for case_id in records]
     predictions_by_case = collect_replica_predictions(replica_roots, case_ids)

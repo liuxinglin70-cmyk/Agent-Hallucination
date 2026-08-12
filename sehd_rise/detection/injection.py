@@ -13,7 +13,6 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import Any, Iterator, Mapping, Protocol
 
 from sehd_rise.skills.action import MODULE_ROUTE_IDS, sanitize_action_spec
@@ -85,7 +84,6 @@ class ProviderCall(Protocol):
         route: dict[str, Any],
         system: str,
         user: str,
-        cache_dir: Path,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         ...
 
@@ -509,7 +507,6 @@ def make_skill_aware_provider(
         route: dict[str, Any],
         system: str,
         user: str,
-        cache_dir: Path,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         binding = bindings.get(id(route))
         if binding is None:
@@ -623,7 +620,6 @@ def make_skill_aware_provider(
             route=route,
             system=augmented_system,
             user=user,
-            cache_dir=cache_dir,
         )
         rule_effects: list[dict[str, Any]] = []
         applied_rule_ids: list[str] = []

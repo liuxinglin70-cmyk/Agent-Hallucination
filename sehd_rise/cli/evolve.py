@@ -35,10 +35,6 @@ def main() -> int:
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
-        "--census-root", type=Path, default=None,
-        help="optional precomputed census cache",
-    )
-    parser.add_argument(
         "--mutation-route", type=Path, default=None,
         help="optional mutation route JSON; defaults to SEHD_MUTATION_* env",
     )
@@ -90,7 +86,6 @@ def main() -> int:
         canary_records=args.canary_records,
         detector_config=args.config,
         output_dir=args.output_dir,
-        census_root=args.census_root,
         mutation_route=args.mutation_route,
         pro_mutation_route=args.pro_mutation_route,
         initial_genome=args.initial_genome,

@@ -47,9 +47,6 @@ def execute_repair_plan(
     budget_usage: dict[str, int],
     records: Mapping[str, dict[str, Any]],
     config: dict[str, Any],
-    census_root: Path | None,
-    baseline_cache_root: Path | None,
-    shared_cache_root: Path | None,
     provider_usage_ledger: ProviderUsageLedger,
     policy_genome: PolicyGenome | None = None,
 ) -> dict[str, Any]:
@@ -66,9 +63,7 @@ def execute_repair_plan(
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
             output_path=output_path, budget_usage=budget_usage,
-            records=records, config=config, census_root=census_root,
-            baseline_cache_root=baseline_cache_root,
-            shared_cache_root=shared_cache_root,
+            records=records, config=config,
             provider_usage_ledger=provider_usage_ledger,
             policy_genome=policy_genome, policy_scope="working",
         )
@@ -80,9 +75,7 @@ def execute_repair_plan(
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
             output_path=output_path, budget_usage=budget_usage,
-            records=records, config=config, census_root=census_root,
-            baseline_cache_root=baseline_cache_root,
-            shared_cache_root=shared_cache_root,
+            records=records, config=config,
             provider_usage_ledger=provider_usage_ledger,
             policy_genome=policy_genome, policy_scope=None,
         )

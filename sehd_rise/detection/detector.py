@@ -233,7 +233,7 @@ def load_policy_genome(path: Path, *, expected_hash: str | None = None) -> Any:
 
 def detect_record(
     *, record: dict[str, Any], config: dict[str, Any], case_id: str = "case",
-    output_dir: Path | None = None, census_root: Path | None = None,
+    output_dir: Path | None = None,
     genome: Any | None = None, genome_source: str | None = None,
     policy_genome: Any | None = None,
     adjudicator: Any | None = None,
@@ -262,7 +262,7 @@ def detect_record(
         run_adjudication = adjudicator or adjudicate_case
         result = run_adjudication(
             case_id=case_id, record=record, config=config,
-            output_dir=output_dir, census_root=census_root,
+            output_dir=output_dir,
             **(
                 {
                     "policy_items": policy_items,
@@ -276,7 +276,7 @@ def detect_record(
         with integrated_engine_provider(genome=genome, config=config):
             result = engine.adjudicate_case(
                 case_id=case_id, record=record, config=config,
-                output_dir=output_dir, census_root=census_root,
+                output_dir=output_dir,
                 policy_items=policy_items,
                 policy_registry=policy_registry,
             )
@@ -335,10 +335,6 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument(
-        "--census-root", type=Path, default=None,
-        help="optional precomputed census cache; provider census is used when omitted",
-    )
-    parser.add_argument(
         "--genome", type=Path, default=None,
         help="optional persisted SkillGenome JSON; loading is explicit and fail-closed",
     )
@@ -368,14 +364,13 @@ def main() -> int:
             max_parallel=args.max_parallel, resume=not args.no_resume,
             genome=genome, genome_source=genome_source,
             policy_genome=policy_genome,
-            census_root=args.census_root,
         )
         print(args.output_dir / "summary.json")
         return 0 if summary["failed_case_count"] == 0 else 2
     record = read_json(args.record)
     result = detect_record(
         record=record, config=config, case_id=args.case_id,
-        output_dir=args.output_dir, census_root=args.census_root,
+        output_dir=args.output_dir,
         genome=genome, genome_source=genome_source,
         policy_genome=policy_genome,
     )

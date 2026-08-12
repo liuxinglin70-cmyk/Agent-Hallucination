@@ -37,10 +37,6 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument(
-        "--census-root", type=Path, default=None,
-        help="optional precomputed census cache; provider census is used when omitted",
-    )
-    parser.add_argument(
         "--genome", type=Path, default=None,
         help="optional persisted SkillGenome JSON; loading is explicit and fail-closed",
     )
@@ -67,14 +63,13 @@ def main() -> int:
             max_parallel=args.max_parallel, resume=not args.no_resume,
             genome=genome, genome_source=genome_source,
             policy_genome=policy_genome,
-            census_root=args.census_root,
         )
         print(args.output_dir / "summary.json")
         return 0 if summary["failed_case_count"] == 0 else 2
     record = json.loads(Path(args.record).read_text(encoding="utf-8"))
     result = detect_record(
         record=record, config=config, case_id=args.case_id,
-        output_dir=args.output_dir, census_root=args.census_root,
+        output_dir=args.output_dir,
         genome=genome, genome_source=genome_source,
         policy_genome=policy_genome,
     )

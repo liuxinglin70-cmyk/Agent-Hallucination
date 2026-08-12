@@ -7,14 +7,13 @@ single self-contained successor: every orchestration path the live detector
 actually runs is inlined once, with no version-suffix helpers and no
 cross-generation imports.
 
-Three adjudication surfaces share one provider-transport boundary:
+Two adjudication surfaces share one provider-transport boundary:
 
-* ``adjudicate_ledger_case`` — single typed-ledger candidate validation.
 * ``adjudicate_layered_case`` — separated qualification/propagation layers.
 * ``adjudicate_case`` — focused prosecution + calibrated appeal + counterfactual
   localization (the production surface).
 
-All three call the same transport primitives; the skill-injection adapter
+Both call the same transport primitives; the skill-injection adapter
 patches ``provider_call`` / ``json_object_provider_call`` on this module to
 attach a genome without changing any adjudication rule.
 """
@@ -22,7 +21,7 @@ attach a genome without changing any adjudication rule.
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -35,7 +34,6 @@ from sehd_rise.detection.transport import (
     candidate_provider_user_prompt,
     candidate_system_prompt,
     json_object_provider_call,
-    load_paca_census,
     parse_gold_label,
     private_ref,
     provider_call,
@@ -47,27 +45,8 @@ from sehd_rise.skills.vocabulary.registry import L2_REGISTRY, POLICY_STAGE_PRE_L
 
 
 # ============================================================
-# Provider prompts (frozen wire format — any change re-keys the cache)
+# Provider prompts (frozen wire format — any change re-keys the request hash)
 # ============================================================
-
-SINGLE_LEDGER_SYSTEM = """You are the semantic audit layer of PACA-TCL, a typed causal-ledger detector for agent hallucinations.
-The candidates were independently discovered from the complete trajectory. Audit every candidate; never invent or delete one.
-
-A verified error requires ALL of: (1) a verified F/Fa/P/S violation, (2) agent-caused or agent-contributed responsibility, (3) the ordinary-failure/exploration/approximation/authorized-action boundary is cleared, and (4) an addressable origin -> consumption -> material impact chain that was not repaired before impact. Do not infer a contradiction merely because an action is imperfect. A bad tool result is agent-caused only when the agent's target, argument, assumption, or omission caused or materially contributed to it.
-
-Use only IDs present in ADDRESSABLE_REFERENCE_IDS. Event IDs may be used for causal locations. Event IDs and tool interaction IDs may be used as evidence. For omissions, origin_event_id is the decision event where the required action should have occurred. Recovery means explicit correction, successful rollback, or supersession of the same commitment; a workaround is not automatically recovery. If recovery occurs after an irreversible external/process impact, set impacted_then_recovered and residual_impact=true.
-
-Enums:
-- violation_state: verified_violation | verified_non_violation | unresolved
-- actor_state: agent_caused | agent_contributed | environment_caused | external_input_caused | unresolved
-- boundary_state: cleared | triggered | unresolved
-- propagation_state: no_consumption | recovered_before_impact | impacted_then_recovered | unrecovered_impact | unresolved
-- impact_surfaces: A(final answer), X(external state/cost), R(process debt)
-- coverage_state: complete only when every supplied candidate is returned; otherwise incomplete or unresolved.
-
-Return JSON only: {"coverage_state":"complete|incomplete|unresolved","candidates":[...]}. Each candidate must include exactly these semantic fields (extra fields are allowed but ignored): candidate_id, axes, candidate_kind, trigger_event_id, origin_event_id, claim_or_commitment, dependency_event_ids, violation_state, actor_state, boundary_state, propagation_state, residual_impact, positive_evidence_refs, actor_evidence_refs, boundary_evidence_refs, consumption_event_ids, consumption_evidence_refs, impact_event_ids, impact_evidence_refs, recovery_event_id, recovery_evidence_refs, impact_surfaces, rationale.
-For non-applicable evidence lists return []; for no recovery return null. Never use a Boolean such as answer_causal instead of the three-segment chain."""
-
 
 QUALIFICATION_SYSTEM = """You are PACA-TCL v2 qualification layer. Audit every supplied PACA candidate independently using only the trajectory. Decide only: violation, actor responsibility, and counter-boundary. Do not decide propagation, recovery, impact, final case label, or scores. A triggered boundary means the apparent deviation is attributable to environment/external input, explicitly authorized, or otherwise outside agent responsibility. Evidence references must be supplied event/interaction IDs. Return JSON only:
 {"coverage_state":"complete|incomplete|unresolved","candidates":[{"candidate_id":"...","violation_state":"verified_violation|verified_non_violation|unresolved","actor_state":"agent_caused|agent_contributed|environment_caused|external_input_caused|unresolved","boundary_state":"cleared|triggered|unresolved","positive_evidence_refs":[],"actor_evidence_refs":[],"boundary_evidence_refs":[],"rationale":"..."}]}"""
@@ -248,195 +227,6 @@ def _provider_user(built: dict[str, Any], *, census: list[dict[str, Any]] | None
     return value
 
 
-def single_ledger_user_prompt(built: dict[str, Any], census: list[dict[str, Any]]) -> str:
-    """Materialize the label-free provider input in one auditable function."""
-    user = (
-        "TRAJECTORY_PACKET=\n" + canonical_json(built) +
-        "\nCANDIDATE_CENSUS=\n" + canonical_json(census) +
-        "\nADDRESSABLE_REFERENCE_IDS=\n" + canonical_json(_addressable_refs(built))
-    )
-    forbidden_control_fields = {
-        '"is_hallucination"', '"hallucination_step"', '"hallucination_reason"',
-        '"gold_label"', '"case_id"', '"source_dir"', '"outer_feedback"',
-    }
-    hits = sorted(field for field in forbidden_control_fields if field in user)
-    if hits:
-        raise ValueError("provider input firewall violation: " + ",".join(hits))
-    return user
-
-
-# ============================================================
-# Single-ledger adjudication surface
-# ============================================================
-
-def adjudicate_ledger_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, census_root: Path) -> dict[str, Any]:
-    built = build_packet(record)
-    census, census_audit = load_paca_census(case_id=case_id, built=built, cache_root=census_root)
-    candidate_provider: dict[str, Any] = {"calls": 0, "source": "frozen_paca_stage1_cache"}
-    if not census or census_audit.get("status") != "complete":
-        try:
-            provider_value, provider_meta = provider_call(
-                route=config.get("candidate_fallback_route") or config["model_route"],
-                system=candidate_system_prompt(),
-                user=candidate_provider_user_prompt(built),
-                cache_dir=output_dir / "candidate_provider_cache",
-            )
-            census, generated_audit = validate_provider_census(provider_value, built)
-            census_audit = {**generated_audit, "fallback_from": census_audit}
-            candidate_provider = {**provider_meta, "calls": 1, "source": "provider_fallback"}
-        except Exception as exc:
-            census = []
-            census_audit = {"status": "fallback_failed", "prior": census_audit, "error_type": type(exc).__name__, "error": str(exc)[:500]}
-            candidate_provider = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
-    result = {
-        "case_ref": private_ref(case_id, "case_"),
-        "census": census,
-        "census_audit": census_audit,
-        "candidate_provider": candidate_provider,
-    }
-    if not census:
-        result.update({
-            "runtime_valid": census_audit["status"] == "complete",
-            "state": "verified_clean" if census_audit["status"] == "complete" else "unresolved",
-            "responsible_event_id": None,
-            "responsible_step": None,
-            "ledger": {"coverage_state": "complete" if census_audit["status"] == "complete" else "unresolved", "candidates": []},
-            "adjudication": None,
-            "provider": {"calls": 0},
-        })
-        return result
-
-    user = single_ledger_user_prompt(built, census)
-    try:
-        ledger, provider = provider_call(
-            route=config["model_route"],
-            system=SINGLE_LEDGER_SYSTEM,
-            user=user,
-            cache_dir=output_dir / "provider_cache",
-        )
-        expected = {row["candidate_id"] for row in census}
-        returned = {str(row.get("candidate_id") or "") for row in ledger.get("candidates") or [] if isinstance(row, dict)}
-        if expected != returned:
-            ledger = {**ledger, "coverage_state": "incomplete"}
-        adjudication = contract.adjudicate_ledger(ledger, built)
-        result.update({
-            "runtime_valid": True,
-            "state": adjudication["state"],
-            "responsible_event_id": adjudication["responsible_event_id"],
-            "responsible_step": _responsible_step(adjudication["responsible_event_id"], built),
-            "ledger": ledger,
-            "adjudication": adjudication,
-            "provider": provider,
-        })
-    except Exception as exc:
-        result.update({
-            "runtime_valid": False,
-            "state": "unresolved",
-            "responsible_event_id": None,
-            "responsible_step": None,
-            "ledger": None,
-            "adjudication": None,
-            "provider": {"error_type": type(exc).__name__, "error": str(exc)[:500]},
-        })
-    return result
-
-
-def evaluate_ledger_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    confusion = Counter()
-    tri_state = Counter()
-    runtime_valid = 0
-    step_correct = 0
-    positive_total = 0
-    discovery_hits = 0
-    fn_mechanisms = Counter()
-    quarantined_candidates = 0
-    total_candidates = 0
-    layer_states: dict[str, Counter] = defaultdict(Counter)
-
-    for row in rows:
-        raw_gold = row.get("gold_label")
-        if raw_gold is None:
-            continue
-        gold = parse_gold_label(raw_gold)
-        positive_total += int(gold)
-        state = str(row.get("state") or "unresolved")
-        tri_state[state] += 1
-        runtime_valid += int(bool(row.get("runtime_valid")))
-        if state == "unresolved":
-            confusion["unresolved"] += 1
-            continue
-        else:
-            predicted = state == "verified_error"
-        if gold and predicted:
-            confusion["tp"] += 1
-            step_correct += int(row.get("responsible_step") in set(row.get("gold_steps") or []))
-        elif gold:
-            confusion["fn"] += 1
-        elif predicted:
-            confusion["fp"] += 1
-        else:
-            confusion["tn"] += 1
-
-        census_steps = {
-            str(item.get("source_step_id"))
-            for item in row.get("census") or []
-            if item.get("source_step_id") is not None
-        }
-        hit = bool(census_steps & {str(step) for step in row.get("gold_steps") or []}) if gold else False
-        discovery_hits += int(hit)
-        adjudication = row.get("adjudication") or {}
-        quarantined_candidates += len(adjudication.get("quarantined_candidate_ids") or [])
-        ledger_rows = (row.get("ledger") or {}).get("candidates") or []
-        total_candidates += len(ledger_rows)
-        for candidate in ledger_rows:
-            layer_states["violation"][str(candidate.get("violation_state"))] += 1
-            layer_states["actor"][str(candidate.get("actor_state"))] += 1
-            layer_states["boundary"][str(candidate.get("boundary_state"))] += 1
-            layer_states["propagation"][str(candidate.get("propagation_state"))] += 1
-
-        if gold and not predicted:
-            if not hit:
-                fn_mechanisms["candidate_origin_miss"] += 1
-            elif not row.get("runtime_valid"):
-                fn_mechanisms["runtime_invalid"] += 1
-            elif adjudication.get("quarantined_candidate_ids"):
-                fn_mechanisms["candidate_quarantine"] += 1
-            elif any(candidate.get("violation_state") == "verified_violation" for candidate in ledger_rows):
-                if any(candidate.get("actor_state") in {"environment_caused", "external_input_caused"} or candidate.get("boundary_state") == "triggered" for candidate in ledger_rows):
-                    fn_mechanisms["responsibility_or_boundary_filter"] += 1
-                elif any(candidate.get("propagation_state") in {"no_consumption", "recovered_before_impact"} for candidate in ledger_rows):
-                    fn_mechanisms["propagation_or_recovery_filter"] += 1
-                else:
-                    fn_mechanisms["chain_or_unresolved"] += 1
-            else:
-                fn_mechanisms["violation_verification_miss"] += 1
-
-    tp, fp, fn, tn = (confusion[key] for key in ("tp", "fp", "fn", "tn"))
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1_pos = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    clean_precision = tn / (tn + fn) if tn + fn else 0.0
-    clean_recall = tn / (tn + fp) if tn + fp else 0.0
-    f1_clean = 2 * clean_precision * clean_recall / (clean_precision + clean_recall) if clean_precision + clean_recall else 0.0
-    return {
-        "case_count": len(rows),
-        "runtime_valid_rate": runtime_valid / len(rows) if rows else 0.0,
-        "confusion": dict(confusion),
-        "macro_f1": (f1_pos + f1_clean) / 2,
-        "precision": precision,
-        "recall": recall,
-        "clean_fpr": fp / (fp + tn) if fp + tn else 0.0,
-        "responsible_step_recall_over_all_gold_positive": step_correct / positive_total if positive_total else 0.0,
-        "responsible_step_accuracy_on_detected_positive": step_correct / tp if tp else 0.0,
-        "candidate_origin_coverage_on_gold_positive": discovery_hits / positive_total if positive_total else 0.0,
-        "tri_state_counts": dict(tri_state),
-        "candidate_quarantine_rate": quarantined_candidates / total_candidates if total_candidates else 0.0,
-        "fn_mechanisms": dict(fn_mechanisms),
-        "layer_state_counts": {key: dict(value) for key, value in layer_states.items()},
-        "candidate_provider_fallback_count": sum(int((row.get("candidate_provider") or {}).get("source") == "provider_fallback") for row in rows),
-    }
-
-
 # ============================================================
 # Layered adjudication surface (qualification + propagation separated)
 # ============================================================
@@ -485,22 +275,18 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
     }
 
 
-def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, census_root: Path | None = None) -> dict[str, Any]:
+def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path) -> dict[str, Any]:
     built = build_packet(record)
-    census, census_audit = load_paca_census(case_id=case_id, built=built, cache_root=census_root)
-    candidate_provider: dict[str, Any] = {"calls": 0, "source": "frozen_paca_stage1_cache"}
-    if not census or census_audit.get("status") != "complete":
-        try:
-            value, meta = provider_call(
-                route=config["candidate_fallback_route"], system=candidate_system_prompt(),
-                user=candidate_provider_user_prompt(built), cache_dir=output_dir / "candidate_provider_cache",
-            )
-            census, generated = validate_provider_census(value, built)
-            census_audit = {**generated, "fallback_from": census_audit}
-            candidate_provider = {**meta, "calls": 1, "source": "provider_fallback"}
-        except Exception as exc:
-            census, census_audit = [], {"status": "fallback_failed", "error_type": type(exc).__name__, "error": str(exc)[:500]}
-            candidate_provider = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
+    try:
+        value, meta = provider_call(
+            route=config["candidate_fallback_route"], system=candidate_system_prompt(),
+            user=candidate_provider_user_prompt(built),
+        )
+        census, census_audit = validate_provider_census(value, built)
+        candidate_provider = {**meta, "calls": 1, "source": "provider_fallback"}
+    except Exception as exc:
+        census, census_audit = [], {"status": "fallback_failed", "error_type": type(exc).__name__, "error": str(exc)[:500]}
+        candidate_provider = {"calls": 1, "source": "provider_fallback", "error_type": type(exc).__name__}
 
     result: dict[str, Any] = {
         "case_ref": private_ref(case_id, "case_"),
@@ -511,7 +297,7 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
         if census:
             q_value, providers["qualification"] = provider_call(
                 route=config["qualification_route"], system=QUALIFICATION_SYSTEM,
-                user=_provider_user(built, census=census), cache_dir=output_dir / "qualification_cache",
+                user=_provider_user(built, census=census),
             )
             q_coverage, qualifications = _coverage(q_value, {row["candidate_id"] for row in census})
             qualified = []
@@ -524,7 +310,6 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
                 p_value, providers["propagation"] = provider_call(
                     route=config["propagation_route"], system=PROPAGATION_SYSTEM,
                     user=_provider_user(built, census=qualified_census, qualification=qualified),
-                    cache_dir=output_dir / "propagation_cache",
                 )
                 p_coverage, propagations = _coverage(p_value, qualified_ids)
             else:
@@ -546,7 +331,6 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
     try:
         boundary_value, providers["boundary"] = provider_call(
             route=config["boundary_route"], system=BOUNDARY_SYSTEM, user=_provider_user(built),
-            cache_dir=output_dir / "boundary_cache",
         )
         boundary_path = _validate_boundary(boundary_value, built)
     except Exception as exc:
@@ -1020,7 +804,7 @@ def _focused_prosecution_retry_user(
 
 def _run_focused_prosecution_for_candidate(
     *, candidate: dict[str, Any], built: dict[str, Any], base: dict[str, Any],
-    config: dict[str, Any], output_dir: Path, max_retries: int | None = None,
+    config: dict[str, Any], max_retries: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Run one candidate through a uniform envelope + certificate repair loop.
 
@@ -1031,7 +815,6 @@ def _run_focused_prosecution_for_candidate(
     removes the asymmetry where only malformed certificates were retried.
     """
     candidate_id = str(candidate.get("candidate_id") or "unknown")
-    cache_dir = output_dir / "focused_prosecution_cache" / candidate_id
     all_audits: list[dict[str, Any]] = []
     provider_meta: dict[str, Any] = {}
     if max_retries is None:
@@ -1050,7 +833,6 @@ def _run_focused_prosecution_for_candidate(
                 built=built, candidate=candidate, base=base,
             )
             attempt_key = "round1"
-            attempt_cache = cache_dir
         else:
             # Provider calls are stateless.  Re-send the complete output
             # language instead of referring to a schema that existed only in
@@ -1063,12 +845,11 @@ def _run_focused_prosecution_for_candidate(
                 previous_response=previous_response,
             )
             attempt_key = f"retry_{attempt}"
-            attempt_cache = cache_dir / attempt_key
 
         try:
             value, meta = provider_call(
                 route=config["focused_prosecution_route"],
-                system=system, user=user, cache_dir=attempt_cache,
+                system=system, user=user,
             )
             provider_meta[attempt_key] = meta
         except Exception as exc:
@@ -1167,7 +948,7 @@ def _run_focused_prosecution_for_candidate(
 
 
 def _run_focused_prosecution(
-    *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any], output_dir: Path,
+    *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Run focused prosecution for all candidates in parallel.
 
@@ -1188,7 +969,7 @@ def _run_focused_prosecution(
             executor.submit(
                 _run_focused_prosecution_for_candidate,
                 candidate=candidate, built=built, base=base,
-                config=config, output_dir=output_dir,
+                config=config,
             ): candidate
             for candidate in candidates
         }
@@ -1483,9 +1264,9 @@ def _appeal_prosecutor_retry_user(
     """Build appellate prosecutor retry input with structured failure feedback.
 
     The retry request body differs from the initial call only by the appended
-    APPEAL_RETRY_FEEDBACK block, which is a stable case-agnostic category. This
-    guarantees a different cache key while keeping the retry prompt free of
-    case-specific provider text (no prompt poison, no evaluator metadata).
+    APPEAL_RETRY_FEEDBACK block, which is a stable case-agnostic category,
+    keeping the retry prompt free of case-specific provider text (no prompt
+    poison, no evaluator metadata).
     """
     base_user = _appeal_prosecutor_user(
         built=built, candidates=candidates, base=base,
@@ -1522,11 +1303,11 @@ def _validate_appeal_prosecution_contract_or_retry(
       - Any ``source_candidate_id`` in ``candidates`` must be in ``allowed_ids``.
 
     On a structurally repairable failure the function invokes ``retry_call``
-    exactly once with the classified failure category. The retry uses a
-    different request body (retry system + retry user with feedback), so the
-    cache key differs from the initial call. If the retry still fails, the
-    function raises ``ValueError`` and the caller's except block fail-closes
-    via ``_resolve_incomplete_appeal`` — authority is never fabricated.
+    exactly once with the classified failure category. The retry is a fresh
+    request (retry system + retry user with feedback). If the retry still
+    fails, the function raises ``ValueError`` and the caller's except block
+    fail-closes via ``_resolve_incomplete_appeal`` — authority is never
+    fabricated.
 
     ``retry_call`` must return ``(response, meta)``. ``providers`` is mutated
     to record retry audit (parent failure category, retry meta, retry outcome).
@@ -1537,7 +1318,6 @@ def _validate_appeal_prosecution_contract_or_retry(
     if failure_category is None:
         return response  # contract already satisfied
 
-    # One bounded retry with a different request body (different cache key).
     retry_response, retry_meta = retry_call(failure_category)
     providers["appeal_prosecutor_retry"] = {
         "parent_failure_category": failure_category,
@@ -1838,10 +1618,9 @@ def _appeal_defender_retry_user(
 ) -> str:
     """Build appellate defender retry input with structured failure feedback.
 
-    Mirrors ``_appeal_prosecutor_retry_user``. The retry request body
-    differs from the initial call only by the appended APPEAL_RETRY_FEEDBACK
-    block, so the cache key changes (no stale hit) without leaking raw
-    provider text.
+    Mirrors ``_appeal_prosecutor_retry_user``. The retry request differs
+    from the initial call only by the appended APPEAL_RETRY_FEEDBACK block,
+    so no raw provider text is echoed back.
     """
     base_user = _appeal_defender_user(
         built=built, candidates=candidates, base=base,
@@ -1891,7 +1670,6 @@ def _validate_appeal_defense_contract_or_retry(
     if failure_category is None:
         return response  # contract already satisfied
 
-    # One bounded retry with a different request body (different cache key).
     retry_response, retry_meta = retry_call(failure_category)
     providers["appeal_defender_retry"] = {
         "parent_failure_category": failure_category,
@@ -2161,7 +1939,7 @@ def _counterfactual_localization_user(
 
 def _run_counterfactual_localization(
     *, built: dict[str, Any], surviving_errors: list[dict[str, Any]],
-    config: dict[str, Any], output_dir: Path,
+    config: dict[str, Any],
 ) -> dict[str, dict[str, Any]] | None:
     """Run pairwise counterfactual comparison for multiple surviving origins.
 
@@ -2181,7 +1959,7 @@ def _run_counterfactual_localization(
         value, _meta = json_object_provider_call(
             route=config.get("counterfactual_route", config["focused_prosecution_route"]),
             system=COUNTERFACTUAL_LOCALIZATION_SYSTEM,
-            user=user, cache_dir=output_dir / "counterfactual_cache",
+            user=user,
         )
         rankings = value.get("rankings")
         if (
@@ -2340,7 +2118,7 @@ def _resolve_incomplete_appeal(
 
 def _run_appeal_phase(
     *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any],
-    output_dir: Path, providers: dict[str, Any],
+    providers: dict[str, Any],
     appeal_candidates: list[dict[str, Any]],
     prosecution: dict[str, Any], defense: dict[str, Any],
     initial_proof: dict[str, Any],
@@ -2366,12 +2144,10 @@ def _run_appeal_phase(
         appeal_prosecution, providers["appeal_prosecutor"] = provider_call(
             route=config["appeal_prosecutor_route"],
             system=APPEAL_PROSECUTOR_SYSTEM, user=appeal_user,
-            cache_dir=output_dir / "appeal_prosecutor_cache",
         )
         # Validate the reviewed_candidate_ids contract. A structurally
-        # repairable failure triggers ONE bounded retry with a different
-        # request body — different cache key, structured case-agnostic
-        # feedback, no prompt poison.
+        # repairable failure triggers ONE bounded retry with structured
+        # case-agnostic feedback, no prompt poison.
         appeal_prosecution = _validate_appeal_prosecution_contract_or_retry(
             appeal_prosecution,
             allowed_ids=allowed_ids,
@@ -2383,7 +2159,6 @@ def _run_appeal_phase(
                     prosecution=prosecution, defense=defense, proof=initial_proof,
                     failure_category=failure_category,
                 ),
-                cache_dir=output_dir / "appeal_prosecutor_cache" / "retry_1",
             ),
             providers=providers,
         )
@@ -2413,9 +2188,6 @@ def _run_appeal_phase(
                     proof=initial_proof,
                     invalid_audits=invalid_audits,
                 ),
-                cache_dir=(
-                    output_dir / "appeal_prosecutor_cache" / "deep_repair_1"
-                ),
             ),
             providers=providers,
         )
@@ -2429,7 +2201,6 @@ def _run_appeal_phase(
         appeal_defense_certs, providers["appeal_defender"] = provider_call(
             route=config["appeal_defender_route"],
             system=APPEAL_DEFENDER_SYSTEM, user=appeal_defender_user,
-            cache_dir=output_dir / "appeal_defender_cache",
         )
         # Validate the defender coverage contract with ONE bounded retry,
         # symmetric with the prosecutor above.
@@ -2445,7 +2216,6 @@ def _run_appeal_phase(
                     appeal_prosecution=appeal_prosecution,
                     failure_category=failure_category,
                 ),
-                cache_dir=output_dir / "appeal_defender_cache" / "retry_1",
             ),
             providers=providers,
         )
@@ -2473,7 +2243,6 @@ def _run_appeal_phase(
                     appeal_prosecution=appeal_prosecution,
                     invalid_audits=invalid_audits,
                 ),
-                cache_dir=output_dir / "appeal_defender_cache" / "deep_repair_1",
             ),
             providers=providers,
         )
@@ -2511,7 +2280,7 @@ def _run_appeal_phase(
 
 def adjudicate_case(
     *, case_id: str, record: dict[str, Any], config: dict[str, Any],
-    output_dir: Path, census_root: Path | None = None,
+    output_dir: Path,
     policy_items: Sequence[Mapping[str, Any]] | None = None,
     policy_registry=None,
 ) -> dict[str, Any]:
@@ -2521,15 +2290,15 @@ def adjudicate_case(
     with ThreadPoolExecutor(max_workers=2) as executor:
         base_future = executor.submit(
             adjudicate_layered_case, case_id=case_id, record=record, config=config,
-            output_dir=output_dir / "layered_v2", census_root=census_root,
+            output_dir=output_dir / "layered_v2",
         )
         construct_future = executor.submit(
             provider_call, route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
-            user=_provider_user(built), cache_dir=output_dir / "construct_census_cache",
+            user=_provider_user(built),
         )
         base = base_future.result()
         construct_census, construct_audit, construct_provider = (
-            _resolve_construct_census(construct_future, built, config, output_dir)
+            _resolve_construct_census(construct_future, built, config)
         )
 
     construct_authoritative, construct_authority_reasons = _construct_authority(
@@ -2563,11 +2332,11 @@ def adjudicate_case(
         with ThreadPoolExecutor(max_workers=2) as executor:
             focused_pros_future = executor.submit(
                 _run_focused_prosecution,
-                built=built, base=base, config=config, output_dir=output_dir,
+                built=built, base=base, config=config,
             )
             defense_future = executor.submit(
                 provider_call, route=config["defense_route"], system=DEFENSE_SYSTEM,
-                user=user, cache_dir=output_dir / "defense_cache",
+                user=user,
             )
             focused_prosecution, focused_audits, focused_metas = focused_pros_future.result()
             defense, providers["defense"] = defense_future.result()
@@ -2620,7 +2389,7 @@ def adjudicate_case(
 
         if appeal_candidates:
             appeal_outcome = _run_appeal_phase(
-                built=built, base=base, config=config, output_dir=output_dir,
+                built=built, base=base, config=config,
                 providers=providers, appeal_candidates=appeal_candidates,
                 prosecution=prosecution, defense=defense,
                 initial_proof=initial_proof,
@@ -2654,7 +2423,7 @@ def adjudicate_case(
             if len(surviving_errors) >= 2:
                 counterfactual_rankings = _run_counterfactual_localization(
                     built=built, surviving_errors=surviving_errors,
-                    config=config, output_dir=output_dir,
+                    config=config,
                 )
                 if counterfactual_rankings:
                     # Re-adjudicate with counterfactual rankings. The
@@ -2801,7 +2570,7 @@ def adjudicate_case(
 
 def _resolve_construct_census(
     construct_future, built: dict[str, Any],
-    config: dict[str, Any], output_dir: Path,
+    config: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """Resolve the construct census from a concurrent provider future.
 
@@ -2816,9 +2585,8 @@ def _resolve_construct_census(
         # One bounded census-repair call. A structurally incomplete or
         # schema-invalid census response is repairable under the same
         # coverage contract (coverage_state="complete" + every supplied
-        # candidate returned). The retry uses a different request body so
-        # the cache key differs, and never weakens the fail-closed construct
-        # authority: a still-incomplete retry keeps the same
+        # candidate returned). The retry never weakens the fail-closed
+        # census authority: a repair that fails again yields the same
         # non-authoritative outcome.
         if construct_audit.get("status") != "complete":
             # Structured repair feedback: the generic "must be complete"
@@ -2849,7 +2617,7 @@ def _resolve_construct_census(
             repair_user = _provider_user(built) + repair_hint
             repair_value, repair_provider = provider_call(
                 route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
-                user=repair_user, cache_dir=output_dir / "construct_census_cache" / "repair_1",
+                user=repair_user,
             )
             construct_provider = {"initial": construct_provider, "repair": repair_provider}
             construct_value, axis_normalized_count = _normalize_construct_value(repair_value)

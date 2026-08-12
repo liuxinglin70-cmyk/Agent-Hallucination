@@ -173,7 +173,6 @@ def run_evolution(
     canary_records: Mapping[str, Mapping[str, Any]] | Path | None = None,
     detector_config: Path | Mapping[str, Any],
     output_dir: Path,
-    census_root: Path | None = None,
     mutation_route: Path | Mapping[str, Any] | None = None,
     pro_mutation_route: Path | Mapping[str, Any] | None = None,
     initial_genome: Path | SkillGenome | None = None,
@@ -208,8 +207,6 @@ def run_evolution(
             ``evolution_result.json``, ``champion_genome.json`` and
             ``htc_tes_experience_memory.json`` here, and the run finalizes
             with ``evolution_state_manifest.json`` binding those artifacts.
-        census_root: Optional precomputed census cache.  Omitted by default;
-            the detector falls back to its provider census route.
         mutation_route: Optional reflection/mutation route.  When omitted the
             official default (``SEHD_MUTATION_*``) is used.
         pro_mutation_route: Optional deeper-diagnosis route, used only when
@@ -337,7 +334,6 @@ def run_evolution(
         records=all_records,
         config=config,
         output_dir=Path(output_dir),
-        census_root=Path(census_root) if census_root is not None else None,
         use_gold=use_gold,
         mutation_route=resolved_mutation_route,
         module_cooldown=module_cooldown,
