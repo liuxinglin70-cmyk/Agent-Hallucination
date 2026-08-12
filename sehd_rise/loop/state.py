@@ -34,7 +34,7 @@ class RunState:
     stable_policy_genome: Any = None
     l2_policy_accepts: int = 0
     stable_l2_policy_accepts: int = 0
-    meta_skill_state: Any = None
+    strategy_state: Any = None
     edits_accepted: int = 0
     edits_rejected: int = 0
     rollback_reason: str = ""

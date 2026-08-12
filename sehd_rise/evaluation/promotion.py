@@ -126,12 +126,21 @@ DECISION_AUTHORITIES = frozenset({
 # ============================================================
 # Closed decision-class catalogue (exhaustive catalogue of the loop's gate
 # outcomes; anything outside this catalogue is unknown and fails closed).
+#
+# The §2.9 outcome funnel (``loop/machine.Outcome``) is the terminal
+# vocabulary the loop writes onto ``gate_decision``. Its string values are
+# recognized here directly so ``promote()`` grades a funnel terminal the
+# same way it graded the legacy decision word — the outcome strings are
+# duplicated as literals (not imported, since evaluation may not import
+# the loop layer) and must stay byte-identical to ``Outcome`` value fields.
 # ============================================================
 
 _ACCEPT_DECISIONS = frozenset({
     "accept_batch",
     "accept_fitness_disabled",
     "accept_policy",
+    # §2.9 fitness-layer accept terminal.
+    "ACCEPTED",
 })
 _PROVISIONAL_DECISIONS = frozenset({
     "provisional",
@@ -155,6 +164,12 @@ _REJECT_DECISIONS = frozenset({
     "retry_structural",
     "retry_fitness_no_effect",
     "retry_invalid_mutation",
+    # §2.9 fitness-layer reject terminals: the proposal ran, the target
+    # edge moved and the blocker cleared, but fitness judged no acceptable
+    # improvement.
+    "SOURCE_NOT_IMPROVED",
+    "CANARY_REGRESSION",
+    "TRANSFER_REGRESSION",
 })
 _SKIP_DECISIONS = frozenset({
     "skip_invalid_mutation",
@@ -167,6 +182,22 @@ _SKIP_DECISIONS = frozenset({
     "skip_unaddressable_failure",
     "no_edit",
     "halted",
+    # §2.9 framework / search / execution layer terminals: the case never
+    # produced a valid repair attempt, so it carries no artifact and grades
+    # ``skip`` exactly like a no-edit / halt outcome.
+    "NON_EVOLVABLE",
+    "UNADDRESSABLE",
+    "ROUTING_FAILURE",
+    "SCHEMA_FAILURE",
+    "INFRA_FAILURE",
+    "BUDGET_EXHAUSTED",
+    "NO_HYPOTHESIS",
+    "INVALID_PROPOSAL",
+    "DUPLICATE_PROPOSAL",
+    "ACTION_NOT_DISPATCHED",
+    "PROVIDER_NOT_COMPLIED",
+    "TARGET_EDGE_UNCHANGED",
+    "BLOCKER_NOT_CLEARED",
 })
 LEGACY_DECISIONS = frozenset(
     _ACCEPT_DECISIONS

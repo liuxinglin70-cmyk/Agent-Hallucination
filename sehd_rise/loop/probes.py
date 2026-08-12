@@ -235,9 +235,9 @@ def _run_development_probe_impl(
         persisted_meta = causal_memory.meta_review.get("meta_state") or {}
         if persisted_meta:
             try:
-                state.meta_skill_state = StrategyState.from_dict(persisted_meta)
+                state.strategy_state = StrategyState.from_dict(persisted_meta)
             except ValueError:
-                state.meta_skill_state = create_baseline_strategy()
+                state.strategy_state = create_baseline_strategy()
         stable_canaries.clear()
         stable_canaries.update(state.stable_canaries_checkpoint)
         for item in pending_probe_commits:

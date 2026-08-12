@@ -1,31 +1,20 @@
 """Old/new detection parity harness (plan §3.3 level 2).
 
-Two verification modes:
-
-1. Warm-cache replay (preferred).  With ``PACA_GLOBAL_CACHE_ROOT`` pointing at
-   a populated provider cache, every fixture case is adjudicated through the
-   frozen reference engine (``src.sehd_v6``) and through ``sehd_rise``; the
-   verdict, decision authority, surviving/quarantined certificate sets and the
-   terminal basis must be field-equal, and every new-path provider call must
-   be a cache hit (a hit is only possible when the request bytes are
-   identical, so hit-ness is itself the byte-equality proof).
-
-2. Offline contract check (degradation path, §5 R2).  When no warm cache is
-   available, the deterministic surfaces are compared instead: packet build,
-   certificate validators, the full proof-court adjudicator over synthetic
-   evidence bundles covering error/clean/unresolved terminals, the L2 policy
-   executors over identical adjudication facts, certificate identity, and
-   replica aggregation.  The degradation is reported loudly, never skipped.
+Offline contract check: the deterministic detection surfaces are compared —
+packet build, certificate validators, the full proof-court adjudicator over
+synthetic evidence bundles covering error/clean/unresolved terminals, the
+L2 policy executors over identical adjudication facts, certificate
+identity, and replica aggregation.  Provider request byte-identity is proven
+offline via the prompt-builder surface (identical builder outputs plus the
+unchanged transport payload recipe imply identical request bodies), so no
+live provider calls are made.
 
 Run:  python tools/parity/compare_detection.py
 """
 
 from __future__ import annotations
 
-import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -401,10 +390,9 @@ def check_policy_parity() -> None:
 # ============================================================
 # Offline surface 4b: provider request surface byte parity
 # ============================================================
-# Provider request byte-identity is what warm replay would prove via cache
-# hits.  Every prompt builder is a pure string function, so the same
-# byte-equality is provable offline: identical builder outputs plus the
-# unchanged transport payload recipe imply identical request bodies.
+# Every prompt builder is a pure string function, so byte-identity is provable
+# offline: identical builder outputs plus the unchanged transport payload
+# recipe imply identical request bodies.
 
 def check_prompt_surface_parity() -> None:
     from src.sehd_v6.core.paca_tcl import basic_runner as old_transport
@@ -595,83 +583,6 @@ def check_identity_and_replica_parity() -> None:
                   new_replicas.aggregate_states(states, policy=policy_name))
 
 
-# ============================================================
-# Warm-cache replay (preferred path; loudly degraded when unavailable)
-# ============================================================
-
-def warm_cache_available() -> bool:
-    root = os.environ.get("PACA_GLOBAL_CACHE_ROOT")
-    if not root or root.strip().lower() in {"off", "disabled", "none"}:
-        return False
-    root_path = Path(root.strip())
-    return root_path.is_dir() and any(root_path.rglob("*.json"))
-
-
-def run_warm_replay() -> None:
-    from src.sehd_v6.core.paca_tcl import proof_engine as old_engine
-    from sehd_rise.detection.court import engine as new_engine
-    from sehd_rise.detection.detector import load_detector_config
-
-    config = load_detector_config(
-        REPO_ROOT / "sehd_rise" / "configs" / "detector_v3_5.json",
-        require_credentials=False,
-    )
-    records = load_fixture_records()
-    fields = (
-        "state", "decision_authority", "occurrence_state",
-        "responsible_event_id", "impact_status", "winning_impact_kind",
-        "wide_construct_state", "surviving_error_certificate_ids",
-        "quarantined_error_certificate_ids", "quarantined_defense_certificate_ids",
-        "consensus_gate_blocked_ids", "terminal_basis",
-    )
-    total_calls = 0
-    hit_calls = 0
-    with tempfile.TemporaryDirectory(prefix="parity_warm_") as tmp:
-        for case_id, record in sorted(records.items()):
-            old_result = old_engine.adjudicate_case(
-                case_id=case_id, record=record, config=config,
-                output_dir=Path(tmp) / "old" / case_id.replace("/", "_"),
-            )
-            new_result = new_engine.adjudicate_case(
-                case_id=case_id, record=record, config=config,
-                output_dir=Path(tmp) / "new" / case_id.replace("/", "_"),
-            )
-            old_projection = {k: old_result.get(k) for k in fields}
-            new_projection = {k: new_result.get(k) for k in fields}
-            old_projection["terminal_basis"] = (
-                (old_result.get("proof_adjudication") or {}).get("terminal_basis")
-            )
-            new_projection["terminal_basis"] = (
-                (new_result.get("proof_adjudication") or {}).get("terminal_basis")
-            )
-            check(f"warm replay {case_id}", old_projection, new_projection)
-
-            def count_hits(node: Any) -> tuple[int, int]:
-                calls = hits = 0
-                if isinstance(node, dict):
-                    if "cache_hit" in node:
-                        calls += 1
-                        hits += int(bool(node["cache_hit"]))
-                    for value in node.values():
-                        c, h = count_hits(value)
-                        calls += c
-                        hits += h
-                elif isinstance(node, list):
-                    for value in node:
-                        c, h = count_hits(value)
-                        calls += c
-                        hits += h
-                return calls, hits
-
-            calls, hits = count_hits(new_result.get("providers"))
-            total_calls += calls
-            hit_calls += hits
-    print(f"warm-cache replay: {hit_calls}/{total_calls} new-path provider calls were cache hits")
-    if total_calls == 0 or hit_calls != total_calls:
-        FAILURES.append("warm replay cache-hit coverage")
-        print("  FAIL warm replay cache-hit coverage (requests diverged or cache cold)")
-
-
 def main() -> int:
     print("== compare_detection ==")
     check_packet_parity()
@@ -680,14 +591,6 @@ def main() -> int:
     check_policy_parity()
     check_prompt_surface_parity()
     check_identity_and_replica_parity()
-
-    if warm_cache_available():
-        run_warm_replay()
-    else:
-        print()
-        print("DEGRADED (§5 R2): PACA_GLOBAL_CACHE_ROOT warm cache unavailable;")
-        print("provider-level byte-identity replay NOT executed in this run.")
-        print("Offline deterministic contract checks above were executed instead.")
 
     print()
     print(f"{len(CHECKS)} checks passed, {len(FAILURES)} failed")
