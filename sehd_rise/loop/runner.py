@@ -4334,7 +4334,7 @@ class EvolutionLoop:
             edit=edit,
             certificate=cert,
             applied_rule_idx=_applied_rule_idx,
-            source_signal=view,
+            source_signal=signal,
             source_result=detection_result,
             source_after_signal=candidate_signal,
             source_after_result=candidate_result,
