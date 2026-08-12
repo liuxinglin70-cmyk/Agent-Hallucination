@@ -281,6 +281,15 @@ def run_evolution(
     resolved_mutation_route = _resolve_mutation_route(mutation_route)
     if not has_provider_credential(resolved_mutation_route):
         resolved_mutation_route = None
+    resolved_pro_mutation_route = (
+        _resolve_mutation_route(pro_mutation_route, purpose="pro")
+        if pro_mutation_route is not None else None
+    )
+    if (
+        resolved_pro_mutation_route is not None
+        and not has_provider_credential(resolved_pro_mutation_route)
+    ):
+        resolved_pro_mutation_route = None
 
     lineage: list[dict[str, str]] = []
     if inherit_from is not None:
@@ -357,9 +366,7 @@ def run_evolution(
         max_mutation_calls=max_mutation_calls,
         initial_genome=_load_initial_genome(initial_genome),
         initial_policy_genome=_load_initial_policy_genome(initial_policy_genome),
-        pro_mutation_route=_resolve_mutation_route(
-            pro_mutation_route, purpose="pro"
-        ) if pro_mutation_route is not None else None,
+        pro_mutation_route=resolved_pro_mutation_route,
         run_id=run_id,
         resume_from=Path(resume_from) if resume_from is not None else None,
         gold_reflection=gold_reflection,
