@@ -336,6 +336,7 @@ def _llm_no_conflict_gate(
     mutation_route: dict[str, Any] | None,
     budget_usage: dict[str, int] | None = None,
     mutation_call_limit: int | None = None,
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[bool, str, list[int], bool]:
     """LLM no-conflict gate (T5): semantic conflict check on a new rule.
 
@@ -373,6 +374,7 @@ def _llm_no_conflict_gate(
             user=user_prompt,
             budget_usage=budget_usage,
             mutation_call_limit=mutation_call_limit,
+            provider_usage_ledger=provider_usage_ledger,
         )
     except Exception:
         return False, "provider_exception", [], True
@@ -3613,6 +3615,7 @@ class EvolutionLoop:
                 mutation_route=self.mutation_route,
                 budget_usage=self.budget_usage,
                 mutation_call_limit=self.max_mutation_calls,
+                provider_usage_ledger=self.provider_usage_ledger,
             )
             conflict_gate_ran = _cg_ran
             _conflict_flag = {

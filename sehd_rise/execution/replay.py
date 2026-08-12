@@ -279,6 +279,7 @@ def _run_conflict_gate_call(
     *, route: dict[str, Any], system: str, user: str,
     budget_usage: dict[str, int] | None = None,
     mutation_call_limit: int | None = None,
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Provider call for the LLM no-conflict gate (T5).
 
@@ -298,12 +299,18 @@ def _run_conflict_gate_call(
             )
             raise RuntimeError("conflict_gate_budget_exhausted")
         budget_usage["mutation_calls"] += 1
-    return json_object_provider_call(
+    result, meta = json_object_provider_call(
         route=route,
         system=system,
         user=user,
         purpose="mutation",
     )
+    if provider_usage_ledger is not None:
+        provider_usage_ledger.record(
+            purpose="conflict_gate",
+            meta=meta if isinstance(meta, Mapping) else None,
+        )
+    return result, meta
 
 
 def _run_counted_detection(
