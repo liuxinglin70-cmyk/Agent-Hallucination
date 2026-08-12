@@ -1939,7 +1939,7 @@ def _counterfactual_localization_user(
 
 def _run_counterfactual_localization(
     *, built: dict[str, Any], surviving_errors: list[dict[str, Any]],
-    config: dict[str, Any],
+    config: dict[str, Any], providers: dict[str, Any],
 ) -> dict[str, dict[str, Any]] | None:
     """Run pairwise counterfactual comparison for multiple surviving origins.
 
@@ -1956,11 +1956,12 @@ def _run_counterfactual_localization(
     try:
         # Counterfactual localization returns {"rankings": {...}} (no
         # "candidates" field), so use the schema-relaxed provider call.
-        value, _meta = json_object_provider_call(
+        value, meta = json_object_provider_call(
             route=config.get("counterfactual_route", config["focused_prosecution_route"]),
             system=COUNTERFACTUAL_LOCALIZATION_SYSTEM,
             user=user,
         )
+        providers["counterfactual"] = meta
         rankings = value.get("rankings")
         if (
             isinstance(rankings, dict)
@@ -2423,7 +2424,7 @@ def adjudicate_case(
             if len(surviving_errors) >= 2:
                 counterfactual_rankings = _run_counterfactual_localization(
                     built=built, surviving_errors=surviving_errors,
-                    config=config,
+                    config=config, providers=providers,
                 )
                 if counterfactual_rankings:
                     # Re-adjudicate with counterfactual rankings. The
