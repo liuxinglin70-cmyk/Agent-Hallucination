@@ -117,15 +117,21 @@ def _resolve_mutation_route(
     purpose: str = "mutation",
 ) -> dict[str, Any]:
     if route is None:
-        return default_mutation_route()
-    if isinstance(route, Path):
-        value = json.loads(Path(route).read_text(encoding="utf-8"))
-        if not isinstance(value, dict):
-            raise ValueError("mutation route file must contain an object")
-        route = value
-    return resolve_provider_route(
-        dict(route), purpose=purpose, route_name=purpose,
-    )
+        resolved = default_mutation_route()
+    else:
+        if isinstance(route, Path):
+            value = json.loads(Path(route).read_text(encoding="utf-8"))
+            if not isinstance(value, dict):
+                raise ValueError("mutation route file must contain an object")
+            route = value
+        resolved = resolve_provider_route(
+            dict(route), purpose=purpose, route_name=purpose,
+        )
+    # Mark finalized so the transport boundary trusts this route_name-aware
+    # resolution instead of re-resolving without route_name (which would let
+    # a purpose-level selector override a route-specific one).
+    resolved["_provider_route_resolved"] = True
+    return resolved
 
 
 def _load_initial_genome(
