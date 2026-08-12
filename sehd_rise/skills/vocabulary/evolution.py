@@ -172,6 +172,13 @@ def plan_registry_candidates(
         "quarantined_defense_count",
         "defeated_error_count",
         "required_candidate_count",
+        # ``quarantine_reason_other`` is the one remaining quarantine-reason
+        # bucket the baseline predicate set never references (the schema /
+        # evidence / causal buckets are already named by the dominance
+        # predicates, so the dedup below skips them). Exposing it lets a
+        # future policy react to a quarantine whose dominant cause is none of
+        # the three recognized buckets.
+        "quarantine_reason_other",
     ):
         if fact_field in {
             field

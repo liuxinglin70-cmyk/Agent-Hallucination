@@ -37,7 +37,11 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from sehd_rise.causal.cut import build_causal_cut
+from sehd_rise.causal.cut import (
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+    REASON_GOLD_FALSE_POSITIVE,
+    build_causal_cut,
+)
 from sehd_rise.causal.episode import (
     CausalFailureEpisode,
     build_causal_episode,
@@ -174,7 +178,6 @@ from sehd_rise.planning.search import (
     _abstention_ladder_rung_complete,
     _contrast_inversion,
     _select_contrast_neighbor,
-    _signal_process_owner,
     _trim_contrast_registry,
 )
 from sehd_rise.skills.action import compile_action_spec, sanitize_action_spec
@@ -497,6 +500,31 @@ def _run_registry_reflection_impl(
 
 _CONTRAST_RESOLVED_STATES = frozenset({"verified_error", "verified_clean"})
 
+# Highest-value learning signals: a gold-locked polarity flip (FP / FN-clean)
+# names the detector's exact error pole, so these cases earn extra search
+# budget. Everything else uses the configured cap unchanged. The ceiling is a
+# sanity bound, not a knob: it only caps how far the adaptive bonus can go.
+_GOLD_POLARITY_REASON_CODES = frozenset({
+    REASON_GOLD_FALSE_POSITIVE,
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+})
+_MAX_ATTEMPT_CAP = 6
+_GOLD_POLARITY_ATTEMPT_BONUS = 2
+
+
+def _attempt_cap(base: int, reason_code: str) -> int:
+    """Search budget for one case's mutation retries.
+
+    A gold-locked polarity flip (FP / FN-clean) names the detector's exact
+    error pole — the highest-value learning signal — so it earns a bounded
+    bonus over the configured cap. All other cases use the configured cap
+    unchanged, so this never changes behavior for the default self-supervised
+    / process-repair path.
+    """
+    if reason_code in _GOLD_POLARITY_REASON_CODES:
+        return min(base + _GOLD_POLARITY_ATTEMPT_BONUS, _MAX_ATTEMPT_CAP)
+    return base
+
 
 @dataclass(frozen=True)
 class _ReflectionSignalView:
@@ -516,10 +544,26 @@ class _ReflectionSignalView:
 
     @property
     def error_type(self) -> str:
-        return str(
-            self.signal.diagnostics.get("appeal_error_type")
-            or self.reason_code or ""
-        )
+        # The reflection direction contract and the polarity admission pool
+        # consume the classifier's closed error_type vocabulary (false_positive
+        # / false_negative_clean / unresolved_should_*). The causal reason_code
+        # is NOT part of that vocabulary, so falling back to it silently
+        # disabled both the direction contract and the polarity filter for every
+        # gold-locked FP/FN case (the reflection prompt then offered the full
+        # opcode set and the admission pool never fired). Derive the polarity
+        # token from the gold label + terminal state — the same reading the
+        # frozen reflection engine consumed — and keep appeal breakages as a
+        # process diagnostic that never maps to a polarity.
+        gold = self.signal.gold_label
+        if self.signal.has_gold and gold is not None:
+            state = self.signal.state
+            if state == "verified_error" and not gold:
+                return "false_positive"
+            if state == "verified_clean" and gold:
+                return "false_negative_clean"
+            if state == "unresolved":
+                return "unresolved_should_error" if gold else "unresolved_should_clean"
+        return str(self.signal.diagnostics.get("appeal_error_type") or "")
 
     @property
     def trigger_source(self) -> str:
@@ -783,6 +827,11 @@ class EvolutionLoop:
         # derives its counters from this funnel, never from the per-step
         # words.
         self.funnel = OutcomeFunnel()
+
+    def _attempt_cap_for(self, reason_code: str) -> int:
+        """Search budget for one case's mutation retries (delegates to the
+        pure module-level ``_attempt_cap`` so the logic stays testable)."""
+        return _attempt_cap(self.max_mutation_attempts_per_case, reason_code)
 
     def _initialize_state(self) -> None:
         """Validate parameters and build all run state.
@@ -1389,6 +1438,7 @@ class EvolutionLoop:
                                 cut.evidence.get("artifact_frontier", ())
                                 if isinstance(cut.evidence, Mapping) else ()
                             ),
+                            cut.secondary_owner,
                         ),
                     )
                     episode_payload = episode.to_dict()
@@ -1407,6 +1457,7 @@ class EvolutionLoop:
                                 cut.evidence.get("artifact_frontier", ())
                                 if isinstance(cut.evidence, Mapping) else ()
                             ),
+                            cut.secondary_owner,
                         )
                         if cut.skill_layer == LAYER_L1 else ()
                     ),
@@ -1531,7 +1582,7 @@ class EvolutionLoop:
                 f"  [{idx}] TRIGGERED {case_id}: "
                 f"{cut.reason_code} -> {cut.skill_layer}/{cut.owner} "
                 f"(attempt {self.active_attempt_index + 1}/"
-                f"{self.max_mutation_attempts_per_case})"
+                f"{self._attempt_cap_for(cut.reason_code)})"
             )
             if episode.skill_layer == LAYER_L2:
                 if l2_attribution is None:
@@ -2455,6 +2506,7 @@ class EvolutionLoop:
                 cut.evidence.get("artifact_frontier", ())
                 if isinstance(cut.evidence, Mapping) else ()
             ),
+            cut.secondary_owner,
         )
         type_guidance = self.type_evolution.generate_type_guidance(
             type_result.primary_type, evolution_direction,
@@ -3285,7 +3337,7 @@ class EvolutionLoop:
             retry_scheduled = (
                 self.mutation_route is not None
                 and self.active_attempt_index + 1
-                < self.max_mutation_attempts_per_case
+                < self._attempt_cap_for(cut.reason_code)
             )
             if retry_scheduled:
                 failure_category = _classify_mutation_failure(
@@ -3376,7 +3428,7 @@ class EvolutionLoop:
                 retry_scheduled = (
                     self.mutation_route is not None
                     and self.active_attempt_index + 1
-                    < self.max_mutation_attempts_per_case
+                    < self._attempt_cap_for(cut.reason_code)
                 )
             if not accepted:
                 if retry_scheduled:
@@ -3490,7 +3542,7 @@ class EvolutionLoop:
                 retry_scheduled = (
                     self.mutation_route is not None
                     and self.active_attempt_index + 1
-                    < self.max_mutation_attempts_per_case
+                    < self._attempt_cap_for(cut.reason_code)
                     and _structural_rejection_retryable(reject_reasons)
                     and not repeated_category
                 )
@@ -3711,12 +3763,26 @@ class EvolutionLoop:
             candidate_result, case_id, records=self.records,
             use_gold=self.use_gold, gold_reflection=self.gold_reflection,
         )
+        # C10: the source failure was triggered by construction (this path is
+        # only reachable for a REPAIRABLE episode); the replay's trigger state
+        # decides whether the edit closed the failure. Threading both into
+        # fitness/effect re-activates the "source failure closed" and
+        # "trigger:closed/opened" channels that the loop otherwise left dead.
+        source_gold_label = (
+            _evaluator_gold(self.records[case_id]) if self.use_gold else None
+        )
+        after_trigger = _triggered(
+            candidate_result, use_gold=self.use_gold,
+            gold_label=source_gold_label,
+        )
         assessment = assess_source_fitness(
             signal,
             candidate_signal,
             target_module=edit.target_module,
             before_result=detection_result,
             after_result=candidate_result,
+            before_trigger=True,
+            after_trigger=after_trigger,
             gold_label=fitness_gold_label(
                 case_id, records=self.records,
                 fitness_use_gold=self.fitness_use_gold,
@@ -3860,6 +3926,8 @@ class EvolutionLoop:
             after=candidate_signal,
             before_result=detection_result,
             after_result=candidate_result,
+            before_trigger=True,
+            after_trigger=after_trigger,
         )
         fitness_audit["expected_effect_contract"] = effect_audit
         decision_before_effect_gate = assessment.decision
@@ -4136,7 +4204,7 @@ class EvolutionLoop:
             retry_scheduled = (
                 self.mutation_route is not None
                 and self.active_attempt_index + 1
-                < self.max_mutation_attempts_per_case
+                < self._attempt_cap_for(cut.reason_code)
             )
             if retry_scheduled:
                 self.source_work_queue.appendleft(

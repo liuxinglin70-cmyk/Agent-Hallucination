@@ -316,7 +316,7 @@ _INVARIANTS = frozenset(
 # Skill built on them can prevent the first failure, not just steer a retry.
 _FIRST_CALL_FEATURES = frozenset({
     "candidate_kind", "candidate_axis", "event_role",
-    "has_tool_call", "has_tool_error",
+    "has_tool_call", "has_tool_error", "has_tool_retry",
 })
 
 # Features that only appear in retry-diagnostic prompts (after a failure).
@@ -337,7 +337,16 @@ _FEATURE_CONTRACT: Mapping[str, tuple[str, frozenset[Any]]] = {
     "event_role": ("contains", _EVENT_ROLES),
     "has_tool_call": ("equals", frozenset({True, False})),
     "has_tool_error": ("equals", frozenset({True, False})),
+    "has_tool_retry": ("equals", frozenset({True, False})),
 }
+
+# Boolean-typed atom features: their ``value`` must be a real bool, and the
+# value_type must be "boolean". Kept as one closed set so the feature contract
+# and the validator cannot drift apart on which atoms are scalar.
+_BOOLEAN_FEATURES = frozenset(
+    name for name, (operator, _values) in _FEATURE_CONTRACT.items()
+    if operator == "equals"
+)
 
 # Typed boolean composition: ``atom`` is the single-predicate form;
 # ``all_of``/``any_of``/``not`` compose child specs.
@@ -420,7 +429,7 @@ def _validate_atom_spec(spec: ConditionSpec) -> tuple[bool, str]:
             f"condition_operator_invalid:{spec.feature}:{spec.operator or 'missing'}"
         )
     normalized_value: Any = spec.value
-    if spec.feature in {"has_tool_call", "has_tool_error"}:
+    if spec.feature in _BOOLEAN_FEATURES:
         if spec.value_type != "boolean":
             return False, f"condition_value_type_invalid:{spec.feature}:{spec.value_type}"
         if not isinstance(normalized_value, bool):
@@ -572,6 +581,7 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
     }
     has_tool_call = False
     has_tool_error = False
+    tool_names: list[str] = []
 
     def visit(node: Any) -> None:
         nonlocal has_tool_call, has_tool_error
@@ -604,6 +614,8 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
                 if key in {"tool_name", "tool_call", "tool_calls", "tool_interactions"}:
                     if raw_value not in (None, "", [], {}):
                         has_tool_call = True
+                if key == "tool_name" and isinstance(raw_value, str) and raw_value:
+                    tool_names.append(raw_value)
                 if key in {"error", "exception", "tool_error"} and raw_value not in (None, "", False, [], {}):
                     has_tool_error = True
                 if isinstance(raw_value, str) and key in {"observation", "result", "error", "message"}:
@@ -616,12 +628,17 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
 
     for payload in _json_payloads(str(user or "")):
         visit(payload)
+    # Redundant repetition is a first-class AgentHallu axis: a repeated tool
+    # name is a closed, label-free signal the deterministic census already
+    # surfaces, so the reflection model may now condition a rule on it.
+    has_tool_retry = len(tool_names) != len(set(tool_names))
     return {
         "schema_version": "sehd.route_condition_features.v1",
         "route_id": str(route_id),
         **{key: sorted(values) for key, values in sets.items()},
         "has_tool_call": has_tool_call,
         "has_tool_error": has_tool_error,
+        "has_tool_retry": has_tool_retry,
     }
 
 

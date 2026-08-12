@@ -407,6 +407,52 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
 | C9 | 收敛只消费完整的修复尝试 | `loop/runner.py` |
 | C10 | 完整因果归功链；每一环由自己的层出具证据 | `evaluation/`、`loop/` |
 
+## 框架加固（自进化正确性 + 适度自由度，2026-08）
+
+相对冻结基线新增以下行为。它们不改变检测权威、不进 prompt 语义、不触碰硬门；全部是
+「修根因 + 受控自由度 + 纯观测遥测」，并有回归测试锁定。
+
+- **E1 反思方向契约修复**（`loop/runner.py`）：`_ReflectionSignalView.error_type` 改为
+  从 gold 极性 + 终态推导（`false_positive` / `false_negative_clean` /
+  `unresolved_should_*`），不再回退到因果 reason_code。修复前 gold 锁定的 FP/FN 案例
+  的方向契约与极性准入池被静默禁用。
+- **E2 触发关闭归功修复**（`loop/runner.py`）：`assess_source_fitness` /
+  `_expected_effect_audit` 重新接通 `before_trigger` / `after_trigger`，`source_failure_closed`
+  与 `new_failure_trigger_introduced` 两条对称通道恢复生效。
+- **E3 极性伙伴面修复**（`planning/candidates.py`）：`_allowed_l1_modules` 增加
+  `secondary_owner` 参数，经极性池过滤后把 cut 的 partner 模块（如 FP 的
+  `atomic_verifier_instruction` / `withhold_certificate`）纳入合法目标。
+- **E4 自适应搜索预算**（`loop/runner.py`）：`_attempt_cap` 给 gold 极性 FP/FN 案例
+  一个受上限约束的额外 mutation 重试预算（`_MAX_ATTEMPT_CAP = 6`）；`max_mutation_attempts_per_case`
+  上限从 3 放宽到 8。非极性路径行为不变。
+- **E5 L1 可观测特征扩展**（`skills/rule.py`）：封闭词表新增布尔特征 `has_tool_retry`
+  （同名工具重复调用），确定性投影、经 `_FEATURE_CONTRACT` 校验，仍是 first-call
+  label-free 特征。
+- **E6 meta 证据接线**（`meta/review.py`）：为 5 个已声明但无证据源、因此永远无法晋升
+  的策略 token 补上封闭 feedback-code 映射（search_prior ×2、candidate_diversity ×2、
+  retry_strategy ×1）。meta 仍「只学策略、不学真相」，不新增任何可触及属主/切点/门控的
+  token。
+- **E7 L2 词表候选扩展**（`skills/vocabulary/evolution.py`）：注册候选新增
+  `quarantine_reason_other` 谓词（既有 schema/evidence/causal 桶已被支配谓词占用）。
+- **E8 Goodhart 背离遥测**（`loop/result.py::_goodhart_divergence`）：把 `directional_evidence`
+  （纯代理移动）与 gold 目标改进/回归分开计数，输出 `divergence_rate`。纯报告，绝不
+  否决编辑或喂入 prompt。
+- **E9 谱系多样性/塌陷遥测**（`loop/result.py::_lineage_diversity`）：逐模块进化规则数、
+  接受编辑分布、L2 工作项数，以及塌陷 flag（单模块主导、无进化规则等）。纯报告。
+
+**仍保留为预留**（框架不擅自实现）：engine-level L2 动作 `reclassify_candidate_state` /
+`require_route_replay` 仍是 `runtime_owner="engine"` 的预留操作符，不可提议、不可执行；
+只有先实现确定性运行时语义、更新 `_POSTCONDITION`/求值器并把它们从预留集移入
+court-local 集，才能真正落地。这个顺序被有意保留，因为「能重新调用 provider / 重分类
+候选」的动作会显著放大表达力，也就同时放大过拟合与归功复杂度——它必须先有选择门
+（见 README「下一步正式实验」）再放开。
+
+## 下一步正式实验（规划，尚未实施）
+
+以下为**实验层**规划（实现于 `experiments/`，绝不进 `sehd_rise/`）：密封 holdout +
+公开基线对标；holdout 回放作为「泛化选择」信号；测试时 best-of-N 确定性投票；课程/
+主动学习与负样本挖掘/红队循环。详见 README「下一步正式实验」。
+
 ## 路由解析
 
 所有 provider 路由都经 `sehd_rise/platform/routes.py` 解析，无第三方依赖：仓库

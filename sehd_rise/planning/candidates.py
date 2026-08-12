@@ -31,7 +31,7 @@ from sehd_rise.skills.genome import (
     validate_runtime_rule,
 )
 from sehd_rise.skills.policy import PolicyEdit
-from sehd_rise.planning.search import _signal_process_modules
+from sehd_rise.planning.search import _signal_polarity_pool
 from sehd_rise.skills.rule import (
     RuleSpec,
     evaluate_condition_spec,
@@ -87,16 +87,20 @@ def _allowed_l1_modules(
     signal: Any,
     attribution_owner: str,
     artifact_frontier: Sequence[Mapping[str, Any]] = (),
+    secondary_owner: str = "",
 ) -> tuple[str, ...]:
     """Return the executable owner set shared by episodes and reflection.
 
     Owner provenance: the authoritative owner set comes from the
     proof-cut obligation — the attribution owner and the artifact_frontier
-    owners. Process-signal owners (polarity-based) are added only on the
-    gold-polarity path, where the classifier rewrapped the attribution to a
-    signal owner and the secondary module is a legitimate exploration
-    surface. They are not added as a general state heuristic, because a
-    heuristic owner can shadow or conflict with the proof-cut obligation.
+    owners. On the gold-polarity path the cut's partner module (secondary
+    owner) is additionally admitted when it is direction-compatible, so an
+    FP's surgical ``withhold_certificate`` (owned by
+    ``atomic_verifier_instruction``) and an FN's symmetric partner remain
+    legal exploration surfaces alongside the primary owner. The partner is
+    filtered through the polarity pool — the same guard that kept a
+    polarity-crossing process owner out — so it can never open a surface
+    that moves the verdict the wrong way.
 
     Defense coverage complete no longer unconditionally removes
     ``clean_defense_boundary``: if the proof-cut frontier names it as an
@@ -115,9 +119,15 @@ def _allowed_l1_modules(
         and getattr(signal, "gold_label", None) is not None
     )
     if is_gold_polarity:
-        for process_module in _signal_process_modules(signal):
-            if process_module not in modules:
-                modules.append(process_module)
+        polarity_pool = _signal_polarity_pool(signal)
+        partner = str(secondary_owner)
+        if (
+            polarity_pool is not None
+            and partner in MODULE_IDS
+            and partner in polarity_pool
+            and partner not in modules
+        ):
+            modules.append(partner)
     if getattr(signal, "defense_coverage_state", None) == "complete":
         if "clean_defense_boundary" not in frontier_owners:
             modules = [m for m in modules if m != "clean_defense_boundary"]

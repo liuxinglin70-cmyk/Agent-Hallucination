@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.skills.action import CLEAN_TO_ERROR_ACTIONS, ERROR_TO_CLEAN_ACTIONS
-from sehd_rise.skills.vocabulary.contracts import MODULE_IDS
 
 # Error-type string vocabulary (the classifier's closed ``error_type``
 # values, kept as strings so this layer needs no typing import).
@@ -165,38 +164,11 @@ def _signal_polarity_pool(signal: Any) -> frozenset[str] | None:
     return None
 
 
-def _signal_process_modules(signal: Any) -> tuple[str, ...]:
-    """Resolve the ordered, direction-compatible process-owner hypotheses."""
-    polarity_pool = _signal_polarity_pool(signal)
-    if polarity_pool is None:
-        return ()
-    modules: list[str] = []
-    for candidate in (
-        str(getattr(signal, "target_module", "") or ""),
-        str(getattr(signal, "secondary_module", "") or ""),
-    ):
-        if (
-            candidate in MODULE_IDS
-            and candidate not in modules
-            and candidate in polarity_pool
-        ):
-            modules.append(candidate)
-    return tuple(modules)
-
-
-def _signal_process_owner(signal: Any) -> str:
-    """Return the first process owner that can move the verdict toward gold."""
-    modules = _signal_process_modules(signal)
-    return modules[0] if modules else ""
-
-
 __all__ = [
     "_abstention_ladder_rung_complete",
     "_contrast_inversion",
     "_select_contrast_neighbor",
     "_signal_polarity_pool",
-    "_signal_process_modules",
-    "_signal_process_owner",
     "_task_state_score",
     "_trim_contrast_registry",
 ]

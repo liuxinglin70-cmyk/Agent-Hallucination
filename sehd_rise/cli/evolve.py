@@ -71,7 +71,11 @@ def main() -> int:
     parser.add_argument("--module-cooldown", type=int, default=0)
     parser.add_argument("--max-edits", type=int, default=200)
     parser.add_argument("--convergence-window", type=int, default=20)
-    parser.add_argument("--max-mutation-attempts", type=int, default=2)
+    parser.add_argument(
+        "--max-mutation-attempts", type=int, default=2,
+        help="mutation retries per triggered case (1..8; gold-polarity "
+             "cases may earn a bounded adaptive bonus)",
+    )
     parser.add_argument(
         "--reflection-candidates", type=int,
         default=DEFAULT_REFLECTION_CANDIDATES,

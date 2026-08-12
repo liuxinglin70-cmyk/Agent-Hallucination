@@ -203,6 +203,27 @@ FEEDBACK_EVIDENCE_SOURCES: Mapping[tuple[str, str], tuple[str, ...]] = {
     ("operation_preference", "avoid_redundant_intervention"): (
         FEEDBACK_REDUNDANT_INTERVENTION,
     ),
+    # Wiring for search/diversity/retry tokens that were declared in the
+    # closed vocabulary but had no evidence source, so a recurring,
+    # audited feedback pattern could never enable them. Each mapping stays
+    # strictly "how to search better" — it never names an owner, a cut, a
+    # gate, a threshold, or a verdict.
+    ("search_prior", "prefer_observable_discriminator"): (
+        FEEDBACK_INSUFFICIENT_GROUNDING,
+    ),
+    ("search_prior", "require_independent_anchor"): (
+        FEEDBACK_INDEPENDENT_REGRESSION_RISK,
+    ),
+    ("candidate_diversity", "seek_distinct_candidate_direction"): (
+        FEEDBACK_REDUNDANT_INTERVENTION,
+    ),
+    ("candidate_diversity", "duplicate_risk"): (
+        FEEDBACK_REDUNDANT_INTERVENTION,
+        FEEDBACK_CANDIDATE_QUALITY_INCONCLUSIVE,
+    ),
+    ("retry_strategy", "avoid_unexecuted_action_shape"): (
+        FEEDBACK_EXECUTION_NOT_ESTABLISHED,
+    ),
 }
 
 # Verified-outcome signal -> strategy token. The C7 rewire: outcome evidence

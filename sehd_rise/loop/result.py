@@ -9,6 +9,7 @@ vocabulary (C8).
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -17,7 +18,11 @@ from sehd_rise.evaluation.fitness import FitnessAssessment
 from sehd_rise.loop.machine import Outcome, OutcomeFunnel
 from sehd_rise.planning.feedback import _build_rejection_summary
 from sehd_rise.platform.usage import ProviderUsageLedger
-from sehd_rise.skills.genome import SkillEdit, SkillGenome
+from sehd_rise.skills.genome import (
+    BASELINE_RULE_TEXT,
+    SkillEdit,
+    SkillGenome,
+)
 from sehd_rise.skills.policy import PolicyGenome
 
 
@@ -163,6 +168,114 @@ class ProvisionalEdit:
     conflict_gate_passed: bool = False
 
 
+def _goodhart_divergence(steps: Sequence[EvolutionStep]) -> dict[str, Any]:
+    """Reporting-only proxy-vs-target divergence telemetry (Goodhart guard).
+
+    The self-evolution loop can improve its own fitness proxies (module-local
+    scores, coverage states) without improving — or while silently hurting —
+    the real target (gold task correctness). This reads the persisted
+    ``fitness_check.assessment`` rows and separates:
+
+    - ``proxy_only``: the replay showed a measurable local/process movement
+      but no correctness authority verified a task improvement
+      (``directional_evidence`` — exactly the Goodhart risk);
+    - ``target_improved`` / ``target_regressed``: a gold task score actually
+      moved toward / away from the label.
+
+    ``divergence_rate`` is proxy-only over (proxy-only + target-improved).
+    It is telemetry only — it never vetoes an edit, never feeds a prompt and
+    never touches a gate; a run whose accepted edits are dominated by
+    proxy-only movement is a red-team signal to tighten the holdout gate.
+    """
+    proxy_only = 0
+    target_improved = 0
+    target_regressed = 0
+    for step in steps:
+        check = step.fitness_check if isinstance(step.fitness_check, Mapping) else {}
+        assessment = check.get("assessment")
+        if not isinstance(assessment, Mapping):
+            continue
+        decision = str(assessment.get("decision") or "")
+        if decision == "directional_evidence":
+            proxy_only += 1
+            continue
+        after = assessment.get("task_score_after")
+        before = assessment.get("task_score_before")
+        if isinstance(after, int) and isinstance(before, int):
+            if after > before:
+                target_improved += 1
+            elif after < before:
+                target_regressed += 1
+    total = proxy_only + target_improved
+    return {
+        "proxy_only_movement": proxy_only,
+        "target_improved": target_improved,
+        "target_regressed": target_regressed,
+        "divergence_rate": (proxy_only / total) if total else 0.0,
+    }
+
+
+def _lineage_diversity(
+    steps: Sequence[EvolutionStep],
+    champion_genome: SkillGenome,
+    policy_genome: PolicyGenome,
+) -> dict[str, Any]:
+    """Reporting-only lineage diversity / collapse telemetry.
+
+    Self-evolution collapses when the champion concentrates on one module, when
+    accepted edits keep landing on the same surface, or when the lineage stops
+    adding novel rules. This aggregates those signals into one auditable block
+    (never a gate input, never a prompt input):
+
+    - per-module evolved (non-baseline) rule counts and the top module's share;
+    - the distribution of accepted/provisional edits across modules;
+    - L2 working-item count;
+    - collapse flags that name a risk, not a verdict.
+    """
+    evolved_by_module: dict[str, int] = {}
+    for mid, mod in champion_genome.modules.items():
+        baseline = BASELINE_RULE_TEXT.get(mid, ())
+        evolved_by_module[mid] = sum(
+            1 for rule in mod.rules if rule not in baseline
+        )
+    total_evolved = sum(evolved_by_module.values())
+    top_evolved = max(evolved_by_module.values(), default=0)
+
+    accepted_modules: Counter[str] = Counter()
+    for step in steps:
+        if step.gate_decision not in ("ACCEPTED", "provisional"):
+            continue
+        proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
+        module = str(proposal.get("target_module") or "")
+        if module:
+            accepted_modules[module] += 1
+    total_accepts = sum(accepted_modules.values())
+    top_accept_share = (
+        max(accepted_modules.values()) / total_accepts if total_accepts else 0.0
+    )
+
+    working_items = len(policy_genome.items_for_scope("working"))
+
+    return {
+        "evolved_rules_total": total_evolved,
+        "evolved_rules_by_module": evolved_by_module,
+        "top_module_rule_share": (
+            top_evolved / total_evolved if total_evolved else 0.0
+        ),
+        "accepted_edits_by_module": dict(accepted_modules),
+        "top_module_accept_share": top_accept_share,
+        "l2_working_items": working_items,
+        "collapse_flags": {
+            "single_module_rule_dominance": (
+                total_evolved > 0 and top_evolved / total_evolved > 0.5
+            ),
+            "single_module_accept_dominance": top_accept_share > 0.5,
+            "no_evolved_rules": total_evolved == 0,
+            "l2_empty": working_items == 0,
+        },
+    }
+
+
 def _build_evolution_result(
     *,
     run_id: str,
@@ -269,5 +382,9 @@ def _build_evolution_result(
             ),
             "meta_review": meta_review_summary,
             "provider_usage_totals": provider_usage_ledger.totals(),
+            "goodhart_divergence": _goodhart_divergence(steps),
+            "lineage_diversity": _lineage_diversity(
+                steps, champion_genome, policy_genome,
+            ),
         },
     )

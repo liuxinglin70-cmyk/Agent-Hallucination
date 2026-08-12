@@ -92,9 +92,9 @@ def validate_evolution_params(
         raise ValueError(
             "validation_probe_trigger_threshold must be non-negative"
         )
-    if max_mutation_attempts_per_case < 1 or max_mutation_attempts_per_case > 3:
+    if max_mutation_attempts_per_case < 1 or max_mutation_attempts_per_case > 8:
         raise ValueError(
-            "max_mutation_attempts_per_case must be between 1 and 3"
+            "max_mutation_attempts_per_case must be between 1 and 8"
         )
     if probe_limit < 0 or probe_limit > 20:
         raise ValueError("probe_limit must be between 0 and 20")

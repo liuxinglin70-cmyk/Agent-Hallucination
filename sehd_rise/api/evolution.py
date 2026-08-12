@@ -235,6 +235,9 @@ def run_evolution(
         run_id: Optional run identifier.
         module_cooldown / max_total_edits / convergence_window /
             max_mutation_attempts_per_case / canary_limit: framework knobs.
+            ``max_mutation_attempts_per_case`` accepts 1..8 (the runner then
+            grants a bounded adaptive bonus to gold-polarity FP/FN cases,
+            which name the detector's exact error pole).
         resume_from: Optional directory holding a previously persisted
             checkpoint (``evolution_checkpoint.json`` + champion/shadow
             genome checkpoints + HTC-TES experience memory).  When set, the
