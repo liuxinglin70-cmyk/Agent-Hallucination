@@ -175,7 +175,7 @@ sehd_rise/
 │   ├── probes.py                #   开发探针               ← _run_development_probe_impl 等
 │   ├── ledger.py                #   GateEvent 台账与投影    ← bccse/gate_feedback.py + runner 门事件函数族
 │   ├── persistence.py           #   检查点/恢复/结果落盘    ← runner 持久化函数族（约 550 行）
-│   ├── records.py               #   案例记录准备/gold 视图  ← _detector_record/_evaluator_gold 等
+│   ├── records.py               #   案例记录准备/参数校验  ← _attribution_for_result/_validate_evolution_params（_detector_record→detection/detector.py、_evaluator_gold→platform/gold.py、_authority_failure_details→execution/replay.py，见 Phase 7 归属迁移）
 │   └── result.py                #   EvolutionStep / OnlineEvolutionResult
 │
 ├── api/                         # 对外门面（唯一允许"组装"的层）
@@ -577,6 +577,28 @@ api / cli       → loop, detection, evaluation, planning
 
 **提交：** `refactor(sehd_rise): phase 7 — execution evidence chain and evaluation (effect/fitness/canary/gate/promotion)`
 
+**Phase 7 实施记录（2026-08-12，commit 后回写）：**
+
+本阶段落地执行证据链与评估层共 9 个模块。执行层 4 模块（上一会话已落地验证未提交）+ 评估层 5 模块（本会话落地）+ 归属迁移 3 项 + Phase 6 l1 残渣修复 + C10 语义重接。`tools/parity/compare_effect.py` 24 项检查全绿、0 失败、16 偏差（全部 C10 trigger bridge DEV，引用 §2.12）；结构门判定 5 组合法/非法编辑 0 不一致；PromotionDecision 全枚举 768 组合（32 决策 × 2 权威 × 2 profile × 2 证据状态 × 3 理由集）0 不一致；`check_layers.py` 65 文件 / 13 层无违反；S1 结构消解维持（下方各层零 import execution/evaluation）；既有 parity harness（roundtrip_skills / compare_causal 173 / compare_detection 74 / compare_experience_typing 93 / compare_planning 36）无回归。
+
+1. **C10 语义重接（§2.12 因果信用链，本阶段唯一语义变更）。** 旧 `AttributionSignal.should_evolve` 已被 Phase 4 C1/C3 删除（吸收进 `repairability.analyze` + `DetectionSignal`）。effect/fitness/canary 的信号参数全部重接 `DetectionSignal`（`causal.signals.project_detection` 产出）。`should_evolve` 的三处消费点重接方式：(a) `observable_process_delta` 的 `trigger:closed/opened` token —— 旧版读 `signal.should_evolve`，新版改为 `before_trigger`/`after_trigger` 参数（repairability verdict），由调用方（loop）线程传入；(b) `assess_source_fitness` 的 trigger 闭合/开启判定 —— 同样改读 `before_trigger`/`after_trigger`；(c) `_canary_preserved` 的稳定性判定 —— 旧版调 `attribute_failure(payload).should_evolve`，新版调 `project_detection` → `build_causal_cut` → `build_causal_episode` → `repairability.analyze`，trigger = `status == REPAIRABLE`。**`_attribute_intervention_fitness` 不读 `should_evolve`**（它纯从 postcondition + edge counterfactual 判信用），逐字平移。**`CausalEffectRecord`** 新定义（边级反事实 `_verify_edge_level_counterfactual` + 阻塞谓词闭合 + 干预归因 `_attribute_intervention_fitness` 三证据承载为单一 record），由 `build_causal_effect_record` 组装。no-effect 分类学（`_classify_replay_no_effect`/`_no_effect_reason_for`）原样保留。C10 偏差在 `compare_effect.py` 记 16 DEV（trigger bridge：旧 over-trigger 在 C4 framework-defect / NON_EVOLVABLE 场景被新包正确降级为 non-trigger —— 即 §2.12 的语义修正本身）。
+
+2. **评估层组成与接口重接。** `evaluation/fitness.py` ← `bccse/fitness.py`（842 行）平移：`FitnessAssessment`/`observable_process_delta`/`module_local_score`/`task_state_score`/`_coverage_rank`/`_valid_claim_fingerprints`/`_prosecution_strength_score`/`_localization_quality` 等；signal 参数重接 `DetectionSignal`（`signal.crs.complete` 替 `signal.crs_complete`；`signal.prosecution_coverage.score/.state` 替 `signal.prosecution_coverage`/`_state`；`signal.diagnostics["localization_status"]` 替 `signal.localization_status`；`_gold_step_correct` 从 `signal.gold_steps`+`responsible_step` 重算替 `signal.responsible_step_correct`）；旧 `replace(signal, state=resolve_evolution_state(result))` 内部重解析删除（signal 即单一投影，state 已匹配）。`evaluation/effect.py` ← runner 10 函数平移 + `CausalEffectRecord` 新定义 + `build_causal_effect_record` 组装器。`evaluation/canary.py` ← runner `_selected_canaries`/`_canary_preserved`/`_evict_stable_canaries`/`_fitness_gold_label`；`_canary_preserved` C10 重接（见第 1 条）；`fitness_gold_label` 消费已迁 `platform.gold._evaluator_gold`。`evaluation/gate.py` ← `bccse/safety_gate.py`（672）+ runner `_llm_no_conflict_gate` 合并；`StructuralGate`/`GateCertificate`/`GateConfig`/`create_structural_gate` 原样；`llm_no_conflict_gate` 的 provider transport 经 `execution.replay._run_conflict_gate_call` 路由（evaluation 不可 import detection）。`evaluation/promotion.py` ← `bccse/promotion_contract.py`（437）+ `bccse/promotion_gates.py`（72）合并；`PromotionDecision`/`PromotionEvidence`/`promote`/`MetricSnapshot`/`ReplayEvidence` 原样；schema 字段 `legacy_decision` → `gate_decision` 重命名（pristine law 7：pre-launch 无 installed base，schema 即代码所言；parity harness 同步更新 kw）。
+
+3. **归属迁移（落地裁决：计划文档 Phase 9 loop/records.py 列 `_detector_record`/`_evaluator_gold`/`_authority_failure_details`，但 execution.replay / evaluation.canary 需要它们且 execution 禁 import loop——迁到下层单一真源）。** `_detector_record` → `detection/detector.py`（检测防火墙本就是 detection 关切；消费 `detection.packet.EVALUATOR_ONLY_FIELDS`）；`_evaluator_gold` → `platform/gold.py`（与 `coerce_gold_label` 同住；evaluation/canary 与 loop 均可 import）；`_authority_failure_details` → `execution/replay.py`（读检测结果诊断，execution 关切）。**计划文档 Phase 9 loop/records.py 映射表已回写**（删此三项，注其已迁下层）。
+
+4. **task_state_score 层裁决（Phase 6 遗留）。** Phase 6 实施记录称 `planning/search._task_state_score` 将「Phase 7 引用 evaluation/fitness 权威版本」——但 LAYER_RULES 禁 planning→evaluation，不可行。裁决：planning 保留内联 7 行纯函数（与 `evaluation/fitness.task_state_score` 逐字节同，harness 覆盖防漂移）；`evaluation/fitness.task_state_score` 为权威版本，docstring 注明 planning 内联副本的存在与层规则原因。本会话已落地此裁决（fitness.py docstring 已注）。
+
+5. **execution 层 4 模块（上一会话已落地，本会话复验未回归）。** `execution/action.py`（D1 后置条件求值）+ `execution/trace.py`（9 轨迹收集）+ `execution/replay.py`（计数重放 + mutation call + 本会话新增 `_run_conflict_gate_call`）+ `execution/executor.py`（§2.7 单一分派点 `execute_repair_plan`）。本会话为 gate.py 的 LLM 无冲突门新增 `_run_conflict_gate_call`（execution 是 evaluation 的 provider transport 边界，evaluation 不可 import detection）。
+
+6. **Phase 6 审计修复（残渣）。** `planning/l1.py` 的 `build_runtime_observation` 死别名（旧 reflection_engine 同名 wrapper 的镜像，新包无调用方）已删函数 + `__all__` 条目。
+
+7. **降级路径（§3.3 R2 显式记录）。** `PACA_GLOBAL_CACHE_ROOT` 暖缓存本机仍不可用（`experiments/cache/provider` 不存在）；Phase 7 effect/fitness/canary 检查在确定性合成行上运行，不调用 provider（gate 的 LLM 无冲突门在无凭据时 skip_no_live_route）。`compare_effect.py` 顶部 DEGRADED 横幅 + 提交信息双重显式记录降级。凭据恢复后须补跑暖缓存回放分支（provider 级 byte-identity replay）。
+
+8. **纯净扫描收敛记录。** `pristine-scan sehd_rise` 初扫 15 命中（本阶段新增 11，既有 4）。逐项改写收敛：`promotion.py` 字段 `legacy_decision` → `gate_decision`、注释 "Legacy decision classes" → "Closed decision-class catalogue"、"legacy gate outcome" → "gate outcome"；`effect.py` 变量 `legacy_status` → `free_text_status`、"legacy edits" → "pre-contract edits"、"legacy id-list fallback" → "fallback id list"、"legacy free-text path" → "free-text fallback path"、"classify as action_spec_absent" → "land in the action_spec_absent class"（scan 的 commented-code regex 误命中 `# class`ify 前缀）；`fitness.py` "legacy count fallback" → "count fallback"、"legacy court count" → "court count"、"legacy no_effect contract" → "no_effect contract"；`gate.py` "semantically dead" → "semantically inert"。收敛后 4 命中（全部既有保留：`detection/court/engine.py` 2 + `skills/policy.py` 2，Phase 7 范围外，与 Phase 6 终态基线一致）。
+
+9. **与旧包行为偏差。** C10（§2.12）为本阶段唯一语义变更：`should_evolve` → repairability verdict 的 trigger 重接，导致旧包 over-trigger 的 C4 framework-defect / NON_EVOLVABLE 场景在新包正确降级为 non-trigger（compare_effect 16 DEV 即此）。`legacy_decision` → `gate_decision` 为 schema 字段重命名（pre-launch，parity harness 同步）。其余迁移（fitness/effect/canary/gate/promotion 逻辑）与旧包等价，harness 24 项 + 结构门 5 组 + PromotionDecision 768 组合全绿为证。
+
 ---
 
 ## Phase 8 — meta 策略层 ★ 语义变更 C7
@@ -606,7 +628,7 @@ api / cli       → loop, detection, evaluation, planning
 |---|---|---|---|
 | `evolution_runner.py` 的 `EvolutionStep`/`OnlineEvolutionResult`/`ProvisionalEdit`/`_build_evolution_result` | `loop/result.py` | 平移 | 步骤与结果记录 |
 | `evolution_runner.py` 的 `_PersistenceContext`/`_persist_progress`/`load_evolution_checkpoint`/`_restore_state_from_checkpoint`/`_restore_checkpoint_state`/`_save_evolution_results`/`_last_audited_step` | `loop/persistence.py` | 平移 | 检查点/恢复/落盘约 550 行整体收编 |
-| `evolution_runner.py` 的 `_detector_record`/`_evaluator_gold`/`_attribution_for_result`/`_validate_evolution_params`/`_authority_failure_details` | `loop/records.py` | 平移 | 案例记录准备与参数校验 |
+| `evolution_runner.py` 的 `_attribution_for_result`/`_validate_evolution_params` | `loop/records.py` | 平移 | 案例记录准备与参数校验（`_detector_record` 已迁 `detection/detector.py`、`_evaluator_gold` 已迁 `platform/gold.py`、`_authority_failure_details` 已迁 `execution/replay.py`——见 Phase 7 实施记录归属迁移裁决） |
 | `bccse/gate_feedback.py`（338 行）+ `evolution_runner.py` 的 `_project_gate_event`/`_project_delta_class`/`_build_gate_event_ledger`/`_record_gate_event`/`_record_attempt` | `loop/ledger.py` | 合并 | GateEvent 台账与全部投影（维持单一投影权威） |
 | `evolution_runner.py` 的 `_shadow_commit_eligible`/`_flush_shadow_batch_impl`（约 600 行） | `loop/shadow.py` | 平移 + 接口重接 | shadow 批量提交；消费 RepairPlan outcome |
 | `evolution_runner.py` 的 `PendingProbeCommit`/`_probe_case_delta`/`_probe_certification`/`_probe_certification_label`/`_run_development_probe_impl` | `loop/probes.py` | 平移 | 开发探针 |

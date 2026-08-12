@@ -10,7 +10,7 @@ ever fabricated).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 _TRUE_TOKENS = frozenset({"true", "1", "yes"})
 _FALSE_TOKENS = frozenset({"false", "0", "no"})
@@ -39,3 +39,17 @@ def coerce_gold_label(value: Any) -> bool | None:
         if value == 0:
             return False
     return None
+
+
+def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
+    """Join a label only inside an evaluator; never pass it to detection.
+
+    Both label keys accept booleans and the string token forms handled by
+    ``coerce_gold_label`` (dataset dumps are inconsistent about types);
+    unrecognizable values stay ``None`` so the opt-in gold paths remain
+    fail-closed.
+    """
+    value = coerce_gold_label(record.get("gold_label"))
+    if value is not None:
+        return value
+    return coerce_gold_label(record.get("is_hallucination"))

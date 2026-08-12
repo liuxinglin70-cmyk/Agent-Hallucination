@@ -276,23 +276,6 @@ MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
 }
 
 
-def build_runtime_observation(
-    detection_result: Mapping[str, Any],
-    signal: Any,
-    *,
-    allowed_modules: Sequence[str] = (),
-) -> dict[str, Any]:
-    """Delegate to the single signal-projection owner.
-
-    The causal episode's ``build_runtime_observation`` is the single
-    authority for the bounded observation; the detection result dict is
-    redundant there because the signal already carries the projection.
-    """
-    from sehd_rise.causal.episode import build_runtime_observation as _build
-
-    return _build(signal, allowed_modules=allowed_modules)
-
-
 def _sanitize_rejected_content_echo(content: Any) -> str:
     """Bound the rejected-rule text echoed into the next reflection prompt.
 
@@ -1605,7 +1588,6 @@ __all__ = [
     "build_causal_reflection_prompt",
     "build_failure_diagnosis_prompt",
     "build_intervention_critic_prompt",
-    "build_runtime_observation",
     "extract_intervention_candidates",
     "format_detection_context_for_llm",
     "format_skill_context_for_llm",

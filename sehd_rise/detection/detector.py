@@ -38,6 +38,21 @@ DETECTOR_SCHEMA_VERSION = "agenthallu.paca_tcl_detector_config.v3_5"
 FORBIDDEN_INPUT_FIELDS = EVALUATOR_ONLY_FIELDS
 
 
+def _detector_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the detector envelope with evaluator-only labels removed.
+
+    The detector firewall: gold labels and localization-correctness fields
+    are evaluator-only and must never reach the provider surface. Stripping
+    them at the single detector entry keeps every replay and source detection
+    label-free by construction.
+    """
+    return {
+        key: value
+        for key, value in record.items()
+        if key not in EVALUATOR_ONLY_FIELDS
+    }
+
+
 def _forbidden_field_hits(value: Any) -> set[str]:
     """Find evaluator-only keys at any detector boundary depth.
 
