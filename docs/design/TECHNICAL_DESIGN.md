@@ -1,9 +1,13 @@
-# SEHD v6 Technical Design
+# SEHD-RISE Technical Design
 
 ## Purpose
 
-SEHD v6 is a research prototype that treats PACA-TCL v3.5 verdicts as the
-runtime authority and adds a type-conditioned evolution layer around them.
+SEHD-RISE (Repairability-driven Integrated Self-Evolution) is the refactored
+framework that treats PACA-TCL v3.5 verdicts as the runtime authority and
+adds a repairability-centric causal layer, a unified RepairPlan protocol
+(C6), and a four-layer outcome funnel (C8) around the type-conditioned
+evolution layer.  The framework lives in `sehd_rise/`; the frozen reference
+package `src/sehd_v6/` is the behavioral baseline.
 Configuration, role manifests and provider routes are frozen for a registered
 execution, while the injected strategy genome is intentionally mutable. The
 design follows a two-step research protocol:
@@ -287,7 +291,7 @@ fitness credit and experience records.
 
 ## Dry-Run Wiring Exercise
 
-The standalone self-evolution module (`python -m src.sehd_v6.evolution`)
+The standalone self-evolution module (`python -m sehd_rise evolve`)
 supports the same two wiring modes the retired `dry_run_5.py` script used:
 
 - no mutation environment: deterministic local mutation plumbing;
@@ -296,7 +300,7 @@ supports the same two wiring modes the retired `dry_run_5.py` script used:
   proposal remains invalid.
 
 All active provider routes use the dependency-free resolver in
-`src/sehd_v6/provider_routes.py`. It loads the repository `.env` without
+`sehd_rise/platform/routes.py`. It loads the repository `.env` without
 overriding process variables, then applies route-level (`SEHD_ROUTE_*_*`),
 purpose-level (`SEHD_MUTATION_*`, `SEHD_DETECTOR_*`, `SEHD_JUDGE_*`,
 `SEHD_EMBEDDING_*`) and global `SEHD_PROVIDER_*` overrides before falling back

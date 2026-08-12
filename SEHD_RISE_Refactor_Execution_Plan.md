@@ -714,12 +714,26 @@ api / cli       → loop, detection, evaluation, planning
 
 **端到端 parity 验收：**
 
-1. `compare_run.py`：同一夹具案例流 + 暖缓存，分别经 `src.sehd_v6.evolution.run_evolution` 与 `sehd_rise.api.evolution.run_evolution` 运行；比对项：accepted 编辑的 target module/operation 集合、经验记忆的机制签名计数、artifact schema（`evolution_result.json`/`champion_genome.json`/`htc_tes_experience_memory.json`/`evolution_state_manifest.json` 字段齐全）。**允许且必须解释的差异**：因 C1–C10 产生的 outcome 分类与统计口径差异，逐条对照语义变更点编号注释。
+1. `compare_run.py`：同一夹具案例流 + 真实 provider，分别经 `src.sehd_v6.evolution.run_evolution` 与 `sehd_rise.api.evolution.run_evolution` 运行；比对项：accepted 编辑的 target module/operation 集合、经验记忆的机制签名计数、artifact schema（`evolution_result.json`/`champion_genome.json`/`htc_tes_experience_memory.json`/`evolution_state_manifest.json` 字段齐全）。**允许且必须解释的差异**：因 C1–C10 产生的 outcome 分类与统计口径差异，逐条对照语义变更点编号注释。
 2. CLI 冒烟：`python -m sehd_rise evolve --help`、`python -m sehd_rise detect` 夹具单条跑通。
 3. 纯净扫描终验 + 全包冒烟 + 分层检查。
 4. 更新 `README.md` 与 `docs/design/TECHNICAL_DESIGN.md` 中的框架指向（文档可改；`src/sehd_v6/` 代码仍不动）。
 
 **提交：** `refactor(sehd_rise): phase 10 — public api/cli, end-to-end parity acceptance, docs`
+
+**Phase 10 实施记录（2026-08-12，commit 后回写）：**
+
+本阶段落地 api/cli 门面层 + 端到端验收（终态）。实际提交信息为 `refactor(sehd_rise): phase 10 — public api/cli, end-to-end parity acceptance, docs`。`api/evolution.py`（平移 `evolution/runner.py`，重接 `loop.runner.run_online_evolution`）；`api/manifests.py`（平移 `state_manifest.py`）；`api/detection.py`（公共出口：detect_record/批量/副本聚合，不含 EvolutionDetection/project_for_evolution——C6 RepairPlan 替代）；`cli/evolve.py`（平移 `evolution/__main__.py`，参数面一致）；`cli/detect.py`（合并 `detector/__main__.py` + `paca_tcl/detector.py` main()）；`cli/__main__.py` + `sehd_rise/__main__.py`（`python -m sehd_rise <evolve|detect>` 分发）；`tools/parity/compare_run.py`（端到端 parity 工具，C1-C10 差异逐条注释）；`check_layers.py` 扩 ROOT 层（`<root>` → `cli`）。
+
+1. **迁移映射。** (a) `api/evolution.py`：`run_evolution`/`load_records`/`_coerce_record_source`/`_resolve_mutation_route`/`_load_initial_genome`/`_load_initial_policy_genome`/`default_mutation_route` 全部平移，接口重接 `loop.runner.run_online_evolution`（签名等价，旧 `run_online_evolution` 的全部 kwargs 在新 loop 中存在）。(b) `api/manifests.py`：`write_state_manifest`/`load_state_manifest` 逐行平移（纯 stdlib，无重接）。(c) `api/detection.py`：re-export `sehd_rise.detection.detector`（`detect_record`/`load_detector_config`/`load_skill_genome`/`load_policy_genome`/`resolve_detector_config`/`validate_record`）+ `sehd_rise.detection.batch`（`run_batch`/`load_batch_records`/`label_free_record`/`collect_replica_predictions`/`run_replicated_batch`）+ `sehd_rise.detection.replicas`（`aggregate_replicas`/`aggregate_states`/`POLICIES`/`POLICY_CONSENSUS`/`POLICY_MAJORITY`）。(d) `cli/evolve.py`：argparse 参数面与旧 `evolution/__main__.py` 一致；summary schema 升级为 `sehd_rise.evolution_run_summary.v1`，artifact 列表加 `policy_genome.json`/`evolution_state_manifest.json`。(e) `cli/detect.py`：合并 `detector/__main__.py` + `paca_tcl/detector.py` main()，经 `sehd_rise.api.detection` 调用（S1：cli 只经 api，不 import loop 内部）。
+
+2. **分层裁决。** (a) api 层 import 规则：`api` 可 import `{loop, detection, evaluation, planning}`；`SkillGenome`/`PolicyGenome`/`has_provider_credential`/`resolve_provider_route`/`validate_policy_genome_items`/`run_online_evolution`/`OnlineEvolutionResult` 全部经 `sehd_rise.loop.runner`（loop 是编排入口，已 import skills/platform）。为此 runner.py 将 `resolve_provider_route` 从 __init__ 局部 import 提升为模块级（删重复局部 import），将 `validate_policy_genome_items` 加入 `skills.policy` import 列表。(b) ROOT 层：`check_layers.py` 加 `ROOT_LAYER: frozenset({"cli"})`，使 `sehd_rise/__main__.py` 可 import `sehd_rise.cli.__main__`（`python -m sehd_rise <evolve|detect>` 入口）；`check_scaffold` 豁免 ROOT 的目录检查。(c) S1 维持：`grep -rn "from sehd_rise.loop" sehd_rise/{api,cli,__main__.py}` → 仅 `api/evolution.py:20`。(d) C6 落地：`EvolutionDetection`/`project_for_evolution` 在新架构中被 RepairPlan 协议替代，`api/detection.py` 不导出它们（旧 detector/__init__.py 导出，新门面不导出——C6 差异已在 compare_run.py C_NOTES 注释）。
+
+3. **验证摘要。** `python tools/parity/check_layers.py` 83 文件/14 层无违规（旧 76/13 + api 3 + cli 3 + root __main__ + ROOT 层）；`node ~/.zcode/skills/pristine/scripts/pristine-scan.js sehd_rise/api sehd_rise/cli sehd_rise/__main__.py` 0 命中、`pristine-scan sehd_rise/loop` 0 命中；`python -c "import sehd_rise.api.evolution, sehd_rise.api.detection, sehd_rise.api.manifests, sehd_rise.cli.evolve, sehd_rise.cli.detect, sehd_rise.cli"` 全过；`python -m sehd_rise evolve --help` / `python -m sehd_rise detect --help` CLI 冒烟通过；`python -m sehd_rise evolve --records <2 夹具> --config sehd_rise/configs/detector_v3_5.json --max-mutation-calls 10`（真实 provider）2 cases / 1 triggered / 0 accepted / 1 rejected / 6 artifacts 全齐（evolution_result / champion_genome / policy_genome / htc_tes_experience_memory / htc_tes_coverage / evolution_state_manifest）/ state manifest 哈希绑定成功 / 24.4s / exit 0；`python -m sehd_rise detect --record <夹具去金标> --config <new>`（真实 provider）prediction.json 写出 / exit 0；`python tools/parity/test_loop_machine.py` 10/10（runner.py import-only 变更无回归）。
+
+4. **compare_run 偏离记录。** 卡 §5.1 要求 `compare_run.py` 端到端 parity 全绿，但用户裁决「不用进行 compare_run，只需验证重构后框架能正确调用 LLM 进行自进化」：`compare_run.py` 工具已落地（C1-C10 C_NOTES 逐条注释、artifact schema 检查、genome rule set 比对、mechanism count 比对），提交入库但本会话不运行；以 `python -m sehd_rise evolve`（真实 provider，2 夹具，LLM 反射/变异/适应度全链路）为替代验收证据。
+
+5. **终态声明。** Phase 0-10 全部提交；`sehd_rise` 包 13 层 + ROOT 入口完整落地；`src/sehd_v6/` 一字不改；`SEHD_RISE_Phase10_Prompt.md` 随本提交入库。无下一卡。
 
 ---
 

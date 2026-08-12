@@ -1,13 +1,17 @@
-# SEHD v6 — Hallucination Detector and Self-Evolution Framework
+# SEHD-RISE — Hallucination Detector and Self-Evolution Framework
 
-SEHD v6 implements a court-style hallucination detector (PACA-TCL v3.5) and a
-self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning).
-Self-evolution operates on a two-layer evolvable surface: an L1 provider-rule
-layer of eight controlled natural-language slot-rule modules, and an L2
-adjudication-policy genome of closed-vocabulary policy items evaluated
-deterministically by the proof court.  The detector and the evolution loop
-are standalone modules; experiment protocols, data partitioning and
-evaluation gates live outside the framework code.
+SEHD-RISE (Repairability-driven Integrated Self-Evolution) is the refactored
+framework: a court-style hallucination detector (PACA-TCL v3.5) and a
+self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning) with a
+repairability-centric causal layer, a unified RepairPlan protocol, and a
+four-layer outcome funnel.  Self-evolution operates on a two-layer evolvable
+surface: an L1 provider-rule layer of eight controlled natural-language
+slot-rule modules, and an L2 adjudication-policy genome of closed-vocabulary
+policy items evaluated deterministically by the proof court.
+
+The framework lives in `sehd_rise/`; the frozen reference package
+`src/sehd_v6/` is the behavioral baseline per
+`SEHD_RISE_Refactor_Execution_Plan.md` and is not modified.
 
 For framework design and flow documentation see
 [docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md).
@@ -74,21 +78,26 @@ check compliance before results are accepted.
 ## Layout
 
 ```text
-SEHD v6
-├── src/sehd_v6/          # ① framework code: detector + self-evolution
-│   ├── detector/         #   standalone single-trajectory detector API
-│   ├── evolution/        #   standalone self-evolution framework API
-│   ├── core/             #   engine implementations
-│   │   ├── paca_tcl/     #   PACA-TCL v3.5 court-style detector engine
-│   │   ├── bccse/        #   BCCSE v5 self-evolution core
-│   │   └── htc_tes/      #   HTC-TES v3 type conditioning
-│   ├── configs/          #   detector config template
-│   ├── provider_routes.py
-│   ├── env_loader.py
-│   └── utils/            #   OCSE packet utilities
-├── docs/                 # ② framework technical design
+sehd_rise/                # ① refactored framework (13-layer architecture)
+├── platform/             #   env / routes / jsonio / gold / usage
+├── skills/               #   genome / rule / action / policy / vocabulary
+├── detection/            #   detector / batch / replicas / court / packet
+├── causal/               #   signals / cut / episode / plan / repairability
+├── experience/           #   mechanism memory (single Experience Truth)
+├── typing/               #   HTC-TES advisory: classifier / guidance / slices
+├── planning/             #   L1/L2 reflection prompts and candidate search
+├── execution/            #   action / executor / replay / trace
+├── evaluation/           #   effect / fitness / canary / gate / promotion
+├── meta/                 #   cross-case strategy learner (review / strategy)
+├── loop/                 #   unified orchestration (runner / machine / state)
+├── api/                  #   public facade: evolution / detection / manifests
+├── cli/                  #   CLI: evolve / detect / dispatch
+├── configs/              #   detector config
+└── __main__.py           #   python -m sehd_rise <evolve|detect>
+src/sehd_v6/              # ② frozen reference package (behavioral baseline)
+├── docs/                 # ③ framework technical design
 │   └── design/           #   detector + evolution architecture
-└── datasets/             # ③ raw datasets (local-only, git-ignored)
+└── datasets/             # ④ raw datasets (local-only, git-ignored)
 ```
 
 Experiment protocols (partitioning, manifests, execution authorization,
@@ -410,8 +419,8 @@ fields such as `is_hallucination`, `hallucination_step`, or `gold_label`.
 # the provider defaults; credential values are never stored in config files.
 set DEEPSEEK_API_KEY=<secret>
 
-python -m src.sehd_v6.detector \
-  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+python -m sehd_rise detect \
+  --config sehd_rise/configs/detector_v3_5.json \
   --record trajectory.json \
   --case-id example \
   --output-dir detector_output
@@ -442,10 +451,7 @@ For self-evolution, the same detector boundary is used directly:
 
 ```python
 from pathlib import Path
-from src.sehd_v6.detector import (
-    detect_record,
-    project_for_evolution,
-)
+from sehd_rise.api.detection import detect_record
 
 prediction = detect_record(
     record=trajectory_without_gold,
@@ -453,7 +459,6 @@ prediction = detect_record(
     case_id="case-001",
     output_dir=Path("detector_output"),
 )
-evolution_input = project_for_evolution(prediction).to_dict()
 ```
 
 The single-case detector does not require a partition, manifest, P0 role,
@@ -469,9 +474,9 @@ accepts raw trajectories (one case or a batch), runs the detector loop, and
 writes the evolved champion genome plus typed experience memory.
 
 ```bash
-python -m src.sehd_v6.evolution \
+python -m sehd_rise evolve \
   --records records.jsonl \
-  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output
 ```
 
@@ -488,9 +493,9 @@ fitness -> commit/rollback -> experience memory`
 The CLI exposes bounded reflection test-time scaling:
 
 ```bash
-python -m src.sehd_v6.evolution \
+python -m sehd_rise evolve \
   --records records.jsonl \
-  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output \
   --reflection-candidates 3 \
   --max-mutation-calls 100
@@ -512,9 +517,9 @@ Artifacts written to `evolution_output`:
 The loop can continue from its own outputs:
 
 ```bash
-python -m src.sehd_v6.evolution \
+python -m sehd_rise evolve \
   --records records.jsonl \
-  --config src/sehd_v6/configs/paca_tcl_detector_v3_5.json \
+  --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output_2 \
   --initial-genome evolution_output/champion_genome.json \
   --experience-memory evolution_output/htc_tes_experience_memory.json
@@ -550,38 +555,20 @@ repository.
 
 ## Public API
 
-The stable application-facing imports are `sehd_v6.detector` and
-`sehd_v6.evolution`:
+The stable application-facing imports are `sehd_rise.api.detection` and
+`sehd_rise.api.evolution`:
 
 ```python
-from sehd_v6.detector import detect_record, project_for_evolution
-from sehd_v6.evolution import run_evolution, SkillGenome, create_baseline_genome
+from sehd_rise.api.detection import detect_record
+from sehd_rise.api.evolution import run_evolution
 ```
 
-Lower-level imports remain available through `sehd_v6.core`:
-
-```python
-from sehd_v6.core import (
-    # Detection (PACA-TCL v3.5)
-    adjudicate_case, evaluate,
-    # Evolution (BCCSE v5)
-    run_online_evolution, SkillGenome, create_baseline_genome,
-    SkillEdit, SkillOp, apply_edit, validate_edit,
-    ErrorType, AttributionSignal, attribute_failure,
-    StructuralGate, create_structural_gate,
-    # Type conditioning (HTC-TES v3)
-    HallucinationType, HallucinationTypeClassifier,
-    TypeClassificationResult, TypeConditionedEvolution,
-    TypeAwareFitness, classify_hallucination_type,
-)
-```
-
-Each sub-package also exposes its own `__init__.py` for granular imports:
-- `sehd_v6.detector` — standalone detector API
-- `sehd_v6.evolution` — standalone self-evolution API
-- `sehd_v6.core.bccse` — self-evolution framework core
-- `sehd_v6.core.paca_tcl` — detector engine
-- `sehd_v6.core.htc_tes` — type conditioning layer
+The CLI dispatches through ``python -m sehd_rise <evolve|detect> ...``.
+Layer-level imports are available through the 13-layer package structure
+(``platform``, ``skills``, ``detection``, ``causal``, ``experience``,
+``typing``, ``planning``, ``execution``, ``evaluation``, ``meta``,
+``loop``, ``api``, ``cli``); the layer rules in
+``tools/parity/check_layers.py`` enforce the acyclic import discipline.
 
 ## Key Design Decisions
 

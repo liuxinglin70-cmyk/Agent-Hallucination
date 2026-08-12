@@ -24,10 +24,13 @@ PACKAGE_ROOT = REPO_ROOT / "sehd_rise"
 PACKAGE_PREFIX = "sehd_rise"
 FROZEN_PACKAGE = "sehd_v6"
 
+ROOT_LAYER = "<root>"
+
 # Plan §2.2: value = the layers the key layer may import. Intra-layer
 # imports are always allowed and not listed. The plan groups api/cli with
 # the same target set; cli additionally may import api because the shell
-# must reach its facade.
+# must reach its facade. The root layer (package-level __main__.py) may
+# reach cli so ``python -m sehd_rise <evolve|detect>`` dispatches.
 LAYER_RULES: dict[str, frozenset[str]] = {
     "platform": frozenset(),
     "skills": frozenset({"platform"}),
@@ -45,9 +48,8 @@ LAYER_RULES: dict[str, frozenset[str]] = {
     }),
     "api": frozenset({"loop", "detection", "evaluation", "planning"}),
     "cli": frozenset({"api", "loop", "detection", "evaluation", "planning"}),
+    ROOT_LAYER: frozenset({"cli"}),
 }
-
-ROOT_LAYER = "<root>"
 
 
 def module_layer(path: Path) -> str:
@@ -116,7 +118,8 @@ def check_scaffold() -> list[str]:
     missing = [
         f"layer directory missing or lacks __init__.py: {layer}"
         for layer in sorted(LAYER_RULES)
-        if not (PACKAGE_ROOT / layer / "__init__.py").is_file()
+        if layer != ROOT_LAYER
+        and not (PACKAGE_ROOT / layer / "__init__.py").is_file()
     ]
     if not (PACKAGE_ROOT / "__init__.py").is_file():
         missing.append("package root __init__.py missing")

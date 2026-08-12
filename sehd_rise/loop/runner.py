@@ -132,7 +132,7 @@ from sehd_rise.meta.review import (
 from sehd_rise.meta.strategy import StrategyState, create_baseline_strategy
 from sehd_rise.platform.gold import _evaluator_gold
 from sehd_rise.platform.jsonio import atomic_write_json
-from sehd_rise.platform.routes import has_provider_credential
+from sehd_rise.platform.routes import has_provider_credential, resolve_provider_route
 from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.planning.candidates import (
     _allowed_l1_modules,
@@ -201,6 +201,7 @@ from sehd_rise.skills.policy import (
     apply_policy_edit,
     create_baseline_policy_genome,
     validate_policy_edit,
+    validate_policy_genome_items,
 )
 from sehd_rise.skills.rule import sanitize_condition_spec
 from sehd_rise.skills.vocabulary.contracts import (
@@ -822,7 +823,6 @@ class EvolutionLoop:
         )
         self.registered_probe_ids = tuple(self.probe_ids[:self.probe_limit])
         if self.mutation_route is not None:
-            from sehd_rise.platform.routes import resolve_provider_route
             self.mutation_route = resolve_provider_route(
                 dict(self.mutation_route), purpose="mutation",
             )
