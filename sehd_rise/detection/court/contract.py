@@ -1648,8 +1648,12 @@ def _resolve_terminal_state(
         "valid_defense_certificate_count": len(valid_defenses),
         "surviving_error_certificate_ids": [str(row["certificate_id"]) for row in surviving],
         "auxiliary_process_certificate_ids": [str(row["certificate_id"]) for row in auxiliary_process],
-        "wide_construct_state": "verified_process_incident" if auxiliary_process else (
-            "verified_hallucination" if surviving else "no_verified_incident"
+        # A surviving causal error is the strongest verified incident: it
+        # must outrank an auxiliary process-only note, never be masked by it.
+        "wide_construct_state": (
+            "verified_hallucination" if surviving else
+            "verified_process_incident" if auxiliary_process else
+            "no_verified_incident"
         ),
         "defeated_error_certificate_ids": defeated,
         "quarantined_error_certificate_ids": [

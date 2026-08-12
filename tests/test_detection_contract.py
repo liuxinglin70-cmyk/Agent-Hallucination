@@ -36,6 +36,29 @@ def _candidate() -> list[dict]:
     return [{"candidate_id": "c1", "origin_hypothesis_event_id": "event_001"}]
 
 
+def _error_cert(cert_id: str, causal: str, impact: str) -> dict:
+    return {
+        "certificate_id": cert_id,
+        "source_candidate_id": "c1",
+        "origin_event_id": "event_001",
+        "claim_kind": "agent_assertion",
+        "norm_source": "tool_contract",
+        "norm_evidence_refs": ["event_001"],
+        "breach_type": "invalid_action",
+        "violation_evidence_refs": ["event_001"],
+        "agent_control_event_id": "event_001",
+        "agent_control_evidence_refs": ["event_001"],
+        "impact_kind": impact,
+        "impact_event_ids": ["event_001"],
+        "impact_evidence_refs": ["event_001"],
+        "recovery_state": "none",
+        "recovery_evidence_refs": [],
+        "benchmark_causal_status": causal,
+        "benchmark_causal_evidence_refs": ["event_001"],
+        "rationale": "NORM: ... | ORIGIN: ... | CONTROL: ... | PROPAGATION: ... | IMPACT: ... | COUNTERFACTUAL: ...",
+    }
+
+
 def test_unresolved_candidate_stays_unresolved_in_occurrence() -> None:
     """Coverage-complete but non-terminal candidate is unresolved at both
     the verdict and the occurrence level — never promoted to clean."""
@@ -156,6 +179,44 @@ def test_skill_provider_accepts_copied_route() -> None:
     value, meta = wrapped(route=copied, system="s", user="u")
     assert isinstance(value, dict)
     assert meta["bccse_route"] == "focused_prosecution_route"
+
+
+def test_wide_construct_state_surviving_error_outranks_process() -> None:
+    """A real surviving error must report ``verified_hallucination`` even
+    when an auxiliary process-only certificate also exists."""
+    result = adjudicate_proof_court(
+        required_candidates=_candidate(),
+        prosecution={
+            "coverage_state": "complete",
+            "candidates": [
+                _error_cert("e1", "causes_incorrect_result", "final_answer"),
+                _error_cert("e2", "process_only", "process_debt"),
+            ],
+        },
+        defense={"coverage_state": "complete", "candidates": []},
+        packet=_packet(),
+    )
+    assert result["state"] == "verified_error"
+    assert result["wide_construct_state"] == "verified_hallucination"
+    assert result["auxiliary_process_certificate_ids"] == ["e2"]
+
+
+def test_wide_construct_state_process_only() -> None:
+    """With no surviving causal error, a process-only note resolves clean
+    (no hallucination) but reports ``verified_process_incident``."""
+    result = adjudicate_proof_court(
+        required_candidates=_candidate(),
+        prosecution={
+            "coverage_state": "complete",
+            "candidates": [
+                _error_cert("e2", "process_only", "process_debt"),
+            ],
+        },
+        defense={"coverage_state": "complete", "candidates": []},
+        packet=_packet(),
+    )
+    assert result["state"] == "verified_clean"
+    assert result["wide_construct_state"] == "verified_process_incident"
 
 
 def main() -> int:
