@@ -112,17 +112,42 @@ def _provider_repair_payload(
     return canonical_json(repair_payload).encode("utf-8"), repair_user
 
 
+def _sum_usage(*usages: Any) -> dict[str, Any]:
+    """Sum the billed token fields of one logical call's provider responses."""
+    prompt_tokens = 0
+    completion_tokens = 0
+    reasoning_tokens = 0
+    for usage in usages:
+        if not isinstance(usage, Mapping):
+            continue
+        prompt_tokens += int(usage.get("prompt_tokens") or 0)
+        completion_tokens += int(usage.get("completion_tokens") or 0)
+        details = usage.get("completion_tokens_details")
+        if isinstance(details, Mapping):
+            reasoning_tokens += int(details.get("reasoning_tokens") or 0)
+    summed: dict[str, Any] = {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+    }
+    if reasoning_tokens:
+        summed["completion_tokens_details"] = {
+            "reasoning_tokens": reasoning_tokens,
+        }
+    return summed
+
+
 def _provider_repair_call(
     *,
     route: dict[str, Any],
     api_key: str,
     payload: bytes,
     request_timeout: int | None = None,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
     """One bounded repair provider call for a truncated JSON response.
 
-    Any provider/parse failure returns None, and the caller fail-closes with
-    the original error.
+    Returns ``(parsed, usage)``: the repair is a separately billed call and
+    its tokens belong in the logical call's ledger entry. Any provider/parse
+    failure returns None, and the caller fail-closes with the original error.
     """
     req = urlrequest.Request(
         route["endpoint"].rstrip("/") + "/chat/completions",
@@ -147,7 +172,8 @@ def _provider_repair_call(
         parsed = json.loads(content)
         if not isinstance(parsed, dict):
             return None
-        return parsed
+        usage = value.get("usage")
+        return parsed, usage if isinstance(usage, dict) else {}
     except Exception:
         return None
 
@@ -309,6 +335,8 @@ def provider_call_with_schema(
                 content.strip() if isinstance(content, str) and content.strip()
                 else ""
             )
+            usage = value.get("usage")
+            usage = dict(usage) if isinstance(usage, dict) else {}
             try:
                 if not usable_content:
                     raise json.JSONDecodeError("empty provider body", "", 0)
@@ -323,7 +351,7 @@ def provider_call_with_schema(
                 )
                 try:
                     transport_attempts += 1
-                    repair_value = _provider_repair_call(
+                    repair_result = _provider_repair_call(
                         route=route, api_key=api_key,
                         payload=repair_body,
                         request_timeout=request_timeout,
@@ -335,14 +363,17 @@ def provider_call_with_schema(
                         "reasoning_content_present="
                         f"{bool(message.get('reasoning_content'))}"
                     ) from exc
-                if repair_value is None:
+                if repair_result is None:
                     raise ValueError(
                         "provider_empty_content:"
                         f"finish_reason={choice.get('finish_reason') or 'unknown'},"
                         "reasoning_content_present="
                         f"{bool(message.get('reasoning_content'))}"
                     )
-                parsed = repair_value
+                parsed, repair_usage = repair_result
+                # The repair is a second billed request on top of the empty
+                # first response; the logical call's ledger entry carries both.
+                usage = _sum_usage(usage, repair_usage)
                 repair_used = True
                 choice = {"finish_reason": "repair"}
             if not isinstance(parsed, dict):
@@ -352,7 +383,7 @@ def provider_call_with_schema(
             return parsed, {
                 "cache_hit": False,
                 "request_hash": request_hash,
-                "usage": value.get("usage") or {},
+                "usage": usage,
                 "latency_seconds": time.time() - started,
                 "transport_attempts": transport_attempts,
                 "repair_used": repair_used,
