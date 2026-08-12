@@ -199,6 +199,7 @@ def provider_thinking_control(
             "reflection_diagnosis",
             "policy_reflection",
             "reflection_pro",
+            "pro",
         }
         and model.startswith("deepseek-v4-")
     ):
