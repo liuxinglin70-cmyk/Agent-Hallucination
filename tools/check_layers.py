@@ -19,7 +19,7 @@ import ast
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = REPO_ROOT / "sehd_rise"
 PACKAGE_PREFIX = "sehd_rise"
 FROZEN_PACKAGE = "sehd_v6"

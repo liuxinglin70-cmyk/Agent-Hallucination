@@ -26,7 +26,7 @@ The framework lives in `sehd_rise/`. The pre-refactor baseline
 The package is organized into 13 layers plus a root entry. Dependencies
 point strictly downward (`A → B` means A may import B); reverse imports are
 forbidden and the rule is enforced mechanically by
-`tools/parity/check_layers.py`:
+`tools/check_layers.py`:
 
 ```text
 platform        ← every layer may depend on it; depends on nothing in sehd_rise
@@ -509,21 +509,31 @@ silently substitute `DEEPSEEK_API_KEY`.
 
 ## Evidence Boundaries
 
-What the repository establishes today:
+Standing verification, runnable at any time:
 
-- **Architecture**: 13 layers + root entry, acyclic import discipline
-  mechanically enforced (`tools/parity/check_layers.py`, 83 files / 14
-  layers, no violations); full-package import smoke clean.
-- **Behavioral parity with the frozen baseline**: seven offline harnesses
-  green — serialization round-trips, causal classification, detection
-  contract (74 checks), effect/gate/promotion decisions, experience/typing,
-  planning prompts, meta legality enumeration. All deviations are documented
+- `tools/check_layers.py` — acyclic layer discipline (83 files / 14 layers,
+  no violations), including the guard that no framework module imports the
+  frozen baseline.
+- `python -m pytest tests/` — loop state machine suite (10/10: all legal
+  transitions reachable, illegal transitions rejected, every funnel outcome
+  counted independently).
+- Full-package import smoke — all modules import clean.
+
+Refactor-time acceptance (performed against the frozen baseline, recorded in
+git history; the migration harnesses were removed from the tree after
+acceptance):
+
+- Behavioral parity across serialization round-trips, causal classification,
+  detection contract, effect/gate/promotion decisions, experience/typing,
+  planning prompts and meta legality enumeration — all deviations documented
   and bound to C1–C10 register entries.
-- **Live operation**: real-provider end-to-end runs of both CLI entries
-  (`detect` / `evolve`) with complete artifact sets; the loop state machine
-  unit suite passes 10/10; e2e scenarios cover independent `UNADDRESSABLE`
-  counting, non-learning events excluded from convergence, and checkpoint
-  resume equivalence.
+- Real-provider end-to-end runs of both CLI entries (`detect` / `evolve`)
+  with complete artifact sets; e2e scenarios covering independent
+  `UNADDRESSABLE` counting, non-learning events excluded from convergence,
+  and checkpoint resume equivalence.
+- The end-to-end old-vs-new `compare_run` parity run was not part of
+  acceptance (user decision); acceptance evidence was the real-provider
+  evolution run plus the offline parity harnesses.
 
 What is **not** established:
 
@@ -532,8 +542,5 @@ What is **not** established:
   holdout evaluation run as an experiment-layer protocol (see
   `experiments/README.md`), with concrete intermediate outputs per the
   advisor requirements.
-- The end-to-end old-vs-new `compare_run.py` parity harness exists but was
-  not part of acceptance (user decision); acceptance evidence is the
-  real-provider evolution run plus the seven offline harnesses.
 - Type telemetry and strategy suggestions are observability; they are not
   evidence that any detector direction improved.

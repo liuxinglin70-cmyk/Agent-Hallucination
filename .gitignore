@@ -7,8 +7,8 @@ tmp_pull_*/
 tmp_upload_*/
 *.txt
 
-# Pre-refactor SEHD-v6 frozen baseline: local backup only, superseded by sehd_rise/
-# (see src/README.md; tools/parity/ harnesses still import it)
+# Pre-refactor SEHD-v6 frozen baseline: local historical backup only,
+# superseded by sehd_rise/ (see src/README.md)
 src/
 
 # Experiment workspace (run artifacts are local-only; the README is tracked)
@@ -22,6 +22,7 @@ datasets/**/*.jsonl
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 *.egg-info/

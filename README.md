@@ -13,8 +13,8 @@ carries a full causal credit chain from dispatch to cross-case transfer.
 
 The framework lives in `sehd_rise/` (13 layers + root entry). The
 pre-refactor baseline `src/sehd_v6/` is kept as a local, git-untracked
-backup (see `src/README.md`); the migration-period parity harnesses under
-`tools/parity/` still import it.
+historical backup (see `src/README.md`); nothing in the tracked tree depends
+on it.
 
 For the framework architecture and design contracts see
 [docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md).
@@ -99,14 +99,15 @@ sehd_rise/                # the framework (13 layers + root entry)
 └── __main__.py           #   root entry dispatching to cli
 
 docs/design/              # framework technical design (core document)
-tools/parity/             # migration-period verification harnesses + layer check
+tools/check_layers.py     # acyclic layer-discipline check
+tests/                    # state-machine unit tests
 experiments/              # local experiment workspace (artifacts git-ignored)
 datasets/                 # raw datasets (local-only, git-ignored)
 src/sehd_v6/              # pre-refactor frozen baseline (local backup, git-untracked)
 ```
 
 The layer dependency rules are acyclic and mechanically enforced by
-`tools/parity/check_layers.py`; see TECHNICAL_DESIGN.md for the rule table.
+`tools/check_layers.py`; see TECHNICAL_DESIGN.md for the rule table.
 
 ## Usage
 
@@ -208,7 +209,7 @@ from sehd_rise.api.evolution import run_evolution, load_records
 Layer-level imports follow the 13-layer package structure (`platform`,
 `skills`, `detection`, `causal`, `experience`, `typing`, `planning`,
 `execution`, `evaluation`, `meta`, `loop`, `api`, `cli`); the acyclic import
-discipline is enforced by `tools/parity/check_layers.py`.
+discipline is enforced by `tools/check_layers.py`.
 
 ## Caches and Logs
 
