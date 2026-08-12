@@ -709,35 +709,36 @@ def integrated_engine_provider(
     genome: SkillGenome,
     config: Mapping[str, Any],
 ) -> Iterator[CompiledPacaSkill]:
-    """Temporarily attach a genome to the engine's provider call surface.
+    """Temporarily attach a genome to the detection egress provider seam.
 
-    The engine imports provider functions by value, so both bindings must be
-    replaced.  A process lock prevents concurrent genomes from sharing global
-    provider state.  Original functions are restored even if evaluation fails.
+    The detection egress exposes its two provider bindings by value, so both
+    must be replaced.  A process lock prevents concurrent genomes from sharing
+    global provider state.  Original functions are restored even if evaluation
+    fails.
 
     Thread-safety constraint:
         ``_PATCH_LOCK`` serializes all genome evaluations in the process.
-        This is intentional: ``provider_call`` is a module-level binding on
-        the engine, so concurrent evaluations with different genomes would
-        cross-contaminate skill context. Parallel evaluation of different
+        This is intentional: the provider bindings are module-level names on
+        the detection egress, so concurrent evaluations with different genomes
+        would cross-contaminate skill context. Parallel evaluation of different
         genomes must use separate processes (not threads). The baseline
         detector does NOT use this context manager and is unaffected.
     """
 
-    from sehd_rise.detection.court import engine
+    from sehd_rise.detection import egress
 
     compiled = compile_genome_for_paca(genome)
     with _PATCH_LOCK:
-        original_call = engine.provider_call
-        original_json = engine.json_object_provider_call
+        original_call = egress.provider_call
+        original_json = egress.json_object_provider_call
         wrapped = make_skill_aware_provider(original_call, compiled=compiled, config=config)
         wrapped_json = make_skill_aware_provider(
             original_json, compiled=compiled, config=config,
         )
-        engine.provider_call = wrapped
-        engine.json_object_provider_call = wrapped_json
+        egress.provider_call = wrapped
+        egress.json_object_provider_call = wrapped_json
         try:
             yield compiled
         finally:
-            engine.provider_call = original_call
-            engine.json_object_provider_call = original_json
+            egress.provider_call = original_call
+            egress.json_object_provider_call = original_json

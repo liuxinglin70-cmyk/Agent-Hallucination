@@ -90,6 +90,7 @@ def _run_detection_with_genome(
     output_dir: Path,
     policy_genome: PolicyGenome | None = None,
     policy_scope: str | None = "working",
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> dict[str, Any]:
     """Run PACA-TCL v3.5 with global skill injection.
 
@@ -150,6 +151,7 @@ def _run_detection_with_genome(
                 output_dir=genome_dir,
                 policy_items=policy_items,
                 policy_registry=policy_registry,
+                provider_usage_ledger=provider_usage_ledger,
             )
 
     result = invoke()
@@ -212,33 +214,6 @@ def _run_detection_with_genome(
     except ValueError as exc:
         raise RuntimeError(f"detector returned invalid state: {exc}") from exc
     return result
-
-
-def _record_detector_provider_usage(
-    ledger: ProviderUsageLedger,
-    result: Mapping[str, Any],
-    budget_kind: str,
-) -> None:
-    """Record the per-surface provider metas a detection result carries.
-
-    The engine places one provider-meta dict per surface (usage, latency,
-    cache fields) in ``result["providers"]``; some surfaces nest their metas
-    (construct initial/repair, per-candidate focused prosecution), so walk
-    one level.  Error-only dicts (no ``usage`` key) are skipped: they carry
-    no billable tokens and the budget counters already account for the call.
-    """
-    providers = result.get("providers")
-    if not isinstance(providers, Mapping):
-        return
-    purpose = f"detector:{budget_kind}"
-    for surface, meta in providers.items():
-        if isinstance(meta, Mapping) and "usage" in meta:
-            ledger.record(purpose=f"{purpose}:{surface}", meta=meta)
-            continue
-        if isinstance(meta, Mapping):
-            for sub in meta.values():
-                if isinstance(sub, Mapping) and "usage" in sub:
-                    ledger.record(purpose=f"{purpose}:{surface}", meta=sub)
 
 
 def _run_mutation_call(
@@ -324,14 +299,8 @@ def _run_counted_detection(
         record=_detector_record(records[case_id]),
         config=config,
         output_dir=output_path,
+        provider_usage_ledger=provider_usage_ledger,
         **replay_kwargs,
-    )
-    # The engine surfaces one provider-meta dict per surface in the result's
-    # ``providers`` map (with usage / latency / cache fields); walk it and
-    # record every leaf into the same per-logical-call ledger the mutation
-    # path uses.
-    _record_detector_provider_usage(
-        provider_usage_ledger, result, budget_kind,
     )
     return result
 
@@ -340,7 +309,6 @@ __all__ = [
     "_authority_failure_details",
     "_run_conflict_gate_call",
     "_run_detection_with_genome",
-    "_record_detector_provider_usage",
     "_run_mutation_call",
     "_run_counted_detection",
 ]

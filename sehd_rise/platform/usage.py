@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -116,6 +117,10 @@ class ProviderUsageLedger:
 
     def __init__(self, records: Sequence[UsageRecord] = ()) -> None:
         self._records: list[UsageRecord] = list(records)
+        # Detection surfaces record from concurrent worker threads (focused
+        # prosecution fans out up to max_focused_parallel), so the append and
+        # the per-purpose sequence read must be a single critical section.
+        self._lock = threading.Lock()
 
     def record(
         self,
@@ -126,6 +131,16 @@ class ProviderUsageLedger:
     ) -> UsageRecord:
         """Append one logical call from a provider-call metadata object."""
         meta = meta if isinstance(meta, Mapping) else {}
+        with self._lock:
+            return self._record(purpose=purpose, meta=meta, logical_call_id=logical_call_id)
+
+    def _record(
+        self,
+        *,
+        purpose: str,
+        meta: Mapping[str, Any],
+        logical_call_id: str = "",
+    ) -> UsageRecord:
         usage = meta.get("usage")
         tokens = _usage_tokens(usage if isinstance(usage, Mapping) else {})
         cache_hit = bool(meta.get("cache_hit"))

@@ -13,8 +13,8 @@ Two adjudication surfaces share one provider-transport boundary:
 * ``adjudicate_case`` — focused prosecution + calibrated appeal + counterfactual
   localization (the production surface).
 
-Both call the same transport primitives; the skill-injection adapter
-patches ``provider_call`` / ``json_object_provider_call`` on this module to
+Both call the detection egress; the skill-injection adapter patches the
+detection egress's ``provider_call`` / ``json_object_provider_call`` seams to
 attach a genome without changing any adjudication rule.
 """
 
@@ -27,19 +27,19 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.detection.court import contract
+from sehd_rise.detection.egress import detection_call, detection_rankings_call
 from sehd_rise.detection.packet import build_packet
 from sehd_rise.detection.transport import (
     _addressable_refs,
     _responsible_step,
     candidate_provider_user_prompt,
     candidate_system_prompt,
-    json_object_provider_call,
     parse_gold_label,
     private_ref,
-    provider_call,
     validate_provider_census,
 )
 from sehd_rise.platform.jsonio import canonical_json
+from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.skills.vocabulary.contracts import PolicyItem
 from sehd_rise.skills.vocabulary.registry import L2_REGISTRY, POLICY_STAGE_PRE_LEDGER
 
@@ -275,13 +275,14 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
     }
 
 
-def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], output_dir: Path, provider_usage_ledger: ProviderUsageLedger | None = None) -> dict[str, Any]:
     built = build_packet(record)
     providers: dict[str, Any] = {}
     try:
-        value, meta = provider_call(
+        value, meta = detection_call(
             route=config["candidate_fallback_route"], system=candidate_system_prompt(),
             user=candidate_provider_user_prompt(built),
+            purpose="detector:candidate_fallback", ledger=provider_usage_ledger,
         )
         census, census_audit = validate_provider_census(value, built)
         providers["candidate_fallback"] = {**meta, "calls": 1, "source": "provider_fallback"}
@@ -295,9 +296,10 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
     }
     try:
         if census:
-            q_value, providers["qualification"] = provider_call(
+            q_value, providers["qualification"] = detection_call(
                 route=config["qualification_route"], system=QUALIFICATION_SYSTEM,
                 user=_provider_user(built, census=census),
+                purpose="detector:qualification", ledger=provider_usage_ledger,
             )
             q_coverage, qualifications = _coverage(q_value, {row["candidate_id"] for row in census})
             qualified = []
@@ -307,9 +309,10 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
             qualified_ids = {row["candidate_id"] for row in qualified}
             qualified_census = [row for row in census if row["candidate_id"] in qualified_ids]
             if qualified_census:
-                p_value, providers["propagation"] = provider_call(
+                p_value, providers["propagation"] = detection_call(
                     route=config["propagation_route"], system=PROPAGATION_SYSTEM,
                     user=_provider_user(built, census=qualified_census, qualification=qualified),
+                    purpose="detector:propagation", ledger=provider_usage_ledger,
                 )
                 p_coverage, propagations = _coverage(p_value, qualified_ids)
             else:
@@ -329,8 +332,9 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
         providers["candidate_path_error"] = {"error_type": type(exc).__name__, "error": str(exc)[:500]}
 
     try:
-        boundary_value, providers["boundary"] = provider_call(
+        boundary_value, providers["boundary"] = detection_call(
             route=config["boundary_route"], system=BOUNDARY_SYSTEM, user=_provider_user(built),
+            purpose="detector:boundary", ledger=provider_usage_ledger,
         )
         boundary_path = _validate_boundary(boundary_value, built)
     except Exception as exc:
@@ -805,6 +809,7 @@ def _focused_prosecution_retry_user(
 def _run_focused_prosecution_for_candidate(
     *, candidate: dict[str, Any], built: dict[str, Any], base: dict[str, Any],
     config: dict[str, Any], max_retries: int | None = None,
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Run one candidate through a uniform envelope + certificate repair loop.
 
@@ -847,9 +852,10 @@ def _run_focused_prosecution_for_candidate(
             attempt_key = f"retry_{attempt}"
 
         try:
-            value, meta = provider_call(
+            value, meta = detection_call(
                 route=config["focused_prosecution_route"],
                 system=system, user=user,
+                purpose="detector:focused_prosecution", ledger=provider_usage_ledger,
             )
             provider_meta[attempt_key] = meta
         except Exception as exc:
@@ -949,6 +955,7 @@ def _run_focused_prosecution_for_candidate(
 
 def _run_focused_prosecution(
     *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Run focused prosecution for all candidates in parallel.
 
@@ -969,7 +976,7 @@ def _run_focused_prosecution(
             executor.submit(
                 _run_focused_prosecution_for_candidate,
                 candidate=candidate, built=built, base=base,
-                config=config,
+                config=config, provider_usage_ledger=provider_usage_ledger,
             ): candidate
             for candidate in candidates
         }
@@ -1940,6 +1947,7 @@ def _counterfactual_localization_user(
 def _run_counterfactual_localization(
     *, built: dict[str, Any], surviving_errors: list[dict[str, Any]],
     config: dict[str, Any], providers: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> dict[str, dict[str, Any]] | None:
     """Run pairwise counterfactual comparison for multiple surviving origins.
 
@@ -1956,10 +1964,11 @@ def _run_counterfactual_localization(
     try:
         # Counterfactual localization returns {"rankings": {...}} (no
         # "candidates" field), so use the schema-relaxed provider call.
-        value, meta = json_object_provider_call(
+        value, meta = detection_rankings_call(
             route=config.get("counterfactual_route", config["focused_prosecution_route"]),
             system=COUNTERFACTUAL_LOCALIZATION_SYSTEM,
             user=user,
+            purpose="detector:counterfactual", ledger=provider_usage_ledger,
         )
         providers["counterfactual"] = meta
         rankings = value.get("rankings")
@@ -2124,6 +2133,7 @@ def _run_appeal_phase(
     prosecution: dict[str, Any], defense: dict[str, Any],
     initial_proof: dict[str, Any],
     initial_court_kwargs: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> dict[str, Any]:
     """Run the calibrated appeal: prosecution, informed defense, re-adjudication.
 
@@ -2142,9 +2152,10 @@ def _run_appeal_phase(
             built=built, candidates=appeal_candidates, base=base,
             prosecution=prosecution, defense=defense, proof=initial_proof,
         )
-        appeal_prosecution, providers["appeal_prosecutor"] = provider_call(
+        appeal_prosecution, providers["appeal_prosecutor"] = detection_call(
             route=config["appeal_prosecutor_route"],
             system=APPEAL_PROSECUTOR_SYSTEM, user=appeal_user,
+            purpose="detector:appeal_prosecutor", ledger=provider_usage_ledger,
         )
         # Validate the reviewed_candidate_ids contract. A structurally
         # repairable failure triggers ONE bounded retry with structured
@@ -2152,7 +2163,7 @@ def _run_appeal_phase(
         appeal_prosecution = _validate_appeal_prosecution_contract_or_retry(
             appeal_prosecution,
             allowed_ids=allowed_ids,
-            retry_call=lambda failure_category: provider_call(
+            retry_call=lambda failure_category: detection_call(
                 route=config["appeal_prosecutor_route"],
                 system=APPEAL_PROSECUTOR_RETRY_SYSTEM,
                 user=_appeal_prosecutor_retry_user(
@@ -2160,6 +2171,7 @@ def _run_appeal_phase(
                     prosecution=prosecution, defense=defense, proof=initial_proof,
                     failure_category=failure_category,
                 ),
+                purpose="detector:appeal_prosecutor_retry", ledger=provider_usage_ledger,
             ),
             providers=providers,
         )
@@ -2177,7 +2189,7 @@ def _run_appeal_phase(
             proof=initial_proof,
             required_candidates=_required_candidates(base),
             allowed_ids=allowed_ids,
-            retry_call=lambda invalid_audits: provider_call(
+            retry_call=lambda invalid_audits: detection_call(
                 route=config["appeal_prosecutor_route"],
                 system=APPEAL_PROSECUTOR_RETRY_SYSTEM,
                 user=_appeal_prosecutor_deep_repair_user(
@@ -2189,6 +2201,7 @@ def _run_appeal_phase(
                     proof=initial_proof,
                     invalid_audits=invalid_audits,
                 ),
+                purpose="detector:appeal_prosecutor_retry", ledger=provider_usage_ledger,
             ),
             providers=providers,
         )
@@ -2199,16 +2212,17 @@ def _run_appeal_phase(
             prosecution=prosecution, defense=defense, proof=initial_proof,
             appeal_prosecution=appeal_prosecution,
         )
-        appeal_defense_certs, providers["appeal_defender"] = provider_call(
+        appeal_defense_certs, providers["appeal_defender"] = detection_call(
             route=config["appeal_defender_route"],
             system=APPEAL_DEFENDER_SYSTEM, user=appeal_defender_user,
+            purpose="detector:appeal_defender", ledger=provider_usage_ledger,
         )
         # Validate the defender coverage contract with ONE bounded retry,
         # symmetric with the prosecutor above.
         appeal_defense_certs = _validate_appeal_defense_contract_or_retry(
             appeal_defense_certs,
             allowed_ids=allowed_ids,
-            retry_call=lambda failure_category: provider_call(
+            retry_call=lambda failure_category: detection_call(
                 route=config["appeal_defender_route"],
                 system=APPEAL_DEFENDER_RETRY_SYSTEM,
                 user=_appeal_defender_retry_user(
@@ -2217,6 +2231,7 @@ def _run_appeal_phase(
                     appeal_prosecution=appeal_prosecution,
                     failure_category=failure_category,
                 ),
+                purpose="detector:appeal_defender_retry", ledger=provider_usage_ledger,
             ),
             providers=providers,
         )
@@ -2235,7 +2250,7 @@ def _run_appeal_phase(
             proof=initial_proof,
             appeal_prosecution=appeal_prosecution,
             required_candidates=_required_candidates(base),
-            retry_call=lambda invalid_audits: provider_call(
+            retry_call=lambda invalid_audits: detection_call(
                 route=config["appeal_defender_route"],
                 system=APPEAL_DEFENDER_RETRY_SYSTEM,
                 user=_appeal_defender_deep_repair_user(
@@ -2244,6 +2259,7 @@ def _run_appeal_phase(
                     appeal_prosecution=appeal_prosecution,
                     invalid_audits=invalid_audits,
                 ),
+                purpose="detector:appeal_defender_retry", ledger=provider_usage_ledger,
             ),
             providers=providers,
         )
@@ -2284,6 +2300,7 @@ def adjudicate_case(
     output_dir: Path,
     policy_items: Sequence[Mapping[str, Any]] | None = None,
     policy_registry=None,
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> dict[str, Any]:
     built = build_packet(record)
 
@@ -2292,14 +2309,16 @@ def adjudicate_case(
         base_future = executor.submit(
             adjudicate_layered_case, case_id=case_id, record=record, config=config,
             output_dir=output_dir / "layered_v2",
+            provider_usage_ledger=provider_usage_ledger,
         )
         construct_future = executor.submit(
-            provider_call, route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
+            detection_call, route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
             user=_provider_user(built),
+            purpose="detector:construct_census", ledger=provider_usage_ledger,
         )
         base = base_future.result()
         construct_census, construct_audit, construct_provider = (
-            _resolve_construct_census(construct_future, built, config)
+            _resolve_construct_census(construct_future, built, config, provider_usage_ledger)
         )
 
     construct_authoritative, construct_authority_reasons = _construct_authority(
@@ -2334,10 +2353,12 @@ def adjudicate_case(
             focused_pros_future = executor.submit(
                 _run_focused_prosecution,
                 built=built, base=base, config=config,
+                provider_usage_ledger=provider_usage_ledger,
             )
             defense_future = executor.submit(
-                provider_call, route=config["defense_route"], system=DEFENSE_SYSTEM,
+                detection_call, route=config["defense_route"], system=DEFENSE_SYSTEM,
                 user=user,
+                purpose="detector:defense", ledger=provider_usage_ledger,
             )
             focused_prosecution, focused_audits, focused_metas = focused_pros_future.result()
             defense, providers["defense"] = defense_future.result()
@@ -2395,6 +2416,7 @@ def adjudicate_case(
                 prosecution=prosecution, defense=defense,
                 initial_proof=initial_proof,
                 initial_court_kwargs=initial_court_kwargs,
+                provider_usage_ledger=provider_usage_ledger,
             )
             if appeal_outcome["error"] is None:
                 proof = appeal_outcome["proof"]
@@ -2425,6 +2447,7 @@ def adjudicate_case(
                 counterfactual_rankings = _run_counterfactual_localization(
                     built=built, surviving_errors=surviving_errors,
                     config=config, providers=providers,
+                    provider_usage_ledger=provider_usage_ledger,
                 )
                 if counterfactual_rankings:
                     # Re-adjudicate with counterfactual rankings. The
@@ -2572,6 +2595,7 @@ def adjudicate_case(
 def _resolve_construct_census(
     construct_future, built: dict[str, Any],
     config: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """Resolve the construct census from a concurrent provider future.
 
@@ -2616,9 +2640,10 @@ def _resolve_construct_census(
                 "(same candidate_ids). Return JSON only."
             )
             repair_user = _provider_user(built) + repair_hint
-            repair_value, repair_provider = provider_call(
+            repair_value, repair_provider = detection_call(
                 route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
                 user=repair_user,
+                purpose="detector:construct_census", ledger=provider_usage_ledger,
             )
             construct_provider = {"initial": construct_provider, "repair": repair_provider}
             construct_value, axis_normalized_count = _normalize_construct_value(repair_value)
