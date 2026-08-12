@@ -269,12 +269,12 @@ def provider_call_with_schema(
         "temperature": float(route.get("temperature", 0)),
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
-    # The DeepSeek-V4 models reject response_format on every gateway tested
-    # so far while still returning JSON when the system prompt requests it,
-    # so the parameter is dropped for the whole model family instead of
-    # maintaining per-gateway rules.
-    if not str(route["model"]).lower().startswith("deepseek-v4"):
-        payload["response_format"] = {"type": "json_object"}
+    # JSON mode is the official DeepSeek structured-output contract
+    # (response_format={"type":"json_object"}; the prompt must mention
+    # "json", which every caller here already does via "Return JSON only").
+    # Every caller of this primitive expects a JSON object response, so the
+    # mode is always requested rather than special-cased per model family.
+    payload["response_format"] = {"type": "json_object"}
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
     thinking = provider_thinking_control(route)

@@ -132,7 +132,7 @@ from sehd_rise.meta.review import (
 from sehd_rise.meta.strategy import StrategyState, create_baseline_strategy
 from sehd_rise.platform.gold import _evaluator_gold
 from sehd_rise.platform.jsonio import atomic_write_json
-from sehd_rise.platform.routes import has_provider_credential
+from sehd_rise.platform.routes import has_provider_credential, resolve_provider_route
 from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.planning.candidates import (
     _allowed_l1_modules,

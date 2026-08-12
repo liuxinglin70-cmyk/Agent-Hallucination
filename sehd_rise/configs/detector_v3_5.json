@@ -1,7 +1,7 @@
 {
   "schema_version": "agenthallu.paca_tcl_detector_config.v3_5",
   "outer_opened": false,
-  "max_focused_parallel": 4,
+  "max_focused_parallel": 20,
   "focused_prosecution_retries": 1,
   "candidate_fallback_route": {
     "transport_retries": 3,
@@ -24,7 +24,6 @@
     "total_timeout_seconds": 480
   },
   "boundary_route": {
-    "thinking": {"type": "disabled"},
     "transport_retries": 3,
     "timeout_seconds": 120,
     "total_timeout_seconds": 480
@@ -40,14 +39,12 @@
     "total_timeout_seconds": 480
   },
   "appeal_prosecutor_route": {
-    "thinking": {"type": "disabled"},
     "max_tokens": 8192,
     "timeout_seconds": 180,
     "total_timeout_seconds": 240,
     "transport_retries": 3
   },
   "appeal_defender_route": {
-    "thinking": {"type": "disabled"},
     "max_tokens": 8192,
     "timeout_seconds": 180,
     "total_timeout_seconds": 240,
