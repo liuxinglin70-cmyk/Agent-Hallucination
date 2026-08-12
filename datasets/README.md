@@ -1,21 +1,21 @@
-# Raw Datasets
+# 原始数据集
 
-Place raw dataset files in this directory.  They are never tracked by git.
+把原始数据集文件放在本目录。它们从不被 git 跟踪。
 
-Expected layout:
+预期布局：
 
 ```text
 datasets/
-├── README.md            # this file
-└── raw/                 # actual dataset files (git-ignored)
+├── README.md            # 本文件
+└── raw/                 # 实际数据集文件（被 git 忽略）
     └── <dataset>/
-        ├── cases/       # raw trajectory records
+        ├── cases/       # 原始轨迹记录
         └── manifest.jsonl
 ```
 
-## Record format
+## 记录格式
 
-Each raw trajectory is a JSON object consumed by the detector:
+每条原始轨迹是供检测器消费的一个 JSON 对象：
 
 ```json
 {
@@ -33,11 +33,10 @@ Each raw trajectory is a JSON object consumed by the detector:
 }
 ```
 
-- `history` must be a non-empty list.
-- Evaluator-only fields (`gold_label`, `is_hallucination`,
-  `hallucination_step`, ...) may be present; the detector strips them before
-  every provider call, and the evolution framework may use them only under an
-  explicit gold-enhanced opt-in.
+- `history` 必须是非空列表。
+- 仅求值器使用的字段（`gold_label`、`is_hallucination`、`hallucination_step`，……）
+  可以存在；检测器在每次 provider 调用前剥离它们，进化框架只可在显式启用
+  gold 增强时使用它们。
 
-The evolution CLI accepts this directory's records as a JSON mapping or a
-JSONL sequence, see `src/sehd_v6/evolution/README.md`.
+进化 CLI 接受本目录的记录，可以是 JSON 映射，也可以是 JSONL 序列；见
+`sehd_rise/detection/detector.py` 与 `sehd_rise/api/evolution.py` 中的记录加载入口。

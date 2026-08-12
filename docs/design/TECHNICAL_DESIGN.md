@@ -1,35 +1,28 @@
-# SEHD-RISE Technical Design
+# SEHD-RISE 技术设计
 
-## Purpose
+## 目的
 
-SEHD-RISE (Repairability-driven Integrated Self-Evolution) treats PACA-TCL
-v3.5 proof-court verdicts as the runtime authority and organizes
-self-evolution around one principle: **repairability before evolution**. A
-causal repair layer is the single authority on failure ownership and
-repairability; only repairable failures enter evolution; L1/L2/Meta skills
-share one canonical RepairPlan protocol; and every repair attempt is
-evidenced by an explicit causal credit chain and classified by a four-layer
-outcome funnel.
+SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动的一体化
+自进化）把 PACA-TCL v3.5 证明法庭的裁决当作运行时权威，并围绕一条原则组织自进化：
+**可修复性先于进化（repairability before evolution）**。因果修复层是对失败属主
+（ownership）与可修复性的唯一权威；只有可修复的失败进入进化；L1/L2/Meta 技能共享
+一份规范 RepairPlan 协议；每次修复尝试都由显式的因果归功链作为证据，并由四层结果
+漏斗分类。
 
-The normative project charter — core objective, design philosophy and
-advisor requirements that every agent must comply with — is the "Core
-Objective and Design Discipline" section of the repository
-[README](../../README.md); this document only implements it.
+规范性的项目章程——每个 agent 都必须遵守的核心目标、设计理念与导师要求——是仓库
+[README](../../README.md) 的「核心目标与设计纪律」一节；本文档只是把它落实为设计。
+框架代码位于 `sehd_rise/`。重构前基线 `src/sehd_v6/` 已冻结、未被 git 跟踪、绝不
+修改。
 
-The framework lives in `sehd_rise/`. The pre-refactor baseline
-`src/sehd_v6/` is frozen, git-untracked and never modified.
+## 架构
 
-## Architecture
+### 层级与依赖规则
 
-### Layers and dependency rules
-
-The package is organized into 13 layers plus a root entry. Dependencies
-point strictly downward (`A → B` means A may import B); reverse imports are
-forbidden and the rule is enforced mechanically by
-`tools/check_layers.py`:
+包按 13 层加一个根入口组织。依赖严格向下（`A → B` 表示 A 可以导入 B）；反向导入
+被禁止，该规则由 `tools/check_layers.py` 机械强制：
 
 ```text
-platform        ← every layer may depend on it; depends on nothing in sehd_rise
+platform        ← 所有层都可以依赖它；不依赖 sehd_rise 内任何东西
 skills          → platform
 detection       → platform, skills
 causal          → platform, skills, detection
@@ -39,273 +32,232 @@ planning        → platform, skills, causal, experience, typing
 execution       → platform, skills, detection, causal
 evaluation      → platform, skills, causal, execution
 meta            → platform, causal, experience, evaluation
-loop            → every layer except api/cli
+loop            → api/cli 之外的每一层
 api, cli        → loop, detection, evaluation, planning
 ```
 
-Layer responsibilities:
+各层职责：
 
-| Layer | Modules | Responsibility |
+| 层 | 模块 | 职责 |
 |---|---|---|
-| `platform` | env / routes / models / usage / gold / jsonio | Research-agnostic infrastructure: `.env` loading, provider route resolution, canonical model names, usage ledger, gold normalization (evaluation side only), canonical JSON / stable hash / atomic writes |
-| `skills` | genome / policy / rule / vocabulary/ | Evolvable-surface data models and closed vocabularies — pure data, no process logic. `vocabulary/` is the single source of truth for L2 predicates/actions, L1 module charters and court audit vocabulary |
-| `detection` | packet / transport / court/ / policy / injection / detector / replicas / batch | Proof-court detection: trajectory packing, provider transport, the v3.5 court engine, the deterministic L2 policy evaluator, L1 rule injection at the provider boundary, `detect_record` entry, replica aggregation, batch runs |
-| `causal` | signals / cut / episode / repairability / plan | The single causal authority: detection→evolution projection, terminal causal cut, `CausalFailureEpisode`, `RepairabilityStatus` triage, canonical `RepairPlan` |
-| `experience` | memory | Mechanism-level experience memory — the single Experience Truth |
-| `typing` | classifier / guidance / slices | HTC-TES advisory type intelligence: type tagging, retrieval/reflection priors, typed evaluation slices. No causal veto |
-| `planning` | l1 / l2 / retrieval / candidates / search / feedback | Hypothesis search driven by RepairPlan: L1 LLM causal reflection, L2 closed-vocabulary policy planning, experience retrieval, retry feedback |
-| `execution` | action / executor / replay / trace | Repair execution and evidence: `ActionSpec`, dispatch by `RepairPlan.executor`, genome-injected detection replay, `ExecutionTrace` |
-| `evaluation` | effect / fitness / canary / gate / promotion | Causal effect records, source fitness, canary selection/keeping/eviction, structural + no-conflict gates, `PromotionDecision` |
-| `meta` | strategy / review | Cross-case strategy learner: five-domain closed strategy vocabulary, evidence-gated commits, strategy suggestions only |
-| `loop` | machine / runner / state / records / persistence / ledger / probes / shadow / result | Unified orchestration: the evolution state machine, the outcome funnel, case queue and budgets, checkpoints, GateEvent ledger, development probes, shadow batch commits |
-| `api` | detection / evolution / manifests | Public facade — the only layer allowed to assemble |
-| `cli` | evolve / detect | `python -m sehd_rise <evolve|detect>` argument surface |
+| `platform` | env / routes / models / usage / gold / jsonio | 与研究无关的基础设施：`.env` 加载、provider 路由解析、规范模型名、用量账本（usage ledger）、gold 归一化（仅评估侧）、规范 JSON / 稳定哈希 / 原子写入 |
+| `skills` | genome / policy / rule / vocabulary/ | 可进化面的数据模型与封闭词表——纯数据，无流程逻辑。`vocabulary/` 是 L2 谓词/动作、L1 模块章程与法庭审计词表的唯一真源 |
+| `detection` | packet / transport / court/ / policy / injection / detector / replicas / batch | 证明法庭检测：轨迹打包、provider 传输、v3.5 法庭引擎、确定性 L2 策略求值器、provider 边界上的 L1 规则注入、`detect_record` 入口、副本聚合、批量运行 |
+| `causal` | signals / cut / episode / repairability / plan | 唯一的因果权威：检测→进化投影、终态因果切点、`CausalFailureEpisode`、`RepairabilityStatus` 分诊、规范 `RepairPlan` |
+| `experience` | memory | 机制级经验记忆——单一 Experience Truth |
+| `typing` | classifier / guidance / slices | HTC-TES 咨询型类型智能：类型标注、检索/反思先验、类型化评估切片。无因果否决权 |
+| `planning` | l1 / l2 / retrieval / candidates / search / feedback | 由 RepairPlan 驱动的假设搜索：L1 LLM 因果反思、L2 封闭词表策略规划、经验检索、重试反馈 |
+| `execution` | action / executor / replay / trace | 修复执行与证据：`ActionSpec`、按 `RepairPlan.executor` 分发、基因组注入的检测回放、`ExecutionTrace` |
+| `evaluation` | effect / fitness / canary / gate / promotion | 因果效应记录、源 fitness、canary 选择/保留/驱逐、结构门 + 无冲突门、`PromotionDecision` |
+| `meta` | strategy / review | 跨案例策略学习器：五域封闭策略词表、证据门控的提交、仅输出策略建议 |
+| `loop` | machine / runner / state / records / persistence / ledger / probes / shadow / result | 统一编排：进化状态机、结果漏斗、案例队列与预算、检查点、GateEvent 账本、开发探针、shadow 批次提交 |
+| `api` | detection / evolution / manifests | 公共门面——唯一允许做装配的层 |
+| `cli` | evolve / detect | `python -m sehd_rise <evolve|detect>` 参数面 |
 
-### Authority relations (one fact, one authority)
+### 权威关系（一个事实，一个权威）
 
-| Fact | Single source of truth | Everything else |
+| 事实 | 唯一真源 | 其余 |
 |---|---|---|
-| Detection Truth | `detection/court/` output (terminal basis) | `causal/signals.py` is the only legal projection into evolution |
-| Failure Truth | `causal/episode.py` (`CausalFailureEpisode`) | attribution/classifier/episode are one merged site |
-| Repair Truth | `causal/plan.py` (`RepairPlan`) | planning/execution never re-create repair semantics |
-| Trigger / repairability | `causal/repairability.py` | replaces the old `should_evolve` + `skip_unaddressable_failure` dual authority |
-| Execution Truth | `execution/trace.py` (`ExecutionTrace`) | |
-| Effect Truth | `evaluation/effect.py` (`CausalEffectRecord`) | edge-level counterfactual evidence is judged only here |
-| Fitness Truth | `evaluation/promotion.py` (`PromotionDecision`) | |
-| Experience Truth | `experience/memory.py` | `typing/` holds slice views only, never copies |
-| Meta Truth | `meta/strategy.py` (`StrategyState`) | |
-| Gate events | `loop/ledger.py` (`GateEvent`) | single projection authority |
+| 检测真相 | `detection/court/` 输出（终态依据） | `causal/signals.py` 是进入进化的唯一合法投影 |
+| 失败真相 | `causal/episode.py`（`CausalFailureEpisode`） | attribution/classifier/episode 是同一处合并站点 |
+| 修复真相 | `causal/plan.py`（`RepairPlan`） | planning/execution 永不重建修复语义 |
+| 触发 / 可修复性 | `causal/repairability.py` | 取代旧的 `should_evolve` + `skip_unaddressable_failure` 双权威 |
+| 执行真相 | `execution/trace.py`（`ExecutionTrace`） | |
+| 效应真相 | `evaluation/effect.py`（`CausalEffectRecord`） | 边级反事实证据只在这里判定 |
+| Fitness 真相 | `evaluation/promotion.py`（`PromotionDecision`） | |
+| 经验真相 | `experience/memory.py` | `typing/` 只持有切片视图，绝不复制 |
+| Meta 真相 | `meta/strategy.py`（`StrategyState`） | |
+| 门控事件 | `loop/ledger.py`（`GateEvent`） | 唯一的投影权威 |
 
-## Detection Authority
+## 检测权威
 
-The detection path is:
+检测路径为：
 
 ```text
-trajectory record
-  -> H0: OCSE packet + layered base pass + construct census
-  -> H1: qualification / propagation + focused prosecution and defense
-  -> H2: calibrated appeal + informed defense + consensus gate
+trajectory record（原始轨迹记录）
+  -> H0: OCSE packet + 分层基座通道 + construct census
+  -> H1: qualification / propagation + focused prosecution 与 defense
+  -> H2: 校准式 appeal + informed defense + 共识门
   -> H3: counterfactual localization
   -> verified_error | verified_clean | unresolved
 ```
 
-The proof court is the source of truth for the three-state verdict. CRS is a
-diagnostic projection used by causal analysis and must not be treated as an
-independent verdict. Court invariants:
+证明法庭是三态裁决的真源。CRS 是因果分析使用的诊断投影，绝不能被当作独立裁决。
+法庭不变量：
 
-- A certificate must use addressable event or interaction references; an
-  invalid certificate is quarantined and cannot support a clean or appeal
-  decision.
-- `supported_or_correct` is mechanism-limited and requires related evidence.
-- Appeal positives require admissible independent initial support.
-- Invalid counterfactual rankings fall back to deterministic localization.
-- Unresolved is a first-class outcome; a negative unresolved case is never
-  counted as decisive-clean accuracy.
-- A formally scored case must have `runtime_valid=true`; base-layer
-  quarantine outcomes are projected into machine-readable
-  `authority_failure_reasons` (observability only, never a verdict input).
+- 证书（certificate）必须使用可寻址的事件或交互引用；无效证书被隔离（quarantine），
+  不能支撑 clean 或 appeal 裁决。
+- `supported_or_correct` 受机制限制，且必须附相关证据。
+- Appeal 阳性判定必须有可采信的独立初始支撑。
+- 无效的反事实排序回退到确定性定位。
+- `unresolved` 是一等终态；一个阴性 unresolved 案例绝不记为 decisive-clean 准确率。
+- 形式化评分的案例必须 `runtime_valid=true`；基座层隔离结果被投影为机器可读的
+  `authority_failure_reasons`（仅可观测性，绝不作为裁决输入）。
 
-The five-dimensional CRS diagnostic projection uses frozen weights:
-Factuality 0.35, Counterfactual 0.15, Recovery 0.20, Process 0.20, Scope
-0.10.
+五维 CRS 诊断投影使用冻结权重：Factuality 0.35、Counterfactual 0.15、Recovery
+0.20、Process 0.20、Scope 0.10。
 
-## Causal Repair Layer
+## 因果修复层
 
-The causal layer (`causal/`) is where the old framework's competing
-authorities were merged into one.
+因果层（`causal/`）是旧框架里相互竞争的多处权威被合并为单一权威的地方。
 
-**Terminal causal cut** (`cut.py`). Root-cause localization finds the
-minimal repairable cause preventing the correct terminal state, not merely
-the first malformed artifact. Malformed/missing artifacts, quarantines,
-coverage anomalies and appeal anomalies are evidence for constructing the
-cut, not automatic owners. The deterministic failure classifier answers
-exactly one question — at which layer, on which artifact, did the failure
-happen — with no LLM and no heuristics, in priority order:
+**终态因果切点**（`cut.py`）。根因定位找的是阻止正确终态出现的最小可修复原因，
+而不只是第一个畸形产物。畸形/缺失产物、隔离、覆盖异常与 appeal 异常是构造切点的
+证据，不是自动的属主。确定性失败分类器只回答一个问题——失败发生在哪一层、哪个
+产物上——不调用 LLM、不使用启发式，按优先级顺序：
 
-1. Provider artifact missing or malformed → L1; owner resolved from the
-   artifact kind (candidate → `candidate_trigger`, error certificate →
-   `evidence_obligation`, defense certificate → `clean_defense_boundary`).
-2. Consensus gate blocked a non-empty candidate set → L2,
-   `consensus_gate_policy`.
-3. Hollow complete coverage (claims `complete` with zero valid certificates
-   on that side) → L2, `coverage_validity_policy`.
-4. Boundary path returned `verified_clean` but terminal state is
-   `unresolved` → L2, `boundary_consumption_policy`.
-5. Fall-through: unresolved with no actionable shape, or a terminal verdict
-   contradicting the court's own certificate bookkeeping → not
-   skill-addressable.
+1. Provider 产物缺失或畸形 → L1；属主按产物类型解析（candidate →
+   `candidate_trigger`，错误证书 → `evidence_obligation`，defense 证书 →
+   `clean_defense_boundary`）。
+2. 共识门挡下了一个非空候选集 → L2，`consensus_gate_policy`。
+3. 空洞的完整覆盖（该侧声称 `complete` 却零有效证书）→ L2，`coverage_validity_policy`。
+4. Boundary 路径返回 `verified_clean` 但终态是 `unresolved` → L2，
+   `boundary_consumption_policy`。
+5. 兜底：无可操作形状的 unresolved，或终态裁决与法庭自己的证书账本矛盾 → 不在
+   技能可寻址范围内。
 
-An L1 owner hypothesis additionally passes the gold polarity gate: a false
-negative may only be owned by modules that tighten error detection, a false
-positive only by modules that relax or bound the error claim; hypotheses on
-the wrong polarity side are dropped. Unresolved terminals carry no polarity.
+L1 属主假设额外要过 gold 极性门：假阴性（false negative）只能由收紧错误检测的模块
+属主，假阳性（false positive）只能由放松或限定错误主张的模块属主；极性错误的假设
+被丢弃。Unresolved 终态不带极性。
 
-**CausalFailureEpisode** (`episode.py`). The single failure object every
-downstream layer consumes: terminal state, terminal basis, blocking
-predicate, causal failure edge, failure owner, skill layer, repairable
-surface, legal repair operations, observable effect, repairability status.
+**CausalFailureEpisode**（`episode.py`）。每个下游层都消费的单一失败对象：终态、
+终态依据、阻塞谓词、因果失败边、失败属主、技能层、可修复面、合法修复操作、可观测
+效应、可修复性状态。
 
-**Repairability authority** (`repairability.py`). The only evolution
-trigger. Every analyzed failure is triaged into exactly one status:
+**可修复性权威**（`repairability.py`）。唯一的进化触发器。每个被分析的失败恰好被
+分诊为一种状态：
 
-- `NON_EVOLVABLE` — detector/no-actionable/runtime-invalid outcomes; never
-  produce a skill.
-- `REPAIRABLE` — at least one legal RepairPlan compiles; only these enter
-  evolution.
-- `UNADDRESSABLE_FRAMEWORK_DEFECT` — the framework invariant violation: a
-  failure declared to be on the evolvable surface for which no legal
-  RepairPlan exists. Counted independently; never enters no-edit or
-  convergence statistics.
-- `FRAMEWORK_DEFECT` — detector-boundary origin (validator / transport /
-  route / config). Routed to the framework side permanently; never produces
-  a skill, so the genome can never learn to compensate for detector bugs.
+- `NON_EVOLVABLE` —— 检测器/无可操作/运行时无效的结果；绝不产出技能。
+- `REPAIRABLE` —— 至少存在一份可编译的合法 RepairPlan；只有这些进入进化。
+- `UNADDRESSABLE_FRAMEWORK_DEFECT` —— 框架不变量违例：某个被声明在可进化面上、
+  却不存在合法 RepairPlan 的失败。独立计数；绝不进入 no-edit 或收敛统计。
+- `FRAMEWORK_DEFECT` —— 检测器边界来源的缺陷（validator / transport / route /
+  config）。永久路由到框架侧；绝不产出技能，因此基因组永远不会学会为检测器 bug
+  打补丁。
 
-**Canonical RepairPlan** (`plan.py`). L1 and L2 share one protocol:
+**规范 RepairPlan**（`plan.py`）。L1 与 L2 共享同一协议：
 
 ```text
 RepairPlan
-├── failure identity
+├── failure identity（失败身份）
 ├── layer                  # L1 | L2
-├── owner
-├── target causal edge
+├── owner（属主）
+├── target causal edge（目标因果边）
 ├── executor               # provider-behavior | adjudication-policy
-├── legal operations
-├── effect contract
-└── evaluation contract
+├── legal operations（合法操作）
+├── effect contract（效应契约）
+└── evaluation contract（评估契约）
 ```
 
-L1 executes through the provider-behavior executor (injected rules); L2
-executes through the adjudication-policy executor (the deterministic court
-evaluator). Multi-layer novelty lives in the different learning surfaces,
-not in different failure semantics.
+L1 经 provider-behavior 执行器（注入规则）执行；L2 经 adjudication-policy 执行器
+（确定性法庭求值器）执行。多层的新颖性在于不同的学习面，而不在于不同的失败语义。
 
-## Two-Layer Evolvable Surface
+## 双层可进化面
 
-The frozen base never changes: evolution mutates only the L1 rule genome and
-the L2 policy genome; CRS weights, court decision rules and stage structure
-are untouched, and no threshold is hand-tuned.
+冻结基座永不改变：进化只改动 L1 规则基因组与 L2 策略基因组；CRS 权重、法庭决策
+规则与阶段结构原封不动，任何阈值都不手调。
 
-### L1 — provider-rule genome
+### L1 —— provider 规则基因组
 
-Eight skill modules own the provider-emitted surfaces:
+八个技能模块拥有 provider 输出的面：
 
-| Module | Stage | Role |
+| 模块 | 阶段 | 作用 |
 |--------|-------|------|
-| `candidate_trigger` | Census | What constitutes a hallucination candidate |
-| `evidence_obligation` | Verification | What evidence must support each candidate |
-| `candidate_to_verifier_route` | Verification | How candidates are routed to verification |
-| `atomic_verifier_instruction` | Verification | How to verify individual claims atomically |
-| `clean_defense_boundary` | Verification | When to defend a candidate as clean |
-| `causal_link_test` | Causal Court | How to test causal chains for localization |
-| `earliest_origin_tiebreak` | Causal Court | How to resolve multi-origin localization ties |
-| `abstention_rule` | Causal Court | When to output `unresolved` |
+| `candidate_trigger` | Census | 什么构成幻觉候选 |
+| `evidence_obligation` | Verification | 每个候选必须由什么证据支撑 |
+| `candidate_to_verifier_route` | Verification | 候选如何被路由到验证 |
+| `atomic_verifier_instruction` | Verification | 如何原子地验证单个主张 |
+| `clean_defense_boundary` | Verification | 何时把候选辩护为 clean |
+| `causal_link_test` | Causal Court | 如何测试用于定位的因果链 |
+| `earliest_origin_tiebreak` | Causal Court | 如何解决多来源定位平局 |
+| `abstention_rule` | Causal Court | 何时输出 `unresolved` |
 
-Rules are stored as typed English slots (`skills/rule.py`):
+规则以类型化英文槽位存储（`skills/rule.py`）：
 
-- `condition`: one trajectory-observable situation (≤ 300 chars);
-- `action`: one module-local closed opcode from the owning module's charter,
-  optionally `"<opcode>: <target>"` naming the exact output field (≤ 300
-  chars); free-text actions are rejected as `action_opcode_unowned`;
-- `evidence_anchor`: failure-signature bookkeeping for evolution triage
-  (≤ 240 chars); never rendered into runtime prompts, so it cannot leak
-  case identity into detection.
+- `condition`：一个轨迹可观测情境（≤ 300 字符）；
+- `action`：所属模块章程中的一个模块内封闭操作码（opcode），可选
+  `"<opcode>: <target>"` 形式指名具体输出字段（≤ 300 字符）；自由文本动作以
+  `action_opcode_unowned` 拒绝；
+- `evidence_anchor`：供进化分诊使用的失败签名记账（≤ 240 字符）；永不渲染进
+  运行时提示词，因此不会把案例身份泄露进检测。
 
-Prompt injection is a deterministic render — exactly `When <condition>,
-<action>.` — so the structural gate validates the slot contract as the
-single shape check. Each module carries a charter
-(`skills/vocabulary/charters.py`): pipeline stage, influenceable surfaces,
-forbidden surfaces, allowed verdicts, in-scope vs out-of-scope failure
-examples. Only the allowed target modules' charters and opcode lists enter
-the reflection prompt, constraining proposals at generation time. Runtime
-rules may not encode dataset labels, case-specific identifiers, internal
-diagnostic state, forbidden direct verdicts, unsafe cross-module references,
-or baseline mutations.
+提示词注入是确定性渲染——恰好 `When <condition>, <action>.`——结构门因此把槽位
+契约当作唯一形状检查。每个模块带一份章程（`skills/vocabulary/charters.py`）：
+流水线阶段、可影响面、禁止面、允许的裁决、在范围内与范围外的失败示例。只有被允许
+的目标模块的章程与操作码列表进入反思提示词，在生成时就约束提案。运行时规则不得
+编码数据集标签、案例特定标识符、内部诊断状态、禁止的直接裁决、不安全的跨模块引用
+或基线变异。
 
-### L2 — adjudication-policy genome
+### L2 —— 裁决策略基因组
 
-Closed-vocabulary policy items: one precondition predicate (a pure function
-over the frozen `AdjudicationFacts` snapshot) paired with one enumerated
-action whose parameters draw from closed vocabularies. Every predicate,
-action and parameter token is owned by the versioned registry
-(`skills/vocabulary/registry.py`); the reflection prompt's vocabulary table
-is generated from that registry at call time, and every parsed proposal is
-re-validated against the same closed sets.
+封闭词表策略项：一个前置谓词（冻结的 `AdjudicationFacts` 快照上的纯函数）配一个
+枚举动作，动作参数取自封闭词表。每个谓词、动作与参数 token 都由带版本的注册表
+（`skills/vocabulary/registry.py`）拥有；反思提示词的词表表在调用时由该注册表生成，
+每个被解析的提案都对着同一组封闭集合重新验证。
 
-Runtime semantics are owned by the deterministic evaluator
-(`detection/policy.py`), executed mechanically through the proof-court
-policy hook. If the proposing model also interpreted items at runtime, the
-verdict would depend on an unrepeatable LLM reading of its own artifact; the
-deterministic evaluator is what keeps the artifact-to-behaviour coupling
-auditable. The hook is inert by default — an empty policy set is the
-baseline, so every behavior change must be earned. Policies act on the
-terminal edge only; coverage downgrades are monotone (a policy can lower but
-never upgrade a coverage rank); unknown predicates, actions or parameters
-fail closed into the evaluator's `skipped` list.
+运行时语义由确定性求值器（`detection/policy.py`）拥有，经证明法庭的策略钩子机械
+执行。如果提案模型在运行时也自己解释策略项，裁决就会依赖对自身产物的不可复现的
+LLM 解读；确定性求值器正是让「产物→行为」耦合可审计的东西。钩子默认惰性——空策略
+集就是基线，因此任何行为变化都必须被挣得。策略只作用于终态边；覆盖降级是单调的
+（策略只能降低、绝不提升覆盖等级）；未知谓词、动作或参数失败即关闭进求值器的
+`skipped` 列表。
 
-The surface is closed under correction: `add_item` / `modify_item` /
-`remove_item` keep a wrong or dead policy repairable or eliminable.
-Validation enforces vocabulary membership, genome capacity (12 items),
-semantic deduplication, index bounds, immutable baseline items and
-weak/strong fitness protection; application produces a new genome with
-parent-hash lineage. The vocabulary itself is online-evolvable under
-constraint: new predicates or court-local action instances register as
-`pending` (shadow-only) and promote to `registered` only through the
-evidence path (`skills/vocabulary/evolution.py`).
+该面对修正封闭：`add_item` / `modify_item` / `remove_item` 让错误或失效的策略保持
+可修复或可消除。验证强制词表成员、基因组容量（12 项）、语义去重、索引边界、不可变
+基线项与弱/强 fitness 保护；应用产生带父哈希谱系的新基因组。词表本身在约束下可
+在线进化：新谓词或法庭本地动作实例先注册为 `pending`（仅 shadow），只通过证据路径
+（`skills/vocabulary/evolution.py`）晋升为 `registered`。
 
-## Evolution Loop
+## 进化循环
 
-### State machine
+### 状态机
 
-`loop/machine.py` implements the evolution state machine:
+`loop/machine.py` 实现进化状态机：
 
 ```text
 DETECTED
   -> CAUSAL_FAILURE_ANALYZED
-       -> NON_EVOLVABLE | FRAMEWORK_DEFECT        (terminal, framework layer)
+       -> NON_EVOLVABLE | FRAMEWORK_DEFECT        （终态，framework 层）
        -> REPAIRABLE
   -> REPAIR_PLANNED
-  -> HYPOTHESIS_SEARCH                            (NO_HYPOTHESIS: search layer)
-  -> PROPOSAL_VALIDATED                           (INVALID_PROPOSAL / DUPLICATE_PROPOSAL)
-  -> EXECUTED                                     (ACTION_NOT_DISPATCHED / PROVIDER_NOT_COMPLIED)
-  -> TARGET_EDGE_CHANGED                          (TARGET_EDGE_UNCHANGED)
-  -> BLOCKER_CLEARED                              (BLOCKER_NOT_CLEARED)
+  -> HYPOTHESIS_SEARCH                            （NO_HYPOTHESIS：search 层）
+  -> PROPOSAL_VALIDATED                           （INVALID_PROPOSAL / DUPLICATE_PROPOSAL）
+  -> EXECUTED                                     （ACTION_NOT_DISPATCHED / PROVIDER_NOT_COMPLIED）
+  -> TARGET_EDGE_CHANGED                          （TARGET_EDGE_UNCHANGED）
+  -> BLOCKER_CLEARED                              （BLOCKER_NOT_CLEARED）
   -> FITNESS_EVALUATED
-       -> REJECTED (SOURCE_NOT_IMPROVED / CANARY_REGRESSION / TRANSFER_REGRESSION)
+       -> REJECTED （SOURCE_NOT_IMPROVED / CANARY_REGRESSION / TRANSFER_REGRESSION）
        -> ACCEPTED
   -> EXPERIENCE_LEARNED
   -> META_UPDATED
 ```
 
-### Outcome funnel
+### 结果漏斗
 
-Every repair attempt terminates in exactly one of 17 outcomes across four
-layers — `loop/machine.py::Outcome`, replacing the old `skip_*` vocabulary
-entirely:
+每次修复尝试恰好终止于四层共 16 种终态之一——`loop/machine.py::Outcome`，彻底取代
+旧的 `skip_*` 词表：
 
-- **Framework**: `NON_EVOLVABLE`, `UNADDRESSABLE`, `ROUTING_FAILURE`,
-  `SCHEMA_FAILURE`, `INFRA_FAILURE`, `BUDGET_EXHAUSTED`
-- **Search**: `NO_HYPOTHESIS`, `INVALID_PROPOSAL`, `DUPLICATE_PROPOSAL`
-- **Execution**: `ACTION_NOT_DISPATCHED`, `PROVIDER_NOT_COMPLIED`,
-  `TARGET_EDGE_UNCHANGED`, `BLOCKER_NOT_CLEARED`
-- **Fitness**: `SOURCE_NOT_IMPROVED`, `CANARY_REGRESSION`,
-  `TRANSFER_REGRESSION`, `ACCEPTED`
+- **Framework**：`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
+  `SCHEMA_FAILURE`、`INFRA_FAILURE`
+- **Search**：`NO_HYPOTHESIS`、`INVALID_PROPOSAL`、`DUPLICATE_PROPOSAL`
+- **Execution**：`ACTION_NOT_DISPATCHED`、`PROVIDER_NOT_COMPLIED`、
+  `TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
+- **Fitness**：`SOURCE_NOT_IMPROVED`、`CANARY_REGRESSION`、`TRANSFER_REGRESSION`、
+  `ACCEPTED`
 
-Each outcome is counted independently in `evolution_result.json`, so the
-true framework bottleneck is always recoverable from experiment output and
-framework failure is never mixed with learning rejection.
+每种终态在 `evolution_result.json` 中独立计数，因此真正的框架瓶颈总能从实验输出
+中恢复出来，框架失败从不与学习拒绝混在一起。
 
-### Convergence
+### 收敛
 
-The convergence window consumes only **complete repair attempts**: plan
-valid → proposal valid → action executed → causal effect measured → no
-acceptable improvement (i.e. fitness-layer rejections). Budget exhaustion,
-infra failure, routing failure and invalid proposals are system-availability
-events, not learning-saturation evidence, and never increment convergence.
+收敛窗口只消费**完整的修复尝试**：计划有效 → 提案有效 → 动作已执行 → 因果效应已
+测量 → 无可接受改进（即 fitness 层拒绝）。基础设施故障、路由失败与无效提案是系统
+可用性事件，不是学习饱和的证据，绝不推进收敛计数。
 
-### Causal credit chain
+### 因果归功链
 
-An accepted edit carries the full chain, each link evidenced by its own
-layer — no intermediate layer may substitute for the next layer's evidence:
+一个被接受的编辑携带完整链条，每一环都由自己的层出具证据——中间任何一层都不得
+替代下一层的证据：
 
 ```text
 Hypothesis -> RepairPlan selected -> Action dispatched
@@ -314,233 +266,212 @@ Hypothesis -> RepairPlan selected -> Action dispatched
   -> Task score improved -> Canary/transfer preserved -> Skill committed
 ```
 
-### Orchestration
+### 编排
 
-`loop/runner.py` is the single orchestration path for both layers: case
-queue → detection → causal cut → episode → repairability triage → RepairPlan
-→ planning → execution → evaluation → ledger → experience → meta. Supporting
-machinery:
+`loop/runner.py` 是两条层共用的唯一编排路径：案例队列 → 检测 → 因果切点 →
+episode → 可修复性分诊 → RepairPlan → 规划 → 执行 → 评估 → 账本 → 经验 → meta。
+支撑机制：
 
-- **Shadow batch commits** (`shadow.py`): one edit per shadow batch;
-  combined multi-edit replay is never attributed back to individual rules.
-- **Checkpoints** (`persistence.py`): `evolution_checkpoint.json` /
-  `champion_checkpoint.json` / `shadow_checkpoint.json`; resume re-validates
-  vocabulary membership and content hashes fail-closed, and the outcome
-  funnel is rebuilt from step projections after resume so an interrupted run
-  is equivalent to a continuous one.
-- **Development probes** (`probes.py`): a budgeted probe on stable
-  development cases may steer or roll back development (both genomes roll
-  back together); a probe is a direction gate, never generalization
-  evidence.
-- **GateEvent ledger** (`ledger.py`): every gate decision recorded once,
-  projected everywhere.
+- **Shadow 批次提交**（`shadow.py`）：每个 shadow 批次一个编辑；合并的多编辑回放
+  绝不回溯归功到单条规则。
+- **检查点**（`persistence.py`）：`evolution_checkpoint.json` /
+  `champion_checkpoint.json` / `shadow_checkpoint.json`；续跑时以失败即关闭的方式
+  重新验证词表成员与内容哈希，续跑后从步骤投影重建结果漏斗，因此被打断的运行等价
+  于连续运行。
+- **开发探针**（`probes.py`）：在稳定开发案例上的带预算探针可转向或回滚开发（两个
+  基因组一起回滚）；探针是方向门，绝不是泛化证据。
+- **GateEvent 账本**（`ledger.py`）：每次门控决策只记一次，处处投影。
 
-### L1 loop (per case)
+### L1 循环（每案例）
 
-Detect → attribute (deterministic, gold-polarity-gated) → reflect (LLM with
-evaluator-stripped evidence, module charters, closed opcodes, bounded
-negative experience, optional support/counter-case contrast) → structural
-pre-validation and gate → source replay with rule-trace and deterministic
-no-effect classification (`output_changed_then_quarantined` /
-`provider_output_changed_but_court_invariant` /
-`no_observable_change_any_layer`) → one bounded same-source repair retry for
-repairable structural or no-effect candidates → commit/rollback.
+检测 → 归因（确定性、gold 极性门控）→ 反思（LLM，用剥离求值器字段的证据、模块
+章程、封闭操作码、有界负面经验、可选的支持/反例对比）→ 结构预验证与门控 → 源回放
+（带规则轨迹与确定性 no-effect 分类：`output_changed_then_quarantined` /
+`provider_output_changed_but_court_invariant` / `no_observable_change_any_layer`）
+→ 对可修复的结构或无效应候选做一次有界的同源修复重试 → 提交/回滚。
 
-### L2 loop (per case)
+### L2 循环（每案例）
 
-Propose (one reflection call, one closed-vocabulary `PolicyEdit`, no gold in
-prompt) → validate (vocabulary / capacity / dedup / index bounds /
-protection) → apply to a candidate genome copy → source replay through
-`adjudicate_case(policy_items=...)` at the court's convergence point with
-the identical evidence bundle → effect gate (add/modify require the policy
-to fire and move terminal state or effective coverage; remove requires the
-targeted item to have actually fired and its removal to move an observable
-output) → gold polarity gate (terminal movement must strictly improve
-`task_state_score`) → accept or inherent rollback. Gold-verified
-terminal-moving accepts earn `strong` protection against later
-modify/remove; coverage-only accepts stay correctable.
+提案（一次反思调用、一个封闭词表 `PolicyEdit`、提示词无 gold）→ 验证（词表 /
+容量 / 去重 / 索引边界 / 保护）→ 应用到候选基因组副本 → 在法庭收敛点用完全相同的
+证据束经 `adjudicate_case(policy_items=...)` 做源回放 → 效应门（add/modify 要求
+策略确实触发并移动终态或有效覆盖；remove 要求被定向的项确实触发过、且其移除移动了
+可观测输出）→ gold 极性门（终态移动必须严格提升 `task_state_score`）→ 接受或固有
+回滚。gold 验证的终态移动接受获得 `strong` 保护，防后续 modify/remove；仅覆盖的
+接受保持可修正。
 
-## Typing — HTC-TES Advisory
+## Typing —— HTC-TES 咨询层
 
-HTC-TES survives as advisory type intelligence (`typing/`): experience
-indexing, retrieval priors, mechanism clustering, type-conditioned
-reflection priors, evaluation slicing and transfer analysis. It holds no
-veto over the causal owner: when type classification and causal attribution
-disagree, the attribution route stands.
+HTC-TES 以咨询型类型智能（`typing/`）存活：经验索引、检索先验、机制聚类、类型条件
+反思先验、评估切片与迁移分析。它对因果属主没有否决权：类型分类与因果归因不一致时，
+以归因路径为准。
 
-The taxonomy is eight types: `factual`, `instructional`, `tool`,
-`reasoning`, `omission`, `adoption`, `contextual`, `unknown`. The classifier
-(`classifier.py`) combines runtime candidate structure, normalized CRS
-signals, attribution and module evidence over the versioned, label-free
-`TrajectoryFeatures` object (`htc_tes.trajectory_features.v1`). Typed
-telemetry is recorded separately from gold correctness: direction and type
-are bookkeeping, never evidence that a detector direction was optimized.
+分类法共八型：`factual`、`instructional`、`tool`、`reasoning`、`omission`、
+`adoption`、`contextual`、`unknown`。分类器（`classifier.py`）在带版本的、无标签的
+`TrajectoryFeatures` 对象（`htc_tes.trajectory_features.v1`）上组合运行时候选结构、
+归一化 CRS 信号、归因与模块证据。类型化遥测与 gold 正确性分开记录：方向与类型是
+记账，绝不是「某检测方向被优化过」的证据。
 
-## Meta Skill — Cross-Case Strategy Learner
+## Meta 技能 —— 跨案例策略学习器
 
-The meta layer (`meta/`) learns how to search, never what is causally
-broken. `StrategyEdit`s operate on a five-domain closed vocabulary (22 live
-tokens): search prior, operation preference, mechanism ranking, retry
-strategy, candidate diversity. Tokens touching owner, causal cut,
-repairability or hard gates do not exist — those channels are
-unrepresentable at the type level, not merely rejected at validation.
+meta 层（`meta/`）学习的是如何搜索，绝不是什么东西在因果上坏了。`StrategyEdit` 在
+五域封闭词表（22 个活 token）上操作：搜索先验、操作偏好、机制排序、重试策略、候选
+多样性。触及属主、因果切点、可修复性或硬门控的 token 根本不存在——这些通道在类型
+层面就不可表示，而不只是在校验时被拒。
 
-Inputs are the GateEvent projection and verified RepairPlan outcomes from
-the experience memory; outputs are strategy suggestions only, projected into
-prompts with the fixed authority marker `evolution_guidance_only`. Commits
-are evidence-gated (`MIN_COMMIT_EVIDENCE = 3` observations of the same
-mechanism), `StrategyState` keeps immutable lineage with content-hash-derived
-ids, and disable operations require manual review. The layer is fully
-deterministic and makes no provider calls.
+输入是 GateEvent 投影与经验记忆中的已验证 RepairPlan 结果；输出只是策略建议，以
+固定权威标记 `evolution_guidance_only` 投影进提示词。提交由证据门控
+（`MIN_COMMIT_EVIDENCE = 3`，同一机制的 3 次观测），`StrategyState` 以内容哈希派生的
+id 保持不可变谱系，禁用操作需要人工评审。该层完全确定性，不发出任何 provider 调用。
 
-## Experience Memory
+## 经验记忆
 
-`experience/memory.py` is the single Experience Truth. Entries are
-mechanism-level: what failure mechanism, under what conditions, repaired at
-which skill layer by what operation, with what causal effect, and whether
-transfer occurred — not merely "some rule once succeeded". Deduplication
-keys on the deterministic attribution signature (`layer` + `artifact` +
-`reason_code` + `operation`) plus feature/direction/success; repeated
-observations merge into an outcome distribution instead of overwriting the
-first snapshot.
+`experience/memory.py` 是单一 Experience Truth。条目是机制级的：什么失败机制、在
+什么条件下、在哪个技能层、由什么操作修复、带来什么因果效应、是否发生迁移——而不只
+是「某条规则曾经成功过」。去重以确定性归因签名（`layer` + `artifact` +
+`reason_code` + `operation`）加特征/方向/成败为键；重复观测合并进一个结果分布，
+而不是覆盖第一份快照。
 
-The runner persists `htc_tes_experience_memory.json` and
-`htc_tes_coverage.json`. Experience is evidence for future reflection, not
-an accuracy claim: coverage improves only after the evaluation layer records
-a successful source-level outcome. Cross-run continuation loads
-`--initial-genome`, `--initial-policy-genome` and `--experience-memory`
-explicitly; loading memory alone never mutates the registered baseline
-genome.
+runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。经验是
+未来反思的证据，不是准确率主张：只有评估层记录了成功的源级结果之后，覆盖才会提升。
+跨运行续跑显式加载 `--initial-genome`、`--initial-policy-genome` 与
+`--experience-memory`；只加载记忆绝不改动已注册的基线基因组。
 
-## Evaluation and Promotion
+## 评估与晋升
 
-The promotion hierarchy (`evaluation/`):
+晋升层级（`evaluation/`）：
 
-1. **Structural gate** (`gate.py`) rejects unsafe edits through the slot /
-   vocabulary contracts, plus an LLM no-conflict gate.
-2. **Effect** (`effect.py`): edge-level counterfactual verification —
-   did the target causal edge move, did the blocking predicate clear, is the
-   intervention the attributable cause.
-3. **Source fitness** (`fitness.py`): before/after comparison on the
-   triggering case; evidence-obligation local fitness rewards the weaker of
-   prosecution and defense coverage rather than a large one-sided gap.
-4. **Canary** (`canary.py`): a rolling set of previously stable cases must
-   preserve decisive state, runtime validity and non-triggered process
-   status; canary regression vetoes catastrophic forgetting.
-5. **Promotion** (`promotion.py`): `PromotionDecision` with evidence
-   grades; `no_effect` is never silently committed; attempts never share
-   fitness credit.
+1. **结构门**（`gate.py`）通过槽位/词表契约拒绝不安全编辑，外加一个 LLM 无冲突门。
+2. **效应**（`effect.py`）：边级反事实验证——目标因果边是否移动、阻塞谓词是否清除、
+   干预是否为可归因的原因。
+3. **源 fitness**（`fitness.py`）：触发案例上的前后对比；evidence-obligation 本地
+   fitness 奖励公诉与辩护覆盖中的较弱者，而不是单边的大差距。
+4. **Canary**（`canary.py`）：一组滚动的、先前稳定的案例必须保持决定性状态、运行时
+   有效性与未触发的进程状态；canary 回归否决灾难性遗忘。
+5. **晋升**（`promotion.py`）：带证据等级的 `PromotionDecision`；`no_effect` 绝不
+   静默提交；不同尝试绝不共享 fitness 归功。
 
-Contrastive replay additionally replays an otherwise-accepted edit on one
-nearest stable same-type neighbour; polarity flips and gold-informed
-task-score regressions reject the edit. An accepted `abstention_rule`
-clean-to-unresolved demotion re-queues the source exactly once for the
-`evidence_obligation` rung, each rung gated and credited individually.
+对比回放（contrastive replay）额外把一份原本会被接受的编辑回放到一个最近的、稳定
+的同类邻居上；极性翻转与 gold 知情（gold-informed）的任务分回归拒绝该编辑。一个
+被接受的 `abstention_rule` clean→unresolved 降级会把源案例重新入队恰好一次，交给
+`evidence_obligation` 阶梯处理，每个阶梯单独门控、单独记功。
 
-## Metrics
+## 度量
 
-The funnel metrics the framework is designed to report (each step counted
-independently in the outcome funnel):
+框架设计要报告的漏斗度量（每个步骤在结果漏斗中独立计数）：
 
-| Metric | Definition |
+| 度量 | 定义 |
 |---|---|
-| Repairability rate | failures with a legal RepairPlan / failures on the evolvable surface |
-| Unaddressable framework failure rate | `UNADDRESSABLE` count — framework quality indicator, target ≈ 0 |
-| Execution rate | executed repairs / legal RepairPlans |
-| Causal effect rate | target edge changed / executed repairs |
-| Blocker closure rate | blocking predicate cleared / target edge changed |
-| Source improvement rate | source detector improved / blocker cleared |
-| Transfer gain | real gain of an evolved skill on independent cases — the core value metric |
-| Framework failure rate | unaddressable / authority conflict / route mismatch / schema mismatch / state desync / infra — never mixed with learning rejects |
+| 可修复率 | 有合法 RepairPlan 的失败 / 位于可进化面上的失败 |
+| 不可寻址框架失败率 | `UNADDRESSABLE` 计数——框架质量指标，目标 ≈ 0 |
+| 执行率 | 已执行的修复 / 合法 RepairPlan |
+| 因果效应率 | 目标边已移动 / 已执行的修复 |
+| 阻塞关闭率 | 阻塞谓词已清除 / 目标边已移动 |
+| 源改进率 | 源检测器已改进 / 阻塞谓词已清除 |
+| 迁移增益 | 进化技能在独立案例上的真实增益——核心价值度量 |
+| 框架失败率 | 不可寻址 / 权威冲突 / 路由失配 / 模式失配 / 状态失步 / 基础设施——绝不与学习拒绝混算 |
 
-Skill credit binds target edge, execution, effect, fitness and transfer;
-provider resampling, proxy observables and random verdict movement earn no
-credit.
+技能归功绑定目标边、执行、效应、fitness 与迁移；provider 重采样、代理可观测量与
+随机裁决移动不挣任何归功。
 
-## Design Principles
+## 设计原则
 
-1. **Complex detector, simple evolution control plane.** The detection layer
-   may be complex; the control plane must be verifiable.
-2. **One fact, one authority.** Many projections, one source of truth.
-3. **Repairability before evolution.** Repairability is established first;
-   evolution starts after.
-4. **Multi-layer skills, one causal contract.** L1/L2/Meta novelty comes
-   from different learning surfaces, not different failure semantics.
-5. **Meta learns strategy, not truth.**
-6. **Type information organizes experience, not causal truth.**
-7. **Framework failure ≠ learning failure**, separated in all results.
-8. **Execution before credit.** No execution, no causal credit.
-9. **Causal effect before fitness.** A coincidental label improvement
-   without target-edge movement proves nothing.
-10. **Generalization before strong skill claim.** Source-case improvement
-    proves local repair; only cross-case transfer supports a skill claim.
+1. **复杂检测器，简单进化控制面。** 检测层可以复杂；控制面必须可验证。
+2. **一个事实，一个权威。** 许多投影，一个真源。
+3. **可修复性先于进化。** 先确立可修复性；之后才开始进化。
+4. **多层技能，一个因果契约。** L1/L2/Meta 的新颖性来自不同的学习面，而不是不同
+   的失败语义。
+5. **Meta 学策略，不学真相。**
+6. **类型信息组织经验，不组织因果真相。**
+7. **框架失败 ≠ 学习失败**，在所有结果中分离。
+8. **执行先于归功。** 没有执行，就没有因果归功。
+9. **因果效应先于 fitness。** 没有目标边移动的巧合性标签改进证明不了任何东西。
+10. **泛化先于强技能主张。** 源案例改进只证明局部修复；只有跨案例迁移才支持技能
+    主张。
 
-## Semantic Change Register
+## 语义变更登记表
 
-The refactor allowed exactly ten behavior changes against the frozen
-baseline; everything else is behavior-equivalent. This register is the
-normative record for interpreting outcome differences between old and new
-artifacts:
+这次重构相对冻结基线恰好允许十项行为变更；其余一切行为等价。本登记表是解释新旧
+产物结果差异的规范记录：
 
-| # | Change | Where |
+| # | 变更 | 位置 |
 |---|---|---|
-| C1 | Single repairability authority; `should_evolve` absorbed; only `REPAIRABLE` evolves | `causal/repairability.py` |
-| C2 | Unaddressable redefined as `UNADDRESSABLE_FRAMEWORK_DEFECT`, peeled out of no-edit statistics | `causal/repairability.py`, `loop/machine.py` |
-| C3 | Unified `CausalFailureEpisode` + terminal causal cut; three attribution sites merged into one | `causal/` |
-| C4 | Hard detector/evolution ownership boundary; validator/transport/route/config defects never produce skills | `causal/repairability.py` |
-| C5 | HTC-TES demoted to advisory; owner-override and module-filter powers removed | `typing/` |
-| C6 | L1/L2 share the canonical RepairPlan protocol and one orchestration path | `causal/plan.py`, `loop/runner.py` |
-| C7 | Meta redefined as cross-case strategy learner; owner/cut/repairability/hard-gate channels type-level removed | `meta/` |
-| C8 | Four-layer outcome funnel replaces `skip_*` vocabulary | `loop/machine.py` |
-| C9 | Convergence consumes only complete repair attempts | `loop/runner.py` |
-| C10 | Full causal credit chain; each link evidenced by its own layer | `evaluation/`, `loop/` |
+| C1 | 单一可修复性权威；吸收 `should_evolve`；只有 `REPAIRABLE` 进化 | `causal/repairability.py` |
+| C2 | 不可寻址重新定义为 `UNADDRESSABLE_FRAMEWORK_DEFECT`，从 no-edit 统计中剥离 | `causal/repairability.py`、`loop/machine.py` |
+| C3 | 统一 `CausalFailureEpisode` + 终态因果切点；三处归因站点合并为一处 | `causal/` |
+| C4 | 硬性的检测/进化属主边界；validator/transport/route/config 缺陷绝不产出技能 | `causal/repairability.py` |
+| C5 | HTC-TES 降级为咨询层；移除属主覆盖与模块过滤权 | `typing/` |
+| C6 | L1/L2 共享规范 RepairPlan 协议与单一条编排路径 | `causal/plan.py`、`loop/runner.py` |
+| C7 | Meta 重新定义为跨案例策略学习器；属主/切点/可修复性/硬门控通道在类型层面移除 | `meta/` |
+| C8 | 四层结果漏斗取代 `skip_*` 词表 | `loop/machine.py` |
+| C9 | 收敛只消费完整的修复尝试 | `loop/runner.py` |
+| C10 | 完整因果归功链；每一环由自己的层出具证据 | `evaluation/`、`loop/` |
 
-## Route Resolution
+## 路由解析
 
-All provider routes resolve through `sehd_rise/platform/routes.py` without
-dependencies: repository `.env` (never overriding process variables) →
-route-level `SEHD_ROUTE_<ROUTE>_*` → purpose-level `SEHD_MUTATION_*` /
-`SEHD_DETECTOR_*` / `SEHD_JUDGE_*` → global `SEHD_PROVIDER_*` → config file
-values → official DeepSeek defaults. Only the name of the key environment
-variable is retained; credentials are read at the HTTP boundary and never
-written to source, prompts, result files or logs. Explicit non-official
-proxy routes fail closed when their selected key is absent and never
-silently substitute `DEEPSEEK_API_KEY`.
+所有 provider 路由都经 `sehd_rise/platform/routes.py` 解析，无第三方依赖：仓库
+`.env`（绝不覆盖进程变量）→ 路由级 `SEHD_ROUTE_<ROUTE>_*` → 用途级
+`SEHD_MUTATION_*` / `SEHD_DETECTOR_*` / `SEHD_JUDGE_*` → 全局 `SEHD_PROVIDER_*` →
+配置文件值 → DeepSeek 官方默认值。只保留密钥所在环境变量的名字；凭据在 HTTP 边界
+读取，绝不写入源码、提示词、结果文件或日志。显式的非官方代理路由在所选密钥缺失时
+失败即关闭，绝不静默替换成 `DEEPSEEK_API_KEY`。
 
-## Evidence Boundaries
+## Provider 出口（三层出口）
 
-Standing verification, runnable at any time:
+所有 provider 调用只有**一个 HTTP 原语**：`detection/transport.py` 的
+`provider_call_with_schema`（含 `json_object_provider_call`）。重试、超时、有界
+JSON 修复与请求哈希都在这一原语内实现（`time.monotonic()` 截止期跨 attempt 生效）；
+它不因任何 `purpose` 字符串改变行为。在它之上，`detection/egress.py` 按各自契约
+建了三个特化出口——差异靠结构保证，不靠 `purpose` 串：
 
-- `tools/check_layers.py` — acyclic layer discipline (83 files / 14 layers,
-  no violations), including the guard that no framework module imports the
-  frozen baseline.
-- `python -m pytest tests/` — loop state machine suite (10/10: all legal
-  transitions reachable, illegal transitions rejected, every funnel outcome
-  counted independently).
-- Full-package import smoke — all modules import clean.
+| 出口 | 函数 | 契约 | usage |
+|---|---|---|---|
+| 检测 | `detection_call` / `detection_rankings_call` | census 信封（或 counterfactual 的 schema-relaxed rankings） | 每 surface 调用时自带 record |
+| 进化 L1 | `l1_call` | strict JSON；DeepSeek-V4 结构性禁用 thinking | 自带 record |
+| 进化 L2 / Pro | `l2_call` | closed-vocabulary；DeepSeek-V4 结构性禁用 thinking | 自带 record |
+| ConflictGate | `conflict_gate_call` | 跨层无冲突安全检查；V4 结构性禁用 thinking | 自带 record |
 
-Refactor-time acceptance (performed against the frozen baseline, recorded in
-git history; the migration harnesses were removed from the tree after
-acceptance):
+要点：
 
-- Behavioral parity across serialization round-trips, causal classification,
-  detection contract, effect/gate/promotion decisions, experience/typing,
-  planning prompts and meta legality enumeration — all deviations documented
-  and bound to C1–C10 register entries.
-- Real-provider end-to-end runs of both CLI entries (`detect` / `evolve`)
-  with complete artifact sets; e2e scenarios covering independent
-  `UNADDRESSABLE` counting, non-learning events excluded from convergence,
-  and checkpoint resume equivalence.
-- The end-to-end old-vs-new `compare_run` parity run was not part of
-  acceptance (user decision); acceptance evidence was the real-provider
-  evolution run plus the offline parity harnesses.
+- **thinking 靠结构**。DeepSeek-V4 默认开启推理，推理预算可在任何 `content` 输出
+  前截断（`finish_reason=length`、空 body），strict-JSON 传输随即失败即关闭。进化
+  出口在把路由交给原语前对 V4 路线盖 `thinking.type=disabled`；`provider_thinking_control`
+  只回读显式路由设置，绝不从 `purpose` 串推导。
+- **usage 靠出口自带**。每个出口在调用点就把 surface/purpose 记进
+  `platform/usage.py` 的 `ProviderUsageLedger`；不再有事后对 `result["providers"]`
+  的 depth-1 遍历。检测侧 14 个 proof-court 调用点各自穿过 `provider_usage_ledger`；
+  `ProviderUsageLedger.record` 持锁，支撑 focused prosecution 的 `max_focused_parallel`
+  并发扇出。
+- **注入接缝在检测出口**。`detection/injection.py` 的 `integrated_engine_provider`
+  通过猴子补丁 `egress.provider_call` / `egress.json_object_provider_call`（两个模块级
+  别名）把进化 L1 规则追加进检测提示词；进化出口直接绑定原语别名，注入绝不触及
+  进化路径。
+- **无预算上限**。所有 LLM 调用只保留重试/超时控制；预算上限与仅服务预算判定的
+  计数器已移除。`mutation_calls` / `detector_calls` / `conflict_gate_calls` 等计数
+  保留为运行遥测，供给结果审计与收敛之外的观测。
 
-What is **not** established:
+## 证据边界
 
-- No out-of-sample detector improvement is claimed. Evolution artifacts are
-  development evidence; a generalization claim requires a sealed, independent
-  holdout evaluation run as an experiment-layer protocol (see
-  `experiments/README.md`), with concrete intermediate outputs per the
-  advisor requirements.
-- Type telemetry and strategy suggestions are observability; they are not
-  evidence that any detector direction improved.
+随时可运行的常驻验证：
+
+- `tools/check_layers.py` —— 无环层级纪律（84 文件 / 14 层，零违例），包括「任何
+  框架模块都不得导入冻结基线」的守卫。
+- `python -m pytest tests/` —— 循环状态机套件（10/10：所有合法迁移可达、非法迁移
+  被拒绝、每个漏斗终态独立计数）。
+- 全包导入冒烟 —— 所有模块干净导入。
+
+重构验收（对照冻结基线执行，记录在 git 历史中；验收后迁移 harness 已从树中移除）：
+
+- 序列化往返、因果分类、检测契约、effect/gate/promotion 决策、经验/typing、规划
+  提示词与 meta 合法性枚举的行为等价——所有偏差均已记录并绑定到 C1–C10 登记表条目。
+- 两个 CLI 入口（`detect` / `evolve`）的真实 provider 端到端运行，产物集完整；e2e
+  场景覆盖独立 `UNADDRESSABLE` 计数、非学习事件被排除出收敛、检查点续跑等价。
+- 新旧 `compare_run` 的端到端对等运行不属于验收范围（用户决定）；验收证据是真实
+  provider 进化运行加离线等价 harness。
+
+**未**确立的内容：
+
+- 不主张任何样本外（out-of-sample）检测改进。进化产物是开发证据；泛化主张需要一次
+  密封的、独立的留出集评估运行作为实验层协议（见 `experiments/README.md`），并按
+  导师要求给出具体中间输出。
+- 类型遥测与策略建议是可观测性；它们不是「某个检测方向改进过」的证据。

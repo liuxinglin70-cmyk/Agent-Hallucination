@@ -1,125 +1,103 @@
-# SEHD-RISE — Hallucination Detector and Self-Evolution Framework
+# SEHD-RISE — 幻觉检测器与自进化框架
 
-SEHD-RISE (Repairability-driven Integrated Self-Evolution) is a court-style
-hallucination detector (PACA-TCL v3.5) wrapped in a repairability-centric
-self-evolution framework. A causal repair layer decides whether a detected
-failure is repairable at all; only repairable failures enter evolution, where
-they are repaired through a unified RepairPlan protocol shared by two
-evolvable surfaces — an L1 provider-rule genome of eight controlled
-natural-language slot-rule modules, and an L2 adjudication-policy genome of
-closed-vocabulary policy items evaluated deterministically by the proof
-court. Every repair attempt is classified by a four-layer outcome funnel and
-carries a full causal credit chain from dispatch to cross-case transfer.
+SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动的一体化自进化）
+由一个法庭式幻觉检测器（PACA-TCL v3.5）和一个以可修复性为中心的自进化框架组成。
+因果修复层先判定一次检测到的失败是否可修复；只有可修复的失败才进入进化，并经由
+L1/L2 两个可进化面共享的统一 RepairPlan（修复计划）协议完成修复——L1 是 provider
+规则基因组（八个受控自然语言槽位规则模块），L2 是裁决策略基因组（封闭词表策略项，
+由证明法庭（proof court）确定性地求值）。每次修复尝试都由四层结果漏斗（outcome
+funnel）归类，并携带从投递（dispatch）到跨案例迁移的完整因果归功链。
 
-The framework lives in `sehd_rise/` (13 layers + root entry). The
-pre-refactor baseline `src/sehd_v6/` is kept as a local, git-untracked
-historical backup (see `src/README.md`); nothing in the tracked tree depends
-on it.
+框架代码位于 `sehd_rise/`（13 层 + 根入口）。重构前基线 `src/sehd_v6/` 仅作为本地、
+未被 git 跟踪的历史备份保留（见 `src/README.md`）；被跟踪的树中没有任何内容依赖它。
 
-For the framework architecture and design contracts see
-[docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md).
+框架架构与设计契约见
+[docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md)。
 
-## Core Objective and Design Discipline (必读 / Mandatory)
+## 核心目标与设计纪律（必读 / Mandatory）
 
-Every agent working in this repository — on framework code, experiments, or
-documentation — must read this section first and comply with it. It is the
-single source of truth for why this project exists and how decisions are
-made; downstream documents only reference it, never restate it.
+在本仓库中工作的每个 agent——无论涉及框架代码、实验还是文档——都必须先读本节并
+遵守。本节是「项目为何存在、决策如何作出」的唯一真源；下游文档只引用它，从不复述。
 
-### Core objective (核心目标)
+### 核心目标
 
-Produce **effective self-evolving detection skills** that measurably improve
-agent-hallucination detection quality. The detector base (PACA-TCL v3.5) is
-frozen; all improvement must come from the two evolvable surfaces (L1
-provider rules, L2 adjudication policies) and must be demonstrated by
-independent holdout measurement, not by framework-internal signals alone.
-Every framework change is justified by its contribution to this objective;
-correctness, auditability and call-efficiency work are enablers, never ends
-in themselves.
+产出**有效的自进化检测技能（skill）**，可度量地提升 agent 幻觉检测质量。检测器
+基座（PACA-TCL v3.5）已冻结；一切改进必须来自两个可进化面（L1 provider 规则、
+L2 裁决策略），且必须由独立留出集（holdout）测量证明，而不是仅靠框架内部信号。
+每一项框架改动都要以它对这一目标的贡献来辩护；正确性、可审计性与调用效率的工作
+是使能项，从来不是目的本身。
 
-### Design philosophy (设计理念)
+### 设计理念
 
-1. **Systemic over patch-style.** Fix root causes with structural, bottom-up
-   redesign; never accumulate special-case `if`s, hand-tuned knobs, or
-   scenario mappings (see the First-Time Principle: single source of truth,
-   no residue, local/deployed parity).
-2. **Evidence-driven gates, no hand-tuned thresholds.** Acceptance decisions
-   rest on observable replay effects, closed-vocabulary contracts and gold
-   polarity — never on a manually adjusted numeric threshold or CRS weight
-   (weights are frozen at 0.35/0.15/0.20/0.20/0.10).
-3. **Fail-closed discipline.** Missing authority, unparseable output, or
-   vocabulary violations always reject; uncertainty never passes as a
-   verdict or an accepted edit.
-4. **Evolvable surfaces are closed under correction.** Every layer that can
-   produce a defective artifact must also be able to repair or remove it
-   (L1: add/modify/remove rules; L2: add_item/modify_item/remove_item).
-5. **Gold isolation.** Gold labels select polarity and fitness credit only;
-   they never enter skill content, policy content or reflection prompts.
-6. **Provider discipline.** Only DeepSeek-V4-Flash / DeepSeek-V4-Pro routes
-   are allowed; credential values never enter code or artifacts.
+1. **系统性优于打补丁。** 用结构化的自底向上重设计修根因；绝不堆积特判 `if`、
+   手调旋钮或场景映射（见 First-Time Principle：单一真源、不留残渣、本地/部署
+   一致）。
+2. **证据驱动的门控，不手调阈值。** 接受决策只依赖可观测的回放效应、封闭词表
+   契约与 gold 极性——绝不依赖手调数值阈值或 CRS 权重（权重冻结为
+   0.35/0.15/0.20/0.20/0.10）。
+3. **失败即关闭（fail-closed）纪律。** 权威缺失、输出不可解析或词表违例一律拒绝；
+   不确定从不冒充裁决或被接受的编辑。
+4. **可进化面对修正封闭。** 每个能产生缺陷产物的层必须也能修复或移除它（L1：
+   增/改/删规则；L2：`add_item` / `modify_item` / `remove_item`）。
+5. **Gold 隔离。** gold 标签（金标）只用于选择极性与 fitness 归功；绝不进入技能
+   内容、策略内容或反思提示词。
+6. **Provider 纪律。** 只允许 DeepSeek-V4-Flash / DeepSeek-V4-Pro 路由；凭据值
+   绝不进入代码或产物。
 
-### Advisor requirements (导师要求, 2026-08 discussion)
+### 导师要求（2026-08 讨论）
 
-1. **Never hard-tune thresholds.** A single hand-adjusted threshold is always
-   wrong in the end; prefer experiential judgment expressed as evolved
-   skills (the agent decides from accumulated experience, not from a
-   hand-picked number).
-2. **Alternatives to a single threshold are encouraged.** Multiple
-   thresholds / multiple outputs with best-of-N selection (test-time
-   scaling) is a legitimate direction; broaden the option space instead of
-   tuning one value.
-3. **Regression-style validation (e.g. canary regression) is an optimizable
-   mechanism**, adopted selectively where it earns its cost; it is a guard,
-   not a correctness authority.
-4. **Skill effects must be validated on an independent validation set.**
-   Progress reports must show concrete intermediate experiment outputs, not
-   only framework descriptions.
+1. **绝不硬调阈值。** 任何一个手调阈值最终总是错的；优先把经验判断表达为进化出的
+   技能（agent 依据积累的经验作判断，而不是依赖一个人工挑选的数字）。
+2. **鼓励单一阈值的替代方案。** 多阈值 / 多输出配 best-of-N 选择（测试时扩展，
+   test-time scaling）是正当方向；拓宽可选空间，而不是去调一个值。
+3. **回归式验证（如 canary 哨兵回归）是可优化的机制**，在值得其成本的地方选择性
+   采用；它是护栏，不是正确性权威。
+4. **技能效果必须在独立验证集上验证。** 进度汇报必须展示具体的中间实验输出，
+   而不只是框架描述。
 
-Experiment protocols must state how they comply with this section; reviews
-check compliance before results are accepted.
+实验协议必须说明它们如何遵守本节；评审在接受结果之前先检查合规性。
 
-## Layout
+## 目录结构
 
 ```text
-sehd_rise/                # the framework (13 layers + root entry)
+sehd_rise/                # 框架本体（13 层 + 根入口）
 ├── platform/             #   env / routes / models / usage / gold / jsonio
-├── skills/               #   L1 genome / L2 policy genome / rule slots / vocabulary
+├── skills/               #   L1 基因组 / L2 策略基因组 / 规则槽位 / 词表
 ├── detection/            #   packet / transport / court / policy / injection / detector
 ├── causal/               #   signals / cut / episode / repairability / plan
-├── experience/           #   mechanism memory (single Experience Truth)
-├── typing/               #   HTC-TES advisory: classifier / guidance / slices
-├── planning/             #   L1/L2 reflection, retrieval, candidates, search, feedback
+├── experience/           #   机制级经验记忆（单一 Experience Truth）
+├── typing/               #   HTC-TES 咨询层：classifier / guidance / slices
+├── planning/             #   L1/L2 反思、检索、候选、搜索、反馈
 ├── execution/            #   action / executor / replay / trace
 ├── evaluation/           #   effect / fitness / canary / gate / promotion
-├── meta/                 #   cross-case strategy learner (strategy / review)
-├── loop/                 #   unified orchestration (machine / runner / ledger / …)
-├── api/                  #   public facade: detection / evolution / manifests
+├── meta/                 #   跨案例策略学习器（strategy / review）
+├── loop/                 #   统一编排（machine / runner / ledger / …）
+├── api/                  #   公共门面：detection / evolution / manifests
 ├── cli/                  #   python -m sehd_rise <evolve|detect>
-├── configs/              #   detector config (detector_v3_5.json)
-└── __main__.py           #   root entry dispatching to cli
+├── configs/              #   检测器配置（detector_v3_5.json）
+└── __main__.py           #   根入口，分发到 cli
 
-docs/design/              # framework technical design (core document)
-tools/check_layers.py     # acyclic layer-discipline check
-tests/                    # state-machine unit tests
-experiments/              # local experiment workspace (artifacts git-ignored)
-datasets/                 # raw datasets (local-only, git-ignored)
-src/sehd_v6/              # pre-refactor frozen baseline (local backup, git-untracked)
+docs/design/              # 框架技术设计（核心文档）
+tools/check_layers.py     # 无环层级纪律检查
+tests/                    # 状态机单元测试
+experiments/              # 本地实验工作区（产物被 git 忽略）
+datasets/                 # 原始数据集（仅本地，被 git 忽略）
+src/sehd_v6/              # 重构前冻结基线（本地备份，未被 git 跟踪）
 ```
 
-The layer dependency rules are acyclic and mechanically enforced by
-`tools/check_layers.py`; see TECHNICAL_DESIGN.md for the rule table.
+层级依赖规则是无环的，由 `tools/check_layers.py` 机械强制；规则表见
+TECHNICAL_DESIGN.md。
 
-## Usage
+## 用法
 
-### Standalone Detector
+### 独立检测器
 
-The detector runs independently from evolution. The input JSON must contain a
-non-empty `history` and must not contain dataset gold fields such as
-`is_hallucination`, `hallucination_step`, or `gold_label`.
+检测器可以脱离进化独立运行。输入 JSON 必须包含非空的 `history`，且不得包含
+`is_hallucination`、`hallucination_step`、`gold_label` 等数据集 gold 字段。
 
 ```bash
-# Required credential. Route-specific and purpose-specific variables override
-# the provider defaults; credential values are never stored in config files.
+# 必需凭据。路由级、用途级环境变量可覆盖 provider 默认值；
+# 凭据值绝不写入配置文件。
 set DEEPSEEK_API_KEY=<secret>
 
 python -m sehd_rise detect \
@@ -129,32 +107,28 @@ python -m sehd_rise detect \
   --output-dir detector_output
 ```
 
-The prediction is written to `detector_output/prediction.json`. Batch mode
-(`--records`, with `--max-parallel` / `--limit` / `--no-resume`) is
-available through the same command, and an optional precomputed census cache
-can be injected via `--census-root`. Provider settings use one precedence
-rule throughout:
+预测结果写入 `detector_output/prediction.json`。同一命令支持批处理模式
+（`--records`，配合 `--max-parallel` / `--limit` / `--no-resume`）。
+Provider 设置全程遵循一条优先级规则：
 
-- `SEHD_ROUTE_<ROUTE>_*`, for example `SEHD_ROUTE_DEFENSE_MODEL`
-- `SEHD_DETECTOR_*` or `SEHD_JUDGE_*`, selected by route responsibility
+- `SEHD_ROUTE_<ROUTE>_*`，例如 `SEHD_ROUTE_DEFENSE_MODEL`
+- `SEHD_DETECTOR_*` 或 `SEHD_JUDGE_*`，按路由职责选择
 - `SEHD_PROVIDER_*`
-- values in the JSON config
-- official DeepSeek endpoint/model defaults
+- JSON 配置中的值
+- DeepSeek 官方端点/模型默认值
 
-Supported suffixes are `ENDPOINT`, `MODEL`, `API_KEY_ENV`, `TEMPERATURE`,
-`MAX_TOKENS`, `TRANSPORT_RETRIES`, `TIMEOUT_SECONDS`, and
-`TOTAL_TIMEOUT_SECONDS`. The process environment overrides repository `.env`.
+支持的后缀有 `ENDPOINT`、`MODEL`、`API_KEY_ENV`、`TEMPERATURE`、`MAX_TOKENS`、
+`TRANSPORT_RETRIES`、`TIMEOUT_SECONDS` 与 `TOTAL_TIMEOUT_SECONDS`。进程环境优先于
+仓库 `.env`。
 
-Genome injection is explicit: `--genome` / `--policy-genome` (or
-`detect_record(..., genome=..., policy_genome=...)`) deploy an evolved
-two-layer capability without any framework-global state.
+基因组注入是显式的：`--genome` / `--policy-genome`（或
+`detect_record(..., genome=..., policy_genome=...)`）部署进化出的双层能力，
+不引入任何框架级全局状态。
 
-### Standalone Self-Evolution
+### 独立自进化
 
-The evolution framework accepts raw trajectories (one case or a batch), runs
-the detect → causal analysis → repairability triage → RepairPlan → execution
-→ evaluation loop, and writes the evolved champion genomes plus the
-mechanism experience memory.
+进化框架接受原始轨迹（单案例或批量），运行「检测 → 因果分析 → 可修复性分诊 →
+RepairPlan → 执行 → 评估」循环，并写出进化后的冠军基因组与机制级经验记忆。
 
 ```bash
 python -m sehd_rise evolve \
@@ -163,133 +137,99 @@ python -m sehd_rise evolve \
   --output-dir evolution_output
 ```
 
-`records.jsonl` is one record per line; each line is either
-`{"case_id": "...", "record": {...}}` or a record with an embedded
-`case_id`. A JSON object mapping `case_id -> record` also works.
+`records.jsonl` 每行一条记录；每行可以是 `{"case_id": "...", "record": {...}}`，
+也可以是内嵌 `case_id` 的记录本体。`case_id -> record` 的 JSON 映射对象同样可用。
 
-Useful bounds and continuation flags:
+常用的预算与续跑参数：
 
 ```bash
 python -m sehd_rise evolve \
   --records records.jsonl \
   --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output_2 \
-  --reflection-candidates 3 \        # independent mutation samples per case (1..5)
-  --max-mutation-calls 100 \         # hard LLM budget, fail-closed when exhausted
+  --reflection-candidates 3 \        # 每案例的独立 mutation 采样数（1..5）
+  --max-mutation-calls 100 \         # LLM 硬预算，耗尽即失败即关闭
   --initial-genome evolution_output/champion_genome.json \
   --initial-policy-genome evolution_output/policy_genome.json \
   --experience-memory evolution_output/htc_tes_experience_memory.json \
   --resume-from evolution_output/evolution_checkpoint.json
 ```
 
-Artifacts written to the output directory:
+写入输出目录的产物：
 
-- `evolution_result.json` — audit trail with the four-layer outcome funnel
-- `champion_genome.json` — evolved L1 skill genome
-- `policy_genome.json` — evolved L2 adjudication-policy genome
-- `htc_tes_experience_memory.json` — mechanism-level experience memory
-- `htc_tes_coverage.json` — typed coverage projection
-- `evolution_state_manifest.json` — hash-bound state manifest
+- `evolution_result.json` — 含四层结果漏斗的审计轨迹
+- `champion_genome.json` — 进化出的 L1 技能基因组
+- `policy_genome.json` — 进化出的 L2 裁决策略基因组
+- `htc_tes_experience_memory.json` — 机制级经验记忆
+- `htc_tes_coverage.json` — 类型化覆盖投影
+- `evolution_state_manifest.json` — 哈希绑定的状态清单
 
-Provider routes are loaded from the repository-root `.env` (or the process
-environment; process values win). No credential value is written to code or
-artifacts. The default mutation route is official DeepSeek V4-Flash; see
-TECHNICAL_DESIGN.md for the full route resolution order.
+Provider 路由从仓库根的 `.env` 加载（或进程环境；进程值优先）。凭据值绝不写入
+代码或产物。默认 mutation 路由为 DeepSeek 官方 V4-Flash；完整路由解析顺序见
+TECHNICAL_DESIGN.md。
 
-## Public API
+## 公共 API
 
-The stable application-facing imports are `sehd_rise.api.detection` and
-`sehd_rise.api.evolution`:
+面向应用的稳定导入是 `sehd_rise.api.detection` 与 `sehd_rise.api.evolution`：
 
 ```python
 from sehd_rise.api.detection import detect_record, load_detector_config
 from sehd_rise.api.evolution import run_evolution, load_records
 ```
 
-Layer-level imports follow the 13-layer package structure (`platform`,
-`skills`, `detection`, `causal`, `experience`, `typing`, `planning`,
-`execution`, `evaluation`, `meta`, `loop`, `api`, `cli`); the acyclic import
-discipline is enforced by `tools/check_layers.py`.
+层级导入遵循 13 层包结构（`platform`、`skills`、`detection`、`causal`、
+`experience`、`typing`、`planning`、`execution`、`evaluation`、`meta`、`loop`、
+`api`、`cli`）；无环导入纪律由 `tools/check_layers.py` 强制。
 
-## Caches and Logs
+## 运行产物
 
-Run artifacts live in the local `experiments/` workspace (git-ignored) so
-the framework never depends on a fixed system path. The global provider
-cache is configured with `PACA_GLOBAL_CACHE_ROOT`:
+运行产物放在本地 `experiments/` 工作区（被 git 忽略），框架不依赖任何固定系统
+路径。框架不缓存 provider 响应：每次调用都直达 HTTPS，重跑即重算。
 
-```text
-PACA_GLOBAL_CACHE_ROOT=experiments/cache/provider
-```
+## 关键设计决策
 
-A warm provider cache makes replay runs deterministic and zero-cost; editing
-a prompt invalidates only the affected mutation cache entries. All caches
-are local-only and safe to delete between runs.
+1. **可修复性先于进化。** `causal/repairability.py` 是唯一的触发权威：只有
+   `REPAIRABLE` 的失败进入技能进化；`NON_EVOLVABLE` 与 `FRAMEWORK_DEFECT` 在任何
+   搜索开始之前就被分流；一个位于可进化面上却没有合法 RepairPlan 的失败是
+   `UNADDRESSABLE` 框架不变量违例，绝不是 no-edit。
+2. **一个因果对象，一个 RepairPlan 协议。** 所有下游层消费同一个
+   `CausalFailureEpisode` 与规范 `RepairPlan`（失败身份 / 层 / 属主 / 目标边 /
+   执行器 / 合法操作 / 效应契约 / 评估契约）；没有哪一层重新发明失败语义。
+3. **受控自然语言槽位规则**（不是类型化 DSL，也不是自由文本）：L1 规则是类型化
+   `condition` / `action` / `evidence_anchor` 槽位，确定性地渲染为
+   `When <condition>, <action>.`（`skills/rule.py`），结构门因此校验的是槽位契约
+   而不是重新猜自由文本。
+4. **封闭词表的 L2 策略，对修正封闭**：策略项把一个封闭前置谓词与一个枚举动作
+   配对；运行时语义由确定性的证明法庭求值器（`detection/policy.py`）拥有，
+   增/改/删让缺陷策略可修复而不是永久滞留。
+5. **四层结果漏斗取代 `skip`。** 每次修复尝试恰好终止于框架 / 搜索 / 执行 /
+   fitness 四层共 17 种终态之一（`loop/machine.py`），框架瓶颈从此不会被压缩进
+   一个 skip 桶。
+6. **收敛只消费完整的修复尝试。** 预算耗尽、基础设施故障与无效提案都不是学习
+   证据；收敛窗口只统计「完整执行且已测效应」的修复在 fitness 层遭到的拒绝。
+7. **执行先于归功，效应先于 fitness。** 一个被接受的编辑携带完整链条——投递 →
+   目标边移动 → 阻塞谓词清除 → 终态改进 → canary 保持——中间任何一层都不得替代
+   下一层的证据。
+8. **HTC-TES 是咨询层。** 类型智能（`typing/`）组织经验、检索与评估切片；它从不
+   推翻因果属主。
+9. **Meta 学策略，不学真相。** meta 层（`meta/`）是五域封闭词表上的跨案例策略
+   学习器（搜索先验 / 操作偏好 / 机制排序 / 重试策略 / 候选多样性）；属主、因果
+   切点、可修复性与硬门控通道在类型层面不可表示。
+10. **失败即关闭、gold 隔离、冻结基座纪律**，如上文必读章程所述。
 
-## Key Design Decisions
+## 开发准则
 
-1. **Repairability before evolution.** `causal/repairability.py` is the
-   single trigger authority: only `REPAIRABLE` failures enter skill
-   evolution; `NON_EVOLVABLE` and `FRAMEWORK_DEFECT` are diverted before any
-   search begins, and an evolvable-surface failure without a legal RepairPlan
-   is an `UNADDRESSABLE` framework invariant violation, never a no-edit.
-2. **One causal object, one RepairPlan protocol.** All downstream layers
-   consume the `CausalFailureEpisode` and the canonical `RepairPlan`
-   (failure identity / layer / owner / target edge / executor / legal
-   operations / effect contract / evaluation contract); no layer re-invents
-   failure semantics.
-3. **Controlled natural-language slot rules** (not a typed DSL, not free
-   text): L1 rules are typed `condition` / `action` / `evidence_anchor`
-   slots rendered deterministically as `When <condition>, <action>.`
-   (`skills/rule.py`), so the structural gate validates a slot contract
-   instead of re-guessing free text.
-4. **Closed-vocabulary L2 policies, closed under correction**: policy items
-   pair a closed precondition predicate with an enumerated action; runtime
-   semantics are owned by the deterministic proof-court evaluator
-   (`detection/policy.py`), and add/modify/remove keep defective policies
-   repairable instead of permanent.
-5. **Four-layer outcome funnel instead of `skip`.** Every repair attempt
-   ends in exactly one of 17 terminal outcomes across the framework /
-   search / execution / fitness layers (`loop/machine.py`), so framework
-   bottlenecks are never compressed into a single skip bucket.
-6. **Convergence consumes only complete repair attempts.** Budget
-   exhaustion, infra failure and invalid proposals are not learning
-   evidence; the convergence window counts only fitness-layer rejections of
-   fully executed, effect-measured repairs.
-7. **Execution before credit, effect before fitness.** An accepted edit
-   carries the full chain — dispatch → target edge moved → blocker cleared →
-   terminal improvement → canary preserved — and no intermediate layer may
-   substitute for the next layer's evidence.
-8. **HTC-TES is advisory.** Type intelligence (`typing/`) organizes
-   experience, retrieval and evaluation slices; it never overrides the
-   causal owner.
-9. **Meta learns strategy, not truth.** The meta layer (`meta/`) is a
-   cross-case strategy learner over a five-domain closed vocabulary (search
-   prior / operation preference / mechanism ranking / retry strategy /
-   candidate diversity); owner, causal cut, repairability and hard-gate
-   channels are unrepresentable at the type level.
-10. **Fail-closed, gold-isolated, frozen-base discipline** as stated in the
-    mandatory charter above.
+1. **框架内不写实验协议。** 分区、清单、执行授权、数据集切分与评估门控绝不得加入
+   `sehd_rise/`；它们属于实验层。
+2. **实验放在 `experiments/`。** 协议记录、运行脚本与运行输出留在本地实验工作区
+   （被 git 忽略），且只通过上述公共 API/CLI 消费框架。见 `experiments/README.md`。
+3. **框架保持独立可调用。** 仅以一条原始轨迹为输入就必须能运行框架；任何实验层
+   都是可选消费者，绝不是必需依赖。
+4. **共性改进进框架，实验特有行为进实验。** 实验需要新的框架能力时，以通用 API
+   的形式加进 `sehd_rise/`，实验特有的策略留在 `experiments/`。
+5. **冻结基线只读。** `src/sehd_v6/` 绝不修改；在旧代码中发现的缺陷，通过在
+   `sehd_rise/` 中实现正确的语义来修复。
 
-## Development Guidelines
+## 许可证
 
-1. **No experiment protocols inside the framework.** Partitions, manifests,
-   execution authorization, dataset splits and evaluation gates must not be
-   added to `sehd_rise/`; they belong to the experiment layer.
-2. **Experiments live in `experiments/`.** Protocol records, run scripts and
-   run outputs stay in the local experiment workspace (git-ignored) and
-   consume the framework only through the public API/CLI above. See
-   `experiments/README.md`.
-3. **Keep the framework callable standalone.** The framework must remain
-   runnable with a raw trajectory as the only input; any experiment layer is
-   an optional consumer, never a required dependency.
-4. **Shared improvements belong in the framework; experiment-specific
-   behavior belongs in the experiment.** If an experiment needs a new
-   framework capability, add it as a generic API in `sehd_rise/` and keep
-   the experiment-specific policy in `experiments/`.
-5. **The frozen baseline is read-only.** `src/sehd_v6/` is never modified;
-   defects found in old code are fixed by implementing the correct
-   semantics in `sehd_rise/`.
-
-## License
-
-Private research repository.
+私有研究仓库。
