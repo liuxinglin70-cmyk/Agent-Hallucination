@@ -1,19 +1,22 @@
 # SEHD-RISE — Hallucination Detector and Self-Evolution Framework
 
-SEHD-RISE (Repairability-driven Integrated Self-Evolution) is the refactored
-framework: a court-style hallucination detector (PACA-TCL v3.5) and a
-self-evolution framework (BCCSE v5 with HTC-TES v3 type conditioning) with a
-repairability-centric causal layer, a unified RepairPlan protocol, and a
-four-layer outcome funnel.  Self-evolution operates on a two-layer evolvable
-surface: an L1 provider-rule layer of eight controlled natural-language
-slot-rule modules, and an L2 adjudication-policy genome of closed-vocabulary
-policy items evaluated deterministically by the proof court.
+SEHD-RISE (Repairability-driven Integrated Self-Evolution) is a court-style
+hallucination detector (PACA-TCL v3.5) wrapped in a repairability-centric
+self-evolution framework. A causal repair layer decides whether a detected
+failure is repairable at all; only repairable failures enter evolution, where
+they are repaired through a unified RepairPlan protocol shared by two
+evolvable surfaces — an L1 provider-rule genome of eight controlled
+natural-language slot-rule modules, and an L2 adjudication-policy genome of
+closed-vocabulary policy items evaluated deterministically by the proof
+court. Every repair attempt is classified by a four-layer outcome funnel and
+carries a full causal credit chain from dispatch to cross-case transfer.
 
-The framework lives in `sehd_rise/`; the frozen reference package
-`src/sehd_v6/` is the behavioral baseline per
-`SEHD_RISE_Refactor_Execution_Plan.md` and is not modified.
+The framework lives in `sehd_rise/` (13 layers + root entry). The
+pre-refactor baseline `src/sehd_v6/` is kept as a local, git-untracked
+backup (see `src/README.md`); the migration-period parity harnesses under
+`tools/parity/` still import it.
 
-For framework design and flow documentation see
+For the framework architecture and design contracts see
 [docs/design/TECHNICAL_DESIGN.md](docs/design/TECHNICAL_DESIGN.md).
 
 ## Core Objective and Design Discipline (必读 / Mandatory)
@@ -78,341 +81,40 @@ check compliance before results are accepted.
 ## Layout
 
 ```text
-sehd_rise/                # ① refactored framework (13-layer architecture)
-├── platform/             #   env / routes / jsonio / gold / usage
-├── skills/               #   genome / rule / action / policy / vocabulary
-├── detection/            #   detector / batch / replicas / court / packet
-├── causal/               #   signals / cut / episode / plan / repairability
+sehd_rise/                # the framework (13 layers + root entry)
+├── platform/             #   env / routes / models / usage / gold / jsonio
+├── skills/               #   L1 genome / L2 policy genome / rule slots / vocabulary
+├── detection/            #   packet / transport / court / policy / injection / detector
+├── causal/               #   signals / cut / episode / repairability / plan
 ├── experience/           #   mechanism memory (single Experience Truth)
 ├── typing/               #   HTC-TES advisory: classifier / guidance / slices
-├── planning/             #   L1/L2 reflection prompts and candidate search
+├── planning/             #   L1/L2 reflection, retrieval, candidates, search, feedback
 ├── execution/            #   action / executor / replay / trace
 ├── evaluation/           #   effect / fitness / canary / gate / promotion
-├── meta/                 #   cross-case strategy learner (review / strategy)
-├── loop/                 #   unified orchestration (runner / machine / state)
-├── api/                  #   public facade: evolution / detection / manifests
-├── cli/                  #   CLI: evolve / detect / dispatch
-├── configs/              #   detector config
-└── __main__.py           #   python -m sehd_rise <evolve|detect>
-src/sehd_v6/              # ② frozen reference package (behavioral baseline)
-├── docs/                 # ③ framework technical design
-│   └── design/           #   detector + evolution architecture
-└── datasets/             # ④ raw datasets (local-only, git-ignored)
+├── meta/                 #   cross-case strategy learner (strategy / review)
+├── loop/                 #   unified orchestration (machine / runner / ledger / …)
+├── api/                  #   public facade: detection / evolution / manifests
+├── cli/                  #   python -m sehd_rise <evolve|detect>
+├── configs/              #   detector config (detector_v3_5.json)
+└── __main__.py           #   root entry dispatching to cli
+
+docs/design/              # framework technical design (core document)
+tools/parity/             # migration-period verification harnesses + layer check
+experiments/              # local experiment workspace (artifacts git-ignored)
+datasets/                 # raw datasets (local-only, git-ignored)
+src/sehd_v6/              # pre-refactor frozen baseline (local backup, git-untracked)
 ```
 
-Experiment protocols (partitioning, manifests, execution authorization,
-development probes, evaluation gates) are deliberately not part of the
-framework code.  They live outside this repository and may be re-added as a
-layer on top of the standalone detector and evolution modules.
-
-## Documentation Map
-
-```text
-docs/
-└── design/
-    └── TECHNICAL_DESIGN.md    # detector + evolution architecture (sole framework doc)
-```
-
-Module-level documentation lives beside the code:
-
-- `src/sehd_v6/detector/README.md` — standalone detector API
-- `src/sehd_v6/evolution/README.md` — standalone self-evolution API
-- `datasets/README.md` — raw dataset layout and record format
-
-## Development Guidelines
-
-The detector (`src/sehd_v6/detector`) and the self-evolution framework
-(`src/sehd_v6/evolution`) are the two stable framework modules.  Subsequent
-experiments may iterate and optimize the detector and evolution code, but must
-follow these rules:
-
-1. **No experiment protocols or boundary splitting inside the framework.**
-   Partitions, manifests, execution authorization, development probes,
-   evaluation gates and dataset splits must not be added to
-   `src/sehd_v6/detector`, `src/sehd_v6/evolution` or `src/sehd_v6/core`.
-2. **Experiments live outside the repository.**  Protocol records, run
-   scripts, dataset builds and run orchestration stay out of the repo and
-   consume the framework modules through their public APIs:
-   - `detect_record()` / `load_detector_config()` from `src/sehd_v6.detector`
-   - `run_evolution()` / `load_records()` from `src/sehd_v6.evolution`
-3. **Keep the framework callable standalone.**  The framework must remain
-   runnable with a raw trajectory as the only input; any experiment layer must
-   be an optional consumer, never a required dependency.
-4. **Shared improvements belong in the framework; experiment-specific
-   behavior belongs in the experiment.**  If an experiment needs a new
-   framework capability, add it as a generic API in the framework and
-   implement the experiment-specific policy in the experiment layer, kept
-   outside the repository.
-
-## Caches and Logs
-
-Experiment runs keep their caches and logs in a local workspace outside the
-repository so the framework never depends on a fixed system path.  The
-global provider cache is configured with `PACA_GLOBAL_CACHE_ROOT`:
-
-```text
-PACA_GLOBAL_CACHE_ROOT=<local-workspace>/cache/provider
-```
-
-Per-run caches (`shared_cache`, provider route caches) are written by the
-framework inside each run's output directory.  All of these are local-only
-and safe to delete between runs.
-
-## Core Methodology
-
-### 1. PACA-TCL v3.5 — Registered Execution Protocol
-
-The baseline protocol registers a court-style pipeline. Config,
-case roles and provider routes are frozen for an individual audited run. BCCSE
-can deliberately mutate injected strategy rules, so the resulting detector
-behavior must not be described as globally frozen.
-
-- **H0 Base pass and construct census**: Builds the OCSE packet, runs the layered base analysis and enumerates candidate constructs. These are hypotheses for later adjudication, not verdicts.
-- **H1 Prosecution**: Constructs a causal prosecution case identifying hallucination candidates from the agent trajectory. Produces error certificates with evidence chains.
-- **H2 Consensus Gate**: Adversarial defense vs prosecution. Defense attempts to exonerate candidates via counter-evidence. Gate adjudicates based on certificate validity.
-- **H3 Dual-Phase Localization**: When error is confirmed, localizes the responsible step via causal backtracking and earliest-origin tiebreak.
-
-**Five-dimensional CRS diagnostic projection** (configured weights):
-- Factuality (0.35): Does the claim have verified tool/output support?
-- Counterfactual (0.15): Would the error exist under intervention?
-- Recovery (0.20): Did the agent self-correct downstream?
-- Process (0.20): Was the reasoning process sound regardless of outcome?
-- Scope (0.10): Is the error localized or systemic?
-
-**Three-state output**: `verified_error` / `verified_clean` / `unresolved`
-
-### 2. BCCSE v5 — Self-Evolution Framework
-
-Self-evolution operates on a two-layer evolvable surface. Both layers share
-the same gate discipline: no detection threshold or CRS weight is ever
-hand-tuned, gold labels never enter rule content or reflection prompts, and
-provider routes are restricted to DeepSeek-V4-Flash / DeepSeek-V4-Pro.
-
-#### L1 provider-rule layer
-
-Eight skill modules own the provider-emitted surfaces:
-
-| Module | Stage | Role |
-|--------|-------|------|
-| `candidate_trigger` | Census | What constitutes a hallucination candidate |
-| `evidence_obligation` | Verification | What evidence must support each candidate |
-| `candidate_to_verifier_route` | Verification | How candidates are routed to verification |
-| `atomic_verifier_instruction` | Verification | How to verify individual claims atomically |
-| `clean_defense_boundary` | Verification | When to defend a candidate as clean |
-| `causal_link_test` | Causal Court | How to test causal chains for localization |
-| `earliest_origin_tiebreak` | Causal Court | How to resolve multi-origin localization ties |
-| `abstention_rule` | Causal Court | When to output `unresolved` |
-
-L1 rules are stored as typed slots (`condition` / `action` /
-`evidence_anchor`, English by contract) instead of free text
-(`rule_contract.py`). The `action` slot is a **closed opcode** of the
-selected module (`module_charter.py::MODULE_ACTION_OPCODES`), optionally
-`"<opcode>: <target>"` naming the exact output field it acts on; free-text
-actions are rejected as `action_opcode_unowned`. Prompt injection is a
-deterministic render: `render_rule()` expands the opcode into its English
-template and emits exactly `When <condition>, <action>.`, so the structural
-gate validates the slot contract whenever slots are present; the free-text
-path only serves `remove_rule` and historical checkpoint replay. The
-`evidence_anchor` slot is failure-signature bookkeeping for evolution triage
-and is never rendered into runtime prompts.
-
-Each module carries a charter (`module_charter.py`): its influenceable
-surfaces, forbidden surfaces, allowed verdicts, and in-scope vs out-of-scope
-failure examples (all in English). Only the allowed target modules'
-charters and opcode lists are injected into the reflection prompt, so
-proposals are constrained at generation time without relitigating the full
-architecture. Each evolved `SkillEdit` also stores a label-free
-`feature_description` recording the reusable trajectory pattern that
-motivated the edit; it is metadata and never enters the final proof-court
-verdict directly.
-
-#### L2 adjudication-policy layer
-
-The L2 genome (`policy_genome.py`) stores closed-vocabulary policy items:
-one precondition predicate (a pure function over the frozen
-`AdjudicationFacts` snapshot) paired with one enumerated action —
-`downgrade_coverage`, `invalidate_coverage_claim`, `emit_telemetry_only` —
-whose parameters draw from closed vocabularies. The single source of truth
-for every predicate, action and parameter token is the versioned baseline
-registry `vocabulary_registry.L2_REGISTRY` (re-exported through
-`v6_contracts.py`), and
-`L2_ACTIONS` contains exactly the actions the runtime can execute: the
-engine-level actions (`reclassify_candidate_state`, `require_route_replay`)
-are reserved in `ENGINE_LEVEL_ACTIONS` but excluded until a provider
-re-execution engine implements them, so a proposal for one fails at parse
-time instead of reaching a runtime rejection. The LLM only proposes items;
-runtime semantics are owned by the deterministic evaluator
-(`policy_evaluator.py`), which the proof court executes mechanically through
-its policy hook:
-`adjudicate_proof_court(policy_items=..., boundary_path_state=...)`. The
-hook is inert by default — without policy items the detector output is
-byte-identical to the baseline — and the detection engine re-adjudicates
-with the same evidence bundle at the court's convergence point. The L2
-baseline is the empty policy set, so every behavior change must be earned.
-
-The L2 genome is a first-class capability alongside the L1 skill genome:
-a fresh run can inherit both via `initial_genome` + `initial_policy_genome`
-(`run_evolution` / `run_online_evolution`), checkpoints restore both, the
-run persists `policy_genome.json`, and the standalone detector CLI accepts
-`--policy-genome` (or `detect_record(policy_genome=...)`) so an evolved
-two-layer capability can be deployed and validated independently.
-
-#### Deterministic attribution
-
-Attribution is a deterministic failure classifier (`failure_classifier.py`)
-that answers exactly one question: at which layer, on which artifact, did
-the failure happen — no LLM, no heuristics. The classifier input is the
-complete provider-artifact integrity projection of one detection
-(construct-stage candidate counts, court audit failed-checks, quarantine
-tallies, appeal provider status, and the single gold-informed FN+omission
-signal). It runs on every detection: an L2 attribution opens the L2 loop
-independently of the self-supervised trigger, and an L1 attribution carries
-an evidence-based owner that outranks the process-heuristic secondary
-module. An L1 owner hypothesis must pass the gold polarity gate (a false
-negative can only be owned by modules that tighten error detection, a false
-positive only by modules that relax or bound the error claim); hypotheses
-crossing the gold side are dropped. Non-L1 failures (adjudication-policy
-layer, detector-layer anomalies) have no L1 owner: they are recorded in
-`non_l1_failure_attributions` as audit telemetry and feed the L2 policy
-loop.
-
-#### L1 evolution loop (per case)
-
-1. **Detect**: Run PACA-TCL v3.5 with the current genomes injected
-2. **Attribute**: Deterministic failure classification on the full
-   provider-artifact projection; L1 owners pass the gold polarity gate;
-   non-L1 failures go to telemetry and the L2 loop
-3. **Reflect**: LLM reflection receives evaluator-field-stripped trajectory
-   evidence, attribution, module charters and closed action opcodes,
-   executable module-output contracts, bounded negative experience, and
-   (when available) a supporting case + stable counter-case contrast block
-   that bounds the condition to the separating discriminator
-4. **Gate**: Deterministic pre-validation (ownership/opcode/slot/contract
-   shape) before the critic, then the structural constraint gate validates
-   edit safety; a structurally invalid pick can fall through to the next
-   ranked legal candidate
-5. **Fitness**: Source replay plus rolling stable-case canaries; every
-   replay records the injected rule ids (`rule_trace`) and a deterministic
-   no-effect class (`output_changed_then_quarantined` /
-   `provider_output_changed_but_court_invariant` /
-   `no_observable_change_any_layer`) so a no-effect is no longer guessed;
-   a budgeted probe can steer/rollback development, while only an
-authorized sealed final holdout can support a generalization claim
-6. **Repair**: A repairable structural or source-no-effect candidate may use
-   one bounded same-source retry with its actual observable replay deltas;
-   when a source exhausts its Flash attempts with a categorical no-edit
-   outcome, an optional `pro_mutation_route` gets one deeper diagnosis
-   attempt
-7. **Commit/Rollback**: One-edit shadow commit; verdict or process-level canary regression rejects the edit
-
-#### L2 closed loop
-
-The L2 surface is closed under correction: proposals use three operations —
-`add_item` (new item), `modify_item` (replace the item at `item_index`),
-`remove_item` (delete the item at `item_index`) — so a wrong or dead policy
-can be repaired or eliminated instead of accumulating.
-
-1. **Propose**: One reflection call proposes a single closed-vocabulary
-   `PolicyEdit` (the vocabulary table and the `[index]`-addressed current
-   policy set in the prompt are generated from `v6_contracts.py` / the live
-   genome at call time, never copied)
-2. **Gate**: The structural gate enforces the closed vocabulary, genome
-   capacity, deduplication, index bounds, and baseline/fitness protection
-3. **Replay**: Source replay (counted separately as `policy_replays`) must
-   show an observable adjudication movement: add/modify require the policy
-   to fire and move the terminal state or effective coverage; remove
-   requires the targeted item to have actually fired on the source
-   detection and its removal to move an observable output
-4. **Gold polarity gate**: When the terminal state moves, `task_state_score`
-   must strictly improve (no consecutive-improvement threshold); state
-   movement without gold is rejected
-5. **Accept/Rollback**: Rejected candidates are only ever replayed as
-   copies, so the working genome rolls back inherently. A gold-verified
-   terminal-moving accept (add/modify) earns `strong` protection against
-   later modify/remove; coverage-only accepts stay correctable (good
-   policies lock in, bad policies are eliminable). Gate decisions are
-   `accept_policy` / `reject_policy_no_effect` / `reject_policy_fitness` /
-   `skip_no_policy`; the policy genome persists in the checkpoint (single
-   persistence point, vocabulary + hash validated on resume), a failed
-   development probe rolls the policy surface back together with the L1
-   champion, and every decision is audited in
-   `evolution_audit["l2_policy_audit"]`
-
-### 3. HTC-TES v3 — Hallucination-Typed Conditioning
-
-**Problem addressed**: BCCSE v5's monolithic evolution treats all hallucination types identically, causing:
-- Evolution direction conflicts (error↔clean simultaneously)
-- No type-specific detection experience accumulation
-- Fitness signal diluted across heterogeneous types
-
-**Solution**: Three-layer conditioning:
-
-| Layer | Mechanism | Implementation |
-|-------|-----------|----------------|
-| Macro | Taxonomy-conditioned routing | `type_classifier.py` classifies 8 types; `type_conditioned_evolution.py` routes to target modules |
-| Meso | Process-level fitness | `type_aware_fitness.py` evaluates per-type directional progress |
-| Micro | Typed experience memory | `TypeExperienceMemory` persists trajectory features, feature descriptions and success/failure patterns |
-
-**8 Hallucination Types**: FACTUAL, INSTRUCTIONAL, TOOL, REASONING, OMISSION, ADOPTION, CONTEXTUAL, UNKNOWN
-
-**Multi-signal classification** (in `type_classifier.py`):
-1. Error type mapping (`ErrorType` → `HallucinationType`)
-2. Target module mapping (module → likely type)
-3. Candidate nature analysis (claim/action/omission patterns)
-4. CRS score pattern analysis (which dimensions are anomalous)
-5. State transition analysis (unresolved + CRS aggregate)
-
-**Type→Module Routing** (primary targets):
-- FACTUAL → evidence_obligation, atomic_verifier
-- INSTRUCTIONAL → clean_defense, abstention
-- TOOL → c_to_v_route, atomic_verifier
-- REASONING → causal_link, origin_tiebreak
-- OMISSION → candidate_trigger, c_to_v_route
-- ADOPTION → evidence_obligation, clean_defense
-- CONTEXTUAL → abstention, clean_defense
-
-**Advisory routing**: the type route is advisory, not a hard safety
-constraint — the causal attributor owns root-cause priority and the type
-classifier only filters implausible modules from the already bounded
-attribution route (empty intersection falls back to the attribution
-route). HTC-TES functions as an experience-organisation label, a
-retrieval/diversity tag, and an experiment telemetry dimension; it never
-decides the owner.
-
-**Type→Editing Strategy** mapping:
-- FACTUAL → strict_verification
-- INSTRUCTIONAL → boundary_enforcement
-- TOOL → tool_validation
-- REASONING → causal_chain_strengthening
-- OMISSION → trigger_sensitivity
-- ADOPTION → adoption_scrutiny
-- CONTEXTUAL → context_preservation
-
-**Typed direction telemetry**: The implementation can record declared
-error-oriented, clean-oriented, process-repair and abstention transitions.
-This routing vocabulary is not evidence that both detector directions have
-been successfully optimized.
-
-**Typed telemetry**: Directional decisiveness × type-experience coverage
-- Without gold, decisive outcomes are not called correct; the metric records whether a typed process edit reached its declared direction
-- Type-experience coverage is reported separately from detector accuracy
-- A dry-run rule application is not counted as detection improvement unless source replay changes the authoritative detector outcome
-
-**Artifact-first experience memory**: experience deduplication keys on the
-deterministic attribution signature (`layer` + `artifact` + `reason_code` +
-`operation`) plus feature/direction/success, so the same intervention on
-the same failure signature is one experience; repeated observations merge
-into an outcome distribution (`outcome_counts`) instead of overwriting the
-first snapshot. Reflection summaries aggregate artifact and reason-code
-counts alongside the type label.
+The layer dependency rules are acyclic and mechanically enforced by
+`tools/parity/check_layers.py`; see TECHNICAL_DESIGN.md for the rule table.
 
 ## Usage
 
 ### Standalone Detector
 
-The detector can run independently from BCCSE evolution and evaluation. The
-input JSON must contain a non-empty `history` and must not contain dataset gold
-fields such as `is_hallucination`, `hallucination_step`, or `gold_label`.
+The detector runs independently from evolution. The input JSON must contain a
+non-empty `history` and must not contain dataset gold fields such as
+`is_hallucination`, `hallucination_step`, or `gold_label`.
 
 ```bash
 # Required credential. Route-specific and purpose-specific variables override
@@ -426,8 +128,11 @@ python -m sehd_rise detect \
   --output-dir detector_output
 ```
 
-The prediction is written to `detector_output/prediction.json`. Provider
-settings use one precedence rule throughout the detector:
+The prediction is written to `detector_output/prediction.json`. Batch mode
+(`--records`, with `--max-parallel` / `--limit` / `--no-resume`) is
+available through the same command, and an optional precomputed census cache
+can be injected via `--census-root`. Provider settings use one precedence
+rule throughout:
 
 - `SEHD_ROUTE_<ROUTE>_*`, for example `SEHD_ROUTE_DEFENSE_MODEL`
 - `SEHD_DETECTOR_*` or `SEHD_JUDGE_*`, selected by route responsibility
@@ -439,39 +144,16 @@ Supported suffixes are `ENDPOINT`, `MODEL`, `API_KEY_ENV`, `TEMPERATURE`,
 `MAX_TOKENS`, `TRANSPORT_RETRIES`, `TIMEOUT_SECONDS`, and
 `TOTAL_TIMEOUT_SECONDS`. The process environment overrides repository `.env`.
 
-The stable application-facing import is now `src.sehd_v6.detector`. The
-detector itself does not load partition/manifest files and does not enforce
-experiment authorization. Those policies belong to experiment orchestration.
-The evolution loop consumes an equivalent label-free projection inline
-(`signal_adapter.resolve_authoritative_state()`); the `project_for_evolution()`
-adapter remains available for external consumers that want the same projection
-as an explicit object.
-
-For self-evolution, the same detector boundary is used directly:
-
-```python
-from pathlib import Path
-from sehd_rise.api.detection import detect_record
-
-prediction = detect_record(
-    record=trajectory_without_gold,
-    config=detector_config,
-    case_id="case-001",
-    output_dir=Path("detector_output"),
-)
-```
-
-The single-case detector does not require a partition, manifest, P0 role,
-execution authorization flag, or precomputed census cache. A cache root is an
-optional optimization; when omitted, the detector uses provider census
-fallback. Genome injection is explicit through `detect_record(..., genome=...)`
-and is not inferred from global evaluation state.
+Genome injection is explicit: `--genome` / `--policy-genome` (or
+`detect_record(..., genome=..., policy_genome=...)`) deploy an evolved
+two-layer capability without any framework-global state.
 
 ### Standalone Self-Evolution
 
-The evolution framework is equally independent from experiment protocols. It
-accepts raw trajectories (one case or a batch), runs the detector loop, and
-writes the evolved champion genome plus typed experience memory.
+The evolution framework accepts raw trajectories (one case or a batch), runs
+the detect → causal analysis → repairability triage → RepairPlan → execution
+→ evaluation loop, and writes the evolved champion genomes plus the
+mechanism experience memory.
 
 ```bash
 python -m sehd_rise evolve \
@@ -482,76 +164,36 @@ python -m sehd_rise evolve \
 
 `records.jsonl` is one record per line; each line is either
 `{"case_id": "...", "record": {...}}` or a record with an embedded
-`case_id`. A JSON object mapping `case_id -> record` also works. The loop for
-every case is:
+`case_id`. A JSON object mapping `case_id -> record` also works.
 
-`detect -> attribute (self-supervised) -> HTC-TES type routing ->
-structured observation -> independent reflection candidates -> candidate
-deduplication -> critic selection -> structural gate -> source replay + canary
-fitness -> commit/rollback -> experience memory`
-
-The CLI exposes bounded reflection test-time scaling:
-
-```bash
-python -m sehd_rise evolve \
-  --records records.jsonl \
-  --config sehd_rise/configs/detector_v3_5.json \
-  --output-dir evolution_output \
-  --reflection-candidates 3 \
-  --max-mutation-calls 100
-```
-
-`--reflection-candidates` controls independent mutation samples per triggered
-case (1..5). The critic only prioritizes which candidate reaches replay; it does
-not certify correctness. Generation, attribution, critic and conflict-gate
-calls share the hard `--max-mutation-calls` budget and fail closed when it is
-exhausted. The evolution audit records candidate count, owner validation,
-critic decision and cache metadata.
-
-Artifacts written to `evolution_output`:
-
-- `evolution_result.json` — audit trail
-- `champion_genome.json` — evolved skill genome
-- `htc_tes_experience_memory.json` — typed experience memory
-
-The loop can continue from its own outputs:
+Useful bounds and continuation flags:
 
 ```bash
 python -m sehd_rise evolve \
   --records records.jsonl \
   --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output_2 \
+  --reflection-candidates 3 \        # independent mutation samples per case (1..5)
+  --max-mutation-calls 100 \         # hard LLM budget, fail-closed when exhausted
   --initial-genome evolution_output/champion_genome.json \
-  --experience-memory evolution_output/htc_tes_experience_memory.json
+  --initial-policy-genome evolution_output/policy_genome.json \
+  --experience-memory evolution_output/htc_tes_experience_memory.json \
+  --resume-from evolution_output/evolution_checkpoint.json
 ```
 
-The standalone evolution module does not require partitions, manifests,
-development probes, pre-registered canaries, execution authorization, or a
-census cache. Those are experiment protocols and live outside the
-repository, not in the framework loop.
+Artifacts written to the output directory:
+
+- `evolution_result.json` — audit trail with the four-layer outcome funnel
+- `champion_genome.json` — evolved L1 skill genome
+- `policy_genome.json` — evolved L2 adjudication-policy genome
+- `htc_tes_experience_memory.json` — mechanism-level experience memory
+- `htc_tes_coverage.json` — typed coverage projection
+- `evolution_state_manifest.json` — hash-bound state manifest
 
 Provider routes are loaded from the repository-root `.env` (or the process
 environment; process values win). No credential value is written to code or
-artifacts. The default mutation route is official DeepSeek V4-Flash:
-
-```text
-DEEPSEEK_API_KEY=<secret>
-# Optional purpose-specific overrides:
-SEHD_MUTATION_ENDPOINT=https://api.deepseek.com
-SEHD_MUTATION_MODEL=deepseek-v4-flash
-SEHD_MUTATION_API_KEY_ENV=DEEPSEEK_API_KEY
-SEHD_DETECTOR_ENDPOINT=...
-SEHD_DETECTOR_MODEL=...
-SEHD_DETECTOR_API_KEY_ENV=...
-SEHD_JUDGE_ENDPOINT=...
-# Route-level selectors such as SEHD_ROUTE_DEFENSE_MODEL take precedence over
-# purpose-level selectors. A non-official proxy route never silently receives
-# DEEPSEEK_API_KEY.
-```
-
-Raw datasets belong in `datasets/` (see `datasets/README.md`). Experiment
-progress, results and logs belong in a local workspace outside the
-repository.
+artifacts. The default mutation route is official DeepSeek V4-Flash; see
+TECHNICAL_DESIGN.md for the full route resolution order.
 
 ## Public API
 
@@ -559,83 +201,93 @@ The stable application-facing imports are `sehd_rise.api.detection` and
 `sehd_rise.api.evolution`:
 
 ```python
-from sehd_rise.api.detection import detect_record
-from sehd_rise.api.evolution import run_evolution
+from sehd_rise.api.detection import detect_record, load_detector_config
+from sehd_rise.api.evolution import run_evolution, load_records
 ```
 
-The CLI dispatches through ``python -m sehd_rise <evolve|detect> ...``.
-Layer-level imports are available through the 13-layer package structure
-(``platform``, ``skills``, ``detection``, ``causal``, ``experience``,
-``typing``, ``planning``, ``execution``, ``evaluation``, ``meta``,
-``loop``, ``api``, ``cli``); the layer rules in
-``tools/parity/check_layers.py`` enforce the acyclic import discipline.
+Layer-level imports follow the 13-layer package structure (`platform`,
+`skills`, `detection`, `causal`, `experience`, `typing`, `planning`,
+`execution`, `evaluation`, `meta`, `loop`, `api`, `cli`); the acyclic import
+discipline is enforced by `tools/parity/check_layers.py`.
+
+## Caches and Logs
+
+Run artifacts live in the local `experiments/` workspace (git-ignored) so
+the framework never depends on a fixed system path. The global provider
+cache is configured with `PACA_GLOBAL_CACHE_ROOT`:
+
+```text
+PACA_GLOBAL_CACHE_ROOT=experiments/cache/provider
+```
+
+A warm provider cache makes replay runs deterministic and zero-cost; editing
+a prompt invalidates only the affected mutation cache entries. All caches
+are local-only and safe to delete between runs.
 
 ## Key Design Decisions
 
-1. **Controlled natural-language slot rules** (not a typed DSL, not free text): the LLM generates rule slots directly — no compilation step — and the runtime injection is a deterministic render (`When <condition>, <action>.`) that the structural gate can validate as a slot contract.
-2. **Closed-vocabulary L2 policies, closed under correction**: adjudication-policy items pair a closed precondition predicate with an enumerated action; runtime semantics are fixed by the deterministic proof-court evaluator, and the evolution loop supports add/modify/remove so defective policies are repairable instead of permanent.
-3. **Deterministic attribution**: a heuristic-free failure classifier answers "which layer, which artifact"; L1 owners pass the gold polarity gate, non-L1 failures feed telemetry and the L2 policy loop.
-4. **Self-supervised triggers**: Evolution can proceed without gold labels from unresolved, CRS contradiction, evidence-incomplete, and unavailable-signal conditions. It does not prescribe clean/error polarity without gold.
-5. **Incremental batch commit**: Each edit validated independently; failed edits don't discard successful ones.
-6. **Shared LLM cache**: Same genome+case replay reuses cache, eliminating CRS nondeterminism.
-7. **Layered edit checks**: Structural validation and stable-case canary replay cover different failure modes; neither establishes generalization.
-8. **Interface normalization**: HTC-TES modules accept both `AttributionSignal` dataclass and `Mapping[str, Any]` dict via a `_normalize_signal` helper, decoupling the type-conditioning layer from BCCSE's dataclass internals while maintaining a uniform access pattern.
-9. **Typed transition bookkeeping**: Direction and type are recorded separately from gold correctness and claim eligibility.
+1. **Repairability before evolution.** `causal/repairability.py` is the
+   single trigger authority: only `REPAIRABLE` failures enter skill
+   evolution; `NON_EVOLVABLE` and `FRAMEWORK_DEFECT` are diverted before any
+   search begins, and an evolvable-surface failure without a legal RepairPlan
+   is an `UNADDRESSABLE` framework invariant violation, never a no-edit.
+2. **One causal object, one RepairPlan protocol.** All downstream layers
+   consume the `CausalFailureEpisode` and the canonical `RepairPlan`
+   (failure identity / layer / owner / target edge / executor / legal
+   operations / effect contract / evaluation contract); no layer re-invents
+   failure semantics.
+3. **Controlled natural-language slot rules** (not a typed DSL, not free
+   text): L1 rules are typed `condition` / `action` / `evidence_anchor`
+   slots rendered deterministically as `When <condition>, <action>.`
+   (`skills/rule.py`), so the structural gate validates a slot contract
+   instead of re-guessing free text.
+4. **Closed-vocabulary L2 policies, closed under correction**: policy items
+   pair a closed precondition predicate with an enumerated action; runtime
+   semantics are owned by the deterministic proof-court evaluator
+   (`detection/policy.py`), and add/modify/remove keep defective policies
+   repairable instead of permanent.
+5. **Four-layer outcome funnel instead of `skip`.** Every repair attempt
+   ends in exactly one of 17 terminal outcomes across the framework /
+   search / execution / fitness layers (`loop/machine.py`), so framework
+   bottlenecks are never compressed into a single skip bucket.
+6. **Convergence consumes only complete repair attempts.** Budget
+   exhaustion, infra failure and invalid proposals are not learning
+   evidence; the convergence window counts only fitness-layer rejections of
+   fully executed, effect-measured repairs.
+7. **Execution before credit, effect before fitness.** An accepted edit
+   carries the full chain — dispatch → target edge moved → blocker cleared →
+   terminal improvement → canary preserved — and no intermediate layer may
+   substitute for the next layer's evidence.
+8. **HTC-TES is advisory.** Type intelligence (`typing/`) organizes
+   experience, retrieval and evaluation slices; it never overrides the
+   causal owner.
+9. **Meta learns strategy, not truth.** The meta layer (`meta/`) is a
+   cross-case strategy learner over a five-domain closed vocabulary (search
+   prior / operation preference / mechanism ranking / retry strategy /
+   candidate diversity); owner, causal cut, repairability and hard-gate
+   channels are unrepresentable at the type level.
+10. **Fail-closed, gold-isolated, frozen-base discipline** as stated in the
+    mandatory charter above.
 
-## Module Dependencies
+## Development Guidelines
 
-```
-evolution/runner.py (run_evolution)
-  └── evolution_runner.py (run_online_evolution)
-        ├── genome.py (SkillGenome, SkillEdit, apply_edit)
-        ├── step_attributor.py (attribute_failure, ErrorType, AttributionSignal)
-        ├── reflection_engine.py (build_causal_reflection_prompt)
-        ├── fitness.py (assess_source_fitness)
-        ├── safety_gate.py (StructuralGate)
-        ├── types.py (ExperienceRecord) ← breaks circular dep
-        ├── promotion_gates.py (MetricSnapshot, ReplayEvidence)
-        └── htc_tes/ (HallucinationTypeClassifier, TypeConditionedEvolution, TypeAwareFitness)
-                └── type_classifier.py::_normalize_signal() ← accepts AttributionSignal | Mapping
-
-detector/__init__.py (detect_record)
-  └── proof_engine.py (adjudicate_case)
-        ├── layered_engine.py (base layer)
-        ├── proof_contract.py (proof-court contract)
-        └── basic_runner.py (provider transport)
-
-signal_adapter.py (resolve_evolution_state, metric_snapshot, experience_record_from_row)
-  ├── promotion_gates.py (MetricSnapshot, ReplayEvidence)
-  └── types.py (ExperienceRecord)
-```
-
-## Interface Contract
-
-HTC-TES modules accept attribution signals via a normalized interface:
-
-| Function | Accepts | Normalization |
-|----------|---------|---------------|
-| `HallucinationTypeClassifier.classify()` | `AttributionSignal \| Mapping \| None` | `_normalize_signal()` → dict |
-| `TypeConditionedEvolution.create_edit_proposal()` | `AttributionSignal \| Mapping` | `_normalize_signal()` → dict |
-| `build_type_conditioned_reflection_prompt()` | `AttributionSignal \| Mapping` | `_normalize_signal()` → dict |
-
-This decouples HTC-TES from BCCSE's dataclass shape while allowing the runner
-path (which passes `AttributionSignal` objects) to work without manual
-`.to_dict()` conversion at every call site.
-
-## Current Evidence Boundaries
-
-- **PACA-TCL v3.5**: standalone research detector implementation; its
-  strategy can be modified by genome injection.
-- **BCCSE v5**: standalone research evolution machinery. Historical artifacts
-  do not by themselves establish out-of-sample improvement.
-- **HTC-TES v3**: integrated typed telemetry.
-  - Type telemetry and type→module routing are recorded in evolution results
-  - Interface normalization: `_normalize_signal` resolves AttributionSignal/dict mismatch
-
-Experiment protocols (partitions, probes, final-holdout roles, authorization
-flags) are intentionally removed from the framework code. They can be re-added
-as a layer on top of the standalone detector and evolution modules, kept
-outside the repository.
+1. **No experiment protocols inside the framework.** Partitions, manifests,
+   execution authorization, dataset splits and evaluation gates must not be
+   added to `sehd_rise/`; they belong to the experiment layer.
+2. **Experiments live in `experiments/`.** Protocol records, run scripts and
+   run outputs stay in the local experiment workspace (git-ignored) and
+   consume the framework only through the public API/CLI above. See
+   `experiments/README.md`.
+3. **Keep the framework callable standalone.** The framework must remain
+   runnable with a raw trajectory as the only input; any experiment layer is
+   an optional consumer, never a required dependency.
+4. **Shared improvements belong in the framework; experiment-specific
+   behavior belongs in the experiment.** If an experiment needs a new
+   framework capability, add it as a generic API in `sehd_rise/` and keep
+   the experiment-specific policy in `experiments/`.
+5. **The frozen baseline is read-only.** `src/sehd_v6/` is never modified;
+   defects found in old code are fixed by implementing the correct
+   semantics in `sehd_rise/`.
 
 ## License
 
