@@ -53,3 +53,19 @@ def _evaluator_gold(record: Mapping[str, Any]) -> bool | None:
     if value is not None:
         return value
     return coerce_gold_label(record.get("is_hallucination"))
+
+
+def _evaluator_gold_steps(record: Mapping[str, Any]) -> Any:
+    """Join localization-correctness steps only inside an evaluator.
+
+    ``gold_steps`` is the authoritative array form; AgentHallu dumps carry
+    only the single ``hallucination_step`` scalar, so it is the fallback.
+    The value is returned verbatim (list or scalar) and consumed by
+    ``project_detection``, which normalizes both forms to a step tuple. An
+    absent annotation returns ``None`` — a missing step is not evidence of
+    mislocalization.
+    """
+    steps = record.get("gold_steps")
+    if steps is not None:
+        return steps
+    return record.get("hallucination_step")

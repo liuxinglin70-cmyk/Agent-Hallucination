@@ -89,6 +89,11 @@ REASON_APPEAL_FAILED = "appeal_failed_with_errors"
 REASON_LOCALIZATION_FALLBACK = "localization_temporal_fallback"
 REASON_RESPONSIBLE_STEP_MISSING = "responsible_step_missing"
 REASON_QUARANTINE_PATTERN = "quarantine_pattern_dominant"
+# Gold-locked polarity mismatches: the supervised label names the true pole
+# when no artifact evidence caught the failure. FP = error verdict on a clean
+# case; FN-clean = clean verdict on an error case.
+REASON_GOLD_FALSE_POSITIVE = "gold_false_positive"
+REASON_GOLD_FALSE_NEGATIVE_CLEAN = "gold_false_negative_clean"
 # Demotion when the raw cut routes to L1 but the L1 executable-completeness
 # gate fails: no "nominally L1 but no execution semantics" intermediate may
 # reach the evolution side (plan §2.4 -- the cut must be repairable).
@@ -107,6 +112,12 @@ _REASON_SYNTHESIZED_FIELD: dict[str, tuple[str, str]] = {
     ),
     REASON_QUARANTINE_PATTERN: (
         "atomic_verifier_instruction", "certificate_id",
+    ),
+    REASON_GOLD_FALSE_POSITIVE: (
+        "evidence_obligation", "coverage_state",
+    ),
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
+        "evidence_obligation", "certificate_id",
     ),
 }
 
@@ -645,6 +656,46 @@ def _gold_step_correct(signal: DetectionSignal) -> bool | None:
     return str(signal.responsible_step) in signal.gold_steps
 
 
+def _gold_polarity_mismatch_owner(
+    signal: DetectionSignal, facts: Any,
+) -> tuple[str, str, str] | None:
+    """Gold-locked owner for a verdict that flipped the wrong way.
+
+    Only the FP and FN-clean shapes are addressable here; unresolved shapes
+    carry no flipped verdict.
+
+    - FP (error verdict, gold=clean): the only L1 op that can relax a
+      surviving error certificate is prosecution-side, so the owner is always
+      the evidence/verifier pair (``keep_coverage_incomplete`` demotes the
+      verdict). Defense is never the owner — adding defense cannot demote a
+      verdict carried by a still-surviving error certificate.
+    - FN-clean (clean verdict, gold=error): the symmetric fix is to
+      strengthen prosecution into a decisive error, so the owner is also the
+      evidence/verifier pair — whether the error was never found (incomplete
+      prosecution) or found-but-defeated (complete prosecution). The
+      ``abstention_rule`` shape of ``_route_gold_locked_owner`` has no
+      clean→error opcode, so it is deliberately never emitted here.
+    """
+    gold_token = _gold_error_type_token(signal)
+    if gold_token == "false_positive":
+        owner, secondary = _route_gold_locked_owner(
+            state=signal.state,
+            prosecution_state=signal.prosecution_coverage.state,
+            defense_state=signal.defense_coverage.state,
+            default_module="evidence_obligation",
+            default_secondary="atomic_verifier_instruction",
+            surviving_error_count=facts.surviving_error_count,
+        )
+        return owner, secondary, REASON_GOLD_FALSE_POSITIVE
+    if gold_token == "false_negative_clean":
+        return (
+            "evidence_obligation",
+            "atomic_verifier_instruction",
+            REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+        )
+    return None
+
+
 # ============================================================
 # Single cut builder
 # ============================================================
@@ -797,6 +848,34 @@ def build_causal_cut(
             secondary_owner=secondary,
         )
         return _enforce_executable_gate(cut)
+
+    # --- Rule 1.5: gold-locked polarity mismatch (FP / FN-clean) ------
+    # Supervised polarity names the true pole when no artifact evidence
+    # (Rule 1) caught the failure. A false positive must relax prosecution; a
+    # false-negative-clean must strengthen it. Placed before the
+    # self-supervised rules so an FP with a co-occurring localization
+    # fallback still routes to its true owner (over-prosecution, not
+    # mislocalization of a real error).
+    gold_mismatch = _gold_polarity_mismatch_owner(signal, facts)
+    if gold_mismatch is not None:
+        owner, secondary, reason = gold_mismatch
+        return _enforce_executable_gate(_cut(
+            signal=signal,
+            skill_layer=LAYER_L1,
+            owner=owner,
+            secondary_owner=secondary,
+            reason_code=reason,
+            evidence={
+                "terminal_state": signal.state,
+                "gold_polarity": (
+                    "clean" if reason == REASON_GOLD_FALSE_POSITIVE else "error"
+                ),
+                "surviving_error_count": facts.surviving_error_count,
+                "prosecution_coverage": signal.prosecution_coverage.state,
+                "defense_coverage": signal.defense_coverage.state,
+            },
+            blocking_predicate="gold_polarity_mismatch",
+        ))
 
     # --- Rule 2: boundary terminal conflict ---------------------------
     if L2_PREDICATES["boundary_state_conflicts_with_terminal"](facts):

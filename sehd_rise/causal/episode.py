@@ -49,6 +49,8 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.cut import (
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+    REASON_GOLD_FALSE_POSITIVE,
     REASON_LOCALIZATION_FALLBACK,
     REASON_PROVIDER_MALFORMED,
     REASON_PROVIDER_MISSING,
@@ -89,6 +91,12 @@ _SYNTHESIZED_FIELD_REASONS: dict[str, tuple[str, str]] = {
     ),
     REASON_QUARANTINE_PATTERN: (
         "atomic_verifier_instruction", "certificate_id",
+    ),
+    REASON_GOLD_FALSE_POSITIVE: (
+        "evidence_obligation", "coverage_state",
+    ),
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
+        "evidence_obligation", "certificate_id",
     ),
 }
 
@@ -995,31 +1003,34 @@ def _compile_failure_edges(
                 rejected_fields.append(f"{owner}:{field}")
                 continue
             routes = MODULE_ROUTE_IDS.get(owner, ())
+            if cut.reason_code == REASON_GOLD_FALSE_POSITIVE:
+                observed, required = "complete", "incomplete"
+            elif cut.reason_code == REASON_GOLD_FALSE_NEGATIVE_CLEAN:
+                observed, required = "absent", "present"
+            elif cut.reason_code in (
+                REASON_PROVIDER_MISSING,
+                REASON_LOCALIZATION_FALLBACK,
+                REASON_RESPONSIBLE_STEP_MISSING,
+            ):
+                observed, required = "absent", "present"
+            else:
+                observed, required = "malformed", "well_formed"
             edges.append(FailureEdge(
                 producer_route=routes[0] if routes else MODULE_OUTPUT_OBJECT.get(owner, owner),
                 output_object=MODULE_OUTPUT_OBJECT.get(owner, owner),
                 field=field,
                 consumer=consumer,
-                observed=(
-                    "absent" if cut.reason_code in (
-                        REASON_PROVIDER_MISSING,
-                        REASON_LOCALIZATION_FALLBACK,
-                        REASON_RESPONSIBLE_STEP_MISSING,
-                    )
-                    else "malformed"
-                ),
-                required=(
-                    "present" if cut.reason_code in (
-                        REASON_PROVIDER_MISSING,
-                        REASON_LOCALIZATION_FALLBACK,
-                        REASON_RESPONSIBLE_STEP_MISSING,
-                    )
-                    else "well_formed"
-                ),
+                observed=observed,
+                required=required,
                 owner_module=owner,
                 source_artifact_id=str(row.get("artifact_id") or ""),
-                blocking_predicate=_artifact_blocking_predicate(
-                    kind, blocking_predicates
+                blocking_predicate=(
+                    "gold_polarity_mismatch"
+                    if cut.reason_code in (
+                        REASON_GOLD_FALSE_POSITIVE,
+                        REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+                    )
+                    else _artifact_blocking_predicate(kind, blocking_predicates)
                 ),
             ))
     dedup = {edge.edge_id: edge for edge in edges}

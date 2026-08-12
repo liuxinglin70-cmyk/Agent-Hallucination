@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.signals import DetectionSignal, project_detection
-from sehd_rise.platform.gold import _evaluator_gold
+from sehd_rise.platform.gold import _evaluator_gold, _evaluator_gold_steps
 
 
 def attribute_failure_for_result(
@@ -33,12 +33,11 @@ def attribute_failure_for_result(
             # ``gold_steps`` is the authoritative localization-correctness
             # input (``responsible_step_correct`` in fitness); it was
             # stripped by the detector firewall like every evaluator field,
-            # so it is re-joined here under the same explicit opt-in.  A
-            # gold error case without gold_steps stays
-            # responsible_step_correct=False in fitness (documented
-            # behaviour: unverified localization is not evidence of a
-            # defect, but also not evidence of correctness).
-            payload["gold_steps"] = records[case_id].get("gold_steps")
+            # so it is re-joined here under the same explicit opt-in.
+            # AgentHallu dumps carry only ``hallucination_step``, so the
+            # single gold-join helper falls back to it; an absent annotation
+            # (list and scalar both missing) stays None.
+            payload["gold_steps"] = _evaluator_gold_steps(records[case_id])
     signal = project_detection(payload, use_gold=use_gold)
     # ``gold_reflection`` gates the gold-diagnostic section of the L1
     # reflection prompt (planning/l1 reads it off the signal). The signal
