@@ -24,7 +24,7 @@ from sehd_rise.skills.policy import PolicyGenome
 from sehd_rise.detection.injection import integrated_engine_provider
 from sehd_rise.detection.court.engine import adjudicate_case
 from sehd_rise.detection.detector import _detector_record
-from sehd_rise.detection.transport import json_object_provider_call
+from sehd_rise.detection.egress import conflict_gate_call, l1_call
 from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.platform.gold import _evaluator_gold
 from sehd_rise.causal.signals import (
@@ -248,7 +248,13 @@ def _run_mutation_call(
     """Count attribution/reflection calls separately from detector calls."""
     budget_usage["mutation_calls"] += 1
     try:
-        parsed, meta = json_object_provider_call(**kwargs)
+        parsed, meta = l1_call(
+            route=kwargs["route"],
+            system=kwargs["system"],
+            user=kwargs["user"],
+            purpose=str(kwargs.get("purpose") or "mutation"),
+            ledger=provider_usage_ledger,
+        )
     except Exception:
         budget_usage["mutation_errors"] += 1
         raise
@@ -265,10 +271,6 @@ def _run_mutation_call(
             budget_usage["mutation_repairs"] += int(
                 bool(meta.get("repair_used"))
             )
-    provider_usage_ledger.record(
-        purpose=str(kwargs.get("purpose") or "mutation"),
-        meta=meta if isinstance(meta, Mapping) else None,
-    )
     return parsed, meta
 
 
@@ -285,18 +287,10 @@ def _run_conflict_gate_call(
     """
     if budget_usage is not None:
         budget_usage["conflict_gate_calls"] += 1
-    result, meta = json_object_provider_call(
-        route=route,
-        system=system,
-        user=user,
-        purpose="mutation",
+    return conflict_gate_call(
+        route=route, system=system, user=user,
+        ledger=provider_usage_ledger,
     )
-    if provider_usage_ledger is not None:
-        provider_usage_ledger.record(
-            purpose="conflict_gate",
-            meta=meta if isinstance(meta, Mapping) else None,
-        )
-    return result, meta
 
 
 def _run_counted_detection(

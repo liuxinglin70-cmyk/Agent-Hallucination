@@ -277,7 +277,7 @@ def provider_call_with_schema(
         payload["response_format"] = {"type": "json_object"}
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
-    thinking = provider_thinking_control(route, purpose=transport_purpose)
+    thinking = provider_thinking_control(route)
     if thinking is not None:
         payload["thinking"] = thinking
     body = canonical_json(payload).encode("utf-8")

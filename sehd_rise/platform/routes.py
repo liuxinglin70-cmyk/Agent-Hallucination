@@ -165,21 +165,17 @@ def has_provider_credential(route: Mapping[str, Any]) -> bool:
 
 
 def provider_thinking_control(
-    route: Mapping[str, Any], *, purpose: str
+    route: Mapping[str, Any],
 ) -> dict[str, str] | None:
-    """Resolve a bounded thinking toggle for strict JSON provider calls.
+    """Return an explicit thinking toggle configured on the route, if any.
 
-    DeepSeek V4 defaults to thinking mode, and the gateway honors that
-    default regardless of which deployment fronts it: an unconstrained
-    mutation request can spend nearly its entire output budget in
-    ``reasoning_content``, and when the reasoning crosses the budget the
-    response is truncated before any ``content`` is emitted
-    (``finish_reason=length``, empty body), which the strict-JSON transport
-    then fail-closes as an unparseable response. The mutation/reflection
-    family (including the L2 closed-vocabulary policy reflection) produces
-    strict machine-readable JSON and never needs chain-of-thought, so it
-    defaults to non-thinking mode for any DeepSeek V4 model on any gateway;
-    an explicit route setting still wins.
+    The egress layer owns the thinking contract by structure: evolution
+    routes are stamped ``thinking.type=disabled`` for DeepSeek-V4 before they
+    reach the primitive (the reasoning budget can truncate before any
+    ``content`` is emitted, ``finish_reason=length``, empty body, which the
+    strict-JSON transport fail-closes), and detection routes carry no toggle
+    so the model default applies. This function surfaces an explicit route
+    setting only; it derives nothing from a purpose string.
     """
     configured = route.get("thinking")
     if isinstance(configured, Mapping):
@@ -190,20 +186,6 @@ def provider_thinking_control(
         if value not in {"enabled", "disabled"}:
             raise ValueError("provider thinking mode must be enabled or disabled")
         return {"type": value}
-    model = str(route.get("model") or "").lower()
-    if (
-        purpose
-        in {
-            "mutation",
-            "reflection_critic",
-            "reflection_diagnosis",
-            "policy_reflection",
-            "reflection_pro",
-            "pro",
-        }
-        and model.startswith("deepseek-v4-")
-    ):
-        return {"type": "disabled"}
     return None
 
 

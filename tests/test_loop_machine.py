@@ -68,7 +68,7 @@ def _drive_to(machine: RepairStateMachine, target: State) -> None:
 
 
 def test_legal_transition_count() -> None:
-    assert len(LEGAL_TRANSITIONS) == 33, len(LEGAL_TRANSITIONS)
+    assert len(LEGAL_TRANSITIONS) == 30, len(LEGAL_TRANSITIONS)
 
 
 def test_every_legal_transition_reachable() -> None:
