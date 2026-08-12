@@ -155,8 +155,17 @@ def build_adjudication_facts(
         appeal_status=str(court_result.get("appeal_status") or ""),
         appeal_triggered=bool(court_result.get("appeal_triggered", False)),
         localization_status=str(court_result.get("localization_status") or ""),
+        # The proof court anchors localization on ``responsible_event_id``
+        # (always present for a verified_error); ``responsible_step`` is the
+        # source-step projection of that anchor and only exists on the
+        # top-level result, never inside ``proof_adjudication``. Reading only
+        # ``responsible_step`` made this flag always-false, which let the
+        # ``responsible_step_missing_and_verdict_error`` predicate phantom-fire
+        # on every verified_error case and mis-attribute it to
+        # ``earliest_origin_tiebreak``.
         responsible_step_available=bool(
             court_result.get("responsible_step") is not None
+            or court_result.get("responsible_event_id") is not None
         ),
         quarantine_reason_schema_mismatch=quarantine_schema_mismatch,
         quarantine_reason_evidence_missing=quarantine_evidence_missing,

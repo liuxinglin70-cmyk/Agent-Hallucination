@@ -20,6 +20,7 @@ from sehd_rise.detection.injection import (
     make_skill_aware_provider,
     route_binding_map,
 )
+from sehd_rise.detection.policy import build_adjudication_facts
 from sehd_rise.skills.genome import create_baseline_genome
 from sehd_rise.skills.vocabulary.contracts import PolicyItem
 
@@ -217,6 +218,22 @@ def test_wide_construct_state_process_only() -> None:
     )
     assert result["state"] == "verified_clean"
     assert result["wide_construct_state"] == "verified_process_incident"
+
+
+def test_responsible_step_available_anchors_on_event_id() -> None:
+    """A verified_error proof anchors localization on ``responsible_event_id``
+    (always present), so the fact snapshot must not report the step missing
+    when only the event id is carried (``proof_adjudication`` has no
+    ``responsible_step`` field)."""
+    facts = build_adjudication_facts({
+        "state": "verified_error",
+        "responsible_event_id": "event_007",
+    })
+    assert facts.responsible_step_available is True
+    # With neither field present, the flag stays False (genuine missing step).
+    assert build_adjudication_facts(
+        {"state": "verified_error"}
+    ).responsible_step_available is False
 
 
 def main() -> int:
