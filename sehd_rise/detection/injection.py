@@ -3,9 +3,9 @@
 The L1 Skill layer never injects prose into model/provider prompts. This
 module compiles a genome's delta rules into the ordered executable rule
 set the deterministic executor consumes: each entry is
-``(module_id, rule_id, condition_spec, action_spec)`` in genome order. Only
-slot-contract rules with a compiled action spec are executable; an untyped
-prose rule carries no action and is skipped.
+``(module_id, rule_id, condition_spec, action_spec, binding_entity_id)`` in
+genome order. Only slot-contract rules with a compiled action spec are
+executable; an untyped prose rule carries no action and is skipped.
 """
 
 from __future__ import annotations

@@ -452,7 +452,7 @@ def validate_policy_edit(
 
     if operation == PolicyOp.ADD_ITEM.value:
         if edit.new_item is None:
-            return False, "missing_new_item"
+            return False, "missing_item_payload"
         valid, reason = _validate_item_contract(edit.new_item, genome.registry)
         if not valid:
             return False, reason
@@ -482,7 +482,7 @@ def validate_policy_edit(
 
     if operation == PolicyOp.MODIFY_ITEM.value:
         if edit.new_item is None:
-            return False, "missing_new_item"
+            return False, "missing_item_payload"
         valid, reason = _validate_item_contract(edit.new_item, genome.registry)
         if not valid:
             return False, reason

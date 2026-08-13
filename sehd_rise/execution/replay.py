@@ -162,10 +162,8 @@ def _run_detection_with_genome(
             result, transforms, record=record,
         )
         l1_execution = {
-            key: [
-                *constructive_execution.get(key, []),
-                *transform_execution.get(key, []),
-            ]
+            key: list(constructive_execution.get(key, []))
+            + list(transform_execution.get(key, []))
             for key in ("fired", "bound", "skipped")
         }
         l1_execution["constructive_execution_proofs"] = (

@@ -6,10 +6,12 @@ only when the deployed runtime already has a deterministic executor and the
 evaluation layer has an observable postcondition for the same operation.
 
 The registry deliberately describes the current runtime, including its
-negative space.  In particular, every L1 capability is a post-court monotonic
-transform; no L1 capability creates candidates, evidence, certificates, or
-provider reasoning.  Missing constructive behavior is reported as a
-``CapabilityGap`` rather than being translated into a suppressive operation.
+negative space.  Every L1 capability is a post-court monotonic transform;
+apart from the single bounded constructive exception (``construct_candidate``
+materializes neutral candidates from a bound claim anchor), no L1 capability
+creates candidates, evidence, certificates, verdicts, or provider reasoning.
+Missing constructive behavior is reported as a ``CapabilityGap`` rather than
+being translated into a suppressive operation.
 """
 
 from __future__ import annotations
@@ -711,7 +713,7 @@ _FN_FAMILY_COVERAGE_KIND: Mapping[str, str] = {
 # mirrors the owner's registered ``does_not_support`` fact — it is a curriculum
 # label (what capability must be invented on a provider-side / L2 surface), not
 # a new L1 opcode. Adding the opcode would reverse the "delete generative L1
-# opcodes, keep 9 deterministic ones" decision and cross the authority boundary.
+# opcodes, keep 8 deterministic ones" decision and cross the authority boundary.
 _FN_FAMILY_BLOCKERS: Mapping[str, tuple[str, str]] = {
     "missing_evidence_obligation": (
         "assert_evidence_obligation", "author evidence / collect missing evidence",

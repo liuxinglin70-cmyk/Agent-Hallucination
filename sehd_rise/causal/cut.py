@@ -90,8 +90,9 @@ REASON_QUARANTINE_PATTERN = "quarantine_pattern_dominant"
 # case; FN-clean = clean verdict on an error case.
 REASON_GOLD_FALSE_POSITIVE = "gold_false_positive"
 REASON_GOLD_FALSE_NEGATIVE_CLEAN = "gold_false_negative_clean"
-# Marker retained for serialized compatibility.  A cut carrying this reason is
-# now a capability-gap witness, never NON_EVOLVABLE or a framework defect.
+# Names an episode whose nominally-L1 surface compiled no executable
+# obligation: a cut carrying this reason is a capability-gap witness, never
+# NON_EVOLVABLE or a framework defect (``repairability.analyze`` resolves it).
 REASON_DEMOTED_L1_NO_EXECUTABLE = "demoted_l1_no_executable_obligation"
 
 # Self-supervised defect reasons carrying their executable field canonically
