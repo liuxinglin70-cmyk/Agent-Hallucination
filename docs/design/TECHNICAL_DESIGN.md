@@ -27,6 +27,7 @@ skills          → platform
 detection       → platform, skills
 causal          → platform, skills, detection
 experience      → platform, skills, causal
+learning        → causal
 typing          → platform, skills, causal, experience
 planning        → platform, skills, causal, experience, typing
 execution       → platform, skills, detection, causal
@@ -45,6 +46,7 @@ api, cli        → loop, detection, evaluation, planning
 | `detection` | packet / transport / court/ / policy / injection / detector / replicas / batch | 证明法庭检测：轨迹打包、provider 传输、v3.5 法庭引擎、确定性 L2 策略求值器、L1 post-court Skill 编译与执行、`detect_record` 入口、副本聚合、批量运行 |
 | `causal` | signals / cut / episode / repairability / plan | 唯一的因果权威：检测→进化投影、终态因果切点、`CausalFailureEpisode`、`RepairabilityStatus` 分诊、规范 `RepairPlan` |
 | `experience` | memory | 机制级经验记忆——单一 Experience Truth |
+| `learning` | protocol | SEHD-v7 学习协议：五个一等类型（FailureObservation / RepairIntent / ExecutableCandidate / EvaluationEvidence / EvolutionMemory）+ CandidateArchive + 候选失败分类。纯数据投影，绝不重推修复语义或权威 |
 | `typing` | classifier / guidance / slices | HTC-TES 咨询型类型智能：类型标注、检索/反思先验、类型化评估切片。无因果否决权 |
 | `planning` | l1 / l2 / retrieval / candidates / search / feedback | 由 RepairPlan 驱动的假设搜索：L1 LLM 因果反思、L2 封闭词表策略规划、经验检索、重试反馈 |
 | `execution` | action / executor / replay / trace | 修复执行与证据：`ActionSpec`、按 `RepairPlan.executor` 分发、带新鲜 child genome 的检测回放、`ExecutionTrace` |
@@ -256,15 +258,18 @@ DETECTED
 
 ### 结果漏斗
 
-每次修复尝试恰好终止于四层共 20 种终态之一——`loop/machine.py::Outcome`，彻底取代
+每次修复尝试恰好终止于四层共 26 种终态之一——`loop/machine.py::Outcome`，彻底取代
 旧的 `skip_*` 词表：
 
 - **Framework**：`CAPABILITY_GAP`、`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
-  `SCHEMA_FAILURE`、`INFRA_FAILURE`、`BINDING_DOMAIN_MISMATCH`
+  `SCHEMA_FAILURE`、`INFRA_FAILURE`、`BINDING_DOMAIN_MISMATCH`、
+  `CONSTRUCTION_NO_CANDIDATE`、`CONSTRUCTION_ANCHOR_MISMATCH`、
+  `CONSTRUCTED_CANDIDATE_DUPLICATE`
 - **Search**：`NO_HYPOTHESIS`、`INVALID_PROPOSAL`、`DUPLICATE_PROPOSAL`
-- **Execution**：`BINDING_NOT_FOUND`、`BINDING_AMBIGUOUS`、`ACTION_NOT_DISPATCHED`、
-  `EXECUTION_RUNTIME_FAILURE`、
-  `TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
+- **Execution**：`BINDING_NOT_FOUND`、`BINDING_AMBIGUOUS`、
+  `CONSTRUCTED_CANDIDATE_NOT_QUALIFIED`、`CONSTRUCTED_CANDIDATE_NOT_VERIFIED`、
+  `CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE`、`ACTION_NOT_DISPATCHED`、
+  `EXECUTION_RUNTIME_FAILURE`、`TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
 - **Fitness**：`SOURCE_NOT_IMPROVED`、`CANARY_REGRESSION`、`TRANSFER_REGRESSION`、
   `ACCEPTED`
 
@@ -359,6 +364,62 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
 未来反思的证据，不是准确率主张：只有评估层记录了成功的源级结果之后，覆盖才会提升。
 跨运行续跑显式加载 `--initial-genome`、`--initial-policy-genome` 与
 `--experience-memory`；只加载记忆绝不改动已注册的基线基因组。
+
+## 学习协议（SEHD-v7 五类型）
+
+`learning/protocol.py` 把训练协议解耦成五个一等类型，让「值得怎么修」与「当前
+RuleSpec 能否精确表达」不再过早合并：
+
+```text
+FailureObservation    真实发生了什么（终态 + 阻塞谓词 + 属主 + 缺失/畸形字段）
+RepairIntent          要改哪条因果边，DSL 无关；missing_capability 非空时即为
+                      CAPABILITY_GAP 信号（记录「缺什么」，而非静默 no-edit）
+ExecutableCandidate   当前能力空间里怎么实现
+EvaluationEvidence    执行后发生了什么（fired / edge changed / blocker cleared / transition）
+EvolutionMemory       什么条件下这类改动值得再次尝试
+```
+
+`CandidateArchive` 是一个有界、按阶段（raw_hypothesis / schema_valid / bindable /
+executable）归档被拒候选的集合，取代「只追单条 mutation lineage」的丢弃。候选失败
+经 `classify_candidate_failure` 映射到 `learning/protocol.py` 的封闭分类：
+`DSL_NOT_REPRESENTABLE`（能力语言表达不了）、`ENTITY_NOT_FOUND`（实体定位失败）、
+`SEARCH_FAILURE`（绑定到 repair 边失败）、`BINDING_AMBIGUOUS`、`STRUCTURAL_INVALID`。
+只有 DSL 缺口喂能力课程，只有搜索失败喂策略学习器（§2.8），二者不再压成同一个
+`INVALID_PROPOSAL`。
+
+## FN 能力覆盖矩阵
+
+`skills/capabilities.py::fn_capability_coverage_matrix()` 是正向召回学习面的唯一审计
+视图：每个 FN 家族记录 `covered`、`operations`、`coverage_kind` 与（未覆盖时）
+`required_capability` + `blocker`。三类 coverage：
+
+- `primitive` —— 一个注册的确定性 opcode **本身**就是该机制（当前仅
+  `construct_candidate` 之于 missing_claim_candidate）。
+- `condition_specialization` —— 同一 `construct_candidate` primitive 覆盖该家族，家族
+  的区分度来自学到的 condition / anchor，而非独立 opcode（cross_claim_dependency /
+  tool_grounding / temporal_numeric_entity_consistency）。
+- `provider_side_capability` —— 确定性 L1 后处理面表达不了，需在 provider-side / L2 层
+  发明新能力（missing_evidence_* / wrong_qualification / missing_verifier_route /
+  wrong_verifier_instruction / missing_certificate_path / coverage_blind_spot）。
+  `blocker` 镜像 owner 注册的 `does_not_support` 事实（如 `collect missing evidence` /
+  `invoke a verifier` / `create missing certificate`），是课程输入而非新 L1 opcode——
+  新增这些 opcode 会推翻「删除生成性 L1 opcode、保留确定性 transform」的决策并跨越
+  权威边界（Skill 不得写证据/证书/verdict）。
+
+## 运行模式三分
+
+`loop/run_mode.py::resolve_run_mode` 把公开 API 此前塌缩进 `use_gold` /
+`fitness_use_gold` / `canary_case_ids` 默认值的三种 regime 显式化：
+
+| 模式 | gold | canary | claim_learning |
+|---|---|---|---|
+| `supervised_evolution` | 是 | 否 | 是 |
+| `label_free_diagnostic` | 否（强制） | 否 | 否 |
+| `protected_label_free_evolution` | 否 | **必需**（fail-fast） | 是 |
+
+「没学到 skill」是 planner 不行还是证据不足不允许 commit，就此可区分，不再混在
+`skill_count = 0` 里。`shadow._shadow_commit_eligible` 的 canary-vs-gold 准入谓词不变，
+本模块只做 regime 的显式化与前置校验。
 
 ## 评估与晋升
 
@@ -462,12 +523,31 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
 - **E9 谱系多样性/塌陷遥测**（`loop/result.py::_lineage_diversity`）：逐模块进化规则数、
   接受编辑分布、L2 工作项数，以及塌陷 flag（单模块主导、无进化规则等）。纯报告。
 
+- **E10 实体身份/泛化谓词分离**（`skills/binding.py`、`planning/candidates.py`、
+  `detection/injection.py`）：`match_condition_bindings` 增加 `preferred_entity_id`，
+  训练期实体按 id 精确绑定（`preferred_entity_grounded`），过宽的泛化谓词不再把源回放
+  打成 `BINDING_AMBIGUOUS`；`compile_genome_rules` 输出 5 元组（含 `binding_entity_id`）
+  但该 id 不固化进谓词——跨案例复用仍按 `condition_spec` 在新案例 universe 上求值。
+  反思提示词按能力注册表枚举 `<entity_menu>`，模型选 `target_entity_id` 而非猜谓词定位。
+- **E11 失败分类 + 候选归档**（`learning/protocol.py`）：`classify_candidate_failure`
+  区分 DSL / entity / search / binding / structural 五类失败；`CandidateArchive` 按阶段
+  归档被拒候选，供能力课程与策略学习器消费。
+- **E12 minibatch meta 搜索策略更新**（`loop/runner.py`）：`_run_meta_update` 从
+  `_finalize` 抽出；`meta_update_every=N` 使同一 run 后续 case 每 N 个 case 刷新一次
+  策略配置，meta 从「run 后事后」向「run 内优化器状态」迈一步。仍只学搜索策略，不碰
+  门控/属主/切点。
+- **E13 FN 覆盖矩阵**（`skills/capabilities.py`）：`fn_capability_coverage_matrix` +
+  `fn_family_for` 输出正向召回能力覆盖，`CAPABILITY_GAP` 步骤现在把 `RepairIntent` 与
+  `fn_family` 写入审计。
+
 **仍保留为预留**（框架不擅自实现）：engine-level L2 动作 `reclassify_candidate_state` /
 `require_route_replay` 仍是 `runtime_owner="engine"` 的预留操作符，不可提议、不可执行；
 只有先实现确定性运行时语义、更新 `_POSTCONDITION`/求值器并把它们从预留集移入
 court-local 集，才能真正落地。这个顺序被有意保留，因为「能重新调用 provider / 重分类
 候选」的动作会显著放大表达力，也就同时放大过拟合与归功复杂度——它必须先有选择门
-（见 README「下一步正式实验」）再放开。
+（见 README「下一步正式实验」）再放开。同理，FN 覆盖矩阵中标 `provider_side_capability`
+的七个家族（missing_evidence_* 等）也不在 L1 确定性层实现：它们需要 provider-side /
+L2 新能力，属于能力课程输入，而非「再加一个 prompt 规则」。
 
 ## 下一步正式实验（规划，尚未实施）
 
@@ -518,14 +598,34 @@ JSON 修复与请求哈希都在这一原语内实现（`time.monotonic()` 截�
   计数器已移除。`mutation_calls` / `detector_calls` / `conflict_gate_calls` 等计数
   保留为运行遥测，供给结果审计与收敛之外的观测。
 
+### 检测热路径读超时（2026-08-14 观测）
+
+`provider_call_with_schema` 的 per-attempt 读超时默认
+`timeout_seconds=300`，但检测路由（`detector_v3_5.json` 的 `candidate_fallback_route` /
+`qualification_route` / `propagation_route` / `proof_court` 相关子调用）显式配置
+`timeout_seconds=120`、`total_timeout_seconds=480`。`_read_response_body` 把整个响应体
+的 socket 读也纳入单调截止期（`sock.settimeout(remaining)`），所以**不是**「只测连接、
+不测正文」的经典误配——正文流式停顿会被正确抬成 `TimeoutError` 并进入重试。
+
+真实 5 例并发 census 里 4/5 例的 `INFRA_FAILURE` 都来自这条超时（
+`TimeoutError The read operation timed out`），发生在 `proof_court` / `census` /
+`candidate_path` / `appeal` 这些检测热路径；叠加 `finish_reason=length` 空 body 的
+`provider_empty_content`。结论是**检测侧 V4 推理模型在并发放大下、单个 120s 读窗口内
+产不出完整 JSON**，而检测出口（`detection_call`）刻意不盖 `thinking.type=disabled`
+（与进化出口不同）：检测让模型完整推理以换证据质量，代价是尾部推理吃满时间与
+token 预算。这是一个**吞吐/延迟预算与推理模型的匹配问题**（框架层），不是代理、不是
+代码回归；在路由或并发上收紧（降并发串行、或为推理模型配更长读窗口）是下一步
+实验配置，不手调检测阈值。
+
 ## 证据边界
 
 随时可运行的常驻验证：
 
-- `tools/check_layers.py` —— 无环层级纪律（84 文件 / 14 层，零违例），包括「任何
+- `tools/check_layers.py` —— 无环层级纪律（93 文件 / 15 层，零违例），包括「任何
   框架模块都不得导入冻结基线」的守卫。
-- `python -m pytest tests/` —— 循环状态机套件（10/10：所有合法迁移可达、非法迁移
-  被拒绝、每个漏斗终态独立计数）。
+- `python -m pytest tests/` —— 循环状态机套件（所有合法迁移可达、非法迁移被拒绝、
+  每个漏斗终态独立计数），以及 P0 一致性、实体身份绑定、学习协议/覆盖矩阵/运行模式
+  等不变量测试（99 项全绿）。
 - 全包导入冒烟 —— 所有模块干净导入。
 
 重构验收（对照冻结基线执行，记录在 git 历史中；验收后迁移 harness 已从树中移除）：

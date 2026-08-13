@@ -149,11 +149,18 @@ python -m sehd_rise evolve \
   --config sehd_rise/configs/detector_v3_5.json \
   --output-dir evolution_output_2 \
   --reflection-candidates 3 \        # 每案例的独立 mutation 采样数（1..5）
-  --max-mutation-calls 100 \         # LLM 硬预算，耗尽即失败即关闭
+  --max-mutation-attempts 2 \        # 每触发案例的 mutation 重试数（1..8）
   --initial-genome evolution_output/champion_genome.json \
   --initial-policy-genome evolution_output/policy_genome.json \
   --experience-memory evolution_output/htc_tes_experience_memory.json \
   --resume-from evolution_output/evolution_checkpoint.json
+```
+
+运行模式（§10 三分法）与 minibatch meta 节奏：
+
+```bash
+  --run-mode supervised_evolution|label_free_diagnostic|protected_label_free_evolution \
+  --meta-update-every 5              # 每 5 个 case 刷新一次搜索策略（0 = 仅 run 后）
 ```
 
 写入输出目录的产物：
@@ -178,9 +185,9 @@ from sehd_rise.api.detection import detect_record, load_detector_config
 from sehd_rise.api.evolution import run_evolution, load_records
 ```
 
-层级导入遵循 13 层包结构（`platform`、`skills`、`detection`、`causal`、
-`experience`、`typing`、`planning`、`execution`、`evaluation`、`meta`、`loop`、
-`api`、`cli`）；无环导入纪律由 `tools/check_layers.py` 强制。
+层级导入遵循 15 层包结构（`platform`、`skills`、`detection`、`causal`、
+`experience`、`learning`、`typing`、`planning`、`execution`、`evaluation`、`meta`、
+`loop`、`api`、`cli`）；无环导入纪律由 `tools/check_layers.py` 强制。
 
 ## 运行产物
 
@@ -223,6 +230,16 @@ from sehd_rise.api.evolution import run_evolution, load_records
    学习器（搜索先验 / 操作偏好 / 机制排序 / 重试策略 / 候选多样性）；属主、因果
    切点、可修复性与硬门控通道在类型层面不可表示。
 10. **失败即关闭、gold 隔离、冻结基座纪律**，如上文必读章程所述。
+11. **实体身份与泛化谓词分离。** 训练期实体按 `target_entity_id` 精确绑定（不是
+    靠谓词去「猜」唯一命中）；`condition_spec` 只描述 skill 将来复用时的条件。过宽的
+    泛化谓词因此不再把源回放打成 `BINDING_AMBIGUOUS`，而跨案例复用仍按 `condition_spec`
+    在新案例 universe 上重新求值，不固化训练期实体 id。
+12. **FN 能力缺口是 provider-side 问题，不在 L1 确定性层填补。** 七个未覆盖 FN 家族
+    （missing_evidence_*、wrong_qualification、missing_verifier_route、
+    wrong_verifier_instruction、missing_certificate_path、coverage_blind_spot）需要
+    provider-side / L2 新能力；`fn_capability_coverage_matrix` 记录其
+    `required_capability` 与 `blocker` 作为课程输入，绝不新增会跨越权威边界的生成性
+    opcode（Skill 不得写证据/证书/verdict）。
 
 ## 下一步正式实验（规划，尚未实施）
 
@@ -244,6 +261,14 @@ from sehd_rise.api.evolution import run_evolution, load_records
    最不自信的案例（FP/FN 边界、高置信 unresolved）。
 5. **负样本挖掘 / 红队循环。** 定期跑检测器，把"自信出错"的案例定向扩充进化池，并把
    有限 gold 标注预算投到这些边界案例。
+
+> **试运行观测（2026-08-14）**：5 例并发 gold census（3 正例 + 2 负例）全部停在
+> framework 层——4 例 `INFRA_FAILURE`（detector 热路径
+> `TimeoutError The read operation timed out`）与 1 例正确的 `NON_EVOLVABLE`。根因是
+> 检测侧 V4 推理模型在并发放大下、单个 120s 读窗口内产不出完整 JSON，叠加
+> `finish_reason=length` 空 body。要拿到干净的 search→execution→fitness 漏斗，需**串行
+> 或 2 路以内并发**重跑（或为推理模型配更长读窗口）；这是吞吐预算与模型的匹配问题，
+> 不是代理、不是代码回归。见 TECHNICAL_DESIGN「检测热路径读超时」。
 
 ## 开发准则
 
