@@ -683,6 +683,17 @@ _FN_FAMILY_OWNERS: Mapping[str, tuple[str, ...]] = {
     "temporal_numeric_entity_consistency": ("candidate_trigger",),
 }
 
+# The plain family an owner falls back to when the mechanism evidence
+# discriminates none of its more specific families. Every owner below hosts
+# at least two families; owners with a single family never reach this table.
+DEFAULT_FN_FAMILY_BY_OWNER: Mapping[str, str] = {
+    "candidate_trigger": "missing_claim_candidate",
+    "evidence_obligation": "missing_evidence_obligation",
+    "candidate_to_verifier_route": "wrong_qualification",
+    "atomic_verifier_instruction": "wrong_verifier_instruction",
+    "causal_link_test": "cross_claim_dependency",
+}
+
 # How a covered family is actually expressed. ``primitive`` means a registered
 # deterministic opcode IS the family's mechanism; ``condition_specialization``
 # means the single forward-recall primitive ``construct_candidate`` covers it,
@@ -780,18 +791,17 @@ def fn_capability_coverage_matrix() -> dict[str, dict[str, Any]]:
     return matrix
 
 
-def fn_family_for(failure_shape: str, owner: str) -> str:
-    """Map a failure shape + owner onto its FN family, if any.
+def fn_families_for_owner(owner: str) -> tuple[str, ...]:
+    """Families whose declared causal edge an owner can host, in table order.
 
-    Returns "" for shapes that are not forward-recall (FP / localization /
-    policy), so the curriculum only attaches a family to real FN gaps.
+    The mechanism classifier (``loop.mechanism``) uses this as the per-owner
+    candidate set and then discriminates on the failure observation; an owner
+    is never the *first-match* answer itself.
     """
-    if str(failure_shape) != "gold_false_negative_clean":
-        return ""
-    for family, owners in _FN_FAMILY_OWNERS.items():
-        if str(owner) in owners:
-            return family
-    return "missing_claim_candidate"
+    return tuple(
+        family for family, owners in _FN_FAMILY_OWNERS.items()
+        if str(owner) in owners
+    )
 
 
 def _render_transition(direction: str) -> str:
@@ -839,6 +849,7 @@ __all__ = [
     "BINDING_CARDINALITIES",
     "BINDING_DOMAINS",
     "CapabilityGap",
+    "DEFAULT_FN_FAMILY_BY_OWNER",
     "FN_FAILURE_FAMILIES",
     "L1_COURT_TRANSFORM_EXECUTOR",
     "L1_CONSTRUCTIVE_HARNESS_EXECUTOR",
@@ -848,6 +859,6 @@ __all__ = [
     "SkillCapability",
     "SkillCapabilityRegistry",
     "fn_capability_coverage_matrix",
-    "fn_family_for",
+    "fn_families_for_owner",
     "render_capability_contracts",
 ]

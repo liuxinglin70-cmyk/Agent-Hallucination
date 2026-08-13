@@ -202,14 +202,16 @@ from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
 from sehd_rise.learning.protocol import (
     CandidateArchive,
     ExecutableCandidate,
+    FailureObservation,
     RepairIntent,
     STAGE_SCHEMA_VALID,
     classify_candidate_failure,
 )
+from sehd_rise.loop.mechanism import classify_failure_mechanism
 from sehd_rise.loop.run_mode import RunModeResolution, resolve_run_mode
+from sehd_rise.skills.anchors import project_locus_evidence
 from sehd_rise.skills.capabilities import (
     fn_capability_coverage_matrix,
-    fn_family_for,
 )
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
@@ -1613,9 +1615,18 @@ class EvolutionLoop:
                 repair_intent = RepairIntent.from_episode(
                     episode, missing_capability=missing_capability,
                 )
-                fn_family = fn_family_for(
-                    cut.reason_code, cut.owner,
-                )
+                # §13/§14#7: the failure observation is the single typed
+                # input of the FN mechanism classifier; the trajectory locus
+                # evidence comes from the label-free anchor projector, never
+                # from the gold join.
+                failure_observation = FailureObservation.from_episode(episode)
+                source_record = self.records.get(case_id)
+                if isinstance(source_record, Mapping):
+                    failure_observation = replace(
+                        failure_observation,
+                        trajectory_hints=project_locus_evidence(source_record),
+                    )
+                fn_family = classify_failure_mechanism(failure_observation)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -1625,6 +1636,7 @@ class EvolutionLoop:
                         "operation": "capability_gap",
                         **dict(verdict.evidence),
                         "repair_intent": repair_intent.to_dict(),
+                        "failure_observation": failure_observation.to_dict(),
                         "fn_family": fn_family,
                     },
                     mutation_applied=None,
@@ -1636,6 +1648,7 @@ class EvolutionLoop:
                     fitness_check={
                         "repairability": verdict.to_dict(),
                         "repair_intent": repair_intent.to_dict(),
+                        "failure_observation": failure_observation.to_dict(),
                         "fn_family": fn_family,
                     },
                 ), next_case_index=idx + 1)

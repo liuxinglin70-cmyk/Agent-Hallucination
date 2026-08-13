@@ -23,6 +23,7 @@ from sehd_rise.causal.episode import FailureEdge
 from sehd_rise.learning.protocol import (
     CandidateArchive,
     ExecutableCandidate,
+    FailureObservation,
     RepairIntent,
     STAGE_SCHEMA_VALID,
     classify_candidate_failure,
@@ -32,13 +33,13 @@ from sehd_rise.learning.protocol import (
     FAILURE_CLASS_SEARCH_FAILURE,
     FAILURE_CLASS_STRUCTURAL_INVALID,
 )
+from sehd_rise.loop.mechanism import classify_failure_mechanism
 from sehd_rise.loop.run_mode import (
     RunMode,
     resolve_run_mode,
 )
 from sehd_rise.skills.capabilities import (
     fn_capability_coverage_matrix,
-    fn_family_for,
 )
 
 
@@ -97,13 +98,97 @@ def test_fn_coverage_uncovered_rows_carry_blocker_and_required_capability() -> N
     assert "create missing certificate" in matrix["missing_certificate_path"]["blocker"]
 
 
-def test_fn_family_for_maps_failure_shape_and_owner() -> None:
+def _observation(**overrides) -> FailureObservation:
+    """A gold FN-clean observation on candidate_trigger with plain evidence."""
+    base = dict(
+        terminal_state="verified_clean",
+        blocking_predicate="gold_polarity_mismatch",
+        failure_owner="candidate_trigger",
+        skill_layer="l1_provider_rule",
+        reason_code="gold_false_negative_clean",
+        missing_fields=("anchor_id",),
+        malformed_fields=(),
+        candidate_kind="unknown",
+        output_object="candidate",
+        output_field="anchor_id",
+        consumer="proof_court",
+    )
+    base.update(overrides)
+    return FailureObservation(**base)
+
+
+def test_mechanism_classifier_distinguishes_candidate_trigger_families() -> None:
+    """One owner, four families: the observation decides, not the owner table.
+
+    ``candidate_trigger`` hosts all four of these families, so a first-match
+    owner walk would collapse them onto ``missing_claim_candidate``.
+    """
     assert (
-        fn_family_for("gold_false_negative_clean", "candidate_trigger")
+        classify_failure_mechanism(_observation())
         == "missing_claim_candidate"
     )
+    assert (
+        classify_failure_mechanism(_observation(dependency_refs=("event_002",)))
+        == "cross_claim_dependency"
+    )
+    assert (
+        classify_failure_mechanism(
+            _observation(trajectory_hints=("tool_result_cited",)),
+        )
+        == "tool_grounding_requirement"
+    )
+    assert (
+        classify_failure_mechanism(
+            _observation(trajectory_hints=("numeric_locus",)),
+        )
+        == "temporal_numeric_entity_consistency"
+    )
+
+
+def test_mechanism_classifier_tool_grounding_beats_numeric_locus() -> None:
+    """The matcher order is deterministic: tool grounding is the stronger
+    mechanism even when the locus also carries numbers."""
+    assert (
+        classify_failure_mechanism(
+            _observation(
+                trajectory_hints=("tool_result_cited", "numeric_locus"),
+            ),
+        )
+        == "tool_grounding_requirement"
+    )
+
+
+def test_mechanism_classifier_non_fn_shapes_get_no_family() -> None:
     # Forward-recall only: an FP shape never gets an FN family.
-    assert fn_family_for("gold_false_positive", "evidence_obligation") == ""
+    assert (
+        classify_failure_mechanism(
+            _observation(
+                reason_code="gold_false_positive",
+                failure_owner="evidence_obligation",
+            ),
+        )
+        == ""
+    )
+    # Owners outside the declared FN surface never get a guessed family.
+    assert (
+        classify_failure_mechanism(_observation(failure_owner="unknown_owner"))
+        == ""
+    )
+
+
+def test_mechanism_classifier_uses_owner_default_when_evidence_is_plain() -> None:
+    """A multi-family owner without discriminating evidence lands on its
+    plain family, e.g. evidence_obligation -> missing_evidence_obligation."""
+    observation = _observation(
+        failure_owner="evidence_obligation",
+        output_object="error_certificate",
+        output_field="coverage_state",
+        missing_fields=(),
+    )
+    assert (
+        classify_failure_mechanism(observation)
+        == "missing_evidence_obligation"
+    )
 
 
 # --- §14#4: candidate-failure classification -------------------------------

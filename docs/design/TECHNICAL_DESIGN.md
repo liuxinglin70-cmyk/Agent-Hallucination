@@ -537,8 +537,10 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
   策略配置，meta 从「run 后事后」向「run 内优化器状态」迈一步。仍只学搜索策略，不碰
   门控/属主/切点。
 - **E13 FN 覆盖矩阵**（`skills/capabilities.py`）：`fn_capability_coverage_matrix` +
-  `fn_family_for` 输出正向召回能力覆盖，`CAPABILITY_GAP` 步骤现在把 `RepairIntent` 与
-  `fn_family` 写入审计。
+  `fn_families_for_owner` 输出正向召回能力覆盖；`loop/mechanism.py::classify_failure_mechanism`
+  把 `FailureObservation`（因果边身份 + missing/malformed fields + 轨迹 locus 证据）
+  分类到 FN 家族，同一 owner 下的多个家族不再塌缩到表首命中。
+  `CAPABILITY_GAP` 步骤把 `RepairIntent`、`failure_observation` 与 `fn_family` 写入审计。
 
 **仍保留为预留**（框架不擅自实现）：engine-level L2 动作 `reclassify_candidate_state` /
 `require_route_replay` 仍是 `runtime_owner="engine"` 的预留操作符，不可提议、不可执行；

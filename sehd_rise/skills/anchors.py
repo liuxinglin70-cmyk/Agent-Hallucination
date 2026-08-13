@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 
 _GOLD_KEYS = frozenset({
@@ -25,6 +25,26 @@ _CONTENT_KEYS = ("content", "message", "text", "thought", "response", "assistant
 _SPAN_RE = re.compile(r"[^\n.!?。！？]+(?:[.!?。！？]+|$)", re.UNICODE)
 _NUMBER_RE = re.compile(r"\d")
 _CITATION_RE = re.compile(r"https?://|\[[0-9]+\]|\([A-Z][A-Za-z]+,?\s+\d{4}\)")
+_WORD_RE = re.compile(r"[A-Za-z]{3,}")
+
+# Closed label-free mechanism-evidence tokens for the terminal claim locus.
+# The FN mechanism classifier consumes exactly this vocabulary.
+TOOL_RESULT_CITED = "tool_result_cited"
+TOOL_RESULT_ADJACENT = "tool_result_adjacent"
+NUMERIC_LOCUS = "numeric_locus"
+CITATION_LOCUS = "citation_locus"
+LOCUS_EVIDENCE_TOKENS = frozenset({
+    TOOL_RESULT_CITED, TOOL_RESULT_ADJACENT, NUMERIC_LOCUS, CITATION_LOCUS,
+})
+
+# Function-word tokens excluded from tool-result adoption overlap: a claim
+# sharing only stopwords with a result does not depend on that result.
+_STOP_TOKENS = frozenset({
+    "the", "and", "for", "are", "was", "has", "had", "have", "not", "with",
+    "that", "this", "from", "into", "were", "will", "would", "they", "them",
+    "then", "than", "you", "your", "its", "his", "her", "our", "their",
+    "been", "being", "there", "here", "after", "before",
+})
 
 
 def _canonical_hash(value: Any) -> str:
@@ -69,6 +89,101 @@ def _tool_interaction_ids(history: list[Any], stop: int) -> tuple[str, ...]:
             if call is not None:
                 refs.append(f"event_{event_index:03d}_tool_{call_index:02d}")
     return tuple(refs)
+
+
+def _adjacent_tool_responses(
+    history: list[Any], event_index: int,
+) -> tuple[str, ...]:
+    """Tool-result texts available at one event (its own row or the previous).
+
+    A claim only reads results delivered on its own row or the row right
+    before it; older results no longer ground this claim. ``event_index`` is
+    1-based; string responses contribute their text, object responses their
+    string values.
+    """
+    rows = history[max(0, event_index - 2):event_index]
+    texts: list[str] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        responses = row.get("tool_responses") or ()
+        if isinstance(responses, (str, Mapping)):
+            responses = (responses,)
+        if not isinstance(responses, (list, tuple)):
+            continue
+        for response in responses:
+            if isinstance(response, str):
+                texts.append(response)
+            elif isinstance(response, Mapping):
+                texts.extend(
+                    value for value in response.values() if isinstance(value, str)
+                )
+    return tuple(texts)
+
+
+def _span_adopts_tool_result(
+    span: str, responses: Sequence[str],
+) -> bool:
+    """Whether a span shows adoption evidence for one of the given results.
+
+    Adoption is label-free and deterministic: a citation marker in the span,
+    or non-stopword token / multi-digit overlap with a result text.
+    """
+    if _CITATION_RE.search(span):
+        return True
+    lowered = span.lower()
+    span_tokens = set(_WORD_RE.findall(lowered)) - _STOP_TOKENS
+    span_numbers = set(re.findall(r"\d{2,}", span))
+    for response in responses:
+        response_lower = str(response).lower()
+        if span_tokens & (set(_WORD_RE.findall(response_lower)) - _STOP_TOKENS):
+            return True
+        if span_numbers & set(re.findall(r"\d{2,}", response_lower)):
+            return True
+    return False
+
+
+def project_locus_evidence(record: Mapping[str, Any]) -> tuple[str, ...]:
+    """Closed label-free mechanism evidence for the terminal claim locus.
+
+    The locus is the final assistant event: the claim the detector missed
+    surfaces in the terminal trajectory there. Tokens come from the closed
+    ``LOCUS_EVIDENCE_TOKENS`` vocabulary so the FN mechanism classifier reads
+    a fixed set of shapes. Numeric and citation presence are the same proxies
+    the anchor projector already exposes; the tool tokens additionally
+    require results on the same or previous row plus adoption evidence.
+    """
+    if not isinstance(record, Mapping):
+        return ()
+    history = record.get("history")
+    if not isinstance(history, list) or not history:
+        return ()
+    locus_index = -1
+    locus_content = ""
+    for index, raw in enumerate(history, start=1):
+        if not isinstance(raw, Mapping):
+            continue
+        if str(raw.get("role") or "").lower() != "assistant":
+            continue
+        content = _text(raw)
+        if content.strip():
+            locus_index = index
+            locus_content = content
+    if locus_index < 0:
+        return ()
+    responses = _adjacent_tool_responses(history, locus_index)
+    hints: list[str] = []
+    if responses:
+        hints.append(
+            TOOL_RESULT_CITED
+            if _span_adopts_tool_result(locus_content, responses)
+            else TOOL_RESULT_ADJACENT
+        )
+    if _NUMBER_RE.search(locus_content):
+        hints.append(NUMERIC_LOCUS)
+    if _CITATION_RE.search(locus_content):
+        hints.append(CITATION_LOCUS)
+    return tuple(hints)
 
 
 @dataclass(frozen=True)
@@ -184,4 +299,13 @@ def project_claim_anchors(record: Mapping[str, Any]) -> tuple[ClaimAnchor, ...]:
     return tuple(anchors[:64])
 
 
-__all__ = ["ClaimAnchor", "project_claim_anchors"]
+__all__ = [
+    "CITATION_LOCUS",
+    "ClaimAnchor",
+    "LOCUS_EVIDENCE_TOKENS",
+    "NUMERIC_LOCUS",
+    "TOOL_RESULT_ADJACENT",
+    "TOOL_RESULT_CITED",
+    "project_claim_anchors",
+    "project_locus_evidence",
+]

@@ -118,7 +118,16 @@ def classify_candidate_failure(reason: str) -> str:
 
 @dataclass(frozen=True)
 class FailureObservation:
-    """What actually happened: the detector's terminal proof state."""
+    """What actually happened: the detector's terminal proof state.
+
+    Beyond the terminal proof, the observation carries the causal-edge
+    identity (``output_object`` / ``output_field`` / ``consumer``) and the
+    episode's cross-claim ``dependency_refs`` so a mechanism classifier can
+    tell *why* this failure shape occurred. ``trajectory_hints`` holds the
+    closed label-free locus-evidence tokens projected from the trajectory by
+    ``skills.anchors.project_locus_evidence``; the loop attaches them because
+    the episode alone never sees the raw record.
+    """
 
     terminal_state: str
     blocking_predicate: str
@@ -128,10 +137,16 @@ class FailureObservation:
     missing_fields: tuple[str, ...]
     malformed_fields: tuple[str, ...]
     candidate_kind: str = ""
+    output_object: str = ""
+    output_field: str = ""
+    consumer: str = ""
+    dependency_refs: tuple[str, ...] = ()
+    trajectory_hints: tuple[str, ...] = ()
 
     @classmethod
     def from_episode(cls, episode: CausalFailureEpisode) -> "FailureObservation":
         slice_payload = episode.causal_slice
+        edge = episode.causal_failure_edge
         return cls(
             terminal_state=episode.terminal_state,
             blocking_predicate=episode.blocking_predicate,
@@ -141,6 +156,10 @@ class FailureObservation:
             missing_fields=tuple(slice_payload.missing_fields),
             malformed_fields=tuple(slice_payload.malformed_fields),
             candidate_kind=slice_payload.candidate_kind,
+            output_object=str(edge.output_object) if edge is not None else "",
+            output_field=str(edge.field) if edge is not None else "",
+            consumer=str(edge.consumer) if edge is not None else "",
+            dependency_refs=tuple(slice_payload.dependency_refs),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -153,6 +172,11 @@ class FailureObservation:
             "missing_fields": list(self.missing_fields),
             "malformed_fields": list(self.malformed_fields),
             "candidate_kind": self.candidate_kind,
+            "output_object": self.output_object,
+            "output_field": self.output_field,
+            "consumer": self.consumer,
+            "dependency_refs": list(self.dependency_refs),
+            "trajectory_hints": list(self.trajectory_hints),
         }
 
 
