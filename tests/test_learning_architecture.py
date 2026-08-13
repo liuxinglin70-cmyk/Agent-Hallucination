@@ -21,11 +21,15 @@ import pytest
 
 from sehd_rise.causal.episode import FailureEdge
 from sehd_rise.learning.protocol import (
+    ARCHIVE_SIGNAL_ANCHOR_PROJECTION,
+    ARCHIVE_SIGNAL_DSL_CURRICULUM,
+    ARCHIVE_SIGNAL_SEARCH_POLICY,
     CandidateArchive,
     ExecutableCandidate,
     FailureObservation,
     RepairIntent,
     STAGE_SCHEMA_VALID,
+    archive_policy_signals,
     classify_candidate_failure,
     FAILURE_CLASS_BINDING_AMBIGUOUS,
     FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
@@ -251,6 +255,93 @@ def test_candidate_archive_preserves_by_failure_class() -> None:
     recent = archive.recent(failure_class=FAILURE_CLASS_DSL_NOT_REPRESENTABLE)
     assert len(recent) == 1
     assert archive.recent(failure_class=FAILURE_CLASS_SEARCH_FAILURE) == ()
+
+
+def _archive_with_runs(classes: tuple[str, ...]) -> CandidateArchive:
+    """An archive whose tail matches ``classes`` (newest last)."""
+    archive = CandidateArchive(capacity=64)
+    for index, failure_class in enumerate(classes):
+        archive.archive(
+            stage=STAGE_SCHEMA_VALID,
+            failure_class=failure_class,
+            reason=f"reason_{index}",
+            candidate=ExecutableCandidate(
+                operation="add_rule", target_module="candidate_trigger",
+            ),
+        )
+    return archive
+
+
+def test_archive_policy_signals_fire_on_consecutive_runs() -> None:
+    """A same-class tail reaching the threshold emits exactly its own signal."""
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+        )),
+    ) == (ARCHIVE_SIGNAL_DSL_CURRICULUM,)
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_SEARCH_FAILURE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+        )),
+    ) == (ARCHIVE_SIGNAL_SEARCH_POLICY,)
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_ENTITY_NOT_FOUND,
+            FAILURE_CLASS_ENTITY_NOT_FOUND,
+            FAILURE_CLASS_ENTITY_NOT_FOUND,
+            FAILURE_CLASS_ENTITY_NOT_FOUND,
+        )),
+    ) == (ARCHIVE_SIGNAL_ANCHOR_PROJECTION,)
+
+
+def test_archive_policy_signals_require_the_threshold() -> None:
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+        )),
+    ) == ()
+
+
+def test_archive_policy_signals_do_not_cross_pollute() -> None:
+    """An interleaved tail emits nothing: one class never steers another's
+    learner, and an older dsl run cannot fire behind a search tail."""
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+        )),
+    ) == ()
+    # dsl x4 followed by one search rejection: the tail is search x1.
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+            FAILURE_CLASS_SEARCH_FAILURE,
+        )),
+    ) == ()
+    # Non-routing classes never signal, however long their run.
+    assert archive_policy_signals(
+        _archive_with_runs((
+            FAILURE_CLASS_STRUCTURAL_INVALID,
+            FAILURE_CLASS_STRUCTURAL_INVALID,
+            FAILURE_CLASS_STRUCTURAL_INVALID,
+            FAILURE_CLASS_STRUCTURAL_INVALID,
+        )),
+    ) == ()
 
 
 # --- §13: RepairIntent carries missing capability --------------------------

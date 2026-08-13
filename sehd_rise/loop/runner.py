@@ -200,12 +200,19 @@ from sehd_rise.skills.capabilities import (
 )
 from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
 from sehd_rise.learning.protocol import (
+    ARCHIVE_SIGNAL_ANCHOR_PROJECTION,
+    ARCHIVE_SIGNAL_DSL_CURRICULUM,
+    ARCHIVE_SIGNAL_SEARCH_POLICY,
     CandidateArchive,
     EvaluationEvidence,
+    EvolutionMemory,
     ExecutableCandidate,
+    FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+    FAILURE_CLASS_SEARCH_FAILURE,
     FailureObservation,
     RepairIntent,
     STAGE_SCHEMA_VALID,
+    archive_policy_signals,
     classify_candidate_failure,
 )
 from sehd_rise.loop.mechanism import classify_failure_mechanism
@@ -871,6 +878,12 @@ class EvolutionLoop:
             else self.use_gold
         )
         self.candidate_archive = CandidateArchive()
+        # Archive -> policy routing state (§14#4): the entity-menu budget the
+        # anchor projector exposes, the capability-curriculum entries a
+        # recurring DSL gap records, and the applied signal history.
+        self.binding_menu_limit = 16
+        self.capability_curriculum_entries: list[dict[str, Any]] = []
+        self.archive_signal_history: list[dict[str, Any]] = []
         self._meta_case_counter = 0
         self._meta_last_idx = 0
         # Per-case §7 state machine; instantiated on each work-queue pop so a
@@ -900,6 +913,46 @@ class EvolutionLoop:
         """
         self._case_transition(State.EXPERIENCE_LEARNED, outcome=outcome)
         self._case_transition(State.META_UPDATED)
+
+    def _apply_archive_signals(self, case_id: str) -> None:
+        """Route a consecutive same-class rejection run to its own learner.
+
+        §14#4 feedback closure: a repeated DSL_NOT_REPRESENTABLE tail feeds
+        the capability curriculum, SEARCH_FAILURE refreshes the search
+        policy (the minibatch meta authority), ENTITY_NOT_FOUND widens the
+        anchor projector's entity-menu budget. Each signal only ever touches
+        its own knob, so distinct failure classes never pollute each other's
+        learners.
+        """
+        for signal in archive_policy_signals(self.candidate_archive, threshold=4):
+            self.archive_signal_history.append({
+                "case_id": case_id,
+                "signal": signal,
+                "archive_counts": self.candidate_archive.failure_class_counts(),
+            })
+            if signal == ARCHIVE_SIGNAL_SEARCH_POLICY:
+                self._run_meta_update()
+                self.causal_memory.meta_review["archive_evolution_memory"] = [
+                    EvolutionMemory(
+                        mechanism_signature=(
+                            "candidate_search", FAILURE_CLASS_SEARCH_FAILURE,
+                        ),
+                        outcome_slot="search_policy_refresh",
+                        retry_worthy=True,
+                    ).to_dict(),
+                ]
+            elif signal == ARCHIVE_SIGNAL_DSL_CURRICULUM:
+                recent = self.candidate_archive.recent(
+                    failure_class=FAILURE_CLASS_DSL_NOT_REPRESENTABLE,
+                    limit=4,
+                )
+                self.capability_curriculum_entries.append({
+                    "signal": signal,
+                    "case_id": case_id,
+                    "recent_reasons": [item.reason for item in recent],
+                })
+            elif signal == ARCHIVE_SIGNAL_ANCHOR_PROJECTION:
+                self.binding_menu_limit = min(self.binding_menu_limit * 2, 64)
 
     @property
     def funnel(self) -> OutcomeFunnel:
@@ -1415,6 +1468,9 @@ class EvolutionLoop:
             ):
                 self._meta_last_idx = idx
                 self._run_meta_update()
+            # §14#4: consecutive same-class rejection runs steer their own
+            # learner (curriculum / search policy / anchor projector).
+            self._apply_archive_signals(case_id)
             prior_episode_payload = None
             if self.active_attempt_index > 0:
                 for prior_step in reversed(self.steps):
@@ -2719,6 +2775,7 @@ class EvolutionLoop:
                 detection_result,
                 binding_domain,
                 record=_detector_record(self.records[case_id]),
+                limit=self.binding_menu_limit,
             )
 
         if self.mutation_route is not None:
@@ -4807,6 +4864,12 @@ class EvolutionLoop:
         )
         meta_review_summary["candidate_archive"] = (
             self.candidate_archive.to_dict()
+        )
+        meta_review_summary["capability_curriculum"] = list(
+            self.capability_curriculum_entries
+        )
+        meta_review_summary["archive_signal_history"] = list(
+            self.archive_signal_history
         )
 
         result = _build_evolution_result(

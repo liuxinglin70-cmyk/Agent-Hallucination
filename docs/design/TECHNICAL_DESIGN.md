@@ -394,7 +394,12 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
 `DSL_NOT_REPRESENTABLE`（能力语言表达不了）、`ENTITY_NOT_FOUND`（实体定位失败）、
 `SEARCH_FAILURE`（绑定到 repair 边失败）、`BINDING_AMBIGUOUS`、`STRUCTURAL_INVALID`。
 只有 DSL 缺口喂能力课程，只有搜索失败喂策略学习器（§2.8），二者不再压成同一个
-`INVALID_PROPOSAL`。
+`INVALID_PROPOSAL`。归档现在闭环回到下一次候选生成：`archive_policy_signals`
+读归档尾部**连续同类别**拒绝串（默认阈值 4），`dsl_not_representable` 追加能力课程
+条目、`search_failure` 立即刷新搜索策略（复用 minibatch meta 的
+`_run_meta_update`）、`entity_not_found` 把 anchor projector 的 entity-menu 预算翻倍
+（16 → 32 → 64 封顶）；不同 failure class 永不互相污染，信号历史与课程条目写入
+`meta_review_summary`。
 
 ## FN 能力覆盖矩阵
 

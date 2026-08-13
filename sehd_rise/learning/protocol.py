@@ -377,7 +377,54 @@ class CandidateArchive:
         }
 
 
+# ============================================================
+# Archive -> policy routing (§14#4 feedback closure)
+# ============================================================
+# A consecutive same-class rejection run steers exactly one learner:
+# DSL_NOT_REPRESENTABLE -> the capability curriculum, SEARCH_FAILURE -> the
+# search-policy learner (minibatch meta), ENTITY_NOT_FOUND -> the anchor
+# projector (entity-menu budget). The other classes carry no routing signal.
+ARCHIVE_SIGNAL_DSL_CURRICULUM = "dsl_recurring_curriculum_refresh"
+ARCHIVE_SIGNAL_SEARCH_POLICY = "search_recurring_policy_refresh"
+ARCHIVE_SIGNAL_ANCHOR_PROJECTION = "entity_recurring_anchor_refresh"
+
+_ARCHIVE_SIGNAL_BY_CLASS: dict[str, str] = {
+    FAILURE_CLASS_DSL_NOT_REPRESENTABLE: ARCHIVE_SIGNAL_DSL_CURRICULUM,
+    FAILURE_CLASS_SEARCH_FAILURE: ARCHIVE_SIGNAL_SEARCH_POLICY,
+    FAILURE_CLASS_ENTITY_NOT_FOUND: ARCHIVE_SIGNAL_ANCHOR_PROJECTION,
+}
+
+
+def archive_policy_signals(
+    archive: "CandidateArchive", *, threshold: int = 4,
+) -> tuple[str, ...]:
+    """Closed policy signals for a consecutive same-class rejection run.
+
+    Only the current tail counts: walk the archive newest-first while the
+    failure class stays identical, and emit that class's routing signal when
+    the run reaches ``threshold``. Distinct classes never mix, so an
+    interleaved tail emits nothing and one learner is never steered by
+    another class's failures.
+    """
+    items = archive.recent(limit=len(archive))
+    if not items:
+        return ()
+    head_class = items[0].failure_class
+    run_length = 0
+    for item in items:
+        if item.failure_class != head_class:
+            break
+        run_length += 1
+    signal = _ARCHIVE_SIGNAL_BY_CLASS.get(head_class, "")
+    if signal and run_length >= max(1, int(threshold)):
+        return (signal,)
+    return ()
+
+
 __all__ = [
+    "ARCHIVE_SIGNAL_ANCHOR_PROJECTION",
+    "ARCHIVE_SIGNAL_DSL_CURRICULUM",
+    "ARCHIVE_SIGNAL_SEARCH_POLICY",
     "ArchivedCandidate",
     "CANDIDATE_STAGES",
     "CandidateArchive",
@@ -398,5 +445,6 @@ __all__ = [
     "STAGE_EXECUTABLE",
     "STAGE_RAW_HYPOTHESIS",
     "STAGE_SCHEMA_VALID",
+    "archive_policy_signals",
     "classify_candidate_failure",
 ]
