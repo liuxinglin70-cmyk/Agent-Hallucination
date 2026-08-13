@@ -6,7 +6,7 @@ SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动�
 自进化）把 PACA-TCL v3.5 证明法庭的裁决当作运行时权威，并围绕一条原则组织自进化：
 **可修复性先于进化（repairability before evolution）**。因果修复层是对失败属主
 （ownership）与可修复性的唯一权威；只有可修复的失败进入进化；L1/L2/Meta 技能共享
-一份规范 RepairPlan 协议；每次修复尝试都由显式的因果归功链作为证据，并由四层结果
+一份规范 RepairPlan 协议；每次修复尝试都由显式的因果归功链作为证据，并由五层结果
 漏斗分类。
 
 规范性的项目章程——每个 agent 都必须遵守的核心目标、设计理念与导师要求——是仓库
@@ -258,23 +258,25 @@ DETECTED
 
 ### 结果漏斗
 
-每次修复尝试恰好终止于四层共 26 种终态之一——`loop/machine.py::Outcome`，彻底取代
+每次修复尝试恰好终止于五层共 26 种终态之一——`loop/machine.py::Outcome`，彻底取代
 旧的 `skip_*` 词表：
 
 - **Framework**：`CAPABILITY_GAP`、`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
-  `SCHEMA_FAILURE`、`INFRA_FAILURE`、`BINDING_DOMAIN_MISMATCH`、
-  `CONSTRUCTION_NO_CANDIDATE`、`CONSTRUCTION_ANCHOR_MISMATCH`、
-  `CONSTRUCTED_CANDIDATE_DUPLICATE`
+  `SCHEMA_FAILURE`、`INFRA_FAILURE`
 - **Search**：`NO_HYPOTHESIS`、`INVALID_PROPOSAL`、`DUPLICATE_PROPOSAL`
-- **Execution**：`BINDING_NOT_FOUND`、`BINDING_AMBIGUOUS`、
-  `CONSTRUCTED_CANDIDATE_NOT_QUALIFIED`、`CONSTRUCTED_CANDIDATE_NOT_VERIFIED`、
-  `CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE`、`ACTION_NOT_DISPATCHED`、
-  `EXECUTION_RUNTIME_FAILURE`、`TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
+- **Grounding**（提案已通过验证但实体未绑定 / 构造未物化，发生在 executor 派发之前）：
+  `BINDING_DOMAIN_MISMATCH`、`BINDING_NOT_FOUND`、`BINDING_AMBIGUOUS`、
+  `CONSTRUCTION_NO_CANDIDATE`、`CONSTRUCTION_ANCHOR_MISMATCH`、
+  `CONSTRUCTED_CANDIDATE_DUPLICATE`、`CONSTRUCTED_CANDIDATE_NOT_QUALIFIED`、
+  `CONSTRUCTED_CANDIDATE_NOT_VERIFIED`、`CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE`
+- **Execution**：`ACTION_NOT_DISPATCHED`、`EXECUTION_RUNTIME_FAILURE`、
+  `TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
 - **Fitness**：`SOURCE_NOT_IMPROVED`、`CANARY_REGRESSION`、`TRANSFER_REGRESSION`、
   `ACCEPTED`
 
 每种终态在 `evolution_result.json` 中独立计数，因此真正的框架瓶颈总能从实验输出
-中恢复出来，框架失败从不与学习拒绝混在一起。
+中恢复出来，框架失败从不与学习拒绝混在一起；binding/construction 类失败按 grounding
+层单独计数，不会再伪装成 executor 失败去误导执行层优化。
 
 ### 收敛
 
@@ -500,7 +502,7 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
 | C5 | HTC-TES 降级为咨询层；移除属主覆盖与模块过滤权 | `typing/` |
 | C6 | L1/L2 共享规范 RepairPlan 协议与单一条编排路径 | `causal/plan.py`、`loop/runner.py` |
 | C7 | Meta 重新定义为跨案例策略学习器；属主/切点/可修复性/硬门控通道在类型层面移除 | `meta/` |
-| C8 | 四层结果漏斗取代 `skip_*` 词表 | `loop/machine.py` |
+| C8 | 五层结果漏斗取代 `skip_*` 词表 | `loop/machine.py` |
 | C9 | 收敛只消费完整的修复尝试 | `loop/runner.py` |
 | C10 | 完整因果归功链；每一环由自己的层出具证据 | `evaluation/`、`loop/` |
 

@@ -40,7 +40,8 @@ python -m sehd_rise evolve \
   --max-mutation-calls 100
 ```
 
-产出：`evolution_result.json`（含四层结果漏斗）、`champion_genome.json`、
-`policy_genome.json`、`htc_tes_experience_memory.json`、`htc_tes_coverage.json`、
-`evolution_state_manifest.json`。分析实验结果时按四层漏斗区分 framework failure
-与 learning reject，二者绝不合并统计。
+产出：`evolution_result.json`（含五层结果漏斗：框架 / 搜索 / 接地 / 执行 / fitness）、
+`champion_genome.json`、`policy_genome.json`、`htc_tes_experience_memory.json`、
+`htc_tes_coverage.json`、`evolution_state_manifest.json`。分析实验结果时按五层漏斗区分
+framework failure 与 learning reject，二者绝不合并统计；binding/construction 失败
+属于 grounding 层，不并入 execution 层。

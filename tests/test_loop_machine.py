@@ -4,7 +4,7 @@ Verifies the §7 machine: every legal transition in ``LEGAL_TRANSITIONS``
 is reachable from ``DETECTED``; illegal edges (cross-layer jumps, an
 outcome absent from the table, a transition out of an absorbing terminal)
 raise ``IllegalTransition``; and the ``OutcomeFunnel`` keeps an independent
-per-outcome and per-layer count whose ``to_dict`` exposes the four §2.9
+per-outcome and per-layer count whose ``to_dict`` exposes the five §2.9
 layers with ``unaddressable`` on its own line and no ``no_edit`` bucket.
 The funnel is a pure projection of the terminal step ledger (C8), so the
 projection tests pin the fresh/resume equivalence invariant: the same
@@ -183,8 +183,9 @@ def test_funnel_per_outcome_counts() -> None:
 
 def test_funnel_layer_totals() -> None:
     funnel = OutcomeFunnel()
-    # Framework includes capability and binding-contract failures.
+    # Framework includes capability and other non-repair-attempt failures.
     # Search: NO_HYPOTHESIS + INVALID_PROPOSAL
+    # Grounding: binding/construction stops before any executor invocation.
     # Execution: ACTION_NOT_DISPATCHED + TARGET_EDGE_UNCHANGED
     # Fitness: ACCEPTED + SOURCE_NOT_IMPROVED + CANARY_REGRESSION + TRANSFER_REGRESSION
     for outcome in (
@@ -204,24 +205,27 @@ def test_funnel_layer_totals() -> None:
         Outcome.CANARY_REGRESSION, Outcome.TRANSFER_REGRESSION,
     ):
         funnel.record(outcome)
-    assert funnel.layer_total(Layer.FRAMEWORK) == 8
+    assert funnel.layer_total(Layer.FRAMEWORK) == 4
     assert funnel.layer_total(Layer.SEARCH) == 2
-    assert funnel.layer_total(Layer.EXECUTION) == 7
+    assert funnel.layer_total(Layer.GROUNDING) == 9
+    assert funnel.layer_total(Layer.EXECUTION) == 2
     assert funnel.layer_total(Layer.FITNESS) == 4
 
 
 def test_funnel_to_dict_structure() -> None:
-    """to_dict exposes four layers, accepted and unaddressable; no no_edit."""
+    """to_dict exposes five layers, accepted and unaddressable; no no_edit."""
     funnel = OutcomeFunnel()
     funnel.record(Outcome.ACCEPTED)
     funnel.record(Outcome.UNADDRESSABLE)
     funnel.record(Outcome.NON_EVOLVABLE)
+    funnel.record(Outcome.BINDING_NOT_FOUND)
     payload = funnel.to_dict()
     assert set(payload) == {"by_layer", "totals", "accepted", "unaddressable"}, payload
     assert "no_edit" not in payload, payload
     assert set(payload["by_layer"]) == {
         Layer.FRAMEWORK.value,
         Layer.SEARCH.value,
+        Layer.GROUNDING.value,
         Layer.EXECUTION.value,
         Layer.FITNESS.value,
     }, payload["by_layer"]
@@ -230,7 +234,9 @@ def test_funnel_to_dict_structure() -> None:
     assert payload["unaddressable"] == 1
     assert payload["by_layer"][Layer.FRAMEWORK.value][Outcome.UNADDRESSABLE.value] == 1
     assert payload["by_layer"][Layer.FRAMEWORK.value][Outcome.NON_EVOLVABLE.value] == 1
+    assert payload["by_layer"][Layer.GROUNDING.value][Outcome.BINDING_NOT_FOUND.value] == 1
     assert payload["totals"][Layer.FRAMEWORK.value] == 2
+    assert payload["totals"][Layer.GROUNDING.value] == 1
     assert payload["totals"][Layer.FITNESS.value] == 1
 
 

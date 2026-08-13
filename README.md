@@ -5,8 +5,8 @@ SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动�
 因果修复层先判定一次检测到的失败是否可修复；只有可修复的失败才进入进化，并经由
 L1/L2 两个可进化面共享的统一 RepairPlan（修复计划）协议完成修复——L1 是
 Skill 基因组（六个模块、七个确定性抑制/选择操作及一个受限构造操作），L2 是裁决策略基因组（封闭词表策略项，
-由证明法庭（proof court）确定性地求值）。每次修复尝试都由四层结果漏斗（outcome
-funnel）归类，并携带从投递（dispatch）到跨案例迁移的完整因果归功链。
+由证明法庭（proof court）确定性地求值）。每次修复尝试都由五层结果漏斗（outcome
+funnel：框架 / 搜索 / 接地 / 执行 / fitness）归类，并携带从投递（dispatch）到跨案例迁移的完整因果归功链。
 
 框架代码位于 `sehd_rise/`（13 层 + 根入口）。重构前基线 `src/sehd_v6/` 仅作为本地、
 未被 git 跟踪的历史备份保留（见 `src/README.md`）；被跟踪的树中没有任何内容依赖它。
@@ -165,7 +165,7 @@ python -m sehd_rise evolve \
 
 写入输出目录的产物：
 
-- `evolution_result.json` — 含四层结果漏斗的审计轨迹
+- `evolution_result.json` — 含五层结果漏斗的审计轨迹
 - `champion_genome.json` — 进化出的 L1 技能基因组
 - `policy_genome.json` — 进化出的 L2 裁决策略基因组
 - `htc_tes_experience_memory.json` — 机制级经验记忆
@@ -215,10 +215,11 @@ from sehd_rise.api.evolution import run_evolution, load_records
 4. **封闭词表的 L2 策略，对修正封闭**：策略项把一个封闭前置谓词与一个枚举动作
    配对；运行时语义由确定性的证明法庭求值器（`detection/policy.py`）拥有，
    增/改/删让缺陷策略可修复而不是永久滞留。
-5. **四层结果漏斗取代 `skip`。** 每次修复尝试恰好终止于框架 / 搜索 / 执行 /
-   fitness 四层共 26 种终态之一（`loop/machine.py`）；binding not found / ambiguous /
-   domain mismatch 在 fitness 前单独终止，框架瓶颈从此不会被压缩进
-   一个 skip 桶。
+5. **五层结果漏斗取代 `skip`。** 每次修复尝试恰好终止于框架 / 搜索 / 接地（grounding）/
+   执行 / fitness 五层共 26 种终态之一（`loop/machine.py`）；binding not found /
+   ambiguous / domain mismatch 与 construction 类终态都发生在 proposal 验证之后、
+   executor 派发之前，归入 grounding 层单独计数，执行层只统计真正派发后的失败——
+   框架/搜索空间瓶颈从此不会被压缩进一个 skip 桶，也不会伪装成 executor 失败。
 6. **收敛只消费完整的修复尝试。** 预算耗尽、基础设施故障与无效提案都不是学习
    证据；收敛窗口只统计「完整执行且已测效应」的修复在 fitness 层遭到的拒绝。
 7. **执行先于归功，效应先于 fitness。** 一个被接受的编辑携带完整链条——投递 →

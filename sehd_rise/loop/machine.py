@@ -5,7 +5,7 @@ DETECTED -> CAUSAL_FAILURE_ANALYZED -> REPAIRABLE -> REPAIR_PLANNED ->
 HYPOTHESIS_SEARCH -> PROPOSAL_VALIDATED -> BOUND -> EXECUTED -> TARGET_EDGE_CHANGED
 -> BLOCKER_CLEARED -> FITNESS_EVALUATED -> EXPERIENCE_LEARNED ->
 META_UPDATED, or exits early at a layer terminal. Guideline §2.9 replaces
-the flat skip vocabulary with a four-layer outcome funnel: every terminal
+the flat skip vocabulary with a five-layer outcome funnel: every terminal
 carries one outcome naming the layer that stopped the case. Outcomes are a
 closed vocabulary; the terminal step ledger (``EvolutionStep.gate_decision``)
 is the single terminal-count authority, and the funnel is a pure projection
@@ -45,10 +45,11 @@ class State(str, Enum):
 
 
 class Layer(str, Enum):
-    """The four §2.9 outcome layers; each terminal belongs to exactly one."""
+    """The five §2.9 outcome layers; each terminal belongs to exactly one."""
 
     FRAMEWORK = "framework"
     SEARCH = "search"
+    GROUNDING = "grounding"
     EXECUTION = "execution"
     FITNESS = "fitness"
 
@@ -58,6 +59,8 @@ class Outcome(str, Enum):
 
     Framework: the case never produced a valid repair attempt.
     Search: planning produced no valid proposal.
+    Grounding: the proposal validated but its entities never bound or its
+    constructive candidates never materialized — no executor was reached.
     Execution: the proposal ran but the target edge did not move / blocker
     did not clear.
     Fitness: the edge moved and blocker cleared; fitness then judged the
@@ -102,15 +105,19 @@ OUTCOME_LAYER: dict[Outcome, Layer] = {
     Outcome.NO_HYPOTHESIS: Layer.SEARCH,
     Outcome.INVALID_PROPOSAL: Layer.SEARCH,
     Outcome.DUPLICATE_PROPOSAL: Layer.SEARCH,
-    Outcome.BINDING_DOMAIN_MISMATCH: Layer.FRAMEWORK,
-    Outcome.BINDING_NOT_FOUND: Layer.EXECUTION,
-    Outcome.BINDING_AMBIGUOUS: Layer.EXECUTION,
-    Outcome.CONSTRUCTION_NO_CANDIDATE: Layer.FRAMEWORK,
-    Outcome.CONSTRUCTION_ANCHOR_MISMATCH: Layer.FRAMEWORK,
-    Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE: Layer.FRAMEWORK,
-    Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED: Layer.EXECUTION,
-    Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED: Layer.EXECUTION,
-    Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE: Layer.EXECUTION,
+    # Grounding: the proposal passed validation but its entities never bound
+    # or its constructed candidates never materialized — the case stopped
+    # between PROPOSAL_VALIDATED and an executor invocation, so counting it
+    # as execution misleads executor-side optimization.
+    Outcome.BINDING_DOMAIN_MISMATCH: Layer.GROUNDING,
+    Outcome.BINDING_NOT_FOUND: Layer.GROUNDING,
+    Outcome.BINDING_AMBIGUOUS: Layer.GROUNDING,
+    Outcome.CONSTRUCTION_NO_CANDIDATE: Layer.GROUNDING,
+    Outcome.CONSTRUCTION_ANCHOR_MISMATCH: Layer.GROUNDING,
+    Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE: Layer.GROUNDING,
+    Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED: Layer.GROUNDING,
+    Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED: Layer.GROUNDING,
+    Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE: Layer.GROUNDING,
     Outcome.ACTION_NOT_DISPATCHED: Layer.EXECUTION,
     Outcome.EXECUTION_RUNTIME_FAILURE: Layer.EXECUTION,
     Outcome.TARGET_EDGE_UNCHANGED: Layer.EXECUTION,
