@@ -240,7 +240,10 @@ from sehd_rise.api.evolution import run_evolution, load_records
     wrong_verifier_instruction、missing_certificate_path、coverage_blind_spot）需要
     provider-side / L2 新能力；`fn_capability_coverage_matrix` 记录其
     `required_capability` 与 `blocker` 作为课程输入，绝不新增会跨越权威边界的生成性
-    opcode（Skill 不得写证据/证书/verdict）。
+    opcode（Skill 不得写证据/证书/verdict）。由此，L1 自进化的诚实定义是**固定
+    primitive 词表上的规则特化**（学 condition / anchor 判别器）：`CAPABILITY_GAP`
+    被识别后只记录为课程输入（RepairIntent + fn_family + 归档信号），本框架不宣称
+    能发明新 detector capability；能力合成管线是明确的后续工作，不是当前行为。
 
 ## 下一步正式实验（规划，尚未实施）
 

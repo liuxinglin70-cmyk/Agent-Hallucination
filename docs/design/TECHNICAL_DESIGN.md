@@ -422,6 +422,19 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
   新增这些 opcode 会推翻「删除生成性 L1 opcode、保留确定性 transform」的决策并跨越
   权威边界（Skill 不得写证据/证书/verdict）。
 
+### L1 能力边界（不自称发明新 detector capability）
+
+`CAPABILITY_GAP` 被 100% 正确识别后**只记录、不合成**：runner 把 `RepairIntent` +
+`failure_observation` + `fn_family` 写入审计，`CandidateArchive` 的连续同类失败信号
+追加能力课程条目，但没有任何环节把这些信号变成新 capability。当前 L1 自进化的诚实
+定义是**固定 primitive 词表上的规则特化**——学习 condition / anchor 判别器，让八个
+确定性 L1 变换（七个抑制/选择 + 一个受限构造）与 L2 判定策略在更多失败形状上正确
+触发；系统不宣称能发明新 detector capability。`RepairIntent → CapabilityCandidate → Sandbox executor
+合成 → interface/static checks → 源行为证明 → canary → 多案例复发 → holdout →
+registry 晋升` 是明确的后续工作（安全引入新执行器必须先有确定性运行时语义与选择门），
+不是当前框架行为；在实现前，能力课程（`meta_review_summary.capability_curriculum` +
+FN 矩阵的 `required_capability`/`blocker`）是唯一的跨运行输入。
+
 ## 运行模式三分
 
 `loop/run_mode.py::resolve_run_mode` 把公开 API 此前塌缩进 `use_gold` /
