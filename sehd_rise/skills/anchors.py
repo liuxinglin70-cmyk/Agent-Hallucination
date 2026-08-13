@@ -82,7 +82,9 @@ def _tool_interaction_ids(history: list[Any], stop: int) -> tuple[str, ...]:
     for event_index, raw in enumerate(history[:stop], start=1):
         if not isinstance(raw, Mapping):
             continue
-        calls = raw.get("tool_calls") or ()
+        calls = raw.get("tool_calls")
+        if not calls:
+            continue
         if not isinstance(calls, list):
             calls = [calls]
         for call_index, call in enumerate(calls, start=1):
@@ -209,7 +211,13 @@ class ClaimAnchor:
 
 
 def project_claim_anchors(record: Mapping[str, Any]) -> tuple[ClaimAnchor, ...]:
-    """Project a fixed assistant-span universe without reading evaluator data."""
+    """Project the complete fixed assistant-span universe, label-free.
+
+    The projector never truncates: a long trajectory keeps every span so the
+    binding search space cannot drop a claim before candidate construction
+    starts. Prompt budget is a consumer concern — ``render_binding_menu``
+    selects its rows through ``select_relevant_anchors``.
+    """
     if not isinstance(record, Mapping):
         raise TypeError("claim anchor record must be an object")
     leaked = sorted(_owned_gold_hits(record))
@@ -296,7 +304,58 @@ def project_claim_anchors(record: Mapping[str, Any]) -> tuple[ClaimAnchor, ...]:
                 },
                 upstream_ref_ids=upstream_refs,
             ))
-    return tuple(anchors[:64])
+    return tuple(anchors)
+
+
+_MENU_GROUP_COUNT = 5
+
+
+def select_relevant_anchors(
+    anchors: Sequence[ClaimAnchor], limit: int,
+) -> tuple[ClaimAnchor, ...]:
+    """Relevance-preserving, bounded menu selection over the anchor universe.
+
+    Priority groups: final-assistant-event anchors, tool-grounded anchors,
+    citation anchors, origin-neighborhood anchors (first assistant event),
+    then the remaining diversity pool. Each group contributes up to
+    ``ceil(limit / 5)`` slots before a refill pass, so one dense event cannot
+    starve the other groups — a relevant anchor far beyond the first N spans
+    of document order still reaches the menu. Deterministic and label-free:
+    a pure projection of the anchor features.
+    """
+    limit = max(0, int(limit))
+    if limit == 0 or not anchors:
+        return ()
+    origin_event = min(anchor.source_event_id for anchor in anchors)
+    grouped: dict[int, list[ClaimAnchor]] = {
+        key: [] for key in range(_MENU_GROUP_COUNT)
+    }
+    for anchor in anchors:
+        features = anchor.observable_features
+        if features.get("anchor_is_final_assistant"):
+            key = 0
+        elif anchor.anchor_kind == "tool_grounded_claim":
+            key = 1
+        elif features.get("anchor_has_citation"):
+            key = 2
+        elif anchor.source_event_id == origin_event:
+            key = 3
+        else:
+            key = 4
+        grouped[key].append(anchor)
+    quota = -(-limit // _MENU_GROUP_COUNT)
+    selected: list[ClaimAnchor] = []
+    for key in range(_MENU_GROUP_COUNT):
+        selected.extend(grouped[key][:quota])
+        if len(selected) >= limit:
+            return tuple(selected[:limit])
+    for key in range(_MENU_GROUP_COUNT):
+        remaining = grouped[key][quota:]
+        take = min(len(remaining), limit - len(selected))
+        selected.extend(remaining[:take])
+        if len(selected) >= limit:
+            return tuple(selected)
+    return tuple(selected)
 
 
 __all__ = [
@@ -308,4 +367,5 @@ __all__ = [
     "TOOL_RESULT_CITED",
     "project_claim_anchors",
     "project_locus_evidence",
+    "select_relevant_anchors",
 ]

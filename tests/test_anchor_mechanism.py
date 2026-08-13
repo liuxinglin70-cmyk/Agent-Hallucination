@@ -3,12 +3,17 @@
 The locus projector feeds the FN mechanism classifier with closed tokens
 (``tool_result_cited`` / ``tool_result_adjacent`` / ``numeric_locus`` /
 ``citation_locus``); these tests pin the deterministic label-free behavior
-without a provider.
+without a provider. The anchor-universe / menu tests pin the
+relevance-preserving enumeration that keeps a long trajectory's relevant
+anchors inside the planner menu.
 """
 
 from __future__ import annotations
 
-from sehd_rise.skills.anchors import project_locus_evidence
+import copy
+
+from sehd_rise.skills.anchors import project_claim_anchors, project_locus_evidence
+from sehd_rise.skills.binding import render_binding_menu
 
 
 def test_locus_evidence_tool_result_cited() -> None:
@@ -61,3 +66,64 @@ def test_locus_evidence_tool_result_adjacent_without_adoption() -> None:
         ],
     }
     assert project_locus_evidence(record) == ("tool_result_adjacent",)
+
+
+def _long_trajectory_record() -> dict:
+    """Twenty plain spans, then a tool-grounded claim near the tail."""
+    history = [{"role": "user", "content": "Check the release date."}]
+    history.extend(
+        {"role": "assistant", "content": f"Statement number {index} about things."}
+        for index in range(20)
+    )
+    history.append({
+        "role": "assistant", "tool_calls": [{"name": "search", "arguments": {}}],
+    })
+    history.append({
+        "role": "tool", "tool_responses": ["The release date is 1999."],
+    })
+    history.append({"role": "assistant", "content": "The release date is 1999 [1]."})
+    history.append({"role": "assistant", "content": "All done."})
+    return {"history": history}
+
+
+def test_anchor_universe_is_not_truncated_at_sixty_four() -> None:
+    """A 70-span trajectory keeps all 70 anchors: no deterministic deletion
+    before candidate search starts."""
+    record = {
+        "history": [
+            {"role": "user", "content": "Enumerate."},
+            *[
+                {"role": "assistant", "content": f"Statement number {index}."}
+                for index in range(70)
+            ],
+        ],
+    }
+    assert len(project_claim_anchors(record)) == 70
+
+
+def test_menu_includes_relevant_anchor_beyond_first_sixteen() -> None:
+    """The tool-grounded anchor sits past the first 16 spans of document
+    order; the relevance-ordered menu still carries it."""
+    record = _long_trajectory_record()
+    anchors = project_claim_anchors(record)
+    tool_anchors = [a for a in anchors if a.anchor_kind == "tool_grounded_claim"]
+    assert tool_anchors, "fixture must produce a tool-grounded anchor"
+    tool_anchor = tool_anchors[0]
+    # Document order: the tool anchor is not among the first 16 spans.
+    assert [a.anchor_id for a in anchors].index(tool_anchor.anchor_id) >= 16
+
+    menu = render_binding_menu({}, "claim_anchor", record=record, limit=16)
+    assert len(menu) == 16
+    assert tool_anchor.anchor_id in {row["entity_id"] for row in menu}
+
+
+def test_menu_is_deterministic_over_long_trajectory() -> None:
+    """The relevance selection is a pure projection: same record, same menu."""
+    first = render_binding_menu(
+        {}, "claim_anchor", record=_long_trajectory_record(), limit=16,
+    )
+    second = render_binding_menu(
+        {}, "claim_anchor", record=copy.deepcopy(_long_trajectory_record()),
+        limit=16,
+    )
+    assert [row["entity_id"] for row in first] == [row["entity_id"] for row in second]

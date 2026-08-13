@@ -16,7 +16,7 @@ from sehd_rise.skills.capabilities import (
     BINDING_CARDINALITIES,
     BINDING_DOMAINS,
 )
-from sehd_rise.skills.anchors import project_claim_anchors
+from sehd_rise.skills.anchors import project_claim_anchors, select_relevant_anchors
 from sehd_rise.skills.rule import (
     ConditionSpec,
     normalize_candidate_kind,
@@ -512,15 +512,18 @@ def render_binding_menu(
     ``claim_anchor`` rows carry the anchor's bounded text so the model can
     select the entity to edit by id instead of guessing a uniquely-matching
     predicate; every other domain exposes the entity id plus its projected
-    identifiers/features. This is the deterministic enumeration the reflection
-    prompt shows when entity identity must be decoupled from the reusable
-    condition predicate.
+    identifiers/features. The claim_anchor rows come from
+    ``select_relevant_anchors`` (relevance-ordered, bounded), so the first N
+    spans of document order can never crowd out the tool-grounded / terminal
+    anchors a repair actually targets.
     """
     if domain not in BINDING_DOMAINS:
         return ()
     if domain == "claim_anchor" and isinstance(record, Mapping):
         rows: list[dict[str, Any]] = []
-        for anchor in project_claim_anchors(record)[:limit]:
+        for anchor in select_relevant_anchors(
+            project_claim_anchors(record), limit,
+        ):
             rows.append({
                 "entity_id": anchor.anchor_id,
                 "domain": "claim_anchor",
