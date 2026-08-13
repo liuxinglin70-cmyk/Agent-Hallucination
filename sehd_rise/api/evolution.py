@@ -197,7 +197,7 @@ def run_evolution(
     resume_from: Path | None = None,
     inherit_from: Path | None = None,
     run_mode: str = "",
-    meta_update_every: int = 0,
+    meta_update_every: int = 5,
 ) -> OnlineEvolutionResult:
     """Run the label-free detector -> evolution -> experience closed loop.
 
@@ -269,7 +269,8 @@ def run_evolution(
         meta_update_every: Optional minibatch cadence for the search-policy
             meta update (§14#6).  ``N`` refreshes the strategy configuration
             every ``N`` cases so later cases of the same run see the refined
-            search policy; 0 keeps the run-level-only update.
+            search policy; the default 5 keeps self-evolution on the in-run
+            trajectory, and 0 defers the update to the run-level finalize.
 
     Returns:
         OnlineEvolutionResult with the champion genome and audit trail.

@@ -88,8 +88,9 @@ def main() -> int:
         "protected_label_free_adaptation (resolves gold/canary flags)",
     )
     parser.add_argument(
-        "--meta-update-every", type=int, default=0,
-        help="minibatch search-policy meta update cadence in cases (0 = run-level only)",
+        "--meta-update-every", type=int, default=5,
+        help="minibatch search-policy meta update cadence in cases "
+        "(0 = run-level finalize only)",
     )
     args = parser.parse_args()
 

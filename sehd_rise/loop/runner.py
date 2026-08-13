@@ -838,7 +838,7 @@ class EvolutionLoop:
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
-    meta_update_every: int = 0,
+    meta_update_every: int = 5,
     run_mode: str = "",
     claim_learning: bool | None = None,
     ) -> None:
@@ -4963,7 +4963,7 @@ def run_online_evolution(
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
-    meta_update_every: int = 0,
+    meta_update_every: int = 5,
     run_mode: str = "",
     claim_learning: bool | None = None,
 ) -> OnlineEvolutionResult:
@@ -4981,7 +4981,9 @@ def run_online_evolution(
     ``run_mode`` selects one of the §10 regimes; when set it resolves the
     gold/canary flags and ``claim_learning`` fail-fast (see
     ``loop.run_mode``). ``meta_update_every`` enables minibatch search-policy
-    updates between cases (§14#6); 0 keeps the run-level-only update.
+    updates between cases (§14#6); the default 5 keeps the self-evolution
+    mode on the same in-run trajectory, and 0 defers the update to the
+    run-level finalize.
     """
     resolved_mode: RunModeResolution | None = None
     if run_mode:

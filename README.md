@@ -160,7 +160,7 @@ python -m sehd_rise evolve \
 
 ```bash
   --run-mode supervised_evolution|label_free_diagnostic|protected_label_free_adaptation \
-  --meta-update-every 5              # 每 5 个 case 刷新一次搜索策略（0 = 仅 run 后）
+  --meta-update-every 5              # 每 5 个 case 刷新一次搜索策略（默认 5；0 = 仅 run 后）
 ```
 
 写入输出目录的产物：

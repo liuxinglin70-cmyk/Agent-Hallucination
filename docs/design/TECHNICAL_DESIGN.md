@@ -548,8 +548,8 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
   归档被拒候选，供能力课程与策略学习器消费。
 - **E12 minibatch meta 搜索策略更新**（`loop/runner.py`）：`_run_meta_update` 从
   `_finalize` 抽出；`meta_update_every=N` 使同一 run 后续 case 每 N 个 case 刷新一次
-  策略配置，meta 从「run 后事后」向「run 内优化器状态」迈一步。仍只学搜索策略，不碰
-  门控/属主/切点。
+  策略配置（默认 5，`0` 表示仅 run 后 finalize 更新），meta 从「run 后事后」向
+  「run 内优化器状态」迈一步。仍只学搜索策略，不碰门控/属主/切点。
 - **E13 FN 覆盖矩阵**（`skills/capabilities.py`）：`fn_capability_coverage_matrix` +
   `fn_families_for_owner` 输出正向召回能力覆盖；`loop/mechanism.py::classify_failure_mechanism`
   把 `FailureObservation`（因果边身份 + missing/malformed fields + 轨迹 locus 证据）
