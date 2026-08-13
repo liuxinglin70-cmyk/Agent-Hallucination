@@ -192,6 +192,18 @@ from sehd_rise.skills.capabilities import (
     SKILL_CAPABILITY_REGISTRY,
 )
 from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
+from sehd_rise.learning.protocol import (
+    CandidateArchive,
+    ExecutableCandidate,
+    RepairIntent,
+    STAGE_SCHEMA_VALID,
+    classify_candidate_failure,
+)
+from sehd_rise.loop.run_mode import RunModeResolution, resolve_run_mode
+from sehd_rise.skills.capabilities import (
+    fn_capability_coverage_matrix,
+    fn_family_for,
+)
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -809,6 +821,9 @@ class EvolutionLoop:
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
+    meta_update_every: int = 0,
+    run_mode: str = "",
+    claim_learning: bool | None = None,
     ) -> None:
         self.evolution_case_ids = list(evolution_case_ids)
         self.records = records
@@ -838,6 +853,16 @@ class EvolutionLoop:
         self.gold_reflection = gold_reflection
         self.probe_experience_record = probe_experience_record
         self.reflection_candidate_count = reflection_candidate_count
+        self.meta_update_every = max(0, int(meta_update_every))
+        self.run_mode = str(run_mode or "")
+        self.claim_learning = (
+            bool(claim_learning)
+            if claim_learning is not None
+            else self.use_gold
+        )
+        self.candidate_archive = CandidateArchive()
+        self._meta_case_counter = 0
+        self._meta_last_idx = 0
         # The §2.9 funnel is the single terminal-count authority (C8/C2):
         # every case deposits exactly one outcome here and the final result
         # derives its counters from this funnel, never from the per-step
@@ -1341,6 +1366,16 @@ class EvolutionLoop:
             )
         while self.source_work_queue:
             idx, case_id, self.active_attempt_index = self.source_work_queue.popleft()
+            # Minibatch meta search-policy update (§14#6): refresh the strategy
+            # configuration between cases so later cases of the same run see the
+            # refined search policy. Retries re-enter at the same idx and never
+            # re-trigger (``_meta_last_idx`` only advances on new case indices).
+            if (
+                self.meta_update_every > 0
+                and idx >= self._meta_last_idx + self.meta_update_every
+            ):
+                self._meta_last_idx = idx
+                self._run_meta_update()
             prior_episode_payload = None
             if self.active_attempt_index > 0:
                 for prior_step in reversed(self.steps):
@@ -1526,10 +1561,22 @@ class EvolutionLoop:
             if status is RepairabilityStatus.CAPABILITY_GAP:
                 # Learn-worthy detector failure with no current Skill
                 # primitive.  Keep it out of stable-canary/convergence pools
-                # and persist the exact missing capability for Phase 2.
+                # and persist the exact missing capability for Phase 2. The
+                # §13 RepairIntent records the DSL-independent repair intent
+                # with its missing capability (instead of a silent no-edit),
+                # and the §14#7 FN family attaches when this is forward recall.
                 if self.active_attempt_index == 0:
                     self.state.triggered_cases += 1
                 self.funnel.record(Outcome.CAPABILITY_GAP)
+                missing_capability = str(
+                    verdict.evidence.get("missing_capability") or ""
+                )
+                repair_intent = RepairIntent.from_episode(
+                    episode, missing_capability=missing_capability,
+                )
+                fn_family = fn_family_for(
+                    cut.reason_code, cut.owner,
+                )
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -1538,6 +1585,8 @@ class EvolutionLoop:
                     edit_proposal={
                         "operation": "capability_gap",
                         **dict(verdict.evidence),
+                        "repair_intent": repair_intent.to_dict(),
+                        "fn_family": fn_family,
                     },
                     mutation_applied=None,
                     gate_decision=Outcome.CAPABILITY_GAP.value,
@@ -1545,7 +1594,11 @@ class EvolutionLoop:
                     genome_hash_after=self.state.current_genome.content_hash,
                     detection_state=detection_state,
                     timestamp=time.time(),
-                    fitness_check={"repairability": verdict.to_dict()},
+                    fitness_check={
+                        "repairability": verdict.to_dict(),
+                        "repair_intent": repair_intent.to_dict(),
+                        "fn_family": fn_family,
+                    },
                 ), next_case_index=idx + 1)
                 print(
                     f"  [{idx}] CAPABILITY_GAP {case_id}: "
@@ -2819,6 +2872,30 @@ class EvolutionLoop:
                             )
                         else:
                             round_reject_categories.append(prevalidate_reason)
+                            # §13/§14#4: archive the rejected candidate at the
+                            # stage where it stopped, keyed by its learnable
+                            # failure class, so a DSL gap / search failure is
+                            # observable instead of folded into the lineage.
+                            self.candidate_archive.archive(
+                                stage=STAGE_SCHEMA_VALID,
+                                failure_class=classify_candidate_failure(
+                                    prevalidate_reason,
+                                ),
+                                reason=prevalidate_reason,
+                                candidate=ExecutableCandidate(
+                                    operation=str(
+                                        candidate.get("operation") or ""
+                                    ),
+                                    target_module=str(
+                                        candidate.get("target_module") or ""
+                                    ),
+                                    action=str(candidate.get("action") or ""),
+                                    condition=str(
+                                        candidate.get("condition") or ""
+                                    ),
+                                ),
+                                case_id=case_id,
+                            )
                     if generated_no_edit:
                         no_edit_reasons.append(generated_no_edit)
                 candidates, _ = extract_intervention_candidates(
@@ -4548,25 +4625,19 @@ class EvolutionLoop:
         )
         self.flush_shadow_batch(next_case_index=idx + 1)
 
-    def _finalize(self) -> OnlineEvolutionResult:
-        """Final summary, Meta aggregation and result save."""
-        self.flush_shadow_batch(
-            next_case_index=len(self.evolution_case_ids),
-            force=True,
-        )
-        if self.pending_probe_commits and self.registered_probe_ids:
-            self.run_development_probe(reason="final_pending_candidate")
-            self.persist_progress(len(self.evolution_case_ids))
-        duration = time.time() - self.start_time
-        final_gate_summary = self.gate.summary()
+    def _run_meta_update(self) -> dict[str, Any]:
+        """Aggregate audited gate events and verified outcomes into strategy edits.
 
-        # --- Meta Review aggregation (Phase 8 cross-case strategy learner) ---
-        # Deterministic, prompt-safe and never touching the hard gate:
-        # aggregate the audited gate events into GateExperience rows, derive
-        # the verified outcome signals from the mechanism memory, enumerate
-        # shadow StrategyEdit candidates, build a reporting-only drift
-        # snapshot, and persist the strategy configuration back into the
-        # single meta_review authority.
+        Deterministic, prompt-safe and never touching the hard gate: aggregate
+        the audited gate events into GateExperience rows, derive the verified
+        outcome signals from the mechanism memory, enumerate shadow StrategyEdit
+        candidates, build a reporting-only drift snapshot, and persist the
+        strategy configuration back into the single meta_review authority.
+        Returns the meta review summary. Called once at finalize, and between
+        cases when ``meta_update_every`` is set (minibatch search-policy update,
+        §14#6): the update only commits tokens that cleared the evidence
+        threshold, so later cases of the same run see the refined search policy.
+        """
         gate_event_ledger = _build_gate_event_ledger(self.steps)
         aggregated_experiences = [
             aggregate_gate_experience(event, sequence=event.sequence)
@@ -4611,7 +4682,15 @@ class EvolutionLoop:
         self.causal_memory.meta_review["drift_snapshots"] = [
             drift_snapshot.to_dict()
         ]
-        meta_review_summary = {
+        if meta_edits_committed:
+            print(
+                f"  [META] committed {len(meta_edits_committed)} meta "
+                f"edit(s); generation "
+                f"{self.state.strategy_state.generation} -> "
+                f"{committed_meta_state.generation}"
+            )
+        self.state.strategy_state = committed_meta_state
+        return {
             "gate_experience_count": len(gate_experiences),
             "shadow_candidate_count": len(meta_candidates),
             "shadow_candidates": [
@@ -4624,14 +4703,32 @@ class EvolutionLoop:
             "meta_generation": committed_meta_state.generation,
             "drift": drift_snapshot.to_dict(),
         }
-        if meta_edits_committed:
-            print(
-                f"  [META] committed {len(meta_edits_committed)} meta "
-                f"edit(s); generation "
-                f"{self.state.strategy_state.generation} -> "
-                f"{committed_meta_state.generation}"
-            )
-        self.state.strategy_state = committed_meta_state
+
+    def _finalize(self) -> OnlineEvolutionResult:
+        """Final summary, Meta aggregation and result save."""
+        self.flush_shadow_batch(
+            next_case_index=len(self.evolution_case_ids),
+            force=True,
+        )
+        if self.pending_probe_commits and self.registered_probe_ids:
+            self.run_development_probe(reason="final_pending_candidate")
+            self.persist_progress(len(self.evolution_case_ids))
+        duration = time.time() - self.start_time
+        final_gate_summary = self.gate.summary()
+
+        # --- Meta Review aggregation (Phase 8 cross-case strategy learner) ---
+        meta_review_summary = self._run_meta_update()
+        # §10 run-mode claim semantics + §14#7 FN coverage + §14#4 archive are
+        # surfaced as audit telemetry (never a gate input): the result must
+        # name its learning regime and the forward-recall capability gaps.
+        meta_review_summary["run_mode"] = self.run_mode
+        meta_review_summary["claim_learning"] = self.claim_learning
+        meta_review_summary["fn_capability_coverage"] = (
+            fn_capability_coverage_matrix()
+        )
+        meta_review_summary["candidate_archive"] = (
+            self.candidate_archive.to_dict()
+        )
 
         result = _build_evolution_result(
             run_id=self.run_id,
@@ -4666,6 +4763,8 @@ class EvolutionLoop:
             runtime_error_categories=self.runtime_error_categories,
             meta_review_summary=meta_review_summary,
             provider_usage_ledger=self.provider_usage_ledger,
+            run_mode=self.run_mode,
+            claim_learning=self.claim_learning,
         )
 
         _save_evolution_results(
@@ -4722,6 +4821,9 @@ def run_online_evolution(
     gold_reflection: bool = False,
     probe_experience_record: bool = False,
     reflection_candidate_count: int = 1,
+    meta_update_every: int = 0,
+    run_mode: str = "",
+    claim_learning: bool | None = None,
 ) -> OnlineEvolutionResult:
     """Run per-case online evolution over the single RepairPlan pipeline.
 
@@ -4733,7 +4835,25 @@ def run_online_evolution(
     unprotected provisional working candidate after independent canary
     non-regression. Protected promotion and accuracy claims require
     explicit evaluation authority outside this run.
+
+    ``run_mode`` selects one of the §10 regimes; when set it resolves the
+    gold/canary flags and ``claim_learning`` fail-fast (see
+    ``loop.run_mode``). ``meta_update_every`` enables minibatch search-policy
+    updates between cases (§14#6); 0 keeps the run-level-only update.
     """
+    resolved_mode: RunModeResolution | None = None
+    if run_mode:
+        resolved_mode = resolve_run_mode(
+            run_mode,
+            use_gold=use_gold,
+            fitness_use_gold=fitness_use_gold,
+            gold_reflection=gold_reflection,
+            canary_case_ids=canary_case_ids,
+        )
+        use_gold = resolved_mode.use_gold
+        fitness_use_gold = resolved_mode.fitness_use_gold
+        gold_reflection = resolved_mode.gold_reflection
+        claim_learning = resolved_mode.claim_learning
     loop = EvolutionLoop(
         evolution_case_ids=evolution_case_ids,
         records=records,
@@ -4763,6 +4883,9 @@ def run_online_evolution(
         gold_reflection=gold_reflection,
         probe_experience_record=probe_experience_record,
         reflection_candidate_count=reflection_candidate_count,
+        meta_update_every=meta_update_every,
+        run_mode=run_mode,
+        claim_learning=claim_learning,
     )
     loop._initialize_state()
     loop.run()

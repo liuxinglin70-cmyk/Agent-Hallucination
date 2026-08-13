@@ -122,6 +122,8 @@ class OnlineEvolutionResult:
     halt_reason: str
     duration_seconds: float
     evolution_audit: dict[str, Any] = field(default_factory=dict)
+    run_mode: str = ""
+    claim_learning: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -138,6 +140,8 @@ class OnlineEvolutionResult:
             "stable_cases": self.stable_cases,
             "runtime_invalid_cases": self.runtime_invalid_cases,
             "supervision_mode": "gold_enhanced" if self.use_gold else "self_supervised",
+            "run_mode": self.run_mode,
+            "claim_learning": self.claim_learning,
             "use_gold": self.use_gold,
             "halted": self.halted,
             "halt_reason": self.halt_reason,
@@ -308,6 +312,8 @@ def _build_evolution_result(
     runtime_error_categories: dict[str, int],
     meta_review_summary: dict[str, Any],
     provider_usage_ledger: ProviderUsageLedger,
+    run_mode: str = "",
+    claim_learning: bool = False,
 ) -> OnlineEvolutionResult:
     """Assemble the final run result from run state and the outcome funnel.
 
@@ -343,6 +349,8 @@ def _build_evolution_result(
             else ("converged" if gate.converged else "")
         ),
         duration_seconds=duration,
+        run_mode=run_mode,
+        claim_learning=claim_learning,
         evolution_audit={
             **budget_usage,
             "total_provider_calls": (

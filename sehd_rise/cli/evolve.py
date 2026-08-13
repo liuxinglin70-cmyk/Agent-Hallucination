@@ -82,6 +82,15 @@ def main() -> int:
         help="independent reflection samples per triggered case (1..5)",
     )
     parser.add_argument("--canary-limit", type=int, default=2)
+    parser.add_argument(
+        "--run-mode", type=str, default="",
+        help="evolution regime: supervised_evolution | label_free_diagnostic | "
+        "protected_label_free_evolution (resolves gold/canary flags)",
+    )
+    parser.add_argument(
+        "--meta-update-every", type=int, default=0,
+        help="minibatch search-policy meta update cadence in cases (0 = run-level only)",
+    )
     args = parser.parse_args()
 
     result = run_evolution(
@@ -106,6 +115,8 @@ def main() -> int:
         max_mutation_attempts_per_case=args.max_mutation_attempts,
         reflection_candidate_count=args.reflection_candidates,
         canary_limit=args.canary_limit,
+        run_mode=args.run_mode,
+        meta_update_every=args.meta_update_every,
     )
     summary = {
         "schema_version": "sehd_rise.evolution_run_summary.v1",

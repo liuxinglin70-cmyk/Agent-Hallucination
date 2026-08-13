@@ -642,6 +642,89 @@ _MISSING_CAPABILITY_BY_FAILURE = {
 }
 
 
+# ============================================================
+# FN capability coverage matrix (§14#7)
+# ============================================================
+# The forward-recall learning surface, expanded beyond the single
+# ``construct_candidate`` primitive. Each family names a causal edge the FN
+# detector graph can need; ``fn_capability_coverage_matrix`` reports, per
+# family, the registered operations that can express it. An empty operation
+# list is a CAPABILITY_GAP the curriculum collects as "what to invent next".
+
+FN_FAILURE_FAMILIES = frozenset({
+    "missing_claim_candidate",
+    "missing_evidence_obligation",
+    "missing_evidence_acquisition",
+    "wrong_qualification",
+    "missing_verifier_route",
+    "wrong_verifier_instruction",
+    "missing_certificate_path",
+    "coverage_blind_spot",
+    "cross_claim_dependency",
+    "tool_grounding_requirement",
+    "temporal_numeric_entity_consistency",
+})
+
+# Family -> the owner modules whose forward-recall (clean_to_error) operations
+# would cover that causal edge. This is the declared coverage surface; the
+# matrix function checks which of those owners actually register a
+# clean_to_error capability.
+_FN_FAMILY_OWNERS: Mapping[str, tuple[str, ...]] = {
+    "missing_claim_candidate": ("candidate_trigger",),
+    "missing_evidence_obligation": ("evidence_obligation",),
+    "missing_evidence_acquisition": ("evidence_obligation",),
+    "wrong_qualification": ("candidate_to_verifier_route",),
+    "missing_verifier_route": ("candidate_to_verifier_route",),
+    "wrong_verifier_instruction": ("atomic_verifier_instruction",),
+    "missing_certificate_path": ("atomic_verifier_instruction",),
+    "coverage_blind_spot": ("evidence_obligation",),
+    "cross_claim_dependency": ("candidate_trigger", "causal_link_test"),
+    "tool_grounding_requirement": ("candidate_trigger",),
+    "temporal_numeric_entity_consistency": ("candidate_trigger",),
+}
+
+
+def fn_capability_coverage_matrix() -> dict[str, dict[str, Any]]:
+    """Report the forward-recall capability coverage per FN family.
+
+    ``covered`` is true when at least one declared owner registers a
+    ``clean_to_error`` operation; ``operations`` lists exactly those. This is
+    the single audit view for the §14#7 "every evolvable FN failure must have
+    at least one legal executable capability" invariant — the runner enforces
+    the per-case version through the exact failure_shape capability resolution
+    in ``causal.plan``, and this matrix names the gaps for the curriculum.
+    """
+    matrix: dict[str, dict[str, Any]] = {}
+    for family in sorted(FN_FAILURE_FAMILIES):
+        operations: set[str] = set()
+        for owner in _FN_FAMILY_OWNERS.get(family, ()):
+            operations.update(SKILL_CAPABILITY_REGISTRY.operations_for(
+                skill_layer="l1_provider_rule",
+                modules=(owner,),
+                direction="clean_to_error",
+            ))
+        matrix[family] = {
+            "owners": list(_FN_FAMILY_OWNERS.get(family, ())),
+            "covered": bool(operations),
+            "operations": sorted(operations),
+        }
+    return matrix
+
+
+def fn_family_for(failure_shape: str, owner: str) -> str:
+    """Map a failure shape + owner onto its FN family, if any.
+
+    Returns "" for shapes that are not forward-recall (FP / localization /
+    policy), so the curriculum only attaches a family to real FN gaps.
+    """
+    if str(failure_shape) != "gold_false_negative_clean":
+        return ""
+    for family, owners in _FN_FAMILY_OWNERS.items():
+        if str(owner) in owners:
+            return family
+    return "missing_claim_candidate"
+
+
 def _render_transition(direction: str) -> str:
     value = str(direction or "")
     if "_to_" in value:
@@ -687,6 +770,7 @@ __all__ = [
     "BINDING_CARDINALITIES",
     "BINDING_DOMAINS",
     "CapabilityGap",
+    "FN_FAILURE_FAMILIES",
     "L1_COURT_TRANSFORM_EXECUTOR",
     "L1_CONSTRUCTIVE_HARNESS_EXECUTOR",
     "L2_ADJUDICATION_POLICY_EXECUTOR",
@@ -694,5 +778,7 @@ __all__ = [
     "SKILL_CAPABILITY_REGISTRY",
     "SkillCapability",
     "SkillCapabilityRegistry",
+    "fn_capability_coverage_matrix",
+    "fn_family_for",
     "render_capability_contracts",
 ]
