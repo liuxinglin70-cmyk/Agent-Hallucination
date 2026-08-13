@@ -1,7 +1,7 @@
 """Skill-genome compilation for the deterministic L1 execution layer (plan B).
 
-The L1 provider-rule layer no longer injects prose into provider prompts.
-This module compiles a genome's delta rules into the ordered executable rule
+The L1 Skill layer never injects prose into model/provider prompts. This
+module compiles a genome's delta rules into the ordered executable rule
 set the deterministic executor consumes: each entry is
 ``(module_id, rule_id, condition_spec, action_spec)`` in genome order. Only
 slot-contract rules with a compiled action spec are executable; an untyped

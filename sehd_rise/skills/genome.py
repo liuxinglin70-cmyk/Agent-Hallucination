@@ -684,7 +684,7 @@ class SkillGenome:
 
     @property
     def execution_hash(self) -> str:
-        """Identity of every genome field that can change provider behavior.
+        """Identity of every genome field that can change post-court behavior.
 
         ``content_hash`` stays the stable text-lineage id so historical
         checkpoints remain readable when bookkeeping is updated. Runtime

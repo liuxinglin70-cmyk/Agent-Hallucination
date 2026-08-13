@@ -185,6 +185,7 @@ _SKIP_DECISIONS = frozenset({
     # produced a valid repair attempt, so it carries no artifact and grades
     # ``skip`` exactly like a no-edit / halt outcome.
     "NON_EVOLVABLE",
+    "CAPABILITY_GAP",
     "UNADDRESSABLE",
     "ROUTING_FAILURE",
     "SCHEMA_FAILURE",
@@ -193,7 +194,7 @@ _SKIP_DECISIONS = frozenset({
     "INVALID_PROPOSAL",
     "DUPLICATE_PROPOSAL",
     "ACTION_NOT_DISPATCHED",
-    "PROVIDER_NOT_COMPLIED",
+    "EXECUTION_RUNTIME_FAILURE",
     "TARGET_EDGE_UNCHANGED",
     "BLOCKER_NOT_CLEARED",
 })

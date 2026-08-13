@@ -1,6 +1,6 @@
 """Complete evolution-state manifest for cross-run inheritance.
 
-A completed run binds its three resumable artifacts (provider-rule genome,
+A completed run binds its three resumable artifacts (L1 Skill genome,
 adjudication-policy genome, experience memory) by sha256 in one manifest so
 a new data stream can inherit the full state atomically.  Inheritance is
 strict: a manifest whose paths are missing or whose hashes do not match is

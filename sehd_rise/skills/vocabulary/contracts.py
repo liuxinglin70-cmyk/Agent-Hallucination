@@ -174,7 +174,7 @@ L2_ARTIFACTS = frozenset({
     L2_ARTIFACT_APPEAL_MECHANISM,
 })
 
-# L1 artifacts are exactly the eight registered provider-rule modules.
+# L1 artifacts are exactly the registered post-court Skill modules.
 L1_ARTIFACTS = frozenset(MODULE_IDS)
 
 

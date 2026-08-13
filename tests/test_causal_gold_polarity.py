@@ -29,7 +29,7 @@ from sehd_rise.causal.signals import project_detection
 from sehd_rise.loop.runner import _infer_evolution_direction
 from sehd_rise.planning.candidates import _allowed_l1_modules
 from sehd_rise.platform.gold import _evaluator_gold_steps
-from sehd_rise.skills.vocabulary.contracts import LAYER_L1, LAYER_NONE
+from sehd_rise.skills.vocabulary.contracts import LAYER_L1
 
 
 def _result(state: str, *, surviving: list[str] | None = None) -> dict:
@@ -94,23 +94,21 @@ def test_false_positive_routes_to_prosecution_evidence() -> None:
     assert verdict.status is RepairabilityStatus.REPAIRABLE
 
 
-def test_false_negative_clean_is_non_evolvable() -> None:
-    """gold=true + verified_clean is NON_EVOLVABLE until Phase 3 designs a
-    deterministic clean->error action for evidence_obligation.
-
-    ``require_evidence_field`` / ``enforce_certificate_invariant`` were removed
-    (their postconditions only read court audits, never executed a transform),
-    so ``evidence_obligation`` no longer carries a clean->error opcode and the
-    L1 executable-completeness gate demotes the FN-clean cut to ``LAYER_NONE``.
-    """
+def test_false_negative_clean_is_capability_gap() -> None:
+    """A missing candidate is learn-worthy but not currently expressible."""
     signal = project_detection(
         {**_result("verified_clean"), "gold_label": True},
         use_gold=True,
     )
     cut = build_causal_cut(signal)
-    assert cut.skill_layer == LAYER_NONE
-    assert cut.owner == ""
-    assert cut.reason_code == "demoted_l1_no_executable_obligation"
+    assert cut.skill_layer == LAYER_L1
+    assert cut.owner == "candidate_trigger"
+    verdict = _verdict(cut, signal)
+    assert verdict is not None
+    assert verdict.status is RepairabilityStatus.CAPABILITY_GAP
+    assert verdict.evidence["failure"] == "missing_error_candidate"
+    assert verdict.evidence["desired_transition"] == "clean -> error"
+    assert verdict.evidence["missing_capability"] == "construct_candidate"
 
 
 def test_gold_polarity_partner_module_stays_legal() -> None:

@@ -49,7 +49,7 @@ from sehd_rise.skills.genome import create_baseline_genome
 from sehd_rise.skills.policy import create_baseline_policy_genome
 from sehd_rise.skills.rule import (
     evaluate_condition_spec,
-    project_route_condition_features,
+    project_result_condition_features,
     validate_condition_spec,
 )
 
@@ -78,31 +78,28 @@ def test_attempt_cap_is_ceiling_bounded() -> None:
 
 _RETRY_SPEC = {
     "schema_version": "sehd.condition_spec.v2",
-    "feature_source": "provider_input",
+    "feature_source": "court_result",
     "feature": "has_tool_retry",
     "operator": "equals",
     "value_type": "boolean",
     "value": True,
-    "scope": "action_spec_routes",
-    "evidence_binding": "pre_call_projection",
+    "scope": "l1_court_transform",
+    "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "route_scoped",
+    "binding": "result_scoped",
 }
 
 
 def test_has_tool_retry_project_and_evaluate() -> None:
-    import json
-    repeated = {
-        "events": [
-            {"event_id": "event_001", "tool_interactions": [
-                {"tool_name": "search", "arguments": {}}]},
-            {"event_id": "event_002", "tool_interactions": [
-                {"tool_name": "search", "arguments": {}}]},
+    record = {
+        "history": [
+            {"event_id": "event_001", "role": "assistant", "tool_calls": [
+                {"name": "search", "arguments": {}}]},
+            {"event_id": "event_002", "role": "assistant", "tool_calls": [
+                {"name": "search", "arguments": {}}]},
         ]
     }
-    features = project_route_condition_features(
-        "r", "TRAJECTORY_PACKET=" + json.dumps(repeated),
-    )
+    features = project_result_condition_features({}, record)
     assert features["has_tool_retry"] is True
     assert features["has_tool_call"] is True
     assert validate_condition_spec(_RETRY_SPEC)[0] is True
@@ -110,16 +107,13 @@ def test_has_tool_retry_project_and_evaluate() -> None:
 
 
 def test_has_tool_retry_false_on_single_call() -> None:
-    import json
-    single = {
-        "events": [
-            {"event_id": "event_001", "tool_interactions": [
-                {"tool_name": "search", "arguments": {}}]},
+    record = {
+        "history": [
+            {"event_id": "event_001", "role": "assistant", "tool_calls": [
+                {"name": "search", "arguments": {}}]},
         ]
     }
-    features = project_route_condition_features(
-        "r", "TRAJECTORY_PACKET=" + json.dumps(single),
-    )
+    features = project_result_condition_features({}, record)
     assert features["has_tool_retry"] is False
 
 
@@ -129,28 +123,25 @@ def test_has_tool_retry_false_on_single_call() -> None:
 
 _MODULE_TAG_SPEC = {
     "schema_version": "sehd.condition_spec.v2",
-    "feature_source": "provider_input",
+    "feature_source": "court_result",
     "feature": "module_tag",
     "operator": "contains",
     "value_type": "string",
     "value": "tool_use",
-    "scope": "action_spec_routes",
-    "evidence_binding": "pre_call_projection",
+    "scope": "l1_court_transform",
+    "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "route_scoped",
+    "binding": "result_scoped",
 }
 
 
 def test_module_tag_project_normalizes_and_evaluates() -> None:
-    import json
-    packet = {
-        "candidates": [
+    result = {
+        "census": [
             {"candidate_id": "c1", "module_tag": "Tool-Use"},
         ]
     }
-    features = project_route_condition_features(
-        "r", "TRAJECTORY_PACKET=" + json.dumps(packet),
-    )
+    features = project_result_condition_features(result)
     assert features["module_tag"] == ["tool_use"]
     assert validate_condition_spec(_MODULE_TAG_SPEC)[0] is True
     assert evaluate_condition_spec(_MODULE_TAG_SPEC, features).matched is True
@@ -163,9 +154,8 @@ def test_module_tag_rejects_unregistered_value() -> None:
     assert "condition_value_unregistered" in reason
 
 
-def test_condition_binding_only_route_scoped() -> None:
-    """candidate_bound/obligation_bound were advertised but never honored by
-    the evaluator; the contract now admits only the implemented scope."""
+def test_condition_binding_only_result_scoped() -> None:
+    """Only the implemented court-result binding is admitted."""
     ok, _ = validate_condition_spec(_MODULE_TAG_SPEC)
     assert ok is True
     unimplemented = dict(_MODULE_TAG_SPEC, binding="candidate_bound")
@@ -180,15 +170,15 @@ def test_condition_binding_only_route_scoped() -> None:
 
 _MISSING_FIELD_SPEC = {
     "schema_version": "sehd.condition_spec.v2",
-    "feature_source": "provider_input",
+    "feature_source": "court_result",
     "feature": "missing_field",
     "operator": "contains",
     "value_type": "string",
     "value": "responsible_event_id",
-    "scope": "action_spec_routes",
-    "evidence_binding": "pre_call_projection",
+    "scope": "l1_court_transform",
+    "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "route_scoped",
+    "binding": "result_scoped",
 }
 
 

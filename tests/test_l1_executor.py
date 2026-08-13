@@ -99,15 +99,15 @@ def test_resolve_condition_instance_candidate_kind() -> None:
     result = _result(surviving=["cert_1", "cert_2"])
     spec = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "candidate_kind",
         "operator": "contains",
         "value_type": "string",
         "value": "unsupported_claim",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     resolved = resolve_condition_instance(spec, result)
     assert resolved["candidate_id"] == "c1"
@@ -118,15 +118,15 @@ def test_resolve_condition_instance_module_tag_normalizes() -> None:
     result = _result(surviving=["cert_1"])
     spec = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "module_tag",
         "operator": "contains",
         "value_type": "string",
         "value": "tool_use",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     resolved = resolve_condition_instance(spec, result)
     assert resolved["candidate_id"] == "c1"
@@ -136,15 +136,15 @@ def test_resolve_condition_instance_failed_invariant() -> None:
     result = _result(surviving=["cert_2"])
     spec = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
         "value_type": "string",
         "value": "norm_evidence",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     resolved = resolve_condition_instance(spec, result)
     assert resolved["certificate_id"] == "cert_2"
@@ -155,15 +155,15 @@ def test_resolve_condition_instance_no_match_is_empty() -> None:
     result = _result(surviving=["cert_1"])
     spec = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "candidate_kind",
         "operator": "contains",
         "value_type": "string",
         "value": "omission",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     assert resolve_condition_instance(spec, result) == {}
 
@@ -172,27 +172,27 @@ def test_resolve_condition_instance_combinator_is_empty() -> None:
     result = _result(surviving=["cert_1"])
     spec = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "",
         "operator": "",
         "value_type": "string",
         "value": "",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "all_of",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
         "children": [
             {
                 "schema_version": "sehd.condition_spec.v2",
-                "feature_source": "provider_input",
+                "feature_source": "court_result",
                 "feature": "candidate_kind",
                 "operator": "contains",
                 "value_type": "string",
                 "value": "unsupported_claim",
-                "scope": "action_spec_routes",
-                "evidence_binding": "pre_call_projection",
+                "scope": "l1_court_transform",
+                "evidence_binding": "post_court_projection",
                 "combinator": "atom",
-                "binding": "route_scoped",
+                "binding": "result_scoped",
             },
         ],
     }
@@ -203,15 +203,15 @@ def test_withhold_certificate_resolves_instance_from_condition() -> None:
     result = _result(surviving=["cert_2"])
     spec_cond = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
         "value_type": "string",
         "value": "norm_evidence",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     mutated, report = execute_l1_intervention(
         result,
@@ -246,15 +246,15 @@ def test_evaluate_l1_rule_fires_matched_condition() -> None:
     result = _result(surviving=["cert_2"])
     spec_cond = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
         "value_type": "string",
         "value": "norm_evidence",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     action = compile_action_spec(
         "atomic_verifier_instruction", "withhold_certificate: certificate_id",
@@ -273,15 +273,15 @@ def test_evaluate_l1_rule_skips_unmatched_condition() -> None:
     result = _result(surviving=["cert_1"])
     spec_cond = {
         "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "provider_input",
+        "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
         "value_type": "string",
         "value": "impact_evidence_binding",
-        "scope": "action_spec_routes",
-        "evidence_binding": "pre_call_projection",
+        "scope": "l1_court_transform",
+        "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "route_scoped",
+        "binding": "result_scoped",
     }
     action = compile_action_spec(
         "atomic_verifier_instruction", "withhold_certificate: certificate_id",

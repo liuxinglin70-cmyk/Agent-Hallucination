@@ -53,10 +53,7 @@ from sehd_rise.causal.signals import (
     ProcessDiagnostic,
 )
 from sehd_rise.detection.policy import build_adjudication_facts
-from sehd_rise.skills.vocabulary.charters import (
-    MODULE_ACTION_OPCODES,
-    MODULE_OPERATION_TARGETS,
-)
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.contracts import (
     L2_ARTIFACT_APPEAL_MECHANISM,
     L2_ARTIFACT_BOUNDARY_CONSUMPTION,
@@ -93,9 +90,8 @@ REASON_QUARANTINE_PATTERN = "quarantine_pattern_dominant"
 # case; FN-clean = clean verdict on an error case.
 REASON_GOLD_FALSE_POSITIVE = "gold_false_positive"
 REASON_GOLD_FALSE_NEGATIVE_CLEAN = "gold_false_negative_clean"
-# Demotion when the raw cut routes to L1 but the L1 executable-completeness
-# gate fails: no "nominally L1 but no execution semantics" intermediate may
-# reach the evolution side (plan §2.4 -- the cut must be repairable).
+# Marker retained for serialized compatibility.  A cut carrying this reason is
+# now a capability-gap witness, never NON_EVOLVABLE or a framework defect.
 REASON_DEMOTED_L1_NO_EXECUTABLE = "demoted_l1_no_executable_obligation"
 
 # Self-supervised defect reasons carrying their executable field canonically
@@ -251,10 +247,10 @@ def _resolve_l1_module(artifact: Mapping[str, Any], reason: str) -> str:
 
 
 def _module_has_executable_field(module: str, field: str) -> bool:
-    """Direction-agnostic check: does the field belong to any registered
-    operation target of the module?"""
-    targets_by_op = MODULE_OPERATION_TARGETS.get(module, {})
-    return any(field in targets for targets in targets_by_op.values())
+    """Direction-agnostic registry query for one operation target."""
+    return bool(SKILL_CAPABILITY_REGISTRY.query(
+        skill_layer=LAYER_L1, modules=(module,), target_field=field,
+    ))
 
 
 def can_compile_repair_obligation(
@@ -271,10 +267,7 @@ def can_compile_repair_obligation(
     demoted to ``LAYER_NONE`` so no "nominally L1 but no execution semantics"
     intermediate reaches the evolution side.
     """
-    if owner not in MODULE_ACTION_OPCODES:
-        return False
-    opcodes = MODULE_ACTION_OPCODES.get(owner, ())
-    if not opcodes:
+    if not SKILL_CAPABILITY_REGISTRY.for_module(owner):
         return False
     if reason_code in _REASON_CARRIES_ARTIFACT_FIELDS:
         for key in ("failed_invariants", "failed_fields", "missing_fields"):
@@ -658,11 +651,11 @@ def _gold_polarity_mismatch_owner(
       the evidence/verifier pair (``keep_coverage_incomplete`` demotes the
       verdict). Defense is never the owner — adding defense cannot demote a
       verdict carried by a still-surviving error certificate.
-    - FN-clean (clean verdict, gold=error): the symmetric fix is to
-      strengthen prosecution into a decisive error, so the owner is also the
-      evidence/verifier pair. ``evidence_obligation`` no longer carries a
-      clean→error opcode (``require_evidence_field`` was removed), so the
-      executable gate demotes this shape to NON_EVOLVABLE.
+    - FN-clean (clean verdict, gold=error): preserve the first missing
+      constructive surface as the causal owner. Zero census candidates means
+      ``candidate_trigger``; otherwise the evidence/verifier pair owns the
+      missing certificate. The repairability authority then reports the
+      unavailable constructive primitive as CAPABILITY_GAP.
     """
     gold_token = _gold_error_type_token(signal)
     if gold_token == "false_positive":
@@ -676,6 +669,12 @@ def _gold_polarity_mismatch_owner(
         )
         return owner, secondary, REASON_GOLD_FALSE_POSITIVE
     if gold_token == "false_negative_clean":
+        if signal.candidate_count == 0:
+            return (
+                "candidate_trigger",
+                "candidate_to_verifier_route",
+                REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+            )
         return (
             "evidence_obligation",
             "atomic_verifier_instruction",
@@ -1115,43 +1114,15 @@ def _gold_or_process_secondary(
 
 
 def _enforce_executable_gate(cut: CausalCut) -> CausalCut:
-    """Apply the L1 executable-completeness gate (plan §2.4 invariant).
+    """Preserve an attributed failure even when no capability can repair it.
 
-    A "nominally L1 but no execution semantics" intermediate state is
-    forbidden: when the raw L1 cut cannot compile at least one executable
-    repair edge (owner/route/object/field/operation/postcondition), it is
-    demoted to ``LAYER_NONE`` so the evolution runner never observes what
-    would otherwise become an ``UnaddressableFailure`` (now subsumed by the
-    repairability authority emitting ``UNADDRESSABLE_FRAMEWORK_DEFECT``).
-
-    The demoted cut preserves the carried defect / process_diagnostic /
-    diagnostic_only reading so the repairability authority can dispatch
-    ``UNADDRESSABLE_FRAMEWORK_DEFECT`` with the same provenance as a
-    non-demoted cut.
+    Capability availability is a repairability question, not causal-cut
+    authority.  Demoting here used to erase the real failure owner and caused
+    learn-worthy false negatives to look non-evolvable.  The registry query in
+    ``repairability.analyze`` now distinguishes CAPABILITY_GAP from a broken
+    registry/runtime invariant.
     """
-    if cut.skill_layer != LAYER_L1:
-        return cut
-    if can_compile_repair_obligation(
-        owner=cut.owner, reason_code=cut.reason_code, evidence=cut.evidence
-    ):
-        return cut
-    return CausalCut(
-        skill_layer=LAYER_NONE,
-        owner="",
-        secondary_owner="",
-        reason_code=REASON_DEMOTED_L1_NO_EXECUTABLE,
-        failure_origin="",
-        blocking_predicate="demoted_l1_no_executable_obligation",
-        evidence={
-            "classified_layer": cut.skill_layer,
-            "classified_owner": cut.owner,
-            "classified_reason": cut.reason_code,
-            "classified_evidence": dict(cut.evidence),
-        },
-        defect=cut.defect,
-        process_diagnostic=cut.process_diagnostic,
-        diagnostic_only=cut.diagnostic_only,
-    )
+    return cut
 
 
 # ============================================================

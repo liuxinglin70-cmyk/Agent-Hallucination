@@ -35,6 +35,19 @@ from sehd_rise.skills.vocabulary.registry import (
 
 ACTION_RESTORE_AUDITED_CONSENSUS = "restore_audited_consensus"
 
+# Machine-readable executor/fitness surface consumed by the semantic-closure
+# validator. Telemetry-only branches intentionally do not appear here.
+EXECUTED_L2_REPAIR_OPERATIONS = frozenset({
+    ACTION_DOWNGRADE_COVERAGE,
+    ACTION_INVALIDATE_COVERAGE_CLAIM,
+    ACTION_REQUIRE_ADDITIONAL_VERIFICATION,
+    ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
+})
+L2_FITNESS_POSTCONDITIONS = frozenset({
+    "policy_item_fired_and_coverage_changed",
+    "policy_item_fired_and_terminal_changed",
+})
+
 _COVERAGE_RANK = {"unresolved": 0, "incomplete": 1, "complete": 2}
 
 

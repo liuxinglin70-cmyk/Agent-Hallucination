@@ -239,8 +239,8 @@ def detect_record(
 ) -> dict[str, Any]:
     """Detect one trajectory and return a label-free result.
 
-    ``genome`` applies the evolved L1 provider-rule skill deterministically via
-    plan-B post-processing; ``policy_genome`` supplies the evolved L2
+    ``genome`` applies the evolved L1 Skill deterministically as post-court
+    transforms; ``policy_genome`` supplies the evolved L2
     adjudication-policy items to the proof court. Either may be supplied
     independently, so a deployed detector can carry the complete two-layer
     capability.
@@ -270,8 +270,7 @@ def detect_record(
     )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
-    # L1 provider-rule skill is applied deterministically to the court result
-    # (plan B), never injected into provider prompts.
+    # L1 Skill operations transform only the already-computed court result.
     if genome is not None:
         from sehd_rise.detection.injection import compile_genome_rules
         from sehd_rise.skills.l1_execution import execute_l1_rules

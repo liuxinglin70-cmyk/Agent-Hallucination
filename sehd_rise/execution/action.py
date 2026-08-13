@@ -25,7 +25,7 @@ from sehd_rise.detection.court.identity import (
 # mapping here cannot be verified against the final detection result and
 # evaluates fail-closed to ``unmapped_postcondition``: an obligation that
 # the result schema does not expose is never silently treated as met.
-_POSTCONDITION_CHECKS = frozenset({
+POSTCONDITION_CHECKS = frozenset({
     "object_present",
     "object_absent",
     "coverage_not_complete",
@@ -143,7 +143,7 @@ def evaluate_action_spec_postcondition(
     """
     result = result if isinstance(result, Mapping) else {}
     postcondition = spec.postcondition
-    if postcondition not in _POSTCONDITION_CHECKS:
+    if postcondition not in POSTCONDITION_CHECKS:
         return False, f"unmapped_postcondition:{postcondition}"
 
     if postcondition in ("object_present", "object_absent"):
@@ -482,6 +482,7 @@ def classify_execution_evidence(
 
 
 __all__ = [
+    "POSTCONDITION_CHECKS",
     "certificate_carrier_movement",
     "certificate_claim_fingerprint",
     "classify_execution_evidence",

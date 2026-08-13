@@ -59,12 +59,8 @@ from sehd_rise.causal.cut import (
     CausalCut,
 )
 from sehd_rise.causal.signals import DetectionSignal
-from sehd_rise.skills.action import (
-    CLEAN_TO_ERROR_ACTIONS,
-    ERROR_TO_CLEAN_ACTIONS,
-    MODULE_OUTPUT_OBJECT,
-    MODULE_ROUTE_IDS,
-)
+from sehd_rise.skills.action import MODULE_OUTPUT_OBJECT, MODULE_ROUTE_IDS
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.charters import (
     MODULE_ACTION_OPCODES,
     MODULE_OBSERVABLE_FIELDS,
@@ -825,11 +821,11 @@ def _downstream_consumption(
 def _direction_operations(
     *, module: str, evolution_direction: str
 ) -> frozenset[str]:
-    if str(evolution_direction).endswith("_to_error"):
-        return CLEAN_TO_ERROR_ACTIONS.get(module, frozenset())
-    if str(evolution_direction).endswith("_to_clean"):
-        return ERROR_TO_CLEAN_ACTIONS.get(module, frozenset())
-    return frozenset(MODULE_OPERATION_TARGETS.get(module, {}))
+    return frozenset(SKILL_CAPABILITY_REGISTRY.operations_for(
+        skill_layer=LAYER_L1,
+        modules=(module,),
+        direction=str(evolution_direction or ""),
+    ))
 
 
 def _field_is_executable(
@@ -1034,18 +1030,21 @@ def _compile_failure_edges(
 
 
 def _legal_repair_operations(
-    *, cut: CausalCut, frontier: Sequence[FailureEdge]
+    *, cut: CausalCut, frontier: Sequence[FailureEdge], evolution_direction: str
 ) -> tuple[str, ...]:
     """Operations available against the primary edge in the frontier."""
     if not frontier or cut.skill_layer not in (LAYER_L1, LAYER_L2):
         return ()
-    if cut.skill_layer == LAYER_L1:
-        owner = frontier[0].owner_module
-        return tuple(sorted(opcode for opcode, _ in MODULE_ACTION_OPCODES.get(owner, ())))
-    # L2: closed action set is owned by the L2 vocabulary registry; Phase 6
-    # narrows by the candidate's ``params`` whitelist.
-    from sehd_rise.skills.vocabulary.contracts import COURT_LOCAL_ACTIONS
-    return tuple(sorted(COURT_LOCAL_ACTIONS))
+    owner = (
+        frontier[0].owner_module
+        if cut.skill_layer == LAYER_L1 else frontier[0].output_object
+    )
+    return SKILL_CAPABILITY_REGISTRY.operations_for(
+        skill_layer=cut.skill_layer,
+        modules=(owner,),
+        failure_shape=cut.reason_code,
+        direction=evolution_direction,
+    )
 
 
 def _terminal_basis_payload(signal: DetectionSignal) -> dict[str, Any]:
@@ -1158,13 +1157,15 @@ def build_causal_episode(
 
     # Surface envelope: the broad closed vocabulary for the allowed module
     # set, even when the cut produced no frontier. This keeps the prompt
-    # projection stable for the L2 no-registered-runtime-action path (C2
-    # witness: ``allowed_modules`` is non-empty but the frontier is empty;
-    # ``repairability.analyze`` then declares
-    # ``UNADDRESSABLE_FRAMEWORK_DEFECT``).
+    # projection stable even when the causal cut has no registered runtime
+    # action; repairability records that shape as CAPABILITY_GAP.
     if cut.skill_layer == LAYER_L2:
-        from sehd_rise.skills.vocabulary.contracts import COURT_LOCAL_ACTIONS
-        legal_operations = tuple(sorted(COURT_LOCAL_ACTIONS))
+        legal_operations = SKILL_CAPABILITY_REGISTRY.operations_for(
+            skill_layer=LAYER_L2,
+            modules=legal_modules,
+            failure_shape=cut.reason_code,
+            direction=evolution_direction,
+        )
         # L2 envelopes do not enumerate per-module output fields / observables:
         # each RepairPlan's effect contract names its own. Leaving the broad
         # envelope's per-field list empty for L2 is by construction.
@@ -1194,7 +1195,8 @@ def build_causal_episode(
         legal_observables=legal_observables,
     )
     legal_repair_operations = _legal_repair_operations(
-        cut=cut, frontier=repair_frontier
+        cut=cut, frontier=repair_frontier,
+        evolution_direction=evolution_direction,
     )
 
     candidate_rows = (

@@ -1,6 +1,6 @@
-"""Deterministic post-processing executor for L1 provider-rule actions (plan B).
+"""Deterministic post-court executor for L1 Skill actions.
 
-The L1 provider-rule layer has exactly seven executable actions left after the
+The L1 Skill layer has exactly seven executable actions left after the
 generative opcodes were removed. Their semantics are monotonic suppress/select
 transforms over the proof court's already-computed result — the same shape the
 L2 policy evaluator uses (``detection.policy.evaluate_policies``). This module
@@ -48,6 +48,17 @@ from sehd_rise.skills.rule import (
     project_result_condition_features,
     sanitize_condition_spec,
 )
+
+
+EXECUTED_L1_OPERATIONS = frozenset({
+    "suppress_candidate",
+    "withhold_certificate",
+    "keep_coverage_incomplete",
+    "hold_candidate_qualification",
+    "reject_non_causal_origin",
+    "select_earliest_origin",
+    "suppress_later_origin",
+})
 
 
 def _certificate_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -212,11 +223,10 @@ def resolve_condition_instance(
 ) -> dict[str, str]:
     """Resolve a matched condition to the concrete instance it names.
 
-    The route-level condition is a closed predicate over provider-input
-    features; the executor needs the specific instance that predicate named.
-    This is the result-side projection parallel to
-    ``project_route_condition_features``: it maps the condition's feature to
-    one census candidate or one prosecuted certificate, deterministically.
+    The result-scoped condition is a closed predicate over court-result
+    features; the executor needs the specific existing instance that predicate
+    named. It maps the feature to one census candidate or one prosecuted
+    certificate deterministically.
 
     Returns a mapping keyed by identifier kind — ``candidate_id``,
     ``source_candidate_id``, ``certificate_id``, ``origin_event_id`` — with
@@ -368,11 +378,7 @@ def execute_l1_intervention(
             fired = True
             detail = f"responsible_origin_selected:{origin}"
 
-    if operation in {
-        "suppress_candidate", "withhold_certificate", "keep_coverage_incomplete",
-        "hold_candidate_qualification", "reject_non_causal_origin",
-        "select_earliest_origin", "suppress_later_origin",
-    }:
+    if operation in EXECUTED_L1_OPERATIONS:
         state, responsible = _recompute_terminal(mutated, surviving, rows)
         before = str((proof or {}).get("state") if isinstance(proof, Mapping) else "")
         _mutate_proof(
@@ -538,6 +544,7 @@ def execute_l1_rules(
 
 
 __all__ = [
+    "EXECUTED_L1_OPERATIONS",
     "evaluate_l1_rule",
     "execute_l1_intervention",
     "execute_l1_interventions",

@@ -7,12 +7,12 @@ Plan §2.7 replaces the per-layer repair story with a unified protocol:
     |-- layer (L1 or L2)
     |-- owner
     |-- target causal edge (the FailureEdge the plan would lift)
-    |-- executor (PROVIDER_BEHAVIOR for L1, ADJUDICATION_POLICY for L2)
+    |-- executor (L1_COURT_TRANSFORM for L1, ADJUDICATION_POLICY for L2)
     |-- legal operations (the closed opcode/action set the plan may propose)
     |-- effect contract (what the operator must change in the next detection)
     |-- evaluation contract (how the next detection measures the change)
 
-L1 and L2 keep their novelty (provider-rule vs adjudication-policy) but share
+L1 and L2 keep their novelty (post-court rule vs adjudication-policy) but share
 this protocol so the planning/execution/evaluation layers downstream do not
 re-interpret repair semantics per layer. This module owns:
 
@@ -35,17 +35,14 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.episode import CausalFailureEpisode, FailureEdge
-from sehd_rise.skills.action import (
-    CLEAN_TO_ERROR_ACTIONS,
-    ERROR_TO_CLEAN_ACTIONS,
-    MODULE_OUTPUT_OBJECT,
-    MODULE_ROUTE_IDS,
+from sehd_rise.skills.capabilities import (
+    L1_COURT_TRANSFORM_EXECUTOR,
+    L2_ADJUDICATION_POLICY_EXECUTOR,
+    SKILL_CAPABILITY_REGISTRY,
 )
-from sehd_rise.skills.vocabulary.charters import MODULE_ACTION_OPCODES, MODULE_OPERATION_TARGETS
 from sehd_rise.skills.vocabulary.contracts import (
     LAYER_L1,
     LAYER_L2,
-    L2_ACTIONS,
 )
 
 
@@ -53,9 +50,9 @@ from sehd_rise.skills.vocabulary.contracts import (
 # Executors (closed vocabulary)
 # ============================================================
 
-EXECUTOR_PROVIDER_BEHAVIOR = "provider_behavior"
-EXECUTOR_ADJUDICATION_POLICY = "adjudication_policy"
-EXECUTORS = frozenset({EXECUTOR_PROVIDER_BEHAVIOR, EXECUTOR_ADJUDICATION_POLICY})
+EXECUTOR_L1_COURT_TRANSFORM = L1_COURT_TRANSFORM_EXECUTOR
+EXECUTOR_ADJUDICATION_POLICY = L2_ADJUDICATION_POLICY_EXECUTOR
+EXECUTORS = frozenset({EXECUTOR_L1_COURT_TRANSFORM, EXECUTOR_ADJUDICATION_POLICY})
 
 
 # ============================================================
@@ -83,7 +80,7 @@ class RepairPlan:
     skill_layer: str  # LAYER_L1 or LAYER_L2
     owner: str
     target_causal_edge: FailureEdge
-    executor: str  # EXECUTOR_PROVIDER_BEHAVIOR or EXECUTOR_ADJUDICATION_POLICY
+    executor: str  # registry executor identifier
     legal_operations: tuple[str, ...]
     effect_contract: Mapping[str, Any]
     evaluation_contract: Mapping[str, Any]
@@ -141,20 +138,17 @@ def _direction_legal_operations(
     (``error_to_clean`` / ``clean_to_error`` / ``error_to_focused`` etc.) and
     narrows the set accordingly.
     """
-    direction = str(evolution_direction or "")
-    if direction.endswith("_to_error"):
-        actions = CLEAN_TO_ERROR_ACTIONS.get(module, frozenset())
-    elif direction.endswith("_to_clean"):
-        actions = ERROR_TO_CLEAN_ACTIONS.get(module, frozenset())
-    else:
-        actions = frozenset(opcode for opcode, _ in MODULE_ACTION_OPCODES.get(module, ()))
-    return tuple(sorted(actions))
+    return SKILL_CAPABILITY_REGISTRY.operations_for(
+        skill_layer=LAYER_L1,
+        modules=(module,),
+        direction=str(evolution_direction or ""),
+    )
 
 
 def _executor_for_layer(skill_layer: str) -> str:
     """Maps skill layer to its canonical executor (plan §2.7)."""
     if skill_layer == LAYER_L1:
-        return EXECUTOR_PROVIDER_BEHAVIOR
+        return EXECUTOR_L1_COURT_TRANSFORM
     if skill_layer == LAYER_L2:
         return EXECUTOR_ADJUDICATION_POLICY
     return ""
@@ -179,10 +173,16 @@ def _l1_effect_contract(edge: FailureEdge, owner: str) -> dict[str, Any]:
     field, observed/required postcondition, and the carrier the verdict
     traveled on (certificate_id source artifact) when present.
     """
-    routes = MODULE_ROUTE_IDS.get(owner, ())
+    capabilities = SKILL_CAPABILITY_REGISTRY.for_module(owner)
+    capability = capabilities[0] if capabilities else None
     return {
-        "producer_route": routes[0] if routes else edge.producer_route,
-        "output_object": MODULE_OUTPUT_OBJECT.get(owner, owner),
+        "producer_route": (
+            capability.route_ids[0]
+            if capability and capability.route_ids else edge.producer_route
+        ),
+        "output_object": (
+            capability.output_object if capability else edge.output_object
+        ),
         "output_field": edge.field,
         "observed": edge.observed,
         "required": edge.required,
@@ -239,7 +239,7 @@ def build_repair_plan(
     """Compile one ``RepairPlan`` per executable repair edge of the episode.
 
     The episode MUST be on an evolvable surface (skill_layer L1 or L2). Plan
-    §2.7: L1 mode routes via ``PROVIDER_BEHAVIOR`` over the rule opcodes;
+    L1 mode routes via ``L1_COURT_TRANSFORM`` over registry capabilities;
     L2 mode routes via ``ADJUDICATION_POLICY`` over the L2 action vocabulary.
 
     For L1: each repair_frontier edge whose owner is in ``allowed_modules``
@@ -276,7 +276,7 @@ def build_repair_plan(
             direction_ops = _direction_legal_operations(owner, evolution_direction)
             executable_ops = tuple(
                 op for op in direction_ops
-                if field in MODULE_OPERATION_TARGETS.get(owner, {}).get(op, ())
+                if field in SKILL_CAPABILITY_REGISTRY.require(op).operation_targets
             )
             if not executable_ops:
                 continue
@@ -287,7 +287,7 @@ def build_repair_plan(
                 skill_layer=LAYER_L1,
                 owner=owner,
                 target_causal_edge=edge,
-                executor=EXECUTOR_PROVIDER_BEHAVIOR,
+                executor=EXECUTOR_L1_COURT_TRANSFORM,
                 legal_operations=executable_ops,
                 effect_contract=_l1_effect_contract(edge, owner),
                 evaluation_contract=_l1_evaluation_contract(edge, evolution_direction),
@@ -300,7 +300,14 @@ def build_repair_plan(
     # layer; Phase 6 narrows by the candidate's ``params`` whitelist.
     for edge in episode.causal_failure_edge_frontier:
         owner = str(edge.output_object) or episode.failure_owner
-        legal_ops = tuple(sorted(L2_ACTIONS))
+        legal_ops = SKILL_CAPABILITY_REGISTRY.operations_for(
+            skill_layer=LAYER_L2,
+            modules=(owner,),
+            failure_shape=episode.reason_code,
+            direction=evolution_direction,
+        )
+        if not legal_ops:
+            continue
         auto_op = legal_ops[0] if len(legal_ops) == 1 else ""
         plans.append(RepairPlan(
             plan_id=_plan_id(episode.episode_id, edge.edge_id, LAYER_L2),
@@ -323,7 +330,7 @@ def build_repair_plan(
 
 __all__ = [
     "EXECUTOR_ADJUDICATION_POLICY",
-    "EXECUTOR_PROVIDER_BEHAVIOR",
+    "EXECUTOR_L1_COURT_TRANSFORM",
     "EXECUTORS",
     "RepairPlan",
     "build_repair_plan",

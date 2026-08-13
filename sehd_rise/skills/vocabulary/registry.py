@@ -27,6 +27,8 @@ from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
+
 # ============================================================
 # Adjudication facts: the addressable observation surface
 # ============================================================
@@ -313,10 +315,14 @@ class VocabularyRegistry:
         return entry.evaluate if entry is not None else None
 
     def action_names(self) -> frozenset[str]:
-        """Court-local proposable AND executable actions."""
+        """Court-local executable actions with repair/fitness contracts.
+
+        Runtime-only telemetry operators remain registered for audit loading,
+        but are not Skill capabilities and therefore are not proposable.
+        """
         return frozenset(
             name for name, entry in self._action_instances.items()
-            if self._active(entry)
+            if self._active(entry) and SKILL_CAPABILITY_REGISTRY.contains(name)
         )
 
     def engine_level_action_names(self) -> frozenset[str]:
@@ -330,7 +336,7 @@ class VocabularyRegistry:
         return _freeze({
             name: entry.params
             for name, entry in self._action_instances.items()
-            if self._active(entry)
+            if self._active(entry) and SKILL_CAPABILITY_REGISTRY.contains(name)
         })
 
     # --- raw (status-unfiltered) views: serialization and hashing cover the

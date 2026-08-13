@@ -1,6 +1,6 @@
 """SEHD-RISE loop runner: the single L1/L2 orchestration path on RepairPlan.
 
-C6 converges the two frozen orchestrations (L1 provider-rule reflection and
+C6 converges the two frozen orchestrations (L1 Skill reflection and
 L2 adjudication-policy reflection) onto one per-case pipeline:
 
     case queue -> detection -> causal cut -> causal episode
@@ -10,7 +10,9 @@ L2 adjudication-policy reflection) onto one per-case pipeline:
 
 The repairability authority (``causal/repairability.analyze``) is the single
 routing decision: a REPAIRABLE episode is executed through a RepairPlan, a
-NON_EVOLVABLE episode is a stable detection, an UNADDRESSABLE_FRAMEWORK_DEFECT
+CAPABILITY_GAP records a learn-worthy but currently inexpressible repair,
+NON_EVOLVABLE is reserved for non-learn-worthy/stable cases, an
+UNADDRESSABLE_FRAMEWORK_DEFECT
 is counted on its own funnel line (C2) and a FRAMEWORK_DEFECT is an infra
 outcome. Every case deposits exactly one §2.9 outcome into the funnel; the
 convergence window only consumes complete repair attempts whose fitness
@@ -1506,6 +1508,35 @@ class EvolutionLoop:
                 )
                 continue
             status = verdict.status
+            if status is RepairabilityStatus.CAPABILITY_GAP:
+                # Learn-worthy detector failure with no current Skill
+                # primitive.  Keep it out of stable-canary/convergence pools
+                # and persist the exact missing capability for Phase 2.
+                if self.active_attempt_index == 0:
+                    self.state.triggered_cases += 1
+                self.funnel.record(Outcome.CAPABILITY_GAP)
+                self.record_step(EvolutionStep(
+                    case_id=case_id,
+                    case_index=idx,
+                    trigger_source="capability_gap",
+                    attribution=signal.to_dict(),
+                    edit_proposal={
+                        "operation": "capability_gap",
+                        **dict(verdict.evidence),
+                    },
+                    mutation_applied=None,
+                    gate_decision=Outcome.CAPABILITY_GAP.value,
+                    genome_hash_before=genome_before,
+                    genome_hash_after=self.state.current_genome.content_hash,
+                    detection_state=detection_state,
+                    timestamp=time.time(),
+                    fitness_check={"repairability": verdict.to_dict()},
+                ), next_case_index=idx + 1)
+                print(
+                    f"  [{idx}] CAPABILITY_GAP {case_id}: "
+                    f"{verdict.evidence.get('missing_capability', '')}"
+                )
+                continue
             if status is RepairabilityStatus.NON_EVOLVABLE:
                 self._record_stable_case(
                     idx, case_id, detection_state, genome_before, signal,
@@ -1610,7 +1641,7 @@ class EvolutionLoop:
                 )
                 continue
 
-            # L1 provider-rule surface.
+            # L1 post-court Skill surface.
             view = _ReflectionSignalView(signal, cut.owner, cut.reason_code)
             self._run_l1_policy_case(
                 idx=idx, case_id=case_id, detection_result=detection_result,
@@ -1794,7 +1825,7 @@ class EvolutionLoop:
 
         Returns True when the policy edit was accepted. Rejected and
         unavailable L2 repairs remain L2 outcomes: they do not authorize a
-        synthetic provider-rule episode because no L1 artifact defect has
+        synthetic L1 Skill episode because no L1 artifact defect has
         been established.
         """
         accepted_outcome = False
@@ -2470,7 +2501,7 @@ class EvolutionLoop:
         signal: Any, view: Any, cut: Any, episode: CausalFailureEpisode,
         type_result: Any, evolution_direction: str,
     ) -> None:
-        """Run the L1 provider-rule repair path for one REPAIRABLE episode.
+        """Run the L1 post-court Skill repair path for one REPAIRABLE episode.
 
         Reflection (hypothesis search) -> deterministic pre-validation ->
         structural gate -> optional LLM no-conflict gate -> source replay
@@ -3748,14 +3779,14 @@ class EvolutionLoop:
                 attribution=signal.to_dict(),
                 edit_proposal=edit.to_dict(),
                 mutation_applied=None,
-                gate_decision=Outcome.PROVIDER_NOT_COMPLIED.value,
+                gate_decision=Outcome.EXECUTION_RUNTIME_FAILURE.value,
                 genome_hash_before=genome_before,
                 genome_hash_after=self.state.current_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check=fitness_audit,
             ), next_case_index=idx + 1)
-            self.funnel.record(Outcome.PROVIDER_NOT_COMPLIED)
+            self.funnel.record(Outcome.EXECUTION_RUNTIME_FAILURE)
             print(f"  [{idx}] REJECT_FITNESS_RUNTIME {case_id}: {reason}")
             return
         candidate_signal = attribute_failure_for_result(

@@ -1,19 +1,16 @@
 """One L1 rule, two halves: the slot contract and the applicability contract.
 
 The slot contract (RuleSpec) stores a rule as typed slots instead of free
-text so the if-then shape is structurally guaranteed: prompt injection is a
+text so the if-then shape is structurally guaranteed: persistence is a
 deterministic render, and permission/pollution checks are semantic gates
 rather than after-the-fact shape guesses. All free-text slots are English by
 contract.
 
 The applicability contract (ConditionSpec) is the framework-owned execution
 boundary. A natural-language condition is an explanation, not an execution
-boundary: injecting every rule and letting the provider decide whether the
-prose applies makes ``condition_not_matched`` indistinguishable from provider
-non-compliance and lets irrelevant rules perturb unrelated calls. The typed
-condition uses a deliberately small closed vocabulary of provider-input
-features projected before the provider call; the prose condition remains a
-human-readable refinement and no longer decides injection.
+boundary. The typed condition uses a deliberately small closed vocabulary of
+proof-court result features projected before the deterministic L1 transform;
+the prose condition remains a human-readable refinement only.
 """
 
 from __future__ import annotations
@@ -361,12 +358,9 @@ _BOOLEAN_FEATURES = frozenset(
 # ``all_of``/``any_of``/``not`` compose child specs.
 _COMBINATORS = frozenset({"atom", "all_of", "any_of", "not"})
 
-# Binding scope. Only ``route_scoped`` is implemented: the pre-call
-# projection merges every object on a route into one feature set, so there is
-# no per-object identity to bind a condition to. The field exists so the v2
-# spec schema names the single honored scope explicitly instead of implying a
-# per-candidate or per-obligation binding the evaluator does not perform.
-_BINDINGS = frozenset({"route_scoped"})
+# L1 evaluates one proof-court result projection. Instance operations then
+# resolve a matched atom to an existing candidate/certificate/origin.
+_BINDINGS = frozenset({"result_scoped"})
 
 
 @dataclass(frozen=True)
@@ -374,14 +368,14 @@ class ConditionSpec:
     feature: str
     operator: str
     value: str | bool
-    feature_source: str = "provider_input"
+    feature_source: str = "court_result"
     value_type: str = "string"
-    scope: str = "action_spec_routes"
-    evidence_binding: str = "pre_call_projection"
+    scope: str = "l1_court_transform"
+    evidence_binding: str = "post_court_projection"
     schema_version: str = SCHEMA_VERSION
     combinator: str = "atom"
     children: tuple[dict[str, Any], ...] = ()
-    binding: str = "route_scoped"
+    binding: str = "result_scoped"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -400,17 +394,17 @@ class ConditionSpec:
             operator=str(value.get("operator") or ""),
             value=value.get("value", ""),
             feature_source=str(
-                value.get("feature_source") or "provider_input"
+                value.get("feature_source") or "court_result"
             ),
             value_type=str(value.get("value_type") or "string"),
-            scope=str(value.get("scope") or "action_spec_routes"),
+            scope=str(value.get("scope") or "l1_court_transform"),
             evidence_binding=str(
-                value.get("evidence_binding") or "pre_call_projection"
+                value.get("evidence_binding") or "post_court_projection"
             ),
             schema_version=str(value.get("schema_version") or SCHEMA_VERSION),
             combinator=str(value.get("combinator") or "atom"),
             children=children,
-            binding=str(value.get("binding") or "route_scoped"),
+            binding=str(value.get("binding") or "result_scoped"),
         )
 
 
@@ -459,11 +453,11 @@ def validate_condition_spec(value: Any) -> tuple[bool, str]:
     # Accept both v1 (atom-only) and v2 (combinator) schema versions.
     if spec.schema_version not in (SCHEMA_VERSION, SCHEMA_VERSION_V1):
         return False, f"condition_spec_schema:{spec.schema_version}"
-    if spec.feature_source != "provider_input":
+    if spec.feature_source != "court_result":
         return False, f"condition_feature_source_invalid:{spec.feature_source}"
-    if spec.scope != "action_spec_routes":
+    if spec.scope != "l1_court_transform":
         return False, f"condition_scope_invalid:{spec.scope}"
-    if spec.evidence_binding != "pre_call_projection":
+    if spec.evidence_binding != "post_court_projection":
         return False, f"condition_evidence_binding_invalid:{spec.evidence_binding}"
     if spec.combinator not in _COMBINATORS:
         return False, f"condition_combinator_invalid:{spec.combinator}"
@@ -505,11 +499,11 @@ def render_condition_spec_contract() -> str:
     lines = [
         "condition_spec is mandatory for add_rule/modify_rule. The atom form: ",
         '{"schema_version":"sehd.condition_spec.v2",',
-        ' "feature_source":"provider_input","feature":"...",',
+        ' "feature_source":"court_result","feature":"...",',
         ' "operator":"...","value_type":"string|boolean","value":"...",',
-        ' "scope":"action_spec_routes",',
-        ' "evidence_binding":"pre_call_projection",',
-        ' "combinator":"atom","binding":"route_scoped"}. Select one predicate:',
+        ' "scope":"l1_court_transform",',
+        ' "evidence_binding":"post_court_projection",',
+        ' "combinator":"atom","binding":"result_scoped"}. Select one predicate:',
     ]
     for feature, (operator, values) in _FEATURE_CONTRACT.items():
         rendered = ", ".join(
@@ -528,7 +522,7 @@ def render_condition_spec_contract() -> str:
         "with a children array of condition_spec objects (each a valid atom).",
         "not takes exactly one child. Prefer first-call features so the rule",
         "can prevent the first failure, not just steer a retry.",
-        "binding: route_scoped is the only supported scope (route-level match);",
+        "binding: result_scoped is the only supported scope (court-result match);",
         "any other binding value is rejected.",
     ])
     return "\n".join(lines)
@@ -567,120 +561,18 @@ def normalize_module_tag(value: Any) -> str:
     return tag if tag in _MODULE_TAGS else ""
 
 
-def _json_payloads(text: str) -> list[Any]:
-    """Decode top-level JSON values embedded in tagged provider input."""
-    decoder = json.JSONDecoder()
-    payloads: list[Any] = []
-    index = 0
-    while index < len(text):
-        starts = [position for position in (text.find("{", index), text.find("[", index)) if position >= 0]
-        if not starts:
-            break
-        start = min(starts)
-        try:
-            value, consumed = decoder.raw_decode(text[start:])
-        except json.JSONDecodeError:
-            index = start + 1
-            continue
-        payloads.append(value)
-        index = start + consumed
-    return payloads
-
-
-def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]:
-    """Project bounded structural features before a provider call.
-
-    The projector reads only the provider's already-constructed input. It does
-    not consume gold labels, evolution state, case ids, CRS, or post-call
-    outputs. Unknown/open text is reduced to registered categories.
-    """
-    sets: dict[str, set[str]] = {
-        "candidate_kind": set(), "candidate_axis": set(),
-        "module_tag": set(), "coverage_state": set(), "missing_field": set(),
-        "failed_invariant": set(), "event_role": set(),
-    }
-    has_tool_call = False
-    has_tool_error = False
-    tool_names: list[str] = []
-
-    def visit(node: Any) -> None:
-        nonlocal has_tool_call, has_tool_error
-        if isinstance(node, Mapping):
-            for raw_key, raw_value in node.items():
-                key = str(raw_key)
-                if key == "candidate_kind":
-                    sets["candidate_kind"].add(normalize_candidate_kind(raw_value))
-                elif key == "module_tag":
-                    normalized = normalize_module_tag(raw_value)
-                    if normalized:
-                        sets["module_tag"].add(normalized)
-                elif key in {"axes", "axis", "candidate_axis"}:
-                    values = raw_value if isinstance(raw_value, (list, tuple, set)) else (raw_value,)
-                    sets["candidate_axis"].update(
-                        str(item) for item in values if str(item) in _AXES
-                    )
-                elif key in {"coverage_state", "prosecution_coverage", "defense_coverage"}:
-                    value = str(raw_value or "unknown").lower()
-                    if value in _COVERAGE_STATES:
-                        sets["coverage_state"].add(value)
-                elif key in {"missing_fields", "missing_field"}:
-                    values = raw_value if isinstance(raw_value, (list, tuple, set)) else (raw_value,)
-                    sets["missing_field"].update(
-                        str(item) for item in values if str(item) in _RUNTIME_FIELDS
-                    )
-                elif key in {"failed_invariants", "failed_checks", "failed_invariant"}:
-                    values = raw_value if isinstance(raw_value, (list, tuple, set)) else (raw_value,)
-                    sets["failed_invariant"].update(
-                        str(item) for item in values if str(item) in _INVARIANTS
-                    )
-                elif key == "role" and str(raw_value) in _EVENT_ROLES:
-                    sets["event_role"].add(str(raw_value))
-                if key in {"tool_name", "tool_call", "tool_calls", "tool_interactions"}:
-                    if raw_value not in (None, "", [], {}):
-                        has_tool_call = True
-                if key == "tool_name" and isinstance(raw_value, str) and raw_value:
-                    tool_names.append(raw_value)
-                if key in {"error", "exception", "tool_error"} and raw_value not in (None, "", False, [], {}):
-                    has_tool_error = True
-                if isinstance(raw_value, str) and key in {"observation", "result", "error", "message"}:
-                    if re.search(r"\b(error|exception|failed|failure|rejected)\b", raw_value, re.IGNORECASE):
-                        has_tool_error = True
-                visit(raw_value)
-        elif isinstance(node, (list, tuple)):
-            for item in node:
-                visit(item)
-
-    for payload in _json_payloads(str(user or "")):
-        visit(payload)
-    # Redundant repetition is a first-class AgentHallu axis: a repeated tool
-    # name is a closed, label-free signal the deterministic census already
-    # surfaces, so the reflection model may now condition a rule on it.
-    has_tool_retry = len(tool_names) != len(set(tool_names))
-    return {
-        "schema_version": "sehd.route_condition_features.v1",
-        "route_id": str(route_id),
-        **{key: sorted(values) for key, values in sets.items()},
-        "has_tool_call": has_tool_call,
-        "has_tool_error": has_tool_error,
-        "has_tool_retry": has_tool_retry,
-    }
-
-
 def project_result_condition_features(
     result: Mapping[str, Any], record: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Project the same closed condition features from a court result.
+    """Project closed condition features for the post-court L1 executor.
 
-    This is the result-side projection parallel to
-    ``project_route_condition_features``: the deterministic L1 executor
-    evaluates a rule's ``condition_spec`` against this snapshot instead of a
-    provider user prompt. Result-observable features (candidate_kind /
+    The deterministic L1 executor evaluates a rule's ``condition_spec``
+    against this snapshot. Result-observable features (candidate_kind /
     candidate_axis / module_tag / coverage_state / missing_field /
     failed_invariant) come from the court result; trajectory-observable
     features (event_role / has_tool_*) come from the raw record, which the
-    court result does not carry. The output shape matches the route projection
-    (minus ``route_id``) so ``evaluate_condition_spec`` consumes both without
-    drift.
+    court result does not carry. No provider prompt or response controls
+    applicability.
     """
     sets: dict[str, set[str]] = {
         "candidate_kind": set(), "candidate_axis": set(),

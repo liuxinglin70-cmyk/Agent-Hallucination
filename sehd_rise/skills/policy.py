@@ -2,7 +2,7 @@
 
 L2 artifacts are closed-vocabulary policy items (observable precondition +
 enumerated action) evaluated deterministically by the proof court, in
-contrast to the L1 provider-rule genome whose rules are natural language.
+contrast to the L1 post-court Skill genome whose conditions retain text.
 This partition is deliberately independent of the L1 genome internals: it
 reuses only the shared vocabulary contracts and the versioned registry, so
 the two layers can evolve on separate schedules without cross-layer

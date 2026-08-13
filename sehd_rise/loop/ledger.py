@@ -379,6 +379,8 @@ def _project_execution_trace(
     decision = str(step.gate_decision or "")
     if decision == Outcome.INFRA_FAILURE.value:
         return "runtime_invalid"
+    if decision == Outcome.CAPABILITY_GAP.value:
+        return "no_proposal"
     proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
     if not proposal.get("operation"):
         return "no_proposal"

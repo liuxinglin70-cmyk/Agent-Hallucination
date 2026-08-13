@@ -1,18 +1,17 @@
-"""L1 causal-process reflection: LLM planning + template fallback.
+"""L1 post-court capability reflection: applicability induction.
 
-The PRIMARY planner for provider-rule skill evolution (plan §2.7:
-PROVIDER_BEHAVIOR). It analyzes a detection failure and generates a
+The PRIMARY planner for deterministic L1 transform evolution. It analyzes a
+detection failure and generates a
 structured rule-edit proposal. The input is the CausalFailureEpisode's
 prompt-safe projection (``causal.episode.project_for_prompt``) plus the
 framework-compiled RepairPlan candidate slots (``causal.plan.build_repair_plan``):
 the model selects an edge and an operation from the legal enum; it never
 re-generates framework-known execution vocabulary.
 
-Prompt construction is preserved verbatim from the old reflection engine so
-the gold-sample parity harness can compare key paragraphs between packages:
-the system prompt keeps the closed action-opcode contract, the charter
-render per allowed module, the direction action contract, the
-repair-frontier binding and the VERDICT-CARRIER RULE; the user prompt keeps
+Prompt construction keeps the deployed JSON/edit envelope while replacing
+its old action semantics with registry-derived capabilities. The system prompt
+keeps the charter render per allowed module, the direction action contract,
+the repair-frontier binding and the VERDICT-CARRIER RULE; the user prompt keeps
 the diagnostic signal block, the structured observation (episode projection
 merged with the runtime observation's court-balance carriers), the
 experience/negative-feedback sections, the detection trace and the task
@@ -45,6 +44,10 @@ from sehd_rise.planning.retrieval import (
 from sehd_rise.skills.action import (
     render_action_spec_contract,
     render_direction_action_contract,
+)
+from sehd_rise.skills.capabilities import (
+    SKILL_CAPABILITY_REGISTRY,
+    render_capability_contracts,
 )
 from sehd_rise.skills.genome import (
     BASELINE_RULE_TEXT,
@@ -214,47 +217,20 @@ class RejectedEditEntry:
         )
 
 
-# Each module is injected only into providers whose output schema can execute
-# these actions. Reflection must therefore propose a change to one of these
-# concrete outputs, rather than an abstract policy that no provider can enact.
+# Compatibility prompt views derived from the capability authority.
 MODULE_RUNTIME_CONTRACTS: dict[str, str] = {
-    "candidate_trigger": (
-        "emit or suppress a census candidate and set its observable origin, "
-        "kind, axes, or dependency event IDs"
-    ),
-    "evidence_obligation": (
-        "require or populate cited evidence fields, or keep proof coverage "
-        "incomplete when a required causal field is absent"
-    ),
-    "candidate_to_verifier_route": (
-        "route every supplied candidate to a matching qualification or "
-        "verification record without dropping its candidate ID"
-    ),
-    "atomic_verifier_instruction": (
-        "set certificate violation, actor, boundary, propagation, or evidence "
-        "fields from cited trajectory events"
-    ),
-    "causal_link_test": (
-        "populate the origin-consumption-impact/recovery chain or reject a "
-        "non-causal origin locally"
-    ),
-    "earliest_origin_tiebreak": (
-        "select an addressable earlier responsible event among supported "
-        "causal origins"
-    ),
+    module: ", ".join(
+        capability.executable_operation
+        for capability in SKILL_CAPABILITY_REGISTRY.for_module(module)
+    )
+    for module in MODULE_OBSERVABLE_FIELDS
 }
-
 MODULE_OBSERVABLE_EFFECTS: dict[str, str] = {
-    "candidate_trigger": "candidate_count or emitted candidate origin/kind changes",
-    "evidence_obligation": (
-        "prosecution coverage or cited causal evidence-field coverage changes"
-    ),
-    "candidate_to_verifier_route": "prosecution certificate count/coverage changes",
-    "atomic_verifier_instruction": (
-        "valid or quarantined certificate count and certificate fields change"
-    ),
-    "causal_link_test": "causal-field coverage or propagation state changes",
-    "earliest_origin_tiebreak": "responsible-step/origin selection changes",
+    module: ", ".join(
+        f"{capability.expected_local_effect[0]}:{capability.expected_local_effect[1]}"
+        for capability in SKILL_CAPABILITY_REGISTRY.for_module(module)
+    )
+    for module in MODULE_OBSERVABLE_FIELDS
 }
 
 
@@ -405,8 +381,13 @@ def build_causal_reflection_prompt(
         action_direction,
         allowed_modules,
     )
+    capability_contract_text = render_capability_contracts(
+        allowed_modules,
+        direction=action_direction,
+        failure_shape=(episode.reason_code if episode is not None else ""),
+    )
 
-    system = """You are the BCCSE v5 causal-process reflection engine.
+    system = """You are the BCCSE v5 Skill applicability-induction engine.
 
 The experiment may be self-supervised or explicitly gold-enhanced. If a gold
 diagnostic reference is present, use it only to understand WHY the detector's
@@ -432,48 +413,33 @@ secondary is the root cause. Produce at most one local edit in one allowed
 module.
 
 Use this causal design sequence BEFORE writing a rule:
-1. Find one observable failure: a missing, malformed, or wrongly retained
-   candidate/certificate/evidence/origin output in the detection trace.
-2. Name the provider output that owns that failure. Do not target a downstream
-   symptom when another module owns the missing output.
-3. Form one intervention hypothesis: one trajectory-observable condition ->
-   one exact output action.
+1. Find one observable failure on an object that already exists in the
+   proof-court result. Missing-object construction belongs to CAPABILITY_GAP.
+2. Query the supplied capability contracts. Never imagine a provider action.
+3. Induce only an applicability condition -> the exact executable primitive.
+   If none repairs the edge, upstream repairability must return CAPABILITY_GAP;
+   never translate a constructive failure into suppression.
 4. Compare it with current rules. The condition must add a genuinely distinct
    discriminator; if it only restates an existing rule, return no_edit.
-5. Predict one allowed observable field and direction that source replay can
-   measure. If the field is not in the selected module's allowed list, choose
-   another allowed module or return no_edit.
+5. Predict the registry-declared observable field and direction that source
+   replay measures. Never substitute a nearby field.
 
 REPAIR-FRONTIER BINDING (mandatory): for an L1 episode, select exactly one
 edge from ``repair_frontier`` and return its ``edge_id`` as repair_edge_id.
 The selected edge's owner_module must equal target_module and the action
-target must repair that edge's exact ``field``. If that field is a registered
-certificate invariant, use the module's invariant-enforcement opcode with
-that same invariant as its target. Do not substitute a nearby evidence field,
-another validation check, or an aggregate score merely because it also moved
-in the trace. A sibling output may improve while leaving the diagnosed causal
-edge unchanged; such a proposal is rejected before replay. You may retry the
-same correct operation with a genuinely different observable condition after
-a no-effect attempt; only near-duplicate rules are forbidden.
+target must repair that edge's exact ``field``. Do not substitute a nearby
+evidence field, another validation check, or an aggregate score merely because
+it also moved in the trace. A sibling output may improve while leaving the
+diagnosed causal edge unchanged; such a proposal is rejected before replay.
+You may retry the same correct operation with a genuinely different observable
+condition after a no-effect attempt; only near-duplicate rules are forbidden.
 
-Read downstream_consumption and repair_frontier inside structured_runtime_observation
-to locate who carried the verdict, then pick the executable owner inside the
-allowed modules:
-- verdict clean + surviving_error_certificates>0 or defense_certificates>0:
-  the defense side defeated the error evidence; the executable fix is a
-  stricter cited-evidence requirement (evidence_obligation) on the
-  prosecution side — no L1 module emits defense/boundary records anymore.
-- verdict unresolved/error + quarantined_error_certificates>0: error evidence
-  was built but failed validation; atomic_verifier_instruction or
-  evidence_obligation owns the repair.
-- verdict error + surviving_error_certificates>0 and the defense side is
-  already established: the error certificates are over-convicting a case the
-  defense could not clear, so the executable fix is to QUARANTINE or tighten
-  the offending error certificate (atomic_verifier_instruction) or to demand
-  stronger cited evidence before an error certificate stands
-  (evidence_obligation). Do NOT add more defense/boundary records here: the
-  defense side is already complete, so another defense record cannot move any
-  observable and only restates what already lost.
+Read downstream_consumption and repair_frontier inside
+structured_runtime_observation to locate the existing object that carried the
+verdict. Then select only a capability whose module, operation target, reads,
+writes, direction, and binding requirements all match that edge. The registry
+contract is authoritative; do not infer a constructive action from a module
+name or from an older rule's prose.
 
 VERDICT-CARRIER RULE (binding): court_balance.verdict_carriers lists, by
 certificate_id, the surviving prosecution certificates that actually carry
@@ -490,14 +456,15 @@ discounted it, so tightening its emission cannot move the verdict. When
 multiple carriers are listed, your one edit may target only one carrier;
 choose the one whose breach_type / candidate_kind best matches a
 trajectory-observable discriminator, and keep the rule general (no
-case-specific identifiers). If no allowed module can target any listed
-carrier, return no_edit — do not fall back to a witness certificate.
+case-specific identifiers). If no allowed capability can target any listed
+carrier, do not invent an edit or fall back to a witness certificate; this is
+a capability-gap invariant.
 
-- verdict clean/unresolved + zero candidates or zero certificates on the
-  decisive side: candidate_trigger or candidate_to_verifier_route owns the
-  missing emission.
-If no allowed module owns the located failure, return no_edit with that
-reason; never force an edit into a module whose provider cannot execute it.
+- verdict clean/unresolved + a missing candidate/certificate/evidence object:
+  current L1 cannot construct it. Upstream must classify CAPABILITY_GAP. Never
+  select a suppress/withhold primitive for a missing-object failure.
+If no listed capability repairs the causal edge, do not force an edit into a
+nearby module; reaching reflection in that state is a routing invariant fault.
 
 A legal rule:
 - has one or two trajectory-observable conditions;
@@ -516,19 +483,16 @@ A legal rule:
 - does not directly force clean/error/unresolved (no L1 module may emit a
   verdict).
 
-Most importantly, the action must be one closed opcode of the target module
-and must change an output field that the target module's provider can
-actually emit. Abstract actions such as "improve the analysis", "treat the
-obligation as satisfied", or "consider the evidence" are inert unless they
-name a candidate/certificate/evidence/boundary/causal output and one of the
-module's opcodes that emits, suppresses, populates, or keeps it incomplete.
+Most importantly, the action must be one capability listed below. L1 runs
+after the proof court and can only suppress, withhold, open coverage, or select
+among objects that already exist. It cannot create a candidate/certificate,
+collect evidence, re-run a verifier, or change provider reasoning.
 
 An applicable broad baseline rule does not by itself justify no_edit when the
-runtime trace proves the receiving provider failed to execute it. In that
-case, you may add one operational specialization: name a distinct observable
-sub-pattern and the exact module-local output it must change. The specialization
-must add an executable trigger that the baseline lacks; never merely restate
-the baseline conclusion.
+runtime trace proves the deterministic transform did not match the needed
+existing object. You may add one applicability specialization: name a distinct
+court-result pattern for the same registry operation. Never restate the
+baseline conclusion or change the operation semantics.
 
 historical_references in structured_runtime_observation describe what an earlier
 case with the same failure mechanism attempted and what the local execution
@@ -547,13 +511,10 @@ Operation preference (v5.3.2):
   signals for other cases.
 - remove_rule is almost never justified; prefer adding a complementary rule.
 
-Good examples:
-- When a tool error is acknowledged and repaired before impact, treat that
-  failure as clean.
-- When a claim lacks cited tool or trajectory support, require an error
-  certificate before accepting it.
-- When correcting an alleged origin would not change the result, reject that
-  origin as non-causal.
+Good examples pair a court-result condition with an exact capability:
+- existing candidate matches a recovered tool-error pattern -> suppress_candidate;
+- existing error certificate lacks a registered invariant -> withhold_certificate;
+- existing selected origin fails the causal-link pattern -> reject_non_causal_origin.
 
 Do not copy one rule across modules. Do not modify or remove immutable baseline
 rules. Only rules explicitly marked evolvable may be modified or removed.
@@ -563,30 +524,29 @@ must be descriptive rather than imperative and must not contain a case/source
 identifier, gold/answer information, URL, quoted instruction, prompt text, or
 request to change model behavior.
 
-Do not invent an expected effect. The framework compiles the selected module,
-closed action opcode and target field into one ActionSpec containing its exact
-provider routes, schema object, postcondition and observable effect. This is
-the single execution contract used by provider injection and source replay.
+Do not invent an expected effect. The registry compiles the selected module,
+closed operation and target into one ActionSpec containing the exact post-court
+executor, postcondition and observable effect used by source replay.
 
 RULE FORM CONTRACT: add_rule and modify_rule edits are typed slots, not free
-text. You supply "condition" (English, one provider-runtime-observable
+text. You supply "condition" (English, one court-result-observable
 condition), "action" (a closed opcode of the selected module, optionally
 "<opcode>: <target>"), and "evidence_anchor" (failure-signature anchor
 used only for evolution telemetry). The persisted rule text is the
 deterministic render "When <condition>, <action>." — you never write the
 sentence yourself, and a slot payload that fails the slot contract is
 discarded as an invalid mutation, never rewritten into free text. The
-condition must describe a situation the target module's provider can
+condition must describe a situation the post-court executor can
 observe at runtime, and the action must be one of the executable_action_specs
 listed for the target module in runtime_output_contracts.
 
-TYPED APPLICABILITY CONTRACT: the framework decides applicability before the
-provider call. Natural-language condition prose is not executable. Supply one
+TYPED APPLICABILITY CONTRACT: the framework decides applicability on the
+completed proof-court result. Natural-language condition prose is not executable. Supply one
 closed condition_spec predicate from this registry; an unregistered feature,
-operator or value is rejected, and a false predicate prevents injection.
-The predicate must already evaluate true in runtime_condition_features for at
-least one route named by the selected ActionSpec; otherwise the source cannot
-execute the intervention and the candidate is rejected before replay:
+operator or value is rejected, and a false predicate prevents the transform.
+The predicate must evaluate true in runtime_condition_features from that
+court result; otherwise the source cannot execute the intervention and the
+candidate is rejected before replay:
 """ + render_condition_spec_contract() + """
 
 <module_charters>
@@ -862,6 +822,9 @@ execute the intervention and the candidate is rejected before replay:
         f"<current_skill allowed_modules=\"{allowed_modules_text}\">\n"
         f"{current_skill_text}\n"
         "</current_skill>\n"
+        "<available_executable_capabilities>\n"
+        f"{capability_contract_text}\n"
+        "</available_executable_capabilities>\n"
         "<runtime_output_contracts>\n"
         f"{runtime_contract_text}\n"
         "</runtime_output_contracts>\n"
@@ -885,11 +848,11 @@ execute the intervention and the candidate is rejected before replay:
             '{"candidates":[{"target_module":"...","operation":"add_rule",'
             '"rule_index":null,"condition":"...","action":"...",'
             '"condition_spec":{"schema_version":"sehd.condition_spec.v2",'
-            '"feature_source":"provider_input","feature":"candidate_kind",'
+            '"feature_source":"court_result","feature":"candidate_kind",'
             '"operator":"contains","value_type":"string","value":"omission",'
-            '"scope":"action_spec_routes",'
-            '"evidence_binding":"pre_call_projection",'
-            '"combinator":"atom","binding":"route_scoped"},'
+            '"scope":"l1_court_transform",'
+            '"evidence_binding":"post_court_projection",'
+            '"combinator":"atom","binding":"result_scoped"},'
             '"repair_edge_id":"edge_...",'
             '"evidence_anchor":"...","feature_description":"...",'
             '"rationale":"..."}],"no_edit_rationale":"..."}\n'

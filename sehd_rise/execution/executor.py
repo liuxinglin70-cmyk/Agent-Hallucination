@@ -1,12 +1,12 @@
 """Single dispatch point for the two-skill-layer execution model (§2.7).
 
-A RepairPlan carries its ``executor`` field (``EXECUTOR_PROVIDER_BEHAVIOR``
+A RepairPlan carries its ``executor`` field (``EXECUTOR_L1_COURT_TRANSFORM``
 for L1, ``EXECUTOR_ADJUDICATION_POLICY`` for L2); this module is the only
 place that field is read to choose how the plan executes:
 
-* ``PROVIDER_BEHAVIOR`` — rule-injection replay. The candidate rule lives
-  in ``genome`` (an L1 SkillGenome with the proposed edit applied); the
-  detector replays with the provider boundary skill-aware over those rules.
+* ``L1_COURT_TRANSFORM`` — deterministic post-court replay. The candidate
+  rule lives in ``genome`` and is evaluated after the frozen proof court;
+  provider prompts and provider reasoning are unchanged.
   Deployed L2 policies ride along in ``policy_genome`` at the working scope.
 * ``ADJUDICATION_POLICY`` — deterministic policy execution. The candidate
   policy item lives in ``policy_genome``; the court evaluates it via
@@ -30,7 +30,7 @@ from sehd_rise.skills.policy import PolicyGenome
 from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.causal.plan import (
     EXECUTOR_ADJUDICATION_POLICY,
-    EXECUTOR_PROVIDER_BEHAVIOR,
+    EXECUTOR_L1_COURT_TRANSFORM,
     RepairPlan,
 )
 from sehd_rise.execution.replay import _run_counted_detection
@@ -51,13 +51,13 @@ def execute_repair_plan(
     """Dispatch one repair plan to its executor and return the replay result.
 
     The plan's ``executor`` field is the sole determinant of the route: a
-    ``PROVIDER_BEHAVIOR`` plan replays the candidate rule through the
-    skill-aware provider boundary at the working scope; an
+    ``L1_COURT_TRANSFORM`` plan replays the candidate rule through the
+    deterministic post-court executor; an
     ``ADJUDICATION_POLICY`` plan replays the candidate policy through the
     court's deterministic ``evaluate_policies`` on the candidate-validation
     channel (full item set, scope ``None``).
     """
-    if plan.executor == EXECUTOR_PROVIDER_BEHAVIOR:
+    if plan.executor == EXECUTOR_L1_COURT_TRANSFORM:
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
             budget_usage=budget_usage,

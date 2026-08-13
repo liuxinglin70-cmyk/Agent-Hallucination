@@ -330,8 +330,8 @@ def _build_structural_system_constraints(
 # reflection must know WHY nothing moved, not only that nothing moved.
 _NO_EFFECT_RETRY_GUIDANCE: dict[str, str] = {
     "output_changed_then_quarantined": (
-        "the previous edit moved provider output but the court quarantined "
-        "it: tighten the condition or fix the emitted fields, do not switch "
+        "the previous edit changed an intermediate court field but the final "
+        "court projection quarantined it: tighten the condition or binding, do not switch "
         "the intervention surface"
     ),
     "provider_output_changed_but_court_invariant": (

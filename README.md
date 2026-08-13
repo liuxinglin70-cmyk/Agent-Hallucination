@@ -3,8 +3,8 @@
 SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动的一体化自进化）
 由一个法庭式幻觉检测器（PACA-TCL v3.5）和一个以可修复性为中心的自进化框架组成。
 因果修复层先判定一次检测到的失败是否可修复；只有可修复的失败才进入进化，并经由
-L1/L2 两个可进化面共享的统一 RepairPlan（修复计划）协议完成修复——L1 是 provider
-规则基因组（六个受控自然语言槽位规则模块），L2 是裁决策略基因组（封闭词表策略项，
+L1/L2 两个可进化面共享的统一 RepairPlan（修复计划）协议完成修复——L1 是
+post-court Skill 基因组（六个模块、七个确定性抑制/选择操作），L2 是裁决策略基因组（封闭词表策略项，
 由证明法庭（proof court）确定性地求值）。每次修复尝试都由四层结果漏斗（outcome
 funnel）归类，并携带从投递（dispatch）到跨案例迁移的完整因果归功链。
 
@@ -22,7 +22,7 @@ funnel）归类，并携带从投递（dispatch）到跨案例迁移的完整因
 ### 核心目标
 
 造一个**会自己越改越准的幻觉检测器**：自进化的幻觉检测效果能够达到 SOTA。检测器
-基座（PACA-TCL v3.5）已冻结；一切改进必须来自两个可进化面（L1 provider 规则、
+基座（PACA-TCL v3.5）已冻结；一切改进必须来自两个可进化面（L1 post-court Skill、
 L2 裁决策略），且必须由跨案例的可验证结局奖励证明——gold 标签在编辑未参与生成的
 案例上测得——而不是仅靠框架内部信号或编辑来源案例自身的重放。每一项框架改动都要
 以它对这一目标的贡献来辩护；正确性、可审计性与调用效率的工作是使能项，从来不是
@@ -122,7 +122,7 @@ Provider 设置全程遵循一条优先级规则：
 `TRANSPORT_RETRIES`、`TIMEOUT_SECONDS` 与 `TOTAL_TIMEOUT_SECONDS`。进程环境优先于
 仓库 `.env`。
 
-基因组注入是显式的：`--genome` / `--policy-genome`（或
+基因组部署是显式的：`--genome` / `--policy-genome`（或
 `detect_record(..., genome=..., policy_genome=...)`）部署进化出的双层能力，
 不引入任何框架级全局状态。
 
@@ -190,16 +190,16 @@ from sehd_rise.api.evolution import run_evolution, load_records
 ## 关键设计决策
 
 1. **可修复性先于进化。** `causal/repairability.py` 是唯一的触发权威：只有
-   `REPAIRABLE` 的失败进入技能进化；`NON_EVOLVABLE` 与 `FRAMEWORK_DEFECT` 在任何
-   搜索开始之前就被分流；一个位于可进化面上却没有合法 RepairPlan 的失败是
-   `UNADDRESSABLE` 框架不变量违例，绝不是 no-edit。
+   `REPAIRABLE` 的失败进入技能进化；已归因但当前 Skill 语言无法表达的修复进入
+   `CAPABILITY_GAP`，绝不伪装成 `NON_EVOLVABLE` 或替代动作；注册表声明有精确能力
+   却无法生成 RepairPlan 才是 `UNADDRESSABLE` 框架不变量违例。
 2. **一个因果对象，一个 RepairPlan 协议。** 所有下游层消费同一个
    `CausalFailureEpisode` 与规范 `RepairPlan`（失败身份 / 层 / 属主 / 目标边 /
    执行器 / 合法操作 / 效应契约 / 评估契约）；没有哪一层重新发明失败语义。
-3. **受控自然语言槽位规则**（不是类型化 DSL，也不是自由文本）：L1 规则是类型化
-   `condition` / `action` / `evidence_anchor` 槽位，确定性地渲染为
-   `When <condition>, <action>.`（`skills/rule.py`），结构门因此校验的是槽位契约
-   而不是重新猜自由文本。
+3. **注册表闭合的 L1 Skill。** `skills/capabilities.py` 是操作、读写面、方向、
+   binding、executor、fitness postcondition 与负能力的唯一真源。规则文本
+   `When <condition>, <action>.` 只用于持久化/反思；运行时由类型化
+   `condition_spec` 在 court result 上决定适用性，再派发确定性 post-court 操作。
 4. **封闭词表的 L2 策略，对修正封闭**：策略项把一个封闭前置谓词与一个枚举动作
    配对；运行时语义由确定性的证明法庭求值器（`detection/policy.py`）拥有，
    增/改/删让缺陷策略可修复而不是永久滞留。

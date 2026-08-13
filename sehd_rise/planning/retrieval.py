@@ -487,7 +487,7 @@ def _avoidance_strategy(root_cause: str) -> str:
         ),
         ROOT_CAUSE_NO_OBSERVABLE_EFFECT: (
             "Predict an effect that source replay can measure; avoid "
-            "abstract actions that do not change provider output fields."
+            "abstract actions that do not change registry-declared court fields."
         ),
         ROOT_CAUSE_GOLD_LEAKAGE: (
             "Never include gold labels, case IDs, or dataset identity in "

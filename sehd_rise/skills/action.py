@@ -1,15 +1,9 @@
-"""Executable L1 intervention specifications: the compiled action slot.
+"""Compile registry capabilities into executable L1 ActionSpecs.
 
-Natural-language conditions remain the generalization surface, while every
-action is compiled from the module/action vocabulary into an explicit provider
-route, schema object, output field and postcondition. Reflection therefore
-does not invent execution semantics or a separate expected-effect story.
-
-This module owns the data model and the deterministic compiler: the ActionSpec
-persisted inside rule metadata, the opcode -> postcondition/effect tables, and
-the render helpers shared by the prompt and the validator. Evaluating a
-postcondition against a detection result is execution evidence and lives in
-the execution layer, never here.
+Natural-language conditions remain the generalization surface.  Operation,
+target, executor semantics, postcondition, and expected effect all come from
+``SkillCapabilityRegistry``; this module owns only the persisted ActionSpec
+shape and its compiler/view helpers.
 """
 
 from __future__ import annotations
@@ -17,91 +11,45 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Sequence
 
-from sehd_rise.skills.vocabulary.charters import (
-    MODULE_ACTION_OPCODES,
-    MODULE_OPERATION_TARGETS,
-    validate_action_surface,
-)
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
+from sehd_rise.skills.vocabulary.charters import validate_action_surface
 
 
 MODULE_ROUTE_IDS: Mapping[str, tuple[str, ...]] = {
-    "candidate_trigger": (
-        "candidate_fallback_route", "construct_census_route",
-    ),
-    "evidence_obligation": (
-        "propagation_route", "focused_prosecution_route",
-        "appeal_prosecutor_route",
-    ),
-    "candidate_to_verifier_route": ("qualification_route",),
-    "atomic_verifier_instruction": (
-        "qualification_route", "focused_prosecution_route",
-        "appeal_prosecutor_route",
-    ),
-    "causal_link_test": (
-        "propagation_route", "focused_prosecution_route",
-        "appeal_prosecutor_route", "boundary_route", "counterfactual_route",
-    ),
-    "earliest_origin_tiebreak": ("boundary_route", "counterfactual_route"),
+    module: capability.route_ids
+    for capability in SKILL_CAPABILITY_REGISTRY.for_layer("l1_provider_rule")
+    for module in (capability.module,)
 }
 
 MODULE_OUTPUT_OBJECT: Mapping[str, str] = {
-    "candidate_trigger": "candidate",
-    "evidence_obligation": "error_certificate",
-    "candidate_to_verifier_route": "candidate_qualification",
-    "atomic_verifier_instruction": "verification_certificate",
-    "causal_link_test": "causal_certificate_or_boundary",
-    "earliest_origin_tiebreak": "boundary_finding",
-}
-
-_OPERATION_POSTCONDITION: Mapping[str, str] = {
-    "suppress_candidate": "object_absent",
-    "keep_coverage_incomplete": "coverage_not_complete",
-    "hold_candidate_qualification": "qualification_not_positive",
-    # ``withhold_certificate`` semantics are fingerprint-targeted (the rule
-    # removes ONE certificate matching its condition), not whole-surface (all
-    # surviving certificates gone): whenever multiple certificates carry the
-    # verdict and the rule withholds one, a whole-surface absence check is
-    # unreachable and the verifier's compliant action would be scored as not
-    # executed. ``targeted_certificate_withheld`` evaluates the rule's actual
-    # effect against any prior surviving id set the postcondition caller can
-    # supply, and otherwise falls back to the strict whole-surface check for
-    # single-carrier cases.
-    "withhold_certificate": "targeted_certificate_withheld",
-    "reject_non_causal_origin": "origin_not_selected",
-    "select_earliest_origin": "responsible_origin_present",
-    "suppress_later_origin": "later_origin_not_selected",
-}
-
-_MODULE_EFFECT: Mapping[str, tuple[str, str]] = {
-    "earliest_origin_tiebreak": ("responsible_step", "shift"),
-}
-
-_OPERATION_EFFECT: Mapping[str, tuple[str, str]] = {
-    "suppress_candidate": ("candidate_count", "decrease"),
-    "keep_coverage_incomplete": ("prosecution_coverage", "opened"),
-    "hold_candidate_qualification": ("prosecution_certificates", "decrease"),
-    # Claim-level carrier movement, not the whole-surface count: a withhold
-    # removes ONE surviving claim, and positional certificate ids are
-    # re-minted on every provider re-sampling, so only the content
-    # fingerprint surviving set measures the rule's actual effect.
-    "withhold_certificate": ("surviving_certificates", "decrease"),
-    "reject_non_causal_origin": ("responsible_step", "removed"),
-    "suppress_later_origin": ("responsible_step", "shift"),
+    module: capability.output_object
+    for capability in SKILL_CAPABILITY_REGISTRY.for_layer("l1_provider_rule")
+    for module in (capability.module,)
 }
 
 # Operations whose runtime effect can move an over-conviction toward clean.
 # Generation guidance and admission validation consume this same table so the
 # model cannot be told that an operation is legal while the gate rejects it.
 ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
-    "evidence_obligation": frozenset({"keep_coverage_incomplete"}),
-    "atomic_verifier_instruction": frozenset({"withhold_certificate"}),
-    "causal_link_test": frozenset({"reject_non_causal_origin"}),
-    "candidate_trigger": frozenset({"suppress_candidate"}),
-    "candidate_to_verifier_route": frozenset({"hold_candidate_qualification"}),
+    module: frozenset(
+        capability.executable_operation
+        for capability in SKILL_CAPABILITY_REGISTRY.for_module(module)
+        if "error_to_clean" in capability.supported_directions
+    )
+    for module in MODULE_ROUTE_IDS
 }
 
 CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
-    "earliest_origin_tiebreak": frozenset({"select_earliest_origin"}),
+    module: frozenset(
+        capability.executable_operation
+        for capability in SKILL_CAPABILITY_REGISTRY.for_module(module)
+        if "clean_to_error" in capability.supported_directions
+    )
+    for module in MODULE_ROUTE_IDS
+    if any(
+        "clean_to_error" in capability.supported_directions
+        for capability in SKILL_CAPABILITY_REGISTRY.for_module(module)
+    )
 }
 
 
@@ -192,33 +140,24 @@ class ActionSpec:
 
 
 def compile_action_spec(module_id: str, action: str) -> ActionSpec:
-    """Compile one validated opcode slot into its executable specification."""
+    """Compile one validated registry capability into an ActionSpec."""
     valid, reason = validate_action_surface(module_id, action)
     if not valid:
         raise ValueError(reason)
     operation, separator, raw_target = str(action).lower().partition(":")
     operation = operation.strip()
     output_field = raw_target.strip() if separator else ""
-    postcondition = _OPERATION_POSTCONDITION.get(operation)
-    if not postcondition:
-        raise ValueError(f"action_spec_operation_unmapped:{operation}")
-    # Effect resolution is most-specific first and must be lazy: a module
-    # with no module-default effect (its opcodes all resolve at operation
-    # level) would otherwise KeyError here even though its opcode maps
-    # cleanly — ``dict.get`` evaluates its default argument eagerly. An
-    # opcode that resolves nowhere is an instrumentation defect, reported
-    # fail-closed, never guessed.
-    effect = _OPERATION_EFFECT.get(operation) or _MODULE_EFFECT.get(module_id)
-    if effect is None:
-        raise ValueError(f"action_spec_effect_unmapped:{module_id}:{operation}")
-    observable_field, direction = effect
+    capability = SKILL_CAPABILITY_REGISTRY.require(operation)
+    if capability.module != module_id:
+        raise ValueError(f"action_spec_operation_unowned:{module_id}:{operation}")
+    observable_field, direction = capability.expected_local_effect
     return ActionSpec(
         module_id=module_id,
-        route_ids=MODULE_ROUTE_IDS[module_id],
-        output_object=MODULE_OUTPUT_OBJECT[module_id],
+        route_ids=capability.route_ids,
+        output_object=capability.output_object,
         output_field=output_field,
         operation=operation,
-        postcondition=postcondition,
+        postcondition=capability.fitness_postcondition,
         observable_field=observable_field,
         expected_direction=direction,
     )
@@ -228,21 +167,28 @@ def render_action_spec_contract(module_id: str) -> str:
     """Render the executable intervention choices used by reflection.
 
     The prompt and the runtime compiler share these operation semantics, so
-    reflection selects an output intervention instead of inventing a natural-
-    language effect claim disconnected from provider output.
+    reflection selects a registry-backed result transform instead of inventing
+    a natural-language effect claim disconnected from runtime writes.
     """
     lines: list[str] = []
-    for operation, template in MODULE_ACTION_OPCODES.get(module_id, ()):
-        targets = MODULE_OPERATION_TARGETS.get(module_id, {}).get(operation, ())
+    for capability in SKILL_CAPABILITY_REGISTRY.for_module(module_id):
+        operation = capability.executable_operation
+        targets = capability.operation_targets
         if not targets:
             continue
         spec = compile_action_spec(module_id, f"{operation}: {targets[0]}")
         lines.append(
-            f"- {operation}: {template}; output_object={spec.output_object}; "
+            f"- {operation}: deterministic post-court transform; "
+            f"reads={','.join(capability.reads)}; "
+            f"writes={','.join(capability.writes)}; "
+            f"output_object={spec.output_object}; "
             f"postcondition={spec.postcondition}; "
             f"observable_effect={spec.observable_field}:{spec.expected_direction}"
         )
         lines.append("  valid targets: " + ", ".join(targets))
+        lines.append(
+            "  does not support: " + ", ".join(capability.does_not_support)
+        )
     return "\n".join(lines) if lines else "(no executable actions)"
 
 

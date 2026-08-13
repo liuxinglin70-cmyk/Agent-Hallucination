@@ -1,26 +1,15 @@
-"""Module charters for the six L1 skill modules.
+"""Registry-derived module charters for the L1 post-court transform layer.
 
-Modules historically carried only a stage mapping, so reflection proposals
-were routinely routed to the wrong module. The charter front-loads
-attribution: every module declares which provider-output surfaces it may
-influence, which surfaces it must never touch, and in-scope vs out-of-scope
-failure examples, so the reflection prompt can constrain proposals at
-generation time instead of rejecting them at the validation gate.
-
-Surface boundaries here mirror two code facts:
-- the runtime-rule gate (skills.genome.validate_runtime_rule) forbids rules
-  from touching coverage state, trigger source, CRS, path state, and
-  gold/ground-truth surfaces; the forbidden lists below restate that
-  ownership boundary per module.
-- the injection layer fixes which provider routes each module is injected
-  into, so the influenceable surfaces only cover output that those routes
-  can actually carry.
+Charters describe only deterministic runtime capabilities. They are views
+over :mod:`sehd_rise.skills.capabilities`, so reflection, validation, and the
+runtime share the same operation, input/output, and negative-capability facts.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.contracts import (
     ALLOWED_VERDICTS,
     MODULE_IDS,
@@ -30,12 +19,6 @@ from sehd_rise.skills.vocabulary.contracts import (
 
 @dataclass(frozen=True)
 class ModuleCharter:
-    """Responsibility boundary of one L1 skill module.
-
-    allowed_verdicts is sourced from the shared contracts so verdict
-    permission has exactly one owner; the charter never re-declares it.
-    """
-
     module_id: str
     stage: str
     influenceable_surfaces: tuple[str, ...]
@@ -45,345 +28,125 @@ class ModuleCharter:
     out_of_scope_examples: tuple[str, ...]
 
 
-def _verdicts(module_id: str) -> frozenset[str]:
-    # Single source of truth: the contracts vocabulary owns verdict permission.
-    return ALLOWED_VERDICTS.get(module_id, frozenset())
+def _capabilities(module_id: str):
+    return SKILL_CAPABILITY_REGISTRY.for_module(module_id)
+
+
+def _ordered_unique(values):
+    return tuple(dict.fromkeys(str(value) for value in values if str(value)))
+
+
+def _build_charter(module_id: str) -> ModuleCharter:
+    capabilities = _capabilities(module_id)
+    influenceable = _ordered_unique(
+        value
+        for capability in capabilities
+        for value in capability.writes
+    )
+    forbidden = _ordered_unique(
+        value
+        for capability in capabilities
+        for value in capability.does_not_support
+    )
+    in_scope = tuple(
+        f"Apply {capability.executable_operation} when its existing-carrier "
+        f"bindings are present and its result-side condition matches."
+        for capability in capabilities
+    )
+    out_of_scope = tuple(
+        f"Cannot {fact}; no registered runtime capability performs it."
+        for fact in forbidden
+    )
+    return ModuleCharter(
+        module_id=module_id,
+        stage=MODULE_STAGE[module_id],
+        influenceable_surfaces=influenceable,
+        forbidden_surfaces=forbidden,
+        allowed_verdicts=ALLOWED_VERDICTS.get(module_id, frozenset()),
+        in_scope_examples=in_scope,
+        out_of_scope_examples=out_of_scope,
+    )
 
 
 MODULE_CHARTERS: dict[str, ModuleCharter] = {
-    "candidate_trigger": ModuleCharter(
-        module_id="candidate_trigger",
-        stage=MODULE_STAGE["candidate_trigger"],
-        influenceable_surfaces=(
-            "candidate discovery: whether to create an error candidate at the "
-            "earliest observable origin of an unsupported claim or action",
-            "candidate field completeness: origin event and claimed-content "
-            "fields attached to a newly created candidate",
-        ),
-        forbidden_surfaces=(
-            "verification certificates and their quality",
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "prosecution_coverage and defense_coverage",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("candidate_trigger"),
-        in_scope_examples=(
-            "A hallucinated tool result that influences the final answer "
-            "produces no candidate at its earliest observable origin.",
-            "A candidate is created but its origin event field is empty or "
-            "points to an event not observable in the trajectory.",
-        ),
-        out_of_scope_examples=(
-            "A candidate is discovered correctly but its certificate is "
-            "wrongly rejected; that failure belongs to the "
-            "atomic_verifier_instruction module (stage_2_verification).",
-            "A correctly verified candidate is later mis-adjudicated at the "
-            "final verdict; that belongs to the L2 adjudication policy layer.",
-        ),
-    ),
-    "evidence_obligation": ModuleCharter(
-        module_id="evidence_obligation",
-        stage=MODULE_STAGE["evidence_obligation"],
-        influenceable_surfaces=(
-            "prosecution evidence obligation judgment: whether cited evidence "
-            "proves norm, breach, agent control, impact, and counterfactual "
-            "link for one error candidate",
-            "prosecution coverage declaration derived from evidence "
-            "sufficiency on the prosecution routes",
-        ),
-        forbidden_surfaces=(
-            "defense certificates and defense coverage",
-            "candidate discovery or candidate-to-verifier routing",
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("evidence_obligation"),
-        in_scope_examples=(
-            "The evidence obligation is judged satisfied although a required "
-            "causal-chain field is missing from the cited evidence.",
-            "An error candidate is supported although the cited evidence "
-            "covers only a subset of the obligation fields.",
-        ),
-        out_of_scope_examples=(
-            "A defense certificate is wrongly issued although the agent "
-            "behavior is not clean; defense-verification ownership was "
-            "removed with the clean_defense_boundary module, so this failure "
-            "belongs to the detector inference boundary or the L2 layer.",
-            "A candidate is sent to the wrong verifier before any evidence "
-            "is examined; that belongs to the candidate_to_verifier_route "
-            "module.",
-        ),
-    ),
-    "candidate_to_verifier_route": ModuleCharter(
-        module_id="candidate_to_verifier_route",
-        stage=MODULE_STAGE["candidate_to_verifier_route"],
-        influenceable_surfaces=(
-            "candidate-to-verifier routing decision: which verifier examines "
-            "a candidate based on its type (claim, action, omission, or "
-            "adoption)",
-        ),
-        forbidden_surfaces=(
-            "certificate content and certificate quality",
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "prosecution_coverage and defense_coverage",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("candidate_to_verifier_route"),
-        in_scope_examples=(
-            "A claim-type candidate is routed to an action verifier, so the "
-            "verifier tests the wrong proposition.",
-            "A candidate is routed to no verifier at all and is silently "
-            "dropped before verification.",
-        ),
-        out_of_scope_examples=(
-            "A candidate reaches the correct verifier but the verification "
-            "instruction is malformed; that failure belongs to the "
-            "atomic_verifier_instruction module (stage_2_verification).",
-        ),
-    ),
-    "atomic_verifier_instruction": ModuleCharter(
-        module_id="atomic_verifier_instruction",
-        stage=MODULE_STAGE["atomic_verifier_instruction"],
-        influenceable_surfaces=(
-            "single-candidate verification instruction: one atomic, "
-            "trajectory-evidence-bound test per candidate",
-            "certificate quality: whether the certificate cites the "
-            "trajectory events that establish or refute the candidate",
-        ),
-        forbidden_surfaces=(
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "candidate discovery and candidate-to-verifier routing",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("atomic_verifier_instruction"),
-        in_scope_examples=(
-            "A verifier tests two candidates in one pass, so the resulting "
-            "certificate cannot be attributed to a single candidate.",
-            "A certificate is issued without citing the trajectory events "
-            "that establish the claimed causal chain.",
-        ),
-        out_of_scope_examples=(
-            "Certificates are all valid but the final adjudication still "
-            "picks the wrong verdict; that belongs to the L2 adjudication "
-            "policy layer.",
-        ),
-    ),
-    "causal_link_test": ModuleCharter(
-        module_id="causal_link_test",
-        stage=MODULE_STAGE["causal_link_test"],
-        influenceable_surfaces=(
-            "causal link judgment between a candidate origin and its "
-            "downstream impact, including local negation: the causal link "
-            "does not hold (weakens prosecution without emitting a verdict)",
-        ),
-        forbidden_surfaces=(
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "prosecution_coverage and defense_coverage",
-            "candidate discovery and origin selection",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("causal_link_test"),
-        in_scope_examples=(
-            "An error with no cited propagation to the benchmark impact is "
-            "still treated as causally responsible.",
-            "Correcting the origin would have prevented the incorrect "
-            "result, but the origin is not treated as causal.",
-        ),
-        out_of_scope_examples=(
-            "A causal link is correctly negated but the final verdict stays "
-            "clean instead of unresolved; that belongs to the L2 adjudication "
-            "policy layer.",
-        ),
-    ),
-    "earliest_origin_tiebreak": ModuleCharter(
-        module_id="earliest_origin_tiebreak",
-        stage=MODULE_STAGE["earliest_origin_tiebreak"],
-        influenceable_surfaces=(
-            "origin tiebreak: selecting the earliest cited event when "
-            "multiple origins are causally sufficient",
-        ),
-        forbidden_surfaces=(
-            "causal link validity itself (owned by causal_link_test)",
-            "final verdict emission (clean/error/unresolved)",
-            "coverage_state and trigger_source",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("earliest_origin_tiebreak"),
-        in_scope_examples=(
-            "Two origins are causally sufficient and the later one is "
-            "selected as the responsible origin.",
-            "The tiebreak selects an origin that is not cited anywhere in "
-            "the trajectory.",
-        ),
-        out_of_scope_examples=(
-            "The tiebreak picks the wrong origin because the causal link of "
-            "the preferred origin was wrongly affirmed; that failure belongs "
-            "to the causal_link_test module (stage_3_causal_court).",
-        ),
-    ),
+    module_id: _build_charter(module_id) for module_id in MODULE_IDS
 }
 
 
-# Closed action-opcode vocabulary per module. Each opcode carries the
-# English template the provider actually sees (rendered by ``render_rule``),
-# so an action is enumerable, validatable and traceable instead of free
-# text. Every generated action uses ``"<opcode>: <target>"`` so the exact
-# provider output field operated on is explicit and traceable.
+# Compatibility views, not independent semantic authorities.  All values are
+# projected from SkillCapabilityRegistry and are tested for semantic closure.
 MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
-    "candidate_trigger": (
-        ("suppress_candidate", "suppress the candidate"),
-    ),
-    "evidence_obligation": (
-        ("keep_coverage_incomplete", "keep the coverage incomplete"),
-    ),
-    "candidate_to_verifier_route": (
-        ("hold_candidate_qualification", "hold the candidate qualification"),
-    ),
-    "atomic_verifier_instruction": (
-        ("withhold_certificate", "withhold the certificate"),
-    ),
-    "causal_link_test": (
-        ("reject_non_causal_origin", "reject the non-causal origin"),
-    ),
-    "earliest_origin_tiebreak": (
-        ("select_earliest_origin", "select the earliest responsible origin"),
-        ("suppress_later_origin", "suppress the later origin"),
-    ),
+    module_id: tuple(
+        (
+            capability.executable_operation,
+            capability.executable_operation.replace("_", " "),
+        )
+        for capability in _capabilities(module_id)
+    )
+    for module_id in MODULE_IDS
 }
 
-MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
-    "candidate_trigger": (
-        "defense certificate", "prosecution certificate", "final verdict",
-        "return clean", "return error", "return unresolved",
-    ),
-    "evidence_obligation": (
-        "defense coverage", "defense certificate", "final verdict",
-        "return clean", "return error", "return unresolved",
-    ),
-    "candidate_to_verifier_route": (
-        "certificate", "coverage", "final verdict", "return clean",
-        "return error", "return unresolved",
-    ),
-    "atomic_verifier_instruction": (
-        "defense coverage", "final verdict", "return clean", "return error",
-        "return unresolved",
-    ),
-    "causal_link_test": (
-        "defense coverage", "final verdict", "return clean", "return error",
-        "return unresolved",
-    ),
-    "earliest_origin_tiebreak": (
-        "certificate", "coverage", "final verdict", "return clean",
-        "return error", "return unresolved",
-    ),
-}
-
-
-# Per-module runtime-observable output fields. Single source of truth for
-# both the action-opcode ``<target>`` validation and the reflection
-# prompt's expected-effect contract (``observable_field`` must belong to the
-# selected module).
-MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
-    "candidate_trigger": ("candidate_count",),
-    "evidence_obligation": (
-        "prosecution_coverage", "prosecution_certificates",
-        "causal_field_coverage", "target_local_score",
-    ),
-    "candidate_to_verifier_route": (
-        "prosecution_coverage", "prosecution_certificates",
-        "target_local_score",
-    ),
-    "atomic_verifier_instruction": (
-        "prosecution_certificates", "causal_field_coverage",
-        # Claim-level surviving carriers — the executable observable of
-        # withhold_certificate / emit_certificate, rename-invariant.
-        "surviving_certificates", "target_local_score",
-    ),
-    "causal_link_test": (
-        "causal_field_coverage", "localization_status", "target_local_score",
-        "responsible_step",
-    ),
-    "earliest_origin_tiebreak": (
-        "responsible_step", "localization_status", "target_local_score",
-    ),
-}
-
-
-# Executable opcode/field grammar. Module ownership alone is insufficient:
-# an output field can be present in a route schema while still being the wrong
-# operand for a particular operation (for example, a certificate quarantine
-# operates on certificate_id, never on evidence_refs).
 MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
-    "candidate_trigger": {
-        "suppress_candidate": ("candidate", "candidate_id"),
-    },
-    "evidence_obligation": {
-        "keep_coverage_incomplete": ("coverage_state",),
-    },
-    "candidate_to_verifier_route": {
-        "hold_candidate_qualification": (
-            "violation_state", "actor_state", "boundary_state",
-        ),
-    },
-    "atomic_verifier_instruction": {
-        "withhold_certificate": ("certificate_id",),
-    },
-    "causal_link_test": {
-        "reject_non_causal_origin": ("responsible_event_id", "is_root_cause"),
-    },
-    "earliest_origin_tiebreak": {
-        "select_earliest_origin": ("responsible_event_id",),
-        "suppress_later_origin": ("responsible_event_id",),
-    },
+    module_id: {
+        capability.executable_operation: capability.operation_targets
+        for capability in _capabilities(module_id)
+    }
+    for module_id in MODULE_IDS
+}
+
+MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
+    module_id: _ordered_unique(
+        capability.expected_local_effect[0]
+        for capability in _capabilities(module_id)
+    )
+    for module_id in MODULE_IDS
+}
+
+
+_FORBIDDEN_ACTION_TERMS = (
+    "create candidate",
+    "construct candidate",
+    "emit candidate",
+    "create certificate",
+    "construct certificate",
+    "emit certificate",
+    "reverify",
+    "provider prompt",
+    "provider reasoning",
+    "final verdict",
+    "return clean",
+    "return error",
+    "return unresolved",
+)
+MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
+    module_id: _FORBIDDEN_ACTION_TERMS for module_id in MODULE_IDS
 }
 
 
 def validate_action_surface(module_id: str, action: str) -> tuple[bool, str]:
-    """Check that a slot action names a closed opcode of the target module.
-
-    The action must be ``"<opcode>: <target>"``. The opcode belongs to the
-    module's ``MODULE_ACTION_OPCODES`` and the target belongs to that exact
-    operation in ``MODULE_OPERATION_TARGETS``. Module-level schema ownership
-    alone is not enough. Forbidden surface terms still fail first.
-    """
+    """Validate one ``operation: target`` against the capability registry."""
     lowered = " ".join(str(action or "").lower().split())
     for marker in MODULE_FORBIDDEN_ACTION_TERMS.get(module_id, ()):
         if marker in lowered:
             return False, f"forbidden_action_surface:{marker}"
-    opcodes = MODULE_ACTION_OPCODES.get(module_id, ())
-    opcode_part, sep, target_part = lowered.partition(":")
-    opcode_part = opcode_part.strip()
-    if not any(opcode_part == opcode for opcode, _template in opcodes):
-        return False, f"action_opcode_unowned:{opcode_part or 'missing'}"
-    target = target_part.strip()
-    operation_targets = MODULE_OPERATION_TARGETS.get(module_id, {}).get(
-        opcode_part, (),
-    )
-    if not sep and operation_targets:
-        return False, f"action_target_required:{opcode_part}"
-    if sep and not target:
+    operation, separator, raw_target = lowered.partition(":")
+    capability = SKILL_CAPABILITY_REGISTRY.get(operation.strip())
+    if capability is None or capability.module != module_id:
+        return False, f"action_opcode_unowned:{operation.strip() or 'missing'}"
+    target = raw_target.strip()
+    if capability.operation_targets and not separator:
+        return False, f"action_target_required:{operation.strip()}"
+    if separator and not target:
         return False, "action_target_unowned:empty"
-    if sep:
-        if target not in operation_targets:
-            return False, (
-                f"action_target_not_owned_by_operation:{opcode_part}:{target}"
-            )
+    if target and target not in capability.operation_targets:
+        return False, (
+            "action_target_not_owned_by_operation:"
+            f"{operation.strip()}:{target}"
+        )
     return True, ""
 
 
 def charter_for(module_id: str) -> ModuleCharter:
-    """Return the charter for a registered module, else raise ValueError."""
     charter = MODULE_CHARTERS.get(module_id)
     if charter is None:
         raise ValueError(f"unknown module_id: {module_id}")
@@ -391,25 +154,35 @@ def charter_for(module_id: str) -> ModuleCharter:
 
 
 def render_charter_text(module_id: str) -> str:
-    """Render one charter as an English text block for prompt injection."""
     charter = charter_for(module_id)
     verdicts = ", ".join(sorted(charter.allowed_verdicts)) or "none"
     lines = [
         f"MODULE: {charter.module_id}",
-        f"STAGE: {charter.stage}",
-        "INFLUENCEABLE SURFACES:",
+        f"RUNTIME: deterministic post-court transform at {charter.stage}",
+        "WRITES:",
+        *(f"  - {surface}" for surface in charter.influenceable_surfaces),
+        "DOES NOT SUPPORT:",
+        *(f"  - {surface}" for surface in charter.forbidden_surfaces),
+        f"ALLOWED DIRECT VERDICTS: {verdicts}",
+        "EXECUTABLE USE:",
+        *(f"  - {example}" for example in charter.in_scope_examples),
     ]
-    lines.extend(f"  - {surface}" for surface in charter.influenceable_surfaces)
-    lines.append("FORBIDDEN SURFACES:")
-    lines.extend(f"  - {surface}" for surface in charter.forbidden_surfaces)
-    lines.append(f"ALLOWED VERDICTS: {verdicts}")
-    lines.append("IN-SCOPE FAILURE EXAMPLES:")
-    lines.extend(f"  - {example}" for example in charter.in_scope_examples)
-    lines.append("OUT-OF-SCOPE FAILURE EXAMPLES:")
-    lines.extend(f"  - {example}" for example in charter.out_of_scope_examples)
     return "\n".join(lines)
 
 
 def render_all_charters() -> str:
-    """Render all charters in MODULE_IDS order for the reflection prompt."""
-    return "\n\n".join(render_charter_text(mid) for mid in MODULE_IDS)
+    return "\n\n".join(render_charter_text(module_id) for module_id in MODULE_IDS)
+
+
+__all__ = [
+    "MODULE_ACTION_OPCODES",
+    "MODULE_CHARTERS",
+    "MODULE_FORBIDDEN_ACTION_TERMS",
+    "MODULE_OBSERVABLE_FIELDS",
+    "MODULE_OPERATION_TARGETS",
+    "ModuleCharter",
+    "charter_for",
+    "render_all_charters",
+    "render_charter_text",
+    "validate_action_surface",
+]

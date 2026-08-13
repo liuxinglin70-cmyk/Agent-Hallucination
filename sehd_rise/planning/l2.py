@@ -26,6 +26,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
+from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.policy import PolicyEdit, PolicyGenome, PolicyOp
 from sehd_rise.skills.vocabulary.contracts import (
     ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
@@ -156,6 +157,13 @@ def plan_policy_candidates(
             {},
             "Consume the verified-clean boundary path as the terminal verdict.",
         ))
+    executable_actions = set(SKILL_CAPABILITY_REGISTRY.operations_for(
+        skill_layer="l2_adjudication_policy",
+        failure_shape=reason,
+    ))
+    templates = [
+        template for template in templates if template[1] in executable_actions
+    ]
     if not templates:
         return PolicyPlan(
             candidates=(),
@@ -215,6 +223,8 @@ def plan_policy_candidates(
                 ),
             )
         for action, params in alternatives:
+            if action not in executable_actions:
+                continue
             if not params.get("side"):
                 continue
             identity = (item.precondition, action, tuple(sorted(params.items())))

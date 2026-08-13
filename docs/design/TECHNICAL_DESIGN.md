@@ -42,12 +42,12 @@ api, cli        → loop, detection, evaluation, planning
 |---|---|---|
 | `platform` | env / routes / models / usage / gold / jsonio | 与研究无关的基础设施：`.env` 加载、provider 路由解析、规范模型名、用量账本（usage ledger）、gold 归一化（仅评估侧）、规范 JSON / 稳定哈希 / 原子写入 |
 | `skills` | genome / policy / rule / vocabulary/ | 可进化面的数据模型与封闭词表——纯数据，无流程逻辑。`vocabulary/` 是 L2 谓词/动作、L1 模块章程与法庭审计词表的唯一真源 |
-| `detection` | packet / transport / court/ / policy / injection / detector / replicas / batch | 证明法庭检测：轨迹打包、provider 传输、v3.5 法庭引擎、确定性 L2 策略求值器、provider 边界上的 L1 规则注入、`detect_record` 入口、副本聚合、批量运行 |
+| `detection` | packet / transport / court/ / policy / injection / detector / replicas / batch | 证明法庭检测：轨迹打包、provider 传输、v3.5 法庭引擎、确定性 L2 策略求值器、L1 post-court Skill 编译与执行、`detect_record` 入口、副本聚合、批量运行 |
 | `causal` | signals / cut / episode / repairability / plan | 唯一的因果权威：检测→进化投影、终态因果切点、`CausalFailureEpisode`、`RepairabilityStatus` 分诊、规范 `RepairPlan` |
 | `experience` | memory | 机制级经验记忆——单一 Experience Truth |
 | `typing` | classifier / guidance / slices | HTC-TES 咨询型类型智能：类型标注、检索/反思先验、类型化评估切片。无因果否决权 |
 | `planning` | l1 / l2 / retrieval / candidates / search / feedback | 由 RepairPlan 驱动的假设搜索：L1 LLM 因果反思、L2 封闭词表策略规划、经验检索、重试反馈 |
-| `execution` | action / executor / replay / trace | 修复执行与证据：`ActionSpec`、按 `RepairPlan.executor` 分发、基因组注入的检测回放、`ExecutionTrace` |
+| `execution` | action / executor / replay / trace | 修复执行与证据：`ActionSpec`、按 `RepairPlan.executor` 分发、带新鲜 child genome 的检测回放、`ExecutionTrace` |
 | `evaluation` | effect / fitness / canary / gate / promotion | 因果效应记录、源 fitness、canary 选择/保留/驱逐、结构门 + 无冲突门、`PromotionDecision` |
 | `meta` | strategy / review | 跨案例策略学习器：五域封闭策略词表、证据门控的提交、仅输出策略建议 |
 | `loop` | machine / runner / state / records / persistence / ledger / probes / shadow / result | 统一编排：进化状态机、结果漏斗、案例队列与预算、检查点、GateEvent 账本、开发探针、shadow 批次提交 |
@@ -106,9 +106,10 @@ trajectory record（原始轨迹记录）
 证据，不是自动的属主。确定性失败分类器只回答一个问题——失败发生在哪一层、哪个
 产物上——不调用 LLM、不使用启发式，按优先级顺序：
 
-1. Provider 产物缺失或畸形 → L1；属主按产物类型解析（candidate →
+1. Proof-court 结果中的产物失败 → L1；属主按产物类型解析（candidate →
    `candidate_trigger`，错误证书 → `evidence_obligation`；defense 证书已无 L1 属主，
-   归 detector 边界或 L2）。
+   归 detector 边界或 L2）。若所需产物不存在，仍保留该因果属主，但可修复性为
+   `CAPABILITY_GAP`；只有既有产物上的抑制/选择才能生成 L1 RepairPlan。
 2. 共识门挡下了一个非空候选集 → L2，`consensus_gate_policy`。
 3. 空洞的完整覆盖（该侧声称 `complete` 却零有效证书）→ L2，`coverage_validity_policy`。
 4. Boundary 路径返回 `verified_clean` 但终态是 `unresolved` → L2，
@@ -116,9 +117,9 @@ trajectory record（原始轨迹记录）
 5. 兜底：无可操作形状的 unresolved，或终态裁决与法庭自己的证书账本矛盾 → 不在
    技能可寻址范围内。
 
-L1 属主假设额外要过 gold 极性门：假阴性（false negative）只能由收紧错误检测的模块
-属主，假阳性（false positive）只能由放松或限定错误主张的模块属主；极性错误的假设
-被丢弃。Unresolved 终态不带极性。
+Gold 极性只确定需要的终态迁移方向，不改写已找到的因果属主。假阴性若需要创建缺失
+candidate/certificate，保持原属主并进入 `CAPABILITY_GAP`；假阳性只允许查询与
+error→clean 方向相容的既有产物抑制能力。Unresolved 终态不带极性。
 
 **CausalFailureEpisode**（`episode.py`）。每个下游层都消费的单一失败对象：终态、
 终态依据、阻塞谓词、因果失败边、失败属主、技能层、可修复面、合法修复操作、可观测
@@ -127,7 +128,9 @@ L1 属主假设额外要过 gold 极性门：假阴性（false negative）只能
 **可修复性权威**（`repairability.py`）。唯一的进化触发器。每个被分析的失败恰好被
 分诊为一种状态：
 
-- `NON_EVOLVABLE` —— 检测器/无可操作/运行时无效的结果；绝不产出技能。
+- `CAPABILITY_GAP` —— 已学到、归因清楚，但当前 Skill 注册表没有可表达的执行原语；
+  记录 failure / owner / desired_transition / missing_capability，不伪造替代动作。
+- `NON_EVOLVABLE` —— 非学习目标或稳定检测结果；绝不用于掩盖缺失能力。
 - `REPAIRABLE` —— 至少存在一份可编译的合法 RepairPlan；只有这些进入进化。
 - `UNADDRESSABLE_FRAMEWORK_DEFECT` —— 框架不变量违例：某个被声明在可进化面上、
   却不存在合法 RepairPlan 的失败。独立计数；绝不进入 no-edit 或收敛统计。
@@ -143,44 +146,49 @@ RepairPlan
 ├── layer                  # L1 | L2
 ├── owner（属主）
 ├── target causal edge（目标因果边）
-├── executor               # provider-behavior | adjudication-policy
+├── executor               # l1_court_transform | l2_adjudication_policy
 ├── legal operations（合法操作）
 ├── effect contract（效应契约）
 └── evaluation contract（评估契约）
 ```
 
-L1 经 provider-behavior 执行器（注入规则）执行；L2 经 adjudication-policy 执行器
-（确定性法庭求值器）执行。多层的新颖性在于不同的学习面，而不在于不同的失败语义。
+L1 只经 `l1_court_transform` 对已完成的 proof-court 结果执行七个确定性
+抑制/选择变换；绝不注入 provider prompt，也不能创建候选、证据或证书。L2 经
+`l2_adjudication_policy`（确定性法庭求值器）执行。所有可提议操作由
+`skills/capabilities.py::SKILL_CAPABILITY_REGISTRY` 唯一授权；诊断、计划、反思、
+预验证、执行与 fitness 必须查询同一注册表。
 
 ## 双层可进化面
 
 冻结基座永不改变：进化只改动 L1 规则基因组与 L2 策略基因组；CRS 权重、法庭决策
 规则与阶段结构原封不动，任何阈值都不手调。
 
-### L1 —— provider 规则基因组
+### L1 —— post-court Skill 基因组
 
-六个技能模块拥有 provider 输出的面：
+六个技能模块只拥有既有 proof-court 结果上的抑制/选择面：
 
 | 模块 | 阶段 | 作用 |
 |--------|-------|------|
-| `candidate_trigger` | Census | 什么构成幻觉候选 |
-| `evidence_obligation` | Verification | 每个候选必须由什么证据支撑 |
-| `candidate_to_verifier_route` | Verification | 候选如何被路由到验证 |
-| `atomic_verifier_instruction` | Verification | 如何原子地验证单个主张 |
-| `causal_link_test` | Causal Court | 如何测试用于定位的因果链 |
-| `earliest_origin_tiebreak` | Causal Court | 如何解决多来源定位平局 |
+| `candidate_trigger` | Post-court | 抑制已有候选 |
+| `evidence_obligation` | Post-court | 保持已有 coverage 未完成 |
+| `candidate_to_verifier_route` | Post-court | 暂停已有候选资格 |
+| `atomic_verifier_instruction` | Post-court | 撤下已有证书 |
+| `causal_link_test` | Post-court | 拒绝已有的非因果 origin |
+| `earliest_origin_tiebreak` | Post-court | 在已有 origin 中选择/抑制 |
 
 规则以类型化英文槽位存储（`skills/rule.py`）：
 
-- `condition`：一个轨迹可观测情境（≤ 300 字符）；
+- `condition`：一个 proof-court 结果可观测情境（≤ 300 字符）；
 - `action`：所属模块章程中的一个模块内封闭操作码（opcode），可选
   `"<opcode>: <target>"` 形式指名具体输出字段（≤ 300 字符）；自由文本动作以
   `action_opcode_unowned` 拒绝；
 - `evidence_anchor`：供进化分诊使用的失败签名记账（≤ 240 字符）；永不渲染进
   运行时提示词，因此不会把案例身份泄露进检测。
 
-提示词注入是确定性渲染——恰好 `When <condition>, <action>.`——结构门因此把槽位
-契约当作唯一形状检查。每个模块带一份章程（`skills/vocabulary/charters.py`）：
+规则文本只用于持久化和反思展示，确定性渲染为 `When <condition>, <action>.`；
+它不注入 provider prompt，也不决定运行时动作。类型化 `condition_spec` 在已完成的
+court result 上求值，匹配后才派发注册表中的操作。每个模块带一份从能力注册表派生的
+章程（`skills/vocabulary/charters.py`）：
 流水线阶段、可影响面、禁止面、允许的裁决、在范围内与范围外的失败示例。只有被允许
 的目标模块的章程与操作码列表进入反思提示词，在生成时就约束提案。运行时规则不得
 编码数据集标签、案例特定标识符、内部诊断状态、禁止的直接裁决、不安全的跨模块引用
@@ -215,12 +223,13 @@ LLM 解读；确定性求值器正是让「产物→行为」耦合可审计的�
 ```text
 DETECTED
   -> CAUSAL_FAILURE_ANALYZED
-       -> NON_EVOLVABLE | FRAMEWORK_DEFECT        （终态，framework 层）
+       -> CAPABILITY_GAP | NON_EVOLVABLE | FRAMEWORK_DEFECT
+                                                     （终态，framework 层）
        -> REPAIRABLE
   -> REPAIR_PLANNED
   -> HYPOTHESIS_SEARCH                            （NO_HYPOTHESIS：search 层）
   -> PROPOSAL_VALIDATED                           （INVALID_PROPOSAL / DUPLICATE_PROPOSAL）
-  -> EXECUTED                                     （ACTION_NOT_DISPATCHED / PROVIDER_NOT_COMPLIED）
+  -> EXECUTED                                     （ACTION_NOT_DISPATCHED / EXECUTION_RUNTIME_FAILURE）
   -> TARGET_EDGE_CHANGED                          （TARGET_EDGE_UNCHANGED）
   -> BLOCKER_CLEARED                              （BLOCKER_NOT_CLEARED）
   -> FITNESS_EVALUATED
@@ -232,13 +241,13 @@ DETECTED
 
 ### 结果漏斗
 
-每次修复尝试恰好终止于四层共 16 种终态之一——`loop/machine.py::Outcome`，彻底取代
+每次修复尝试恰好终止于四层共 17 种终态之一——`loop/machine.py::Outcome`，彻底取代
 旧的 `skip_*` 词表：
 
-- **Framework**：`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
+- **Framework**：`CAPABILITY_GAP`、`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
   `SCHEMA_FAILURE`、`INFRA_FAILURE`
 - **Search**：`NO_HYPOTHESIS`、`INVALID_PROPOSAL`、`DUPLICATE_PROPOSAL`
-- **Execution**：`ACTION_NOT_DISPATCHED`、`PROVIDER_NOT_COMPLIED`、
+- **Execution**：`ACTION_NOT_DISPATCHED`、`EXECUTION_RUNTIME_FAILURE`、
   `TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
 - **Fitness**：`SOURCE_NOT_IMPROVED`、`CANARY_REGRESSION`、`TRANSFER_REGRESSION`、
   `ACCEPTED`

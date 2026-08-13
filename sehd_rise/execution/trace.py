@@ -1,6 +1,6 @@
 """Execution evidence for one edit on its source replay (plan B).
 
-The L1 provider-rule layer executes deterministically as post-processing, so
+The L1 Skill layer executes deterministically as post-court transforms, so
 the provider no longer self-reports ``rule_effects`` / ``applied_rule_ids``.
 The compiled/fired state of a rule is read from the executor's
 ``l1_execution`` record on the replay result instead — the same deterministic

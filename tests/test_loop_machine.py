@@ -68,7 +68,7 @@ def _drive_to(machine: RepairStateMachine, target: State) -> None:
 
 
 def test_legal_transition_count() -> None:
-    assert len(LEGAL_TRANSITIONS) == 30, len(LEGAL_TRANSITIONS)
+    assert len(LEGAL_TRANSITIONS) == 31, len(LEGAL_TRANSITIONS)
 
 
 def test_every_legal_transition_reachable() -> None:
@@ -144,6 +144,7 @@ def test_funnel_per_outcome_counts() -> None:
         Outcome.ACCEPTED, Outcome.ACCEPTED, Outcome.ACCEPTED,
         Outcome.SOURCE_NOT_IMPROVED, Outcome.SOURCE_NOT_IMPROVED,
         Outcome.CANARY_REGRESSION,
+        Outcome.CAPABILITY_GAP,
         Outcome.NON_EVOLVABLE,
         Outcome.UNADDRESSABLE, Outcome.UNADDRESSABLE,
         Outcome.INFRA_FAILURE,
@@ -153,6 +154,7 @@ def test_funnel_per_outcome_counts() -> None:
     assert funnel.count(Outcome.ACCEPTED) == 3
     assert funnel.count(Outcome.SOURCE_NOT_IMPROVED) == 2
     assert funnel.count(Outcome.CANARY_REGRESSION) == 1
+    assert funnel.count(Outcome.CAPABILITY_GAP) == 1
     assert funnel.count(Outcome.NON_EVOLVABLE) == 1
     assert funnel.unaddressable() == 2
     assert funnel.count(Outcome.INFRA_FAILURE) == 1
@@ -160,19 +162,20 @@ def test_funnel_per_outcome_counts() -> None:
 
 def test_funnel_layer_totals() -> None:
     funnel = OutcomeFunnel()
-    # Framework: NON_EVOLVABLE + UNADDRESSABLE + INFRA_FAILURE
+    # Framework: CAPABILITY_GAP + NON_EVOLVABLE + UNADDRESSABLE + INFRA_FAILURE
     # Search: NO_HYPOTHESIS + INVALID_PROPOSAL
     # Execution: ACTION_NOT_DISPATCHED + TARGET_EDGE_UNCHANGED
     # Fitness: ACCEPTED + SOURCE_NOT_IMPROVED + CANARY_REGRESSION + TRANSFER_REGRESSION
     for outcome in (
-        Outcome.NON_EVOLVABLE, Outcome.UNADDRESSABLE, Outcome.INFRA_FAILURE,
+        Outcome.CAPABILITY_GAP, Outcome.NON_EVOLVABLE,
+        Outcome.UNADDRESSABLE, Outcome.INFRA_FAILURE,
         Outcome.NO_HYPOTHESIS, Outcome.INVALID_PROPOSAL,
         Outcome.ACTION_NOT_DISPATCHED, Outcome.TARGET_EDGE_UNCHANGED,
         Outcome.ACCEPTED, Outcome.SOURCE_NOT_IMPROVED,
         Outcome.CANARY_REGRESSION, Outcome.TRANSFER_REGRESSION,
     ):
         funnel.record(outcome)
-    assert funnel.layer_total(Layer.FRAMEWORK) == 3
+    assert funnel.layer_total(Layer.FRAMEWORK) == 4
     assert funnel.layer_total(Layer.SEARCH) == 2
     assert funnel.layer_total(Layer.EXECUTION) == 2
     assert funnel.layer_total(Layer.FITNESS) == 4
