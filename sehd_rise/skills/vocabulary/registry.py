@@ -317,12 +317,16 @@ class VocabularyRegistry:
     def action_names(self) -> frozenset[str]:
         """Court-local executable actions with repair/fitness contracts.
 
-        Runtime-only telemetry operators remain registered for audit loading,
-        but are not Skill capabilities and therefore are not proposable.
+        Proposability is inherited from the instance's bound operator: the
+        operator's baseline capability carries the repair/fitness contract,
+        so a promoted ``<operator>_instance`` alias is proposable exactly
+        when its operator is. Runtime-only telemetry operators have no
+        capability and therefore never become proposable.
         """
         return frozenset(
             name for name, entry in self._action_instances.items()
-            if self._active(entry) and SKILL_CAPABILITY_REGISTRY.contains(name)
+            if self._active(entry)
+            and SKILL_CAPABILITY_REGISTRY.contains(entry.operator)
         )
 
     def engine_level_action_names(self) -> frozenset[str]:
@@ -336,7 +340,8 @@ class VocabularyRegistry:
         return _freeze({
             name: entry.params
             for name, entry in self._action_instances.items()
-            if self._active(entry) and SKILL_CAPABILITY_REGISTRY.contains(name)
+            if self._active(entry)
+            and SKILL_CAPABILITY_REGISTRY.contains(entry.operator)
         })
 
     # --- raw (status-unfiltered) views: serialization and hashing cover the

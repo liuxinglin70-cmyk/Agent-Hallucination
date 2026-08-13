@@ -265,6 +265,7 @@ from sehd_rise.skills.vocabulary.evolution import (
     apply_registry_edit,
     build_registry_selection_prompt,
     compile_registration_candidate,
+    enqueue_registry_validation,
     plan_registry_candidates,
     promote_pending_registry_entries,
     promoted_intent_candidates,
@@ -449,6 +450,7 @@ def _llm_no_conflict_gate(
 def _run_registry_reflection_impl(
     *,
     attribution: Any,
+    facts: Any,
     facts_summary: Mapping[str, Any],
     case_id: str,
     policy_genome: PolicyGenome,
@@ -531,6 +533,23 @@ def _run_registry_reflection_impl(
     )
     policy_genome.registry = new_registry
     applied_edit = new_registry.audit[-1]
+    intended_edit = None
+    if candidate.operation == "register_action" and candidate.precondition:
+        intended_edit = {
+            "precondition": candidate.precondition,
+            "params": dict(candidate.params),
+        }
+    # Registration alone is shadow-only telemetry unless the pending entry
+    # enters the validation queue: enqueue it with the motivating facts so
+    # later independent observations can promote it to working vocabulary.
+    enqueue_registry_validation(
+        genome=policy_genome,
+        operation=candidate.operation,
+        target=candidate.target,
+        facts=facts,
+        case_id=case_id,
+        intended_edit=intended_edit,
+    )
     l2_registry_registrations.append({
         "outcome": "registered",
         "edit_id": applied_edit.edit_id,
@@ -1337,10 +1356,12 @@ class EvolutionLoop:
         )
 
     def _run_registry_reflection(self, *,
-        attribution: Any, facts_summary: Mapping[str, Any], case_id: str,
+        attribution: Any, facts: Any,
+        facts_summary: Mapping[str, Any], case_id: str,
     ) -> None:
         _run_registry_reflection_impl(
-            attribution=attribution, facts_summary=facts_summary,
+            attribution=attribution, facts=facts,
+            facts_summary=facts_summary,
             case_id=case_id, policy_genome=self.state.policy_genome,
             mutation_route=self.mutation_route,
             run_mutation_call=self.run_mutation_call,
@@ -2328,6 +2349,7 @@ class EvolutionLoop:
                 else:
                     self._run_registry_reflection(
                         attribution=attribution,
+                        facts=facts,
                         facts_summary=facts_summary,
                         case_id=case_id,
                     )
