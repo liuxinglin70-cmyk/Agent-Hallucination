@@ -272,14 +272,14 @@ _CAPABILITIES = (
         applicable_failure_shapes=("gold_false_negative_clean",),
         supported_directions=("clean_to_error",),
         binding_requirements=(
-            "exactly one existing claim anchor", "label-free observable condition",
+            "one or more existing claim anchors", "label-free observable condition",
         ),
         input_binding_domain="claim_anchor",
         required_binding_fields=(
             "anchor_id", "source_event_id", "span_start", "span_end",
             "span_text_hash",
         ),
-        cardinality="exactly_one",
+        cardinality="one_or_many",
         expected_local_effect=("candidate_count", "increase"),
         possible_terminal_effect=(
             "verified_clean->verified_error", "verified_clean->unresolved",

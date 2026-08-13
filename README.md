@@ -159,7 +159,7 @@ python -m sehd_rise evolve \
 运行模式（§10 三分法）与 minibatch meta 节奏：
 
 ```bash
-  --run-mode supervised_evolution|label_free_diagnostic|protected_label_free_evolution \
+  --run-mode supervised_evolution|label_free_diagnostic|protected_label_free_adaptation \
   --meta-update-every 5              # 每 5 个 case 刷新一次搜索策略（0 = 仅 run 后）
 ```
 

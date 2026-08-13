@@ -85,7 +85,7 @@ def main() -> int:
     parser.add_argument(
         "--run-mode", type=str, default="",
         help="evolution regime: supervised_evolution | label_free_diagnostic | "
-        "protected_label_free_evolution (resolves gold/canary flags)",
+        "protected_label_free_adaptation (resolves gold/canary flags)",
     )
     parser.add_argument(
         "--meta-update-every", type=int, default=0,

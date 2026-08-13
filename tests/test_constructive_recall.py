@@ -309,3 +309,84 @@ def test_construct_candidate_is_idempotent(monkeypatch) -> None:
     )
     assert duplicate.status == CONSTRUCTED_CANDIDATE_DUPLICATE
     assert len(second["skill_constructed_candidates"]) == 1
+
+
+def _numeric_record() -> dict:
+    return {
+        "history": [
+            {"role": "user", "content": "List some figures."},
+            {"role": "assistant", "content": "The rate is 17.4% in 2022."},
+            {"role": "assistant", "content": "It launched on August 8."},
+            {"role": "assistant", "content": "Revenue grew 3 times."},
+        ],
+    }
+
+
+def test_construct_candidate_generalizes_over_many_matching_anchors(monkeypatch) -> None:
+    """A one_or_many construct_candidate builds every matched anchor.
+
+    The generalization predicate (``anchor_has_number``) matches every numeric
+    claim, so the executor must construct each anchor instead of raising
+    BINDING_AMBIGUOUS or silently taking only the first match.
+    """
+    record = _numeric_record()
+    anchors = project_claim_anchors(record)
+    numeric = [a for a in anchors if a.observable_features["anchor_has_number"]]
+    assert len(numeric) >= 2
+
+    match = match_condition_bindings(
+        _condition(), _baseline(), domain="claim_anchor",
+        cardinality="one_or_many", record=record,
+    )
+    assert match.status == BINDING_BOUND
+    assert len(match.bindings) == len(numeric)
+
+    constructed: list[str] = []
+
+    def fake_resume(result, *, candidate, record, config, provider_usage_ledger=None):
+        constructed.append(candidate["claim_anchor_id"])
+        merged = copy.deepcopy(dict(result))
+        merged["census"] = [*merged.get("census", []), dict(candidate)]
+        return merged, continuation._proof(
+            anchor_id=candidate["claim_anchor_id"],
+            before=str(merged.get("state") or ""),
+            candidate=candidate,
+            status=CONSTRUCTION_COMPLETED,
+        )
+
+    monkeypatch.setattr(continuation, "resume_court_from_candidate", fake_resume)
+    result, execution = execute_constructive_rules(
+        _baseline(), [_rule()], record=record, config={},
+    )
+    assert len(constructed) == len(numeric)
+    assert set(constructed) == {anchor.anchor_id for anchor in numeric}
+    assert {row["entity_id"] for row in execution["fired"]} == {
+        anchor.anchor_id for anchor in numeric
+    }
+    assert len(execution["constructive_execution_proofs"]) == len(numeric)
+
+
+def test_construct_candidate_is_bounded_by_max_matches(monkeypatch) -> None:
+    record = _numeric_record()
+    numeric = [a for a in project_claim_anchors(record) if a.observable_features["anchor_has_number"]]
+    constructed: list[str] = []
+
+    def fake_resume(result, *, candidate, record, config, provider_usage_ledger=None):
+        constructed.append(candidate["claim_anchor_id"])
+        merged = copy.deepcopy(dict(result))
+        merged["census"] = [*merged.get("census", []), dict(candidate)]
+        return merged, continuation._proof(
+            anchor_id=candidate["claim_anchor_id"],
+            before=str(merged.get("state") or ""),
+            candidate=candidate,
+            status=CONSTRUCTION_COMPLETED,
+        )
+
+    monkeypatch.setattr(continuation, "resume_court_from_candidate", fake_resume)
+    _result, execution = execute_constructive_rules(
+        _baseline(), [_rule()], record=record, config={},
+        max_matches_per_rule=1,
+    )
+    assert len(constructed) == 1
+    assert len(execution["fired"]) == 1
+    assert constructed[0] in {anchor.anchor_id for anchor in numeric}

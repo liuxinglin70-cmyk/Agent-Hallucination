@@ -129,10 +129,10 @@ DECISION_AUTHORITIES = frozenset({
 #
 # The §2.9 outcome funnel (``loop/machine.Outcome``) is the terminal
 # vocabulary the loop writes onto ``gate_decision``. Its string values are
-# recognized here directly so ``promote()`` grades a funnel terminal the
-# same way it graded the legacy decision word — the outcome strings are
-# duplicated as literals (not imported, since evaluation may not import
-# the loop layer) and must stay byte-identical to ``Outcome`` value fields.
+# recognized here directly so ``promote()`` grades a funnel terminal by the
+# same closed outcome vocabulary. The outcome strings are duplicated as
+# literals (not imported, since evaluation may not import the loop layer)
+# and must stay byte-identical to ``Outcome`` value fields.
 # ============================================================
 
 _ACCEPT_DECISIONS = frozenset({
@@ -146,7 +146,6 @@ _PROVISIONAL_DECISIONS = frozenset({
     "provisional",
     "provisional_accept",
     "provisional_label_free",
-    "provisional_no_gold_telemetry",
 })
 _REJECT_DECISIONS = frozenset({
     "reject",

@@ -6,8 +6,12 @@ outcome absent from the table, a transition out of an absorbing terminal)
 raise ``IllegalTransition``; and the ``OutcomeFunnel`` keeps an independent
 per-outcome and per-layer count whose ``to_dict`` exposes the four §2.9
 layers with ``unaddressable`` on its own line and no ``no_edit`` bucket.
+The funnel is a pure projection of the terminal step ledger (C8), so the
+projection tests pin the fresh/resume equivalence invariant: the same
+ledger always yields the same funnel, and post-hoc terminal updates
+(shadow commit, probe veto) are reflected on re-projection.
 
-Run: ``python tools/parity/test_loop_machine.py``
+Run: ``python tests/test_loop_machine.py``
 """
 from __future__ import annotations
 
@@ -20,6 +24,9 @@ sys.path.insert(0, str(REPO_ROOT))
 from sehd_rise.loop.machine import (
     FITNESS_OUTCOMES,
     IllegalTransition,
+    INTERIM_GATE_DECISIONS,
+    is_legal_gate_decision,
+    is_terminal_gate_decision,
     Layer,
     LEGAL_TRANSITIONS,
     Outcome,
@@ -28,6 +35,7 @@ from sehd_rise.loop.machine import (
     RepairStateMachine,
     State,
 )
+from sehd_rise.loop.result import EvolutionStep
 
 
 def _drive_to(machine: RepairStateMachine, target: State) -> None:
@@ -51,12 +59,6 @@ def _drive_to(machine: RepairStateMachine, target: State) -> None:
         return
     machine.transition(State.BOUND)
     if target is State.BOUND:
-        return
-    if target in {State.CONSTRUCTOR_EXECUTED, State.CANDIDATE_CONSTRUCTED}:
-        machine.transition(State.CONSTRUCTOR_EXECUTED)
-        if target is State.CONSTRUCTOR_EXECUTED:
-            return
-        machine.transition(State.CANDIDATE_CONSTRUCTED)
         return
     machine.transition(State.EXECUTED)
     if target is State.EXECUTED:
@@ -247,6 +249,123 @@ def test_outcome_layer_partition_is_complete_and_disjoint() -> None:
     assert total == len(Outcome), (total, len(Outcome))
     # Fitness outcomes are exactly the four §2.9 fitness terminals.
     assert members[Layer.FITNESS] == set(FITNESS_OUTCOMES)
+
+
+def _step(gate_decision: str, *, case_id: str = "case_x") -> EvolutionStep:
+    return EvolutionStep(
+        case_id=case_id,
+        case_index=0,
+        trigger_source="test",
+        attribution=None,
+        edit_proposal=None,
+        mutation_applied=None,
+        gate_decision=gate_decision,
+        genome_hash_before="a",
+        genome_hash_after="b",
+        detection_state="verified_error",
+        timestamp=0.0,
+    )
+
+
+def test_gate_decision_vocabulary_is_closed() -> None:
+    """Every Outcome and declared interim marker is legal; garbage is not."""
+    for outcome in Outcome:
+        assert is_terminal_gate_decision(outcome.value), outcome
+        assert is_legal_gate_decision(outcome.value), outcome
+    for marker in INTERIM_GATE_DECISIONS:
+        assert is_legal_gate_decision(marker), marker
+        assert not is_terminal_gate_decision(marker), marker
+    for retry_marker in ("retry_structural", "retry_fitness_no_effect"):
+        assert is_legal_gate_decision(retry_marker), retry_marker
+        assert not is_terminal_gate_decision(retry_marker), retry_marker
+    for garbage in ("", "accepted", "ACCEPT", "provisional_no_gold", "x"):
+        assert not is_legal_gate_decision(garbage), garbage
+
+
+def test_funnel_from_steps_projects_terminal_outcomes_only() -> None:
+    """The projection counts terminal outcomes and skips interim markers."""
+    steps = [
+        _step(Outcome.ACCEPTED.value, case_id="c1"),
+        _step("provisional", case_id="c2"),
+        _step(Outcome.SOURCE_NOT_IMPROVED.value, case_id="c3"),
+        _step("retry_structural", case_id="c4"),
+        _step("halted", case_id="c5"),
+        _step("rollback_resume", case_id="c6"),
+        _step(Outcome.CANARY_REGRESSION.value, case_id="c7"),
+        _step(Outcome.CAPABILITY_GAP.value, case_id="c8"),
+    ]
+    funnel = OutcomeFunnel.from_steps(steps)
+    assert funnel.accepted() == 1
+    assert funnel.count(Outcome.SOURCE_NOT_IMPROVED) == 1
+    assert funnel.count(Outcome.CANARY_REGRESSION) == 1
+    assert funnel.count(Outcome.CAPABILITY_GAP) == 1
+    assert sum(funnel.to_dict()["totals"].values()) == 4
+
+
+def test_funnel_projection_reflects_post_hoc_terminal_updates() -> None:
+    """Shadow commit and probe veto rewrite the step; re-projection follows."""
+    steps = [
+        _step("provisional", case_id="c1"),
+        _step("provisional", case_id="c2"),
+        _step("provisional", case_id="c3"),
+    ]
+    assert OutcomeFunnel.from_steps(steps).accepted() == 0
+    # Shadow flush commits c1/c2 and a later probe veto rolls c2 back.
+    steps[0].gate_decision = Outcome.ACCEPTED.value
+    steps[1].gate_decision = Outcome.ACCEPTED.value
+    steps[2].gate_decision = Outcome.SOURCE_NOT_IMPROVED.value
+    committed = OutcomeFunnel.from_steps(steps)
+    assert committed.accepted() == 2
+    assert committed.count(Outcome.SOURCE_NOT_IMPROVED) == 1
+    steps[1].gate_decision = Outcome.CANARY_REGRESSION.value
+    vetoed = OutcomeFunnel.from_steps(steps)
+    assert vetoed.accepted() == 1
+    assert vetoed.count(Outcome.CANARY_REGRESSION) == 1
+
+
+def test_funnel_projection_survives_step_serialization() -> None:
+    """Fresh == resume: a checkpoint round-trip preserves the projection."""
+    steps = [
+        _step(Outcome.ACCEPTED.value, case_id="c1"),
+        _step(Outcome.NON_EVOLVABLE.value, case_id="c2"),
+        _step("provisional", case_id="c3"),
+        _step(Outcome.UNADDRESSABLE.value, case_id="c4"),
+    ]
+    restored = [EvolutionStep.from_dict(step.to_dict()) for step in steps]
+    assert (
+        OutcomeFunnel.from_steps(steps).to_dict()
+        == OutcomeFunnel.from_steps(restored).to_dict()
+    )
+
+
+def test_runner_l1_happy_path_is_drivable() -> None:
+    """The runner's L1 wiring: detection -> dispatch -> shadow-admit fitness.
+
+    Locks the exact sequence the loop drives so a refactor that reorders the
+    phases raises here instead of on a live run.
+    """
+    machine = RepairStateMachine()
+    machine.transition(State.CAUSAL_FAILURE_ANALYZED)
+    machine.transition(State.REPAIRABLE)
+    machine.transition(State.REPAIR_PLANNED)
+    machine.transition(State.HYPOTHESIS_SEARCH)
+    machine.transition(State.PROPOSAL_VALIDATED)
+    machine.transition(State.BOUND)
+    machine.transition(State.EXECUTED)
+    machine.transition(State.TARGET_EDGE_CHANGED)
+    machine.transition(State.BLOCKER_CLEARED)
+    machine.transition(State.FITNESS_EVALUATED)
+    machine.transition(State.EXPERIENCE_LEARNED, outcome=Outcome.ACCEPTED)
+    machine.transition(State.META_UPDATED)
+    assert machine.done
+
+
+def test_runner_detection_crash_terminal_is_drivable() -> None:
+    """A detector crash terminal (INFRA_FAILURE) is legal directly from DETECTED."""
+    machine = RepairStateMachine()
+    machine.transition(None, outcome=Outcome.INFRA_FAILURE)
+    assert machine.done
+    assert machine.outcome is Outcome.INFRA_FAILURE
 
 
 def main() -> int:

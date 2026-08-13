@@ -14,7 +14,8 @@ CAPABILITY_GAP records a learn-worthy but currently inexpressible repair,
 NON_EVOLVABLE is reserved for non-learn-worthy/stable cases, an
 UNADDRESSABLE_FRAMEWORK_DEFECT
 is counted on its own funnel line (C2) and a FRAMEWORK_DEFECT is an infra
-outcome. Every case deposits exactly one §2.9 outcome into the funnel; the
+outcome. Every case deposits exactly one §2.9 outcome onto its terminal
+step, and the run funnel is a pure projection of that step ledger; the
 convergence window only consumes complete repair attempts whose fitness
 verdict found no acceptable improvement (C9), and an accepted edit carries
 the full credit chain from dispatch to canary preservation (C10).
@@ -104,7 +105,13 @@ from sehd_rise.loop.ledger import (
     _record_gate_event,
     aggregate_gate_experience,
 )
-from sehd_rise.loop.machine import Outcome, OutcomeFunnel
+from sehd_rise.loop.machine import (
+    Outcome,
+    OutcomeFunnel,
+    RepairStateMachine,
+    State,
+    is_legal_gate_decision,
+)
 from sehd_rise.loop.persistence import (
     _PersistenceContext,
     _persist_progress,
@@ -863,11 +870,42 @@ class EvolutionLoop:
         self.candidate_archive = CandidateArchive()
         self._meta_case_counter = 0
         self._meta_last_idx = 0
-        # The §2.9 funnel is the single terminal-count authority (C8/C2):
-        # every case deposits exactly one outcome here and the final result
-        # derives its counters from this funnel, never from the per-step
-        # words.
-        self.funnel = OutcomeFunnel()
+        # Per-case §7 state machine; instantiated on each work-queue pop so a
+        # retry starts a fresh attempt at DETECTED. ``_case_transition``
+        # drives every terminal outcome against it — the runtime authority
+        # that makes a cross-layer jump fail fast.
+        self._case_machine: RepairStateMachine | None = None
+
+    def _case_transition(
+        self, to: State | None, *, outcome: Outcome | None = None,
+    ) -> None:
+        """Drive the per-case §7 machine; a stray path raises immediately.
+
+        Only reachable after the work-queue pop that instantiates the
+        machine, so a case always has an active lifecycle to validate.
+        """
+        assert self._case_machine is not None
+        self._case_machine.transition(to, outcome=outcome)
+
+    def _case_complete(self, outcome: Outcome) -> None:
+        """Close a fitness verdict through the §7 experience/meta tail.
+
+        A fitness outcome continues to EXPERIENCE_LEARNED then META_UPDATED,
+        so the credit chain and the case's terminal are one lifecycle. A
+        provisional (shadow-admitted) edit never reaches here: its machine
+        parks at FITNESS_EVALUATED and the shadow flush settles its terminal.
+        """
+        self._case_transition(State.EXPERIENCE_LEARNED, outcome=outcome)
+        self._case_transition(State.META_UPDATED)
+
+    @property
+    def funnel(self) -> OutcomeFunnel:
+        """The §2.9 terminal-count authority (C8/C2) is the step ledger:
+        every terminal step carries its case's outcome and the funnel is a
+        pure projection of those steps, so a fresh run and a
+        checkpoint-resumed run always derive identical counts.
+        """
+        return OutcomeFunnel.from_steps(self.steps)
 
     def _attempt_cap_for(self, reason_code: str) -> int:
         """Search budget for one case's mutation retries (delegates to the
@@ -1078,19 +1116,6 @@ class EvolutionLoop:
                 f"edits_rejected={self.state.edits_rejected}"
             )
 
-        # The funnel is a pure projection of the terminal steps (C8): after
-        # a checkpoint restore it must be rebuilt from the restored steps so
-        # the resumed run's funnel totals match a continuous run's. Interim
-        # markers (provisional / retry_* / halted) are not §2.9 terminals
-        # and never enter the funnel.
-        for step in self.steps:
-            try:
-                outcome = Outcome(str(step.gate_decision or ""))
-            except ValueError:
-                continue
-            if outcome in Outcome:
-                self.funnel.record(outcome)
-
         if self.run_id is None:
             self.run_id = f"bccse_v5_{uuid.uuid4().hex[:8]}"
 
@@ -1240,6 +1265,14 @@ class EvolutionLoop:
         ), next_case_index, status)
 
     def record_step(self, step: EvolutionStep, *, next_case_index: int) -> None:
+        # The step ledger is the terminal-count authority, so its vocabulary
+        # is closed and fail-fast: an unknown word would silently vanish
+        # from the funnel projection.
+        if not is_legal_gate_decision(str(step.gate_decision or "")):
+            raise ValueError(
+                f"gate_decision {step.gate_decision!r} is neither a §2.9 "
+                f"terminal outcome nor a declared interim marker"
+            )
         step.attempt_index = self.active_attempt_index
         step.episode = self.state.active_episode_payload
         self.steps.append(step)
@@ -1332,9 +1365,9 @@ class EvolutionLoop:
         UNADDRESSABLE_FRAMEWORK_DEFECT is counted on its own funnel line
         (C2), a FRAMEWORK_DEFECT is an infra outcome, and a REPAIRABLE
         episode dispatches to the L1 or L2 executor on its RepairPlan.
-        Every case deposits exactly one outcome into the funnel; the
-        convergence window only consumes fitness-layer rejections of
-        complete repair attempts (C9).
+        Every case deposits exactly one terminal outcome onto its step,
+        which the funnel projection counts; the convergence window only
+        consumes fitness-layer rejections of complete repair attempts (C9).
         """
         # The checkpoint's active_attempt_index belongs to the last
         # processed iteration, which is only meaningful for a retry
@@ -1366,6 +1399,9 @@ class EvolutionLoop:
             )
         while self.source_work_queue:
             idx, case_id, self.active_attempt_index = self.source_work_queue.popleft()
+            # A retry re-queues the same case with a fresh machine, so each
+            # attempt walks §7 from DETECTED independently.
+            self._case_machine = RepairStateMachine()
             # Minibatch meta search-policy update (§14#6): refresh the strategy
             # configuration between cases so later cases of the same run see the
             # refined search policy. Retries re-enter at the same idx and never
@@ -1420,11 +1456,13 @@ class EvolutionLoop:
                     ),
                 )
             except Exception as exc:
+                self._case_transition(None, outcome=Outcome.INFRA_FAILURE)
                 self._record_runtime_invalid(
                     idx, case_id, genome_before, exc, "detection_runtime",
                 )
                 continue
             detection_state = resolve_evolution_state(detection_result)
+            self._case_transition(State.CAUSAL_FAILURE_ANALYZED)
 
             # --- [2] Attribution signal (gold join under the explicit
             # use_gold opt-in) ---
@@ -1436,6 +1474,7 @@ class EvolutionLoop:
                 # A diagnostic-only signal (runtime invalid inside the
                 # projection) is recorded as infra telemetry, never
                 # evolution evidence.
+                self._case_transition(None, outcome=Outcome.INFRA_FAILURE)
                 self._record_runtime_invalid_signal(
                     idx, case_id, genome_before, detection_result, signal,
                 )
@@ -1526,7 +1565,7 @@ class EvolutionLoop:
                     # stable/no-edit case.
                     if self.active_attempt_index == 0:
                         self.state.triggered_cases += 1
-                    self.funnel.record(Outcome.UNADDRESSABLE)
+                    self._case_transition(None, outcome=Outcome.UNADDRESSABLE)
                     self.record_step(EvolutionStep(
                         case_id=case_id,
                         case_index=idx,
@@ -1567,7 +1606,7 @@ class EvolutionLoop:
                 # and the §14#7 FN family attaches when this is forward recall.
                 if self.active_attempt_index == 0:
                     self.state.triggered_cases += 1
-                self.funnel.record(Outcome.CAPABILITY_GAP)
+                self._case_transition(None, outcome=Outcome.CAPABILITY_GAP)
                 missing_capability = str(
                     verdict.evidence.get("missing_capability") or ""
                 )
@@ -1614,7 +1653,7 @@ class EvolutionLoop:
             if status is RepairabilityStatus.FRAMEWORK_DEFECT:
                 # §2.5 detector-boundary defect: always a framework defect,
                 # never a Skill. Infra telemetry, not convergence evidence.
-                self.funnel.record(Outcome.INFRA_FAILURE)
+                self._case_transition(None, outcome=Outcome.INFRA_FAILURE)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -1643,7 +1682,7 @@ class EvolutionLoop:
                 # statistics.
                 if self.active_attempt_index == 0:
                     self.state.triggered_cases += 1
-                self.funnel.record(Outcome.UNADDRESSABLE)
+                self._case_transition(None, outcome=Outcome.UNADDRESSABLE)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -1684,7 +1723,7 @@ class EvolutionLoop:
                     # L2 surface owns the repair but the audit row is
                     # missing, so the case ends as unaddressable rather
                     # than fabricating an L1 owner.
-                    self.funnel.record(Outcome.UNADDRESSABLE)
+                    self._case_transition(None, outcome=Outcome.UNADDRESSABLE)
                     self.record_step(EvolutionStep(
                         case_id=case_id,
                         case_index=idx,
@@ -1699,6 +1738,8 @@ class EvolutionLoop:
                         timestamp=time.time(),
                     ), next_case_index=idx + 1)
                     continue
+                # L2 policy reflection is outside the §7 L1 repair sequence;
+                # its terminal vocabulary is still validated by record_step.
                 self._run_l2_policy_case(
                     idx=idx, case_id=case_id,
                     detection_result=detection_result,
@@ -1710,6 +1751,9 @@ class EvolutionLoop:
                 continue
 
             # L1 post-court Skill surface.
+            self._case_transition(State.REPAIRABLE)
+            self._case_transition(State.REPAIR_PLANNED)
+            self._case_transition(State.HYPOTHESIS_SEARCH)
             view = _ReflectionSignalView(signal, cut.owner, cut.reason_code)
             self._run_l1_policy_case(
                 idx=idx, case_id=case_id, detection_result=detection_result,
@@ -1775,7 +1819,6 @@ class EvolutionLoop:
             feature_description="",
             type_confidence=0.0,
         )
-        self.funnel.record(Outcome.INFRA_FAILURE)
         self.record_step(EvolutionStep(
             case_id=case_id,
             case_index=idx,
@@ -1809,7 +1852,6 @@ class EvolutionLoop:
         self.runtime_error_categories[runtime_error] = (
             self.runtime_error_categories.get(runtime_error, 0) + 1
         )
-        self.funnel.record(Outcome.INFRA_FAILURE)
         self.record_step(EvolutionStep(
             case_id=case_id,
             case_index=idx,
@@ -1837,6 +1879,7 @@ class EvolutionLoop:
         detection_result: Mapping[str, Any],
     ) -> None:
         """Record a stable (non-triggered) detection as NON_EVOLVABLE."""
+        self._case_transition(None, outcome=Outcome.NON_EVOLVABLE)
         if self.active_attempt_index == 0:
             self.state.stable_cases += 1
         self.stable_canaries[case_id] = detection_result
@@ -1852,7 +1895,6 @@ class EvolutionLoop:
             "owner": cut.owner,
         })
         _trim_contrast_registry(self.contrast_replay_registry)
-        self.funnel.record(Outcome.NON_EVOLVABLE)
         self.record_step(EvolutionStep(
             case_id=case_id,
             case_index=idx,
@@ -2641,10 +2683,12 @@ class EvolutionLoop:
         allowed_modules = type_allowed_modules
 
         # Entity-identity menu: when the framework-compiled repair surface has
-        # exactly one binding domain and every capability on it is
-        # ``exactly_one``, the model names the training entity by id instead of
-        # guessing a uniquely-matching predicate. This is the identity /
-        # generalization-predicate split (review section 6).
+        # exactly one binding domain, the model names the training entity by id
+        # instead of guessing a uniquely-matching predicate. This is the
+        # identity / generalization-predicate split (review section 6); it is
+        # orthogonal to binding cardinality, because a generalization
+        # predicate may match many entities on later records while the source
+        # case still binds one training entity by id.
         entity_menu: tuple[dict[str, Any], ...] = ()
         binding_domain = ""
         _identity_plans = build_repair_plan(
@@ -2656,18 +2700,12 @@ class EvolutionLoop:
             plan.target_domain for plan in _identity_plans if plan.target_domain
         }
         if len(_identity_domains) == 1:
-            _domain = next(iter(_identity_domains))
-            _cardinalities = {
-                plan.required_binding_schema.get("cardinality", "")
-                for plan in _identity_plans
-            }
-            if _cardinalities <= {"exactly_one"}:
-                binding_domain = _domain
-                entity_menu = render_binding_menu(
-                    detection_result,
-                    _domain,
-                    record=_detector_record(self.records[case_id]),
-                )
+            binding_domain = next(iter(_identity_domains))
+            entity_menu = render_binding_menu(
+                detection_result,
+                binding_domain,
+                record=_detector_record(self.records[case_id]),
+            )
 
         if self.mutation_route is not None:
             skill_context = "\n\n".join(
@@ -3477,7 +3515,7 @@ class EvolutionLoop:
                 structural_result="no_proposal",
                 no_effect_reason="",
             )
-            self.funnel.record(Outcome.NO_HYPOTHESIS)
+            self._case_transition(None, outcome=Outcome.NO_HYPOTHESIS)
             self.record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -3524,6 +3562,8 @@ class EvolutionLoop:
                 ),
                 structural_result="invalid_mutation",
             )
+            if not retry_scheduled:
+                self._case_transition(None, outcome=Outcome.INVALID_PROPOSAL)
             self.record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -3554,8 +3594,6 @@ class EvolutionLoop:
                     ),
                 },
             ), next_case_index=(idx if retry_scheduled else idx + 1))
-            if not retry_scheduled:
-                self.funnel.record(Outcome.INVALID_PROPOSAL)
             return
 
         # --- [4] Structural constraint gate ---
@@ -3741,6 +3779,8 @@ class EvolutionLoop:
                     compiled=bool(edit.action_spec or pending_action_spec),
                     proposal_content=edit.new_content,
                 )
+                if not retry_scheduled:
+                    self._case_transition(None, outcome=Outcome.INVALID_PROPOSAL)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -3764,8 +3804,6 @@ class EvolutionLoop:
                     },
                 ), next_case_index=(idx if retry_scheduled else idx + 1))
                 print(f"  [{idx}] REJECT {case_id}: {reject_reasons}")
-                if not retry_scheduled:
-                    self.funnel.record(Outcome.INVALID_PROPOSAL)
                 return
 
         # --- [4b] LLM no-conflict gate (T5, advisory) ---
@@ -3816,6 +3854,11 @@ class EvolutionLoop:
         reflection_audit["llm_conflict_gate"] = _conflict_flag
 
         # --- [5] Apply edit ---
+        # The structural gate accepted the proposal; dispatch is the EXECUTED
+        # attempt that applies the edit to the reversible working genome.
+        self._case_transition(State.PROPOSAL_VALIDATED)
+        self._case_transition(State.BOUND)
+        self._case_transition(State.EXECUTED)
         baseline_genome_for_replay = self.state.current_genome
         try:
             candidate_genome = apply_edit(self.state.current_genome, edit)
@@ -3831,6 +3874,7 @@ class EvolutionLoop:
                 _applied_rule_idx = None
         except ValueError as e:
             print(f"  [{idx}] EDIT_ERROR {case_id}: {e}")
+            self._case_transition(None, outcome=Outcome.ACTION_NOT_DISPATCHED)
             self.gate.revoke_structural_accept(cert, [f"apply_edit_failed:{e}"])
             self.state.edits_rejected += 1
             self.record_attempt(
@@ -3860,7 +3904,6 @@ class EvolutionLoop:
                 timestamp=time.time(),
                 fitness_check={"reflection": reflection_audit},
             ), next_case_index=idx + 1)
-            self.funnel.record(Outcome.ACTION_NOT_DISPATCHED)
             return
 
         fitness_audit: dict[str, Any] | None = None
@@ -3927,6 +3970,7 @@ class EvolutionLoop:
                 no_effect_reason="unresolved_no_effect",
                 proposal_content=edit.new_content,
             )
+            self._case_transition(None, outcome=Outcome.EXECUTION_RUNTIME_FAILURE)
             self.record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -3941,7 +3985,6 @@ class EvolutionLoop:
                 timestamp=time.time(),
                 fitness_check=fitness_audit,
             ), next_case_index=idx + 1)
-            self.funnel.record(Outcome.EXECUTION_RUNTIME_FAILURE)
             print(f"  [{idx}] REJECT_FITNESS_RUNTIME {case_id}: {reason}")
             return
         binding_failure, binding_evidence = binding_failure_for_edit(
@@ -3949,6 +3992,7 @@ class EvolutionLoop:
         )
         if binding_failure:
             binding_outcome = Outcome(binding_failure)
+            self._case_transition(None, outcome=binding_outcome)
             reason = f"skill_grounding_failed:{binding_failure}"
             self.gate.revoke_structural_accept(cert, [reason])
             self.state.edits_rejected += 1
@@ -3984,7 +4028,6 @@ class EvolutionLoop:
                     "fitness_not_run": True,
                 },
             ), next_case_index=idx + 1)
-            self.funnel.record(binding_outcome)
             print(f"  [{idx}] {binding_outcome.value} {case_id}: {reason}")
             return
         construction_failure, construction_evidence = construction_failure_for_edit(
@@ -3992,6 +4035,7 @@ class EvolutionLoop:
         )
         if construction_failure:
             construction_outcome = Outcome(construction_failure)
+            self._case_transition(None, outcome=construction_outcome)
             reason = f"constructive_recall_failed:{construction_failure}"
             self.gate.revoke_structural_accept(cert, [reason])
             self.state.edits_rejected += 1
@@ -4029,9 +4073,14 @@ class EvolutionLoop:
                     "fitness_not_run": True,
                 },
             ), next_case_index=idx + 1)
-            self.funnel.record(construction_outcome)
             print(f"  [{idx}] {construction_outcome.value} {case_id}: {reason}")
             return
+        # Replay succeeded and grounding (binding + construction) passed: the
+        # target edge moved and the blocker cleared, so the case reaches the
+        # fitness evaluation that judges the terminal improvement.
+        self._case_transition(State.TARGET_EDGE_CHANGED)
+        self._case_transition(State.BLOCKER_CLEARED)
+        self._case_transition(State.FITNESS_EVALUATED)
         candidate_signal = attribute_failure_for_result(
             candidate_result, case_id, records=self.records,
             use_gold=self.use_gold, gold_reflection=self.gold_reflection,
@@ -4400,6 +4449,7 @@ class EvolutionLoop:
                     if canary_regressions
                     else Outcome.SOURCE_NOT_IMPROVED
                 )
+                self._case_complete(outcome)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -4415,7 +4465,6 @@ class EvolutionLoop:
                     fitness_check=fitness_audit,
                 ), next_case_index=idx + 1)
                 print(f"  [{idx}] REJECT_LOCAL_FITNESS {case_id}: {reasons}")
-                self.funnel.record(outcome)
                 return
             # no_effect: retry when budget allows, else terminal.
             reasons = ["source_no_effect:" + ",".join(assessment.reasons)]
@@ -4507,6 +4556,8 @@ class EvolutionLoop:
             )
             fitness_audit["retry_scheduled"] = retry_scheduled
             fitness_audit["retry_reason"] = rejected_entry.feedback_summary()
+            if not retry_scheduled:
+                self._case_complete(Outcome.SOURCE_NOT_IMPROVED)
             self.record_step(EvolutionStep(
                 case_id=case_id, case_index=idx,
                 trigger_source=view.trigger_source,
@@ -4522,8 +4573,6 @@ class EvolutionLoop:
                 fitness_check=fitness_audit,
             ), next_case_index=(idx if retry_scheduled else idx + 1))
             print(f"  [{idx}] REJECT_LOCAL_FITNESS {case_id}: {reasons}")
-            if not retry_scheduled:
-                self.funnel.record(Outcome.SOURCE_NOT_IMPROVED)
             return
 
         if not self.fitness_check:
@@ -4536,6 +4585,7 @@ class EvolutionLoop:
                 )
                 self.state.edits_rejected += 1
                 self.state.current_genome = self.state.champion_genome
+                self._case_complete(Outcome.SOURCE_NOT_IMPROVED)
                 self.record_step(EvolutionStep(
                     case_id=case_id,
                     case_index=idx,
@@ -4543,7 +4593,7 @@ class EvolutionLoop:
                     attribution=signal.to_dict(),
                     edit_proposal=edit.to_dict(),
                     mutation_applied=None,
-                    gate_decision="provisional_no_gold_telemetry",
+                    gate_decision=Outcome.SOURCE_NOT_IMPROVED.value,
                     genome_hash_before=genome_before,
                     genome_hash_after=self.state.champion_genome.content_hash,
                     detection_state=detection_state,
@@ -4556,7 +4606,6 @@ class EvolutionLoop:
                         "rollback_reason": "no_independent_correctness_authority",
                     },
                 ), next_case_index=idx + 1)
-                self.funnel.record(Outcome.SOURCE_NOT_IMPROVED)
                 return
             self.state.champion_genome = candidate_genome
             self.state.current_genome = candidate_genome
@@ -4568,6 +4617,7 @@ class EvolutionLoop:
                 "case_id": case_id,
                 "batch_id": "fitness_disabled",
             })
+            self._case_complete(Outcome.ACCEPTED)
             self.record_step(EvolutionStep(
                 case_id=case_id,
                 case_index=idx,
@@ -4582,7 +4632,6 @@ class EvolutionLoop:
                 timestamp=time.time(),
                 fitness_check=None,
             ), next_case_index=idx + 1)
-            self.funnel.record(Outcome.ACCEPTED)
             return
 
         # Admit locally useful edits to a reversible shadow genome. Champion

@@ -260,11 +260,12 @@ def run_evolution(
             ``experience_memory_path`` arguments that conflict with the
             manifest are rejected.  Mutually exclusive with ``resume_from``.
         run_mode: Optional §10 regime (``supervised_evolution`` /
-            ``label_free_diagnostic`` / ``protected_label_free_evolution``).
+            ``label_free_diagnostic`` / ``protected_label_free_adaptation``).
             When set it resolves and validates the gold/canary flags and the
             ``claim_learning`` semantic; when omitted the explicit flags
-            behave as before.  ``protected_label_free_evolution`` requires
-            ``canary_records``.
+            behave as before.  ``protected_label_free_adaptation`` requires
+            ``canary_records`` and records no learning success (adaptation
+            only).
         meta_update_every: Optional minibatch cadence for the search-policy
             meta update (§14#6).  ``N`` refreshes the strategy configuration
             every ``N`` cases so later cases of the same run see the refined

@@ -352,8 +352,19 @@ def execute_constructive_rules(
     rules: Sequence[tuple[str, str, Mapping[str, Any] | None, Mapping[str, Any] | None, str]],
     *, record: Mapping[str, Any], config: Mapping[str, Any],
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    max_matches_per_rule: int = 8,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Ground and execute constructive rules in deterministic genome order."""
+    """Ground and execute constructive rules in deterministic genome order.
+
+    ``construct_candidate`` is element-wise and idempotent, so a
+    generalization predicate may match many anchors on a new record: each
+    matched anchor is constructed and verified independently, in the
+    deterministic projection order, bounded by ``max_matches_per_rule`` so a
+    broad rule cannot burn an unbounded provider budget. The training-time
+    entity id (``binding_entity_id``) still prefers its own anchor on source
+    replay, so the source case binds exactly one anchor regardless of how
+    many entities the generalization predicate would match.
+    """
     current = copy.deepcopy(dict(result))
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
@@ -384,32 +395,34 @@ def execute_constructive_rules(
             skipped.append(row)
             continue
         bound.append(dict(row))
-        binding = match.bindings[0]
-        anchor = anchors.get(binding.entity_id)
-        if anchor is None:
-            proof = _proof(
-                anchor_id=binding.entity_id,
-                before=str(current.get("state") or ""),
-                status=CONSTRUCTION_ANCHOR_MISMATCH,
-            )
-        else:
-            candidate = _candidate_from_anchor(anchor)
-            current, proof = resume_court_from_candidate(
-                current, candidate=candidate, record=record, config=config,
-                provider_usage_ledger=provider_usage_ledger,
-            )
-        proof_dict = proof.to_dict()
-        proofs.append(proof_dict)
-        row.update({
-            "fired": proof.constructor_invoked and proof.status not in {
-                CONSTRUCTION_NO_CANDIDATE, CONSTRUCTION_ANCHOR_MISMATCH,
-                CONSTRUCTED_CANDIDATE_DUPLICATE,
-            },
-            "construction_status": proof.status,
-            "constructive_execution_proof": proof_dict,
-            "detail": proof.status.lower(),
-        })
-        (fired if row["fired"] else skipped).append(row)
+        for binding in match.bindings[:max_matches_per_rule]:
+            anchor = anchors.get(binding.entity_id)
+            if anchor is None:
+                proof = _proof(
+                    anchor_id=binding.entity_id,
+                    before=str(current.get("state") or ""),
+                    status=CONSTRUCTION_ANCHOR_MISMATCH,
+                )
+            else:
+                candidate = _candidate_from_anchor(anchor)
+                current, proof = resume_court_from_candidate(
+                    current, candidate=candidate, record=record, config=config,
+                    provider_usage_ledger=provider_usage_ledger,
+                )
+            proof_dict = proof.to_dict()
+            proofs.append(proof_dict)
+            per_binding = dict(row)
+            per_binding.update({
+                "entity_id": binding.entity_id,
+                "fired": proof.constructor_invoked and proof.status not in {
+                    CONSTRUCTION_NO_CANDIDATE, CONSTRUCTION_ANCHOR_MISMATCH,
+                    CONSTRUCTED_CANDIDATE_DUPLICATE,
+                },
+                "construction_status": proof.status,
+                "constructive_execution_proof": proof_dict,
+                "detail": proof.status.lower(),
+            })
+            (fired if per_binding["fired"] else skipped).append(per_binding)
     return current, {
         "fired": fired, "bound": bound, "skipped": skipped,
         "constructive_execution_proofs": proofs,

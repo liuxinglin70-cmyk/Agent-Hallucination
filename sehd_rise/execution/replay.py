@@ -254,6 +254,9 @@ def _run_constructive_continuation_with_genome(
     result, execution = execute_constructive_rules(
         baseline_result, constructive, record=record, config=config,
         provider_usage_ledger=provider_usage_ledger,
+        max_matches_per_rule=int(
+            config.get("constructive_max_matches_per_rule", 8)
+        ),
     )
     result["condition_feature_trace"] = project_result_condition_features(
         result, record,

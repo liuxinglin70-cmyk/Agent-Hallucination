@@ -292,6 +292,9 @@ def detect_record(
             if constructive:
                 result, constructive_execution = execute_constructive_rules(
                     result, constructive, record=record, config=config,
+                    max_matches_per_rule=int(
+                        config.get("constructive_max_matches_per_rule", 8)
+                    ),
                 )
             result, transform_execution = execute_l1_rules(
                 result, transforms, record=record,

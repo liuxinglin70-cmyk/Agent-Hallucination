@@ -81,8 +81,6 @@ def classify_candidate_failure(reason: str) -> str:
         or text.startswith("condition_value_unregistered:")
         or text.startswith("condition_operator_invalid:")
         or text.startswith("condition_feature_source_invalid:")
-        or text.startswith("action_polarity_mismatch:")
-        or text.startswith("action_opcode_unowned:")
     ):
         return FAILURE_CLASS_DSL_NOT_REPRESENTABLE
     if (
@@ -104,6 +102,11 @@ def classify_candidate_failure(reason: str) -> str:
         or text.startswith("remove_rule_edge_id_unknown")
         or text.startswith("repair_edge_owner_mismatch:")
         or text.startswith("remove_rule_edge_owner_mismatch:")
+        # A wrong-polarity or unowned opcode is a search miss, not a DSL gap:
+        # the registry can express the repair; the model selected the wrong
+        # operation, so the curriculum must steer search, not extend the DSL.
+        or text.startswith("action_polarity_mismatch:")
+        or text.startswith("action_opcode_unowned:")
     ):
         return FAILURE_CLASS_SEARCH_FAILURE
     return FAILURE_CLASS_STRUCTURAL_INVALID

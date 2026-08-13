@@ -415,7 +415,7 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
 |---|---|---|---|
 | `supervised_evolution` | 是 | 否 | 是 |
 | `label_free_diagnostic` | 否（强制） | 否 | 否 |
-| `protected_label_free_evolution` | 否 | **必需**（fail-fast） | 是 |
+| `protected_label_free_adaptation` | 否 | **必需**（fail-fast） | 否（仅 adaptation） |
 
 「没学到 skill」是 planner 不行还是证据不足不允许 commit，就此可区分，不再混在
 `skill_count = 0` 里。`shadow._shadow_commit_eligible` 的 canary-vs-gold 准入谓词不变，

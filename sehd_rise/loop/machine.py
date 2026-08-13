@@ -7,19 +7,27 @@ HYPOTHESIS_SEARCH -> PROPOSAL_VALIDATED -> BOUND -> EXECUTED -> TARGET_EDGE_CHAN
 META_UPDATED, or exits early at a layer terminal. Guideline §2.9 replaces
 the flat skip vocabulary with a four-layer outcome funnel: every terminal
 carries one outcome naming the layer that stopped the case. Outcomes are a
-closed vocabulary; the runner feeds outcomes in, the machine validates the
-transition and keeps per-outcome counts for the result JSON.
+closed vocabulary; the terminal step ledger (``EvolutionStep.gate_decision``)
+is the single terminal-count authority, and the funnel is a pure projection
+of that ledger, so a fresh run and a checkpoint-resumed run always derive
+identical counts.
 """
 from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 
 class State(str, Enum):
-    """Process states from guideline §7 (terminal exits live in Outcome)."""
+    """Process states from guideline §7 (terminal exits live in Outcome).
+
+    The states mirror the runner's real phase order: the proposal is bound,
+    executed, then its post-replay grounding (binding / construction) is
+    checked before fitness. The constructive harness is a replay mechanism
+    inside ``EXECUTED``, not a distinct machine state.
+    """
 
     DETECTED = "DETECTED"
     CAUSAL_FAILURE_ANALYZED = "CAUSAL_FAILURE_ANALYZED"
@@ -28,8 +36,6 @@ class State(str, Enum):
     HYPOTHESIS_SEARCH = "HYPOTHESIS_SEARCH"
     PROPOSAL_VALIDATED = "PROPOSAL_VALIDATED"
     BOUND = "BOUND"
-    CONSTRUCTOR_EXECUTED = "CONSTRUCTOR_EXECUTED"
-    CANDIDATE_CONSTRUCTED = "CANDIDATE_CONSTRUCTED"
     EXECUTED = "EXECUTED"
     TARGET_EDGE_CHANGED = "TARGET_EDGE_CHANGED"
     BLOCKER_CLEARED = "BLOCKER_CLEARED"
@@ -129,6 +135,35 @@ FITNESS_OUTCOMES: frozenset[Outcome] = frozenset(
 UNADDRESSABLE_OUTCOMES: frozenset[Outcome] = frozenset({Outcome.UNADDRESSABLE})
 
 
+# A step's ``gate_decision`` is closed vocabulary: either an ``Outcome``
+# terminal (the case deposited its §2.9 outcome) or one of these interim
+# markers, which name the non-terminal states a step can legally carry —
+# shadow-batch pending, skipped by a halt, rolled back on resume, or a
+# retry re-queued attempt (``retry_*``).
+INTERIM_GATE_DECISIONS: frozenset[str] = frozenset(
+    {"provisional", "halted", "rollback_resume"}
+)
+INTERIM_GATE_PREFIXES: tuple[str, ...] = ("retry_",)
+
+
+def is_terminal_gate_decision(value: str) -> bool:
+    """True when ``value`` is a §2.9 terminal outcome word."""
+    try:
+        Outcome(value)
+    except ValueError:
+        return False
+    return True
+
+
+def is_legal_gate_decision(value: str) -> bool:
+    """True when ``value`` is a terminal outcome or a declared interim marker."""
+    return (
+        is_terminal_gate_decision(value)
+        or value in INTERIM_GATE_DECISIONS
+        or value.startswith(INTERIM_GATE_PREFIXES)
+    )
+
+
 @dataclass(frozen=True)
 class Transition:
     """One legal edge of the §7 machine.
@@ -150,11 +185,13 @@ def _t(
 
 LEGAL_TRANSITIONS: tuple[Transition, ...] = (
     _t(State.DETECTED, State.CAUSAL_FAILURE_ANALYZED),
+    _t(State.DETECTED, None, Outcome.INFRA_FAILURE),
     _t(State.CAUSAL_FAILURE_ANALYZED, State.REPAIRABLE),
     _t(State.CAUSAL_FAILURE_ANALYZED, None, Outcome.NON_EVOLVABLE),
     _t(State.CAUSAL_FAILURE_ANALYZED, None, Outcome.CAPABILITY_GAP),
     _t(State.CAUSAL_FAILURE_ANALYZED, None, Outcome.UNADDRESSABLE),
     _t(State.CAUSAL_FAILURE_ANALYZED, None, Outcome.SCHEMA_FAILURE),
+    _t(State.CAUSAL_FAILURE_ANALYZED, None, Outcome.INFRA_FAILURE),
     _t(State.REPAIRABLE, State.REPAIR_PLANNED),
     _t(State.REPAIRABLE, None, Outcome.UNADDRESSABLE),
     _t(State.REPAIR_PLANNED, State.HYPOTHESIS_SEARCH),
@@ -162,28 +199,26 @@ LEGAL_TRANSITIONS: tuple[Transition, ...] = (
     _t(State.REPAIR_PLANNED, None, Outcome.INFRA_FAILURE),
     _t(State.HYPOTHESIS_SEARCH, State.PROPOSAL_VALIDATED),
     _t(State.HYPOTHESIS_SEARCH, None, Outcome.NO_HYPOTHESIS),
+    _t(State.HYPOTHESIS_SEARCH, None, Outcome.INVALID_PROPOSAL),
     _t(State.HYPOTHESIS_SEARCH, None, Outcome.ROUTING_FAILURE),
     _t(State.HYPOTHESIS_SEARCH, None, Outcome.INFRA_FAILURE),
     _t(State.PROPOSAL_VALIDATED, State.BOUND),
     _t(State.PROPOSAL_VALIDATED, None, Outcome.INVALID_PROPOSAL),
     _t(State.PROPOSAL_VALIDATED, None, Outcome.DUPLICATE_PROPOSAL),
-    _t(State.PROPOSAL_VALIDATED, None, Outcome.BINDING_NOT_FOUND),
-    _t(State.PROPOSAL_VALIDATED, None, Outcome.BINDING_AMBIGUOUS),
-    _t(State.PROPOSAL_VALIDATED, None, Outcome.BINDING_DOMAIN_MISMATCH),
     _t(State.BOUND, State.EXECUTED),
-    _t(State.BOUND, State.CONSTRUCTOR_EXECUTED),
-    _t(State.CONSTRUCTOR_EXECUTED, State.CANDIDATE_CONSTRUCTED),
-    _t(State.CONSTRUCTOR_EXECUTED, None, Outcome.CONSTRUCTION_NO_CANDIDATE),
-    _t(State.CONSTRUCTOR_EXECUTED, None, Outcome.CONSTRUCTION_ANCHOR_MISMATCH),
-    _t(State.CONSTRUCTOR_EXECUTED, None, Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE),
-    _t(State.CANDIDATE_CONSTRUCTED, State.EXECUTED),
-    _t(State.CANDIDATE_CONSTRUCTED, None, Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED),
-    _t(State.CANDIDATE_CONSTRUCTED, None, Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED),
-    _t(State.CANDIDATE_CONSTRUCTED, None, Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE),
     _t(State.EXECUTED, State.TARGET_EDGE_CHANGED),
     _t(State.EXECUTED, None, Outcome.ACTION_NOT_DISPATCHED),
     _t(State.EXECUTED, None, Outcome.EXECUTION_RUNTIME_FAILURE),
     _t(State.EXECUTED, None, Outcome.INFRA_FAILURE),
+    _t(State.EXECUTED, None, Outcome.BINDING_NOT_FOUND),
+    _t(State.EXECUTED, None, Outcome.BINDING_AMBIGUOUS),
+    _t(State.EXECUTED, None, Outcome.BINDING_DOMAIN_MISMATCH),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTION_NO_CANDIDATE),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTION_ANCHOR_MISMATCH),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED),
+    _t(State.EXECUTED, None, Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE),
     _t(State.TARGET_EDGE_CHANGED, State.BLOCKER_CLEARED),
     _t(State.TARGET_EDGE_CHANGED, None, Outcome.TARGET_EDGE_UNCHANGED),
     _t(State.BLOCKER_CLEARED, State.FITNESS_EVALUATED),
@@ -293,14 +328,34 @@ def is_legal(
 class OutcomeFunnel:
     """Per-run §2.9 outcome aggregator.
 
-    Each case deposits exactly one terminal outcome; the funnel keeps an
-    independent count per outcome and per layer for the result JSON. C2
-    keeps UNADDRESSABLE on its own counter, never folded into a no-edit or
-    convergence line.
+    Each case deposits exactly one terminal outcome onto its terminal step;
+    the funnel keeps an independent count per outcome and per layer for the
+    result JSON. C2 keeps UNADDRESSABLE on its own counter, never folded
+    into a no-edit or convergence line. ``from_steps`` is the authoritative
+    construction: the funnel is a pure projection of the terminal step
+    ledger, never a second mutable state that writers must remember to feed.
     """
 
     def __init__(self) -> None:
         self._counts: Counter[Outcome] = Counter()
+
+    @classmethod
+    def from_steps(cls, steps: Iterable[Any]) -> "OutcomeFunnel":
+        """Project the terminal step ledger onto the §2.9 funnel (C8).
+
+        A step whose ``gate_decision`` is a closed outcome is a terminal
+        deposit; interim markers (``INTERIM_GATE_DECISIONS`` / ``retry_*``)
+        carry no outcome and are skipped. Post-hoc terminal updates (shadow
+        commit, probe veto) rewrite the step before this projection runs,
+        so committed and rolled-back cases are counted from their final
+        ledger state.
+        """
+        funnel = cls()
+        for step in steps:
+            value = str(getattr(step, "gate_decision", "") or "")
+            if is_terminal_gate_decision(value):
+                funnel.record(Outcome(value))
+        return funnel
 
     def record(self, outcome: Outcome) -> None:
         self._counts[outcome] += 1

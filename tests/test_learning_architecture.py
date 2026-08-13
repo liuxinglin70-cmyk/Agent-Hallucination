@@ -135,6 +135,13 @@ def test_classify_candidate_failure_search_failure() -> None:
     assert classify_candidate_failure(
         "action_not_bound_to_repair_edge:edge_1:anchor_id->certificate_id"
     ) == FAILURE_CLASS_SEARCH_FAILURE
+    # A wrong-polarity or unowned opcode is a search miss, not a DSL gap.
+    assert classify_candidate_failure(
+        "action_polarity_mismatch:clean_to_error:candidate_trigger:construct_candidate"
+    ) == FAILURE_CLASS_SEARCH_FAILURE
+    assert classify_candidate_failure(
+        "action_opcode_unowned:withhold_certificate"
+    ) == FAILURE_CLASS_SEARCH_FAILURE
 
 
 def test_classify_candidate_failure_structural_default() -> None:
@@ -217,15 +224,17 @@ def test_run_mode_label_free_diagnostic() -> None:
 
 def test_run_mode_protected_label_free_requires_canary() -> None:
     resolved = resolve_run_mode(
-        "protected_label_free_evolution", use_gold=False,
+        "protected_label_free_adaptation", use_gold=False,
         fitness_use_gold=False, gold_reflection=False,
         canary_case_ids=("c1",),
     )
-    assert resolved.claim_learning is True
+    # A canary proves process non-regression, never correctness, so the
+    # protected label-free regime records adaptation, not learning success.
+    assert resolved.claim_learning is False
     assert resolved.requires_canary is True
     with pytest.raises(ValueError, match="canary_case_ids"):
         resolve_run_mode(
-            "protected_label_free_evolution", use_gold=False,
+            "protected_label_free_adaptation", use_gold=False,
             fitness_use_gold=False, gold_reflection=False,
         )
 
@@ -242,5 +251,5 @@ def test_run_mode_enum_values() -> None:
     assert set(m.value for m in RunMode) == {
         "supervised_evolution",
         "label_free_diagnostic",
-        "protected_label_free_evolution",
+        "protected_label_free_adaptation",
     }

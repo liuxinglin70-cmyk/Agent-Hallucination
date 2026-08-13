@@ -11,9 +11,11 @@ modes make that explicit:
     label_free_diagnostic           generate hypotheses / experience but never
                                     claim a learning success; commit is refused
                                     by construction (no correctness authority).
-    protected_label_free_evolution  label-free, but an external / canary
+    protected_label_free_adaptation label-free, but an external / canary
                                     correctness authority is present, so
-                                    directional commits are admitted.
+                                    directional commits are admitted as
+                                    provisional adaptation — never as a
+                                    claimed learning success.
 
 ``resolve_run_mode`` is the single authority that maps a declared mode onto the
 underlying flags, enforces its prerequisites fail-fast, and derives the
@@ -33,7 +35,7 @@ from typing import Any, Sequence
 class RunMode(str, Enum):
     SUPERVISED_EVOLUTION = "supervised_evolution"
     LABEL_FREE_DIAGNOSTIC = "label_free_diagnostic"
-    PROTECTED_LABEL_FREE_EVOLUTION = "protected_label_free_evolution"
+    PROTECTED_LABEL_FREE_ADAPTATION = "protected_label_free_adaptation"
 
 
 @dataclass(frozen=True)
@@ -91,13 +93,17 @@ def resolve_run_mode(
             claim_learning=False,
             requires_canary=False,
         )
-    elif mode == RunMode.PROTECTED_LABEL_FREE_EVOLUTION.value:
+    elif mode == RunMode.PROTECTED_LABEL_FREE_ADAPTATION.value:
+        # A canary can prove process non-regression, never that a newly
+        # decisive verdict is correct, so a label-free directional commit is
+        # provisional adaptation — the run records no learning success until
+        # an external authority verifies it.
         resolved = RunModeResolution(
             run_mode=mode,
             use_gold=False,
             fitness_use_gold=False,
             gold_reflection=False,
-            claim_learning=True,
+            claim_learning=False,
             requires_canary=True,
         )
     else:
@@ -108,7 +114,7 @@ def resolve_run_mode(
 
     if resolved.requires_canary and not tuple(canary_case_ids):
         raise ValueError(
-            "protected_label_free_evolution requires canary_case_ids: an "
+            "protected_label_free_adaptation requires canary_case_ids: an "
             "external correctness authority must vouch for any commit"
         )
     return resolved
