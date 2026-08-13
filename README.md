@@ -229,7 +229,14 @@ from sehd_rise.api.evolution import run_evolution, load_records
    推翻因果属主。
 9. **Meta 学策略，不学真相。** meta 层（`meta/`）是五域封闭词表上的跨案例策略
    学习器（搜索先验 / 操作偏好 / 机制排序 / 重试策略 / 候选多样性）；属主、因果
-   切点、可修复性与硬门控通道在类型层面不可表示。
+   切点、可修复性与硬门控通道在类型层面不可表示。五域策略的权威形态：
+   `search_prior.require_independent_anchor` 是唯一带确定性控制效果的 token——它
+   收紧 contrast 邻居选择（邻居的已注册属主必须不同于当前切点属主，否则跳过对比
+   回放）。其余四域（operation_preference / mechanism_ranking / retry_strategy /
+   candidate_diversity）以及 search_prior 的另外两个 token 仅以
+   `authority=evolution_guidance_only` 投影进反思提示词，作为有界、封闭词表的
+   引导文本；它们不参与任何确定性决策——候选生成、重试上限、门控、canary、晋升
+   都不读它们。
 10. **失败即关闭、gold 隔离、冻结基座纪律**，如上文必读章程所述。
 11. **实体身份与泛化谓词分离。** 训练期实体按 `target_entity_id` 精确绑定（不是
     靠谓词去「猜」唯一命中）；`condition_spec` 只描述 skill 将来复用时的条件。过宽的

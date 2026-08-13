@@ -148,7 +148,11 @@ from sehd_rise.meta.review import (
     generate_strategy_suggestions,
     project_strategy_for_prompt,
 )
-from sehd_rise.meta.strategy import StrategyState, create_baseline_strategy
+from sehd_rise.meta.strategy import (
+    SEARCH_PRIOR,
+    StrategyState,
+    create_baseline_strategy,
+)
 from sehd_rise.platform.gold import _evaluator_gold
 from sehd_rise.platform.jsonio import atomic_write_json
 from sehd_rise.platform.routes import has_provider_credential, resolve_provider_route
@@ -2729,7 +2733,7 @@ class EvolutionLoop:
                 "case_id": case_id,
                 "state": detection_state,
                 "stable": False,
-                "artifact": cut.owner or view.target_module,
+                "owner": cut.owner or view.target_module,
                 "reason": cut.reason_code or "",
             })
             _trim_contrast_registry(self.contrast_replay_registry)
@@ -4342,11 +4346,18 @@ class EvolutionLoop:
         # Contrastive replay acceptance (overfitting guard).
         contrast_audit: dict[str, Any] | None = None
         if shadow_admissible and not canary_regressions:
+            require_independent = bool(
+                self.state.strategy_state
+                and "require_independent_anchor"
+                in self.state.strategy_state.enabled_in(SEARCH_PRIOR)
+            )
             neighbor = _select_contrast_neighbor(
                 self.contrast_replay_registry.get(
                     type_result.primary_type.value, ()
                 ),
                 case_id=case_id,
+                require_independent_owner=require_independent,
+                current_owner=str(cut.owner or ""),
             )
             if neighbor is not None:
                 neighbor_id = str(neighbor.get("case_id") or "")

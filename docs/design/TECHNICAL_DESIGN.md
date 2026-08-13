@@ -349,10 +349,16 @@ meta 层（`meta/`）学习的是如何搜索，绝不是什么东西在因果�
 多样性。触及属主、因果切点、可修复性或硬门控的 token 根本不存在——这些通道在类型
 层面就不可表示，而不只是在校验时被拒。
 
-输入是 GateEvent 投影与经验记忆中的已验证 RepairPlan 结果；输出只是策略建议，以
-固定权威标记 `evolution_guidance_only` 投影进提示词。提交由证据门控
-（`MIN_COMMIT_EVIDENCE = 3`，同一机制的 3 次观测），`StrategyState` 以内容哈希派生的
-id 保持不可变谱系，禁用操作需要人工评审。该层完全确定性，不发出任何 provider 调用。
+输入是 GateEvent 投影与经验记忆中的已验证 RepairPlan 结果。五域策略的权威形态：
+`search_prior.require_independent_anchor` 是唯一带确定性控制效果的 token——它收紧
+contrast 邻居选择（邻居的已注册属主必须不同于当前切点属主，否则跳过对比回放）。
+其余四域（operation_preference / mechanism_ranking / retry_strategy /
+candidate_diversity）以及 search_prior 的另外两个 token 仅以固定权威标记
+`evolution_guidance_only` 投影进反思提示词，作为有界、封闭词表的引导文本；它们
+不参与任何确定性决策——候选生成、重试上限、门控、canary、晋升都不读它们。提交由
+证据门控（`MIN_COMMIT_EVIDENCE = 3`，同一机制的 3 次观测），`StrategyState` 以内容
+哈希派生的 id 保持不可变谱系，禁用操作需要人工评审。该层完全确定性，不发出任何
+provider 调用。
 
 ## 经验记忆
 

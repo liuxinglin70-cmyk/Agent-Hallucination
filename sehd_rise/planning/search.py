@@ -67,6 +67,8 @@ def _select_contrast_neighbor(
     entries: Sequence[Mapping[str, Any]],
     *,
     case_id: str,
+    require_independent_owner: bool = False,
+    current_owner: str = "",
 ) -> Mapping[str, Any] | None:
     """Pick the nearest stable same-type neighbour for a contrast replay.
 
@@ -74,12 +76,24 @@ def _select_contrast_neighbor(
     the most recently registered row with a resolved verdict that is not the
     triggering case itself.  Deterministic and replay-cheap: neighbours are
     drawn only from cases the current run already detected.
+
+    ``require_independent_owner`` is the deterministic consumer of the meta
+    ``search_prior.require_independent_anchor`` token: a contrast replay is
+    only an independent overfitting guard when the neighbour's failure
+    anchored on a different owner, so same-owner rows are skipped.  No
+    qualifying neighbour yields ``None`` (the replay is skipped, never
+    relaxed).
     """
     for entry in reversed(list(entries or [])):
         if str(entry.get("case_id") or "") == case_id:
             continue
-        if str(entry.get("state") or "") in _CONTRAST_RESOLVED_STATES:
-            return entry
+        if str(entry.get("state") or "") not in _CONTRAST_RESOLVED_STATES:
+            continue
+        if require_independent_owner:
+            owner = str(entry.get("owner") or "")
+            if not owner or owner == str(current_owner or ""):
+                continue
+        return entry
     return None
 
 
