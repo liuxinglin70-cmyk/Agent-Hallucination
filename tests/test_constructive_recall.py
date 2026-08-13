@@ -69,11 +69,11 @@ def _condition() -> dict:
     }
 
 
-def _rule() -> tuple[str, str, dict, dict]:
+def _rule() -> tuple[str, str, dict, dict, str]:
     action = compile_action_spec(
         "candidate_trigger", "construct_candidate: anchor_id",
     )
-    return "candidate_trigger", "rule_construct", _condition(), action.to_dict()
+    return "candidate_trigger", "rule_construct", _condition(), action.to_dict(), ""
 
 
 def _provider(*, purpose: str, **_kwargs):

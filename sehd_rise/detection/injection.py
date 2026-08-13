@@ -15,6 +15,7 @@ import json
 from typing import Any, Mapping
 
 from sehd_rise.skills.action import sanitize_action_spec
+from sehd_rise.skills.binding import sanitize_binding_proof
 from sehd_rise.skills.genome import (
     MODULE_IDS,
     SkillGenome,
@@ -55,6 +56,24 @@ def _rule_condition_spec(module: SkillModule, index: int) -> dict[str, Any]:
     return sanitize_condition_spec(
         module.get_rule_meta(index).get("condition_spec")
     )
+
+
+def _rule_binding_entity_id(module: SkillModule, index: int) -> str:
+    """Return the training-time bound entity id, if a binding proof is stored.
+
+    The entity id is the exact entity the source case edited; the executor
+    prefers it on source replay so an over-broad generalization predicate never
+    turns the source binding into BINDING_AMBIGUOUS. It never bakes into the
+    predicate, so generalization on other records still re-evaluates the
+    condition over their own universe.
+    """
+    proof = sanitize_binding_proof(
+        module.get_rule_meta(index).get("binding_proof")
+    )
+    bindings = proof.get("bindings") or ()
+    if bindings and isinstance(bindings[0], Mapping):
+        return str(bindings[0].get("entity_id") or "")
+    return ""
 
 
 def _rule_stable_id(
@@ -171,30 +190,58 @@ def _delta_condition_specs(
     return specs
 
 
+def _delta_binding_ids(
+    module: SkillModule,
+    baseline_module: SkillModule,
+) -> dict[str, str]:
+    """Return training-time bound entity ids by stable rule id."""
+    if not module.active:
+        return {}
+    unmatched_baseline = list(baseline_module.rules)
+    ids: dict[str, str] = {}
+    for index, rule in enumerate(module.rules):
+        if rule in unmatched_baseline:
+            unmatched_baseline.remove(rule)
+            continue
+        entity_id = _rule_binding_entity_id(module, index)
+        if entity_id:
+            ids[_rule_stable_id(
+                module.module_id,
+                rule,
+                condition=_rule_condition(module, index, rule),
+                condition_spec=_rule_condition_spec(module, index),
+            )] = entity_id
+    return ids
+
+
 def compile_genome_rules(
     genome: SkillGenome,
     *,
     baseline: SkillGenome | None = None,
-) -> list[tuple[str, str, dict[str, Any] | None, dict[str, Any] | None]]:
+) -> list[tuple[str, str, dict[str, Any] | None, dict[str, Any] | None, str]]:
     """Compile genome delta rules into an ordered executable rule set.
 
-    Each entry is ``(module_id, rule_id, condition_spec, action_spec)`` in
-    genome order (``MODULE_IDS`` order = deterministic priority). Only
-    slot-contract rules with a compiled action spec are executable; an untyped
-    prose rule carries no action and is skipped. The returned list is the
-    single input to ``skills.l1_execution.execute_l1_rules``.
+    Each entry is ``(module_id, rule_id, condition_spec, action_spec,
+    binding_entity_id)`` in genome order (``MODULE_IDS`` order = deterministic
+    priority). Only slot-contract rules with a compiled action spec are
+    executable; an untyped prose rule carries no action and is skipped. The
+    trailing ``binding_entity_id`` is the training-time bound entity (empty when
+    the rule predates entity-id binding) the executor prefers on source replay.
+    The returned list is the single input to
+    ``skills.l1_execution.execute_l1_rules`` / ``execute_constructive_rules``.
     """
     baseline = baseline or create_baseline_genome()
     if set(genome.modules) != set(MODULE_IDS):
         raise ValueError("genome must contain exactly the six registered modules")
     rules: list[
-        tuple[str, str, dict[str, Any] | None, dict[str, Any] | None]
+        tuple[str, str, dict[str, Any] | None, dict[str, Any] | None, str]
     ] = []
     for module_id in MODULE_IDS:
         module = genome.modules[module_id]
         baseline_module = baseline.modules[module_id]
         action_specs = _delta_action_specs(module, baseline_module)
         condition_specs = _delta_condition_specs(module, baseline_module)
+        binding_ids = _delta_binding_ids(module, baseline_module)
         for rule_id, _rule in _delta_rule_ids(module, baseline_module):
             action_spec = action_specs.get(rule_id)
             if not action_spec:
@@ -203,6 +250,7 @@ def compile_genome_rules(
                 module_id, rule_id,
                 condition_specs.get(rule_id),
                 action_spec,
+                binding_ids.get(rule_id, ""),
             ))
     return rules
 

@@ -144,18 +144,22 @@ class RepairPlan:
 # ============================================================
 
 def _direction_legal_operations(
-    module: str, evolution_direction: str
+    module: str, evolution_direction: str, failure_shape: str = "",
 ) -> tuple[str, ...]:
-    """Return the direction-filtered legal operation set for an L1 module.
+    """Return the exact capability-filtered legal operation set for an L1 module.
 
-    When ``evolution_direction`` is empty (Phase 4 build) every registered
-    opcode for the module is eligible; Phase 6 supplies a concrete direction
-    (``error_to_clean`` / ``clean_to_error`` / ``error_to_focused`` etc.) and
-    narrows the set accordingly.
+    A repair plan is legal only when the capability's declared
+    ``applicable_failure_shapes`` contain the current ``failure_shape``; the
+    weak module+direction match that predated this filter let a
+    ``provider_artifact_missing`` cut borrow ``construct_candidate`` (declared
+    for ``gold_false_negative_clean`` only) and report REPAIRABLE for a shape
+    the registry never promised to repair. An empty ``failure_shape`` keeps the
+    Phase 4 direction-only behavior (no shape filter).
     """
     return SKILL_CAPABILITY_REGISTRY.operations_for(
         skill_layer=LAYER_L1,
         modules=(module,),
+        failure_shape=str(failure_shape or ""),
         direction=str(evolution_direction or ""),
     )
 
@@ -262,8 +266,12 @@ def build_repair_plan(
 
     For L1: each repair_frontier edge whose owner is in ``allowed_modules``
     and whose field is executable in the given direction produces one
-    RepairPlan. ``auto_selected_operation`` is set when exactly one operation
-    can lift the edge.
+    RepairPlan. The capability lookup is exact: ``failure_shape`` (the
+    episode's ``reason_code``), owner, direction and target field must all
+    match a registered capability, so a shape the registry never promised to
+    repair compiles zero plans instead of borrowing a foreign operation.
+    ``auto_selected_operation`` is set when exactly one operation can lift
+    the edge.
 
     For L2: the episode carries a single synthetic edge for the L2 surface;
     its legal_operations is the closed L2 action set the policy may propose.
@@ -281,6 +289,7 @@ def build_repair_plan(
     plans: list[RepairPlan] = []
 
     if episode.skill_layer == LAYER_L1:
+        failure_shape = str(getattr(episode, "reason_code", "") or "")
         for edge in episode.causal_failure_edge_frontier:
             owner = str(edge.owner_module)
             # When the allow-list is empty the L1 surface is left open
@@ -291,7 +300,9 @@ def build_repair_plan(
             if legal_module_set and owner not in legal_module_set:
                 continue
             field = str(edge.field)
-            direction_ops = _direction_legal_operations(owner, evolution_direction)
+            direction_ops = _direction_legal_operations(
+                owner, evolution_direction, failure_shape,
+            )
             executable_ops = tuple(
                 op for op in direction_ops
                 if field in SKILL_CAPABILITY_REGISTRY.require(op).operation_targets

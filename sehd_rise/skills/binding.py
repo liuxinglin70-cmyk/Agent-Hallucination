@@ -438,8 +438,18 @@ def match_condition_bindings(
     domain: str,
     cardinality: str,
     record: Mapping[str, Any] | None = None,
+    preferred_entity_id: str = "",
 ) -> BindingMatch:
-    """Evaluate a ConditionSpec as binding algebra on one typed domain."""
+    """Evaluate a ConditionSpec as binding algebra on one typed domain.
+
+    ``preferred_entity_id`` is the training-time entity identity: when the
+    entity still exists in the projected universe and the predicate is true on
+    it, the match binds that entity exactly instead of re-running the
+    predicate over every entity (which is what turns an over-broad
+    generalization predicate into BINDING_AMBIGUOUS). On a different record
+    the stored entity is absent, so the predicate evaluation remains the
+    generalization path.
+    """
     if domain not in BINDING_DOMAINS or cardinality not in BINDING_CARDINALITIES:
         return BindingMatch(
             BINDING_DOMAIN_MISMATCH, domain, cardinality, (),
@@ -452,6 +462,15 @@ def match_condition_bindings(
         )
     universe_items = project_binding_universe(result, domain=domain, record=record)
     universe = {binding.key: binding for binding in universe_items}
+    if preferred_entity_id:
+        preferred = universe.get((domain, str(preferred_entity_id)))
+        if preferred is not None and _evaluate(
+            ConditionSpec.from_dict(sanitized), {preferred.key: preferred},
+        ):
+            return BindingMatch(
+                BINDING_BOUND, domain, cardinality, (preferred,),
+                "preferred_entity_grounded",
+            )
     matches = tuple(_evaluate(ConditionSpec.from_dict(sanitized), universe).values())
     if not matches:
         return BindingMatch(
@@ -463,6 +482,60 @@ def match_condition_bindings(
             f"expected_one_binding_found:{len(matches)}",
         )
     return BindingMatch(BINDING_BOUND, domain, cardinality, matches, "entity_grounded")
+
+
+def predicate_matches_binding(
+    condition_spec: Mapping[str, Any] | None, binding: Binding,
+) -> bool:
+    """Whether a condition spec is true on one entity's projected features.
+
+    This is the consistency check that separates entity identity from the
+    generalization predicate: the model names the entity by id, and this
+    verifies the reuse predicate it wrote actually fires on that entity.
+    """
+    sanitized = sanitize_condition_spec(condition_spec)
+    if not sanitized:
+        return False
+    spec = ConditionSpec.from_dict(sanitized)
+    return bool(_evaluate(spec, {binding.key: binding}))
+
+
+def render_binding_menu(
+    result: Mapping[str, Any],
+    domain: str,
+    *,
+    record: Mapping[str, Any] | None = None,
+    limit: int = 16,
+) -> tuple[dict[str, Any], ...]:
+    """Project prompt-safe entity rows for one binding domain.
+
+    ``claim_anchor`` rows carry the anchor's bounded text so the model can
+    select the entity to edit by id instead of guessing a uniquely-matching
+    predicate; every other domain exposes the entity id plus its projected
+    identifiers/features. This is the deterministic enumeration the reflection
+    prompt shows when entity identity must be decoupled from the reusable
+    condition predicate.
+    """
+    if domain not in BINDING_DOMAINS:
+        return ()
+    if domain == "claim_anchor" and isinstance(record, Mapping):
+        rows: list[dict[str, Any]] = []
+        for anchor in project_claim_anchors(record)[:limit]:
+            rows.append({
+                "entity_id": anchor.anchor_id,
+                "domain": "claim_anchor",
+                "text": anchor.span_text[:200],
+                "features": dict(anchor.observable_features),
+            })
+        return tuple(rows)
+    return tuple({
+        "entity_id": binding.entity_id,
+        "domain": binding.domain,
+        "identifiers": dict(binding.identifiers),
+        "features": dict(binding.features),
+    } for binding in project_binding_universe(
+        result, domain=domain, record=record,
+    )[:limit])
 
 
 def validate_binding_contract(
@@ -522,6 +595,7 @@ __all__ = [
     "BINDING_AMBIGUOUS", "BINDING_BOUND", "BINDING_CARDINALITIES",
     "BINDING_DOMAIN_MISMATCH", "BINDING_DOMAINS", "BINDING_NOT_FOUND",
     "Binding", "BindingMatch", "match_condition_bindings",
-    "project_binding_universe", "sanitize_binding_proof",
+    "predicate_matches_binding", "project_binding_universe",
+    "render_binding_menu", "sanitize_binding_proof",
     "validate_binding_contract",
 ]

@@ -191,7 +191,7 @@ from sehd_rise.skills.capabilities import (
     L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
     SKILL_CAPABILITY_REGISTRY,
 )
-from sehd_rise.skills.binding import sanitize_binding_proof
+from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -756,10 +756,15 @@ class _TypeEvolutionAdapter:
         return _infer_evolution_direction(state, gold)
 
     def generate_type_guidance(
-        self, hallucination_type: HallucinationType, evolution_direction: str,
+        self,
+        hallucination_type: HallucinationType,
+        evolution_direction: str,
+        allowed_modules: Sequence[str] = (),
+        failure_shape: str = "",
     ) -> str:
         return self._guidance.generate_type_guidance(
             hallucination_type, evolution_direction,
+            allowed_modules=allowed_modules, failure_shape=failure_shape,
         )
 
 
@@ -2546,6 +2551,8 @@ class EvolutionLoop:
         )
         type_guidance = self.type_evolution.generate_type_guidance(
             type_result.primary_type, evolution_direction,
+            allowed_modules=type_allowed_modules,
+            failure_shape=cut.reason_code,
         )
         print(
             f"    [HTC-TES] type={type_result.primary_type.value} "
@@ -2579,6 +2586,35 @@ class EvolutionLoop:
             "validated_target_module": None,
         }
         allowed_modules = type_allowed_modules
+
+        # Entity-identity menu: when the framework-compiled repair surface has
+        # exactly one binding domain and every capability on it is
+        # ``exactly_one``, the model names the training entity by id instead of
+        # guessing a uniquely-matching predicate. This is the identity /
+        # generalization-predicate split (review section 6).
+        entity_menu: tuple[dict[str, Any], ...] = ()
+        binding_domain = ""
+        _identity_plans = build_repair_plan(
+            episode,
+            allowed_modules=allowed_modules,
+            evolution_direction=evolution_direction,
+        )
+        _identity_domains = {
+            plan.target_domain for plan in _identity_plans if plan.target_domain
+        }
+        if len(_identity_domains) == 1:
+            _domain = next(iter(_identity_domains))
+            _cardinalities = {
+                plan.required_binding_schema.get("cardinality", "")
+                for plan in _identity_plans
+            }
+            if _cardinalities <= {"exactly_one"}:
+                binding_domain = _domain
+                entity_menu = render_binding_menu(
+                    detection_result,
+                    _domain,
+                    record=_detector_record(self.records[case_id]),
+                )
 
         if self.mutation_route is not None:
             skill_context = "\n\n".join(
@@ -2654,6 +2690,8 @@ class EvolutionLoop:
                 episode=episode,
                 experience_memory=self.causal_memory,
                 runtime_observation=runtime_observation,
+                entity_menu=entity_menu,
+                binding_domain=binding_domain,
             )
             experience_summary = (
                 self.type_fitness.get_experience_memory().get_reflection_summary(
@@ -2898,6 +2936,8 @@ class EvolutionLoop:
                             episode=episode,
                             experience_memory=self.causal_memory,
                             runtime_observation=runtime_observation,
+                            entity_menu=entity_menu,
+                            binding_domain=binding_domain,
                         )
                         if self.active_attempt_index > 0:
                             targeted_system += _build_structural_system_constraints(

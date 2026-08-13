@@ -349,7 +349,7 @@ def resume_court_from_candidate(
 
 def execute_constructive_rules(
     result: Mapping[str, Any],
-    rules: Sequence[tuple[str, str, Mapping[str, Any] | None, Mapping[str, Any] | None]],
+    rules: Sequence[tuple[str, str, Mapping[str, Any] | None, Mapping[str, Any] | None, str]],
     *, record: Mapping[str, Any], config: Mapping[str, Any],
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -360,7 +360,7 @@ def execute_constructive_rules(
     bound: list[dict[str, Any]] = []
     proofs: list[dict[str, Any]] = []
     anchors = {anchor.anchor_id: anchor for anchor in project_claim_anchors(record)}
-    for module_id, rule_id, condition_spec, action_value in rules:
+    for module_id, rule_id, condition_spec, action_value, binding_entity_id in rules:
         spec_value = sanitize_action_spec(action_value)
         if not spec_value:
             continue
@@ -370,6 +370,7 @@ def execute_constructive_rules(
         match = match_condition_bindings(
             condition_spec, current, domain=spec.input_binding_domain,
             cardinality=spec.cardinality, record=record,
+            preferred_entity_id=str(binding_entity_id or ""),
         )
         row = {
             "module_id": module_id, "rule_id": rule_id,

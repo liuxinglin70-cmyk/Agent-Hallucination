@@ -44,6 +44,7 @@ from sehd_rise.skills.rule import (
     render_rule,
     sanitize_condition_spec,
     validate_condition_spec,
+    validate_condition_spec_for_domain,
     validate_rule_spec,
 )
 from sehd_rise.skills.vocabulary.contracts import (
@@ -849,6 +850,12 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         if not persisted_action:
             return False, "action_spec_missing"
         action_contract = ActionSpec.from_dict(persisted_action)
+        if edit.condition_spec:
+            domain_ok, domain_reason = validate_condition_spec_for_domain(
+                edit.condition_spec, action_contract.input_binding_domain,
+            )
+            if not domain_ok:
+                return False, domain_reason
         proof_bindings = tuple(
             Binding.from_dict(item)
             for item in binding_proof.get("bindings") or ()

@@ -45,6 +45,7 @@ from sehd_rise.skills.action import (
     render_action_spec_contract,
     render_direction_action_contract,
 )
+from sehd_rise.skills.binding import render_binding_menu
 from sehd_rise.skills.capabilities import (
     SKILL_CAPABILITY_REGISTRY,
     render_capability_contracts,
@@ -332,6 +333,8 @@ def build_causal_reflection_prompt(
     negative_feedback_analysis: Any = None,
     episode: CausalFailureEpisode | None = None,
     runtime_observation: Mapping[str, Any] | None = None,
+    entity_menu: Sequence[Mapping[str, Any]] = (),
+    binding_domain: str = "",
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -343,7 +346,10 @@ def build_causal_reflection_prompt(
     observation the model receives; ``episode`` additionally supplies the
     framework-compiled RepairPlan candidate slots. ``experience_memory`` is
     the ``experience.memory.ExperienceMemory`` the structured retrieval
-    reads (never a copy).
+    reads (never a copy). ``entity_menu`` / ``binding_domain`` carry the
+    framework-enumerated legal entities when the capability's binding domain
+    is ``exactly_one``, so the model names the training entity by id instead
+    of guessing a uniquely-matching predicate.
     """
     allowed_modules = tuple(
         dict.fromkeys(
@@ -377,14 +383,33 @@ def build_causal_reflection_prompt(
         repair_plans_section = _repair_plans_section(
             episode, allowed_modules, action_direction,
         )
+    failure_shape = episode.reason_code if episode is not None else ""
     direction_action_contract = render_direction_action_contract(
         action_direction,
         allowed_modules,
+        failure_shape=failure_shape,
     )
     capability_contract_text = render_capability_contracts(
         allowed_modules,
         direction=action_direction,
-        failure_shape=(episode.reason_code if episode is not None else ""),
+        failure_shape=failure_shape,
+    )
+    # The condition DSL is domain-scoped: a predicate that names a feature the
+    # selected capability's binding domain cannot project is globally legal but
+    # un-bindable. Render only the features of the domains this direction +
+    # failure shape can actually reach, so the model is never invited to write
+    # e.g. ``candidate_kind`` against a claim_anchor-only construct_candidate.
+    reachable_domains = tuple(dict.fromkeys(
+        capability.input_binding_domain
+        for capability in SKILL_CAPABILITY_REGISTRY.query(
+            skill_layer="l1_provider_rule",
+            modules=allowed_modules,
+            direction=action_direction,
+            failure_shape=failure_shape,
+        )
+    ))
+    condition_spec_contract_text = render_condition_spec_contract(
+        binding_domains=reachable_domains,
     )
 
     system = """You are the BCCSE v5 Skill applicability-induction engine.
@@ -413,8 +438,10 @@ secondary is the root cause. Produce at most one local edit in one allowed
 module.
 
 Use this causal design sequence BEFORE writing a rule:
-1. Find one observable failure on an object that already exists in the
-   proof-court result. Missing-object construction belongs to CAPABILITY_GAP.
+1. Find one observable failure on the object the supplied capability contracts
+   describe. If the causal edge is a missing object, only a registered
+   constructive capability (e.g. construct_candidate) may lift it; never
+   translate a missing object into a suppression.
 2. Query the supplied capability contracts. Never imagine a provider action.
 3. Induce only an applicability condition -> the exact executable primitive.
    If none repairs the edge, upstream repairability must return CAPABILITY_GAP;
@@ -461,8 +488,10 @@ carrier, do not invent an edit or fall back to a witness certificate; this is
 a capability-gap invariant.
 
 - verdict clean/unresolved + a missing candidate/certificate/evidence object:
-  current L1 cannot construct it. Upstream must classify CAPABILITY_GAP. Never
-  select a suppress/withhold primitive for a missing-object failure.
+  only a capability whose contract declares it constructs that object may be
+  selected; when the registry lists no such constructive capability for this
+  failure shape, upstream repairability classifies CAPABILITY_GAP. Never select
+  a suppress/withhold primitive for a missing-object failure.
 If no listed capability repairs the causal edge, do not force an edit into a
 nearby module; reaching reflection in that state is a routing invariant fault.
 
@@ -484,9 +513,13 @@ A legal rule:
   verdict).
 
 Most importantly, the action must be one capability listed below. L1 runs
-after the proof court and can only suppress, withhold, open coverage, or select
-among objects that already exist. It cannot create a candidate/certificate,
-collect evidence, re-run a verifier, or change provider reasoning.
+after the proof court and may only perform the transforms its module charters
+and capability contracts declare for this failure shape and direction. The
+capability contracts are the sole authority on what exists: they name the
+reads, writes, binding domain and does_not_support of every operation, so a
+constructive operation is legal exactly when a contract lists it, and a
+suppression is legal exactly when a contract lists it for an existing object.
+Never infer a capability from a module name or an older rule's prose.
 
 An applicable broad baseline rule does not by itself justify no_edit when the
 runtime trace proves the deterministic transform did not match the needed
@@ -547,7 +580,18 @@ operator or value is rejected, and a false predicate prevents the transform.
 The predicate must evaluate true in runtime_condition_features from that
 court result; otherwise the source cannot execute the intervention and the
 candidate is rejected before replay:
-""" + render_condition_spec_contract() + """
+""" + condition_spec_contract_text + """
+
+ENTITY-IDENTITY RULE (binding): when an <entity_menu> is supplied, the
+training entity is selected by exact id, not by the condition predicate. Set
+"target_entity_id" to one entity_id from that menu; the condition_spec is then
+the REUSE predicate (what future cases must look like), not the locator for
+this training sample. The framework verifies that the named id still exists in
+the source court result and that your condition_spec is true on it. Never
+invent an entity_id: only values literally present in the menu are accepted.
+Do not try to make the condition predicate uniquely select one entity — a
+predicate true on several entities is fine, because the id disambiguates the
+training entity while the predicate stays general.
 
 <module_charters>
 """
@@ -585,7 +629,8 @@ candidate is rejected before replay:
             '"target_module", "operation", "rule_index", "condition", '
             '"condition_spec", "repair_edge_id", "action", '
             '"evidence_anchor", "feature_description", and '
-            '"rationale". '
+            '"rationale"; when an <entity_menu> is supplied, also include '
+            '"target_entity_id" naming one menu entity_id. '
             "You may optionally include \"diagnosis\" as a nested object "
             'with "failed_output", "owner_module" and "existing_rule_gap"; '
             "it is audit metadata only and never changes admission.\n"
@@ -796,6 +841,25 @@ candidate is rejected before replay:
             + "\n".join(rejected_lines)
         )
 
+    entity_menu_section = ""
+    if entity_menu and binding_domain:
+        menu_rows = "\n".join(
+            "- entity_id=" + str(row.get("entity_id") or "")
+            + (f" text={json.dumps(row.get('text'), ensure_ascii=False)}"
+               if "text" in row else "")
+            + (" features=" + json.dumps(
+                dict(row.get("features") or {}), ensure_ascii=False,
+                sort_keys=True,
+            ) if row.get("features") else "")
+            for row in entity_menu
+        )
+        entity_menu_section = (
+            "\n<entity_menu domain=\"" + str(binding_domain) + "\">\n"
+            + menu_rows
+            + "\nSelect exactly one entity_id above as target_entity_id.\n"
+            "</entity_menu>\n"
+        )
+
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
         f"trigger={_enum_value(signal.trigger_source)}\n"
@@ -822,6 +886,7 @@ candidate is rejected before replay:
         f"<current_skill allowed_modules=\"{allowed_modules_text}\">\n"
         f"{current_skill_text}\n"
         "</current_skill>\n"
+        f"{entity_menu_section}"
         "<available_executable_capabilities>\n"
         f"{capability_contract_text}\n"
         "</available_executable_capabilities>\n"

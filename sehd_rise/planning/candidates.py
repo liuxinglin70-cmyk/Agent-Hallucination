@@ -23,7 +23,14 @@ from sehd_rise.skills.action import (
     ERROR_TO_CLEAN_ACTIONS,
     compile_action_spec,
 )
-from sehd_rise.skills.binding import match_condition_bindings
+from sehd_rise.skills.binding import (
+    BINDING_BOUND,
+    BINDING_NOT_FOUND,
+    BindingMatch,
+    match_condition_bindings,
+    predicate_matches_binding,
+    project_binding_universe,
+)
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -38,6 +45,7 @@ from sehd_rise.skills.rule import (
     evaluate_condition_spec,
     render_rule,
     validate_condition_spec,
+    validate_condition_spec_for_domain,
     validate_rule_spec,
 )
 from sehd_rise.skills.vocabulary.charters import MODULE_OBSERVABLE_FIELDS
@@ -248,6 +256,55 @@ def _repair_targets_for(
     return repair_targets
 
 
+def _resolve_source_binding(
+    candidate: Mapping[str, Any],
+    source_result: Mapping[str, Any],
+    *,
+    domain: str,
+    cardinality: str,
+    record: Mapping[str, Any] | None = None,
+) -> BindingMatch:
+    """Resolve the source-case entity by exact id when the model named one.
+
+    Entity identity and the generalization predicate are two different things:
+    the model may name ``target_entity_id`` to say *which* entity this training
+    sample edits, while ``condition_spec`` describes *when the skill reuses*.
+    For an ``exactly_one`` capability, binding the named id directly is
+    unambiguous by construction and can never return BINDING_AMBIGUOUS. When no
+    id is named, the predicate evaluates over the universe as before.
+    """
+    target_entity_id = str(candidate.get("target_entity_id") or "").strip()
+    if not target_entity_id:
+        return match_condition_bindings(
+            candidate.get("condition_spec"),
+            source_result,
+            domain=domain,
+            cardinality=cardinality,
+            record=record,
+        )
+    universe = project_binding_universe(
+        source_result, domain=domain, record=record,
+    )
+    binding = next(
+        (item for item in universe if item.entity_id == target_entity_id),
+        None,
+    )
+    if binding is None:
+        return BindingMatch(
+            BINDING_NOT_FOUND, domain, cardinality, (),
+            f"target_entity_not_found:{domain}:{target_entity_id}",
+        )
+    if not predicate_matches_binding(candidate.get("condition_spec"), binding):
+        return BindingMatch(
+            BINDING_NOT_FOUND, domain, cardinality, (),
+            f"condition_not_consistent_with_target_entity:{target_entity_id}",
+        )
+    return BindingMatch(
+        BINDING_BOUND, domain, cardinality, (binding,),
+        "target_entity_grounded",
+    )
+
+
 def _prevalidate_candidate(
     candidate: Mapping[str, Any],
     allowed_modules: Sequence[str],
@@ -338,6 +395,16 @@ def _prevalidate_candidate(
             action_spec = compile_action_spec(target_module, action)
         except (KeyError, ValueError) as exc:
             return f"action_spec:{exc}"
+        # Domain-scoped binding check: a condition that names a feature the
+        # capability's binding domain cannot project (e.g. candidate_kind on a
+        # claim_anchor construct_candidate) passes the global contract but can
+        # never bind, so reject it here with a precise reason instead of
+        # surfacing it later as BINDING_NOT_FOUND / BINDING_AMBIGUOUS.
+        domain_ok, domain_reason = validate_condition_spec_for_domain(
+            candidate.get("condition_spec"), action_spec.input_binding_domain,
+        )
+        if not domain_ok:
+            return domain_reason
         polarity_pool = _polarity_pool(error_type)
         if polarity_pool is not None:
             allowed_operations = (
@@ -384,9 +451,8 @@ def _prevalidate_candidate(
                     f"{failure_edge_field}->{action_spec.output_field}"
                 )
         if isinstance(source_result, Mapping) and source_result:
-            binding_match = match_condition_bindings(
-                candidate.get("condition_spec"),
-                source_result,
+            binding_match = _resolve_source_binding(
+                candidate, source_result,
                 domain=action_spec.input_binding_domain,
                 cardinality=action_spec.cardinality,
                 record=source_record,

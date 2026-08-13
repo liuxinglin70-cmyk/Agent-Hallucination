@@ -8,6 +8,7 @@ claim a constructive operation that the runtime lacks.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.typing.classifier import HallucinationType
@@ -69,11 +70,28 @@ class TypeGuidance:
         self,
         hallucination_type: HallucinationType,
         evolution_direction: str,
+        allowed_modules: Sequence[str] = (),
+        failure_shape: str = "",
     ) -> str:
-        modules = self.get_target_modules(hallucination_type, primary=True)
+        # The type prior is advisory only: it may re-rank modules the causal
+        # cut already admitted, but it can never introduce a module or an
+        # operation outside the legal capability set. Intersect the prior with
+        # the allowed set (falling back to the allowed set when the prior has
+        # no opinion inside it) so the guidance never competes with the cut.
+        prior_modules = self.get_target_modules(hallucination_type, primary=True)
+        allowed = tuple(dict.fromkeys(str(module) for module in allowed_modules))
+        if allowed:
+            modules = tuple(
+                module for module in prior_modules if module in allowed
+            )
+            if not modules:
+                modules = allowed
+        else:
+            modules = prior_modules
         operations = SKILL_CAPABILITY_REGISTRY.operations_for(
             skill_layer="l1_provider_rule",
             modules=modules,
+            failure_shape=failure_shape,
             direction=evolution_direction,
         )
         capability_text = ", ".join(operations) or "CAPABILITY_GAP"

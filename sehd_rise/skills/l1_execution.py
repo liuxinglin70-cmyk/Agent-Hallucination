@@ -392,6 +392,7 @@ def evaluate_l1_rule(
     action_spec: Mapping[str, Any] | None,
     result: Mapping[str, Any],
     record: Mapping[str, Any] | None = None,
+    preferred_entity_id: str = "",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Evaluate one L1 rule deterministically against a court result.
 
@@ -399,6 +400,10 @@ def evaluate_l1_rule(
     provider re-run: project the result-side condition features, evaluate the
     ``condition_spec`` against them, and when it matches apply the
     ``action_spec`` transform (instance-resolved) to a copy of the result.
+
+    ``preferred_entity_id`` is the training-time bound entity; it is preferred
+    when it still exists so an over-broad generalization predicate never turns
+    a source replay into BINDING_AMBIGUOUS.
 
     Returns ``(transformed_result, report)``. ``transformed_result`` is the
     input unchanged when the condition does not match or no action compiles;
@@ -427,6 +432,7 @@ def evaluate_l1_rule(
         domain=action.input_binding_domain,
         cardinality=action.cardinality,
         record=record,
+        preferred_entity_id=preferred_entity_id,
     )
     report["binding_status"] = binding_match.status
     report["binding_proof"] = binding_match.to_dict()
@@ -451,28 +457,30 @@ def evaluate_l1_rule(
 
 def execute_l1_rules(
     result: Mapping[str, Any],
-    rules: Sequence[tuple[str, str, Mapping[str, Any] | None, Mapping[str, Any] | None]],
+    rules: Sequence[tuple[str, str, Mapping[str, Any] | None, Mapping[str, Any] | None, str]],
     *,
     record: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply an ordered L1 rule set deterministically to a court result.
 
     ``rules`` is a sequence of ``(module_id, rule_id, condition_spec,
-    action_spec)`` in genome order (deterministic priority). Each rule is
-    evaluated against the evolving result; the returned execution record
-    mirrors ``policy_evaluation`` with ``fired`` / ``skipped`` lists plus the
-    terminal transition.
+    action_spec, binding_entity_id)`` in genome order (deterministic priority).
+    Each rule is evaluated against the evolving result; the returned execution
+    record mirrors ``policy_evaluation`` with ``fired`` / ``skipped`` lists plus
+    the terminal transition. The trailing ``binding_entity_id`` (empty when the
+    rule predates entity-id binding) is the preferred source entity.
     """
     current = dict(result)
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     bound: list[dict[str, Any]] = []
-    for module_id, rule_id, condition_spec, action_spec in rules:
+    for module_id, rule_id, condition_spec, action_spec, binding_entity_id in rules:
         current, report = evaluate_l1_rule(
             condition_spec=condition_spec,
             action_spec=action_spec,
             result=current,
             record=record,
+            preferred_entity_id=str(binding_entity_id or ""),
         )
         row = {
             "rule_id": rule_id,

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass, field
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from sehd_rise.skills.vocabulary.charters import (
     MODULE_ACTION_OPCODES,
@@ -377,6 +377,51 @@ _COMBINATORS = frozenset({"atom", "all_of", "any_of", "not"})
 # resolve a matched atom to an existing candidate/certificate/origin.
 _BINDINGS = frozenset({"entity_scoped"})
 
+# Each capability binding domain projects only these condition features. A
+# condition_spec feature outside its target domain's set cannot bind: the
+# ``claim_anchor`` domain (construct_candidate) observes only the eight span
+# facts, so a ``candidate_kind`` predicate on it is un-bindable regardless of
+# whether the global contract registers the feature. This table is the single
+# source of truth for both the prompt contract render and the domain-specific
+# prevalidation; it mirrors the feature set each branch of
+# ``skills.binding.project_binding_universe`` actually emits.
+_DOMAIN_FEATURES: Mapping[str, frozenset[str]] = {
+    "claim_anchor": frozenset({
+        "anchor_kind", "anchor_role", "anchor_depends_on_tool",
+        "anchor_has_number", "anchor_has_citation",
+        "anchor_is_final_assistant", "anchor_is_first_in_event",
+        "anchor_is_last_in_event",
+    }),
+    "candidate": frozenset({
+        "candidate_kind", "candidate_axis", "module_tag",
+        "qualification_state", "missing_field", "failed_invariant",
+        "evidence_verified", "event_role", "has_tool_call",
+        "has_tool_error", "has_tool_retry",
+    }),
+    "certificate": frozenset({
+        "candidate_kind", "candidate_axis", "module_tag",
+        "qualification_state", "missing_field", "failed_invariant",
+        "evidence_verified", "event_role", "has_tool_call",
+        "has_tool_error", "has_tool_retry",
+    }),
+    "origin": frozenset({
+        "candidate_kind", "candidate_axis", "module_tag",
+        "qualification_state", "missing_field", "failed_invariant",
+        "evidence_verified", "event_role", "has_tool_call",
+        "has_tool_error", "has_tool_retry",
+    }),
+    "coverage": frozenset({
+        "coverage_state", "coverage_side", "event_role", "has_tool_call",
+        "has_tool_error", "has_tool_retry",
+    }),
+    "boundary": frozenset({
+        "event_role", "has_tool_call", "has_tool_error", "has_tool_retry",
+    }),
+    "event": frozenset({
+        "event_role", "has_tool_call", "has_tool_error", "has_tool_retry",
+    }),
+}
+
 
 @dataclass(frozen=True)
 class ConditionSpec:
@@ -507,18 +552,47 @@ def sanitize_condition_spec(value: Any) -> dict[str, Any]:
     return spec.to_dict()
 
 
-def render_condition_spec_contract() -> str:
-    """Prompt contract for the reflection model; values are closed."""
-    lines = [
-        "condition_spec is mandatory for add_rule/modify_rule. The atom form: ",
-        '{"schema_version":"sehd.condition_spec.v3",',
-        ' "feature_source":"court_result","feature":"...",',
-        ' "operator":"...","value_type":"string|boolean","value":"...",',
-        ' "scope":"l1_court_transform",',
-        ' "evidence_binding":"post_court_projection",',
-        ' "combinator":"atom","binding":"entity_scoped"}. Select one predicate:',
-    ]
-    for feature, (operator, values) in _FEATURE_CONTRACT.items():
+def _collect_spec_features(spec: ConditionSpec) -> frozenset[str]:
+    """Collect every feature name referenced by one (possibly nested) spec."""
+    if spec.combinator == "atom":
+        return frozenset({spec.feature})
+    features: set[str] = set()
+    for child in spec.children:
+        features.update(_collect_spec_features(ConditionSpec.from_dict(child)))
+    return frozenset(features)
+
+
+def validate_condition_spec_for_domain(
+    value: Any, domain: str,
+) -> tuple[bool, str]:
+    """Reject a condition that names a feature its target domain cannot bind.
+
+    ``validate_condition_spec`` checks the global closed vocabulary; this
+    checks the second, domain-scoped axis that the binding projector enforces
+    at runtime. A ``candidate_kind`` predicate on a ``claim_anchor`` capability
+    passes the global contract but can never bind, so it is rejected here with
+    a precise reason instead of surfacing downstream as ``BINDING_NOT_FOUND``.
+    """
+    if not isinstance(value, Mapping):
+        return False, "condition_spec_not_object"
+    domain_features = _DOMAIN_FEATURES.get(str(domain))
+    if domain_features is None:
+        return False, f"condition_domain_unregistered:{domain or 'missing'}"
+    spec = ConditionSpec.from_dict(value)
+    foreign = sorted(_collect_spec_features(spec) - domain_features)
+    if foreign:
+        return False, (
+            f"condition_feature_not_bindable_in_domain:{domain}:"
+            + ",".join(foreign)
+        )
+    return True, ""
+
+
+def _render_feature_lines(features: frozenset[str]) -> list[str]:
+    """Render one predicate line per feature, ordered for determinism."""
+    lines: list[str] = []
+    for feature in sorted(features):
+        operator, values = _FEATURE_CONTRACT[feature]
         rendered = ", ".join(
             json.dumps(value, ensure_ascii=False)
             for value in sorted(values, key=lambda item: str(item))
@@ -529,6 +603,37 @@ def render_condition_spec_contract() -> str:
             else " (first-call: present before any failure)"
         )
         lines.append(f"- {feature} / {operator} / one of: {rendered}{tag}")
+    return lines
+
+
+def render_condition_spec_contract(
+    binding_domains: Sequence[str] = (),
+) -> str:
+    """Prompt contract for the reflection model; values are closed.
+
+    When ``binding_domains`` is non-empty, only the features those domains
+    can actually bind are rendered, so the model is never invited to write a
+    predicate that is globally legal but un-bindable on the target entity
+    (e.g. ``candidate_kind`` on a ``claim_anchor`` capability). An empty
+    argument renders the full vocabulary for a domain-agnostic caller.
+    """
+    lines = [
+        "condition_spec is mandatory for add_rule/modify_rule. The atom form: ",
+        '{"schema_version":"sehd.condition_spec.v3",',
+        ' "feature_source":"court_result","feature":"...",',
+        ' "operator":"...","value_type":"string|boolean","value":"...",',
+        ' "scope":"l1_court_transform",',
+        ' "evidence_binding":"post_court_projection",',
+        ' "combinator":"atom","binding":"entity_scoped"}. Select one predicate:',
+    ]
+    domains = tuple(dict.fromkeys(str(d) for d in binding_domains if str(d)))
+    if domains:
+        features: set[str] = set()
+        for domain in domains:
+            features.update(_DOMAIN_FEATURES.get(domain, ()))
+        lines.extend(_render_feature_lines(frozenset(features)))
+    else:
+        lines.extend(_render_feature_lines(frozenset(_FEATURE_CONTRACT)))
     lines.extend([
         "",
         "For typed boolean composition, use combinator all_of / any_of / not",

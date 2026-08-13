@@ -54,21 +54,30 @@ CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
 
 
 def render_direction_action_contract(
-    direction: str, modules: Sequence[str],
+    direction: str, modules: Sequence[str], *, failure_shape: str = "",
 ) -> str:
-    """Render the executable opcode subset for one task direction."""
-    if direction in {"error_to_clean", "unresolved_to_clean"}:
-        contract = ERROR_TO_CLEAN_ACTIONS
-    elif direction in {"clean_to_error", "unresolved_to_error"}:
-        contract = CLEAN_TO_ERROR_ACTIONS
-    else:
-        return ""
-    lines = []
-    for module in modules:
-        actions = sorted(contract.get(str(module), frozenset()))
-        if actions:
-            lines.append(f"- {module}: " + ", ".join(actions))
-    return "\n".join(lines)
+    """Render the executable opcode subset for one task direction.
+
+    The opcode set is read from the capability registry with the current
+    ``failure_shape`` included in the lookup, so a direction-compatible opcode
+    that the registry did not declare for this failure shape never leaks into
+    the prompt (e.g. ``construct_candidate`` is clean_to_error-only and
+    gold_false_negative_clean-only). An empty ``failure_shape`` keeps the
+    direction-only view.
+    """
+    if direction in {"error_to_clean", "unresolved_to_clean", "clean_to_error", "unresolved_to_error"}:
+        lines = []
+        for module in modules:
+            actions = SKILL_CAPABILITY_REGISTRY.operations_for(
+                skill_layer="l1_provider_rule",
+                modules=(str(module),),
+                failure_shape=failure_shape,
+                direction=direction,
+            )
+            if actions:
+                lines.append(f"- {module}: " + ", ".join(sorted(actions)))
+        return "\n".join(lines)
+    return ""
 
 
 @dataclass(frozen=True)
