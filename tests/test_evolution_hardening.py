@@ -21,6 +21,8 @@ from sehd_rise.causal.cut import (
     REASON_GOLD_FALSE_NEGATIVE_CLEAN,
     REASON_GOLD_FALSE_POSITIVE,
 )
+from sehd_rise.causal.episode import build_runtime_observation
+from sehd_rise.causal.signals import project_detection
 from sehd_rise.loop.result import (
     EvolutionStep,
     _goodhart_divergence,
@@ -34,7 +36,15 @@ from sehd_rise.meta.review import (
     FEEDBACK_INSUFFICIENT_GROUNDING,
     FEEDBACK_REDUNDANT_INTERVENTION,
     FEEDBACK_EVIDENCE_SOURCES,
+    project_strategy_for_prompt,
 )
+from sehd_rise.meta.strategy import (
+    MECHANISM_RANKING,
+    OPERATION_PREFERENCE,
+    SEARCH_PRIOR,
+    StrategyState,
+)
+from sehd_rise.planning.candidates import _prevalidate_candidate
 from sehd_rise.skills.genome import create_baseline_genome
 from sehd_rise.skills.policy import create_baseline_policy_genome
 from sehd_rise.skills.rule import (
@@ -114,6 +124,144 @@ def test_has_tool_retry_false_on_single_call() -> None:
 
 
 # ============================================================
+# #4c — trajectory-content condition feature (module_tag)
+# ============================================================
+
+_MODULE_TAG_SPEC = {
+    "schema_version": "sehd.condition_spec.v2",
+    "feature_source": "provider_input",
+    "feature": "module_tag",
+    "operator": "contains",
+    "value_type": "string",
+    "value": "tool_use",
+    "scope": "action_spec_routes",
+    "evidence_binding": "pre_call_projection",
+    "combinator": "atom",
+    "binding": "route_scoped",
+}
+
+
+def test_module_tag_project_normalizes_and_evaluates() -> None:
+    import json
+    packet = {
+        "candidates": [
+            {"candidate_id": "c1", "module_tag": "Tool-Use"},
+        ]
+    }
+    features = project_route_condition_features(
+        "r", "TRAJECTORY_PACKET=" + json.dumps(packet),
+    )
+    assert features["module_tag"] == ["tool_use"]
+    assert validate_condition_spec(_MODULE_TAG_SPEC)[0] is True
+    assert evaluate_condition_spec(_MODULE_TAG_SPEC, features).matched is True
+
+
+def test_module_tag_rejects_unregistered_value() -> None:
+    unregistered = dict(_MODULE_TAG_SPEC, value="not_a_tag")
+    ok, reason = validate_condition_spec(unregistered)
+    assert ok is False
+    assert "condition_value_unregistered" in reason
+
+
+def test_condition_binding_only_route_scoped() -> None:
+    """candidate_bound/obligation_bound were advertised but never honored by
+    the evaluator; the contract now admits only the implemented scope."""
+    ok, _ = validate_condition_spec(_MODULE_TAG_SPEC)
+    assert ok is True
+    unimplemented = dict(_MODULE_TAG_SPEC, binding="candidate_bound")
+    ok, reason = validate_condition_spec(unimplemented)
+    assert ok is False
+    assert "condition_binding_invalid" in reason
+
+
+# ============================================================
+# #4b — condition-feature trace wiring (P0)
+# ============================================================
+
+_MISSING_FIELD_SPEC = {
+    "schema_version": "sehd.condition_spec.v2",
+    "feature_source": "provider_input",
+    "feature": "missing_field",
+    "operator": "contains",
+    "value_type": "string",
+    "value": "responsible_event_id",
+    "scope": "action_spec_routes",
+    "evidence_binding": "pre_call_projection",
+    "combinator": "atom",
+    "binding": "route_scoped",
+}
+
+
+def _origin_repair_candidate() -> dict:
+    return {
+        "target_module": "earliest_origin_tiebreak",
+        "operation": "add_rule",
+        "condition": "the responsible event id is absent",
+        "action": "select_earliest_origin: responsible_event_id",
+        "evidence_anchor": "localization_ambiguous",
+        "condition_spec": _MISSING_FIELD_SPEC,
+    }
+
+
+def _source_detection_result(state: str = "verified_error") -> dict:
+    return {
+        "state": state,
+        "runtime_valid": True,
+        "decision_authority": "authoritative",
+        "responsible_event_id": "event_001",
+        "responsible_step": 1,
+        "proof_adjudication": {
+            "state": state,
+            "decision_authority": "authoritative",
+            "surviving_error_certificate_ids": ["e1"],
+        },
+    }
+
+
+def test_runtime_observation_threads_condition_feature_trace() -> None:
+    trace = {"boundary_route": [{"candidate_kind": ["omission"]}]}
+    signal = project_detection(_source_detection_result())
+    observation = build_runtime_observation(
+        signal, allowed_modules=("earliest_origin_tiebreak",),
+        condition_feature_trace=trace,
+    )
+    assert observation["runtime_condition_features"] == trace
+
+
+def test_runtime_observation_defaults_to_empty_trace() -> None:
+    signal = project_detection(_source_detection_result())
+    observation = build_runtime_observation(
+        signal, allowed_modules=("earliest_origin_tiebreak",),
+    )
+    assert observation["runtime_condition_features"] == {}
+
+
+def test_prevalidate_rejects_unmatchable_condition_on_source() -> None:
+    trace = {
+        "boundary_route": [{"candidate_kind": ["omission"], "missing_field": []}],
+        "counterfactual_route": [{"candidate_kind": ["other"], "missing_field": []}],
+    }
+    reason = _prevalidate_candidate(
+        _origin_repair_candidate(), ("earliest_origin_tiebreak",),
+        runtime_condition_features=trace,
+    )
+    assert reason == "condition_not_observed_on_source_route"
+
+
+def test_prevalidate_accepts_matchable_condition_on_source() -> None:
+    trace = {
+        "boundary_route": [
+            {"candidate_kind": ["omission"], "missing_field": ["responsible_event_id"]},
+        ],
+    }
+    reason = _prevalidate_candidate(
+        _origin_repair_candidate(), ("earliest_origin_tiebreak",),
+        runtime_condition_features=trace,
+    )
+    assert reason is None
+
+
+# ============================================================
 # #11 — Goodhart divergence telemetry
 # ============================================================
 
@@ -183,6 +331,31 @@ def test_meta_evidence_sources_wired() -> None:
     assert FEEDBACK_EVIDENCE_SOURCES[
         ("retry_strategy", "avoid_unexecuted_action_shape")
     ] == (FEEDBACK_EXECUTION_NOT_ESTABLISHED,)
+
+
+def test_strategy_projection_matches_reflection_consumers() -> None:
+    """The reflection prompt builders read guidance_tokens /
+    ranking_preferences; the projection must emit exactly those keys."""
+    state = StrategyState(state_id="s")
+    state.enabled = {
+        SEARCH_PRIOR: ("prefer_observable_discriminator",),
+        OPERATION_PREFERENCE: ("cost_efficiency",),
+        MECHANISM_RANKING: ("action_shape_previously_effective",),
+    }
+    projection = project_strategy_for_prompt(state)
+    assert projection["authority"] == "evolution_guidance_only"
+    assert set(projection["guidance_tokens"]) == {
+        "prefer_observable_discriminator", "cost_efficiency",
+    }
+    assert projection["ranking_preferences"] == [
+        "action_shape_previously_effective",
+    ]
+
+
+def test_strategy_projection_empty_on_baseline() -> None:
+    projection = project_strategy_for_prompt(StrategyState(state_id="b"))
+    assert projection["guidance_tokens"] == []
+    assert projection["ranking_preferences"] == []
 
 
 def main() -> int:

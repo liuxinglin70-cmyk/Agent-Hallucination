@@ -2596,7 +2596,11 @@ class EvolutionLoop:
                 episode, historical_refs=history_refs,
             )
             runtime_observation = build_runtime_observation(
-                signal, allowed_modules=allowed_modules,
+                signal,
+                allowed_modules=allowed_modules,
+                condition_feature_trace=detection_result.get(
+                    "condition_feature_trace"
+                ),
             )
             system_prompt, user_prompt = build_causal_reflection_prompt(
                 signal=view,
@@ -3767,7 +3771,7 @@ class EvolutionLoop:
         # only reachable for a REPAIRABLE episode); the replay's trigger state
         # decides whether the edit closed the failure. Threading both into
         # fitness/effect re-activates the "source failure closed" and
-        # "trigger:closed/opened" channels that the loop otherwise left dead.
+        # "trigger:closed/opened" channels that were previously unreachable.
         source_gold_label = (
             _evaluator_gold(self.records[case_id]) if self.use_gold else None
         )

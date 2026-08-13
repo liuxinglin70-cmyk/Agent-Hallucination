@@ -299,6 +299,14 @@ _CANDIDATE_KINDS = frozenset({
     "invalid_action", "other",
 })
 _AXES = frozenset({"F", "Fa", "P", "S"})
+# Census ``module_tag``: the AgentHallu category the candidate was assigned.
+# Normalized from the census schema's hyphenated tags ("Tool-Use" ->
+# "tool_use") so a rule can discriminate on hallucination category.
+_MODULE_TAGS = frozenset({
+    "planning", "retrieval", "reasoning", "tool_use", "human_interaction",
+    "loop_detection", "redundancy_check", "factuality", "faithfulness",
+    "completion", "scope",
+})
 _COVERAGE_STATES = frozenset({"none", "incomplete", "complete", "unknown"})
 _EVENT_ROLES = frozenset({"system", "user", "assistant", "tool"})
 _RUNTIME_FIELDS = frozenset({
@@ -332,6 +340,7 @@ _RETRY_DIAGNOSTIC_FEATURES = frozenset({
 _FEATURE_CONTRACT: Mapping[str, tuple[str, frozenset[Any]]] = {
     "candidate_kind": ("contains", _CANDIDATE_KINDS),
     "candidate_axis": ("contains", _AXES),
+    "module_tag": ("contains", _MODULE_TAGS),
     "missing_field": ("contains", _RUNTIME_FIELDS),
     "failed_invariant": ("contains", _INVARIANTS),
     "event_role": ("contains", _EVENT_ROLES),
@@ -352,12 +361,12 @@ _BOOLEAN_FEATURES = frozenset(
 # ``all_of``/``any_of``/``not`` compose child specs.
 _COMBINATORS = frozenset({"atom", "all_of", "any_of", "not"})
 
-# Binding scopes. ``route_scoped`` is the default (any object on the route
-# satisfying the condition triggers). ``candidate_bound`` and
-# ``obligation_bound`` bind the condition to a specific candidate or
-# obligation identity, preventing unrelated objects on the same route from
-# triggering the rule.
-_BINDINGS = frozenset({"route_scoped", "candidate_bound", "obligation_bound"})
+# Binding scope. Only ``route_scoped`` is implemented: the pre-call
+# projection merges every object on a route into one feature set, so there is
+# no per-object identity to bind a condition to. The field exists so the v2
+# spec schema names the single honored scope explicitly instead of implying a
+# per-candidate or per-obligation binding the evaluator does not perform.
+_BINDINGS = frozenset({"route_scoped"})
 
 
 @dataclass(frozen=True)
@@ -519,9 +528,8 @@ def render_condition_spec_contract() -> str:
         "with a children array of condition_spec objects (each a valid atom).",
         "not takes exactly one child. Prefer first-call features so the rule",
         "can prevent the first failure, not just steer a retry.",
-        "binding: route_scoped (default) | candidate_bound | obligation_bound.",
-        "candidate_bound/obligation_bound prevent unrelated objects on the same",
-        "route from triggering the rule.",
+        "binding: route_scoped is the only supported scope (route-level match);",
+        "any other binding value is rejected.",
     ])
     return "\n".join(lines)
 
@@ -545,6 +553,18 @@ def _normalize_candidate_kind(value: Any) -> str:
     )):
         return "unsupported_claim"
     return "other"
+
+
+def _normalize_module_tag(value: Any) -> str:
+    """Fold the census ``module_tag`` enum to its canonical closed value.
+
+    The census emits hyphenated, Title-Case tags ("Tool-Use"); normalization
+    lowercases and collapses separators so the closed ``_MODULE_TAGS`` set
+    matches without fuzzy keyword guessing. Anything unregistered returns ""
+    so a stray tag never becomes a spurious match.
+    """
+    tag = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return tag if tag in _MODULE_TAGS else ""
 
 
 def _json_payloads(text: str) -> list[Any]:
@@ -576,7 +596,7 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
     """
     sets: dict[str, set[str]] = {
         "candidate_kind": set(), "candidate_axis": set(),
-        "coverage_state": set(), "missing_field": set(),
+        "module_tag": set(), "coverage_state": set(), "missing_field": set(),
         "failed_invariant": set(), "event_role": set(),
     }
     has_tool_call = False
@@ -590,6 +610,10 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
                 key = str(raw_key)
                 if key == "candidate_kind":
                     sets["candidate_kind"].add(_normalize_candidate_kind(raw_value))
+                elif key == "module_tag":
+                    normalized = _normalize_module_tag(raw_value)
+                    if normalized:
+                        sets["module_tag"].add(normalized)
                 elif key in {"axes", "axis", "candidate_axis"}:
                     values = raw_value if isinstance(raw_value, (list, tuple, set)) else (raw_value,)
                     sets["candidate_axis"].update(

@@ -36,8 +36,13 @@ from typing import Any, Mapping, Sequence
 
 from sehd_rise.experience.memory import MechanismEntry
 from sehd_rise.meta.strategy import (
+    CANDIDATE_DIVERSITY,
     DOMAIN_TOKENS,
+    MECHANISM_RANKING,
     OP_ENABLE,
+    OPERATION_PREFERENCE,
+    RETRY_STRATEGY,
+    SEARCH_PRIOR,
     STRATEGY_DOMAINS,
     StrategyEdit,
     StrategyState,
@@ -434,19 +439,30 @@ def project_strategy_for_prompt(
     provider-response-free. Always ``authority="evolution_guidance_only"`` so
     the guidance can inform a reflection but never change an owner route, an
     ActionSpec or a gate.
+
+    The shape is the one the reflection prompt builders consume: generation
+    domains flatten into ``guidance_tokens`` and the mechanism-ranking domain
+    into ``ranking_preferences``.
     """
     cap = max(0, int(max_tokens))
-    strategy: dict[str, list[str]] = {}
-    for domain in STRATEGY_DOMAINS:
-        tokens = [
-            token for token in sorted(state.enabled_in(domain))
-            if token in DOMAIN_TOKENS[domain]
-        ][:cap]
-        if tokens:
-            strategy[domain] = tokens
+    guidance_domains = (
+        SEARCH_PRIOR, OPERATION_PREFERENCE, RETRY_STRATEGY, CANDIDATE_DIVERSITY,
+    )
+    guidance = [
+        token
+        for domain in guidance_domains
+        for token in sorted(state.enabled_in(domain))
+        if token in DOMAIN_TOKENS[domain]
+    ][:cap]
+    ranking = [
+        token
+        for token in sorted(state.enabled_in(MECHANISM_RANKING))
+        if token in DOMAIN_TOKENS[MECHANISM_RANKING]
+    ][:cap]
     return {
         "authority": "evolution_guidance_only",
-        "strategy": strategy,
+        "guidance_tokens": guidance,
+        "ranking_preferences": ranking,
     }
 
 

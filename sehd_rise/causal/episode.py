@@ -1310,12 +1310,14 @@ def build_runtime_observation(
     signal: DetectionSignal,
     *,
     allowed_modules: Sequence[str] = (),
+    condition_feature_trace: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the bounded structured observation the reflection model sees.
 
-    Derived from the signal only: no labels, no case identity. It is an
-    observation, not a verdict or a correctness claim. Phase 6's planning
-    layer uses this to assemble the reflection prompt; it stays label-free.
+    Derived from the signal and the source run's pre-call condition-feature
+    projections: no labels, no case identity. It is an observation, not a
+    verdict or a correctness claim. Phase 6's planning layer uses this to
+    assemble the reflection prompt; it stays label-free.
     """
     prosecution_rows = _candidate_rows(signal, "error_certificate")
     defense_rows = _candidate_rows(signal, "defense_certificate")
@@ -1433,7 +1435,7 @@ def build_runtime_observation(
         "observed_fields": field_presence,
         "court_balance": court_balance,
         "terminal_basis": _terminal_basis_payload(signal),
-        "runtime_condition_features": {},  # filled by the execution layer
+        "runtime_condition_features": dict(condition_feature_trace or {}),
         "non_empty_evidence": {
             "census": signal.candidate_count > 0,
             "prosecution": bool(prosecution_rows),
