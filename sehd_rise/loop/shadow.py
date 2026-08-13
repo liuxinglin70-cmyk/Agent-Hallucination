@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from sehd_rise.causal.repairability import triggered_episode
 from sehd_rise.causal.signals import resolve_evolution_state
 from sehd_rise.evaluation.effect import (
     _classify_replay_no_effect,
@@ -503,13 +504,23 @@ def _flush_shadow_batch_impl(
                     typed_assessment.to_dict()
                 )
             # A successfully repaired source becomes a future regression
-            # anchor, so later edits cannot silently forget the fix.
+            # anchor, so later edits cannot silently forget the fix. The
+            # trigger predicate is the shared Repairability Authority source
+            # the main loop and the canary guard use; a resolved replay that
+            # still triggers never enters the stable pool.
             _source_after = source_audits[idx].get("source_after")
             if (
                 resolve_evolution_state(_shadow_result)
                 in {"verified_error", "verified_clean"}
                 and isinstance(_source_after, Mapping)
-                and not bool(_source_after.get("should_evolve"))
+                and not triggered_episode(
+                    _shadow_result,
+                    use_gold=fitness_use_gold,
+                    gold_label=(
+                        item.source_after_signal.gold_label
+                        if fitness_use_gold else None
+                    ),
+                )
             ):
                 stable_canaries[item.case_id] = _shadow_result
                 _evict_stable_canaries(stable_canaries, canary_limit)

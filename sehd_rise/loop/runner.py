@@ -55,6 +55,7 @@ from sehd_rise.causal.plan import build_repair_plan
 from sehd_rise.causal.repairability import (
     RepairabilityStatus,
     analyze as analyze_repairability,
+    triggered_episode,
 )
 from sehd_rise.causal.signals import (
     classify_runtime_error,
@@ -705,30 +706,6 @@ class _L2Attribution:
         }
 
 
-def _triggered(
-    result: Mapping[str, Any], *, use_gold: bool, gold_label: bool | None,
-) -> bool:
-    """Whether a detection result is an evolvable (triggered) episode.
-
-    The trigger is the Repairability Authority's ``REPAIRABLE`` verdict:
-    project -> cut -> episode -> analyze, exactly like the canary guard.
-    """
-    payload = dict(result)
-    if use_gold and gold_label is not None:
-        payload["gold_label"] = gold_label
-    signal = project_detection(payload, use_gold=use_gold)
-    if signal.diagnostic_only:
-        return False
-    cut = build_causal_cut(signal)
-    episode = build_causal_episode(
-        signal=signal,
-        cut=cut,
-        record_key=str(payload.get("case_id") or ""),
-    )
-    verdict = analyze_repairability(episode)
-    return verdict.status is RepairabilityStatus.REPAIRABLE
-
-
 def _l2_outcome_for(
     decision: str, *, reason: str, route: str,
 ) -> Outcome:
@@ -1214,7 +1191,7 @@ class EvolutionLoop:
                 )
                 audit.update({
                     "state": resolve_evolution_state(canary_result),
-                    "should_evolve": _triggered(
+                    "should_evolve": triggered_episode(
                         canary_result, use_gold=self.use_gold,
                         gold_label=(
                             _evaluator_gold(records[canary_id])
@@ -1223,7 +1200,7 @@ class EvolutionLoop:
                     ),
                     "attribution": canary_signal.to_dict(),
                 })
-                if not _triggered(
+                if not triggered_episode(
                     canary_result, use_gold=self.use_gold,
                     gold_label=(
                         _evaluator_gold(records[canary_id])
@@ -4172,7 +4149,7 @@ class EvolutionLoop:
         source_gold_label = (
             _evaluator_gold(self.records[case_id]) if self.use_gold else None
         )
-        after_trigger = _triggered(
+        after_trigger = triggered_episode(
             candidate_result, use_gold=self.use_gold,
             gold_label=source_gold_label,
         )
@@ -4266,7 +4243,7 @@ class EvolutionLoop:
             "source_after": candidate_signal.to_dict(),
             "assessment": assessment.to_dict(),
             "causal_execution": causal_execution_audit,
-            "source_stable_after": not _triggered(
+            "source_stable_after": not triggered_episode(
                         candidate_result, use_gold=self.use_gold,
                         gold_label=(
                             _evaluator_gold(self.records[case_id])

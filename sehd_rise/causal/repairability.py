@@ -48,9 +48,11 @@ from sehd_rise.causal.cut import (
     REASON_DEMOTED_L1_NO_EXECUTABLE,
     REASON_INTERNAL_INCONSISTENCY,
     REASON_NO_FAILURE_SHAPE,
+    build_causal_cut,
 )
-from sehd_rise.causal.episode import CausalFailureEpisode
+from sehd_rise.causal.episode import CausalFailureEpisode, build_causal_episode
 from sehd_rise.causal.plan import build_repair_plan
+from sehd_rise.causal.signals import project_detection
 from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.contracts import (
     LAYER_DETECTOR,
@@ -341,6 +343,37 @@ def analyze(
 
 
 # ============================================================
+# Trigger predicate — the single shared source
+# ============================================================
+
+def triggered_episode(
+    result: Mapping[str, Any], *, use_gold: bool, gold_label: bool | None,
+) -> bool:
+    """Whether a detection result is an evolvable (triggered) episode.
+
+    The trigger is the Repairability Authority's ``REPAIRABLE`` verdict:
+    project -> cut -> episode -> analyze, exactly like the canary guard and
+    the shadow stable-canary admission. Every consumer imports this one
+    predicate, so a trigger definition can never drift between the main
+    loop, the canary guard, and the shadow batch.
+    """
+    payload = dict(result)
+    if use_gold and gold_label is not None:
+        payload["gold_label"] = gold_label
+    signal = project_detection(payload, use_gold=use_gold)
+    if signal.diagnostic_only:
+        return False
+    cut = build_causal_cut(signal)
+    episode = build_causal_episode(
+        signal=signal,
+        cut=cut,
+        record_key=str(payload.get("case_id") or ""),
+    )
+    verdict = analyze(episode)
+    return verdict.status is RepairabilityStatus.REPAIRABLE
+
+
+# ============================================================
 # Public surface
 # ============================================================
 
@@ -360,4 +393,5 @@ __all__ = [
     "RepairabilityStatus",
     "RepairabilityVerdict",
     "analyze",
+    "triggered_episode",
 ]
