@@ -683,16 +683,67 @@ _FN_FAMILY_OWNERS: Mapping[str, tuple[str, ...]] = {
     "temporal_numeric_entity_consistency": ("candidate_trigger",),
 }
 
+# How a covered family is actually expressed. ``primitive`` means a registered
+# deterministic opcode IS the family's mechanism; ``condition_specialization``
+# means the single forward-recall primitive ``construct_candidate`` covers it,
+# and the family's distinction lives in the learned condition/anchor
+# discriminator, not a distinct opcode. Families absent here are
+# ``provider_side_capability`` (uncovered) by construction.
+_FN_FAMILY_COVERAGE_KIND: Mapping[str, str] = {
+    "missing_claim_candidate": "primitive",
+    "cross_claim_dependency": "condition_specialization",
+    "tool_grounding_requirement": "condition_specialization",
+    "temporal_numeric_entity_consistency": "condition_specialization",
+}
+
+# Why an uncovered family is out of the L1 deterministic reach. The blocker
+# mirrors the owner's registered ``does_not_support`` fact — it is a curriculum
+# label (what capability must be invented on a provider-side / L2 surface), not
+# a new L1 opcode. Adding the opcode would reverse the "delete generative L1
+# opcodes, keep 9 deterministic ones" decision and cross the authority boundary.
+_FN_FAMILY_BLOCKERS: Mapping[str, tuple[str, str]] = {
+    "missing_evidence_obligation": (
+        "assert_evidence_obligation", "author evidence / collect missing evidence",
+    ),
+    "missing_evidence_acquisition": (
+        "acquire_missing_evidence", "collect missing evidence",
+    ),
+    "wrong_qualification": (
+        "requalify_candidate", "invoke a verifier",
+    ),
+    "missing_verifier_route": (
+        "route_missing_candidate", "route a missing candidate",
+    ),
+    "wrong_verifier_instruction": (
+        "correct_verifier_instruction", "modify verifier instructions",
+    ),
+    "missing_certificate_path": (
+        "emit_certificate", "create missing certificate",
+    ),
+    "coverage_blind_spot": (
+        "establish_prosecution_coverage", "construct certificate",
+    ),
+}
+
 
 def fn_capability_coverage_matrix() -> dict[str, dict[str, Any]]:
     """Report the forward-recall capability coverage per FN family.
 
-    ``covered`` is true when at least one declared owner registers a
-    ``clean_to_error`` operation; ``operations`` lists exactly those. This is
-    the single audit view for the §14#7 "every evolvable FN failure must have
-    at least one legal executable capability" invariant — the runner enforces
-    the per-case version through the exact failure_shape capability resolution
-    in ``causal.plan``, and this matrix names the gaps for the curriculum.
+    Each family row carries:
+
+    - ``covered``: at least one declared owner registers a clean_to_error op.
+    - ``operations``: exactly those ops.
+    - ``coverage_kind``: ``primitive`` (an opcode IS the mechanism),
+      ``condition_specialization`` (``construct_candidate`` + a learned
+      condition covers it), or ``provider_side_capability`` (uncovered — the
+      deterministic L1 surface cannot express it).
+    - ``covered_by`` / ``required_capability`` + ``blocker``: which op covers a
+      covered family, or (for uncovered) what provider-side capability is
+      missing and which registered ``does_not_support`` fact blocks it.
+
+    This is the single audit view for the §14#7 invariant; the runner enforces
+    the per-case version through exact failure_shape capability resolution in
+    ``causal.plan``, and the uncovered rows name the gaps for the curriculum.
     """
     matrix: dict[str, dict[str, Any]] = {}
     for family in sorted(FN_FAILURE_FAMILIES):
@@ -703,11 +754,29 @@ def fn_capability_coverage_matrix() -> dict[str, dict[str, Any]]:
                 modules=(owner,),
                 direction="clean_to_error",
             ))
-        matrix[family] = {
-            "owners": list(_FN_FAMILY_OWNERS.get(family, ())),
-            "covered": bool(operations),
-            "operations": sorted(operations),
-        }
+        covered = bool(operations)
+        if covered:
+            kind = _FN_FAMILY_COVERAGE_KIND.get(family, "condition_specialization")
+            matrix[family] = {
+                "owners": list(_FN_FAMILY_OWNERS.get(family, ())),
+                "covered": True,
+                "operations": sorted(operations),
+                "coverage_kind": kind,
+                "covered_by": ", ".join(sorted(operations)),
+                "required_capability": "",
+                "blocker": "",
+            }
+        else:
+            required_capability, blocker = _FN_FAMILY_BLOCKERS.get(family, ("", ""))
+            matrix[family] = {
+                "owners": list(_FN_FAMILY_OWNERS.get(family, ())),
+                "covered": False,
+                "operations": [],
+                "coverage_kind": "provider_side_capability",
+                "covered_by": "",
+                "required_capability": required_capability,
+                "blocker": blocker,
+            }
     return matrix
 
 

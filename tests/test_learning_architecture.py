@@ -53,6 +53,50 @@ def test_fn_coverage_matrix_reports_covered_and_uncovered() -> None:
     assert matrix["missing_certificate_path"]["operations"] == []
 
 
+def test_fn_coverage_kind_distinguishes_primitive_and_specialization() -> None:
+    matrix = fn_capability_coverage_matrix()
+    # construct_candidate IS the missing-claim mechanism.
+    assert matrix["missing_claim_candidate"]["coverage_kind"] == "primitive"
+    assert matrix["missing_claim_candidate"]["covered_by"] == "construct_candidate"
+    # These three collapse onto the same primitive; the family lives in the
+    # learned condition, not a distinct opcode.
+    for family in (
+        "cross_claim_dependency",
+        "tool_grounding_requirement",
+        "temporal_numeric_entity_consistency",
+    ):
+        assert matrix[family]["coverage_kind"] == "condition_specialization"
+        assert matrix[family]["covered_by"] == "construct_candidate"
+
+
+def test_fn_coverage_uncovered_rows_carry_blocker_and_required_capability() -> None:
+    matrix = fn_capability_coverage_matrix()
+    uncovered = {
+        family
+        for family, row in matrix.items()
+        if row["coverage_kind"] == "provider_side_capability"
+    }
+    assert uncovered == {
+        "missing_evidence_obligation",
+        "missing_evidence_acquisition",
+        "wrong_qualification",
+        "missing_verifier_route",
+        "wrong_verifier_instruction",
+        "missing_certificate_path",
+        "coverage_blind_spot",
+    }
+    for family in uncovered:
+        row = matrix[family]
+        assert row["covered"] is False
+        assert row["covered_by"] == ""
+        assert row["required_capability"]
+        assert row["blocker"]
+    # A spot-check: the blocker mirrors the owner's registered does_not_support.
+    assert "collect missing evidence" in matrix["missing_evidence_acquisition"]["blocker"]
+    assert "invoke a verifier" in matrix["wrong_qualification"]["blocker"]
+    assert "create missing certificate" in matrix["missing_certificate_path"]["blocker"]
+
+
 def test_fn_family_for_maps_failure_shape_and_owner() -> None:
     assert (
         fn_family_for("gold_false_negative_clean", "candidate_trigger")
