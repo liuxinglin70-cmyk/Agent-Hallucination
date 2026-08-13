@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 
 import pytest
 
@@ -11,6 +12,7 @@ from sehd_rise.detection.court import engine as court_engine
 from sehd_rise.detection.continuation import (
     CONSTRUCTED_CANDIDATE_DUPLICATE,
     CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE,
+    CONSTRUCTED_CANDIDATE_NOT_VERIFIED,
     CONSTRUCTION_COMPLETED,
     execute_constructive_rules,
     resume_court_from_candidate,
@@ -94,11 +96,15 @@ def _provider(*, purpose: str, **_kwargs):
     raise AssertionError(purpose)
 
 
-def _provider_for_candidate(candidate_id: str, *, emit_error: bool = True):
+def _provider_for_candidate(
+    candidate_id: str, *, emit_error: bool = True, origin_event_id: str = "event_002",
+):
     calls: list[str] = []
 
     def provider(*, purpose: str, **_kwargs):
         calls.append(purpose)
+        origin_index = int(origin_event_id.rsplit("_", 1)[1])
+        impact_event_id = f"event_{origin_index + 1:03d}"
         if purpose == "detector:qualification":
             value = {
                 "coverage_state": "complete",
@@ -107,8 +113,8 @@ def _provider_for_candidate(candidate_id: str, *, emit_error: bool = True):
                     "violation_state": "verified_violation",
                     "actor_state": "agent_caused",
                     "boundary_state": "cleared",
-                    "positive_evidence_refs": ["event_002"],
-                    "actor_evidence_refs": ["event_002"],
+                    "positive_evidence_refs": [origin_event_id],
+                    "actor_evidence_refs": [origin_event_id],
                     "boundary_evidence_refs": [],
                     "rationale": "The assistant authored the unsupported release claim.",
                 }],
@@ -120,10 +126,10 @@ def _provider_for_candidate(candidate_id: str, *, emit_error: bool = True):
                     "candidate_id": candidate_id,
                     "propagation_state": "unrecovered_impact",
                     "residual_impact": True,
-                    "consumption_event_ids": ["event_002"],
-                    "consumption_evidence_refs": ["event_002"],
-                    "impact_event_ids": ["event_003"],
-                    "impact_evidence_refs": ["event_003"],
+                    "consumption_event_ids": [origin_event_id],
+                    "consumption_evidence_refs": [origin_event_id],
+                    "impact_event_ids": [impact_event_id],
+                    "impact_evidence_refs": [impact_event_id],
                     "recovery_event_id": None,
                     "recovery_evidence_refs": [],
                     "impact_surfaces": ["A"],
@@ -133,24 +139,26 @@ def _provider_for_candidate(candidate_id: str, *, emit_error: bool = True):
         elif purpose == "detector:focused_prosecution":
             certificates = []
             if emit_error:
+                # The schema example id is a literal, so providers echo
+                # the identical id for every candidate.
                 certificates = [{
-                    "certificate_id": "constructed_error_001",
+                    "certificate_id": "focused_error_001",
                     "source_candidate_id": candidate_id,
-                    "origin_event_id": "event_002",
+                    "origin_event_id": origin_event_id,
                     "claim_kind": "agent_assertion",
                     "norm_source": "prior_trajectory_evidence",
                     "norm_evidence_refs": ["event_001"],
                     "breach_type": "fabrication",
-                    "violation_evidence_refs": ["event_002"],
-                    "agent_control_event_id": "event_002",
-                    "agent_control_evidence_refs": ["event_002"],
+                    "violation_evidence_refs": [origin_event_id],
+                    "agent_control_event_id": origin_event_id,
+                    "agent_control_evidence_refs": [origin_event_id],
                     "impact_kind": "final_answer",
-                    "impact_event_ids": ["event_003"],
-                    "impact_evidence_refs": ["event_003"],
+                    "impact_event_ids": [impact_event_id],
+                    "impact_evidence_refs": [impact_event_id],
                     "recovery_state": "none",
                     "recovery_evidence_refs": [],
                     "benchmark_causal_status": "causes_incorrect_result",
-                    "benchmark_causal_evidence_refs": ["event_003"],
+                    "benchmark_causal_evidence_refs": [impact_event_id],
                     "rationale": (
                         "NORM: The release date requires support from the supplied task. "
                         "ORIGIN: The assistant introduced March 3 at event two. "
@@ -165,17 +173,43 @@ def _provider_for_candidate(candidate_id: str, *, emit_error: bool = True):
             value = {
                 "coverage_state": "complete",
                 "candidates": [{
-                    "certificate_id": "constructed_defense_001",
+                    "certificate_id": "focused_defense_001",
                     "target_candidate_id": candidate_id,
-                    "target_origin_event_id": "event_002",
+                    "target_origin_event_id": origin_event_id,
                     "defense_type": "insufficient_evidence",
-                    "evidence_refs": ["event_002"],
+                    "evidence_refs": [origin_event_id],
                     "rationale": "No addressable evidence proves a clean boundary.",
                 }],
             }
         else:
             raise AssertionError(purpose)
         return value, {"purpose": purpose}
+
+    return provider, calls
+
+
+_CANDIDATE_ID_PATTERN = re.compile(r'"candidate_id"\s*:\s*"([^"]+)"')
+_ORIGIN_PATTERN = re.compile(r'"origin_hypothesis_event_id"\s*:\s*"([^"]+)"')
+
+
+def _provider_for_candidates(
+    candidate_ids: list[str], *, explode_on: str = "",
+) -> tuple[callable, list[str]]:
+    """Serve every candidate with the same literal provider ids, routing by
+    the candidate id and origin embedded in the call's user text."""
+    calls: list[str] = []
+
+    def provider(*, purpose: str, user: str = "", **_kwargs):
+        match = _CANDIDATE_ID_PATTERN.search(user or "")
+        active = match.group(1) if match else candidate_ids[0]
+        origin_match = _ORIGIN_PATTERN.search(user or "")
+        origin = origin_match.group(1) if origin_match else "event_002"
+        calls.append(f"{purpose}:{active}")
+        if active == explode_on and purpose == "detector:focused_prosecution":
+            raise RuntimeError("provider failure for one candidate")
+        return _provider_for_candidate(
+            active, origin_event_id=origin,
+        )[0](purpose=purpose)
 
     return provider, calls
 
@@ -390,3 +424,89 @@ def test_construct_candidate_is_bounded_by_max_matches(monkeypatch) -> None:
     assert len(constructed) == 1
     assert len(execution["fired"]) == 1
     assert constructed[0] in {anchor.anchor_id for anchor in numeric}
+
+
+def test_one_or_many_continuation_renumbers_provider_literal_ids(monkeypatch) -> None:
+    """Two constructed anchors both pass: the same provider-literal
+    certificate id is renumbered into the continuation namespace instead of
+    colliding in the merged court document."""
+    record = _numeric_record()
+    anchors = [
+        a for a in project_claim_anchors(record)
+        if a.observable_features["anchor_has_number"]
+    ]
+    assert len(anchors) >= 3
+    candidate_ids = [
+        continuation._candidate_from_anchor(anchor)["candidate_id"]
+        for anchor in anchors
+    ]
+    provider, calls = _provider_for_candidates(candidate_ids)
+    monkeypatch.setattr(continuation, "detection_call", provider)
+    monkeypatch.setattr(court_engine, "detection_call", provider)
+    result, execution = execute_constructive_rules(
+        _baseline(), [_rule()], record=record, config={
+            "qualification_route": {}, "propagation_route": {},
+            "focused_prosecution_route": {}, "defense_route": {},
+            "focused_prosecution_retries": 0,
+        },
+        max_matches_per_rule=2,
+    )
+    statuses = [proof["status"] for proof in execution["constructive_execution_proofs"]]
+    assert statuses == [CONSTRUCTION_COMPLETED, CONSTRUCTION_COMPLETED]
+    assert execution["terminal_state"] == "verified_error"
+    assert any(call.startswith("detector:focused_prosecution") for call in calls)
+    certificate_ids = [
+        str(row["certificate_id"])
+        for row in result["combined_prosecution"]["candidates"]
+    ]
+    assert certificate_ids == ["constructed_error_001", "constructed_error_002"]
+    defense_ids = [
+        str(row["certificate_id"]) for row in result["defense"]["candidates"]
+    ]
+    assert len(defense_ids) == len(set(defense_ids)) == 2
+
+
+def test_candidate_level_exception_skips_binding_without_failing_case(monkeypatch) -> None:
+    """A candidate-level adjudication failure is recorded per binding and
+    never aborts the remaining constructive run."""
+    record = _numeric_record()
+    anchors = [
+        a for a in project_claim_anchors(record)
+        if a.observable_features["anchor_has_number"]
+    ]
+    candidates = [continuation._candidate_from_anchor(anchor) for anchor in anchors]
+    provider, _calls = _provider_for_candidates(
+        [candidate["candidate_id"] for candidate in candidates],
+    )
+    monkeypatch.setattr(continuation, "detection_call", provider)
+    monkeypatch.setattr(court_engine, "detection_call", provider)
+    real_resume = continuation.resume_court_from_candidate
+    failing_anchor = anchors[1].anchor_id
+
+    def flaky_resume(result, *, candidate, record, config, provider_usage_ledger=None):
+        if candidate["claim_anchor_id"] == failing_anchor:
+            raise ValueError("certificate ids must be present and unique")
+        return real_resume(
+            result, candidate=candidate, record=record, config=config,
+            provider_usage_ledger=provider_usage_ledger,
+        )
+
+    monkeypatch.setattr(continuation, "resume_court_from_candidate", flaky_resume)
+    result, execution = execute_constructive_rules(
+        _baseline(), [_rule()], record=record, config={
+            "qualification_route": {}, "propagation_route": {},
+            "focused_prosecution_route": {}, "defense_route": {},
+            "focused_prosecution_retries": 0,
+        },
+        max_matches_per_rule=2,
+    )
+    statuses = [proof["status"] for proof in execution["constructive_execution_proofs"]]
+    assert statuses == [CONSTRUCTION_COMPLETED, CONSTRUCTED_CANDIDATE_NOT_VERIFIED]
+    failed_row = execution["fired"][1]
+    assert failed_row["entity_id"] == failing_anchor
+    assert failed_row["construction_status"] == CONSTRUCTED_CANDIDATE_NOT_VERIFIED
+    assert "certificate ids must be present and unique" in (
+        failed_row["constructive_execution_proof"]["verifier_result"]
+    )
+    assert len(result["combined_prosecution"]["candidates"]) == 1
+    assert result["state"] == "verified_error"

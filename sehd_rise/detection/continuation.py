@@ -101,6 +101,37 @@ def _existing_candidates(result: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _assign_continuation_ids(
+    certs: Sequence[Mapping[str, Any]],
+    existing: Sequence[Mapping[str, Any]],
+    *,
+    prefix: str,
+) -> list[dict[str, Any]]:
+    """Renumber provider-literal certificate ids into the continuation
+    namespace, seeded after every id already present in the merged document.
+
+    The focused-prosecution schema example shows a literal id
+    (``focused_error_001``), so providers legitimately return the same id for
+    every candidate. Court documents require unique ids per route, so the
+    harness owns its namespace instead of trusting provider literals.
+    """
+    used = {
+        str(row.get("certificate_id") or "")
+        for row in existing if isinstance(row, Mapping)
+    }
+    next_index = 1
+    renumbered: list[dict[str, Any]] = []
+    for cert in certs:
+        row = dict(cert)
+        while f"{prefix}_{next_index:03d}" in used:
+            next_index += 1
+        row["certificate_id"] = f"{prefix}_{next_index:03d}"
+        used.add(row["certificate_id"])
+        next_index += 1
+        renumbered.append(row)
+    return renumbered
+
+
 def _duplicate(candidate: Mapping[str, Any], existing: Sequence[Mapping[str, Any]]) -> bool:
     anchor_id = str(candidate.get("claim_anchor_id") or "")
     origin = str(candidate.get("origin_hypothesis_event_id") or "")
@@ -249,6 +280,14 @@ def resume_court_from_candidate(
         candidate=candidate, built=built, base=result, config=dict(config),
         provider_usage_ledger=provider_usage_ledger,
     )
+    existing_prosecution = result.get("combined_prosecution") or result.get("prosecution") or {}
+    existing_errors = [
+        dict(row) for row in existing_prosecution.get("candidates") or ()
+        if isinstance(row, Mapping)
+    ] if isinstance(existing_prosecution, Mapping) else []
+    certs = _assign_continuation_ids(
+        certs, existing_errors, prefix="constructed_error",
+    )
     providers["constructive_continuation"][candidate_id]["focused_prosecution"] = verifier_meta
     if str(verifier_meta.get("terminal_status") or "") not in {"complete", "no_error"}:
         result["providers"] = providers
@@ -273,11 +312,6 @@ def resume_court_from_candidate(
         purpose="detector:defense", ledger=provider_usage_ledger,
     )
     providers["constructive_continuation"][candidate_id]["defense"] = defense_meta
-    existing_prosecution = result.get("combined_prosecution") or result.get("prosecution") or {}
-    existing_errors = [
-        dict(row) for row in existing_prosecution.get("candidates") or ()
-        if isinstance(row, Mapping)
-    ] if isinstance(existing_prosecution, Mapping) else []
     existing_defense = result.get("defense") or {}
     existing_defenses = [
         dict(row) for row in existing_defense.get("candidates") or ()
@@ -287,6 +321,9 @@ def resume_court_from_candidate(
         dict(row) for row in defense_value.get("candidates") or ()
         if isinstance(row, Mapping)
     ] if isinstance(defense_value, Mapping) else []
+    new_defenses = _assign_continuation_ids(
+        new_defenses, existing_defenses, prefix="constructed_defense",
+    )
     prosecution = {"coverage_state": "complete", "candidates": [*existing_errors, *certs]}
     defense = {"coverage_state": "complete", "candidates": [*existing_defenses, *new_defenses]}
     proof = contract.adjudicate_proof_court(
@@ -405,10 +442,23 @@ def execute_constructive_rules(
                 )
             else:
                 candidate = _candidate_from_anchor(anchor)
-                current, proof = resume_court_from_candidate(
-                    current, candidate=candidate, record=record, config=config,
-                    provider_usage_ledger=provider_usage_ledger,
-                )
+                try:
+                    current, proof = resume_court_from_candidate(
+                        current, candidate=candidate, record=record, config=config,
+                        provider_usage_ledger=provider_usage_ledger,
+                    )
+                except Exception as exc:
+                    # One candidate's continuation failure must not fail the
+                    # whole case: record it as a per-candidate terminal and
+                    # continue with the next bound anchor.
+                    proof = _proof(
+                        anchor_id=binding.entity_id,
+                        before=str(current.get("state") or ""),
+                        candidate=candidate,
+                        status=CONSTRUCTED_CANDIDATE_NOT_VERIFIED,
+                        verifier_invoked=True,
+                        verifier_result=f"{type(exc).__name__}:{exc}",
+                    )
             proof_dict = proof.to_dict()
             proofs.append(proof_dict)
             per_binding = dict(row)
