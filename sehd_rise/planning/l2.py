@@ -143,13 +143,6 @@ def plan_policy_candidates(
             {"side": "defense"},
             "Invalidate a defense coverage claim with no valid certificate.",
         ))
-    elif reason == "all_candidates_quarantined":
-        templates.append((
-            "all_candidates_quarantined",
-            "downgrade_coverage",
-            {"side": "prosecution", "to_state": "unresolved"},
-            "Keep prosecution coverage unresolved when all candidates are quarantined.",
-        ))
     elif reason == "boundary_terminal_conflict":
         templates.append((
             "boundary_state_conflicts_with_terminal",

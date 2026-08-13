@@ -1648,6 +1648,11 @@ def _resolve_terminal_state(
         "valid_defense_certificate_count": len(valid_defenses),
         "surviving_error_certificate_ids": [str(row["certificate_id"]) for row in surviving],
         "auxiliary_process_certificate_ids": [str(row["certificate_id"]) for row in auxiliary_process],
+        # The candidate partition the episode projection consumes: which
+        # candidates carry surviving (positive) error evidence and which are
+        # covered by a dominating clean defense.
+        "positive_candidate_ids": sorted(positive_candidates),
+        "clean_covered_candidate_ids": sorted(clean_covered),
         # A surviving causal error is the strongest verified incident: it
         # must outrank an auxiliary process-only note, never be masked by it.
         "wide_construct_state": (

@@ -1284,24 +1284,6 @@ class DetectionSignal:
         }
 
 
-def _check_step_correct(
-    row: Mapping[str, Any], gold_steps: tuple[str, ...]
-) -> bool | None:
-    """Whether the predicted responsible step matches a gold step annotation.
-
-    ``None`` when no gold step annotation exists: an absent gold step is not
-    evidence of mislocalization, so a gold-labelled case that never received
-    a step annotation must not convert a verdict-correct case into a
-    localization trigger.
-    """
-    if not gold_steps:
-        return None
-    predicted = row.get("responsible_step")
-    if predicted is None:
-        return None
-    return str(predicted) in gold_steps
-
-
 def _defect_confidence(
     defect: DetectionDefect,
     process_diagnostic: ProcessDiagnostic,
@@ -1485,7 +1467,6 @@ def project_detection(
     )
     gold_steps = tuple(str(s) for s in values if s is not None and str(s) != "")
     gold_responsible_step = gold_steps[0] if (has_gold and gold_steps) else None
-    _ = _check_step_correct(row, gold_steps)  # gold-step check lives on cut
 
     defect = _resolve_defect(
         row=row, state=state, crs_signal=crs_signal,

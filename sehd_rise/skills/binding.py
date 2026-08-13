@@ -345,10 +345,12 @@ def project_binding_universe(
                 features={**common, "coverage_state": state, "coverage_side": side},
             ))
     elif domain == "boundary":
-        boundary = result.get("clean_boundary") or proof.get("clean_boundary")
+        boundary = result.get("boundary_path") or proof.get("boundary_path")
         if isinstance(boundary, Mapping):
             boundary_id = str(
-                boundary.get("boundary_id") or boundary.get("event_id") or "clean_boundary"
+                boundary.get("boundary_id")
+                or boundary.get("responsible_event_id")
+                or "boundary_path"
             )
             bindings.append(Binding(
                 domain=domain, entity_id=boundary_id,

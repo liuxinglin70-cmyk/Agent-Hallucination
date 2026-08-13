@@ -1816,7 +1816,6 @@ class EvolutionLoop:
                     idx=idx, case_id=case_id,
                     detection_result=detection_result,
                     detection_state=detection_state,
-                    genome_before=genome_before,
                     l2_attribution=l2_attribution,
                     stable_source=False,
                 )
@@ -1992,7 +1991,6 @@ class EvolutionLoop:
         idx: int, case_id: str,
         detection_result: Mapping[str, Any],
         detection_state: str,
-        genome_before: str,
         l2_attribution: Mapping[str, Any],
         stable_source: bool = False,
     ) -> bool:
@@ -2014,6 +2012,9 @@ class EvolutionLoop:
         policy_canary_audit: list[dict[str, Any]] = []
         policy_canary_regressions: list[str] = []
         policy_canary_results: dict[str, dict[str, Any]] = {}
+        # The L2 step lineage records the policy genome's identity: this case
+        # evolves the adjudication policy, not the L1 skill genome.
+        policy_genome_before = self.state.policy_genome.content_hash
         promotion_canaries = (
             {
                 canary_id: self.stable_canaries[canary_id]
@@ -2322,8 +2323,8 @@ class EvolutionLoop:
                     proposal_edit.to_dict() if accepted else None
                 ),
                 gate_decision=outcome.value,
-                genome_hash_before=genome_before,
-                genome_hash_after=self.state.current_genome.content_hash,
+                genome_hash_before=policy_genome_before,
+                genome_hash_after=self.state.policy_genome.content_hash,
                 detection_state=detection_state,
                 timestamp=time.time(),
                 fitness_check={"l2_policy": audit_entry},

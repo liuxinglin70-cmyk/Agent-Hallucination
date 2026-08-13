@@ -247,6 +247,7 @@ _HARD_REASON_PREFIXES: tuple[tuple[str, str], ...] = tuple(sorted(
         ("gold_leak", HARD_GOLD_OR_IDENTITY_LEAKAGE),
         ("identity_leak", HARD_GOLD_OR_IDENTITY_LEAKAGE),
         ("prompt_leak", HARD_GOLD_OR_IDENTITY_LEAKAGE),
+        ("label_or_case_leakage", HARD_GOLD_OR_IDENTITY_LEAKAGE),
     ),
     key=lambda entry: -len(entry[0]),
 ))
