@@ -219,7 +219,7 @@ def _source_detection_result(state: str = "verified_error") -> dict:
 
 
 def test_runtime_observation_threads_condition_feature_trace() -> None:
-    trace = {"boundary_route": [{"candidate_kind": ["omission"]}]}
+    trace = {"missing_field": ["responsible_event_id"], "candidate_kind": ["omission"]}
     signal = project_detection(_source_detection_result())
     observation = build_runtime_observation(
         signal, allowed_modules=("earliest_origin_tiebreak",),
@@ -237,10 +237,7 @@ def test_runtime_observation_defaults_to_empty_trace() -> None:
 
 
 def test_prevalidate_rejects_unmatchable_condition_on_source() -> None:
-    trace = {
-        "boundary_route": [{"candidate_kind": ["omission"], "missing_field": []}],
-        "counterfactual_route": [{"candidate_kind": ["other"], "missing_field": []}],
-    }
+    trace = {"candidate_kind": ["omission"], "missing_field": []}
     reason = _prevalidate_candidate(
         _origin_repair_candidate(), ("earliest_origin_tiebreak",),
         runtime_condition_features=trace,
@@ -249,11 +246,7 @@ def test_prevalidate_rejects_unmatchable_condition_on_source() -> None:
 
 
 def test_prevalidate_accepts_matchable_condition_on_source() -> None:
-    trace = {
-        "boundary_route": [
-            {"candidate_kind": ["omission"], "missing_field": ["responsible_event_id"]},
-        ],
-    }
+    trace = {"candidate_kind": ["omission"], "missing_field": ["responsible_event_id"]}
     reason = _prevalidate_candidate(
         _origin_repair_candidate(), ("earliest_origin_tiebreak",),
         runtime_condition_features=trace,

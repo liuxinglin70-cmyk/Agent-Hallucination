@@ -44,7 +44,6 @@ from sehd_rise.skills.vocabulary.contracts import (
     ACTION_CONSUME_VERIFIED_CLEAN_BOUNDARY,
     ACTION_DOWNGRADE_COVERAGE,
     ACTION_INVALIDATE_COVERAGE_CLAIM,
-    DEFENSE_CHECK_FIELDS,
     ERROR_CHECK_FIELDS,
     MODULE_IDS,
     semantic_overlap,
@@ -96,15 +95,11 @@ def _allowed_l1_modules(
     owners. On the gold-polarity path the cut's partner module (secondary
     owner) is additionally admitted when it is direction-compatible, so an
     FP's surgical ``withhold_certificate`` (owned by
-    ``atomic_verifier_instruction``) and an FN's symmetric partner remain
-    legal exploration surfaces alongside the primary owner. The partner is
-    filtered through the polarity pool — the same guard that kept a
-    polarity-crossing process owner out — so it can never open a surface
-    that moves the verdict the wrong way.
-
-    Defense coverage complete no longer unconditionally removes
-    ``clean_defense_boundary``: if the proof-cut frontier names it as an
-    owner, deleting it would make a legitimate repair edge uncompilable.
+    ``atomic_verifier_instruction``) remains a legal exploration surface
+    alongside the primary owner. The partner is filtered through the
+    polarity pool — the same guard that kept a polarity-crossing process
+    owner out — so it can never open a surface that moves the verdict the
+    wrong way.
     """
     modules = [str(attribution_owner)] if str(attribution_owner) else []
     frontier_owners: set[str] = set()
@@ -128,9 +123,6 @@ def _allowed_l1_modules(
             and partner not in modules
         ):
             modules.append(partner)
-    if getattr(signal, "defense_coverage_state", None) == "complete":
-        if "clean_defense_boundary" not in frontier_owners:
-            modules = [m for m in modules if m != "clean_defense_boundary"]
     return tuple(modules)
 
 
@@ -252,8 +244,6 @@ def _repair_targets_for(
     repair_targets = {edge_field}
     if target_module == "atomic_verifier_instruction":
         repair_targets.update(ERROR_CHECK_FIELDS.get(edge_field, ()))
-    elif target_module == "clean_defense_boundary":
-        repair_targets.update(DEFENSE_CHECK_FIELDS.get(edge_field, ()))
     return repair_targets
 
 
@@ -390,25 +380,19 @@ def _prevalidate_candidate(
                     "action_not_bound_to_failure_edge:"
                     f"{failure_edge_field}->{action_spec.output_field}"
                 )
-        source_feature_trace = (
+        # Plan B: the source run exposes ONE result-level feature snapshot
+        # (``project_result_condition_features``), not per-route projections.
+        # The condition must evaluate true against it or the candidate names an
+        # unobservable discriminator.
+        source_features = (
             runtime_condition_features
             if isinstance(runtime_condition_features, Mapping) else {}
         )
-        if source_feature_trace:
-            route_features = [
-                item
-                for route_id in action_spec.route_ids
-                for item in source_feature_trace.get(route_id, ())
-                if isinstance(item, Mapping)
-            ]
-            if not route_features:
-                return "condition_route_not_observed_on_source"
-            if not any(
-                evaluate_condition_spec(
-                    candidate.get("condition_spec"), features,
-                ).matched
-                for features in route_features
-            ):
+        if source_features:
+            evaluation = evaluate_condition_spec(
+                candidate.get("condition_spec"), source_features,
+            )
+            if not evaluation.matched:
                 return "condition_not_observed_on_source_route"
     if operation == "remove_rule":
         contract = candidate.get("expected_effect_contract")

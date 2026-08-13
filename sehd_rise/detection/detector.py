@@ -239,10 +239,11 @@ def detect_record(
 ) -> dict[str, Any]:
     """Detect one trajectory and return a label-free result.
 
-    ``genome`` injects the evolved L1 provider-rule skill; ``policy_genome``
-    supplies the evolved L2 adjudication-policy items to the proof court.
-    Either may be supplied independently, so a deployed detector can carry
-    the complete two-layer capability.
+    ``genome`` applies the evolved L1 provider-rule skill deterministically via
+    plan-B post-processing; ``policy_genome`` supplies the evolved L2
+    adjudication-policy items to the proof court. Either may be supplied
+    independently, so a deployed detector can carry the complete two-layer
+    capability.
     """
     validate_record(record)
     # Standalone deployment uses the deployable scope: only baseline and
@@ -256,28 +257,38 @@ def detect_record(
     policy_registry = (
         policy_genome.registry if policy_genome is not None else None
     )
-    if genome is None:
-        run_adjudication = adjudicator or adjudicate_case
-        result = run_adjudication(
-            case_id=case_id, record=record, config=config,
-            **(
-                {
-                    "policy_items": policy_items,
-                    "policy_registry": policy_registry,
-                }
-                if policy_items is not None else {}
-            ),
-        )
-    else:
-        from sehd_rise.detection.injection import integrated_engine_provider
-        with integrated_engine_provider(genome=genome, config=config):
-            result = engine.adjudicate_case(
-                case_id=case_id, record=record, config=config,
-                policy_items=policy_items,
-                policy_registry=policy_registry,
-            )
+    run_adjudication = adjudicator or adjudicate_case
+    result = run_adjudication(
+        case_id=case_id, record=record, config=config,
+        **(
+            {
+                "policy_items": policy_items,
+                "policy_registry": policy_registry,
+            }
+            if policy_items is not None else {}
+        ),
+    )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
+    # L1 provider-rule skill is applied deterministically to the court result
+    # (plan B), never injected into provider prompts.
+    if genome is not None:
+        from sehd_rise.detection.injection import compile_genome_rules
+        from sehd_rise.skills.l1_execution import execute_l1_rules
+        rules = compile_genome_rules(genome)
+        if rules:
+            result, l1_execution = execute_l1_rules(result, rules, record=record)
+            result["l1_execution"] = l1_execution
+            from sehd_rise.detection.packet import build_packet
+            from sehd_rise.detection.transport import _responsible_step
+            proof = result.get("proof_adjudication")
+            responsible = (
+                proof.get("responsible_event_id") if isinstance(proof, Mapping) else None
+            )
+            if responsible is not None:
+                result["responsible_step"] = _responsible_step(
+                    responsible, build_packet(record),
+                )
     leaked = sorted(_forbidden_field_hits(result))
     if leaked:
         raise RuntimeError("detector output contains evaluation fields: " + ", ".join(leaked))

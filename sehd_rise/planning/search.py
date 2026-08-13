@@ -55,37 +55,6 @@ def _task_state_score(state: str, gold_label: bool) -> int:
     raise ValueError(f"invalid detector state: {state!r}")
 
 
-def _abstention_ladder_rung_complete(
-    *,
-    target_module: str,
-    before_state: str,
-    after_state: str,
-    gold_label: bool | None,
-    ladder_used: bool,
-    assessment_passed: bool,
-) -> bool:
-    """Whether rung 1 of the abstention ladder completed on this edit.
-
-    An FN source (gold hallucination) whose verdict was a confident but
-    thin-evidence ``verified_clean`` becomes recoverable through two
-    sequential, individually gated edits instead of one impossible edit.
-    Rung 1 completes when an accepted ``abstention_rule`` edit demotes the
-    clean verdict to ``unresolved``; the re-queued source then fires
-    ``unresolved_should_error`` and routes ``evidence_obligation`` (rung 2).
-    Every rung still passes the same structural gate, source replay and
-    canary checks; no rung may be merged or credited together.  The ladder
-    fires at most once per source (``ladder_used``).
-    """
-    return (
-        target_module == "abstention_rule"
-        and before_state == "verified_clean"
-        and after_state == "unresolved"
-        and gold_label is True
-        and assessment_passed
-        and not ladder_used
-    )
-
-
 def _trim_contrast_registry(registry: dict[str, list[dict[str, Any]]]) -> None:
     """Keep the most recent rows per type bucket, dropping the oldest."""
     for key in list(registry):
@@ -165,7 +134,6 @@ def _signal_polarity_pool(signal: Any) -> frozenset[str] | None:
 
 
 __all__ = [
-    "_abstention_ladder_rung_complete",
     "_contrast_inversion",
     "_select_contrast_neighbor",
     "_signal_polarity_pool",

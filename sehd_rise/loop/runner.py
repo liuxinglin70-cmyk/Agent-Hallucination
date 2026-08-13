@@ -175,7 +175,6 @@ from sehd_rise.planning.l2 import (
     select_policy_candidate,
 )
 from sehd_rise.planning.search import (
-    _abstention_ladder_rung_complete,
     _contrast_inversion,
     _select_contrast_neighbor,
     _trim_contrast_registry,
@@ -908,8 +907,6 @@ class EvolutionLoop:
         self.l2_registry_registrations: list[dict[str, Any]] = []
         self.l2_policy_audit: list[dict[str, Any]] = []
         self.rejected_policy_summaries: list[str] = []
-        self.abstention_ladder_used: set[str] = set()
-        self.abstention_ladder_advances: list[dict[str, str]] = []
         self.contrast_replay_registry: dict[str, list[dict[str, Any]]] = {}
         self.rejected_source_proposals: dict[str, list[dict[str, Any]]] = {}
         self.pending_probe_step_indexes: list[int] = []
@@ -1015,7 +1012,6 @@ class EvolutionLoop:
             self.gate_event_ledger = resumed["gate_event_ledger"]
             self.state.stable_policy_genome = resumed["stable_policy_genome"]
             self.state.stable_l2_policy_accepts = resumed["stable_l2_policy_accepts"]
-            self.abstention_ladder_used = resumed["abstention_ladder_used"]
             self.contrast_replay_registry = resumed["contrast_replay_registry"]
             self.rejected_policy_summaries = resumed["rejected_policy_summaries"]
             self.localization_bias_signals = resumed["localization_bias_signals"]
@@ -1195,7 +1191,6 @@ class EvolutionLoop:
             l2_policy_accepts=self.state.l2_policy_accepts,
             l2_policy_audit=self.l2_policy_audit,
             stable_l2_policy_accepts=self.state.stable_l2_policy_accepts,
-            abstention_ladder_used=self.abstention_ladder_used,
             contrast_replay_registry=self.contrast_replay_registry,
             rejected_policy_summaries=self.rejected_policy_summaries,
             localization_bias_signals=self.localization_bias_signals,
@@ -3876,20 +3871,8 @@ class EvolutionLoop:
                             if self.use_gold else None
                         ),
                     ),
-            "compiled_rule_trace": (
-                candidate_result.get("compiled_rule_trace")
-                if isinstance(candidate_result, Mapping) else None
-            ),
-            "injected_rule_trace": (
-                candidate_result.get("injected_rule_trace")
-                if isinstance(candidate_result, Mapping) else None
-            ),
-            "applied_rule_trace": (
-                candidate_result.get("applied_rule_trace")
-                if isinstance(candidate_result, Mapping) else None
-            ),
-            "rule_effects_trace": (
-                candidate_result.get("rule_effects_trace")
+            "l1_execution": (
+                candidate_result.get("l1_execution")
                 if isinstance(candidate_result, Mapping) else None
             ),
             "no_effect_classification": (
@@ -4368,27 +4351,6 @@ class EvolutionLoop:
         )
         self.flush_shadow_batch(next_case_index=idx + 1)
 
-        # v5.8 mechanism 3: rung 1 of the procedural abstention ladder.
-        if _abstention_ladder_rung_complete(
-            target_module=edit.target_module,
-            before_state=str(signal.state),
-            after_state=str(candidate_signal.state),
-            gold_label=signal.gold_label,
-            ladder_used=case_id in self.abstention_ladder_used,
-            assessment_passed=assessment.passed,
-        ):
-            self.abstention_ladder_used.add(case_id)
-            self.abstention_ladder_advances.append({
-                "case_id": case_id,
-                "rung": "abstention_demotion_clean_to_unresolved",
-            })
-            self.source_work_queue.append((idx, case_id, 0))
-            print(
-                f"  [{idx}] [LADDER] {case_id}: rung 1 complete "
-                f"(verified_clean->unresolved); source re-queued for the "
-                f"evidence_obligation rung"
-            )
-
     def _finalize(self) -> OnlineEvolutionResult:
         """Final summary, Meta aggregation and result save."""
         self.flush_shadow_batch(
@@ -4492,7 +4454,6 @@ class EvolutionLoop:
             l2_policy_audit=self.l2_policy_audit,
             l2_policy_accepts=self.state.l2_policy_accepts,
             l2_registry_registrations=self.l2_registry_registrations,
-            abstention_ladder_advances=self.abstention_ladder_advances,
             rollback_reason=self.state.rollback_reason,
             probe_history=self.probe_history,
             validation_probe_every=self.validation_probe_every,

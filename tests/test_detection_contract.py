@@ -15,11 +15,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from sehd_rise.detection.court.contract import adjudicate_proof_court
-from sehd_rise.detection.injection import (
-    PacaStage,
-    make_skill_aware_provider,
-    route_binding_map,
-)
 from sehd_rise.detection.policy import build_adjudication_facts
 from sehd_rise.skills.genome import create_baseline_genome
 from sehd_rise.skills.vocabulary.contracts import PolicyItem
@@ -151,35 +146,6 @@ def _route_config() -> dict:
         name: {"_provider_route_name": name, "model": "deepseek-v4-flash"}
         for name in routes
     }
-
-
-def test_route_binding_is_name_keyed_not_identity() -> None:
-    """A copied route dict still resolves its binding (O1): the map keys on
-    ``_provider_route_name``, so object identity no longer matters."""
-    config = _route_config()
-    bindings = route_binding_map(config)
-    # Keys are route names, not memory addresses.
-    assert set(bindings) == set(_route_config())
-    # A shallow copy of a route (what any caller may do before dispatch) is
-    # still addressable by its stamped name.
-    copied = dict(config["focused_prosecution_route"])
-    assert bindings[copied["_provider_route_name"]][0] == "focused_prosecution_route"
-
-
-def test_skill_provider_accepts_copied_route() -> None:
-    """The wrapper resolves a copied route dict instead of raising on it."""
-    from sehd_rise.detection.injection import compile_genome_for_paca
-
-    config = _route_config()
-    compiled = compile_genome_for_paca(create_baseline_genome())
-    wrapped = make_skill_aware_provider(
-        lambda *, route, system, user: ({"candidates": []}, {"usage": {}}),
-        compiled=compiled, config=config,
-    )
-    copied = dict(config["focused_prosecution_route"])
-    value, meta = wrapped(route=copied, system="s", user="u")
-    assert isinstance(value, dict)
-    assert meta["bccse_route"] == "focused_prosecution_route"
 
 
 def test_wide_construct_state_surviving_error_outranks_process() -> None:

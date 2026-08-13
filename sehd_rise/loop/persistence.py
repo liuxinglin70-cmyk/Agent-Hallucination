@@ -237,9 +237,6 @@ def load_evolution_checkpoint(output_dir: Path) -> dict[str, Any]:
         "stable_l2_policy_accepts": int(
             checkpoint.get("stable_l2_policy_accepts") or 0
         ),
-        "abstention_ladder_used": list(
-            checkpoint.get("abstention_ladder_used") or []
-        ),
         "contrast_registry": dict(checkpoint.get("contrast_registry") or {}),
         "rejected_policy_summaries": list(
             checkpoint.get("rejected_policy_summaries") or []
@@ -688,10 +685,6 @@ def _restore_checkpoint_state(
         "gate_event_ledger": gate_event_ledger,
         "stable_policy_genome": stable_policy_genome,
         "stable_l2_policy_accepts": stable_l2_policy_accepts,
-        "abstention_ladder_used": {
-            str(value)
-            for value in (checkpoint.get("abstention_ladder_used") or ())
-        },
         "contrast_replay_registry": {
             str(hallucination_type): [
                 dict(row)
@@ -769,7 +762,6 @@ class _PersistenceContext:
     l2_policy_accepts: int
     l2_policy_audit: list[dict[str, Any]]
     stable_l2_policy_accepts: int
-    abstention_ladder_used: set[str]
     contrast_replay_registry: dict[str, list[dict[str, Any]]]
     rejected_policy_summaries: list[str]
     localization_bias_signals: list[dict[str, Any]]
@@ -879,14 +871,12 @@ def _persist_progress(
             "gate_events": _build_gate_event_ledger(ctx.steps).to_list(),
             "l2_policy_audit": list(ctx.l2_policy_audit),
             # Probe rollback anchors and the in-memory evolution context that
-            # a resume must reproduce exactly (behavior invariants like the
-            # once-per-source abstention ladder, plus the audit telemetry of
-            # the processed prefix).
+            # a resume must reproduce exactly (the audit telemetry of the
+            # processed prefix).
             "stable_policy_genome_payload": ctx.stable_policy_genome.to_dict(),
             "stable_policy_genome_hash": ctx.stable_policy_genome.content_hash,
             "stable_memory_hash": payload_hash(ctx.stable_memory_payload),
             "stable_l2_policy_accepts": ctx.stable_l2_policy_accepts,
-            "abstention_ladder_used": sorted(ctx.abstention_ladder_used),
             "contrast_registry": {
                 str(hallucination_type): list(rows)
                 for hallucination_type, rows in ctx.contrast_replay_registry.items()

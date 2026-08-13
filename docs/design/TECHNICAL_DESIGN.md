@@ -107,8 +107,8 @@ trajectory record（原始轨迹记录）
 产物上——不调用 LLM、不使用启发式，按优先级顺序：
 
 1. Provider 产物缺失或畸形 → L1；属主按产物类型解析（candidate →
-   `candidate_trigger`，错误证书 → `evidence_obligation`，defense 证书 →
-   `clean_defense_boundary`）。
+   `candidate_trigger`，错误证书 → `evidence_obligation`；defense 证书已无 L1 属主，
+   归 detector 边界或 L2）。
 2. 共识门挡下了一个非空候选集 → L2，`consensus_gate_policy`。
 3. 空洞的完整覆盖（该侧声称 `complete` 却零有效证书）→ L2，`coverage_validity_policy`。
 4. Boundary 路径返回 `verified_clean` 但终态是 `unresolved` → L2，
@@ -159,7 +159,7 @@ L1 经 provider-behavior 执行器（注入规则）执行；L2 经 adjudication
 
 ### L1 —— provider 规则基因组
 
-八个技能模块拥有 provider 输出的面：
+六个技能模块拥有 provider 输出的面：
 
 | 模块 | 阶段 | 作用 |
 |--------|-------|------|
@@ -167,10 +167,8 @@ L1 经 provider-behavior 执行器（注入规则）执行；L2 经 adjudication
 | `evidence_obligation` | Verification | 每个候选必须由什么证据支撑 |
 | `candidate_to_verifier_route` | Verification | 候选如何被路由到验证 |
 | `atomic_verifier_instruction` | Verification | 如何原子地验证单个主张 |
-| `clean_defense_boundary` | Verification | 何时把候选辩护为 clean |
 | `causal_link_test` | Causal Court | 如何测试用于定位的因果链 |
 | `earliest_origin_tiebreak` | Causal Court | 如何解决多来源定位平局 |
-| `abstention_rule` | Causal Court | 何时输出 `unresolved` |
 
 规则以类型化英文槽位存储（`skills/rule.py`）：
 
@@ -352,9 +350,7 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
    静默提交；不同尝试绝不共享 fitness 归功。
 
 对比回放（contrastive replay）额外把一份原本会被接受的编辑回放到一个最近的、稳定
-的同类邻居上；极性翻转与 gold 知情（gold-informed）的任务分回归拒绝该编辑。一个
-被接受的 `abstention_rule` clean→unresolved 降级会把源案例重新入队恰好一次，交给
-`evidence_obligation` 阶梯处理，每个阶梯单独门控、单独记功。
+的同类邻居上；极性翻转与 gold 知情（gold-informed）的任务分回归拒绝该编辑。
 
 ## 度量
 

@@ -46,7 +46,6 @@ from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.signals import (
     ARTIFACT_KIND_CANDIDATE,
-    ARTIFACT_KIND_DEFENSE_CERTIFICATE,
     ARTIFACT_KIND_ERROR_CERTIFICATE,
     ARTIFACT_KINDS,
     DetectionDefect,
@@ -115,13 +114,6 @@ _REASON_SYNTHESIZED_FIELD: dict[str, tuple[str, str]] = {
     ),
     REASON_GOLD_FALSE_POSITIVE: (
         "evidence_obligation", "coverage_state",
-    ),
-    # FN-clean (a hallucinated case wrongly adjudicated clean) is a missing-
-    # evidence failure: the only deterministic clean_to_error opcode left on
-    # ``evidence_obligation`` is ``require_evidence_field``, so the canonical
-    # executable field is a norm-evidence citation, not a certificate id.
-    REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
-        "evidence_obligation", "norm_evidence_refs",
     ),
 }
 
@@ -229,11 +221,13 @@ def _boundary_repair_owner(origin: str) -> str:
 
 # Default owner per artifact kind: kept here because the cut's owner logic
 # depends on it; the table is closed by what ``skills.vocabulary.contracts``
-# exposes as ``MODULE_IDS`` (the eight L1 modules).
+# exposes as ``MODULE_IDS`` (the six L1 modules). Defense certificates were
+# removed with the ``clean_defense_boundary`` module: no L1 surface emits
+# them, so a missing/malformed defense certificate is a detector-boundary
+# or L2 concern, never an L1 owner.
 _ARTIFACT_OWNER: dict[str, str] = {
     ARTIFACT_KIND_CANDIDATE: "candidate_trigger",
     ARTIFACT_KIND_ERROR_CERTIFICATE: "evidence_obligation",
-    ARTIFACT_KIND_DEFENSE_CERTIFICATE: "clean_defense_boundary",
 }
 
 
@@ -506,7 +500,6 @@ def _artifact_blocking_predicate(
     preferred = {
         ARTIFACT_KIND_CANDIDATE: "required_candidates_terminal",
         ARTIFACT_KIND_ERROR_CERTIFICATE: "prosecution_coverage_complete",
-        ARTIFACT_KIND_DEFENSE_CERTIFICATE: "defense_coverage_complete",
     }.get(kind, "")
     if preferred in blocking_predicates:
         return preferred
@@ -529,26 +522,18 @@ def _route_gold_locked_owner(
     """Route a gold-locked FP/FN to the stage where the court actually broke.
 
     Gold polarity selects the wrong outcome side; coverage states identify the
-    first unsatisfied process contract on that side.
-
-    - FN (clean verdict, gold=error): if prosecution is already complete, the
-      court wrongly accepted clean despite a complete error proof; that is an
-      abstention/adjudication failure. If prosecution is incomplete, evidence
-      construction is the defect. If defense is the only complete side, the
-      court over-deferred to it.
-    - FP (error verdict, gold=clean): the only path that can relax a
-      surviving error certificate is the prosecution-side owner
-      (``evidence_obligation`` -- keep_coverage_incomplete to demote the
-      verdict -- or ``atomic_verifier_instruction`` -- withhold_certificate
-      on the carrier). Adding more defense certificates does NOT demote a
-      verdict carried by a still-surviving error certificate. Therefore: for
-      FP + verified_error, when ``surviving_error_count > 0`` the owner is
-      always the prosecution-side evidence/verifier pair, REGARDLESS of the
-      defense coverage state.
+    first unsatisfied process contract on that side. Both shapes now resolve
+    to the prosecution-side evidence/verifier pair: the defense-verification
+    (``clean_defense_boundary``) and abstention (``abstention_rule``) modules
+    were removed, so no L1 surface can emit a defense certificate or shape the
+    final verdict. An FN-clean that names ``evidence_obligation`` has no
+    remaining clean→error opcode, so the executable gate demotes it to
+    ``LAYER_NONE`` (NON_EVOLVABLE) — the honest label until a deterministic FN
+    action is redesigned.
     """
     if state == "verified_clean":
         if prosecution_state == "complete":
-            return "abstention_rule", "causal_link_test"
+            return "evidence_obligation", "atomic_verifier_instruction"
         if prosecution_state in {"incomplete", "unresolved"}:
             return default_module or "evidence_obligation", "atomic_verifier_instruction"
         return "evidence_obligation", "atomic_verifier_instruction"
@@ -558,8 +543,8 @@ def _route_gold_locked_owner(
         if defense_state == "complete":
             return "evidence_obligation", "atomic_verifier_instruction"
         if defense_state in {"incomplete", "unresolved"}:
-            return default_module or "clean_defense_boundary", "abstention_rule"
-        return "clean_defense_boundary", "abstention_rule"
+            return default_module or "evidence_obligation", "atomic_verifier_instruction"
+        return "evidence_obligation", "atomic_verifier_instruction"
     return default_module, default_secondary
 
 
@@ -601,7 +586,7 @@ def _route_appeal_diagnostic(
     if "appeal defense is incomplete" in error_text or (
         "appeal defender input firewall violation" in error_text
     ):
-        return "clean_defense_boundary", "atomic_verifier_instruction"
+        return "atomic_verifier_instruction", "evidence_obligation"
     if (
         "appeal prosecution is incomplete" in error_text
         or "appeal prosecution contains another candidate" in error_text
@@ -675,10 +660,9 @@ def _gold_polarity_mismatch_owner(
       verdict carried by a still-surviving error certificate.
     - FN-clean (clean verdict, gold=error): the symmetric fix is to
       strengthen prosecution into a decisive error, so the owner is also the
-      evidence/verifier pair — whether the error was never found (incomplete
-      prosecution) or found-but-defeated (complete prosecution). The
-      ``abstention_rule`` shape of ``_route_gold_locked_owner`` has no
-      clean→error opcode, so it is deliberately never emitted here.
+      evidence/verifier pair. ``evidence_obligation`` no longer carries a
+      clean→error opcode (``require_evidence_field`` was removed), so the
+      executable gate demotes this shape to NON_EVOLVABLE.
     """
     gold_token = _gold_error_type_token(signal)
     if gold_token == "false_positive":

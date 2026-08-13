@@ -20,25 +20,20 @@ from typing import Any, Mapping
 
 from sehd_rise.skills.genome import SkillGenome, create_baseline_genome
 from sehd_rise.skills.policy import PolicyGenome
-from sehd_rise.detection.injection import integrated_engine_provider
+from sehd_rise.skills.l1_execution import execute_l1_rules
+from sehd_rise.skills.rule import project_result_condition_features
+from sehd_rise.detection.injection import compile_genome_rules
 from sehd_rise.detection.court.engine import adjudicate_case
 from sehd_rise.detection.detector import _detector_record
 from sehd_rise.detection.egress import conflict_gate_call, l1_call
+from sehd_rise.detection.packet import build_packet
+from sehd_rise.detection.transport import _responsible_step
 from sehd_rise.platform.usage import ProviderUsageLedger
 from sehd_rise.platform.gold import _evaluator_gold
 from sehd_rise.causal.signals import (
     decision_authority_invalid,
     missing_decision_authority,
     resolve_authoritative_state,
-)
-from sehd_rise.execution.trace import (
-    _collect_applied_rule_trace,
-    _collect_candidate_rule_trace,
-    _collect_condition_feature_trace,
-    _collect_condition_matched_rule_trace,
-    _collect_condition_not_matched_rule_trace,
-    _collect_injected_rule_trace,
-    _collect_rule_effects_trace,
 )
 
 
@@ -90,16 +85,14 @@ def _run_detection_with_genome(
     policy_scope: str | None = "working",
     provider_usage_ledger: ProviderUsageLedger | None = None,
 ) -> dict[str, Any]:
-    """Run PACA-TCL v3.5 with global skill injection.
+    """Run PACA-TCL v3.5 with deterministic L1 rule post-processing (plan B).
 
     ``policy_genome`` forwards the accepted L2 adjudication-policy items to
-    the proof court. Items are closed vocabulary and evaluated
-    deterministically inside the court, so the detector envelope itself is
-    unchanged when no genome (or an empty one) is supplied.
-
-    Replays use the same integrated provider boundary as source detection so
-    genome-specific prompt injection remains scoped to one detector call.
-    If genome == baseline, runs plain v3.5 without injection overhead.
+    the proof court; items are closed vocabulary and evaluated deterministically
+    inside the court. The L1 genome's delta rules are NOT injected into provider
+    prompts: the frozen detector runs once, then ``execute_l1_rules`` applies
+    each rule's compiled transform to the court result. If ``genome`` ==
+    baseline (no delta rules), the result is the plain court result unchanged.
     """
     baseline = create_baseline_genome()
 
@@ -129,45 +122,37 @@ def _run_detection_with_genome(
         policy_genome.registry if policy_genome is not None else None
     )
 
-    compiled_rule_trace: dict[str, list[dict[str, str]]] = {}
-
-    def invoke() -> dict[str, Any]:
-        nonlocal compiled_rule_trace
-        # Baseline and evolved genomes cross the same wrapper. With no delta
-        # rules it leaves prompts byte-identical and only records the exact
-        # pre-call condition-feature projection needed by reflection.
-        with integrated_engine_provider(genome=genome, config=config) as compiled:
-            if compiled is not None:
-                compiled_rule_trace = compiled.rule_trace()
-            return adjudicate_case(
-                case_id=case_id,
-                record=record,
-                config=config,
-                policy_items=policy_items,
-                policy_registry=policy_registry,
-                provider_usage_ledger=provider_usage_ledger,
-            )
-
-    result = invoke()
+    result = adjudicate_case(
+        case_id=case_id,
+        record=record,
+        config=config,
+        policy_items=policy_items,
+        policy_registry=policy_registry,
+        provider_usage_ledger=provider_usage_ledger,
+    )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
-    result["condition_feature_trace"] = _collect_condition_feature_trace(result)
-    if compiled_rule_trace:
-        # Compiled rule trace: which evolved rules exist in this genome.
-        # Audit telemetry only; it never participates in a verdict. The
-        # per-route injected/applied/field-effect traces live in the result
-        # too.
-        result["compiled_rule_trace"] = compiled_rule_trace
-        result["injected_rule_trace"] = _collect_injected_rule_trace(result)
-        result["applied_rule_trace"] = _collect_applied_rule_trace(result)
-        result["candidate_rule_trace"] = _collect_candidate_rule_trace(result)
-        result["condition_matched_rule_trace"] = (
-            _collect_condition_matched_rule_trace(result)
+
+    # The result-level condition snapshot feeds reflection and prevalidation.
+    result["condition_feature_trace"] = project_result_condition_features(
+        result, record,
+    )
+
+    rules = compile_genome_rules(genome, baseline=baseline)
+    if rules:
+        result, l1_execution = execute_l1_rules(result, rules, record=record)
+        result["l1_execution"] = l1_execution
+        # Re-project the responsible_step terminal projection: the executor
+        # updates responsible_event_id but not its source-step projection.
+        proof = result.get("proof_adjudication")
+        responsible = (
+            proof.get("responsible_event_id") if isinstance(proof, Mapping) else None
         )
-        result["condition_not_matched_rule_trace"] = (
-            _collect_condition_not_matched_rule_trace(result)
-        )
-        result["rule_effects_trace"] = _collect_rule_effects_trace(result)
+        if responsible is not None:
+            result["responsible_step"] = _responsible_step(
+                responsible, build_packet(record),
+            )
+
     # Formal evolution must never consume rows that omit the explicit
     # authority field.  Compatibility evaluators may still inspect such rows,
     # but they cannot enter source fitness or champion promotion.  The

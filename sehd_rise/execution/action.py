@@ -1,8 +1,7 @@
 """Deterministic execution evidence: action-spec postcondition evaluation.
 
 A rule's declared postcondition is checked against the actual replay
-result, not the provider's self-report (``rule_effects`` stays advisory
-telemetry). This is the D1 acceptance taxonomy: an obligation that the
+result. This is the D1 acceptance taxonomy: an obligation that the
 result cannot expose is reported unsatisfied, never assumed met.
 
 The ``ActionSpec`` data model and the opcode/postcondition/effect tables
@@ -29,8 +28,6 @@ from sehd_rise.detection.court.identity import (
 _POSTCONDITION_CHECKS = frozenset({
     "object_present",
     "object_absent",
-    "field_present",
-    "field_nonempty",
     "coverage_not_complete",
     "error_certificate_absent",
     "targeted_certificate_withheld",
@@ -42,7 +39,6 @@ _POSTCONDITION_CHECKS = frozenset({
     "qualification_positive",
     "qualification_not_positive",
     "verification_state_present",
-    "certificate_invariant_repaired",
 })
 
 # output_object -> result surface row access.  ``verification_certificate``
@@ -56,7 +52,6 @@ _OBJECT_SURFACE_KEYS: Mapping[str, tuple[str, ...]] = {
     "candidate": ("paca_census", "construct_census", "census"),
     "error_certificate": ("combined_prosecution", "prosecution"),
     "verification_certificate": ("combined_prosecution", "prosecution"),
-    "defense_certificate_or_boundary": ("combined_defense", "defense"),
     "causal_certificate_or_boundary": (
         "propagations", "counterfactual_rankings",
     ),
@@ -115,65 +110,6 @@ def _surface_projection(
     ))
 
 
-def _field_obligation_met(
-    spec: ActionSpec, result: Mapping[str, Any],
-) -> tuple[bool, str]:
-    rows = _surface_rows(result, spec.output_object)
-    if rows is None:
-        return False, f"unobservable_in_result:{spec.output_object}"
-    if not spec.output_field:
-        return False, "output_field_unspecified"
-    for row in rows:
-        value = row.get(spec.output_field)
-        if value not in (None, "", [], {}):
-            return True, "field_obligation_satisfied"
-    return False, "field_obligation_absent"
-
-
-def _field_obligation_count(
-    spec: ActionSpec, result: Mapping[str, Any],
-) -> int | None:
-    rows = _surface_rows(result, spec.output_object)
-    if rows is None:
-        return None
-    if not spec.output_field:
-        return None
-    return sum(
-        1
-        for row in rows
-        if row.get(spec.output_field) not in (None, "", [], {})
-    )
-
-
-def _failed_invariant_count(
-    result: Mapping[str, Any], module_id: str, invariant: str,
-) -> int | None:
-    """Count proof-court audits that fail one named certificate invariant.
-
-    The proof court owns validation truth.  Reflection therefore measures an
-    invariant repair against court audits instead of pretending the invariant
-    is a provider JSON field.
-    """
-    proof = result.get("proof_adjudication")
-    if not isinstance(proof, Mapping):
-        return None
-    audit_key = (
-        "defense_audits"
-        if module_id == "clean_defense_boundary" else "error_audits"
-    )
-    audits = proof.get(audit_key)
-    if not isinstance(audits, list):
-        return None
-    return sum(
-        1
-        for audit in audits
-        if isinstance(audit, Mapping)
-        and invariant in {
-            str(item) for item in audit.get("failed_checks") or ()
-        }
-    )
-
-
 def evaluate_action_spec_postcondition(
     spec: ActionSpec,
     result: Mapping[str, Any],
@@ -183,8 +119,7 @@ def evaluate_action_spec_postcondition(
 ) -> tuple[bool, str]:
     """Deterministically verify the spec's output obligation on a result.
 
-    Provider self-report (rule_effects) stays advisory telemetry, while a
-    rule's declared postcondition is checked against the actual replay
+    A rule's declared postcondition is checked against the actual replay
     result. Fail-closed — an obligation that the result cannot expose is
     reported unsatisfied, never assumed met.
 
@@ -231,44 +166,6 @@ def evaluate_action_spec_postcondition(
         return satisfied, (
             f"object_removed:{before_count}->{after_count}"
             if satisfied else f"object_not_removed:{before_count}->{after_count}"
-        )
-
-    if postcondition in ("field_present", "field_nonempty"):
-        satisfied, detail = _field_obligation_met(spec, result)
-        if not satisfied:
-            return False, detail
-        if baseline_result is None:
-            return False, "baseline_result_required_for_field_transition"
-        before_count = _field_obligation_count(spec, baseline_result)
-        after_count = _field_obligation_count(spec, result)
-        if before_count is None or after_count is None:
-            return False, "field_obligation_delta_unobservable"
-        if after_count <= before_count:
-            return False, (
-                f"field_obligation_not_added:{spec.output_field}:"
-                f"{before_count}->{after_count}"
-            )
-        return True, (
-            f"field_obligation_added:{spec.output_field}:"
-            f"{before_count}->{after_count}"
-        )
-
-    if postcondition == "certificate_invariant_repaired":
-        if baseline_result is None:
-            return False, "baseline_result_required_for_invariant_repair"
-        before = _failed_invariant_count(
-            baseline_result, spec.module_id, spec.output_field,
-        )
-        after = _failed_invariant_count(
-            result, spec.module_id, spec.output_field,
-        )
-        if before is None or after is None:
-            return False, "certificate_audits_unreported"
-        satisfied = before > after
-        return satisfied, (
-            f"certificate_invariant_repaired:{spec.output_field}:{before}->{after}"
-            if satisfied else
-            f"certificate_invariant_not_repaired:{spec.output_field}:{before}->{after}"
         )
 
     if postcondition == "coverage_not_complete":

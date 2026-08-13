@@ -534,7 +534,7 @@ def render_condition_spec_contract() -> str:
     return "\n".join(lines)
 
 
-def _normalize_candidate_kind(value: Any) -> str:
+def normalize_candidate_kind(value: Any) -> str:
     lowered = " ".join(str(value or "").lower().split())
     if any(token in lowered for token in ("omission", "missing", "omit")):
         return "omission"
@@ -555,7 +555,7 @@ def _normalize_candidate_kind(value: Any) -> str:
     return "other"
 
 
-def _normalize_module_tag(value: Any) -> str:
+def normalize_module_tag(value: Any) -> str:
     """Fold the census ``module_tag`` enum to its canonical closed value.
 
     The census emits hyphenated, Title-Case tags ("Tool-Use"); normalization
@@ -609,9 +609,9 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
             for raw_key, raw_value in node.items():
                 key = str(raw_key)
                 if key == "candidate_kind":
-                    sets["candidate_kind"].add(_normalize_candidate_kind(raw_value))
+                    sets["candidate_kind"].add(normalize_candidate_kind(raw_value))
                 elif key == "module_tag":
-                    normalized = _normalize_module_tag(raw_value)
+                    normalized = normalize_module_tag(raw_value)
                     if normalized:
                         sets["module_tag"].add(normalized)
                 elif key in {"axes", "axis", "candidate_axis"}:
@@ -659,6 +659,99 @@ def project_route_condition_features(route_id: str, user: str) -> dict[str, Any]
     return {
         "schema_version": "sehd.route_condition_features.v1",
         "route_id": str(route_id),
+        **{key: sorted(values) for key, values in sets.items()},
+        "has_tool_call": has_tool_call,
+        "has_tool_error": has_tool_error,
+        "has_tool_retry": has_tool_retry,
+    }
+
+
+def project_result_condition_features(
+    result: Mapping[str, Any], record: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project the same closed condition features from a court result.
+
+    This is the result-side projection parallel to
+    ``project_route_condition_features``: the deterministic L1 executor
+    evaluates a rule's ``condition_spec`` against this snapshot instead of a
+    provider user prompt. Result-observable features (candidate_kind /
+    candidate_axis / module_tag / coverage_state / missing_field /
+    failed_invariant) come from the court result; trajectory-observable
+    features (event_role / has_tool_*) come from the raw record, which the
+    court result does not carry. The output shape matches the route projection
+    (minus ``route_id``) so ``evaluate_condition_spec`` consumes both without
+    drift.
+    """
+    sets: dict[str, set[str]] = {
+        "candidate_kind": set(), "candidate_axis": set(),
+        "module_tag": set(), "coverage_state": set(), "missing_field": set(),
+        "failed_invariant": set(), "event_role": set(),
+    }
+
+    census = result.get("census")
+    if isinstance(census, list):
+        for row in census:
+            if not isinstance(row, Mapping):
+                continue
+            sets["candidate_kind"].add(normalize_candidate_kind(row.get("candidate_kind")))
+            normalized_tag = normalize_module_tag(row.get("module_tag"))
+            if normalized_tag:
+                sets["module_tag"].add(normalized_tag)
+            axes = row.get("axes")
+            values = axes if isinstance(axes, (list, tuple, set)) else (axes,)
+            sets["candidate_axis"].update(
+                str(item) for item in values if str(item) in _AXES
+            )
+
+    proof = result.get("proof_adjudication")
+    if isinstance(proof, Mapping):
+        for key in ("prosecution_coverage", "defense_coverage"):
+            value = str(proof.get(key) or "unknown").lower()
+            if value in _COVERAGE_STATES:
+                sets["coverage_state"].add(value)
+        for audit in proof.get("error_audits") or []:
+            if not isinstance(audit, Mapping):
+                continue
+            for value in audit.get("missing_fields") or []:
+                if str(value) in _RUNTIME_FIELDS:
+                    sets["missing_field"].add(str(value))
+            for value in audit.get("failed_invariants") or []:
+                if str(value) in _INVARIANTS:
+                    sets["failed_invariant"].add(str(value))
+            for value in audit.get("failed_checks") or []:
+                if str(value) in _INVARIANTS:
+                    sets["failed_invariant"].add(str(value))
+
+    has_tool_call = False
+    has_tool_error = False
+    tool_names: list[str] = []
+    if isinstance(record, Mapping):
+        for row in record.get("history") or []:
+            if not isinstance(row, Mapping):
+                continue
+            role = str(row.get("role") or "")
+            if role in _EVENT_ROLES:
+                sets["event_role"].add(role)
+            calls = row.get("tool_calls")
+            if isinstance(calls, list) and calls:
+                has_tool_call = True
+                for call in calls:
+                    if isinstance(call, Mapping):
+                        name = str(call.get("name") or "")
+                        if name:
+                            tool_names.append(name)
+            responses = row.get("tool_responses")
+            if isinstance(responses, (list, tuple)) and responses:
+                for response in responses:
+                    text = str(response or "")
+                    if re.search(
+                        r"\b(error|exception|failed|failure|rejected)\b",
+                        text, re.IGNORECASE,
+                    ):
+                        has_tool_error = True
+    has_tool_retry = len(tool_names) != len(set(tool_names))
+    return {
+        "schema_version": "sehd.result_condition_features.v1",
         **{key: sorted(values) for key, values in sets.items()},
         "has_tool_call": has_tool_call,
         "has_tool_error": has_tool_error,

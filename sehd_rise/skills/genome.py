@@ -41,7 +41,6 @@ from sehd_rise.skills.rule import (
 )
 from sehd_rise.skills.vocabulary.contracts import (
     ALLOWED_VERDICTS,
-    DEFENSE_CHECK_FIELDS,
     ERROR_CHECK_FIELDS,
     FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
@@ -59,25 +58,20 @@ MODULE_DISPLAY_NAMES: dict[str, str] = {
     "evidence_obligation": "证据义务",
     "candidate_to_verifier_route": "验证路由",
     "atomic_verifier_instruction": "验证指令",
-    "clean_defense_boundary": "辩护边界",
     "causal_link_test": "因果测试",
     "earliest_origin_tiebreak": "根源裁决",
-    "abstention_rule": "弃权规则",
 }
 
 # Per-module capacity (not uniform — based on expected traffic). Core modules
-# (clean_defense_boundary, evidence_obligation, abstention_rule) hold more
-# evolved rules without premature capacity rejection; auxiliary modules keep
-# smaller capacity to prevent bloat.
+# hold more evolved rules without premature capacity rejection; auxiliary
+# modules keep smaller capacity to prevent bloat.
 MODULE_CAPACITY: dict[str, int] = {
     "candidate_trigger": 6,
     "evidence_obligation": 10,
     "candidate_to_verifier_route": 3,
     "atomic_verifier_instruction": 6,
-    "clean_defense_boundary": 10,
     "causal_link_test": 6,
     "earliest_origin_tiebreak": 4,
-    "abstention_rule": 8,
 }
 
 
@@ -153,8 +147,6 @@ OBSERVABLE_FIELDS: tuple[str, ...] = (
     # (withhold_certificate / emit_certificate).
     "surviving_certificates",
     "quarantined_certificates",
-    "certificate_invariant_failures",
-    "target_certificate_invariant_failure",
     "causal_field_coverage",
     "responsible_step",
     "localization_status",
@@ -340,9 +332,8 @@ def validate_runtime_rule(
 
     # Diagnostic-field identifiers are unobservable to the firing provider;
     # under the slot contract they are checked against the condition slot
-    # only, so an action that names the module's own output surface (e.g.
-    # clean_defense_boundary emitting a defense coverage declaration) is
-    # not rejected for mentioning the field it controls.
+    # only, so an action that names the module's own output surface is not
+    # rejected for mentioning the field it controls.
     _diagnostic_markers = (
         "crs",
         "coverage_state",
@@ -656,7 +647,7 @@ class SkillEdit:
 
 @dataclass
 class SkillGenome:
-    """Complete skill genome: 8 modules with natural language rules."""
+    """Complete skill genome: 6 modules with natural language rules."""
     genome_id: str
     modules: dict[str, SkillModule]
     parent_hash: str | None = None
@@ -854,8 +845,6 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             repair_targets = {edge_field}
             if edit.target_module == "atomic_verifier_instruction":
                 repair_targets.update(ERROR_CHECK_FIELDS.get(edge_field, ()))
-            elif edit.target_module == "clean_defense_boundary":
-                repair_targets.update(DEFENSE_CHECK_FIELDS.get(edge_field, ()))
             if output_field not in repair_targets:
                 return False, "action_spec_repair_edge_mismatch"
 
@@ -1101,22 +1090,12 @@ BASELINE_RULE_TEXT: Mapping[str, tuple[str, ...]] = {
         "When verifying a candidate, test it independently against cited trajectory events.",
         "When cited events do not establish the claimed causal chain, reject the certificate.",
     ),
-    "clean_defense_boundary": (
-        "When tool output directly supports the agent claim, treat that claim as clean.",
-        "When the agent acknowledges and repairs a tool failure before impact, treat the failure as clean.",
-        "When a deviation is authorized by the user or forced by the environment, do not attribute it to the agent.",
-        "When an error is fully corrected before downstream impact, treat it as clean.",
-    ),
     "causal_link_test": (
         "When correcting an origin would prevent the incorrect result, treat that origin as causal.",
         "When an error lacks cited propagation to benchmark impact, reject the causal link.",
     ),
     "earliest_origin_tiebreak": (
         "When multiple origins are causally sufficient, select the earliest cited event.",
-    ),
-    "abstention_rule": (
-        "When neither a complete causal error proof nor a complete clean defense is established, return unresolved.",
-        "When a complete clean defense defeats every error candidate, return clean.",
     ),
 }
 

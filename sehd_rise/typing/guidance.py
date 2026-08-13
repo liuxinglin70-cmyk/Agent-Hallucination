@@ -39,8 +39,6 @@ _TYPE_MODULE_ROUTING: dict[HallucinationType, tuple[str, ...]] = {
         "candidate_trigger",
     ),
     HallucinationType.INSTRUCTIONAL: (
-        "clean_defense_boundary",
-        "abstention_rule",
         "evidence_obligation",
     ),
     HallucinationType.TOOL: (
@@ -60,17 +58,13 @@ _TYPE_MODULE_ROUTING: dict[HallucinationType, tuple[str, ...]] = {
     ),
     HallucinationType.ADOPTION: (
         "evidence_obligation",
-        "clean_defense_boundary",
         "candidate_trigger",
     ),
     HallucinationType.CONTEXTUAL: (
-        "abstention_rule",
-        "clean_defense_boundary",
         "causal_link_test",
     ),
     HallucinationType.UNKNOWN: (
         "evidence_obligation",
-        "abstention_rule",
         "candidate_trigger",
     ),
 }

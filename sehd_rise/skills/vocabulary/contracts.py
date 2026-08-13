@@ -38,10 +38,8 @@ MODULE_IDS = (
     "evidence_obligation",
     "candidate_to_verifier_route",
     "atomic_verifier_instruction",
-    "clean_defense_boundary",
     "causal_link_test",
     "earliest_origin_tiebreak",
-    "abstention_rule",
 )
 
 # Stage each module's rules are injected into.
@@ -50,16 +48,15 @@ MODULE_STAGE: dict[str, str] = {
     "evidence_obligation": "stage_2_verification",
     "candidate_to_verifier_route": "stage_2_verification",
     "atomic_verifier_instruction": "stage_2_verification",
-    "clean_defense_boundary": "stage_2_verification",
     "causal_link_test": "stage_3_causal_court",
     "earliest_origin_tiebreak": "stage_3_causal_court",
-    "abstention_rule": "stage_3_causal_court",
 }
 
-ALLOWED_VERDICTS: dict[str, frozenset[str]] = {
-    "abstention_rule": frozenset({"clean", "error", "unresolved"}),
-    "clean_defense_boundary": frozenset({"clean"}),
-}
+# Verdict emission is owned solely by the deterministic proof court: no L1
+# module may emit a final verdict. The two verdict-bearing modules
+# (``clean_defense_boundary``, ``abstention_rule``) were removed with their
+# empty opcode surfaces, so this table is empty by construction.
+ALLOWED_VERDICTS: dict[str, frozenset[str]] = {}
 
 LOCAL_NEGATION_MODULES: frozenset[str] = frozenset({"causal_link_test"})
 

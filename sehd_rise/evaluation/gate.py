@@ -500,19 +500,15 @@ class StructuralGate:
                 break
 
         # Verdict permission is enforced in validate_runtime_rule via
-        # ALLOWED_VERDICTS / LOCAL_NEGATION_MODULES (genome layer). The genome
-        # check supports layered verdict permissions:
-        # abstention_rule → {clean, error, unresolved}
-        # clean_defense_boundary → {clean}
-        # causal_link_test → local negation only
-        # all others → no direct verdict
+        # ALLOWED_VERDICTS / LOCAL_NEGATION_MODULES (genome layer): no L1
+        # module may emit a final verdict, causal_link_test permits local
+        # negation only.
 
         # --- Layer 7: Rule quality — forbidden cross-module references ---
         # Rules must NOT reference other modules' rules by number/name.
         _cross_ref_patterns = [
             r'规则\d',           # "规则2", "规则5"
             r'模块.*规则',       # "证据义务模块规则5"
-            r'abstention_rule.*规则',
             r'evidence_obligation.*规则',
             r'按照.*模块',
             r'遵循.*规则\d',

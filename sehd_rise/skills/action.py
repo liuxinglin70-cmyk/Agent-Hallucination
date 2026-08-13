@@ -33,27 +33,15 @@ MODULE_ROUTE_IDS: Mapping[str, tuple[str, ...]] = {
         "appeal_prosecutor_route",
     ),
     "candidate_to_verifier_route": ("qualification_route",),
-    # The atomic verifier audits ERROR candidates only: its output object is
-    # ``verification_certificate`` and its observable is the proof court's
-    # prosecution-side certificate surface. Defense routes therefore cannot
-    # execute its actions coherently — a withhold rule injected there makes
-    # the defender decline its own certificates, which collapses defense
-    # coverage on a gold-clean case and moves the module score against the
-    # gold polarity. Defense-side verification stays owned by
-    # ``clean_defense_boundary``.
     "atomic_verifier_instruction": (
         "qualification_route", "focused_prosecution_route",
         "appeal_prosecutor_route",
-    ),
-    "clean_defense_boundary": (
-        "defense_route", "appeal_defender_route", "boundary_route",
     ),
     "causal_link_test": (
         "propagation_route", "focused_prosecution_route",
         "appeal_prosecutor_route", "boundary_route", "counterfactual_route",
     ),
     "earliest_origin_tiebreak": ("boundary_route", "counterfactual_route"),
-    "abstention_rule": ("boundary_route",),
 }
 
 MODULE_OUTPUT_OBJECT: Mapping[str, str] = {
@@ -61,16 +49,12 @@ MODULE_OUTPUT_OBJECT: Mapping[str, str] = {
     "evidence_obligation": "error_certificate",
     "candidate_to_verifier_route": "candidate_qualification",
     "atomic_verifier_instruction": "verification_certificate",
-    "clean_defense_boundary": "defense_certificate_or_boundary",
     "causal_link_test": "causal_certificate_or_boundary",
     "earliest_origin_tiebreak": "boundary_finding",
-    "abstention_rule": "boundary_finding",
 }
 
 _OPERATION_POSTCONDITION: Mapping[str, str] = {
     "suppress_candidate": "object_absent",
-    "require_evidence_field": "field_nonempty",
-    "enforce_certificate_invariant": "certificate_invariant_repaired",
     "keep_coverage_incomplete": "coverage_not_complete",
     "hold_candidate_qualification": "qualification_not_positive",
     # ``withhold_certificate`` semantics are fingerprint-targeted (the rule
@@ -89,8 +73,6 @@ _OPERATION_POSTCONDITION: Mapping[str, str] = {
 }
 
 _MODULE_EFFECT: Mapping[str, tuple[str, str]] = {
-    "evidence_obligation": ("causal_field_coverage", "increase"),
-    "clean_defense_boundary": ("defense_certificates", "increase"),
     "earliest_origin_tiebreak": ("responsible_step", "shift"),
 }
 
@@ -107,37 +89,18 @@ _OPERATION_EFFECT: Mapping[str, tuple[str, str]] = {
     "suppress_later_origin": ("responsible_step", "shift"),
 }
 
-_MODULE_OPERATION_EFFECT: Mapping[tuple[str, str], tuple[str, str]] = {
-    (
-        "atomic_verifier_instruction", "require_evidence_field",
-    ): ("causal_field_coverage", "increase"),
-    (
-        "atomic_verifier_instruction", "enforce_certificate_invariant",
-    ): ("target_certificate_invariant_failure", "decrease"),
-    (
-        "clean_defense_boundary", "enforce_certificate_invariant",
-    ): ("target_certificate_invariant_failure", "decrease"),
-}
-
 # Operations whose runtime effect can move an over-conviction toward clean.
 # Generation guidance and admission validation consume this same table so the
 # model cannot be told that an operation is legal while the gate rejects it.
 ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
     "evidence_obligation": frozenset({"keep_coverage_incomplete"}),
     "atomic_verifier_instruction": frozenset({"withhold_certificate"}),
-    "clean_defense_boundary": frozenset({
-        "require_evidence_field", "enforce_certificate_invariant",
-    }),
     "causal_link_test": frozenset({"reject_non_causal_origin"}),
     "candidate_trigger": frozenset({"suppress_candidate"}),
     "candidate_to_verifier_route": frozenset({"hold_candidate_qualification"}),
 }
 
 CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
-    "evidence_obligation": frozenset({"require_evidence_field"}),
-    "atomic_verifier_instruction": frozenset({
-        "require_evidence_field", "enforce_certificate_invariant",
-    }),
     "earliest_origin_tiebreak": frozenset({"select_earliest_origin"}),
 }
 
@@ -240,16 +203,12 @@ def compile_action_spec(module_id: str, action: str) -> ActionSpec:
     if not postcondition:
         raise ValueError(f"action_spec_operation_unmapped:{operation}")
     # Effect resolution is most-specific first and must be lazy: a module
-    # with no module-default effect (its opcodes all resolve at operation or
-    # module-operation level) would otherwise KeyError here even though its
-    # opcode maps cleanly — ``dict.get`` evaluates its default argument
-    # eagerly. An opcode that resolves nowhere is an instrumentation defect,
-    # reported fail-closed, never guessed.
-    effect = (
-        _MODULE_OPERATION_EFFECT.get((module_id, operation))
-        or _OPERATION_EFFECT.get(operation)
-        or _MODULE_EFFECT.get(module_id)
-    )
+    # with no module-default effect (its opcodes all resolve at operation
+    # level) would otherwise KeyError here even though its opcode maps
+    # cleanly — ``dict.get`` evaluates its default argument eagerly. An
+    # opcode that resolves nowhere is an instrumentation defect, reported
+    # fail-closed, never guessed.
+    effect = _OPERATION_EFFECT.get(operation) or _MODULE_EFFECT.get(module_id)
     if effect is None:
         raise ValueError(f"action_spec_effect_unmapped:{module_id}:{operation}")
     observable_field, direction = effect

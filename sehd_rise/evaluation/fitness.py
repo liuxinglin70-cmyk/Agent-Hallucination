@@ -34,10 +34,6 @@ from sehd_rise.execution.action import (
     certificate_claim_fingerprint,
     surviving_carrier_fingerprints,
 )
-from sehd_rise.skills.vocabulary.contracts import (
-    DEFENSE_RELATIONAL_INVARIANTS,
-    ERROR_RELATIONAL_INVARIANTS,
-)
 
 
 VALID_STATES = {"verified_error", "verified_clean", "unresolved"}
@@ -66,10 +62,8 @@ _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
     # meant every genuine evidence_obligation gain on a gold-CLEAN case failed
     # the direction check and was demoted to ``no_effect``.
     "evidence_obligation": None,
-    "clean_defense_boundary": False,  # defense up = cleaner
     "causal_link_test": True,      # causal chain up = more error-like
     "earliest_origin_tiebreak": None,
-    "abstention_rule": None,  # any resolution is progress
 }
 
 
@@ -312,40 +306,6 @@ def _gold_step_correct(signal: DetectionSignal) -> bool | None:
     return str(signal.responsible_step) in signal.gold_steps
 
 
-def _certificate_invariant_failure_count(
-    row: Mapping[str, Any], module: str,
-) -> int | None:
-    proof = row.get("proof_adjudication") or {}
-    if not isinstance(proof, Mapping):
-        return None
-    if module == "atomic_verifier_instruction":
-        audit_key = "error_audits"
-        registered = ERROR_RELATIONAL_INVARIANTS
-    elif module == "clean_defense_boundary":
-        audit_key = "defense_audits"
-        registered = DEFENSE_RELATIONAL_INVARIANTS
-    else:
-        return None
-    audits = proof.get(audit_key)
-    if not isinstance(audits, list):
-        return None
-    total = 0
-    for audit in audits:
-        if not isinstance(audit, Mapping):
-            continue
-        failed_invariants = audit.get("failed_invariants")
-        values = (
-            {str(value) for value in failed_invariants}
-            if isinstance(failed_invariants, list)
-            else {
-                str(value) for value in audit.get("failed_checks") or ()
-                if str(value) in registered
-            }
-        )
-        total += len(values)
-    return total
-
-
 # How much confidence the detector's own localization procedure earned.
 # "complete"  -> counterfactual ranking actually resolved the origin.
 # "not_applicable" -> a single surviving origin, so nothing to disambiguate.
@@ -412,8 +372,6 @@ def module_local_score(
         # A one-sided proof is not progress. Reward the weaker side so that
         # evolution cannot improve this module by starving its challenger.
         return min(prosecution, defense)
-    if module == "clean_defense_boundary":
-        return defense + float(_valid_certificate_count(row, "defense"))
     if module == "causal_link_test":
         # causal_link_test is injected into both causal-field providers and the
         # counterfactual localization route. A rule that turns temporal
@@ -424,30 +382,6 @@ def module_local_score(
     if module == "earliest_origin_tiebreak":
         # Correctness/quality of the chosen origin, not merely that one exists.
         return _localization_quality(signal, row) + _causal_field_score(row)
-    if module == "abstention_rule":
-        # Graduated score reflecting partial progress toward verdict. Full
-        # resolution is best, but CRS/consensus progress is measurable.
-        #
-        # The graduated sub-score weights defense and prosecution symmetrically
-        # (mean of both sides' ranks): an earlier defense-above-prosecution
-        # weighting plus max() re-introduced a clean-leaning bias that credited
-        # completing the defense but registered 0.0 delta in the mirror image.
-        if signal.state == "verified_clean":
-            if signal.has_gold:
-                return 2.0 if not signal.gold_label else 0.0
-            return 2.0
-        if signal.state == "verified_error":
-            if signal.has_gold:
-                return 2.0 if signal.gold_label else 0.0
-            return 2.0
-        # unresolved: measure partial progress toward resolution
-        score = 0.0
-        if signal.crs.complete:
-            score += 0.4
-        if signal.consensus_gate_applied:
-            score += 0.4
-        score += 0.4 * (prosecution + defense) / 2.0
-        return min(score, 1.2)  # cap below definite verdict scores
     return 0.0
 
 
@@ -558,22 +492,6 @@ def observable_process_delta(
         changes.append("causal_field_coverage:increased")
     elif before_causal - after_causal > epsilon:
         changes.append("causal_field_coverage:decreased")
-
-    before_invariants = _certificate_invariant_failure_count(
-        before_result, target_module,
-    )
-    after_invariants = _certificate_invariant_failure_count(
-        after_result, target_module,
-    )
-    if (
-        before_invariants is not None
-        and after_invariants is not None
-        and before_invariants != after_invariants
-    ):
-        changes.append(
-            "certificate_invariant_failures:"
-            + ("increased" if after_invariants > before_invariants else "decreased")
-        )
 
     before_responsible = bool(_responsible_step_present(before_result))
     after_responsible = bool(_responsible_step_present(after_result))

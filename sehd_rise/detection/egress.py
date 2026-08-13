@@ -4,11 +4,9 @@ Each egress encodes its own contract so behavior is guaranteed by structure,
 not by a ``purpose`` string shared with the primitive.
 
 Detection path — the proof-court surfaces wrap the transport primitives and
-self-record per-surface usage at call time (no post-hoc depth-1 walk). The two
-module-level names ``provider_call`` / ``json_object_provider_call`` are the
-injection seam: ``detection.injection.integrated_engine_provider`` patches them
-to append a genome's evolved rules to detection prompts. They exist only here,
-on the detection path.
+self-record per-surface usage at call time (no post-hoc depth-1 walk). The
+provider boundary is no longer a skill-injection seam: L1 rules are applied
+deterministically after the court returns (plan B).
 
 Evolution path — L1/L2/conflict-gate emit strict JSON and structurally silence
 chain-of-thought on DeepSeek-V4 (the reasoning budget can truncate before any
@@ -28,8 +26,6 @@ from sehd_rise.detection.transport import (
 from sehd_rise.platform.models import canonical_model_name
 from sehd_rise.platform.usage import ProviderUsageLedger
 
-# Detection-path injection seam. The skill-injection adapter patches these
-# two module-level names; evolution-path egress never reads them.
 provider_call = _transport_provider_call
 json_object_provider_call = _transport_json_object_call
 

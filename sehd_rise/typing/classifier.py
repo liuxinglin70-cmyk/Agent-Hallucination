@@ -516,10 +516,8 @@ class HallucinationTypeClassifier:
             "candidate_to_verifier_route": HallucinationType.TOOL,
             "atomic_verifier_instruction": HallucinationType.FACTUAL,
             "evidence_obligation": HallucinationType.FACTUAL,
-            "clean_defense_boundary": HallucinationType.INSTRUCTIONAL,
             "causal_link_test": HallucinationType.REASONING,
             "earliest_origin_tiebreak": HallucinationType.REASONING,
-            "abstention_rule": HallucinationType.CONTEXTUAL,
         }
         return module_type_map.get(module)
 

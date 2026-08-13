@@ -86,54 +86,31 @@ class CausalEffectRecord:
 def _experience_intervention_trace(
     result: Mapping[str, Any],
 ) -> dict[str, list[str]]:
-    """Reduce provider self-reports to a reusable execution trajectory."""
+    """Reduce the deterministic executor record to a reusable execution trace.
+
+    Plan B: the provider no longer self-reports applied rules or output
+    fields. The trace is derived from the executor's ``l1_execution`` fired
+    rows — rule ids and operations that actually fired on the court result.
+    """
+    execution = result.get("l1_execution")
+    if not isinstance(execution, Mapping):
+        return {"applied_rule_ids": [], "output_fields": [], "routes": []}
     applied_ids: list[str] = []
     output_fields: list[str] = []
-    routes: list[str] = []
-    applied = result.get("applied_rule_trace")
-    if isinstance(applied, Mapping):
-        for route, rule_ids in applied.items():
-            if isinstance(rule_ids, Sequence) and not isinstance(rule_ids, str):
-                routes.append(str(route))
-                applied_ids.extend(str(rule_id) for rule_id in rule_ids)
-    effects = result.get("rule_effects_trace")
-    if isinstance(effects, Mapping):
-        for route, entries in effects.items():
-            if not isinstance(entries, Sequence) or isinstance(entries, str):
-                continue
-            routes.append(str(route))
-            for entry in entries:
-                if not isinstance(entry, Mapping):
-                    continue
-                applied_ids.append(str(entry.get("rule_id") or ""))
-                fields = entry.get("output_fields")
-                if isinstance(fields, Sequence) and not isinstance(fields, str):
-                    output_fields.extend(str(field) for field in fields)
+    for row in execution.get("fired") or ():
+        if not isinstance(row, Mapping):
+            continue
+        rule_id = str(row.get("rule_id") or "")
+        operation = str(row.get("operation") or "")
+        if rule_id:
+            applied_ids.append(rule_id)
+        if operation:
+            output_fields.append(operation)
     return {
         "applied_rule_ids": applied_ids,
         "output_fields": output_fields,
-        "routes": routes,
+        "routes": [],
     }
-
-
-def _field_binds_output_field(reported: str, expected: str) -> bool:
-    """Whether a provider-reported output field binds an ActionSpec field.
-
-    The provider self-reports the actual JSON collection key it affected (e.g.
-    ``candidates``, the census array key), while the ActionSpec's
-    ``output_field`` is the singular object name from the opcode operand (e.g.
-    ``candidate``). These name the same executable output in two vocabularies,
-    so exact matches and the singular/plural pair both bind. A path-qualified
-    report (e.g. ``candidates[0].certificate_id``) names the field unambiguously
-    and binds through its trailing field segment.
-    """
-    if not expected or not reported:
-        return False
-    if reported == expected:
-        return True
-    if reported == f"{expected}s" or expected == f"{reported}s":
-        return True
-    return reported.endswith(f".{expected}")
 
 
 def _baseline_surviving_error_certificate_ids(
@@ -253,13 +230,14 @@ def _attribute_intervention_fitness(
     """Bind a replay improvement to the compiled intervention that ran.
 
     Aggregate detector movement is not causal evidence by itself because a
-    provider replay may vary even when it ignores the evolved instruction.
+    provider replay may vary even when the intervention's transform did not
+    fire.
 
     The compiled ActionSpec is checked deterministically as a baseline-to-replay
-    transition. Provider self-report (``rule_effects_trace``) remains advisory
-    telemetry only: the model that receives the rule id cannot independently
-    certify its own compliance, so self-report never replaces an unsatisfied or
-    unobservable postcondition.
+    transition, and the executor's ``l1_execution`` record tells whether the
+    transform actually fired. There is no provider self-report to consult: the
+    frozen detector runs once, then the transform fires or does not — causal
+    credit requires both a fired transform and a satisfied postcondition.
 
     ``baseline_result`` is the full source-baseline detection result (before the
     candidate genome ran). It lets the ``withhold_certificate`` postcondition
@@ -271,63 +249,43 @@ def _attribute_intervention_fitness(
     single-certificate rule can satisfy in a multi-carrier case.
     """
     action_spec = sanitize_action_spec(edit.action_spec)
-    compiled = result.get("compiled_rule_trace")
     operation = (
         edit.operation.value
         if isinstance(edit.operation, SkillOp)
         else str(edit.operation)
     )
-    if (
-        not action_spec
-        or operation == SkillOp.REMOVE_RULE.value
-        or not isinstance(compiled, Mapping)
-    ):
+    if not action_spec or operation == SkillOp.REMOVE_RULE.value:
         return assessment, {"status": "not_instrumented"}
 
-    target_entries = compiled.get(edit.target_module)
-    rule_ids = {
-        str(entry.get("rule_id") or "")
-        for entry in target_entries or ()
-        if isinstance(entry, Mapping) and str(entry.get("rule_id") or "")
-    }
-    trace = _experience_intervention_trace(result)
-    applied_ids = set(trace["applied_rule_ids"])
-    def traced_ids(key: str) -> set[str]:
-        payload = result.get(key)
-        if not isinstance(payload, Mapping):
-            return set()
-        return {
-            str(rule_id)
-            for values in payload.values()
-            if isinstance(values, Sequence) and not isinstance(values, str)
-            for rule_id in values
-            if str(rule_id)
-        }
+    execution = result.get("l1_execution")
+    if not isinstance(execution, Mapping):
+        return assessment, {"status": "not_instrumented"}
+    target_module = str(edit.target_module or "")
+    target_operation = str(action_spec.get("operation") or "")
+    fired_rows = [
+        row for row in execution.get("fired") or ()
+        if isinstance(row, Mapping)
+    ]
+    skipped_rows = [
+        row for row in execution.get("skipped") or ()
+        if isinstance(row, Mapping)
+    ]
 
-    candidate_ids = traced_ids("candidate_rule_trace")
-    condition_matched_ids = traced_ids("condition_matched_rule_trace")
-    condition_not_matched_ids = traced_ids("condition_not_matched_rule_trace")
-    injected_ids = traced_ids("injected_rule_trace")
-    expected_field = str(action_spec.get("output_field") or "")
-    effect_ids: set[str] = set()
-    effects = result.get("rule_effects_trace")
-    if isinstance(effects, Mapping):
-        for entries in effects.values():
-            if not isinstance(entries, Sequence) or isinstance(entries, str):
-                continue
-            for entry in entries:
-                if not isinstance(entry, Mapping):
-                    continue
-                fields = entry.get("output_fields")
-                if (
-                    isinstance(fields, Sequence)
-                    and not isinstance(fields, str)
-                    and any(
-                        _field_binds_output_field(str(field), expected_field)
-                        for field in fields
-                    )
-                ):
-                    effect_ids.add(str(entry.get("rule_id") or ""))
+    def _is_edit(row: Mapping[str, Any]) -> bool:
+        return (
+            str(row.get("module_id") or "") == target_module
+            and str(row.get("operation") or "") == target_operation
+        )
+
+    # Plan B: the transform fires deterministically, so "applied" is read from
+    # the executor's fired record, not provider self-report. ``condition_matched``
+    # is fired OR a skipped row whose condition matched but had no reachable
+    # target — the distinction the old injected/applied/condition trace encoded.
+    transform_fired = any(_is_edit(row) for row in fired_rows)
+    condition_matched = transform_fired or any(
+        _is_edit(row) and bool(row.get("matched")) for row in skipped_rows
+    )
+
     postcondition_met, postcondition_detail = (
         evaluate_action_spec_postcondition(
             ActionSpec.from_dict(action_spec), result,
@@ -339,41 +297,24 @@ def _attribute_intervention_fitness(
         edit.repair_edge, baseline_result, result,
     )
     edge_counterfactual_met = edge_counterfactual["met"]
-    executed_ids = sorted(
-        rule_ids if (postcondition_met and edge_counterfactual_met) else ()
-    )
+    executed = transform_fired and postcondition_met and edge_counterfactual_met
     carrier_movement = (
         certificate_carrier_movement(baseline_result, result)
         if baseline_result is not None
         else None
     )
-    if executed_ids:
+
+    if executed:
         execution_status = "executed"
     elif not sanitize_condition_spec(edit.condition_spec):
         execution_status = "not_executed"
-    elif rule_ids & condition_not_matched_ids:
+    elif not condition_matched:
         execution_status = "condition_not_matched"
-    elif rule_ids & (condition_matched_ids | injected_ids):
-        execution_status = "model_ignored_or_action_failed"
-    elif rule_ids & candidate_ids:
-        execution_status = "candidate_not_injected"
+    elif not transform_fired:
+        execution_status = "action_not_fired"
     else:
-        execution_status = "route_not_reached"
-    # Explicit four-event distinction. The previous audit conflated "dispatched"
-    # (rule in prompt), "complied" (provider self-report), "edge changed"
-    # (deterministic postcondition), and "terminal changed" (aggregate verdict
-    # movement) into a single status string. These four events are independently
-    # observable and must not be conflated:
-    #   - action_dispatched: framework put the rule in the provider prompt
-    #   - provider_complied: provider self-reported applying the rule
-    #   - target_edge_changed: deterministic baseline->replay postcondition met
-    #   - terminal_changed: aggregate terminal state moved
-    # Causal credit requires target_edge_changed; terminal_changed alone is
-    # telemetry (provider replay is stochastic). provider_complied is advisory
-    # (the provider is not an independent witness of its own compliance).
-    action_dispatched = bool(rule_ids & injected_ids)
-    provider_complied = bool(rule_ids & applied_ids)
-    target_edge_changed = postcondition_met
+        execution_status = "target_edge_unchanged"
+
     baseline_terminal = (
         str(baseline_result.get("state") or "")
         if isinstance(baseline_result, Mapping) else ""
@@ -386,23 +327,15 @@ def _attribute_intervention_fitness(
     )
     audit = {
         "status": execution_status,
-        "action_dispatched": action_dispatched,
-        "provider_complied": provider_complied,
-        "target_edge_changed": target_edge_changed,
+        "rule_compiled": True,
+        "transform_fired": transform_fired,
+        "condition_matched": condition_matched,
+        "target_edge_changed": postcondition_met,
         "terminal_changed": terminal_changed,
         "baseline_terminal": baseline_terminal,
         "replay_terminal": replay_terminal,
-        "compiled_rule_ids": sorted(rule_ids),
-        "candidate_rule_ids": sorted(rule_ids & candidate_ids),
-        "condition_matched_rule_ids": sorted(rule_ids & condition_matched_ids),
-        "condition_not_matched_rule_ids": sorted(
-            rule_ids & condition_not_matched_ids
-        ),
-        "injected_rule_ids": sorted(rule_ids & injected_ids),
-        "applied_rule_ids": sorted(rule_ids & applied_ids),
-        "effect_rule_ids": sorted(rule_ids & effect_ids),
-        "expected_output_field": expected_field,
-        "executed_rule_ids": executed_ids,
+        "target_module": target_module,
+        "operation": target_operation,
         "postcondition_satisfied": postcondition_met,
         "postcondition_detail": postcondition_detail,
         "edge_counterfactual_met": edge_counterfactual_met,
@@ -425,12 +358,12 @@ def _attribute_intervention_fitness(
             if carrier_movement is not None else None
         ),
     }
-    if executed_ids or not (assessment.passed or assessment.evidence_only):
+    if executed or not (assessment.passed or assessment.evidence_only):
         return assessment, audit
-    # Provider replay is stochastic: a gold-correct terminal outcome can occur
-    # while the injected Skill is ignored. Causal credit therefore requires the
-    # operation's postcondition (or a bound apply/effect trace), regardless of
-    # aggregate task movement. An unobservable postcondition is an
+    # The L1 transform is deterministic, but a gold-correct terminal outcome can
+    # still occur without the rule firing (a no-op transform). Causal credit
+    # therefore requires the operation's postcondition AND a fired transform,
+    # regardless of aggregate task movement. An unobservable postcondition is an
     # instrumentation defect to repair, not evidence of execution.
     return FitnessAssessment(
         "no_effect",
@@ -440,6 +373,7 @@ def _attribute_intervention_fitness(
         assessment.local_score_before,
         assessment.local_score_after,
     ), audit
+
 
 
 def _expected_effect_audit(
@@ -481,15 +415,11 @@ def _expected_effect_audit(
             "certificate", "quarantine", "violation", "actor", "boundary",
             "证书", "隔离", "违规", "责任", "边界",
         ),
-        "clean_defense_boundary": ("defense", "boundary", "辩护", "边界"),
         "causal_link_test": (
             "causal", "propagation", "impact", "recovery", "因果", "传播", "影响", "恢复",
         ),
         "earliest_origin_tiebreak": (
             "responsible", "origin", "earliest", "责任", "根源", "最早",
-        ),
-        "abstention_rule": (
-            "state", "unresolved", "authoritative", "verdict", "状态", "弃权", "判定",
         ),
     }
     markers = effect_markers.get(edit.target_module, ())
@@ -518,21 +448,6 @@ def _expected_effect_audit(
         if isinstance(action_spec, Mapping) and action_spec
         else None
     )
-    if (
-        spec is not None
-        and spec.postcondition == "certificate_invariant_repaired"
-        and before_result is not None
-        and after_result is not None
-    ):
-        target_repaired, _detail = evaluate_action_spec_postcondition(
-            spec,
-            after_result,
-            baseline_result=before_result,
-        )
-        if target_repaired:
-            observable_delta_tokens.append(
-                "target_certificate_invariant_failure:decreased"
-            )
 
     # ---- structured contract path ----
     contract = sanitize_expected_effect_contract(edit.expected_effect_contract)
@@ -552,12 +467,6 @@ def _expected_effect_audit(
             "defense_certificates": ("defense_certificates:",),
             "surviving_certificates": ("surviving_certificates:",),
             "quarantined_certificates": ("quarantined_certificates:",),
-            "certificate_invariant_failures": (
-                "certificate_invariant_failures:",
-            ),
-            "target_certificate_invariant_failure": (
-                "target_certificate_invariant_failure:",
-            ),
             "causal_field_coverage": ("causal_field_coverage:",),
             "responsible_step": ("responsible_step:",),
             "localization_status": ("localization_status:",),
@@ -892,7 +801,6 @@ __all__ = [
     "_enforce_expected_effect_observation",
     "_expected_effect_audit",
     "_experience_intervention_trace",
-    "_field_binds_output_field",
     "_no_effect_reason_for",
     "_verify_edge_level_counterfactual",
     "build_causal_effect_record",

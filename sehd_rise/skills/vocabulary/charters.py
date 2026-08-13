@@ -1,4 +1,4 @@
-"""Module charters for the eight L1 skill modules.
+"""Module charters for the six L1 skill modules.
 
 Modules historically carried only a stage mapping, so reflection proposals
 were routinely routed to the wrong module. The charter front-loads
@@ -23,8 +23,6 @@ from dataclasses import dataclass
 
 from sehd_rise.skills.vocabulary.contracts import (
     ALLOWED_VERDICTS,
-    DEFENSE_INVARIANT_TARGETS,
-    ERROR_INVARIANT_TARGETS,
     MODULE_IDS,
     MODULE_STAGE,
 )
@@ -82,8 +80,7 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
             "wrongly rejected; that failure belongs to the "
             "atomic_verifier_instruction module (stage_2_verification).",
             "A correctly verified candidate is later mis-adjudicated at the "
-            "final verdict; that belongs to the abstention_rule module or "
-            "the L2 adjudication policy layer.",
+            "final verdict; that belongs to the L2 adjudication policy layer.",
         ),
     ),
     "evidence_obligation": ModuleCharter(
@@ -113,8 +110,9 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
         ),
         out_of_scope_examples=(
             "A defense certificate is wrongly issued although the agent "
-            "behavior is not clean; that failure belongs to the "
-            "clean_defense_boundary module (stage_2_verification).",
+            "behavior is not clean; defense-verification ownership was "
+            "removed with the clean_defense_boundary module, so this failure "
+            "belongs to the detector inference boundary or the L2 layer.",
             "A candidate is sent to the wrong verifier before any evidence "
             "is examined; that belongs to the candidate_to_verifier_route "
             "module.",
@@ -161,7 +159,6 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
         forbidden_surfaces=(
             "final verdict emission (clean/error/unresolved)",
             "coverage_state and trigger_source",
-            "defense coverage declaration (owned by clean_defense_boundary)",
             "candidate discovery and candidate-to-verifier routing",
             "CRS score or weight changes",
             "gold or ground-truth labels",
@@ -175,42 +172,8 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
         ),
         out_of_scope_examples=(
             "Certificates are all valid but the final adjudication still "
-            "picks the wrong verdict; that belongs to the abstention_rule "
-            "module or the L2 adjudication policy layer.",
-        ),
-    ),
-    "clean_defense_boundary": ModuleCharter(
-        module_id="clean_defense_boundary",
-        stage=MODULE_STAGE["clean_defense_boundary"],
-        influenceable_surfaces=(
-            "defense certificate issuance for repaired, authorized, or "
-            "environment-forced deviations",
-            "defense coverage assessment on the defense routes",
-            "verdict clean when a complete clean defense defeats every "
-            "error candidate",
-        ),
-        forbidden_surfaces=(
-            "prosecution certificates and prosecution coverage",
-            "error or unresolved verdict emission",
-            "coverage_state and trigger_source",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("clean_defense_boundary"),
-        in_scope_examples=(
-            "A tool failure fully repaired before downstream impact is "
-            "still prosecuted because the defense boundary did not mark "
-            "it clean.",
-            "A deviation authorized by the user is attributed to the agent "
-            "instead of being defended away.",
-        ),
-        out_of_scope_examples=(
-            "The prosecution evidence obligation is wrongly judged complete; "
-            "that failure belongs to the evidence_obligation module "
-            "(stage_2_verification).",
-            "Defense coverage is complete but the final verdict stays "
-            "unresolved because the court misconsumes the boundary finding; "
-            "that belongs to the L2 boundary_consumption_policy artifact.",
+            "picks the wrong verdict; that belongs to the L2 adjudication "
+            "policy layer.",
         ),
     ),
     "causal_link_test": ModuleCharter(
@@ -238,8 +201,8 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
         ),
         out_of_scope_examples=(
             "A causal link is correctly negated but the final verdict stays "
-            "clean instead of unresolved; that belongs to the abstention_rule "
-            "module or the L2 adjudication policy layer.",
+            "clean instead of unresolved; that belongs to the L2 adjudication "
+            "policy layer.",
         ),
     ),
     "earliest_origin_tiebreak": ModuleCharter(
@@ -269,38 +232,6 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
             "to the causal_link_test module (stage_3_causal_court).",
         ),
     ),
-    "abstention_rule": ModuleCharter(
-        module_id="abstention_rule",
-        stage=MODULE_STAGE["abstention_rule"],
-        influenceable_surfaces=(
-            "the boundary-route finding (state and rationale): a conditional "
-            "evidence standard — when the decisive-verdict bar should lower "
-            "or raise based on trajectory-observable facts — reaches the "
-            "proof court as the case_boundary_finding inside NEUTRAL_EVIDENCE "
-            "and constrains evidence construction; the final verdict stays "
-            "with the deterministic proof court and can never be overwritten "
-            "by this rule",
-        ),
-        forbidden_surfaces=(
-            "re-verification of evidence or re-issuing certificates",
-            "coverage_state and trigger_source",
-            "CRS score or weight changes",
-            "gold or ground-truth labels",
-        ),
-        allowed_verdicts=_verdicts("abstention_rule"),
-        in_scope_examples=(
-            "Neither a complete causal error proof nor a complete clean "
-            "defense is established, yet the verdict is not unresolved.",
-            "A complete clean defense defeats every error candidate, but "
-            "the verdict remains error.",
-        ),
-        out_of_scope_examples=(
-            "The verdict edge input is correct but the boundary finding is "
-            "misconsumed downstream by the consensus gate or coverage "
-            "validity policy; that belongs to the L2 adjudication policy "
-            "layer (consensus_gate_policy / coverage_validity_policy).",
-        ),
-    ),
 }
 
 
@@ -314,7 +245,6 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
         ("suppress_candidate", "suppress the candidate"),
     ),
     "evidence_obligation": (
-        ("require_evidence_field", "require the cited evidence field"),
         ("keep_coverage_incomplete", "keep the coverage incomplete"),
     ),
     "candidate_to_verifier_route": (
@@ -322,18 +252,6 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "atomic_verifier_instruction": (
         ("withhold_certificate", "withhold the certificate"),
-        ("require_evidence_field", "require the cited evidence field"),
-        (
-            "enforce_certificate_invariant",
-            "enforce the certificate validation invariant",
-        ),
-    ),
-    "clean_defense_boundary": (
-        ("require_evidence_field", "require the cited evidence field"),
-        (
-            "enforce_certificate_invariant",
-            "enforce the certificate validation invariant",
-        ),
     ),
     "causal_link_test": (
         ("reject_non_causal_origin", "reject the non-causal origin"),
@@ -342,7 +260,6 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
         ("select_earliest_origin", "select the earliest responsible origin"),
         ("suppress_later_origin", "suppress the later origin"),
     ),
-    "abstention_rule": (),
 }
 
 MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
@@ -362,10 +279,6 @@ MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
         "defense coverage", "final verdict", "return clean", "return error",
         "return unresolved",
     ),
-    "clean_defense_boundary": (
-        "prosecution coverage", "prosecution certificate", "return error",
-        "return unresolved",
-    ),
     "causal_link_test": (
         "defense coverage", "final verdict", "return clean", "return error",
         "return unresolved",
@@ -373,10 +286,6 @@ MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
     "earliest_origin_tiebreak": (
         "certificate", "coverage", "final verdict", "return clean",
         "return error", "return unresolved",
-    ),
-    "abstention_rule": (
-        "candidate discovery", "defense certificate", "prosecution certificate",
-        "verification certificate",
     ),
 }
 
@@ -397,16 +306,9 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
     ),
     "atomic_verifier_instruction": (
         "prosecution_certificates", "causal_field_coverage",
-        "certificate_invariant_failures",
-        "target_certificate_invariant_failure",
         # Claim-level surviving carriers — the executable observable of
         # withhold_certificate / emit_certificate, rename-invariant.
         "surviving_certificates", "target_local_score",
-    ),
-    "clean_defense_boundary": (
-        "defense_coverage", "defense_certificates", "target_local_score",
-        "certificate_invariant_failures",
-        "target_certificate_invariant_failure",
     ),
     "causal_link_test": (
         "causal_field_coverage", "localization_status", "target_local_score",
@@ -415,7 +317,6 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
     "earliest_origin_tiebreak": (
         "responsible_step", "localization_status", "target_local_score",
     ),
-    "abstention_rule": ("state", "trigger", "target_local_score"),
 }
 
 
@@ -428,12 +329,6 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
         "suppress_candidate": ("candidate", "candidate_id"),
     },
     "evidence_obligation": {
-        "require_evidence_field": (
-            "consumption_evidence_refs", "impact_evidence_refs",
-            "recovery_evidence_refs", "norm_evidence_refs",
-            "violation_evidence_refs", "agent_control_evidence_refs",
-            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
-        ),
         "keep_coverage_incomplete": ("coverage_state",),
     },
     "candidate_to_verifier_route": {
@@ -443,22 +338,6 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
     },
     "atomic_verifier_instruction": {
         "withhold_certificate": ("certificate_id",),
-        "require_evidence_field": (
-            "positive_evidence_refs", "actor_evidence_refs",
-            "boundary_evidence_refs", "norm_evidence_refs",
-            "violation_evidence_refs", "agent_control_evidence_refs",
-            "impact_evidence_refs", "recovery_evidence_refs",
-            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
-            "evidence_refs",
-        ),
-        "enforce_certificate_invariant": ERROR_INVARIANT_TARGETS,
-    },
-    "clean_defense_boundary": {
-        "require_evidence_field": (
-            "evidence", "evidence_refs", "target_candidate_id",
-            "target_origin_event_id",
-        ),
-        "enforce_certificate_invariant": DEFENSE_INVARIANT_TARGETS,
     },
     "causal_link_test": {
         "reject_non_causal_origin": ("responsible_event_id", "is_root_cause"),
@@ -467,7 +346,6 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
         "select_earliest_origin": ("responsible_event_id",),
         "suppress_later_origin": ("responsible_event_id",),
     },
-    "abstention_rule": {},
 }
 
 
