@@ -19,6 +19,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from sehd_rise.causal.cut import (
     REASON_GOLD_FALSE_POSITIVE,
     build_causal_cut,
+    infer_evolution_direction,
 )
 from sehd_rise.causal.episode import build_causal_episode
 from sehd_rise.causal.repairability import (
@@ -26,7 +27,6 @@ from sehd_rise.causal.repairability import (
     analyze as analyze_repairability,
 )
 from sehd_rise.causal.signals import project_detection
-from sehd_rise.loop.runner import _infer_evolution_direction
 from sehd_rise.planning.candidates import _allowed_l1_modules
 from sehd_rise.platform.gold import _evaluator_gold_steps
 from sehd_rise.skills.vocabulary.contracts import LAYER_L1
@@ -53,7 +53,7 @@ def _result(state: str, *, surviving: list[str] | None = None) -> dict:
 def _verdict(cut, signal):
     if not cut.actionable:
         return None
-    direction = _infer_evolution_direction(signal.state, signal.gold_label)
+    direction = infer_evolution_direction(signal.state, signal.gold_label)
     modules = _allowed_l1_modules(
         signal, cut.owner, cut.evidence.get("artifact_frontier", ())
     )

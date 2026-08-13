@@ -48,7 +48,9 @@ from sehd_rise.causal.cut import (
     REASON_DEMOTED_L1_NO_EXECUTABLE,
     REASON_INTERNAL_INCONSISTENCY,
     REASON_NO_FAILURE_SHAPE,
+    allowed_l1_modules,
     build_causal_cut,
+    infer_evolution_direction,
 )
 from sehd_rise.causal.episode import CausalFailureEpisode, build_causal_episode
 from sehd_rise.causal.plan import build_repair_plan
@@ -349,13 +351,17 @@ def analyze(
 def triggered_episode(
     result: Mapping[str, Any], *, use_gold: bool, gold_label: bool | None,
 ) -> bool:
-    """Whether a detection result is an evolvable (triggered) episode.
+    """Whether a detection result carries an active failure.
 
-    The trigger is the Repairability Authority's ``REPAIRABLE`` verdict:
-    project -> cut -> episode -> analyze, exactly like the canary guard and
-    the shadow stable-canary admission. Every consumer imports this one
-    predicate, so a trigger definition can never drift between the main
-    loop, the canary guard, and the shadow batch.
+    The trigger means *failure exists*, not *failure is currently
+    repairable*. It is derived with the exact same canonical context the
+    main loop uses (evolution direction + the cut's legal L1 module
+    surface), so the main route, the source replay and the canary guard all
+    read one repairability truth. ``REPAIRABLE``, ``CAPABILITY_GAP``,
+    ``UNADDRESSABLE_FRAMEWORK_DEFECT`` and ``FRAMEWORK_DEFECT`` are all
+    active failures: only a no-failure-shape ``NON_EVOLVABLE`` verdict (or
+    a runtime-invalid projection) closes the trigger. A failure that merely
+    falls from repairable to capability-gap therefore stays open.
     """
     payload = dict(result)
     if use_gold and gold_label is not None:
@@ -364,13 +370,29 @@ def triggered_episode(
     if signal.diagnostic_only:
         return False
     cut = build_causal_cut(signal)
+    direction = infer_evolution_direction(signal.state, signal.gold_label)
+    modules = allowed_l1_modules(
+        signal,
+        cut.owner,
+        (
+            tuple(cut.evidence.get("artifact_frontier") or ())
+            if isinstance(cut.evidence, Mapping) else ()
+        ),
+        cut.secondary_owner,
+    )
     episode = build_causal_episode(
         signal=signal,
         cut=cut,
         record_key=str(payload.get("case_id") or ""),
+        evolution_direction=direction,
+        allowed_modules=modules,
     )
-    verdict = analyze(episode)
-    return verdict.status is RepairabilityStatus.REPAIRABLE
+    verdict = analyze(
+        episode,
+        allowed_modules=(modules if cut.skill_layer == LAYER_L1 else ()),
+        evolution_direction=direction,
+    )
+    return verdict.status is not RepairabilityStatus.NON_EVOLVABLE
 
 
 # ============================================================

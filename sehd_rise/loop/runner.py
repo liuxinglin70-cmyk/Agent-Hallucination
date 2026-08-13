@@ -44,6 +44,7 @@ from sehd_rise.causal.cut import (
     REASON_GOLD_FALSE_NEGATIVE_CLEAN,
     REASON_GOLD_FALSE_POSITIVE,
     build_causal_cut,
+    infer_evolution_direction,
 )
 from sehd_rise.causal.episode import (
     CausalFailureEpisode,
@@ -282,31 +283,6 @@ from sehd_rise.typing.slices import TypeAwareFitness
 # ============================================================
 # Frozen-source pure helpers
 # ============================================================
-
-
-def _infer_evolution_direction(state: str, gold: Any) -> str:
-    """Infer the evolution direction from terminal state and gold.
-
-    Gold-supervised: the label names the correct pole, so a disagreement
-    moves toward the gold-implied state. Self-supervised: only unresolved
-    cases need evolution (toward a decisive judgment); an already-decided
-    state is never auto-flipped.
-    """
-    if isinstance(gold, bool):
-        if gold:
-            if state == "unresolved":
-                return "unresolved_to_error"
-            if state == "verified_clean":
-                return "clean_to_error"
-            return "no_evolution"
-        if state == "unresolved":
-            return "unresolved_to_clean"
-        if state == "verified_error":
-            return "error_to_clean"
-        return "no_evolution"
-    if state == "unresolved":
-        return "unresolved_to_decisive"
-    return "process_repair"
 
 
 def _no_edit_reason_categories(reason: str) -> list[str]:
@@ -782,7 +758,7 @@ class _TypeEvolutionAdapter:
         self._guidance = TypeGuidance()
 
     def _infer_evolution_direction(self, state: str, gold: Any) -> str:
-        return _infer_evolution_direction(state, gold)
+        return infer_evolution_direction(state, gold)
 
     def generate_type_guidance(
         self,
@@ -1547,7 +1523,7 @@ class EvolutionLoop:
             type_result = self.type_classifier.classify(
                 detection_result, signal,
             )
-            evolution_direction = _infer_evolution_direction(
+            evolution_direction = infer_evolution_direction(
                 signal.state, signal.gold_label,
             )
             # The cut is the L2 routing authority: when it lands on the

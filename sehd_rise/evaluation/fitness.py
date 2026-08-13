@@ -62,7 +62,6 @@ _MODULE_SCORE_GOLD_DIRECTION: dict[str, bool | None] = {
     # meant every genuine evidence_obligation gain on a gold-CLEAN case failed
     # the direction check and was demoted to ``no_effect``.
     "evidence_obligation": None,
-    "causal_link_test": True,      # causal chain up = more error-like
     "earliest_origin_tiebreak": None,
 }
 
@@ -364,21 +363,12 @@ def module_local_score(
         # Crossing from no candidate to at least one candidate is meaningful;
         # unbounded candidate growth is intentionally not rewarded.
         return 1.0 if signal.candidate_count > 0 else 0.0
-    if module == "candidate_to_verifier_route":
-        return _prosecution_strength_score(signal, row)
     if module == "atomic_verifier_instruction":
         return _prosecution_strength_score(signal, row)
     if module == "evidence_obligation":
         # A one-sided proof is not progress. Reward the weaker side so that
         # evolution cannot improve this module by starving its challenger.
         return min(prosecution, defense)
-    if module == "causal_link_test":
-        # causal_link_test is injected into both causal-field providers and the
-        # counterfactual localization route. A rule that turns temporal
-        # fallback into complete counterfactual ranking is a genuine
-        # module-local gain even when causal certificate field coverage was
-        # already saturated.
-        return _causal_field_score(row) + _localization_quality(signal, row)
     if module == "earliest_origin_tiebreak":
         # Correctness/quality of the chosen origin, not merely that one exists.
         return _localization_quality(signal, row) + _causal_field_score(row)
@@ -421,10 +411,11 @@ def observable_process_delta(
     mutator *which executable output failed to move*, not merely that a scalar
     fitness gate rejected it.
 
-    ``before_trigger`` / ``after_trigger`` are the repairability verdicts of the
-    baseline and replay episodes (C10): the old ``should_evolve`` boolean lived
-    on the signal, but Phase 4 moved the trigger into the Repairability
-    Authority, so the loop threads it in explicitly.
+    ``before_trigger`` / ``after_trigger`` are the failure-existence verdicts
+    of the baseline and replay episodes (C10): the old ``should_evolve``
+    boolean lived on the signal, but Phase 4 moved the trigger into the
+    Repairability Authority, so the loop threads it in explicitly. The
+    trigger closes only when the cut finds no active failure shape.
     """
     changes: list[str] = []
     if before.state != after.state:
@@ -564,10 +555,11 @@ def assess_source_fitness(
     candidate-generation telemetry only. Only explicit gold-assisted scoring (or
     a future independent promotion hook) may emit strong/local decisions.
 
-    ``before_trigger`` / ``after_trigger`` are the repairability verdicts of the
-    baseline and replay episodes (C10): the sole source of the "did the failure
-    trigger close / open" signal now that ``should_evolve`` no longer lives on
-    the detection signal.
+    ``before_trigger`` / ``after_trigger`` are the failure-existence verdicts
+    of the baseline and replay episodes (C10): the trigger closes only when
+    the cut finds no active failure shape. A failure that merely falls from
+    repairable to capability-gap stays open and can never read as
+    ``source_failure_closed``.
     """
     reasons: list[str] = []
     # Invariant: a diagnostic-only signal (e.g. runtime_invalid) is never

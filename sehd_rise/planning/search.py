@@ -13,23 +13,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from sehd_rise.skills.action import CLEAN_TO_ERROR_ACTIONS, ERROR_TO_CLEAN_ACTIONS
-
-# Error-type string vocabulary (the classifier's closed ``error_type``
-# values, kept as strings so this layer needs no typing import).
-_ERRORWARD_ERROR_TYPES = frozenset({
-    "false_negative",
-    "false_negative_clean",
-    "false_negative_unresolved",
-    "unresolved_should_error",
-})
-_CLEANWARD_ERROR_TYPES = frozenset({
-    "false_positive",
-    "unresolved_should_clean",
-})
-
-_FN_POLARITY_MODULES = frozenset(CLEAN_TO_ERROR_ACTIONS)
-_FP_POLARITY_MODULES = frozenset(ERROR_TO_CLEAN_ACTIONS)
+# The polarity pool is owned by the causal layer (single trigger-context
+# source); this module re-exports it under its historical name for callers.
+from sehd_rise.causal.cut import signal_polarity_pool as _signal_polarity_pool
 
 _CONTRAST_RESOLVED_STATES = frozenset({"verified_error", "verified_clean"})
 
@@ -126,25 +112,6 @@ def _contrast_inversion(
         except ValueError:
             return False
     return False
-
-
-def _signal_polarity_pool(signal: Any) -> frozenset[str] | None:
-    """Return the editable module side required by the failure direction."""
-    error_type = str(getattr(signal, "error_type", None) or "")
-    if error_type in _ERRORWARD_ERROR_TYPES:
-        return _FN_POLARITY_MODULES
-    if error_type in _CLEANWARD_ERROR_TYPES:
-        return _FP_POLARITY_MODULES
-    if error_type:
-        return None
-
-    gold_label = getattr(signal, "gold_label", None)
-    state = str(getattr(signal, "state", "") or "")
-    if gold_label is True and state in {"verified_clean", "unresolved"}:
-        return _FN_POLARITY_MODULES
-    if gold_label is False and state in {"verified_error", "unresolved"}:
-        return _FP_POLARITY_MODULES
-    return None
 
 
 __all__ = [

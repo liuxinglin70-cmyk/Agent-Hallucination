@@ -53,6 +53,7 @@ from sehd_rise.causal.signals import (
     ProcessDiagnostic,
 )
 from sehd_rise.detection.policy import build_adjudication_facts
+from sehd_rise.skills.action import CLEAN_TO_ERROR_ACTIONS, ERROR_TO_CLEAN_ACTIONS
 from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.contracts import (
     L2_ARTIFACT_APPEAL_MECHANISM,
@@ -94,6 +95,120 @@ REASON_GOLD_FALSE_NEGATIVE_CLEAN = "gold_false_negative_clean"
 # obligation: a cut carrying this reason is a capability-gap witness, never
 # NON_EVOLVABLE or a framework defect (``repairability.analyze`` resolves it).
 REASON_DEMOTED_L1_NO_EXECUTABLE = "demoted_l1_no_executable_obligation"
+
+
+# ============================================================
+# Canonical trigger context — the single shared derivation
+# ============================================================
+# Every consumer that asks "does this detection result carry an active
+# failure?" must derive the SAME evolution context here: the evolution
+# direction and the legal L1 module surface. The main loop, the source
+# replay, and the canary guard all read this one source, so a result can
+# never hold two different repairability truths in different code paths.
+
+def infer_evolution_direction(state: str, gold: Any) -> str:
+    """Infer the evolution direction from terminal state and gold.
+
+    Gold-supervised: the label names the correct pole, so a disagreement
+    moves toward the gold-implied state. Self-supervised: only unresolved
+    cases need evolution (toward a decisive judgment); an already-decided
+    state is never auto-flipped.
+    """
+    if isinstance(gold, bool):
+        if gold:
+            if state == "unresolved":
+                return "unresolved_to_error"
+            if state == "verified_clean":
+                return "clean_to_error"
+            return "no_evolution"
+        if state == "unresolved":
+            return "unresolved_to_clean"
+        if state == "verified_error":
+            return "error_to_clean"
+        return "no_evolution"
+    if state == "unresolved":
+        return "unresolved_to_decisive"
+    return "process_repair"
+
+
+# Error-type string vocabulary (the classifier's closed ``error_type``
+# values, kept as strings so this layer needs no typing import).
+_ERRORWARD_ERROR_TYPES = frozenset({
+    "false_negative",
+    "false_negative_clean",
+    "false_negative_unresolved",
+    "unresolved_should_error",
+})
+_CLEANWARD_ERROR_TYPES = frozenset({
+    "false_positive",
+    "unresolved_should_clean",
+})
+
+_FN_POLARITY_MODULES = frozenset(CLEAN_TO_ERROR_ACTIONS)
+_FP_POLARITY_MODULES = frozenset(ERROR_TO_CLEAN_ACTIONS)
+
+
+def signal_polarity_pool(signal: Any) -> frozenset[str] | None:
+    """Return the editable module side required by the failure direction."""
+    error_type = str(getattr(signal, "error_type", None) or "")
+    if error_type in _ERRORWARD_ERROR_TYPES:
+        return _FN_POLARITY_MODULES
+    if error_type in _CLEANWARD_ERROR_TYPES:
+        return _FP_POLARITY_MODULES
+    if error_type:
+        return None
+
+    gold_label = getattr(signal, "gold_label", None)
+    state = str(getattr(signal, "state", "") or "")
+    if gold_label is True and state in {"verified_clean", "unresolved"}:
+        return _FN_POLARITY_MODULES
+    if gold_label is False and state in {"verified_error", "unresolved"}:
+        return _FP_POLARITY_MODULES
+    return None
+
+
+def allowed_l1_modules(
+    signal: Any,
+    owner: str,
+    artifact_frontier: Sequence[Mapping[str, Any]] = (),
+    secondary_owner: str = "",
+) -> tuple[str, ...]:
+    """Return the executable owner set shared by every trigger consumer.
+
+    Owner provenance: the authoritative owner set comes from the
+    proof-cut obligation — the attribution owner and the artifact_frontier
+    owners. On the gold-polarity path the cut's partner module (secondary
+    owner) is additionally admitted when it is direction-compatible, so an
+    FP's surgical ``withhold_certificate`` (owned by
+    ``atomic_verifier_instruction``) remains a legal exploration surface
+    alongside the primary owner. The partner is filtered through the
+    polarity pool — the same guard that kept a polarity-crossing process
+    owner out — so it can never open a surface that moves the verdict the
+    wrong way.
+    """
+    modules = [str(owner)] if str(owner) else []
+    frontier_owners: set[str] = set()
+    for artifact in artifact_frontier:
+        frontier_owner = str(artifact.get("owner_module") or "")
+        if frontier_owner in MODULE_IDS:
+            frontier_owners.add(frontier_owner)
+            if frontier_owner not in modules:
+                modules.append(frontier_owner)
+    is_gold_polarity = bool(
+        getattr(signal, "has_gold", False)
+        and getattr(signal, "gold_label", None) is not None
+    )
+    if is_gold_polarity:
+        polarity_pool = signal_polarity_pool(signal)
+        partner = str(secondary_owner)
+        if (
+            polarity_pool is not None
+            and partner in MODULE_IDS
+            and partner in polarity_pool
+            and partner not in modules
+        ):
+            modules.append(partner)
+    return tuple(modules)
 
 # Self-supervised defect reasons carrying their executable field canonically
 # (rather than on the artifact frontier). The quarantine reason's owner is
@@ -1150,8 +1265,11 @@ __all__ = [
     "REASON_PROVIDER_MISSING",
     "REASON_QUARANTINE_PATTERN",
     "REASON_RESPONSIBLE_STEP_MISSING",
+    "allowed_l1_modules",
     "build_causal_cut",
     "can_compile_repair_obligation",
     "classify_malformed_origin",
+    "infer_evolution_direction",
     "origin_layer",
+    "signal_polarity_pool",
 ]

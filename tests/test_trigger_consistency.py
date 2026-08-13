@@ -1,6 +1,6 @@
 """B4 trigger-source consistency: the shadow stable-canary admission guard
 reads the same Repairability Authority predicate as the runner's canary
-guard, so a decisive but still REPAIRABLE replay never poisons the pool."""
+guard, so a decisive but still-failing replay never poisons the pool."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ def _result(state: str, *, surviving: list[str] | None = None) -> dict:
             "prosecution_coverage": "complete",
             "defense_coverage": "complete",
             "surviving_error_certificate_ids": list(surviving or []),
+            "valid_error_certificate_count": len(surviving or []),
+            "valid_defense_certificate_count": 1 if surviving else 0,
             "responsible_event_id": "event_001",
         },
     }
@@ -48,13 +50,13 @@ def test_decisive_but_repairable_replay_is_triggered() -> None:
     assert triggered is True
 
 
-def test_decisive_non_repairable_replay_is_stable() -> None:
-    """A gold false positive without the planner's module context compiles
-    no plan, so it is decisive, not triggered, and passes the admission
-    guard as a stable regression anchor."""
+def test_correct_gold_error_result_is_stable() -> None:
+    """A correctly detected gold-error case with full evidence carries no
+    active failure shape and passes the admission guard as a stable
+    regression anchor."""
     triggered = triggered_episode(
-        {**_result("verified_error", surviving=["e1"]), "gold_label": False},
+        {**_result("verified_error", surviving=["e1"]), "gold_label": True},
         use_gold=True,
-        gold_label=False,
+        gold_label=True,
     )
     assert triggered is False

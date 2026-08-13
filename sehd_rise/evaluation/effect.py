@@ -405,10 +405,12 @@ def _expected_effect_audit(
     free-text ``expected_effect`` substring matching is retained only as a
     fallback for edits produced before the contract was introduced.
 
-    ``before_trigger`` / ``after_trigger`` are the repairability verdicts of the
-    baseline and replay episodes (C10): they supply the ``trigger:closed/opened``
-    delta token now that ``should_evolve`` no longer lives on the detection
-    signal.
+    ``before_trigger`` / ``after_trigger`` are the failure-existence verdicts of
+    the baseline and replay episodes (C10): they supply the
+    ``trigger:closed/opened`` delta token now that ``should_evolve`` no longer
+    lives on the detection signal. The trigger closes only when the cut finds
+    no active failure shape, so a repairability demotion to a capability gap
+    never reads as a closure.
     """
     expected = " ".join(str(edit.expected_effect or "").split())[:240]
     lowered_expected = expected.lower()
