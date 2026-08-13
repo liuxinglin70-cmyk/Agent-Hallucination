@@ -37,6 +37,12 @@ LAYER_RULES: dict[str, frozenset[str]] = {
     "detection": frozenset({"platform", "skills"}),
     "causal": frozenset({"platform", "skills", "detection"}),
     "experience": frozenset({"platform", "skills", "causal"}),
+    # learning: the SEHD-v7 five-type projection protocol (FailureObservation /
+    # RepairIntent / ExecutableCandidate / EvaluationEvidence / EvolutionMemory)
+    # plus the CandidateArchive. It is a pure-data view over the causal episode,
+    # consumed by the loop layer for audit telemetry; it never re-derives repair
+    # semantics or authority.
+    "learning": frozenset({"causal"}),
     "typing": frozenset({"platform", "skills", "causal", "experience"}),
     "planning": frozenset({"platform", "skills", "causal", "experience", "typing"}),
     "execution": frozenset({"platform", "skills", "detection", "causal"}),
@@ -44,7 +50,7 @@ LAYER_RULES: dict[str, frozenset[str]] = {
     "meta": frozenset({"platform", "causal", "experience", "evaluation"}),
     "loop": frozenset({
         "platform", "skills", "detection", "causal", "experience",
-        "typing", "planning", "execution", "evaluation", "meta",
+        "typing", "planning", "execution", "evaluation", "meta", "learning",
     }),
     "api": frozenset({"loop", "detection", "evaluation", "planning"}),
     "cli": frozenset({"api", "loop", "detection", "evaluation", "planning"}),
