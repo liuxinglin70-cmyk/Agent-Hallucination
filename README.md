@@ -163,6 +163,23 @@ python -m sehd_rise evolve \
   --meta-update-every 5              # 每 5 个 case 刷新一次搜索策略（默认 5；0 = 仅 run 后）
 ```
 
+### 学习口径（label-free 设计边界）
+
+- **框架不宣称能发现漏检。** label-free 运行没有任何信号能判定「gold 为 error 却被判
+  clean」，因此默认模式下不存在 FN 触发的修复路径：gold-error 被误判 clean 的案例无
+  artifact、落入 NON_EVOLVABLE。FN 信号（gold false-negative clean 证书、构造性召回
+  construct_candidate）只在显式开启 gold 监督（use_gold=True）时产生。这是设计边界，
+  不是接线缺陷。
+- **默认无 canary 时前几个触发 case 的编辑会被拒。** 默认 label-free 且未配置 canary
+  时，方向性提交受 canary-preserved 谓词约束：canary 池在检测到第一个稳定 case 之前
+  为空，因此前几个触发 case 上的编辑都会进入 rejected_buffer（append-only，无自动
+  重试）。这是保护性设计的预期行为——没有哨兵就没有灾难性遗忘防线，编辑不能自证
+  安全；supervised 模式（gold fitness）不经该谓词。
+- **provisional skill 不是「已学会」的声明。** label-free 下即使提交，skill 也以
+  fitness_status=none 的 provisional 影子存在，claim_learning=False：它永不
+  protected / promoted，直到积累出带全 preserved canary 的方向性证据。运行报告中的
+  provisional skill 不构成「已学会」的声明。
+
 写入输出目录的产物：
 
 - `evolution_result.json` — 含五层结果漏斗的审计轨迹

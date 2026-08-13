@@ -428,6 +428,12 @@ executable）归档被拒候选的集合，取代「只追单条 mutation lineag
   新增这些 opcode 会推翻「删除生成性 L1 opcode、保留确定性 transform」的决策并跨越
   权威边界（Skill 不得写证据/证书/verdict）。
 
+**label-free FN 边界**：框架不宣称能发现漏检。label-free 运行没有任何信号能判定
+「gold 为 error 却被判 clean」，因此默认模式下不存在 FN 触发的修复路径：gold-error
+被误判 clean 的案例无 artifact、落入 NON_EVOLVABLE。FN 信号（gold false-negative
+clean 证书、构造性召回 construct_candidate）只在显式开启 gold 监督（use_gold=True）
+时产生。这是设计边界，不是接线缺陷。
+
 ### L1 能力边界（不自称发明新 detector capability）
 
 `CAPABILITY_GAP` 被 100% 正确识别后**只记录、不合成**：runner 把 `RepairIntent` +
@@ -455,6 +461,17 @@ FN 矩阵的 `required_capability`/`blocker`）是唯一的跨运行输入。
 「没学到 skill」是 planner 不行还是证据不足不允许 commit，就此可区分，不再混在
 `skill_count = 0` 里。`shadow._shadow_commit_eligible` 的 canary-vs-gold 准入谓词不变，
 本模块只做 regime 的显式化与前置校验。
+
+**默认无 canary 时前几个触发 case 的编辑会被拒**：默认 label-free 且未配置 canary
+时，方向性提交受 canary-preserved 谓词约束：canary 池在检测到第一个稳定 case 之前
+为空，因此前几个触发 case 上的编辑都会进入 rejected_buffer（append-only，无自动
+重试）。这是保护性设计的预期行为——没有哨兵就没有灾难性遗忘防线，编辑不能自证
+安全；supervised 模式（gold fitness）不经该谓词。
+
+**provisional skill 不是「已学会」的声明**：label-free 下即使提交，skill 也以
+fitness_status=none 的 provisional 影子存在，claim_learning=False：它永不
+protected / promoted，直到积累出带全 preserved canary 的方向性证据。运行报告中的
+provisional skill 不构成「已学会」的声明。
 
 ## 评估与晋升
 
