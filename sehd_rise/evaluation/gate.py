@@ -74,6 +74,7 @@ class GateCertificate:
     case_index: int
     prior_consecutive_no_edit: int = 0
     prior_converged: bool = False
+    prior_no_edit_case_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +89,7 @@ class GateCertificate:
             "case_index": self.case_index,
             "prior_consecutive_no_edit": self.prior_consecutive_no_edit,
             "prior_converged": self.prior_converged,
+            "prior_no_edit_case_id": self.prior_no_edit_case_id,
         }
 
     @classmethod
@@ -108,6 +110,7 @@ class GateCertificate:
                 data.get("prior_consecutive_no_edit") or 0
             ),
             prior_converged=bool(data.get("prior_converged", False)),
+            prior_no_edit_case_id=str(data.get("prior_no_edit_case_id") or ""),
         )
 
 
@@ -132,6 +135,7 @@ class StructuralGate:
     _module_last_edit_idx: dict[str, int] = field(default_factory=dict)
     _total_edits: int = 0
     _consecutive_no_edit: int = 0
+    _last_no_edit_case_id: str = ""
     _converged: bool = False
     _halted: bool = False
     _halt_reason: str = ""
@@ -158,8 +162,18 @@ class StructuralGate:
     def rejected_count(self) -> int:
         return sum(1 for c in self.certificates if c.decision == "reject")
 
-    def record_no_edit(self) -> None:
-        """Record a no-edit case without skipping unseen registered cases."""
+    def record_no_edit(self, case_id: str = "") -> None:
+        """Record one no-edit case without skipping unseen registered cases.
+
+        Convergence counts distinct source cases, not rejected edits: retries
+        of the same case repeat the same record and must advance the streak
+        exactly once. ``case_id`` is therefore idempotent per case; a streak
+        restore (``revoke_structural_accept`` / ``defer_structural_reject``)
+        restores the recorded case identity along with the count.
+        """
+        if case_id and case_id == self._last_no_edit_case_id:
+            return
+        self._last_no_edit_case_id = case_id
         self._consecutive_no_edit += 1
         if self._consecutive_no_edit >= self.config.convergence_window:
             self._converged = True
@@ -167,6 +181,7 @@ class StructuralGate:
     def reset_convergence(self) -> None:
         """Clear a convergence marker when skipped work is being retried."""
         self._consecutive_no_edit = 0
+        self._last_no_edit_case_id = ""
         self._converged = False
 
     def snapshot_convergence(self) -> dict[str, Any]:
@@ -180,6 +195,7 @@ class StructuralGate:
         """
         return {
             "consecutive_no_edit": self._consecutive_no_edit,
+            "last_no_edit_case_id": self._last_no_edit_case_id,
             "converged": self._converged,
         }
 
@@ -187,6 +203,9 @@ class StructuralGate:
         """Restore the convergence counters from a ``snapshot_convergence``."""
         self._consecutive_no_edit = max(
             0, int(snapshot.get("consecutive_no_edit") or 0)
+        )
+        self._last_no_edit_case_id = str(
+            snapshot.get("last_no_edit_case_id") or ""
         )
         self._converged = bool(snapshot.get("converged"))
 
@@ -232,6 +251,7 @@ class StructuralGate:
             # final no-edit outcome only after all attempts for this case fail.
             self._consecutive_no_edit = certificate.prior_consecutive_no_edit
             self._converged = certificate.prior_converged
+            self._last_no_edit_case_id = certificate.prior_no_edit_case_id
 
     def defer_structural_reject(self, certificate: GateCertificate) -> None:
         """Undo attempt-level convergence accounting before a bounded retry.
@@ -245,6 +265,7 @@ class StructuralGate:
             return
         self._consecutive_no_edit = certificate.prior_consecutive_no_edit
         self._converged = certificate.prior_converged
+        self._last_no_edit_case_id = certificate.prior_no_edit_case_id
 
     def evaluate(
         self,
@@ -267,6 +288,7 @@ class StructuralGate:
         reject_reasons: list[str] = []
         prior_consecutive_no_edit = self._consecutive_no_edit
         prior_converged = self._converged
+        prior_no_edit_case_id = self._last_no_edit_case_id
 
         # --- Check halt ---
         if self._halted:
@@ -575,9 +597,10 @@ class StructuralGate:
             self._total_edits += 1
             self._module_last_edit_idx[target_module] = case_index
             self._consecutive_no_edit = 0
+            self._last_no_edit_case_id = ""
             self._converged = False
         else:
-            self.record_no_edit()
+            self.record_no_edit(case_id)
 
         cert = GateCertificate(
             timestamp=time.time(),
@@ -591,6 +614,7 @@ class StructuralGate:
             case_index=case_index,
             prior_consecutive_no_edit=prior_consecutive_no_edit,
             prior_converged=prior_converged,
+            prior_no_edit_case_id=prior_no_edit_case_id,
         )
         self.certificates.append(cert)
 
@@ -609,6 +633,7 @@ class StructuralGate:
             "halt_reason": self._halt_reason,
             "convergence_signal": self._converged,
             "consecutive_no_edit": self._consecutive_no_edit,
+            "last_no_edit_case_id": self._last_no_edit_case_id,
             "module_last_edit_idx": dict(self._module_last_edit_idx),
             "total_evaluations": len(self.certificates),
             "accepted": self.accepted_count,
@@ -630,6 +655,9 @@ class StructuralGate:
         }
         self._total_edits = int(summary.get("total_edits_applied") or 0)
         self._consecutive_no_edit = int(summary.get("consecutive_no_edit") or 0)
+        self._last_no_edit_case_id = str(
+            summary.get("last_no_edit_case_id") or ""
+        )
         self._converged = bool(summary.get("convergence_signal", False))
         self._halted = bool(summary.get("halted", False))
         self._halt_reason = str(summary.get("halt_reason") or "")

@@ -666,7 +666,7 @@ def _flush_shadow_batch_impl(
             # One processed case produced no effective committed edit.
             # Structural acceptance had reset convergence, so restore the
             # case-level no-edit signal exactly once after replay rejects.
-            gate.record_no_edit()
+            gate.record_no_edit(item.case_id)
             batch_effect = _expected_effect_audit(
                 item.edit,
                 item_assessment,

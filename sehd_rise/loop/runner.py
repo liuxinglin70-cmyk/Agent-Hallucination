@@ -2113,7 +2113,7 @@ class EvolutionLoop:
                     and outcome
                     in (Outcome.SOURCE_NOT_IMPROVED, Outcome.CANARY_REGRESSION)
                 ):
-                    self.gate.record_no_edit()
+                    self.gate.record_no_edit(case_id)
                 if replay_error:
                     self.budget_usage["policy_replay_errors"] += 1
                 if not replay_error:
@@ -3592,6 +3592,7 @@ class EvolutionLoop:
                 structural_result="no_proposal",
                 no_effect_reason="",
             )
+            self.gate.record_no_edit(case_id)
             self._case_transition(None, outcome=Outcome.NO_HYPOTHESIS)
             self.record_step(EvolutionStep(
                 case_id=case_id,
@@ -3640,6 +3641,7 @@ class EvolutionLoop:
                 structural_result="invalid_mutation",
             )
             if not retry_scheduled:
+                self.gate.record_no_edit(case_id)
                 self._case_transition(None, outcome=Outcome.INVALID_PROPOSAL)
             self.record_step(EvolutionStep(
                 case_id=case_id,
@@ -4474,13 +4476,15 @@ class EvolutionLoop:
             )
             if assessment.decision != "no_effect":
                 # C9: a complete repair attempt (executed + measured + no
-                # acceptable improvement) is convergence evidence.
-                self.gate.record_no_edit()
+                # acceptable improvement) is convergence evidence. Revoke
+                # first: the accept-time checkpoint restores the pre-case
+                # streak, then this case records exactly one no-edit.
                 reasons = [
                     f"source_{assessment.decision}:"
                     + ",".join(assessment.reasons)
                 ]
                 self.gate.revoke_structural_accept(cert, reasons)
+                self.gate.record_no_edit(case_id)
                 self.state.edits_rejected += 1
                 injected_flag, applied_flag = _injected_applied_flags(
                     edit, candidate_result
@@ -4608,7 +4612,7 @@ class EvolutionLoop:
                     (idx, case_id, self.active_attempt_index + 1)
                 )
             else:
-                self.gate.record_no_edit()
+                self.gate.record_no_edit(case_id)
             injected_flag, applied_flag = _injected_applied_flags(
                 edit, candidate_result
             )
