@@ -43,7 +43,6 @@ from sehd_rise.meta.strategy import (
     OPERATION_PREFERENCE,
     RETRY_STRATEGY,
     SEARCH_PRIOR,
-    STRATEGY_DOMAINS,
     StrategyEdit,
     StrategyState,
 )
@@ -464,32 +463,6 @@ def project_strategy_for_prompt(
         "guidance_tokens": guidance,
         "ranking_preferences": ranking,
     }
-
-
-def rank_candidates(
-    candidate_ids: Sequence[str],
-    features: Mapping[str, Mapping[str, bool]],
-    state: StrategyState,
-) -> list[str]:
-    """Re-rank (never enlarge) a candidate set using the enabled strategy tokens.
-
-    ``features`` maps candidate_id -> {strategy_token: bool}. Every enabled
-    token contributes equally: a candidate matching more of the learner's
-    current strategy ranks higher. C7 unifies advisory and ranking tokens into
-    one strategy surface — they all bias selection. The ordering is
-    deterministic (match count desc, then candidate_id asc) and returns the
-    SAME set of ids, only reordered.
-    """
-    enabled: list[str] = []
-    for domain in STRATEGY_DOMAINS:
-        enabled.extend(state.enabled_in(domain))
-
-    def score(cid: str) -> tuple[int, str]:
-        row = features.get(cid, {})
-        matches = sum(1 for token in enabled if bool(row.get(token)))
-        return (-matches, cid)
-
-    return sorted((str(c) for c in candidate_ids), key=score)
 
 
 # ============================================================
