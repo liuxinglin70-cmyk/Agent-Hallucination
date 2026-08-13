@@ -201,6 +201,7 @@ from sehd_rise.skills.capabilities import (
 from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
 from sehd_rise.learning.protocol import (
     CandidateArchive,
+    EvaluationEvidence,
     ExecutableCandidate,
     FailureObservation,
     RepairIntent,
@@ -2779,6 +2780,11 @@ class EvolutionLoop:
                     "condition_feature_trace"
                 ),
             )
+            # §13: the typed RepairIntent is the planner's declared repair
+            # target — the DSL-independent owner/field/observed/required the
+            # generation must express through the capability contracts.
+            repair_intent = RepairIntent.from_episode(episode)
+            reflection_audit["repair_intent"] = repair_intent.to_dict()
             system_prompt, user_prompt = build_causal_reflection_prompt(
                 signal=view,
                 current_skill_text=skill_context,
@@ -2796,6 +2802,7 @@ class EvolutionLoop:
                 runtime_observation=runtime_observation,
                 entity_menu=entity_menu,
                 binding_domain=binding_domain,
+                repair_intent=repair_intent.to_dict(),
             )
             experience_summary = (
                 self.type_fitness.get_experience_memory().get_reflection_summary(
@@ -4360,6 +4367,16 @@ class EvolutionLoop:
                 "ran": conflict_gate_ran,
             }
         )
+        # §13: the typed EvaluationEvidence is the fitness input record — the
+        # deterministic effect facts every downstream fitness consumer reads.
+        fitness_audit["evaluation_evidence"] = EvaluationEvidence(
+            fired=bool(construction_evidence.get("fired")),
+            target_edge_changed=True,
+            blocker_cleared=True,
+            terminal_transition=f"{signal.state}->{candidate_signal.state}",
+            decision=assessment.decision,
+            promotable=assessment.passed or assessment.evidence_only,
+        ).to_dict()
         if not shadow_admissible:
             typed_assessment = self.type_fitness.assess_edit(
                 source_case_id=case_id,

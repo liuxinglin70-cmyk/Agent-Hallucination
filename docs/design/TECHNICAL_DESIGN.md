@@ -371,13 +371,22 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
 RuleSpec 能否精确表达」不再过早合并：
 
 ```text
-FailureObservation    真实发生了什么（终态 + 阻塞谓词 + 属主 + 缺失/畸形字段）
+FailureObservation    真实发生了什么（终态 + 阻塞谓词 + 属主 + 因果边身份 +
+                      缺失/畸形字段 + dependency refs + 轨迹 locus 证据）
 RepairIntent          要改哪条因果边，DSL 无关；missing_capability 非空时即为
                       CAPABILITY_GAP 信号（记录「缺什么」，而非静默 no-edit）
 ExecutableCandidate   当前能力空间里怎么实现
 EvaluationEvidence    执行后发生了什么（fired / edge changed / blocker cleared / transition）
 EvolutionMemory       什么条件下这类改动值得再次尝试
 ```
+
+五个类型现在是运行时的类型总线，而非仅 schema 层定义：runner 在每个触发路径上从
+episode 构造 `FailureObservation.from_episode`（`CAPABILITY_GAP` 步骤把
+`failure_observation` 与 `RepairIntent` 一并写入审计）；REPAIRABLE 路径构造
+`RepairIntent.from_episode` 作为 planner 的声明修复目标（`<repair_intent>` 块）；
+fitness 路径把 `EvaluationEvidence`（fired / target_edge_changed / blocker_cleared /
+terminal_transition / decision / promotable）写进 `fitness_check`，作为 fitness
+消费的唯一效果记录。
 
 `CandidateArchive` 是一个有界、按阶段（raw_hypothesis / schema_valid / bindable /
 executable）归档被拒候选的集合，取代「只追单条 mutation lineage」的丢弃。候选失败

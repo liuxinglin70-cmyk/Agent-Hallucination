@@ -335,6 +335,7 @@ def build_causal_reflection_prompt(
     runtime_observation: Mapping[str, Any] | None = None,
     entity_menu: Sequence[Mapping[str, Any]] = (),
     binding_domain: str = "",
+    repair_intent: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
     """Build the PRIMARY LLM prompt for causal process reflection.
 
@@ -349,7 +350,10 @@ def build_causal_reflection_prompt(
     reads (never a copy). ``entity_menu`` / ``binding_domain`` carry the
     framework-enumerated legal entities when the capability's binding domain
     is ``exactly_one``, so the model names the training entity by id instead
-    of guessing a uniquely-matching predicate.
+    of guessing a uniquely-matching predicate. ``repair_intent`` is the
+    DSL-independent RepairIntent the runner derived from the episode — the
+    declared repair target the generation must express through the
+    capability contracts below.
     """
     allowed_modules = tuple(
         dict.fromkeys(
@@ -860,6 +864,18 @@ training entity while the predicate stays general.
             "</entity_menu>\n"
         )
 
+    intent_section = ""
+    if repair_intent:
+        intent_section = (
+            "<repair_intent>\n"
+            + json.dumps(dict(repair_intent), ensure_ascii=False, sort_keys=True)
+            + "\nThis is the DSL-independent repair target the framework "
+            "derived from the causal cut. Express exactly this owner, output "
+            "field, observed and required values through the capability "
+            "contracts below; do not substitute a nearby field or module.\n"
+            "</repair_intent>\n\n"
+        )
+
     user = (
         "<diagnostic_signal runtime_observable=\"false\">\n"
         f"trigger={_enum_value(signal.trigger_source)}\n"
@@ -874,6 +890,7 @@ training entity while the predicate stays general.
         f"attribution_evidence={html.escape(signal.evidence_summary[:1200], quote=True)}\n"
         f"{crs_section}\n"
         "</diagnostic_signal>\n\n"
+        f"{intent_section}"
         f"{meta_section}"
         f"{observation_section}"
         f"{experience_section}"

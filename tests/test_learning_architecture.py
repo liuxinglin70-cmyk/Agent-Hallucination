@@ -285,6 +285,46 @@ def test_repair_intent_records_missing_capability() -> None:
     assert payload["missing_capability"] == "construct_candidate"
 
 
+def test_failure_observation_from_episode_carries_edge_identity() -> None:
+    """The typed observation carries the causal-edge identity and the
+    cross-claim dependency refs the mechanism classifier discriminates on."""
+    edge = FailureEdge(
+        producer_route="local_constructive_harness",
+        output_object="candidate",
+        field="anchor_id",
+        consumer="proof_court",
+        observed="absent",
+        required="present",
+        owner_module="candidate_trigger",
+    )
+    slice_payload = SimpleNamespace(
+        missing_fields=("anchor_id",),
+        malformed_fields=(),
+        candidate_kind="unknown",
+        dependency_refs=("event_002",),
+    )
+    episode = SimpleNamespace(
+        terminal_state="verified_clean",
+        blocking_predicate="gold_polarity_mismatch",
+        failure_owner="candidate_trigger",
+        skill_layer="l1_provider_rule",
+        reason_code="gold_false_negative_clean",
+        causal_slice=slice_payload,
+        causal_failure_edge=edge,
+    )
+    observation = FailureObservation.from_episode(episode)
+    assert observation.output_object == "candidate"
+    assert observation.output_field == "anchor_id"
+    assert observation.consumer == "proof_court"
+    assert observation.dependency_refs == ("event_002",)
+    assert observation.trajectory_hints == ()
+    payload = observation.to_dict()
+    assert payload["output_object"] == "candidate"
+    assert payload["output_field"] == "anchor_id"
+    assert payload["consumer"] == "proof_court"
+    assert payload["dependency_refs"] == ["event_002"]
+
+
 # --- §10: run-mode tri-section ---------------------------------------------
 
 def test_run_mode_supervised() -> None:
