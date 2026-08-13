@@ -11,9 +11,12 @@ C10 reconnection (plan §2.12 causal credit chain): the old ``AttributionSignal`
 carried a ``should_evolve`` trigger boolean. Phase 4 absorbed that trigger into
 the single Repairability Authority (``repairability.analyze``), so
 ``DetectionSignal`` has no equivalent field. The trigger is therefore threaded
-in explicitly as ``before_trigger`` / ``after_trigger`` (the baseline and replay
-repairability verdicts), supplied by the loop that already computed them. The
-signal itself is the single projection of its result, so the old
+in explicitly as ``before_trigger`` / ``after_trigger`` — the failure-existence
+verdicts of the baseline and replay episodes, derived from one canonical
+context (``causal.repairability.triggered_episode``). The trigger means
+*failure exists*, not *currently repairable*: a repairability demotion to a
+capability gap keeps it open. The signal itself is the single projection of
+its result, so the old
 ``replace(signal, state=resolve_evolution_state(result))`` re-resolution is
 gone: a caller passes ``project_detection(result)`` and the state already
 matches.
