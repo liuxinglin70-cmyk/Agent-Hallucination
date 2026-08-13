@@ -239,10 +239,20 @@ def compile_action_spec(module_id: str, action: str) -> ActionSpec:
     postcondition = _OPERATION_POSTCONDITION.get(operation)
     if not postcondition:
         raise ValueError(f"action_spec_operation_unmapped:{operation}")
-    observable_field, direction = _MODULE_OPERATION_EFFECT.get(
-        (module_id, operation),
-        _OPERATION_EFFECT.get(operation, _MODULE_EFFECT[module_id]),
+    # Effect resolution is most-specific first and must be lazy: a module
+    # with no module-default effect (its opcodes all resolve at operation or
+    # module-operation level) would otherwise KeyError here even though its
+    # opcode maps cleanly — ``dict.get`` evaluates its default argument
+    # eagerly. An opcode that resolves nowhere is an instrumentation defect,
+    # reported fail-closed, never guessed.
+    effect = (
+        _MODULE_OPERATION_EFFECT.get((module_id, operation))
+        or _OPERATION_EFFECT.get(operation)
+        or _MODULE_EFFECT.get(module_id)
     )
+    if effect is None:
+        raise ValueError(f"action_spec_effect_unmapped:{module_id}:{operation}")
+    observable_field, direction = effect
     return ActionSpec(
         module_id=module_id,
         route_ids=MODULE_ROUTE_IDS[module_id],
