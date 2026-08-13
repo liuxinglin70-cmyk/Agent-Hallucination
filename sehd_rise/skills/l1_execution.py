@@ -310,9 +310,14 @@ def execute_l1_intervention(
             if isinstance(proof, Mapping) else ""
         )
         if origin and origin != current:
+            # The deterministic selection resolves the origin the court had
+            # to guess by timestamp: write the localization fact back so the
+            # re-projected cut no longer reads a temporal fallback and the
+            # trigger can close.
             _mutate_proof(
                 mutated, responsible_event_id=origin,
                 state="verified_error",
+                localization_status="complete",
             )
             fired = True
             detail = f"responsible_origin_selected:{origin}"

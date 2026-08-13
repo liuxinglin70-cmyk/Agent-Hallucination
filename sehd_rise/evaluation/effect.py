@@ -35,6 +35,7 @@ from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.signals import DetectionSignal
 from sehd_rise.evaluation.fitness import (
+    CONTRACT_DIRECTION_DELTA_TOKENS,
     FitnessAssessment,
     observable_process_delta,
 )
@@ -483,15 +484,11 @@ def _expected_effect_audit(
             "state": ("state:",),
             "trigger": ("trigger:",),
         }
-        direction_tokens: dict[str, tuple[str, ...]] = {
-            "increase": ("increased", "added", "opened"),
-            "decrease": ("decreased", "removed", "closed"),
-            "added": ("added", "opened"),
-            "removed": ("removed", "closed"),
-            "shift": ("shift", "->"),
-            "opened": ("opened",),
-            "closed": ("closed",),
-        }
+        # Declared contract direction -> the movement tokens the delta emits.
+        # The mapping is the single shared table owned by the delta emitter
+        # (fitness.py), so the registry vocabulary and the delta vocabulary
+        # cannot drift apart again.
+        direction_tokens = CONTRACT_DIRECTION_DELTA_TOKENS
         prefixes = field_prefixes.get(cfield, ())
         dir_tokens = direction_tokens.get(cdir, ())
         for token in observable_delta_tokens:

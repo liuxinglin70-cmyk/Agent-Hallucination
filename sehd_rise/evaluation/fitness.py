@@ -385,6 +385,24 @@ def module_local_score(
     return 0.0
 
 
+# The single alignment between the registry's declared contract directions
+# (``EXPECTED_DIRECTIONS``) and the movement tokens
+# ``observable_process_delta`` emits. One capability may declare an intent
+# in gate vocabulary ("opened", "shift") while the delta reports the
+# underlying reading ("decreased", "shifted/added/removed"); this table is
+# the only place the two vocabularies meet, so a drift in either one breaks
+# the contract path in exactly one grep-able spot.
+CONTRACT_DIRECTION_DELTA_TOKENS: dict[str, tuple[str, ...]] = {
+    "increase": ("increased",),
+    "decrease": ("decreased",),
+    "added": ("added",),
+    "removed": ("removed",),
+    "shift": ("shifted", "added", "removed"),
+    "opened": ("opened", "decreased"),
+    "closed": ("closed", "increased"),
+}
+
+
 def observable_process_delta(
     before: DetectionSignal,
     after: DetectionSignal,
@@ -397,7 +415,6 @@ def observable_process_delta(
     epsilon: float = 0.05,
 ) -> tuple[str, ...]:
     """Describe bounded detector-observable changes caused by one edit.
-
     The returned tokens contain no case identifiers or free-form trajectory
     text, so they are safe to persist and feed into a later reflection. This is
     the bridge between replay and learning: a rejected rule should teach the
@@ -493,11 +510,13 @@ def observable_process_delta(
     elif before_causal - after_causal > epsilon:
         changes.append("causal_field_coverage:decreased")
 
-    before_responsible = bool(_responsible_step_present(before_result))
-    after_responsible = bool(_responsible_step_present(after_result))
-    if before_responsible != after_responsible:
+    before_origin = before.responsible_event_id
+    after_origin = after.responsible_event_id
+    if before_origin != after_origin:
         changes.append(
-            "responsible_step:added" if after_responsible else "responsible_step:removed"
+            "responsible_step:added" if before_origin is None
+            else "responsible_step:removed" if after_origin is None
+            else "responsible_step:shifted"
         )
     before_localization = str(
         (before.diagnostics.get("localization_status") if isinstance(
