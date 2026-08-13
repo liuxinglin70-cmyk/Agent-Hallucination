@@ -1667,7 +1667,13 @@ def _resolve_terminal_state(
         "prosecution_coverage": p_coverage,
         "defense_coverage": d_coverage,
         "terminal_basis": terminal_basis,
-        "error_audits": p_audits,
+        # Audits carry the certificate id of the row they judged, so
+        # consumers key by id instead of re-deriving a positional zip
+        # against whichever prosecution subset they happen to hold.
+        "error_audits": [
+            {**audit, "certificate_id": str(row.get("certificate_id") or "")}
+            for row, audit in zip(p_rows, p_audits)
+        ],
         "defense_audits": d_audits,
         "defense_type_counts": dict(Counter(all_defense_types)),
         "materiality_results": materiality_results,

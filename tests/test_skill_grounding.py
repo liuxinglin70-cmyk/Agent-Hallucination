@@ -10,6 +10,7 @@ from sehd_rise.skills.binding import (
     BINDING_NOT_FOUND,
     Binding,
     match_condition_bindings,
+    project_binding_universe,
 )
 from sehd_rise.skills.l1_execution import (
     evaluate_l1_rule,
@@ -76,6 +77,7 @@ def _result(*, same_entity: bool = False, two_matching_certificates: bool = Fals
         },
     ]
     audits = [{
+        "certificate_id": "C7",
         "decision": "pass",
         "missing_fields": [],
         "failed_invariants": ["norm_evidence"],
@@ -88,6 +90,7 @@ def _result(*, same_entity: bool = False, two_matching_certificates: bool = Fals
             "origin_event_id": "E2",
         })
         audits.append({
+            "certificate_id": "C8",
             "decision": "pass",
             "missing_fields": [],
             "failed_invariants": ["norm_evidence"],
@@ -229,3 +232,87 @@ def test_source_prevalidation_persists_binding_proof() -> None:
     assert reason is None
     assert candidate["binding_proof"]["status"] == BINDING_BOUND
     assert candidate["binding_proof"]["bindings"][0]["entity_id"] == "C7"
+
+
+def test_audit_features_key_by_certificate_id_across_focused_and_combined_sets() -> None:
+    """Appeal renumbering (initial_error_NNN / appeal_error_NNN) must not
+    shift audits onto the wrong certificate: the audit map is keyed by each
+    audit's own certificate id, not by a positional zip against the focused
+    prosecution subset."""
+    census = [
+        {
+            "candidate_id": "C1", "candidate_kind": "unsupported_claim",
+            "module_tag": "reasoning", "origin_hypothesis_event_id": "E1",
+            "axes": ["F"],
+        },
+        {
+            "candidate_id": "C2", "candidate_kind": "contradiction",
+            "module_tag": "tool_use", "origin_hypothesis_event_id": "E2",
+            "axes": ["F"],
+        },
+    ]
+    focused = [
+        {
+            "certificate_id": "focused_error_001", "source_candidate_id": "C1",
+            "origin_event_id": "E1",
+        },
+    ]
+    combined = [
+        {
+            "certificate_id": "appeal_error_001", "source_candidate_id": "C2",
+            "origin_event_id": "E2",
+        },
+        {
+            "certificate_id": "initial_error_001", "source_candidate_id": "C1",
+            "origin_event_id": "E1",
+        },
+    ]
+    result = {
+        "state": "verified_error",
+        "census": census,
+        "prosecution": {"candidates": focused},
+        "combined_prosecution": {"candidates": combined},
+        "proof_adjudication": {
+            "state": "verified_error",
+            "responsible_event_id": "E1",
+            "prosecution_coverage": "complete",
+            "defense_coverage": "complete",
+            "surviving_error_certificate_ids": ["initial_error_001"],
+            "error_audits": [
+                {
+                    "certificate_id": "appeal_error_001",
+                    "decision": "quarantine",
+                    "missing_fields": ["norm_evidence_refs"],
+                    "failed_invariants": [],
+                },
+                {
+                    "certificate_id": "initial_error_001",
+                    "decision": "pass",
+                    "missing_fields": [],
+                    "failed_invariants": ["norm_evidence"],
+                },
+            ],
+            "terminal_basis": {"decisive_facts": {
+                "coverage_complete": True,
+                "candidate_terminal": True,
+            }},
+        },
+    }
+    bindings = {
+        binding.entity_id: binding
+        for binding in project_binding_universe(result, domain="certificate")
+    }
+    initial = bindings["initial_error_001"]
+    assert "norm_evidence" in initial.features["failed_invariant"]
+    assert initial.features["missing_field"] == []
+    assert initial.features["evidence_verified"] is True
+    appeal = bindings["appeal_error_001"]
+    assert appeal.features["missing_field"] == ["norm_evidence_refs"]
+    assert appeal.features["failed_invariant"] == []
+    assert appeal.features["evidence_verified"] is False
+    candidate_bindings = {
+        binding.entity_id: binding
+        for binding in project_binding_universe(result, domain="candidate")
+    }
+    assert candidate_bindings["C1"].features["evidence_verified"] is True
+    assert candidate_bindings["C2"].features["evidence_verified"] is False

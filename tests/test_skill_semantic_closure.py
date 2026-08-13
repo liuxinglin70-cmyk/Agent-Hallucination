@@ -60,6 +60,7 @@ def _court_result() -> dict:
             "surviving_error_certificate_ids": ["certificate_1"],
             "error_audits": [
                 {
+                    "certificate_id": "certificate_1",
                     "decision": "quarantine",
                     "failed_checks": ["norm_evidence"],
                     "missing_fields": ["norm_evidence_refs"],

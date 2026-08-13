@@ -164,17 +164,14 @@ def _certificate_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _audit_by_certificate(result: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    prosecution = result.get("prosecution")
-    rows = prosecution.get("candidates") if isinstance(prosecution, Mapping) else ()
     proof = result.get("proof_adjudication")
     audits = proof.get("error_audits") if isinstance(proof, Mapping) else ()
     mapped: dict[str, dict[str, Any]] = {}
-    for index, row in enumerate(rows or ()):
-        if not isinstance(row, Mapping):
+    for audit in audits or ():
+        if not isinstance(audit, Mapping):
             continue
-        certificate_id = str(row.get("certificate_id") or "")
-        audit = audits[index] if isinstance(audits, list) and index < len(audits) else {}
-        if certificate_id and isinstance(audit, Mapping):
+        certificate_id = str(audit.get("certificate_id") or "")
+        if certificate_id:
             mapped[certificate_id] = dict(audit)
     return mapped
 
