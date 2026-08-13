@@ -311,25 +311,17 @@ MODULE_CHARTERS: dict[str, ModuleCharter] = {
 # provider output field operated on is explicit and traceable.
 MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
     "candidate_trigger": (
-        ("emit_candidate", "emit a candidate"),
         ("suppress_candidate", "suppress the candidate"),
-        ("emit_origin_census", "emit the origin census entry"),
     ),
     "evidence_obligation": (
         ("require_evidence_field", "require the cited evidence field"),
-        ("populate_evidence_field", "populate the cited evidence field"),
-        ("emit_error_certificate", "emit an error certificate"),
         ("keep_coverage_incomplete", "keep the coverage incomplete"),
     ),
     "candidate_to_verifier_route": (
-        ("route_candidate_to_verifier", "route the candidate to the verifier"),
-        ("qualify_candidate", "qualify the candidate for verification"),
         ("hold_candidate_qualification", "hold the candidate qualification"),
     ),
     "atomic_verifier_instruction": (
-        ("verify_violation", "verify the violation against the norm"),
         ("withhold_certificate", "withhold the certificate"),
-        ("emit_certificate", "emit the certificate"),
         ("require_evidence_field", "require the cited evidence field"),
         (
             "enforce_certificate_invariant",
@@ -337,8 +329,6 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
         ),
     ),
     "clean_defense_boundary": (
-        ("emit_defense_certificate", "emit a defense certificate"),
-        ("emit_boundary_finding", "emit the boundary finding"),
         ("require_evidence_field", "require the cited evidence field"),
         (
             "enforce_certificate_invariant",
@@ -346,17 +336,13 @@ MODULE_ACTION_OPCODES: dict[str, tuple[tuple[str, str], ...]] = {
         ),
     ),
     "causal_link_test": (
-        ("test_causal_link", "test the causal link"),
         ("reject_non_causal_origin", "reject the non-causal origin"),
-        ("populate_impact_chain", "populate the impact and recovery chain"),
     ),
     "earliest_origin_tiebreak": (
         ("select_earliest_origin", "select the earliest responsible origin"),
         ("suppress_later_origin", "suppress the later origin"),
     ),
-    "abstention_rule": (
-        ("emit_boundary_finding", "emit the boundary finding"),
-    ),
+    "abstention_rule": (),
 }
 
 MODULE_FORBIDDEN_ACTION_TERMS: dict[str, tuple[str, ...]] = {
@@ -439,11 +425,7 @@ MODULE_OBSERVABLE_FIELDS: dict[str, tuple[str, ...]] = {
 # operates on certificate_id, never on evidence_refs).
 MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
     "candidate_trigger": {
-        "emit_candidate": ("candidate",),
         "suppress_candidate": ("candidate", "candidate_id"),
-        "emit_origin_census": (
-            "origin_hypothesis_event_id", "trigger_event_id", "observation",
-        ),
     },
     "evidence_obligation": {
         "require_evidence_field": (
@@ -452,34 +434,15 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
             "violation_evidence_refs", "agent_control_evidence_refs",
             "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
         ),
-        "populate_evidence_field": (
-            "consumption_evidence_refs", "impact_evidence_refs",
-            "recovery_evidence_refs", "norm_evidence_refs",
-            "violation_evidence_refs", "agent_control_evidence_refs",
-            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
-        ),
-        "emit_error_certificate": ("certificate_id",),
         "keep_coverage_incomplete": ("coverage_state",),
     },
     "candidate_to_verifier_route": {
-        "route_candidate_to_verifier": (
-            "violation_state", "actor_state", "boundary_state",
-        ),
-        "qualify_candidate": (
-            "violation_state", "actor_state", "boundary_state",
-        ),
         "hold_candidate_qualification": (
             "violation_state", "actor_state", "boundary_state",
         ),
     },
     "atomic_verifier_instruction": {
-        "verify_violation": (
-            "coverage_state", "breach_type", "benchmark_causal_status",
-            "violation_evidence_refs", "agent_control_evidence_refs",
-            "benchmark_causal_evidence_refs", "counterfactual_evidence_refs",
-        ),
         "withhold_certificate": ("certificate_id",),
-        "emit_certificate": ("certificate_id",),
         "require_evidence_field": (
             "positive_evidence_refs", "actor_evidence_refs",
             "boundary_evidence_refs", "norm_evidence_refs",
@@ -491,8 +454,6 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
         "enforce_certificate_invariant": ERROR_INVARIANT_TARGETS,
     },
     "clean_defense_boundary": {
-        "emit_defense_certificate": ("certificate_id",),
-        "emit_boundary_finding": ("state", "responsible_event_id"),
         "require_evidence_field": (
             "evidence", "evidence_refs", "target_candidate_id",
             "target_origin_event_id",
@@ -500,25 +461,13 @@ MODULE_OPERATION_TARGETS: dict[str, dict[str, tuple[str, ...]]] = {
         "enforce_certificate_invariant": DEFENSE_INVARIANT_TARGETS,
     },
     "causal_link_test": {
-        "test_causal_link": (
-            "benchmark_causal_evidence_refs", "causal_sufficiency_score",
-            "is_root_cause",
-        ),
         "reject_non_causal_origin": ("responsible_event_id", "is_root_cause"),
-        "populate_impact_chain": (
-            "consumption_evidence_refs", "impact_evidence_refs",
-            "recovery_evidence_refs", "benchmark_causal_evidence_refs",
-        ),
     },
     "earliest_origin_tiebreak": {
         "select_earliest_origin": ("responsible_event_id",),
         "suppress_later_origin": ("responsible_event_id",),
     },
-    "abstention_rule": {
-        "emit_boundary_finding": (
-            "state", "responsible_event_id", "evidence_refs",
-        ),
-    },
+    "abstention_rule": {},
 }
 
 

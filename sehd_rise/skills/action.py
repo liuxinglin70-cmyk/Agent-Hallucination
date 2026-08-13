@@ -68,18 +68,11 @@ MODULE_OUTPUT_OBJECT: Mapping[str, str] = {
 }
 
 _OPERATION_POSTCONDITION: Mapping[str, str] = {
-    "emit_candidate": "object_present",
     "suppress_candidate": "object_absent",
-    "emit_origin_census": "object_present",
     "require_evidence_field": "field_nonempty",
-    "populate_evidence_field": "field_nonempty",
     "enforce_certificate_invariant": "certificate_invariant_repaired",
-    "emit_error_certificate": "object_present",
     "keep_coverage_incomplete": "coverage_not_complete",
-    "route_candidate_to_verifier": "route_assignment_present",
-    "qualify_candidate": "qualification_positive",
     "hold_candidate_qualification": "qualification_not_positive",
-    "verify_violation": "verification_state_present",
     # ``withhold_certificate`` semantics are fingerprint-targeted (the rule
     # removes ONE certificate matching its condition), not whole-surface (all
     # surviving certificates gone): whenever multiple certificates carry the
@@ -90,25 +83,15 @@ _OPERATION_POSTCONDITION: Mapping[str, str] = {
     # supply, and otherwise falls back to the strict whole-surface check for
     # single-carrier cases.
     "withhold_certificate": "targeted_certificate_withheld",
-    "emit_certificate": "object_present",
-    "emit_defense_certificate": "object_present",
-    "emit_boundary_finding": "field_present",
-    "test_causal_link": "causal_status_present",
     "reject_non_causal_origin": "origin_not_selected",
-    "populate_impact_chain": "field_nonempty",
     "select_earliest_origin": "responsible_origin_present",
     "suppress_later_origin": "later_origin_not_selected",
 }
 
 _MODULE_EFFECT: Mapping[str, tuple[str, str]] = {
-    "candidate_trigger": ("candidate_count", "increase"),
     "evidence_obligation": ("causal_field_coverage", "increase"),
-    "candidate_to_verifier_route": ("prosecution_certificates", "increase"),
-    "atomic_verifier_instruction": ("prosecution_certificates", "increase"),
     "clean_defense_boundary": ("defense_certificates", "increase"),
-    "causal_link_test": ("causal_field_coverage", "increase"),
     "earliest_origin_tiebreak": ("responsible_step", "shift"),
-    "abstention_rule": ("state", "shift"),
 }
 
 _OPERATION_EFFECT: Mapping[str, tuple[str, str]] = {
@@ -128,12 +111,6 @@ _MODULE_OPERATION_EFFECT: Mapping[tuple[str, str], tuple[str, str]] = {
     (
         "atomic_verifier_instruction", "require_evidence_field",
     ): ("causal_field_coverage", "increase"),
-    # An emitted error certificate is observable as a NEW claim-level
-    # carrier in the surviving set (same fingerprint identity as
-    # withhold_certificate), not as a whole-surface count shift.
-    (
-        "atomic_verifier_instruction", "emit_certificate",
-    ): ("surviving_certificates", "increase"),
     (
         "atomic_verifier_instruction", "enforce_certificate_invariant",
     ): ("target_certificate_invariant_failure", "decrease"),
@@ -149,29 +126,18 @@ ERROR_TO_CLEAN_ACTIONS: Mapping[str, frozenset[str]] = {
     "evidence_obligation": frozenset({"keep_coverage_incomplete"}),
     "atomic_verifier_instruction": frozenset({"withhold_certificate"}),
     "clean_defense_boundary": frozenset({
-        "emit_defense_certificate", "emit_boundary_finding",
         "require_evidence_field", "enforce_certificate_invariant",
     }),
-    "abstention_rule": frozenset({"emit_boundary_finding"}),
     "causal_link_test": frozenset({"reject_non_causal_origin"}),
     "candidate_trigger": frozenset({"suppress_candidate"}),
     "candidate_to_verifier_route": frozenset({"hold_candidate_qualification"}),
 }
 
 CLEAN_TO_ERROR_ACTIONS: Mapping[str, frozenset[str]] = {
-    "candidate_trigger": frozenset({"emit_candidate", "emit_origin_census"}),
-    "evidence_obligation": frozenset({
-        "require_evidence_field", "populate_evidence_field",
-        "emit_error_certificate",
-    }),
-    "candidate_to_verifier_route": frozenset({
-        "route_candidate_to_verifier", "qualify_candidate",
-    }),
+    "evidence_obligation": frozenset({"require_evidence_field"}),
     "atomic_verifier_instruction": frozenset({
-        "verify_violation", "emit_certificate", "require_evidence_field",
-        "enforce_certificate_invariant",
+        "require_evidence_field", "enforce_certificate_invariant",
     }),
-    "causal_link_test": frozenset({"test_causal_link", "populate_impact_chain"}),
     "earliest_origin_tiebreak": frozenset({"select_earliest_origin"}),
 }
 

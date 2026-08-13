@@ -95,8 +95,12 @@ _SYNTHESIZED_FIELD_REASONS: dict[str, tuple[str, str]] = {
     REASON_GOLD_FALSE_POSITIVE: (
         "evidence_obligation", "coverage_state",
     ),
+    # FN-clean (a hallucinated case wrongly adjudicated clean) is a missing-
+    # evidence failure: the only deterministic clean_to_error opcode left on
+    # ``evidence_obligation`` is ``require_evidence_field``, so the canonical
+    # executable field is a norm-evidence citation, not a certificate id.
     REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
-        "evidence_obligation", "certificate_id",
+        "evidence_obligation", "norm_evidence_refs",
     ),
 }
 
