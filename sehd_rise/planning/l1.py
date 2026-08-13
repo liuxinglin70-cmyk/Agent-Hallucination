@@ -477,7 +477,7 @@ certificate_id, the surviving prosecution certificates that actually carry
 the current error verdict; court_balance.witness_certificates lists the
 prosecution rows the court already disregarded (quarantined, superseded or
 otherwise non-surviving). For an error_to_clean (FP / unresolved_should_clean)
-edit, your withhold_certificate / hold_candidate_qualification / suppress_*
+edit, your withhold_certificate
 MUST target a certificate listed in verdict_carriers. Withholding only a
 witness certificate produces zero observable verdict movement because the
 carrier survives untouched; the replay postcondition detects the carrier
@@ -549,9 +549,9 @@ Operation preference (v5.3.2):
 - remove_rule is almost never justified; prefer adding a complementary rule.
 
 Good examples pair a court-result condition with an exact capability:
-- existing candidate matches a recovered tool-error pattern -> suppress_candidate;
 - existing error certificate lacks a registered invariant -> withhold_certificate;
-- existing selected origin fails the causal-link pattern -> reject_non_causal_origin.
+- complete prosecution coverage carries no valid certificate -> keep_coverage_incomplete;
+- multiple surviving origins with a temporal-fallback localization -> select_earliest_origin.
 
 Do not copy one rule across modules. Do not modify or remove immutable baseline
 rules. Only rules explicitly marked evolvable may be modified or removed.

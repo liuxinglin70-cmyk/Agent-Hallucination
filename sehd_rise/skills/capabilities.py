@@ -301,33 +301,6 @@ _CAPABILITIES = (
     ),
     SkillCapability(
         skill_layer="l1_provider_rule",
-        module="candidate_trigger",
-        executable_operation="suppress_candidate",
-        reads=("existing census candidate", "surviving error certificates"),
-        writes=("candidate availability", "surviving_error_certificate_ids"),
-        applicable_failure_shapes=(
-            "gold_false_positive", "provider_artifact_malformed",
-        ),
-        supported_directions=_SUPPRESSIVE_DIRECTIONS,
-        binding_requirements=("existing candidate_id", "matched result condition"),
-        input_binding_domain="candidate",
-        required_binding_fields=("candidate_id",),
-        cardinality="one_or_many",
-        expected_local_effect=("candidate_count", "decrease"),
-        possible_terminal_effect=(
-            "verified_error->unresolved", "verified_error->verified_clean",
-        ),
-        executor=L1_COURT_TRANSFORM_EXECUTOR,
-        fitness_postcondition="object_absent",
-        route_ids=("post_court_l1",),
-        output_object="candidate",
-        operation_targets=("candidate", "candidate_id"),
-        does_not_support=(
-            "author candidate verdict", "modify provider candidate generation",
-        ),
-    ),
-    SkillCapability(
-        skill_layer="l1_provider_rule",
         module="evidence_obligation",
         executable_operation="keep_coverage_incomplete",
         reads=("existing prosecution coverage",),
@@ -351,34 +324,6 @@ _CAPABILITIES = (
         does_not_support=(
             "collect missing evidence", "construct certificate",
             "verified_clean->verified_error", "modify provider reasoning",
-        ),
-    ),
-    SkillCapability(
-        skill_layer="l1_provider_rule",
-        module="candidate_to_verifier_route",
-        executable_operation="hold_candidate_qualification",
-        reads=("existing candidate qualification", "surviving certificates"),
-        writes=("surviving_error_certificate_ids",),
-        applicable_failure_shapes=(
-            "gold_false_positive", "provider_artifact_malformed",
-        ),
-        supported_directions=_SUPPRESSIVE_DIRECTIONS,
-        binding_requirements=("existing candidate_id",),
-        input_binding_domain="candidate",
-        required_binding_fields=("candidate_id",),
-        cardinality="one_or_many",
-        expected_local_effect=("prosecution_certificates", "decrease"),
-        possible_terminal_effect=(
-            "verified_error->unresolved", "verified_error->verified_clean",
-        ),
-        executor=L1_COURT_TRANSFORM_EXECUTOR,
-        fitness_postcondition="qualification_not_positive",
-        route_ids=("post_court_l1",),
-        output_object="candidate_qualification",
-        operation_targets=("violation_state", "actor_state", "boundary_state"),
-        does_not_support=(
-            "route a missing candidate", "invoke a verifier",
-            "verified_clean->verified_error",
         ),
     ),
     SkillCapability(
@@ -408,35 +353,6 @@ _CAPABILITIES = (
         does_not_support=(
             "create missing certificate", "reverify claim",
             "verified_clean->verified_error", "modify verifier instructions",
-        ),
-    ),
-    SkillCapability(
-        skill_layer="l1_provider_rule",
-        module="causal_link_test",
-        executable_operation="reject_non_causal_origin",
-        reads=("existing responsible origin", "surviving certificates"),
-        writes=("surviving_error_certificate_ids", "responsible_event_id"),
-        applicable_failure_shapes=(
-            "gold_false_positive", "provider_artifact_malformed",
-            "localization_temporal_fallback",
-        ),
-        supported_directions=_SUPPRESSIVE_DIRECTIONS,
-        binding_requirements=("existing origin_event_id",),
-        input_binding_domain="origin",
-        required_binding_fields=("origin_event_id",),
-        cardinality="exactly_one",
-        expected_local_effect=("responsible_step", "removed"),
-        possible_terminal_effect=(
-            "verified_error->unresolved", "verified_error->verified_clean",
-        ),
-        executor=L1_COURT_TRANSFORM_EXECUTOR,
-        fitness_postcondition="origin_not_selected",
-        route_ids=("post_court_l1",),
-        output_object="causal_certificate_or_boundary",
-        operation_targets=("responsible_event_id", "is_root_cause"),
-        does_not_support=(
-            "construct causal evidence", "create causal certificate",
-            "modify provider causal reasoning",
         ),
     ),
     SkillCapability(
@@ -501,7 +417,6 @@ _CAPABILITIES = (
         writes=("effective prosecution/defense coverage",),
         applicable_failure_shapes=(
             "hollow_complete_prosecution", "hollow_complete_defense",
-            "all_candidates_quarantined",
         ),
         supported_directions=(
             "error_to_clean", "unresolved_to_clean",
@@ -529,7 +444,6 @@ _CAPABILITIES = (
         writes=("effective prosecution/defense coverage",),
         applicable_failure_shapes=(
             "hollow_complete_prosecution", "hollow_complete_defense",
-            "all_candidates_quarantined",
         ),
         supported_directions=(
             "error_to_clean", "unresolved_to_clean",

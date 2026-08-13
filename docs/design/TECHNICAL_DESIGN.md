@@ -159,7 +159,7 @@ RepairPlan
 └── evaluation contract（评估契约）
 ```
 
-L1 的既有实体修复经 `l1_court_transform` 执行七个确定性抑制/选择变换；缺失 candidate
+L1 的既有实体修复经 `l1_court_transform` 执行四个确定性抑制/选择变换；缺失 candidate
 只经 `l1_constructive_harness` 绑定一个确定性 `ClaimAnchor`、调用冻结 constructor，
 再从 qualification 开始局部续跑。Skill 仍不能编写 evidence/certificate/verdict，续跑也
 不能重新采样 census。L2 经
@@ -439,8 +439,8 @@ clean 证书、构造性召回 construct_candidate）只在显式开启 gold 监
 `CAPABILITY_GAP` 被 100% 正确识别后**只记录、不合成**：runner 把 `RepairIntent` +
 `failure_observation` + `fn_family` 写入审计，`CandidateArchive` 的连续同类失败信号
 追加能力课程条目，但没有任何环节把这些信号变成新 capability。当前 L1 自进化的诚实
-定义是**固定 primitive 词表上的规则特化**——学习 condition / anchor 判别器，让八个
-确定性 L1 变换（七个抑制/选择 + 一个受限构造）与 L2 判定策略在更多失败形状上正确
+定义是**固定 primitive 词表上的规则特化**——学习 condition / anchor 判别器，让五个
+确定性 L1 变换（四个抑制/选择 + 一个受限构造）与 L2 判定策略在更多失败形状上正确
 触发；系统不宣称能发明新 detector capability。`RepairIntent → CapabilityCandidate → Sandbox executor
 合成 → interface/static checks → 源行为证明 → canary → 多案例复发 → holdout →
 registry 晋升` 是明确的后续工作（安全引入新执行器必须先有确定性运行时语义与选择门），

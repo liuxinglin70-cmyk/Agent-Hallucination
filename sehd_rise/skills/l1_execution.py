@@ -1,21 +1,19 @@
 """Deterministic post-court executor for L1 Skill actions.
 
-The L1 Skill layer has exactly seven executable actions left after the
-generative opcodes were removed. Their semantics are monotonic suppress/select
-transforms over the proof court's already-computed result — the same shape the
-L2 policy evaluator uses (``detection.policy.evaluate_policies``). This module
-is that deterministic executor: it consumes one court result plus a compiled
-``ActionSpec`` (whose condition is already known to match), applies the opcode's
-transform to the addressable result surface, and recomputes the terminal state
-with the court's own rule.
+The L1 Skill layer has exactly four executable suppress/select actions left
+after the generative opcodes were removed. Their semantics are monotonic
+suppress/select transforms over the proof court's already-computed result —
+the same shape the L2 policy evaluator uses
+(``detection.policy.evaluate_policies``). This module is that deterministic
+executor: it consumes one court result plus a compiled ``ActionSpec`` (whose
+condition is already known to match), applies the opcode's transform to the
+addressable result surface, and recomputes the terminal state with the
+court's own rule.
 
 Transforms and the surface each operates on (handoff §4.1 mapping):
 
-    suppress_candidate          census + cascade surviving certificate ids
     withhold_certificate        surviving_error_certificate_ids (one carrier)
     keep_coverage_incomplete    prosecution_coverage
-    hold_candidate_qualification surviving ids of the candidate (no re-emit)
-    reject_non_causal_origin    surviving ids of the rejected origin + re-select
     select_earliest_origin      responsible_event_id (earliest surviving origin)
     suppress_later_origin       responsible_event_id (earliest surviving origin)
 
@@ -52,11 +50,8 @@ from sehd_rise.skills.rule import (
 
 
 EXECUTED_L1_OPERATIONS = frozenset({
-    "suppress_candidate",
     "withhold_certificate",
     "keep_coverage_incomplete",
-    "hold_candidate_qualification",
-    "reject_non_causal_origin",
     "select_earliest_origin",
     "suppress_later_origin",
 })
@@ -164,27 +159,6 @@ def _remove_certificates(
     return [value for value in _surviving_ids(result) if value not in remove]
 
 
-def _candidate_certificate_ids(
-    rows: Sequence[Mapping[str, Any]], candidate_id: str,
-) -> set[str]:
-    return {
-        str(row.get("certificate_id") or "")
-        for row in rows
-        if str(row.get("source_candidate_id") or "") == candidate_id
-    }
-
-
-def _candidate_rows_surfaces(result: dict[str, Any], candidate_id: str) -> None:
-    """Remove a candidate from every census surface (best effort)."""
-    for key in ("census", "paca_census", "construct_census", "deterministic_process_census"):
-        rows = result.get(key)
-        if isinstance(rows, list):
-            result[key] = [
-                dict(row) for row in rows
-                if not (isinstance(row, Mapping) and str(row.get("candidate_id") or "") == candidate_id)
-            ]
-
-
 def _mutate_proof(result: dict[str, Any], **updates: Any) -> None:
     proof = result.get("proof_adjudication")
     if isinstance(proof, Mapping):
@@ -236,23 +210,7 @@ def execute_l1_intervention(
 
     identifiers = [dict(binding.identifiers) for binding in bindings]
 
-    if operation == "suppress_candidate":
-        candidate_ids = {
-            value for item in identifiers for value in (item.get("candidate_id"),)
-            if value
-        }
-        for candidate_id in candidate_ids:
-            _candidate_rows_surfaces(mutated, candidate_id)
-        removed = set().union(*(
-            _candidate_certificate_ids(rows, candidate_id)
-            for candidate_id in candidate_ids
-        )) & set(surviving) if candidate_ids else set()
-        if removed:
-            surviving = _remove_certificates(mutated, remove=removed)
-            fired = True
-            detail = "suppressed_candidates:" + ",".join(sorted(candidate_ids))
-
-    elif operation == "withhold_certificate":
+    if operation == "withhold_certificate":
         pinned = identifiers[0].get("certificate_id", "")
         removed = {pinned} & set(surviving)
         if removed:
@@ -266,34 +224,6 @@ def execute_l1_intervention(
             _mutate_proof(mutated, prosecution_coverage="incomplete")
             fired = True
             detail = "prosecution_coverage_opened:complete->incomplete"
-
-    elif operation == "hold_candidate_qualification":
-        # Qualification not positive: the candidate's certificate is not
-        # re-emitted, so its surviving carriers are withheld.
-        candidate_ids = {
-            item.get("candidate_id", "") for item in identifiers
-            if item.get("candidate_id")
-        }
-        removed = set().union(*(
-            _candidate_certificate_ids(rows, candidate_id)
-            for candidate_id in candidate_ids
-        )) & set(surviving) if candidate_ids else set()
-        if removed:
-            surviving = _remove_certificates(mutated, remove=removed)
-            fired = True
-            detail = "qualifications_held:" + ",".join(sorted(candidate_ids))
-
-    elif operation == "reject_non_causal_origin":
-        origin = identifiers[0].get("origin_event_id", "")
-        removed = {
-            str(row.get("certificate_id") or "")
-            for row in rows
-            if str(row.get("origin_event_id") or "") == origin
-        } & set(surviving)
-        if removed:
-            surviving = _remove_certificates(mutated, remove=removed)
-            fired = True
-            detail = f"rejected_non_causal_origin:{origin}"
 
     elif operation in ("select_earliest_origin", "suppress_later_origin"):
         allowed_origins = {

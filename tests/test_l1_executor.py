@@ -1,7 +1,7 @@
 """Deterministic L1 post-processing executor (plan B): surface transforms and
 terminal recompute.
 
-The seven remaining L1 opcodes are monotonic suppress/select transforms over
+The five remaining L1 opcodes are monotonic suppress/select transforms over
 the court result. These tests lock the transform semantics and the terminal
 rule: a surviving carrier keeps the verdict error; withholding every carrier
 with a clean terminal basis flips clean; otherwise the verdict opens to
@@ -34,12 +34,6 @@ def _spec(operation: str, target: str = "") -> ActionSpec:
         return compile_action_spec("evidence_obligation", action)
     if operation in ("select_earliest_origin", "suppress_later_origin"):
         return compile_action_spec("earliest_origin_tiebreak", action)
-    if operation == "reject_non_causal_origin":
-        return compile_action_spec("causal_link_test", action)
-    if operation == "suppress_candidate":
-        return compile_action_spec("candidate_trigger", action)
-    if operation == "hold_candidate_qualification":
-        return compile_action_spec("candidate_to_verifier_route", action)
     raise ValueError(operation)
 
 
@@ -219,19 +213,6 @@ def test_keep_coverage_incomplete_opens_coverage() -> None:
     )
     assert report["fired"] is True
     assert mutated["proof_adjudication"]["prosecution_coverage"] == "incomplete"
-
-
-def test_suppress_candidate_cascades_to_surviving() -> None:
-    result = _result(surviving=["cert_1", "cert_2"])
-    mutated, report = execute_l1_intervention(
-        result, spec=_spec("suppress_candidate", "candidate_id"),
-        bindings=(_binding("candidate", "candidate_id", "c1"),),
-    )
-    assert report["fired"] is True
-    proof = mutated["proof_adjudication"]
-    assert "cert_1" not in proof["surviving_error_certificate_ids"]
-    assert "cert_2" in proof["surviving_error_certificate_ids"]
-    assert proof["state"] == "verified_error"
 
 
 def test_select_earliest_origin_reassigns_responsible() -> None:
