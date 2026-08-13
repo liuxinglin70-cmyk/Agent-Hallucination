@@ -4,7 +4,7 @@ SEHD-RISE（Repairability-driven Integrated Self-Evolution，可修复性驱动�
 由一个法庭式幻觉检测器（PACA-TCL v3.5）和一个以可修复性为中心的自进化框架组成。
 因果修复层先判定一次检测到的失败是否可修复；只有可修复的失败才进入进化，并经由
 L1/L2 两个可进化面共享的统一 RepairPlan（修复计划）协议完成修复——L1 是
-post-court Skill 基因组（六个模块、七个确定性抑制/选择操作），L2 是裁决策略基因组（封闭词表策略项，
+Skill 基因组（六个模块、七个确定性抑制/选择操作及一个受限构造操作），L2 是裁决策略基因组（封闭词表策略项，
 由证明法庭（proof court）确定性地求值）。每次修复尝试都由四层结果漏斗（outcome
 funnel）归类，并携带从投递（dispatch）到跨案例迁移的完整因果归功链。
 
@@ -195,16 +195,22 @@ from sehd_rise.api.evolution import run_evolution, load_records
    却无法生成 RepairPlan 才是 `UNADDRESSABLE` 框架不变量违例。
 2. **一个因果对象，一个 RepairPlan 协议。** 所有下游层消费同一个
    `CausalFailureEpisode` 与规范 `RepairPlan`（失败身份 / 层 / 属主 / 目标边 /
-   执行器 / 合法操作 / 效应契约 / 评估契约）；没有哪一层重新发明失败语义。
-3. **注册表闭合的 L1 Skill。** `skills/capabilities.py` 是操作、读写面、方向、
-   binding、executor、fitness postcondition 与负能力的唯一真源。规则文本
-   `When <condition>, <action>.` 只用于持久化/反思；运行时由类型化
-   `condition_spec` 在 court result 上决定适用性，再派发确定性 post-court 操作。
+   执行器 / 合法操作 / target domain / grounding query / binding schema / 效应契约 /
+   评估契约）；没有哪一层重新发明失败语义。
+3. **注册表闭合且实体绑定的 L1 Skill。** `skills/capabilities.py` 是操作、读写面、
+   方向、binding domain/字段/基数、executor、fitness postcondition 与负能力的唯一
+   真源。规则文本 `When <condition>, <action>.` 只用于持久化/反思；运行时由类型化
+   `condition_spec` 返回同一实体上的 `Binding[]`，通过 capability binding contract 后
+   才派发确定性操作，不做 aggregate bool 或 first-match 回退。`construct_candidate`
+   只能把一个预先确定、无 gold 的 `ClaimAnchor` 交给冻结 constructor；随后只局部续跑
+   qualification / focused verifier / defense / proof-court，不重采样 census，也不授予 Skill
+   证据、证书或终态裁决权。
 4. **封闭词表的 L2 策略，对修正封闭**：策略项把一个封闭前置谓词与一个枚举动作
    配对；运行时语义由确定性的证明法庭求值器（`detection/policy.py`）拥有，
    增/改/删让缺陷策略可修复而不是永久滞留。
 5. **四层结果漏斗取代 `skip`。** 每次修复尝试恰好终止于框架 / 搜索 / 执行 /
-   fitness 四层共 17 种终态之一（`loop/machine.py`），框架瓶颈从此不会被压缩进
+   fitness 四层共 26 种终态之一（`loop/machine.py`）；binding not found / ambiguous /
+   domain mismatch 在 fitness 前单独终止，框架瓶颈从此不会被压缩进
    一个 skip 桶。
 6. **收敛只消费完整的修复尝试。** 预算耗尽、基础设施故障与无效提案都不是学习
    证据；收敛窗口只统计「完整执行且已测效应」的修复在 fitness 层遭到的拒绝。

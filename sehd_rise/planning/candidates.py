@@ -23,6 +23,7 @@ from sehd_rise.skills.action import (
     ERROR_TO_CLEAN_ACTIONS,
     compile_action_spec,
 )
+from sehd_rise.skills.binding import match_condition_bindings
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -255,6 +256,8 @@ def _prevalidate_candidate(
     failure_edge_field: str = "",
     repair_frontier: Sequence[Mapping[str, Any]] = (),
     runtime_condition_features: Mapping[str, Any] | None = None,
+    source_result: Mapping[str, Any] | None = None,
+    source_record: Mapping[str, Any] | None = None,
 ) -> str | None:
     """Return the reject reason for a candidate that cannot pass the
     admission gate, or None when it is structurally eligible.
@@ -380,15 +383,28 @@ def _prevalidate_candidate(
                     "action_not_bound_to_failure_edge:"
                     f"{failure_edge_field}->{action_spec.output_field}"
                 )
-        # Plan B: the source run exposes ONE result-level feature snapshot
-        # (``project_result_condition_features``), not per-route projections.
-        # The condition must evaluate true against it or the candidate names an
-        # unobservable discriminator.
+        if isinstance(source_result, Mapping) and source_result:
+            binding_match = match_condition_bindings(
+                candidate.get("condition_spec"),
+                source_result,
+                domain=action_spec.input_binding_domain,
+                cardinality=action_spec.cardinality,
+                record=source_record,
+            )
+            if not binding_match.bound:
+                return binding_match.status
+            # Source binding proof is audit metadata, never an executable id
+            # baked into the generalized ConditionSpec.
+            if isinstance(candidate, dict):
+                candidate["binding_proof"] = binding_match.to_dict()
+        # Compatibility callers that only have the bounded aggregate snapshot
+        # can still reject an obviously false atom. Formal evolution always
+        # passes source_result and therefore uses entity grounding above.
         source_features = (
             runtime_condition_features
             if isinstance(runtime_condition_features, Mapping) else {}
         )
-        if source_features:
+        if source_features and not source_result:
             evaluation = evaluate_condition_spec(
                 candidate.get("condition_spec"), source_features,
             )

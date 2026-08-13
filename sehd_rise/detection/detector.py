@@ -273,10 +273,40 @@ def detect_record(
     # L1 Skill operations transform only the already-computed court result.
     if genome is not None:
         from sehd_rise.detection.injection import compile_genome_rules
+        from sehd_rise.detection.continuation import execute_constructive_rules
+        from sehd_rise.skills.capabilities import (
+            L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
+            SKILL_CAPABILITY_REGISTRY,
+        )
         from sehd_rise.skills.l1_execution import execute_l1_rules
         rules = compile_genome_rules(genome)
         if rules:
-            result, l1_execution = execute_l1_rules(result, rules, record=record)
+            constructive = [
+                rule for rule in rules
+                if SKILL_CAPABILITY_REGISTRY.require(
+                    str((rule[3] or {}).get("operation") or "")
+                ).executor == L1_CONSTRUCTIVE_HARNESS_EXECUTOR
+            ]
+            transforms = [rule for rule in rules if rule not in constructive]
+            constructive_execution = {"fired": [], "bound": [], "skipped": []}
+            if constructive:
+                result, constructive_execution = execute_constructive_rules(
+                    result, constructive, record=record, config=config,
+                )
+            result, transform_execution = execute_l1_rules(
+                result, transforms, record=record,
+            )
+            l1_execution = {
+                key: [
+                    *constructive_execution.get(key, []),
+                    *transform_execution.get(key, []),
+                ]
+                for key in ("fired", "bound", "skipped")
+            }
+            l1_execution["constructive_execution_proofs"] = (
+                constructive_execution.get("constructive_execution_proofs", [])
+            )
+            l1_execution["terminal_state"] = result.get("state")
             result["l1_execution"] = l1_execution
             from sehd_rise.detection.packet import build_packet
             from sehd_rise.detection.transport import _responsible_step

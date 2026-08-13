@@ -288,8 +288,7 @@ def rules_semantic_overlap(spec_a: RuleSpec, spec_b: RuleSpec) -> float:
 # Applicability contract (typed executable condition)
 # ============================================================
 
-SCHEMA_VERSION = "sehd.condition_spec.v2"
-SCHEMA_VERSION_V1 = "sehd.condition_spec.v1"
+SCHEMA_VERSION = "sehd.condition_spec.v3"
 
 _CANDIDATE_KINDS = frozenset({
     "omission", "unsupported_claim", "contradiction", "invalid_tool_use",
@@ -305,7 +304,11 @@ _MODULE_TAGS = frozenset({
     "completion", "scope",
 })
 _COVERAGE_STATES = frozenset({"none", "incomplete", "complete", "unknown"})
+_QUALIFICATION_STATES = frozenset({"held", "qualified", "rejected", "unknown"})
 _EVENT_ROLES = frozenset({"system", "user", "assistant", "tool"})
+_ANCHOR_KINDS = frozenset({
+    "assistant_assertion", "tool_grounded_claim", "question", "code",
+})
 _RUNTIME_FIELDS = frozenset({
     str(target)
     for operations in MODULE_OPERATION_TARGETS.values()
@@ -335,11 +338,23 @@ _RETRY_DIAGNOSTIC_FEATURES = frozenset({
 
 # Set-valued features use ``contains``. Scalar/boolean features use ``equals``.
 _FEATURE_CONTRACT: Mapping[str, tuple[str, frozenset[Any]]] = {
+    "anchor_kind": ("contains", _ANCHOR_KINDS),
+    "anchor_role": ("contains", frozenset({"assistant"})),
+    "anchor_depends_on_tool": ("equals", frozenset({True, False})),
+    "anchor_has_number": ("equals", frozenset({True, False})),
+    "anchor_has_citation": ("equals", frozenset({True, False})),
+    "anchor_is_final_assistant": ("equals", frozenset({True, False})),
+    "anchor_is_first_in_event": ("equals", frozenset({True, False})),
+    "anchor_is_last_in_event": ("equals", frozenset({True, False})),
     "candidate_kind": ("contains", _CANDIDATE_KINDS),
     "candidate_axis": ("contains", _AXES),
     "module_tag": ("contains", _MODULE_TAGS),
     "missing_field": ("contains", _RUNTIME_FIELDS),
     "failed_invariant": ("contains", _INVARIANTS),
+    "coverage_state": ("contains", _COVERAGE_STATES),
+    "coverage_side": ("contains", frozenset({"prosecution", "defense"})),
+    "qualification_state": ("contains", _QUALIFICATION_STATES),
+    "evidence_verified": ("equals", frozenset({True, False})),
     "event_role": ("contains", _EVENT_ROLES),
     "has_tool_call": ("equals", frozenset({True, False})),
     "has_tool_error": ("equals", frozenset({True, False})),
@@ -360,7 +375,7 @@ _COMBINATORS = frozenset({"atom", "all_of", "any_of", "not"})
 
 # L1 evaluates one proof-court result projection. Instance operations then
 # resolve a matched atom to an existing candidate/certificate/origin.
-_BINDINGS = frozenset({"result_scoped"})
+_BINDINGS = frozenset({"entity_scoped"})
 
 
 @dataclass(frozen=True)
@@ -375,7 +390,7 @@ class ConditionSpec:
     schema_version: str = SCHEMA_VERSION
     combinator: str = "atom"
     children: tuple[dict[str, Any], ...] = ()
-    binding: str = "result_scoped"
+    binding: str = "entity_scoped"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -404,7 +419,7 @@ class ConditionSpec:
             schema_version=str(value.get("schema_version") or SCHEMA_VERSION),
             combinator=str(value.get("combinator") or "atom"),
             children=children,
-            binding=str(value.get("binding") or "result_scoped"),
+            binding=str(value.get("binding") or "entity_scoped"),
         )
 
 
@@ -450,8 +465,7 @@ def validate_condition_spec(value: Any) -> tuple[bool, str]:
     if not isinstance(value, Mapping):
         return False, "condition_spec_not_object"
     spec = ConditionSpec.from_dict(value)
-    # Accept both v1 (atom-only) and v2 (combinator) schema versions.
-    if spec.schema_version not in (SCHEMA_VERSION, SCHEMA_VERSION_V1):
+    if spec.schema_version != SCHEMA_VERSION:
         return False, f"condition_spec_schema:{spec.schema_version}"
     if spec.feature_source != "court_result":
         return False, f"condition_feature_source_invalid:{spec.feature_source}"
@@ -463,8 +477,7 @@ def validate_condition_spec(value: Any) -> tuple[bool, str]:
         return False, f"condition_combinator_invalid:{spec.combinator}"
     if spec.binding not in _BINDINGS:
         return False, f"condition_binding_invalid:{spec.binding}"
-    # v1 schema: atom only (no combinator field). Treat as atom.
-    combinator = spec.combinator if spec.schema_version == SCHEMA_VERSION else "atom"
+    combinator = spec.combinator
     if combinator == "atom":
         required = {
             "feature_source", "value_type", "scope", "evidence_binding",
@@ -498,12 +511,12 @@ def render_condition_spec_contract() -> str:
     """Prompt contract for the reflection model; values are closed."""
     lines = [
         "condition_spec is mandatory for add_rule/modify_rule. The atom form: ",
-        '{"schema_version":"sehd.condition_spec.v2",',
+        '{"schema_version":"sehd.condition_spec.v3",',
         ' "feature_source":"court_result","feature":"...",',
         ' "operator":"...","value_type":"string|boolean","value":"...",',
         ' "scope":"l1_court_transform",',
         ' "evidence_binding":"post_court_projection",',
-        ' "combinator":"atom","binding":"result_scoped"}. Select one predicate:',
+        ' "combinator":"atom","binding":"entity_scoped"}. Select one predicate:',
     ]
     for feature, (operator, values) in _FEATURE_CONTRACT.items():
         rendered = ", ".join(
@@ -522,7 +535,8 @@ def render_condition_spec_contract() -> str:
         "with a children array of condition_spec objects (each a valid atom).",
         "not takes exactly one child. Prefer first-call features so the rule",
         "can prevent the first failure, not just steer a retry.",
-        "binding: result_scoped is the only supported scope (court-result match);",
+        "binding: entity_scoped is mandatory; atoms and combinators return typed",
+        "entity bindings, all_of joins by entity, and not is an anti-join;",
         "any other binding value is rejected.",
     ])
     return "\n".join(lines)
@@ -575,6 +589,7 @@ def project_result_condition_features(
     applicability.
     """
     sets: dict[str, set[str]] = {
+        "anchor_kind": set(), "anchor_role": set(),
         "candidate_kind": set(), "candidate_axis": set(),
         "module_tag": set(), "coverage_state": set(), "missing_field": set(),
         "failed_invariant": set(), "event_role": set(),
@@ -658,7 +673,7 @@ def evaluate_condition_spec(
     if not valid:
         return ConditionEvaluation(False, reason, "", "", "", None)
     spec = ConditionSpec.from_dict(value)
-    combinator = spec.combinator if spec.schema_version == SCHEMA_VERSION else "atom"
+    combinator = spec.combinator
     if combinator == "atom":
         observed = features.get(spec.feature)
         if spec.operator == "contains":

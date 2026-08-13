@@ -1,11 +1,11 @@
 """L1 Skill Genome with natural language rules and typed slots.
 
 The genome replaces the earlier typed-clause structure with natural language
-rules that the model can generate directly and that inject directly into
-detection prompts. Each module carries a list of behavioral rules plus a
+rules that the model can generate directly and the deterministic post-court
+executor can compile. Each module carries a list of behavioral rules plus a
 parallel rule_meta list tracking per-rule bookkeeping (is_baseline,
 source_case_id, fitness_status, direction, typed rule_slots, action_spec,
-condition_spec, repair_edge). Rule TEXT and module activation participate in
+condition_spec, binding_proof, repair_edge). Rule TEXT and module activation participate in
 genome identity; rule_meta is post-commit bookkeeping written after batch
 commit, so it never changes ``content_hash`` (a snapshot would otherwise
 change identity after every commit and break lineage replay and cache keys).
@@ -13,7 +13,7 @@ Rule meta stays serialized in ``to_dict``; it is simply excluded from
 identity.
 
 Executable fields (typed condition, ActionSpec, ConditionSpec) do
-participate in a separate ``execution_hash`` because they change provider
+participate in a separate ``execution_hash`` because they change post-court
 behavior; fitness, provenance and promotion status remain excluded.
 """
 
@@ -29,8 +29,15 @@ from enum import Enum
 from typing import Any, Mapping
 
 from sehd_rise.skills.action import (
+    ActionSpec,
     compile_action_spec,
     sanitize_action_spec,
+)
+from sehd_rise.skills.binding import (
+    BINDING_BOUND,
+    Binding,
+    sanitize_binding_proof,
+    validate_binding_contract,
 )
 from sehd_rise.skills.rule import (
     RuleSpec,
@@ -143,8 +150,8 @@ OBSERVABLE_FIELDS: tuple[str, ...] = (
     "prosecution_certificates",
     "defense_certificates",
     # Claim-level surviving-carrier set (content-fingerprint identity;
-    # rename-invariant).  The observable of fingerprint-targeted operations
-    # (withhold_certificate / emit_certificate).
+    # rename-invariant). The observable of the current certificate-targeted
+    # operation (withhold_certificate).
     "surviving_certificates",
     "quarantined_certificates",
     "causal_field_coverage",
@@ -565,6 +572,7 @@ class SkillEdit:
     rule_slots: dict[str, str] = field(default_factory=dict)
     action_spec: dict[str, Any] = field(default_factory=dict)
     condition_spec: dict[str, Any] = field(default_factory=dict)
+    binding_proof: dict[str, Any] = field(default_factory=dict)
     repair_edge: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -600,6 +608,7 @@ class SkillEdit:
             "rule_slots": _sanitize_rule_slots(self.rule_slots),
             "action_spec": sanitize_action_spec(self.action_spec),
             "condition_spec": sanitize_condition_spec(self.condition_spec),
+            "binding_proof": sanitize_binding_proof(self.binding_proof),
             "repair_edge": _sanitize_repair_edge(self.repair_edge),
         }
 
@@ -641,6 +650,7 @@ class SkillEdit:
             rule_slots=_sanitize_rule_slots(data.get("rule_slots")),
             action_spec=sanitize_action_spec(data.get("action_spec")),
             condition_spec=sanitize_condition_spec(data.get("condition_spec")),
+            binding_proof=sanitize_binding_proof(data.get("binding_proof")),
             repair_edge=_sanitize_repair_edge(data.get("repair_edge")),
         )
 
@@ -832,6 +842,26 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             )
             if not condition_valid:
                 return False, condition_reason
+        binding_proof = sanitize_binding_proof(edit.binding_proof)
+        if not binding_proof:
+            return False, "source_binding_proof_missing"
+        persisted_action = sanitize_action_spec(edit.action_spec)
+        if not persisted_action:
+            return False, "action_spec_missing"
+        action_contract = ActionSpec.from_dict(persisted_action)
+        proof_bindings = tuple(
+            Binding.from_dict(item)
+            for item in binding_proof.get("bindings") or ()
+            if isinstance(item, Mapping)
+        )
+        binding_status, binding_reason = validate_binding_contract(
+            proof_bindings,
+            domain=action_contract.input_binding_domain,
+            required_fields=action_contract.required_binding_fields,
+            cardinality=action_contract.cardinality,
+        )
+        if binding_status != BINDING_BOUND:
+            return False, f"source_binding_proof_invalid:{binding_reason}"
         repair_edge = _sanitize_repair_edge(edit.repair_edge)
         if repair_edge:
             if not repair_edge.get("edge_id"):
@@ -1027,6 +1057,7 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "rule_slots": _sanitize_rule_slots(edit.rule_slots),
         "action_spec": sanitize_action_spec(edit.action_spec),
         "condition_spec": sanitize_condition_spec(edit.condition_spec),
+        "binding_proof": sanitize_binding_proof(edit.binding_proof),
         "repair_edge": _sanitize_repair_edge(edit.repair_edge),
     }
 

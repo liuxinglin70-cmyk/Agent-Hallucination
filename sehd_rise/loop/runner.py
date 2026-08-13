@@ -87,10 +87,15 @@ from sehd_rise.evaluation.fitness import (
 from sehd_rise.evaluation.gate import create_structural_gate
 from sehd_rise.execution.replay import (
     _run_conflict_gate_call,
+    _run_counted_constructive_continuation,
     _run_counted_detection,
     _run_mutation_call,
 )
-from sehd_rise.execution.trace import _injected_applied_flags
+from sehd_rise.execution.trace import (
+    _injected_applied_flags,
+    binding_failure_for_edit,
+    construction_failure_for_edit,
+)
 from sehd_rise.experience.memory import ExperienceMemory
 from sehd_rise.loop.ledger import (
     GateEventLedger,
@@ -182,6 +187,11 @@ from sehd_rise.planning.search import (
     _trim_contrast_registry,
 )
 from sehd_rise.skills.action import compile_action_spec, sanitize_action_spec
+from sehd_rise.skills.capabilities import (
+    L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
+    SKILL_CAPABILITY_REGISTRY,
+)
+from sehd_rise.skills.binding import sanitize_binding_proof
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -2557,6 +2567,7 @@ class EvolutionLoop:
         edit = None
         pending_rule_slots: dict[str, Any] | None = None
         pending_condition_spec: dict[str, Any] = {}
+        pending_binding_proof: dict[str, Any] = {}
         pending_repair_edge: dict[str, Any] = {}
         no_edit_reason = ""
         invalid_mutation_reason = ""
@@ -2760,6 +2771,8 @@ class EvolutionLoop:
                                 if isinstance(runtime_observation, Mapping)
                                 else {}
                             ),
+                            source_result=detection_result,
+                            source_record=self.records.get(case_id),
                         )
                         if prevalidate_reason is None:
                             candidates.append(candidate)
@@ -2970,6 +2983,8 @@ class EvolutionLoop:
                             if isinstance(runtime_observation, Mapping)
                             else {}
                         ),
+                        source_result=detection_result,
+                        source_record=self.records.get(case_id),
                     )
                     if parsed else None
                 )
@@ -3002,6 +3017,9 @@ class EvolutionLoop:
                 rule_index = parsed.get("rule_index")
                 pending_condition_spec = sanitize_condition_spec(
                     parsed.get("condition_spec")
+                )
+                pending_binding_proof = sanitize_binding_proof(
+                    parsed.get("binding_proof")
                 )
                 selected_repair_edge_id = str(
                     parsed.get("repair_edge_id") or ""
@@ -3247,6 +3265,7 @@ class EvolutionLoop:
                         expected_effect=expected_effect,
                         expected_effect_contract=expected_effect_contract,
                         condition_spec=pending_condition_spec,
+                        binding_proof=pending_binding_proof,
                         repair_edge=pending_repair_edge,
                     )
                     print(
@@ -3279,6 +3298,7 @@ class EvolutionLoop:
                         rule_slots=pending_rule_slots or {},
                         action_spec=pending_action_spec,
                         condition_spec=pending_condition_spec,
+                        binding_proof=pending_binding_proof,
                         repair_edge=pending_repair_edge,
                     )
                     print(
@@ -3679,6 +3699,7 @@ class EvolutionLoop:
         reflection_audit["llm_conflict_gate"] = _conflict_flag
 
         # --- [5] Apply edit ---
+        baseline_genome_for_replay = self.state.current_genome
         try:
             candidate_genome = apply_edit(self.state.current_genome, edit)
             if edit.operation == "add_rule":
@@ -3730,16 +3751,33 @@ class EvolutionLoop:
         # remains an interface-compatible flag controlling formal promotion
         # semantics, not permission to skip the replay envelope.
         try:
-            candidate_result = self.run_detection(
-                budget_kind="source",
-                genome=candidate_genome,
-                case_id=case_id,
-                policy_genome=(
-                    self.state.policy_genome
-                    if self.state.policy_genome.items_for_scope("working")
-                    else None
-                ),
-            )
+            action_operation = str((edit.action_spec or {}).get("operation") or "")
+            capability = SKILL_CAPABILITY_REGISTRY.get(action_operation)
+            if (
+                capability is not None
+                and capability.executor == L1_CONSTRUCTIVE_HARNESS_EXECUTOR
+            ):
+                candidate_result = _run_counted_constructive_continuation(
+                    baseline_result=detection_result,
+                    baseline_genome=baseline_genome_for_replay,
+                    candidate_genome=candidate_genome,
+                    case_id=case_id,
+                    budget_usage=self.budget_usage,
+                    records=self.records,
+                    config=self.config,
+                    provider_usage_ledger=self.provider_usage_ledger,
+                )
+            else:
+                candidate_result = self.run_detection(
+                    budget_kind="source",
+                    genome=candidate_genome,
+                    case_id=case_id,
+                    policy_genome=(
+                        self.state.policy_genome
+                        if self.state.policy_genome.items_for_scope("working")
+                        else None
+                    ),
+                )
         except Exception as exc:
             reason = (
                 f"source_replay_runtime_error:{type(exc).__name__}:{exc}"
@@ -3788,6 +3826,94 @@ class EvolutionLoop:
             ), next_case_index=idx + 1)
             self.funnel.record(Outcome.EXECUTION_RUNTIME_FAILURE)
             print(f"  [{idx}] REJECT_FITNESS_RUNTIME {case_id}: {reason}")
+            return
+        binding_failure, binding_evidence = binding_failure_for_edit(
+            edit, candidate_result,
+        )
+        if binding_failure:
+            binding_outcome = Outcome(binding_failure)
+            reason = f"skill_grounding_failed:{binding_failure}"
+            self.gate.revoke_structural_accept(cert, [reason])
+            self.state.edits_rejected += 1
+            self.record_attempt(
+                decision="reject_binding",
+                operation=(
+                    edit.operation.value
+                    if isinstance(edit.operation, SkillOp)
+                    else str(edit.operation)
+                ),
+                target_module=edit.target_module,
+                action_spec=edit.action_spec or pending_action_spec,
+                structural_result="accepted",
+                compiled=True,
+                no_effect_reason=binding_failure.lower(),
+                proposal_content=edit.new_content,
+            )
+            self.record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source=view.trigger_source,
+                attribution=signal.to_dict(),
+                edit_proposal=edit.to_dict(),
+                mutation_applied=None,
+                gate_decision=binding_outcome.value,
+                genome_hash_before=genome_before,
+                genome_hash_after=self.state.current_genome.content_hash,
+                detection_state=detection_state,
+                timestamp=time.time(),
+                fitness_check={
+                    "reflection": reflection_audit,
+                    "binding": dict(binding_evidence),
+                    "fitness_not_run": True,
+                },
+            ), next_case_index=idx + 1)
+            self.funnel.record(binding_outcome)
+            print(f"  [{idx}] {binding_outcome.value} {case_id}: {reason}")
+            return
+        construction_failure, construction_evidence = construction_failure_for_edit(
+            edit, candidate_result,
+        )
+        if construction_failure:
+            construction_outcome = Outcome(construction_failure)
+            reason = f"constructive_recall_failed:{construction_failure}"
+            self.gate.revoke_structural_accept(cert, [reason])
+            self.state.edits_rejected += 1
+            self.record_attempt(
+                decision="reject_construction",
+                operation=(
+                    edit.operation.value
+                    if isinstance(edit.operation, SkillOp)
+                    else str(edit.operation)
+                ),
+                target_module=edit.target_module,
+                action_spec=edit.action_spec or pending_action_spec,
+                structural_result="accepted",
+                compiled=True,
+                injected=True,
+                applied=bool(construction_evidence.get("fired")),
+                no_effect_reason=construction_failure.lower(),
+                proposal_content=edit.new_content,
+            )
+            self.record_step(EvolutionStep(
+                case_id=case_id,
+                case_index=idx,
+                trigger_source=view.trigger_source,
+                attribution=signal.to_dict(),
+                edit_proposal=edit.to_dict(),
+                mutation_applied=None,
+                gate_decision=construction_outcome.value,
+                genome_hash_before=genome_before,
+                genome_hash_after=self.state.current_genome.content_hash,
+                detection_state=detection_state,
+                timestamp=time.time(),
+                fitness_check={
+                    "reflection": reflection_audit,
+                    "constructive_execution": dict(construction_evidence),
+                    "fitness_not_run": True,
+                },
+            ), next_case_index=idx + 1)
+            self.funnel.record(construction_outcome)
+            print(f"  [{idx}] {construction_outcome.value} {case_id}: {reason}")
             return
         candidate_signal = attribute_failure_for_result(
             candidate_result, case_id, records=self.records,

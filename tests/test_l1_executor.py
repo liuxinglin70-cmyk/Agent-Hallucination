@@ -19,9 +19,9 @@ sys.path.insert(0, str(REPO_ROOT))
 from sehd_rise.skills.l1_execution import (
     evaluate_l1_rule,
     execute_l1_intervention,
-    resolve_condition_instance,
 )
 from sehd_rise.skills.action import ActionSpec, compile_action_spec
+from sehd_rise.skills.binding import Binding
 from sehd_rise.skills.rule import project_result_condition_features
 
 
@@ -41,6 +41,10 @@ def _spec(operation: str, target: str = "") -> ActionSpec:
     if operation == "hold_candidate_qualification":
         return compile_action_spec("candidate_to_verifier_route", action)
     raise ValueError(operation)
+
+
+def _binding(domain: str, field: str, value: str) -> Binding:
+    return Binding(domain=domain, entity_id=value, identifiers={field: value})
 
 
 def _result(*, surviving: list[str], coverage: str = "complete",
@@ -95,114 +99,10 @@ def _result(*, surviving: list[str], coverage: str = "complete",
     }
 
 
-def test_resolve_condition_instance_candidate_kind() -> None:
-    result = _result(surviving=["cert_1", "cert_2"])
-    spec = {
-        "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "court_result",
-        "feature": "candidate_kind",
-        "operator": "contains",
-        "value_type": "string",
-        "value": "unsupported_claim",
-        "scope": "l1_court_transform",
-        "evidence_binding": "post_court_projection",
-        "combinator": "atom",
-        "binding": "result_scoped",
-    }
-    resolved = resolve_condition_instance(spec, result)
-    assert resolved["candidate_id"] == "c1"
-    assert resolved["origin_event_id"] == "event_001"
-
-
-def test_resolve_condition_instance_module_tag_normalizes() -> None:
-    result = _result(surviving=["cert_1"])
-    spec = {
-        "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "court_result",
-        "feature": "module_tag",
-        "operator": "contains",
-        "value_type": "string",
-        "value": "tool_use",
-        "scope": "l1_court_transform",
-        "evidence_binding": "post_court_projection",
-        "combinator": "atom",
-        "binding": "result_scoped",
-    }
-    resolved = resolve_condition_instance(spec, result)
-    assert resolved["candidate_id"] == "c1"
-
-
-def test_resolve_condition_instance_failed_invariant() -> None:
-    result = _result(surviving=["cert_2"])
-    spec = {
-        "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "court_result",
-        "feature": "failed_invariant",
-        "operator": "contains",
-        "value_type": "string",
-        "value": "norm_evidence",
-        "scope": "l1_court_transform",
-        "evidence_binding": "post_court_projection",
-        "combinator": "atom",
-        "binding": "result_scoped",
-    }
-    resolved = resolve_condition_instance(spec, result)
-    assert resolved["certificate_id"] == "cert_2"
-    assert resolved["source_candidate_id"] == "c2"
-
-
-def test_resolve_condition_instance_no_match_is_empty() -> None:
-    result = _result(surviving=["cert_1"])
-    spec = {
-        "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "court_result",
-        "feature": "candidate_kind",
-        "operator": "contains",
-        "value_type": "string",
-        "value": "omission",
-        "scope": "l1_court_transform",
-        "evidence_binding": "post_court_projection",
-        "combinator": "atom",
-        "binding": "result_scoped",
-    }
-    assert resolve_condition_instance(spec, result) == {}
-
-
-def test_resolve_condition_instance_combinator_is_empty() -> None:
-    result = _result(surviving=["cert_1"])
-    spec = {
-        "schema_version": "sehd.condition_spec.v2",
-        "feature_source": "court_result",
-        "feature": "",
-        "operator": "",
-        "value_type": "string",
-        "value": "",
-        "scope": "l1_court_transform",
-        "evidence_binding": "post_court_projection",
-        "combinator": "all_of",
-        "binding": "result_scoped",
-        "children": [
-            {
-                "schema_version": "sehd.condition_spec.v2",
-                "feature_source": "court_result",
-                "feature": "candidate_kind",
-                "operator": "contains",
-                "value_type": "string",
-                "value": "unsupported_claim",
-                "scope": "l1_court_transform",
-                "evidence_binding": "post_court_projection",
-                "combinator": "atom",
-                "binding": "result_scoped",
-            },
-        ],
-    }
-    assert resolve_condition_instance(spec, result) == {}
-
-
-def test_withhold_certificate_resolves_instance_from_condition() -> None:
+def test_withhold_certificate_grounds_instance_from_condition() -> None:
     result = _result(surviving=["cert_2"])
     spec_cond = {
-        "schema_version": "sehd.condition_spec.v2",
+        "schema_version": "sehd.condition_spec.v3",
         "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
@@ -211,11 +111,11 @@ def test_withhold_certificate_resolves_instance_from_condition() -> None:
         "scope": "l1_court_transform",
         "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "result_scoped",
+        "binding": "entity_scoped",
     }
-    mutated, report = execute_l1_intervention(
-        result,
-        spec=_spec("withhold_certificate", "certificate_id"),
+    mutated, report = evaluate_l1_rule(
+        result=result,
+        action_spec=_spec("withhold_certificate", "certificate_id").to_dict(),
         condition_spec=spec_cond,
     )
     assert report["fired"] is True
@@ -245,7 +145,7 @@ def test_project_result_condition_features_reads_result_and_record() -> None:
 def test_evaluate_l1_rule_fires_matched_condition() -> None:
     result = _result(surviving=["cert_2"])
     spec_cond = {
-        "schema_version": "sehd.condition_spec.v2",
+        "schema_version": "sehd.condition_spec.v3",
         "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
@@ -254,7 +154,7 @@ def test_evaluate_l1_rule_fires_matched_condition() -> None:
         "scope": "l1_court_transform",
         "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "result_scoped",
+        "binding": "entity_scoped",
     }
     action = compile_action_spec(
         "atomic_verifier_instruction", "withhold_certificate: certificate_id",
@@ -272,7 +172,7 @@ def test_evaluate_l1_rule_fires_matched_condition() -> None:
 def test_evaluate_l1_rule_skips_unmatched_condition() -> None:
     result = _result(surviving=["cert_1"])
     spec_cond = {
-        "schema_version": "sehd.condition_spec.v2",
+        "schema_version": "sehd.condition_spec.v3",
         "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
@@ -281,7 +181,7 @@ def test_evaluate_l1_rule_skips_unmatched_condition() -> None:
         "scope": "l1_court_transform",
         "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "result_scoped",
+        "binding": "entity_scoped",
     }
     action = compile_action_spec(
         "atomic_verifier_instruction", "withhold_certificate: certificate_id",
@@ -301,7 +201,7 @@ def test_withhold_certificate_flips_error_to_unresolved() -> None:
     result = _result(surviving=["cert_1"])
     mutated, report = execute_l1_intervention(
         result, spec=_spec("withhold_certificate", "certificate_id"),
-        target="cert_1",
+        bindings=(_binding("certificate", "certificate_id", "cert_1"),),
     )
     assert report["fired"] is True
     proof = mutated["proof_adjudication"]
@@ -313,6 +213,7 @@ def test_keep_coverage_incomplete_opens_coverage() -> None:
     result = _result(surviving=[])
     mutated, report = execute_l1_intervention(
         result, spec=_spec("keep_coverage_incomplete", "coverage_state"),
+        bindings=(_binding("coverage", "coverage_side", "prosecution"),),
     )
     assert report["fired"] is True
     assert mutated["proof_adjudication"]["prosecution_coverage"] == "incomplete"
@@ -322,7 +223,7 @@ def test_suppress_candidate_cascades_to_surviving() -> None:
     result = _result(surviving=["cert_1", "cert_2"])
     mutated, report = execute_l1_intervention(
         result, spec=_spec("suppress_candidate", "candidate_id"),
-        target="c1",
+        bindings=(_binding("candidate", "candidate_id", "c1"),),
     )
     assert report["fired"] is True
     proof = mutated["proof_adjudication"]
@@ -336,6 +237,10 @@ def test_select_earliest_origin_reassigns_responsible() -> None:
     result["proof_adjudication"]["responsible_event_id"] = "event_002"
     mutated, report = execute_l1_intervention(
         result, spec=_spec("select_earliest_origin", "responsible_event_id"),
+        bindings=(
+            _binding("origin", "origin_event_id", "event_001"),
+            _binding("origin", "origin_event_id", "event_002"),
+        ),
     )
     assert report["fired"] is True
     assert mutated["proof_adjudication"]["responsible_event_id"] == "event_001"

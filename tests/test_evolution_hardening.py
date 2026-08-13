@@ -77,7 +77,7 @@ def test_attempt_cap_is_ceiling_bounded() -> None:
 # ============================================================
 
 _RETRY_SPEC = {
-    "schema_version": "sehd.condition_spec.v2",
+    "schema_version": "sehd.condition_spec.v3",
     "feature_source": "court_result",
     "feature": "has_tool_retry",
     "operator": "equals",
@@ -86,7 +86,7 @@ _RETRY_SPEC = {
     "scope": "l1_court_transform",
     "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "result_scoped",
+    "binding": "entity_scoped",
 }
 
 
@@ -122,7 +122,7 @@ def test_has_tool_retry_false_on_single_call() -> None:
 # ============================================================
 
 _MODULE_TAG_SPEC = {
-    "schema_version": "sehd.condition_spec.v2",
+    "schema_version": "sehd.condition_spec.v3",
     "feature_source": "court_result",
     "feature": "module_tag",
     "operator": "contains",
@@ -131,7 +131,7 @@ _MODULE_TAG_SPEC = {
     "scope": "l1_court_transform",
     "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "result_scoped",
+    "binding": "entity_scoped",
 }
 
 
@@ -154,7 +154,7 @@ def test_module_tag_rejects_unregistered_value() -> None:
     assert "condition_value_unregistered" in reason
 
 
-def test_condition_binding_only_result_scoped() -> None:
+def test_condition_binding_only_entity_scoped() -> None:
     """Only the implemented court-result binding is admitted."""
     ok, _ = validate_condition_spec(_MODULE_TAG_SPEC)
     assert ok is True
@@ -169,7 +169,7 @@ def test_condition_binding_only_result_scoped() -> None:
 # ============================================================
 
 _MISSING_FIELD_SPEC = {
-    "schema_version": "sehd.condition_spec.v2",
+    "schema_version": "sehd.condition_spec.v3",
     "feature_source": "court_result",
     "feature": "missing_field",
     "operator": "contains",
@@ -178,7 +178,7 @@ _MISSING_FIELD_SPEC = {
     "scope": "l1_court_transform",
     "evidence_binding": "post_court_projection",
     "combinator": "atom",
-    "binding": "result_scoped",
+    "binding": "entity_scoped",
 }
 
 

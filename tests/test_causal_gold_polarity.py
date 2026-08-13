@@ -94,8 +94,8 @@ def test_false_positive_routes_to_prosecution_evidence() -> None:
     assert verdict.status is RepairabilityStatus.REPAIRABLE
 
 
-def test_false_negative_clean_is_capability_gap() -> None:
-    """A missing candidate is learn-worthy but not currently expressible."""
+def test_false_negative_clean_compiles_constructive_repair_plan() -> None:
+    """A missing candidate is grounded through the constructive harness."""
     signal = project_detection(
         {**_result("verified_clean"), "gold_label": True},
         use_gold=True,
@@ -105,10 +105,9 @@ def test_false_negative_clean_is_capability_gap() -> None:
     assert cut.owner == "candidate_trigger"
     verdict = _verdict(cut, signal)
     assert verdict is not None
-    assert verdict.status is RepairabilityStatus.CAPABILITY_GAP
-    assert verdict.evidence["failure"] == "missing_error_candidate"
-    assert verdict.evidence["desired_transition"] == "clean -> error"
-    assert verdict.evidence["missing_capability"] == "construct_candidate"
+    assert verdict.status is RepairabilityStatus.REPAIRABLE
+    assert verdict.evidence["primary_executor"] == "l1_constructive_harness"
+    assert verdict.evidence["primary_legal_operations"] == ["construct_candidate"]
 
 
 def test_gold_polarity_partner_module_stays_legal() -> None:

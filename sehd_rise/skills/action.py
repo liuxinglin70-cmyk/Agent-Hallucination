@@ -81,6 +81,9 @@ class ActionSpec:
     postcondition: str
     observable_field: str
     expected_direction: str
+    input_binding_domain: str
+    required_binding_fields: tuple[str, ...]
+    cardinality: str
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -98,6 +101,12 @@ class ActionSpec:
             postcondition=str(value.get("postcondition") or ""),
             observable_field=str(value.get("observable_field") or ""),
             expected_direction=str(value.get("expected_direction") or ""),
+            input_binding_domain=str(value.get("input_binding_domain") or ""),
+            required_binding_fields=tuple(
+                str(item) for item in value.get("required_binding_fields") or ()
+                if str(item)
+            ),
+            cardinality=str(value.get("cardinality") or ""),
         )
 
     def effect_contract(self, condition: str) -> dict[str, str]:
@@ -160,6 +169,9 @@ def compile_action_spec(module_id: str, action: str) -> ActionSpec:
         postcondition=capability.fitness_postcondition,
         observable_field=observable_field,
         expected_direction=direction,
+        input_binding_domain=capability.input_binding_domain,
+        required_binding_fields=capability.required_binding_fields,
+        cardinality=capability.cardinality,
     )
 
 
@@ -183,6 +195,8 @@ def render_action_spec_contract(module_id: str) -> str:
             f"writes={','.join(capability.writes)}; "
             f"output_object={spec.output_object}; "
             f"postcondition={spec.postcondition}; "
+            f"binding={spec.input_binding_domain}/{spec.cardinality}; "
+            f"required_binding_fields={','.join(spec.required_binding_fields)}; "
             f"observable_effect={spec.observable_field}:{spec.expected_direction}"
         )
         lines.append("  valid targets: " + ", ".join(targets))

@@ -11,9 +11,11 @@ from sehd_rise.detection.policy import (
     EXECUTED_L2_REPAIR_OPERATIONS,
     L2_FITNESS_POSTCONDITIONS,
 )
+from sehd_rise.detection.continuation import EXECUTED_CONSTRUCTIVE_OPERATIONS
 from sehd_rise.execution.action import POSTCONDITION_CHECKS
 from sehd_rise.skills.capabilities import (
     L1_COURT_TRANSFORM_EXECUTOR,
+    L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
     L2_ADJUDICATION_POLICY_EXECUTOR,
     SKILL_CAPABILITY_REGISTRY,
 )
@@ -27,6 +29,11 @@ def validate_semantic_closure() -> tuple[str, ...]:
         operation = capability.executable_operation
         if capability.executor == L1_COURT_TRANSFORM_EXECUTOR:
             if operation not in EXECUTED_L1_OPERATIONS:
+                issues.append(f"executor_missing:{operation}")
+            if capability.fitness_postcondition not in POSTCONDITION_CHECKS:
+                issues.append(f"fitness_postcondition_missing:{operation}")
+        elif capability.executor == L1_CONSTRUCTIVE_HARNESS_EXECUTOR:
+            if operation not in EXECUTED_CONSTRUCTIVE_OPERATIONS:
                 issues.append(f"executor_missing:{operation}")
             if capability.fitness_postcondition not in POSTCONDITION_CHECKS:
                 issues.append(f"fitness_postcondition_missing:{operation}")

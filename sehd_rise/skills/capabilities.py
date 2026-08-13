@@ -20,7 +20,13 @@ from typing import Iterable, Mapping, Sequence
 
 
 L1_COURT_TRANSFORM_EXECUTOR = "l1_court_transform"
+L1_CONSTRUCTIVE_HARNESS_EXECUTOR = "l1_constructive_harness"
 L2_ADJUDICATION_POLICY_EXECUTOR = "l2_adjudication_policy"
+BINDING_DOMAINS = frozenset({
+    "claim_anchor", "candidate", "certificate", "origin", "coverage",
+    "boundary", "event",
+})
+BINDING_CARDINALITIES = frozenset({"exactly_one", "one_or_many"})
 
 
 @dataclass(frozen=True)
@@ -35,12 +41,16 @@ class SkillCapability:
     applicable_failure_shapes: tuple[str, ...]
     supported_directions: tuple[str, ...]
     binding_requirements: tuple[str, ...]
+    input_binding_domain: str
+    required_binding_fields: tuple[str, ...]
+    cardinality: str
     expected_local_effect: tuple[str, str]
     possible_terminal_effect: tuple[str, ...]
     executor: str
     fitness_postcondition: str
     route_ids: tuple[str, ...] = ()
     output_object: str = ""
+    produces_domain: str = ""
     operation_targets: tuple[str, ...] = ()
     does_not_support: tuple[str, ...] = ()
 
@@ -54,6 +64,9 @@ class SkillCapability:
             "applicable_failure_shapes": list(self.applicable_failure_shapes),
             "supported_directions": list(self.supported_directions),
             "binding_requirements": list(self.binding_requirements),
+            "input_binding_domain": self.input_binding_domain,
+            "required_binding_fields": list(self.required_binding_fields),
+            "cardinality": self.cardinality,
             "expected_local_effect": {
                 "observable_field": self.expected_local_effect[0],
                 "expected_direction": self.expected_local_effect[1],
@@ -63,6 +76,7 @@ class SkillCapability:
             "fitness_postcondition": self.fitness_postcondition,
             "route_ids": list(self.route_ids),
             "output_object": self.output_object,
+            "produces_domain": self.produces_domain,
             "operation_targets": list(self.operation_targets),
             "does_not_support": list(self.does_not_support),
         }
@@ -105,11 +119,19 @@ class SkillCapabilityRegistry:
                 capability.module,
                 capability.executor,
                 capability.fitness_postcondition,
+                capability.input_binding_domain,
+                capability.cardinality,
                 capability.expected_local_effect[0],
                 capability.expected_local_effect[1],
             )
             if not all(required):
                 raise ValueError(f"incomplete_capability:{operation}")
+            if capability.input_binding_domain not in BINDING_DOMAINS:
+                raise ValueError(f"invalid_binding_domain:{operation}")
+            if capability.cardinality not in BINDING_CARDINALITIES:
+                raise ValueError(f"invalid_binding_cardinality:{operation}")
+            if not capability.required_binding_fields:
+                raise ValueError(f"binding_fields_missing:{operation}")
             by_operation[operation] = capability
         self._by_operation = MappingProxyType(by_operation)
         self._non_repair_runtime_operations = MappingProxyType(
@@ -244,6 +266,40 @@ _CAPABILITIES = (
     SkillCapability(
         skill_layer="l1_provider_rule",
         module="candidate_trigger",
+        executable_operation="construct_candidate",
+        reads=("deterministic claim anchor", "label-free trajectory context"),
+        writes=("skill_constructed_candidates", "candidate availability"),
+        applicable_failure_shapes=("gold_false_negative_clean",),
+        supported_directions=("clean_to_error",),
+        binding_requirements=(
+            "exactly one existing claim anchor", "label-free observable condition",
+        ),
+        input_binding_domain="claim_anchor",
+        required_binding_fields=(
+            "anchor_id", "source_event_id", "span_start", "span_end",
+            "span_text_hash",
+        ),
+        cardinality="exactly_one",
+        expected_local_effect=("candidate_count", "increase"),
+        possible_terminal_effect=(
+            "verified_clean->verified_error", "verified_clean->unresolved",
+            "verified_clean->verified_clean",
+        ),
+        executor=L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
+        fitness_postcondition="candidate_materialized_for_bound_anchor",
+        route_ids=("local_constructive_harness",),
+        output_object="candidate",
+        produces_domain="candidate",
+        operation_targets=("anchor_id",),
+        does_not_support=(
+            "author candidate verdict", "author evidence", "emit certificate",
+            "override verifier", "change terminal verdict directly",
+            "read gold", "choose arbitrary text spans", "rerun full court",
+        ),
+    ),
+    SkillCapability(
+        skill_layer="l1_provider_rule",
+        module="candidate_trigger",
         executable_operation="suppress_candidate",
         reads=("existing census candidate", "surviving error certificates"),
         writes=("candidate availability", "surviving_error_certificate_ids"),
@@ -252,6 +308,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_SUPPRESSIVE_DIRECTIONS,
         binding_requirements=("existing candidate_id", "matched result condition"),
+        input_binding_domain="candidate",
+        required_binding_fields=("candidate_id",),
+        cardinality="one_or_many",
         expected_local_effect=("candidate_count", "decrease"),
         possible_terminal_effect=(
             "verified_error->unresolved", "verified_error->verified_clean",
@@ -262,8 +321,7 @@ _CAPABILITIES = (
         output_object="candidate",
         operation_targets=("candidate", "candidate_id"),
         does_not_support=(
-            "create missing candidate", "verified_clean->verified_error",
-            "modify provider candidate generation",
+            "author candidate verdict", "modify provider candidate generation",
         ),
     ),
     SkillCapability(
@@ -278,6 +336,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_SUPPRESSIVE_DIRECTIONS,
         binding_requirements=("prosecution_coverage == complete",),
+        input_binding_domain="coverage",
+        required_binding_fields=("coverage_side",),
+        cardinality="one_or_many",
         expected_local_effect=("prosecution_coverage", "opened"),
         possible_terminal_effect=("verified_clean->unresolved",),
         executor=L1_COURT_TRANSFORM_EXECUTOR,
@@ -301,6 +362,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_SUPPRESSIVE_DIRECTIONS,
         binding_requirements=("existing candidate_id",),
+        input_binding_domain="candidate",
+        required_binding_fields=("candidate_id",),
+        cardinality="one_or_many",
         expected_local_effect=("prosecution_certificates", "decrease"),
         possible_terminal_effect=(
             "verified_error->unresolved", "verified_error->verified_clean",
@@ -327,6 +391,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_SUPPRESSIVE_DIRECTIONS,
         binding_requirements=("existing certificate_id", "matched result condition"),
+        input_binding_domain="certificate",
+        required_binding_fields=("certificate_id",),
+        cardinality="exactly_one",
         expected_local_effect=("surviving_certificates", "decrease"),
         possible_terminal_effect=(
             "verified_error->unresolved", "verified_error->verified_clean",
@@ -353,6 +420,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_SUPPRESSIVE_DIRECTIONS,
         binding_requirements=("existing origin_event_id",),
+        input_binding_domain="origin",
+        required_binding_fields=("origin_event_id",),
+        cardinality="exactly_one",
         expected_local_effect=("responsible_step", "removed"),
         possible_terminal_effect=(
             "verified_error->unresolved", "verified_error->verified_clean",
@@ -378,6 +448,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_LOCALIZATION_DIRECTIONS,
         binding_requirements=("at least one surviving origin",),
+        input_binding_domain="origin",
+        required_binding_fields=("origin_event_id",),
+        cardinality="one_or_many",
         expected_local_effect=("responsible_step", "shift"),
         possible_terminal_effect=(
             "verified_error->verified_error", "unresolved->verified_error",
@@ -403,6 +476,9 @@ _CAPABILITIES = (
         ),
         supported_directions=_LOCALIZATION_DIRECTIONS,
         binding_requirements=("at least two existing origins",),
+        input_binding_domain="origin",
+        required_binding_fields=("origin_event_id",),
+        cardinality="one_or_many",
         expected_local_effect=("responsible_step", "shift"),
         possible_terminal_effect=("verified_error->verified_error",),
         executor=L1_COURT_TRANSFORM_EXECUTOR,
@@ -430,6 +506,9 @@ _CAPABILITIES = (
             "unresolved_to_error", "unresolved_to_decisive", "process_repair",
         ),
         binding_requirements=("side", "to_state"),
+        input_binding_domain="coverage",
+        required_binding_fields=("coverage_side",),
+        cardinality="one_or_many",
         expected_local_effect=("effective_coverage", "decrease"),
         possible_terminal_effect=("decisive->unresolved",),
         executor=L2_ADJUDICATION_POLICY_EXECUTOR,
@@ -455,6 +534,9 @@ _CAPABILITIES = (
             "unresolved_to_error", "unresolved_to_decisive", "process_repair",
         ),
         binding_requirements=("side",),
+        input_binding_domain="coverage",
+        required_binding_fields=("coverage_side",),
+        cardinality="one_or_many",
         expected_local_effect=("effective_coverage", "invalidate"),
         possible_terminal_effect=("decisive->unresolved",),
         executor=L2_ADJUDICATION_POLICY_EXECUTOR,
@@ -477,6 +559,9 @@ _CAPABILITIES = (
             "unresolved_to_decisive", "process_repair",
         ),
         binding_requirements=("verification_scope",),
+        input_binding_domain="coverage",
+        required_binding_fields=("coverage_side",),
+        cardinality="one_or_many",
         expected_local_effect=("effective_coverage", "opened"),
         possible_terminal_effect=("decisive->unresolved",),
         executor=L2_ADJUDICATION_POLICY_EXECUTOR,
@@ -500,6 +585,9 @@ _CAPABILITIES = (
         binding_requirements=(
             "authoritative verified-clean boundary", "zero surviving errors",
         ),
+        input_binding_domain="boundary",
+        required_binding_fields=("boundary_id",),
+        cardinality="exactly_one",
         expected_local_effect=("terminal_state", "verified_clean"),
         possible_terminal_effect=("unresolved->verified_clean",),
         executor=L2_ADJUDICATION_POLICY_EXECUTOR,
@@ -585,6 +673,9 @@ def render_capability_contracts(
             f"  reads: {', '.join(capability.reads)}",
             f"  writes: {', '.join(capability.writes)}",
             f"  binding_requirements: {', '.join(capability.binding_requirements)}",
+            f"  input_binding_domain: {capability.input_binding_domain}",
+            f"  required_binding_fields: {', '.join(capability.required_binding_fields)}",
+            f"  cardinality: {capability.cardinality}",
             f"  postcondition: {capability.fitness_postcondition}",
             f"  expected_local_effect: {observable}:{effect}",
             f"  does_not_support: {', '.join(capability.does_not_support)}",
@@ -593,8 +684,11 @@ def render_capability_contracts(
 
 
 __all__ = [
+    "BINDING_CARDINALITIES",
+    "BINDING_DOMAINS",
     "CapabilityGap",
     "L1_COURT_TRANSFORM_EXECUTOR",
+    "L1_CONSTRUCTIVE_HARNESS_EXECUTOR",
     "L2_ADJUDICATION_POLICY_EXECUTOR",
     "NON_REPAIR_RUNTIME_OPERATIONS",
     "SKILL_CAPABILITY_REGISTRY",

@@ -78,7 +78,7 @@ def _court_result() -> dict:
 
 def _condition() -> dict:
     return {
-        "schema_version": "sehd.condition_spec.v2",
+        "schema_version": "sehd.condition_spec.v3",
         "feature_source": "court_result",
         "feature": "failed_invariant",
         "operator": "contains",
@@ -87,7 +87,7 @@ def _condition() -> dict:
         "scope": "l1_court_transform",
         "evidence_binding": "post_court_projection",
         "combinator": "atom",
-        "binding": "result_scoped",
+        "binding": "entity_scoped",
     }
 
 
@@ -119,6 +119,13 @@ def test_repairable_fp_keeps_one_operation_from_plan_through_runtime() -> None:
     assert plan.executor == EXECUTOR_L1_COURT_TRANSFORM
     assert plan.auto_selected_operation == "withhold_certificate"
     assert SKILL_CAPABILITY_REGISTRY.contains(plan.auto_selected_operation)
+    assert plan.target_domain == "certificate"
+    assert plan.grounding_query["source_artifact_id"] == "certificate_1"
+    assert plan.required_binding_schema == {
+        "domain": "certificate",
+        "required_fields": ["certificate_id"],
+        "cardinality": "exactly_one",
+    }
 
     spec = compile_action_spec(
         plan.owner,
@@ -167,5 +174,9 @@ def test_non_repair_runtime_actions_are_not_skill_actions() -> None:
 def test_charters_expose_negative_capability_facts() -> None:
     candidate = MODULE_CHARTERS["candidate_trigger"]
     verifier = MODULE_CHARTERS["atomic_verifier_instruction"]
-    assert "create missing candidate" in candidate.forbidden_surfaces
+    assert "author candidate verdict" in candidate.forbidden_surfaces
+    assert "emit certificate" in candidate.forbidden_surfaces
+    assert "construct_candidate" in {
+        operation for operation, _text in MODULE_ACTION_OPCODES["candidate_trigger"]
+    }
     assert "create missing certificate" in verifier.forbidden_surfaces

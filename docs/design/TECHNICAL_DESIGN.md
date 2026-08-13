@@ -108,8 +108,9 @@ trajectory record（原始轨迹记录）
 
 1. Proof-court 结果中的产物失败 → L1；属主按产物类型解析（candidate →
    `candidate_trigger`，错误证书 → `evidence_obligation`；defense 证书已无 L1 属主，
-   归 detector 边界或 L2）。若所需产物不存在，仍保留该因果属主，但可修复性为
-   `CAPABILITY_GAP`；只有既有产物上的抑制/选择才能生成 L1 RepairPlan。
+   归 detector 边界或 L2）。若缺少 error candidate，仍保留 `candidate_trigger` 因果属主，
+   并可编译为受限的 `ClaimAnchor -> construct_candidate` RepairPlan；其他尚无注册构造
+   能力的缺失产物仍进入 `CAPABILITY_GAP`。
 2. 共识门挡下了一个非空候选集 → L2，`consensus_gate_policy`。
 3. 空洞的完整覆盖（该侧声称 `complete` 却零有效证书）→ L2，`coverage_validity_policy`。
 4. Boundary 路径返回 `verified_clean` 但终态是 `unresolved` → L2，
@@ -117,9 +118,10 @@ trajectory record（原始轨迹记录）
 5. 兜底：无可操作形状的 unresolved，或终态裁决与法庭自己的证书账本矛盾 → 不在
    技能可寻址范围内。
 
-Gold 极性只确定需要的终态迁移方向，不改写已找到的因果属主。假阴性若需要创建缺失
-candidate/certificate，保持原属主并进入 `CAPABILITY_GAP`；假阳性只允许查询与
-error→clean 方向相容的既有产物抑制能力。Unresolved 终态不带极性。
+Gold 极性只确定需要的终态迁移方向，不改写已找到的因果属主。缺失 candidate 的假阴性
+可进入 label-free constructive harness；缺失 certificate 等未注册构造能力仍保持原属主
+并进入 `CAPABILITY_GAP`。假阳性只允许查询与 error→clean 方向相容的既有产物抑制能力。
+Unresolved 终态不带极性。
 
 **CausalFailureEpisode**（`episode.py`）。每个下游层都消费的单一失败对象：终态、
 终态依据、阻塞谓词、因果失败边、失败属主、技能层、可修复面、合法修复操作、可观测
@@ -146,14 +148,19 @@ RepairPlan
 ├── layer                  # L1 | L2
 ├── owner（属主）
 ├── target causal edge（目标因果边）
-├── executor               # l1_court_transform | l2_adjudication_policy
+├── executor               # l1_court_transform | l1_constructive_harness | l2_adjudication_policy
 ├── legal operations（合法操作）
+├── target domain          # claim_anchor | candidate | certificate | origin | coverage | boundary | event
+├── grounding query（实体绑定查询）
+├── required binding schema（字段与基数契约）
 ├── effect contract（效应契约）
 └── evaluation contract（评估契约）
 ```
 
-L1 只经 `l1_court_transform` 对已完成的 proof-court 结果执行七个确定性
-抑制/选择变换；绝不注入 provider prompt，也不能创建候选、证据或证书。L2 经
+L1 的既有实体修复经 `l1_court_transform` 执行七个确定性抑制/选择变换；缺失 candidate
+只经 `l1_constructive_harness` 绑定一个确定性 `ClaimAnchor`、调用冻结 constructor，
+再从 qualification 开始局部续跑。Skill 仍不能编写 evidence/certificate/verdict，续跑也
+不能重新采样 census。L2 经
 `l2_adjudication_policy`（确定性法庭求值器）执行。所有可提议操作由
 `skills/capabilities.py::SKILL_CAPABILITY_REGISTRY` 唯一授权；诊断、计划、反思、
 预验证、执行与 fitness 必须查询同一注册表。
@@ -163,13 +170,14 @@ L1 只经 `l1_court_transform` 对已完成的 proof-court 结果执行七个确
 冻结基座永不改变：进化只改动 L1 规则基因组与 L2 策略基因组；CRS 权重、法庭决策
 规则与阶段结构原封不动，任何阈值都不手调。
 
-### L1 —— post-court Skill 基因组
+### L1 —— grounded Skill 基因组
 
-六个技能模块只拥有既有 proof-court 结果上的抑制/选择面：
+六个技能模块拥有既有 proof-court 结果上的抑制/选择面；其中 `candidate_trigger` 另有唯一
+受限的正向召回面：
 
 | 模块 | 阶段 | 作用 |
 |--------|-------|------|
-| `candidate_trigger` | Post-court | 抑制已有候选 |
+| `candidate_trigger` | Constructive / Post-court | 从一个 `ClaimAnchor` 构造中性候选；或抑制已有候选 |
 | `evidence_obligation` | Post-court | 保持已有 coverage 未完成 |
 | `candidate_to_verifier_route` | Post-court | 暂停已有候选资格 |
 | `atomic_verifier_instruction` | Post-court | 撤下已有证书 |
@@ -187,7 +195,11 @@ L1 只经 `l1_court_transform` 对已完成的 proof-court 结果执行七个确
 
 规则文本只用于持久化和反思展示，确定性渲染为 `When <condition>, <action>.`；
 它不注入 provider prompt，也不决定运行时动作。类型化 `condition_spec` 在已完成的
-court result 上求值，匹配后才派发注册表中的操作。每个模块带一份从能力注册表派生的
+court result 或预先投影的 `ClaimAnchor` universe 上返回实体级 `Binding[]`，而不是对聚合结果返回布尔值：`all_of` 按同一
+实体做 join，`any_of` 做去重 union，`not` 在 capability 声明的 domain 上做 anti-join。
+只有 binding 的 domain、必需标识字段和 cardinality 全部满足注册表契约，执行器才会
+派发操作；不得回退到 first-match，也不得把 action 的字段名当作实例 id。每个模块带
+一份从能力注册表派生的
 章程（`skills/vocabulary/charters.py`）：
 流水线阶段、可影响面、禁止面、允许的裁决、在范围内与范围外的失败示例。只有被允许
 的目标模块的章程与操作码列表进入反思提示词，在生成时就约束提案。运行时规则不得
@@ -229,6 +241,9 @@ DETECTED
   -> REPAIR_PLANNED
   -> HYPOTHESIS_SEARCH                            （NO_HYPOTHESIS：search 层）
   -> PROPOSAL_VALIDATED                           （INVALID_PROPOSAL / DUPLICATE_PROPOSAL）
+  -> BOUND                                        （BINDING_NOT_FOUND / BINDING_AMBIGUOUS /
+                                                    BINDING_DOMAIN_MISMATCH）
+  -> CONSTRUCTOR_EXECUTED -> CANDIDATE_CONSTRUCTED（仅 constructive path；分层 construction outcome）
   -> EXECUTED                                     （ACTION_NOT_DISPATCHED / EXECUTION_RUNTIME_FAILURE）
   -> TARGET_EDGE_CHANGED                          （TARGET_EDGE_UNCHANGED）
   -> BLOCKER_CLEARED                              （BLOCKER_NOT_CLEARED）
@@ -241,13 +256,14 @@ DETECTED
 
 ### 结果漏斗
 
-每次修复尝试恰好终止于四层共 17 种终态之一——`loop/machine.py::Outcome`，彻底取代
+每次修复尝试恰好终止于四层共 20 种终态之一——`loop/machine.py::Outcome`，彻底取代
 旧的 `skip_*` 词表：
 
 - **Framework**：`CAPABILITY_GAP`、`NON_EVOLVABLE`、`UNADDRESSABLE`、`ROUTING_FAILURE`、
-  `SCHEMA_FAILURE`、`INFRA_FAILURE`
+  `SCHEMA_FAILURE`、`INFRA_FAILURE`、`BINDING_DOMAIN_MISMATCH`
 - **Search**：`NO_HYPOTHESIS`、`INVALID_PROPOSAL`、`DUPLICATE_PROPOSAL`
-- **Execution**：`ACTION_NOT_DISPATCHED`、`EXECUTION_RUNTIME_FAILURE`、
+- **Execution**：`BINDING_NOT_FOUND`、`BINDING_AMBIGUOUS`、`ACTION_NOT_DISPATCHED`、
+  `EXECUTION_RUNTIME_FAILURE`、
   `TARGET_EDGE_UNCHANGED`、`BLOCKER_NOT_CLEARED`
 - **Fitness**：`SOURCE_NOT_IMPROVED`、`CANARY_REGRESSION`、`TRANSFER_REGRESSION`、
   `ACCEPTED`
@@ -267,7 +283,7 @@ DETECTED
 替代下一层的证据：
 
 ```text
-Hypothesis -> RepairPlan selected -> Action dispatched
+Hypothesis -> RepairPlan selected -> Source entity BOUND -> Action dispatched
   -> Executor/provider complied -> Target causal edge changed
   -> Blocking predicate cleared -> Terminal behavior changed
   -> Task score improved -> Canary/transfer preserved -> Skill committed
@@ -369,7 +385,8 @@ runner 持久化 `htc_tes_experience_memory.json` 与 `htc_tes_coverage.json`。
 |---|---|
 | 可修复率 | 有合法 RepairPlan 的失败 / 位于可进化面上的失败 |
 | 不可寻址框架失败率 | `UNADDRESSABLE` 计数——框架质量指标，目标 ≈ 0 |
-| 执行率 | 已执行的修复 / 合法 RepairPlan |
+| 编译后绑定率 | `BOUND` / 已编译 proposal |
+| 绑定后执行率 | 已执行的修复 / `BOUND` |
 | 因果效应率 | 目标边已移动 / 已执行的修复 |
 | 阻塞关闭率 | 阻塞谓词已清除 / 目标边已移动 |
 | 源改进率 | 源检测器已改进 / 阻塞谓词已清除 |

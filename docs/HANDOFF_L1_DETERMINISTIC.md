@@ -10,9 +10,10 @@
 - `SkillCapabilityRegistry` 是 Skill 能力的唯一真源。每项能力同时声明 layer、
   owner module、operation、reads、writes、failure shapes、direction、binding、
   local/terminal effect、executor、fitness postcondition 与 `does_not_support`。
-- L1 executor 是 `l1_court_transform`。它只对 proof-court 已生成的结果执行七个
-  确定性抑制/选择操作；不创建 candidate、evidence、certificate，不重跑 verifier，
-  不改变 provider prompt 或 reasoning。
+- L1 既有实体修复 executor 是 `l1_court_transform`。缺失 candidate 的唯一正向能力是
+  `l1_constructive_harness`：绑定确定性、无 gold 的 `ClaimAnchor`，调用冻结 constructor，
+  然后局部续跑既有 verifier。Skill 不创建 evidence/certificate/verdict，也不改变 provider
+  prompt 或 reasoning。
 - L2 executor 是 `l2_adjudication_policy`。只有注册表中有可观测检测效果的动作
   可以作为 Skill repair 被计划；纯 telemetry / escalation 名称不能进入 Skill 提案。
 - 因果切点不会因为当前没有可执行操作而被降级或改写。可学习但语言不可表达的
@@ -35,8 +36,8 @@
 
 1. FP：`atomic_verifier_instruction / withhold_certificate` 能编译并在实际 L1
    executor 中命中，目标证书消失，terminal 从 error 变 clean。
-2. FN clean + missing candidate：保持 `candidate_trigger` 因果属主，返回结构化
-   `CAPABILITY_GAP`；不得伪造 suppress 操作或降级为 `NON_EVOLVABLE`。
+2. FN clean + missing candidate：保持 `candidate_trigger` 因果属主，编译为
+   `claim_anchor / exactly_one / construct_candidate`；不得伪造 suppress 操作。
 3. 对注册表逐项检查 executor operation 与 fitness postcondition 均存在；任何一端
    缺失都由 `loop/semantic_closure.py::validate_semantic_closure()` 报错。
 
@@ -46,6 +47,7 @@
 ## 下一阶段边界
 
 Phase 1 只证明“Skill 语言—执行器—fitness”的机械闭环，不证明新 Skill 已在真实
-数据上产生泛化收益。进入下一阶段后，仍须用新鲜 child genome、实际 provider 调用、
+数据上产生泛化收益。实体绑定阶段的完成情况见
+`docs/HANDOFF_SKILL_GROUNDING.md`。后续仍须用新鲜 child genome、实际 provider 调用、
 source edge 变化、下游 blocker 清除、独立 stable canary 与 sealed holdout 建立效果证据；
 不得用编译成功、结构验收、返回码 0 或汇总计数替代。

@@ -91,6 +91,9 @@ _SYNTHESIZED_FIELD_REASONS: dict[str, tuple[str, str]] = {
     REASON_GOLD_FALSE_POSITIVE: (
         "evidence_obligation", "coverage_state",
     ),
+    REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
+        "candidate_trigger", "anchor_id",
+    ),
 }
 
 _EVIDENCE_REF_KEYS = (
@@ -995,11 +998,26 @@ def _compile_failure_edges(
             ):
                 rejected_fields.append(f"{owner}:{field}")
                 continue
-            routes = MODULE_ROUTE_IDS.get(owner, ())
+            matching_capabilities = tuple(
+                capability
+                for capability in SKILL_CAPABILITY_REGISTRY.for_module(owner)
+                if field in capability.operation_targets
+                and (
+                    not evolution_direction
+                    or evolution_direction in capability.supported_directions
+                )
+            )
+            capability = matching_capabilities[0] if matching_capabilities else None
+            routes = capability.route_ids if capability else MODULE_ROUTE_IDS.get(owner, ())
+            output_object = (
+                capability.output_object
+                if capability else MODULE_OUTPUT_OBJECT.get(owner, owner)
+            )
             if cut.reason_code == REASON_GOLD_FALSE_POSITIVE:
                 observed, required = "complete", "incomplete"
             elif cut.reason_code in (
                 REASON_PROVIDER_MISSING,
+                REASON_GOLD_FALSE_NEGATIVE_CLEAN,
                 REASON_LOCALIZATION_FALLBACK,
                 REASON_RESPONSIBLE_STEP_MISSING,
             ):
@@ -1007,8 +1025,8 @@ def _compile_failure_edges(
             else:
                 observed, required = "malformed", "well_formed"
             edges.append(FailureEdge(
-                producer_route=routes[0] if routes else MODULE_OUTPUT_OBJECT.get(owner, owner),
-                output_object=MODULE_OUTPUT_OBJECT.get(owner, owner),
+                producer_route=routes[0] if routes else output_object,
+                output_object=output_object,
                 field=field,
                 consumer=consumer,
                 observed=observed,

@@ -285,6 +285,10 @@ def _attribute_intervention_fitness(
     condition_matched = transform_fired or any(
         _is_edit(row) and bool(row.get("matched")) for row in skipped_rows
     )
+    binding_status = next((
+        str(row.get("binding_status") or "")
+        for row in skipped_rows if _is_edit(row) and row.get("binding_status")
+    ), "BOUND" if transform_fired else "")
 
     postcondition_met, postcondition_detail = (
         evaluate_action_spec_postcondition(
@@ -306,6 +310,10 @@ def _attribute_intervention_fitness(
 
     if executed:
         execution_status = "executed"
+    elif binding_status in {
+        "BINDING_NOT_FOUND", "BINDING_AMBIGUOUS", "BINDING_DOMAIN_MISMATCH",
+    }:
+        execution_status = binding_status.lower()
     elif not sanitize_condition_spec(edit.condition_spec):
         execution_status = "not_executed"
     elif not condition_matched:
@@ -330,6 +338,7 @@ def _attribute_intervention_fitness(
         "rule_compiled": True,
         "transform_fired": transform_fired,
         "condition_matched": condition_matched,
+        "binding_status": binding_status,
         "target_edge_changed": postcondition_met,
         "terminal_changed": terminal_changed,
         "baseline_terminal": baseline_terminal,

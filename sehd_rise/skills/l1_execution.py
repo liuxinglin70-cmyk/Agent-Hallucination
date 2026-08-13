@@ -40,12 +40,13 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.skills.action import ActionSpec, sanitize_action_spec
+from sehd_rise.skills.binding import (
+    BINDING_BOUND,
+    Binding,
+    match_condition_bindings,
+    validate_binding_contract,
+)
 from sehd_rise.skills.rule import (
-    ConditionSpec,
-    evaluate_condition_spec,
-    normalize_candidate_kind,
-    normalize_module_tag,
-    project_result_condition_features,
     sanitize_condition_spec,
 )
 
@@ -184,102 +185,6 @@ def _candidate_rows_surfaces(result: dict[str, Any], candidate_id: str) -> None:
             ]
 
 
-def _census_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The merged census rows (the candidate-discovery surface)."""
-    rows = result.get("census")
-    return [dict(row) for row in rows if isinstance(row, Mapping)] if isinstance(rows, list) else []
-
-
-def _prosecution_rows_and_audits(
-    result: Mapping[str, Any],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Focused-initial prosecution rows and their index-aligned audits.
-
-    ``proof_adjudication.error_audits`` aligns with ``prosecution.candidates``
-    (the focused initial set), NOT with ``combined_prosecution`` — appeal
-    certificates re-enter the merge surface but carry no focused audit row.
-    """
-    prosecution = result.get("prosecution")
-    candidates = (
-        prosecution.get("candidates") if isinstance(prosecution, Mapping) else None
-    )
-    rows = [dict(row) for row in candidates if isinstance(row, Mapping)] if isinstance(candidates, list) else []
-    proof = result.get("proof_adjudication")
-    audits = proof.get("error_audits") if isinstance(proof, Mapping) else None
-    audit_rows = [dict(row) for row in audits if isinstance(row, Mapping)] if isinstance(audits, list) else []
-    return rows, audit_rows
-
-
-_AXIS_CODES = frozenset({"F", "Fa", "P", "S"})
-
-# Condition features that resolve to a census candidate instance.
-_CANDIDATE_FEATURES = frozenset({"candidate_kind", "candidate_axis", "module_tag"})
-# Condition features that resolve to a certificate instance via its audit.
-_CERTIFICATE_FEATURES = frozenset({"missing_field", "failed_invariant"})
-
-
-def resolve_condition_instance(
-    condition_spec: Mapping[str, Any] | None, result: Mapping[str, Any],
-) -> dict[str, str]:
-    """Resolve a matched condition to the concrete instance it names.
-
-    The result-scoped condition is a closed predicate over court-result
-    features; the executor needs the specific existing instance that predicate
-    named. It maps the feature to one census candidate or one prosecuted
-    certificate deterministically.
-
-    Returns a mapping keyed by identifier kind — ``candidate_id``,
-    ``source_candidate_id``, ``certificate_id``, ``origin_event_id`` — with
-    the first match in census/audit order. An empty mapping means the
-    condition is field-level (no instance) or matched nothing; callers then
-    fail closed rather than guessing. Only the atom form resolves; a
-    combinator condition has no single named instance.
-    """
-    spec_dict = sanitize_condition_spec(condition_spec)
-    if not spec_dict:
-        return {}
-    spec = ConditionSpec.from_dict(spec_dict)
-    if spec.combinator != "atom":
-        return {}
-
-    if spec.feature in _CANDIDATE_FEATURES:
-        for row in _census_rows(result):
-            if spec.feature == "candidate_kind":
-                hit = normalize_candidate_kind(row.get("candidate_kind")) == spec.value
-            elif spec.feature == "module_tag":
-                hit = normalize_module_tag(row.get("module_tag")) == spec.value
-            else:  # candidate_axis
-                axes = {
-                    str(axis) for axis in (row.get("axes") or [])
-                    if str(axis) in _AXIS_CODES
-                }
-                hit = spec.value in axes
-            if hit:
-                return {
-                    "candidate_id": str(row.get("candidate_id") or ""),
-                    "origin_event_id": str(row.get("origin_hypothesis_event_id") or ""),
-                }
-        return {}
-
-    if spec.feature in _CERTIFICATE_FEATURES:
-        rows, audits = _prosecution_rows_and_audits(result)
-        for index, row in enumerate(rows):
-            audit = audits[index] if index < len(audits) else {}
-            values = (
-                audit.get("missing_fields") if spec.feature == "missing_field"
-                else audit.get("failed_invariants")
-            )
-            if isinstance(values, (list, tuple, set, frozenset)) and spec.value in {
-                str(value) for value in values
-            }:
-                return {
-                    "certificate_id": str(row.get("certificate_id") or ""),
-                    "source_candidate_id": str(row.get("source_candidate_id") or ""),
-                    "origin_event_id": str(row.get("origin_event_id") or ""),
-                }
-        return {}
-
-
 def _mutate_proof(result: dict[str, Any], **updates: Any) -> None:
     proof = result.get("proof_adjudication")
     if isinstance(proof, Mapping):
@@ -289,22 +194,14 @@ def _mutate_proof(result: dict[str, Any], **updates: Any) -> None:
 
 
 def execute_l1_intervention(
-    result: Mapping[str, Any], *, spec: ActionSpec, target: str = "",
-    condition_spec: Mapping[str, Any] | None = None,
+    result: Mapping[str, Any], *, spec: ActionSpec,
+    bindings: Sequence[Binding] = (),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply one deterministic L1 transform and return (result, report).
 
-    ``spec`` is a compiled ``ActionSpec`` whose condition the caller already
-    evaluated. ``target`` is the condition's resolved instance — the specific
-    ``candidate_id`` / ``certificate_id`` / ``origin_event_id`` the matched
-    condition named. When ``target`` is empty and ``condition_spec`` is
-    supplied, the instance is resolved from the result via
-    ``resolve_condition_instance`` (first match in census/audit order). It is
-    required for the instance-level transforms (``suppress_candidate`` /
-    ``withhold_certificate`` / ``hold_candidate_qualification`` /
-    ``reject_non_causal_origin``) and ignored by the field-level transforms.
-    Without a resolved instance those transforms fail closed (``fired=False``):
-    the executor never guesses which carrier the condition meant.
+    ``bindings`` must already satisfy the capability's typed binding contract.
+    The executor never resolves a first match and never treats a schema field
+    name as an entity id.
 
     The transform mutates a copy of ``result``; the report carries ``fired``,
     ``postcondition``, the opcode and the terminal transition so the effect
@@ -315,21 +212,48 @@ def execute_l1_intervention(
     rows = _certificate_rows(mutated)
     surviving = _surviving_ids(mutated)
     operation = spec.operation
-    resolved = resolve_condition_instance(condition_spec, mutated)
+    binding_status, binding_detail = validate_binding_contract(
+        bindings,
+        domain=spec.input_binding_domain,
+        required_fields=spec.required_binding_fields,
+        cardinality=spec.cardinality,
+    )
     fired = False
     detail = ""
 
+    if binding_status != BINDING_BOUND:
+        return mutated, {
+            "operation": operation,
+            "fired": False,
+            "postcondition": spec.postcondition,
+            "binding_status": binding_status,
+            "binding_detail": binding_detail,
+            "bindings": [binding.to_dict() for binding in bindings],
+            "detail": binding_detail,
+            "surviving_after": list(surviving),
+            "terminal_state": str((proof or {}).get("state") or ""),
+        }
+
+    identifiers = [dict(binding.identifiers) for binding in bindings]
+
     if operation == "suppress_candidate":
-        candidate_id = target or resolved.get("candidate_id") or spec.output_field or ""
-        _candidate_rows_surfaces(mutated, candidate_id)
-        removed = _candidate_certificate_ids(rows, candidate_id) & set(surviving)
+        candidate_ids = {
+            value for item in identifiers for value in (item.get("candidate_id"),)
+            if value
+        }
+        for candidate_id in candidate_ids:
+            _candidate_rows_surfaces(mutated, candidate_id)
+        removed = set().union(*(
+            _candidate_certificate_ids(rows, candidate_id)
+            for candidate_id in candidate_ids
+        )) & set(surviving) if candidate_ids else set()
         if removed:
             surviving = _remove_certificates(mutated, remove=removed)
             fired = True
-            detail = f"suppressed_candidate:{candidate_id}"
+            detail = "suppressed_candidates:" + ",".join(sorted(candidate_ids))
 
     elif operation == "withhold_certificate":
-        pinned = target or resolved.get("certificate_id") or spec.output_field or ""
+        pinned = identifiers[0].get("certificate_id", "")
         removed = {pinned} & set(surviving)
         if removed:
             surviving = _remove_certificates(mutated, remove=removed)
@@ -337,7 +261,8 @@ def execute_l1_intervention(
             detail = f"withheld_certificate:{sorted(removed)[0]}"
 
     elif operation == "keep_coverage_incomplete":
-        if proof and proof.get("prosecution_coverage") == "complete":
+        sides = {item.get("coverage_side") for item in identifiers}
+        if "prosecution" in sides and proof and proof.get("prosecution_coverage") == "complete":
             _mutate_proof(mutated, prosecution_coverage="incomplete")
             fired = True
             detail = "prosecution_coverage_opened:complete->incomplete"
@@ -345,15 +270,21 @@ def execute_l1_intervention(
     elif operation == "hold_candidate_qualification":
         # Qualification not positive: the candidate's certificate is not
         # re-emitted, so its surviving carriers are withheld.
-        candidate_id = target or resolved.get("candidate_id") or spec.output_field or ""
-        removed = _candidate_certificate_ids(rows, candidate_id) & set(surviving)
+        candidate_ids = {
+            item.get("candidate_id", "") for item in identifiers
+            if item.get("candidate_id")
+        }
+        removed = set().union(*(
+            _candidate_certificate_ids(rows, candidate_id)
+            for candidate_id in candidate_ids
+        )) & set(surviving) if candidate_ids else set()
         if removed:
             surviving = _remove_certificates(mutated, remove=removed)
             fired = True
-            detail = f"qualification_held:{candidate_id}"
+            detail = "qualifications_held:" + ",".join(sorted(candidate_ids))
 
     elif operation == "reject_non_causal_origin":
-        origin = target or resolved.get("origin_event_id") or spec.output_field or ""
+        origin = identifiers[0].get("origin_event_id", "")
         removed = {
             str(row.get("certificate_id") or "")
             for row in rows
@@ -365,7 +296,15 @@ def execute_l1_intervention(
             detail = f"rejected_non_causal_origin:{origin}"
 
     elif operation in ("select_earliest_origin", "suppress_later_origin"):
-        origin = _earliest_surviving_origin(mutated, rows, surviving)
+        allowed_origins = {
+            item.get("origin_event_id", "") for item in identifiers
+            if item.get("origin_event_id")
+        }
+        bound_rows = [
+            row for row in rows
+            if str(row.get("origin_event_id") or "") in allowed_origins
+        ]
+        origin = _earliest_surviving_origin(mutated, bound_rows, surviving)
         current = str(
             (proof or {}).get("responsible_event_id")
             if isinstance(proof, Mapping) else ""
@@ -398,6 +337,9 @@ def execute_l1_intervention(
         "operation": operation,
         "fired": bool(fired),
         "postcondition": spec.postcondition,
+        "binding_status": binding_status,
+        "binding_detail": binding_detail,
+        "bindings": [binding.to_dict() for binding in bindings],
         "detail": detail or f"unreachable_surface:{operation}",
         "surviving_after": list(surviving),
         "terminal_state": (
@@ -409,6 +351,7 @@ def execute_l1_intervention(
 
 def execute_l1_interventions(
     result: Mapping[str, Any], *, specs: Sequence[ActionSpec],
+    bindings: Sequence[Sequence[Binding]] = (),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Apply L1 transforms in order, returning (result, execution record).
 
@@ -419,8 +362,9 @@ def execute_l1_interventions(
     current = dict(result)
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
-    for spec in specs:
-        current, report = execute_l1_intervention(current, spec=spec)
+    for index, spec in enumerate(specs):
+        bound = bindings[index] if index < len(bindings) else ()
+        current, report = execute_l1_intervention(current, spec=spec, bindings=bound)
         bucket = fired if report["fired"] else skipped
         bucket.append({
             "operation": report["operation"],
@@ -476,17 +420,23 @@ def evaluate_l1_rule(
         return dict(result), report
 
     condition_dict = sanitize_condition_spec(condition_spec)
-    if condition_dict:
-        features = project_result_condition_features(result, record)
-        evaluation = evaluate_condition_spec(condition_dict, features)
-        report["matched"] = evaluation.matched
-        report["condition_detail"] = evaluation.to_dict()
-        if not evaluation.matched:
-            report["detail"] = "condition_not_matched"
-            return dict(result), report
+    action = ActionSpec.from_dict(spec)
+    binding_match = match_condition_bindings(
+        condition_dict,
+        result,
+        domain=action.input_binding_domain,
+        cardinality=action.cardinality,
+        record=record,
+    )
+    report["binding_status"] = binding_match.status
+    report["binding_proof"] = binding_match.to_dict()
+    report["matched"] = bool(binding_match.bindings)
+    if not binding_match.bound:
+        report["detail"] = binding_match.reason
+        return dict(result), report
 
     transformed, transform_report = execute_l1_intervention(
-        result, spec=ActionSpec.from_dict(spec), condition_spec=condition_dict or None,
+        result, spec=action, bindings=binding_match.bindings,
     )
     report.update(transform_report)
     report["matched"] = True
@@ -516,6 +466,7 @@ def execute_l1_rules(
     current = dict(result)
     fired: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
+    bound: list[dict[str, Any]] = []
     for module_id, rule_id, condition_spec, action_spec in rules:
         current, report = evaluate_l1_rule(
             condition_spec=condition_spec,
@@ -529,14 +480,19 @@ def execute_l1_rules(
             "operation": report.get("operation"),
             "postcondition": report.get("postcondition"),
             "matched": report.get("matched"),
+            "binding_status": report.get("binding_status"),
+            "binding_proof": report.get("binding_proof"),
             "detail": report.get("detail"),
         }
+        if report.get("binding_status") == BINDING_BOUND:
+            bound.append(dict(row))
         (fired if report.get("fired") else skipped).append(row)
     before = str((result or {}).get("state") or "")
     proof = current.get("proof_adjudication")
     after = str(proof.get("state")) if isinstance(proof, Mapping) else ""
     return current, {
         "fired": fired,
+        "bound": bound,
         "skipped": skipped,
         "terminal_state": after,
         "terminal_transition": f"{before}->{after}",
@@ -549,5 +505,4 @@ __all__ = [
     "execute_l1_intervention",
     "execute_l1_interventions",
     "execute_l1_rules",
-    "resolve_condition_instance",
 ]

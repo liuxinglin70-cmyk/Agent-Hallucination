@@ -381,6 +381,18 @@ def _project_execution_trace(
         return "runtime_invalid"
     if decision == Outcome.CAPABILITY_GAP.value:
         return "no_proposal"
+    if decision in {
+        Outcome.BINDING_NOT_FOUND.value,
+        Outcome.BINDING_AMBIGUOUS.value,
+        Outcome.BINDING_DOMAIN_MISMATCH.value,
+        Outcome.CONSTRUCTION_NO_CANDIDATE.value,
+        Outcome.CONSTRUCTION_ANCHOR_MISMATCH.value,
+        Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE.value,
+        Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED.value,
+        Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED.value,
+        Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE.value,
+    }:
+        return "not_executed"
     proposal = step.edit_proposal if isinstance(step.edit_proposal, Mapping) else {}
     if not proposal.get("operation"):
         return "no_proposal"

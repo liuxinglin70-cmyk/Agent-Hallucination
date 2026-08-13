@@ -21,6 +21,11 @@ from typing import Any, Mapping
 from sehd_rise.skills.genome import SkillGenome, create_baseline_genome
 from sehd_rise.skills.policy import PolicyGenome
 from sehd_rise.skills.l1_execution import execute_l1_rules
+from sehd_rise.skills.capabilities import (
+    L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
+    SKILL_CAPABILITY_REGISTRY,
+)
+from sehd_rise.detection.continuation import execute_constructive_rules
 from sehd_rise.skills.rule import project_result_condition_features
 from sehd_rise.detection.injection import compile_genome_rules
 from sehd_rise.detection.court.engine import adjudicate_case
@@ -140,7 +145,33 @@ def _run_detection_with_genome(
 
     rules = compile_genome_rules(genome, baseline=baseline)
     if rules:
-        result, l1_execution = execute_l1_rules(result, rules, record=record)
+        constructive = [
+            rule for rule in rules
+            if SKILL_CAPABILITY_REGISTRY.require(
+                str((rule[3] or {}).get("operation") or "")
+            ).executor == L1_CONSTRUCTIVE_HARNESS_EXECUTOR
+        ]
+        transforms = [rule for rule in rules if rule not in constructive]
+        constructive_execution = {"fired": [], "bound": [], "skipped": []}
+        if constructive:
+            result, constructive_execution = execute_constructive_rules(
+                result, constructive, record=record, config=config,
+                provider_usage_ledger=provider_usage_ledger,
+            )
+        result, transform_execution = execute_l1_rules(
+            result, transforms, record=record,
+        )
+        l1_execution = {
+            key: [
+                *constructive_execution.get(key, []),
+                *transform_execution.get(key, []),
+            ]
+            for key in ("fired", "bound", "skipped")
+        }
+        l1_execution["constructive_execution_proofs"] = (
+            constructive_execution.get("constructive_execution_proofs", [])
+        )
+        l1_execution["terminal_state"] = result.get("state")
         result["l1_execution"] = l1_execution
         # Re-project the responsible_step terminal projection: the executor
         # updates responsible_event_id but not its source-step projection.
@@ -192,6 +223,45 @@ def _run_detection_with_genome(
         resolve_authoritative_state(result)
     except ValueError as exc:
         raise RuntimeError(f"detector returned invalid state: {exc}") from exc
+    return result
+
+
+def _run_constructive_continuation_with_genome(
+    *, baseline_result: Mapping[str, Any], baseline_genome: SkillGenome,
+    candidate_genome: SkillGenome, record: dict[str, Any], config: dict[str, Any],
+    provider_usage_ledger: ProviderUsageLedger | None = None,
+) -> dict[str, Any]:
+    """Replay only newly-added constructive rules on the frozen source artifact."""
+    baseline_rules = compile_genome_rules(baseline_genome)
+    candidate_rules = compile_genome_rules(candidate_genome)
+
+    def _signature(rule: tuple[Any, ...]) -> tuple[str, str, str]:
+        return (
+            str(rule[0]), str(rule[1]),
+            str((rule[3] or {}).get("operation") or ""),
+        )
+
+    existing = {_signature(rule) for rule in baseline_rules}
+    delta = [rule for rule in candidate_rules if _signature(rule) not in existing]
+    constructive = [
+        rule for rule in delta
+        if SKILL_CAPABILITY_REGISTRY.require(
+            str((rule[3] or {}).get("operation") or "")
+        ).executor == L1_CONSTRUCTIVE_HARNESS_EXECUTOR
+    ]
+    if not constructive:
+        raise RuntimeError("constructive continuation has no new constructive rule")
+    result, execution = execute_constructive_rules(
+        baseline_result, constructive, record=record, config=config,
+        provider_usage_ledger=provider_usage_ledger,
+    )
+    result["condition_feature_trace"] = project_result_condition_features(
+        result, record,
+    )
+    result["l1_execution"] = execution
+    if missing_decision_authority(result) or decision_authority_invalid(result):
+        raise RuntimeError("constructive continuation returned invalid decision authority")
+    resolve_authoritative_state(result)
     return result
 
 
@@ -283,9 +353,33 @@ def _run_counted_detection(
     return result
 
 
+def _run_counted_constructive_continuation(
+    *, baseline_result: Mapping[str, Any], baseline_genome: SkillGenome,
+    candidate_genome: SkillGenome, case_id: str,
+    budget_usage: dict[str, int], records: Mapping[str, dict[str, Any]],
+    config: dict[str, Any], provider_usage_ledger: ProviderUsageLedger,
+) -> dict[str, Any]:
+    """Budgeted source replay that never resamples the full detector."""
+    budget_usage["provider_calls"] += 1
+    budget_usage["source_replays"] += 1
+    budget_usage["constructive_continuations"] = (
+        budget_usage.get("constructive_continuations", 0) + 1
+    )
+    return _run_constructive_continuation_with_genome(
+        baseline_result=baseline_result,
+        baseline_genome=baseline_genome,
+        candidate_genome=candidate_genome,
+        record=_detector_record(records[case_id]),
+        config=config,
+        provider_usage_ledger=provider_usage_ledger,
+    )
+
+
 __all__ = [
     "_authority_failure_details",
     "_run_conflict_gate_call",
+    "_run_constructive_continuation_with_genome",
+    "_run_counted_constructive_continuation",
     "_run_detection_with_genome",
     "_run_mutation_call",
     "_run_counted_detection",

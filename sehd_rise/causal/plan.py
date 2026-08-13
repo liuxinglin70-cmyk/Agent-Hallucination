@@ -37,6 +37,7 @@ from typing import Any, Mapping, Sequence
 from sehd_rise.causal.episode import CausalFailureEpisode, FailureEdge
 from sehd_rise.skills.capabilities import (
     L1_COURT_TRANSFORM_EXECUTOR,
+    L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
     L2_ADJUDICATION_POLICY_EXECUTOR,
     SKILL_CAPABILITY_REGISTRY,
 )
@@ -51,8 +52,13 @@ from sehd_rise.skills.vocabulary.contracts import (
 # ============================================================
 
 EXECUTOR_L1_COURT_TRANSFORM = L1_COURT_TRANSFORM_EXECUTOR
+EXECUTOR_L1_CONSTRUCTIVE_HARNESS = L1_CONSTRUCTIVE_HARNESS_EXECUTOR
 EXECUTOR_ADJUDICATION_POLICY = L2_ADJUDICATION_POLICY_EXECUTOR
-EXECUTORS = frozenset({EXECUTOR_L1_COURT_TRANSFORM, EXECUTOR_ADJUDICATION_POLICY})
+EXECUTORS = frozenset({
+    EXECUTOR_L1_COURT_TRANSFORM,
+    EXECUTOR_L1_CONSTRUCTIVE_HARNESS,
+    EXECUTOR_ADJUDICATION_POLICY,
+})
 
 
 # ============================================================
@@ -84,6 +90,9 @@ class RepairPlan:
     legal_operations: tuple[str, ...]
     effect_contract: Mapping[str, Any]
     evaluation_contract: Mapping[str, Any]
+    target_domain: str = ""
+    grounding_query: Mapping[str, Any] = field(default_factory=dict)
+    required_binding_schema: Mapping[str, Any] = field(default_factory=dict)
     auto_selected_operation: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -97,6 +106,9 @@ class RepairPlan:
             "legal_operations": list(self.legal_operations),
             "effect_contract": dict(self.effect_contract),
             "evaluation_contract": dict(self.evaluation_contract),
+            "target_domain": self.target_domain,
+            "grounding_query": dict(self.grounding_query),
+            "required_binding_schema": dict(self.required_binding_schema),
             "auto_selected_operation": self.auto_selected_operation,
         }
 
@@ -120,6 +132,9 @@ class RepairPlan:
             ),
             effect_contract=dict(value.get("effect_contract") or {}),
             evaluation_contract=dict(value.get("evaluation_contract") or {}),
+            target_domain=str(value.get("target_domain") or ""),
+            grounding_query=dict(value.get("grounding_query") or {}),
+            required_binding_schema=dict(value.get("required_binding_schema") or {}),
             auto_selected_operation=str(value.get("auto_selected_operation") or ""),
         )
 
@@ -166,15 +181,18 @@ def _plan_id(episode_id: str, edge_id: str, skill_layer: str) -> str:
     return "plan_" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
-def _l1_effect_contract(edge: FailureEdge, owner: str) -> dict[str, Any]:
+def _l1_effect_contract(
+    edge: FailureEdge, owner: str, capability: Any | None = None,
+) -> dict[str, Any]:
     """The execution-side contract an L1 plan promises to satisfy.
 
     Cached deterministically from the edge: producer route, output object,
     field, observed/required postcondition, and the carrier the verdict
     traveled on (certificate_id source artifact) when present.
     """
-    capabilities = SKILL_CAPABILITY_REGISTRY.for_module(owner)
-    capability = capabilities[0] if capabilities else None
+    if capability is None:
+        capabilities = SKILL_CAPABILITY_REGISTRY.for_module(owner)
+        capability = capabilities[0] if capabilities else None
     return {
         "producer_route": (
             capability.route_ids[0]
@@ -281,16 +299,31 @@ def build_repair_plan(
             if not executable_ops:
                 continue
             auto_op = executable_ops[0] if len(executable_ops) == 1 else ""
+            capability = SKILL_CAPABILITY_REGISTRY.require(
+                auto_op or executable_ops[0]
+            )
             plans.append(RepairPlan(
                 plan_id=_plan_id(episode.episode_id, edge.edge_id, LAYER_L1),
                 episode_id=episode.episode_id,
                 skill_layer=LAYER_L1,
                 owner=owner,
                 target_causal_edge=edge,
-                executor=EXECUTOR_L1_COURT_TRANSFORM,
+                executor=capability.executor,
                 legal_operations=executable_ops,
-                effect_contract=_l1_effect_contract(edge, owner),
+                effect_contract=_l1_effect_contract(edge, owner, capability),
                 evaluation_contract=_l1_evaluation_contract(edge, evolution_direction),
+                target_domain=capability.input_binding_domain,
+                grounding_query={
+                    "semantics": "entity_scoped_binding_algebra",
+                    "causal_target_field": edge.field,
+                    "source_artifact_id": edge.source_artifact_id,
+                    "blocking_predicate": edge.blocking_predicate,
+                },
+                required_binding_schema={
+                    "domain": capability.input_binding_domain,
+                    "required_fields": list(capability.required_binding_fields),
+                    "cardinality": capability.cardinality,
+                },
                 auto_selected_operation=auto_op,
             ))
         return tuple(plans)
@@ -309,6 +342,7 @@ def build_repair_plan(
         if not legal_ops:
             continue
         auto_op = legal_ops[0] if len(legal_ops) == 1 else ""
+        capability = SKILL_CAPABILITY_REGISTRY.require(auto_op or legal_ops[0])
         plans.append(RepairPlan(
             plan_id=_plan_id(episode.episode_id, edge.edge_id, LAYER_L2),
             episode_id=episode.episode_id,
@@ -319,6 +353,17 @@ def build_repair_plan(
             legal_operations=legal_ops,
             effect_contract=_l2_effect_contract(edge, owner),
             evaluation_contract=_l2_evaluation_contract(edge),
+            target_domain=capability.input_binding_domain,
+            grounding_query={
+                "semantics": "entity_scoped_binding_algebra",
+                "causal_target_field": edge.field,
+                "blocking_predicate": edge.blocking_predicate,
+            },
+            required_binding_schema={
+                "domain": capability.input_binding_domain,
+                "required_fields": list(capability.required_binding_fields),
+                "cardinality": capability.cardinality,
+            },
             auto_selected_operation=auto_op,
         ))
     return tuple(plans)
@@ -330,6 +375,7 @@ def build_repair_plan(
 
 __all__ = [
     "EXECUTOR_ADJUDICATION_POLICY",
+    "EXECUTOR_L1_CONSTRUCTIVE_HARNESS",
     "EXECUTOR_L1_COURT_TRANSFORM",
     "EXECUTORS",
     "RepairPlan",

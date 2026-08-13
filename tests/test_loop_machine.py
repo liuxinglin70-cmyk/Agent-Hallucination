@@ -49,6 +49,15 @@ def _drive_to(machine: RepairStateMachine, target: State) -> None:
     machine.transition(State.PROPOSAL_VALIDATED)
     if target is State.PROPOSAL_VALIDATED:
         return
+    machine.transition(State.BOUND)
+    if target is State.BOUND:
+        return
+    if target in {State.CONSTRUCTOR_EXECUTED, State.CANDIDATE_CONSTRUCTED}:
+        machine.transition(State.CONSTRUCTOR_EXECUTED)
+        if target is State.CONSTRUCTOR_EXECUTED:
+            return
+        machine.transition(State.CANDIDATE_CONSTRUCTED)
+        return
     machine.transition(State.EXECUTED)
     if target is State.EXECUTED:
         return
@@ -68,7 +77,7 @@ def _drive_to(machine: RepairStateMachine, target: State) -> None:
 
 
 def test_legal_transition_count() -> None:
-    assert len(LEGAL_TRANSITIONS) == 31, len(LEGAL_TRANSITIONS)
+    assert len(LEGAL_TRANSITIONS) == 44, len(LEGAL_TRANSITIONS)
 
 
 def test_every_legal_transition_reachable() -> None:
@@ -145,6 +154,11 @@ def test_funnel_per_outcome_counts() -> None:
         Outcome.SOURCE_NOT_IMPROVED, Outcome.SOURCE_NOT_IMPROVED,
         Outcome.CANARY_REGRESSION,
         Outcome.CAPABILITY_GAP,
+        Outcome.BINDING_NOT_FOUND,
+        Outcome.BINDING_AMBIGUOUS,
+        Outcome.BINDING_DOMAIN_MISMATCH,
+        Outcome.CONSTRUCTION_ANCHOR_MISMATCH,
+        Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED,
         Outcome.NON_EVOLVABLE,
         Outcome.UNADDRESSABLE, Outcome.UNADDRESSABLE,
         Outcome.INFRA_FAILURE,
@@ -155,6 +169,11 @@ def test_funnel_per_outcome_counts() -> None:
     assert funnel.count(Outcome.SOURCE_NOT_IMPROVED) == 2
     assert funnel.count(Outcome.CANARY_REGRESSION) == 1
     assert funnel.count(Outcome.CAPABILITY_GAP) == 1
+    assert funnel.count(Outcome.BINDING_NOT_FOUND) == 1
+    assert funnel.count(Outcome.BINDING_AMBIGUOUS) == 1
+    assert funnel.count(Outcome.BINDING_DOMAIN_MISMATCH) == 1
+    assert funnel.count(Outcome.CONSTRUCTION_ANCHOR_MISMATCH) == 1
+    assert funnel.count(Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED) == 1
     assert funnel.count(Outcome.NON_EVOLVABLE) == 1
     assert funnel.unaddressable() == 2
     assert funnel.count(Outcome.INFRA_FAILURE) == 1
@@ -162,22 +181,30 @@ def test_funnel_per_outcome_counts() -> None:
 
 def test_funnel_layer_totals() -> None:
     funnel = OutcomeFunnel()
-    # Framework: CAPABILITY_GAP + NON_EVOLVABLE + UNADDRESSABLE + INFRA_FAILURE
+    # Framework includes capability and binding-contract failures.
     # Search: NO_HYPOTHESIS + INVALID_PROPOSAL
     # Execution: ACTION_NOT_DISPATCHED + TARGET_EDGE_UNCHANGED
     # Fitness: ACCEPTED + SOURCE_NOT_IMPROVED + CANARY_REGRESSION + TRANSFER_REGRESSION
     for outcome in (
-        Outcome.CAPABILITY_GAP, Outcome.NON_EVOLVABLE,
+        Outcome.CAPABILITY_GAP, Outcome.BINDING_DOMAIN_MISMATCH,
+        Outcome.CONSTRUCTION_NO_CANDIDATE,
+        Outcome.CONSTRUCTION_ANCHOR_MISMATCH,
+        Outcome.CONSTRUCTED_CANDIDATE_DUPLICATE,
+        Outcome.NON_EVOLVABLE,
         Outcome.UNADDRESSABLE, Outcome.INFRA_FAILURE,
         Outcome.NO_HYPOTHESIS, Outcome.INVALID_PROPOSAL,
+        Outcome.BINDING_NOT_FOUND, Outcome.BINDING_AMBIGUOUS,
+        Outcome.CONSTRUCTED_CANDIDATE_NOT_QUALIFIED,
+        Outcome.CONSTRUCTED_CANDIDATE_NOT_VERIFIED,
+        Outcome.CONSTRUCTED_CANDIDATE_NO_ERROR_CERTIFICATE,
         Outcome.ACTION_NOT_DISPATCHED, Outcome.TARGET_EDGE_UNCHANGED,
         Outcome.ACCEPTED, Outcome.SOURCE_NOT_IMPROVED,
         Outcome.CANARY_REGRESSION, Outcome.TRANSFER_REGRESSION,
     ):
         funnel.record(outcome)
-    assert funnel.layer_total(Layer.FRAMEWORK) == 4
+    assert funnel.layer_total(Layer.FRAMEWORK) == 8
     assert funnel.layer_total(Layer.SEARCH) == 2
-    assert funnel.layer_total(Layer.EXECUTION) == 2
+    assert funnel.layer_total(Layer.EXECUTION) == 7
     assert funnel.layer_total(Layer.FITNESS) == 4
 
 

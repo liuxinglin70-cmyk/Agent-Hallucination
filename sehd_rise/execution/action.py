@@ -39,6 +39,7 @@ POSTCONDITION_CHECKS = frozenset({
     "qualification_positive",
     "qualification_not_positive",
     "verification_state_present",
+    "candidate_materialized_for_bound_anchor",
 })
 
 # output_object -> result surface row access.  ``verification_certificate``
@@ -145,6 +146,26 @@ def evaluate_action_spec_postcondition(
     postcondition = spec.postcondition
     if postcondition not in POSTCONDITION_CHECKS:
         return False, f"unmapped_postcondition:{postcondition}"
+
+    if postcondition == "candidate_materialized_for_bound_anchor":
+        proofs = result.get("l1_execution")
+        proof_rows = (
+            proofs.get("constructive_execution_proofs")
+            if isinstance(proofs, Mapping) else None
+        )
+        if not isinstance(proof_rows, list):
+            return False, "constructive_execution_proof_absent"
+        matched = [
+            row for row in proof_rows
+            if isinstance(row, Mapping)
+            and row.get("constructor_invoked") is True
+            and row.get("constructed_candidate_id")
+            and row.get("candidate_anchor_id") == row.get("source_anchor_id")
+        ]
+        return bool(matched), (
+            "candidate_materialized_for_bound_anchor"
+            if matched else "candidate_not_materialized_for_bound_anchor"
+        )
 
     if postcondition in ("object_present", "object_absent"):
         rows = _surface_rows(result, spec.output_object)
