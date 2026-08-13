@@ -77,19 +77,47 @@ def _text(row: Mapping[str, Any]) -> str:
     return ""
 
 
-def _tool_interaction_ids(history: list[Any], stop: int) -> tuple[str, ...]:
+def _response_texts(responses: Any) -> tuple[str, ...]:
+    """Flatten one tool_responses entry to its string texts."""
+    if isinstance(responses, str):
+        return (responses,)
+    if isinstance(responses, Mapping):
+        return tuple(
+            value for value in responses.values() if isinstance(value, str)
+        )
+    if isinstance(responses, (list, tuple)):
+        texts: list[str] = []
+        for response in responses:
+            texts.extend(_response_texts(response))
+        return tuple(texts)
+    return ()
+
+
+def _adopted_tool_result_refs(
+    history: list[Any], event_index: int, span: str,
+) -> tuple[str, ...]:
+    """Tool-result ids the span demonstrably adopts.
+
+    A result counts only when delivered on the anchor's own row or the row
+    right before it — an old tool call with no adjacent result does not
+    ground a later claim — and only when the span shows adoption evidence
+    (citation marker or token overlap with the result text). ``event_index``
+    is 1-based; ids name the delivering event and the response index.
+    """
     refs: list[str] = []
-    for event_index, raw in enumerate(history[:stop], start=1):
-        if not isinstance(raw, Mapping):
+    for offset in (0, 1):
+        row_index = event_index - 1 - offset
+        if row_index < 0:
             continue
-        calls = raw.get("tool_calls")
-        if not calls:
+        row = history[row_index]
+        if not isinstance(row, Mapping):
             continue
-        if not isinstance(calls, list):
-            calls = [calls]
-        for call_index, call in enumerate(calls, start=1):
-            if call is not None:
-                refs.append(f"event_{event_index:03d}_tool_{call_index:02d}")
+        texts = _response_texts(row.get("tool_responses"))
+        for response_index, text in enumerate(texts, start=1):
+            if text and _span_adopts_tool_result(span, (text,)):
+                refs.append(
+                    f"event_{row_index + 1:03d}_toolresult_{response_index:02d}"
+                )
     return tuple(refs)
 
 
@@ -100,26 +128,12 @@ def _adjacent_tool_responses(
 
     A claim only reads results delivered on its own row or the row right
     before it; older results no longer ground this claim. ``event_index`` is
-    1-based; string responses contribute their text, object responses their
-    string values.
+    1-based.
     """
-    rows = history[max(0, event_index - 2):event_index]
     texts: list[str] = []
-    for row in rows:
-        if not isinstance(row, Mapping):
-            continue
-        responses = row.get("tool_responses") or ()
-        if isinstance(responses, (str, Mapping)):
-            responses = (responses,)
-        if not isinstance(responses, (list, tuple)):
-            continue
-        for response in responses:
-            if isinstance(response, str):
-                texts.append(response)
-            elif isinstance(response, Mapping):
-                texts.extend(
-                    value for value in response.values() if isinstance(value, str)
-                )
+    for row in history[max(0, event_index - 2):event_index]:
+        if isinstance(row, Mapping):
+            texts.extend(_response_texts(row.get("tool_responses")))
     return tuple(texts)
 
 
@@ -255,7 +269,6 @@ def project_claim_anchors(record: Mapping[str, Any]) -> tuple[ClaimAnchor, ...]:
         content = _text(raw)
         if not content.strip():
             continue
-        upstream_refs = _tool_interaction_ids(history, event_index - 1)
         matches = list(_SPAN_RE.finditer(content))
         for span_index, match in enumerate(matches):
             raw_span = match.group(0)
@@ -266,6 +279,7 @@ def project_claim_anchors(record: Mapping[str, Any]) -> tuple[ClaimAnchor, ...]:
             span = content[start:end]
             if not span:
                 continue
+            upstream_refs = _adopted_tool_result_refs(history, event_index, span)
             kind = (
                 "question" if span.rstrip().endswith(("?", "？"))
                 else "code" if "```" in span

@@ -127,3 +127,57 @@ def test_menu_is_deterministic_over_long_trajectory() -> None:
         limit=16,
     )
     assert [row["entity_id"] for row in first] == [row["entity_id"] for row in second]
+
+
+def test_anchor_tool_dependency_ignores_stale_tool_calls() -> None:
+    """An early tool call never grounds a later unrelated claim: without an
+    adjacent result and adoption evidence, the claim stays a plain assertion."""
+    record = {
+        "history": [
+            {"role": "user", "content": "Check something."},
+            {"role": "assistant", "tool_calls": [
+                {"name": "search", "arguments": {}}]},
+            {"role": "tool", "tool_responses": ["Some result."]},
+            {"role": "assistant", "content": "Step one is done."},
+            {"role": "assistant", "content": "Step two is done."},
+            {"role": "assistant", "content": "The final fact is that lions are mammals."},
+        ],
+    }
+    anchors = project_claim_anchors(record)
+    late = next(a for a in anchors if "lions" in a.span_text)
+    assert late.observable_features["anchor_depends_on_tool"] is False
+    assert late.anchor_kind == "assistant_assertion"
+    assert late.upstream_ref_ids == ()
+
+
+def test_anchor_tool_dependency_requires_adopted_result() -> None:
+    """A tool result cited on the claim's own event grounds the claim."""
+    record = {
+        "history": [
+            {"role": "user", "content": "What is the answer?"},
+            {"role": "assistant", "content": "The answer is 42, per the result.",
+             "tool_responses": ["Result: the answer is 42."]},
+        ],
+    }
+    anchors = project_claim_anchors(record)
+    claim = next(a for a in anchors if "42" in a.span_text)
+    assert claim.observable_features["anchor_depends_on_tool"] is True
+    assert claim.anchor_kind == "tool_grounded_claim"
+    assert claim.upstream_ref_ids == ("event_002_toolresult_01",)
+
+
+def test_anchor_tool_dependency_adjacent_result_without_adoption() -> None:
+    """An adjacent result without citation or token overlap does not ground
+    the claim: adjacency alone is not dependency."""
+    record = {
+        "history": [
+            {"role": "assistant", "tool_calls": [
+                {"name": "search", "arguments": {}}]},
+            {"role": "tool", "tool_responses": ["The config value is 8080."]},
+            {"role": "assistant", "content": "Everything is ready now."},
+        ],
+    }
+    anchors = project_claim_anchors(record)
+    claim = next(a for a in anchors if "ready" in a.span_text)
+    assert claim.observable_features["anchor_depends_on_tool"] is False
+    assert claim.anchor_kind == "assistant_assertion"
