@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from sehd_rise.platform.env import load_local_env
+from sehd_rise.platform.models import is_deepseek_v4
 
 
 OFFICIAL_ENDPOINT = "https://api.deepseek.com"
@@ -167,15 +168,15 @@ def has_provider_credential(route: Mapping[str, Any]) -> bool:
 def provider_thinking_control(
     route: Mapping[str, Any],
 ) -> dict[str, str] | None:
-    """Return an explicit thinking toggle configured on the route, if any.
+    """Resolve the thinking toggle for one provider call.
 
-    The egress layer owns the thinking contract by structure: evolution
-    routes are stamped ``thinking.type=disabled`` for DeepSeek-V4 before they
-    reach the primitive (the reasoning budget can truncate before any
-    ``content`` is emitted, ``finish_reason=length``, empty body, which the
-    strict-JSON transport fail-closes), and detection routes carry no toggle
-    so the model default applies. This function surfaces an explicit route
-    setting only; it derives nothing from a purpose string.
+    An explicit route setting (``thinking.type`` enabled/disabled) is the
+    single authority and always wins. Without one, DeepSeek-V4 models
+    default to ``disabled``: every structured-JSON surface (detector census,
+    qualification, prosecution, defense, evolution reflection) fails closed
+    on empty ``content``, and V4 reasoning can spend the whole output budget
+    on ``reasoning_content`` and return ``finish_reason=stop`` with no body.
+    Non-V4 models pass through untouched.
     """
     configured = route.get("thinking")
     if isinstance(configured, Mapping):
@@ -186,6 +187,8 @@ def provider_thinking_control(
         if value not in {"enabled", "disabled"}:
             raise ValueError("provider thinking mode must be enabled or disabled")
         return {"type": value}
+    if is_deepseek_v4(str(route.get("model") or "")):
+        return {"type": "disabled"}
     return None
 
 

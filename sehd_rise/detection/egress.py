@@ -8,10 +8,11 @@ self-record per-surface usage at call time (no post-hoc depth-1 walk). The
 provider boundary is no longer a skill-injection seam: L1 rules are applied
 deterministically after the court returns (plan B).
 
-Evolution path — L1/L2/conflict-gate emit strict JSON and structurally silence
-chain-of-thought on DeepSeek-V4 (the reasoning budget can truncate before any
-``content`` is emitted, ``finish_reason=length``, empty body, which the
-strict-JSON transport fail-closes). These calls bind the transport primitive
+Evolution path — L1/L2/conflict-gate emit strict JSON. The chain-of-thought
+toggle lives in the single platform authority (``platform.routes``): without
+an explicit route setting, DeepSeek-V4 models run with thinking disabled on
+every structured-JSON surface, so the reasoning budget can never truncate
+before ``content`` is emitted. These calls bind the transport primitive
 directly (the aliased imports), so the injection adapter never reaches them.
 """
 
@@ -23,38 +24,10 @@ from sehd_rise.detection.transport import (
     json_object_provider_call as _transport_json_object_call,
     provider_call as _transport_provider_call,
 )
-from sehd_rise.platform.models import canonical_model_name
 from sehd_rise.platform.usage import ProviderUsageLedger
 
 provider_call = _transport_provider_call
 json_object_provider_call = _transport_json_object_call
-
-
-def _is_deepseek_v4(model: Any) -> bool:
-    """Return whether the model resolves to a DeepSeek-V4 variant."""
-    name = str(model or "").strip()
-    if not name:
-        return False
-    try:
-        name = canonical_model_name(name)
-    except ValueError:
-        return False
-    return name.lower().startswith("deepseek-v4")
-
-
-def _with_v4_thinking_off(route: Mapping[str, Any]) -> dict[str, Any]:
-    """Return a route whose DeepSeek-V4 models emit no chain-of-thought.
-
-    A V4 route is stamped ``thinking.type=disabled`` over any explicit
-    setting; a non-V4 route passes through unchanged. The primitive's
-    ``provider_thinking_control`` honors an explicit route setting first, so
-    this stamp is the thinking authority — no ``purpose`` string is consulted.
-    The input route is never mutated.
-    """
-    stamped = dict(route)
-    if _is_deepseek_v4(stamped.get("model")):
-        stamped["thinking"] = {"type": "disabled"}
-    return stamped
 
 
 def _strict_json_call(
@@ -65,8 +38,7 @@ def _strict_json_call(
     purpose: str,
     ledger: ProviderUsageLedger | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Strict-JSON evolution call: V4 thinking off, usage self-recorded."""
-    route = _with_v4_thinking_off(route)
+    """Strict-JSON evolution call: usage self-recorded."""
     value, meta = _transport_json_object_call(
         route=route,
         system=system,
