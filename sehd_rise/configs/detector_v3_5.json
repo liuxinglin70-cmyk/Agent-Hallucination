@@ -4,55 +4,65 @@
   "max_focused_parallel": 20,
   "focused_prosecution_retries": 1,
   "candidate_fallback_route": {
-    "transport_retries": 3,
-    "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "transport_retries": 4,
+    "timeout_seconds": 180,
+    "timeout_growth_factor": 1.5,
+    "timeout_cap_seconds": 480
   },
   "construct_census_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 300,
-    "total_timeout_seconds": 1200
+    "timeout_growth_factor": 1.5,
+    "timeout_cap_seconds": 600
   },
   "qualification_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   },
   "propagation_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   },
   "boundary_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   },
   "focused_prosecution_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   },
   "defense_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   },
   "appeal_prosecutor_route": {
     "max_tokens": 8192,
     "timeout_seconds": 180,
-    "total_timeout_seconds": 240,
+    "timeout_growth_factor": 1.5,
+    "timeout_cap_seconds": 360,
     "transport_retries": 3
   },
   "appeal_defender_route": {
     "max_tokens": 8192,
     "timeout_seconds": 180,
-    "total_timeout_seconds": 240,
+    "timeout_growth_factor": 1.5,
+    "timeout_cap_seconds": 360,
     "transport_retries": 3
   },
   "counterfactual_route": {
-    "transport_retries": 3,
+    "transport_retries": 4,
     "timeout_seconds": 120,
-    "total_timeout_seconds": 480
+    "timeout_growth_factor": 2.0,
+    "timeout_cap_seconds": 480
   }
 }

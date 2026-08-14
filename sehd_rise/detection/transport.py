@@ -35,6 +35,39 @@ load_local_env()
 DIRECT_PROVIDER_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
 
 
+def _transport_budget(
+    route: Mapping[str, Any],
+    *,
+    retries: int,
+    per_attempt_timeout: int,
+) -> tuple[tuple[int, ...], int]:
+    """Derive the per-attempt timeout windows and the default total budget.
+
+    Progressive per-attempt windows: a slow-but-alive provider that misses
+    one short window gets a longer next window instead of identical
+    failures. ``timeout_growth_factor`` grows each window (1.0 = fixed);
+    ``timeout_cap_seconds`` bounds the growth. The default total budget
+    covers every attempt window AND the inter-attempt backoff sleeps
+    (2^0..2^n capped at 30s each), so a total deadline can never silently
+    truncate the configured retry sequence.
+    """
+    growth = max(1.0, float(route.get("timeout_growth_factor", 1.0)))
+    cap = route.get("timeout_cap_seconds")
+    attempt_timeouts = tuple(
+        min(
+            max(1, int(per_attempt_timeout * (growth ** index))),
+            int(cap),
+        )
+        if cap is not None
+        else max(1, int(per_attempt_timeout * (growth ** index)))
+        for index in range(retries + 1)
+    )
+    backoff_allowance = sum(
+        min(30.0, 2.0**index) for index in range(retries)
+    )
+    return attempt_timeouts, sum(attempt_timeouts) + int(backoff_allowance)
+
+
 def _read_response_body(response: Any, budget_seconds: int) -> bytes:
     """Read one provider response body to EOF under a hard monotonic deadline.
 
@@ -289,14 +322,10 @@ def provider_call_with_schema(
     api_key = resolve_provider_credential(route, purpose=transport_purpose)
     retries = int(route.get("transport_retries", 2))
     per_attempt_timeout = max(1, int(route.get("timeout_seconds", 300)))
-    # The retry budget must cover every attempt: a total deadline equal to a
-    # single per-attempt window burns the whole budget on the first timeout
-    # and silently disables every configured transport retry.  Default the
-    # total budget to per-attempt times (retries + 1) so each attempt owns
-    # its own timeout window unless an explicit route override is supplied.
-    total_timeout = route.get(
-        "total_timeout_seconds", per_attempt_timeout * (retries + 1)
+    attempt_timeouts, default_total_timeout = _transport_budget(
+        route, retries=retries, per_attempt_timeout=per_attempt_timeout,
     )
+    total_timeout = route.get("total_timeout_seconds", default_total_timeout)
     deadline = (
         time.monotonic() + max(1, int(total_timeout))
         if total_timeout is not None
@@ -313,9 +342,11 @@ def provider_call_with_schema(
                     "provider total timeout exceeded before attempt"
                 )
                 break
-            request_timeout = max(1, min(per_attempt_timeout, int(remaining)))
+            request_timeout = max(
+                1, min(attempt_timeouts[attempt], int(remaining)),
+            )
         else:
-            request_timeout = per_attempt_timeout
+            request_timeout = attempt_timeouts[attempt]
         try:
             transport_attempts += 1
             req = urlrequest.Request(
