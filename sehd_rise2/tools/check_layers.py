@@ -1,22 +1,14 @@
 """Static layer-dependency checker for the sehd_rise2 package.
 
-Enforces the frozen boundary between the detector package and the future
-evolution framework:
+Enforces the frozen boundary between the minimal detector package and the
+future evolution framework:
 
-    detector/runtime   -> nothing
-    detector/skills    -> detector/runtime
-    detector/engine    -> detector/runtime, detector/skills
-                          (detector/court and detector/pipeline form ONE
-                           engine layer; court<->pipeline edges are intra)
-    detector core      -> detector/runtime, detector/skills, detector/engine
-                          (api / cli / replay / authority / evolution_api /
-                           __main__ — modules directly under detector/)
-    evolution          -> detector core + detector sublayers
-    root               -> detector core, evolution
+    detector   -> nothing outside itself (flat package)
+    evolution  -> detector (one-way)
+    root       -> detector, evolution
 
-Forbidden everywhere: imports of the old packages (``sehd_rise`` without
-the ``2``, ``sehd_v6``), relative imports, and imports of the package root
-(the root exports nothing).
+Forbidden everywhere: imports of the OLD packages (``sehd_rise`` without
+the ``2``, ``sehd_v6``) and relative imports.
 
 Run from the repository root:
 
@@ -34,42 +26,26 @@ PACKAGE_ROOT = REPO_ROOT
 PACKAGE_PREFIX = "sehd_rise2"
 
 ROOT_LAYER = "root"
-CORE_LAYER = "detector_core"
-ENGINE_LAYER = "detector/engine"
+DETECTOR_LAYER = "detector"
+EVOLUTION_LAYER = "evolution"
 
 LAYER_RULES: dict[str, frozenset[str]] = {
-    ROOT_LAYER: frozenset({
-        CORE_LAYER, "evolution", "detector/runtime", "detector/skills",
-        ENGINE_LAYER,
-    }),
-    "detector/runtime": frozenset(),
-    "detector/skills": frozenset({"detector/runtime"}),
-    ENGINE_LAYER: frozenset({"detector/runtime", "detector/skills"}),
-    CORE_LAYER: frozenset({
-        "detector/runtime", "detector/skills", ENGINE_LAYER,
-    }),
-    "evolution": frozenset({
-        CORE_LAYER, "detector/runtime", "detector/skills", ENGINE_LAYER,
-    }),
+    ROOT_LAYER: frozenset({DETECTOR_LAYER, EVOLUTION_LAYER}),
+    DETECTOR_LAYER: frozenset(),
+    EVOLUTION_LAYER: frozenset({DETECTOR_LAYER}),
 }
 
 
 def module_layer(path: Path) -> str:
     """Map a source file path under the package to its layer."""
     rel = path.relative_to(PACKAGE_ROOT)
-    parts = rel.parts
-    if len(parts) == 1:
+    if len(rel.parts) == 1:
         return ROOT_LAYER
-    if parts[0] == "detector":
-        if len(parts) == 2:
-            return CORE_LAYER
-        sub = parts[1]
-        if sub in ("court", "pipeline"):
-            return ENGINE_LAYER
-        return f"detector/{sub}"
-    if parts[0] == "evolution":
-        return "evolution"
-    return ROOT_LAYER
+    return (
+        DETECTOR_LAYER if rel.parts[0] == "detector"
+        else EVOLUTION_LAYER if rel.parts[0] == "evolution"
+        else ROOT_LAYER
+    )
 
 
 def import_layer(dotted: str) -> str | None:
@@ -81,14 +57,9 @@ def import_layer(dotted: str) -> str | None:
     if not parts:
         return ROOT_LAYER
     if parts[0] == "detector":
-        sub = parts[1] if len(parts) > 1 else ""
-        if sub in ("court", "pipeline"):
-            return ENGINE_LAYER
-        if sub in ("runtime", "skills"):
-            return f"detector/{sub}"
-        return CORE_LAYER
+        return DETECTOR_LAYER
     if parts[0] == "evolution":
-        return "evolution"
+        return EVOLUTION_LAYER
     return ROOT_LAYER
 
 
@@ -149,9 +120,7 @@ def main() -> int:
         for violation in violations:
             print(f"  {violation}")
         return 1
-    print(
-        f"layer check OK: {checked} file(s), no violations"
-    )
+    print(f"layer check OK: {checked} file(s), no violations")
     return 0
 
 

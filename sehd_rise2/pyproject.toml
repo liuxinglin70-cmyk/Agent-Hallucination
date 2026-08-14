@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sehd-rise2"
-version = "0.1.0"
-description = "SEHD-RISE v2 workspace: frozen hallucination detector + evolution interfaces"
+version = "0.2.0"
+description = "SEHD-RISE v2: minimal standalone hallucination detector + evolution interfaces"
 requires-python = ">=3.10"
 dependencies = []
 

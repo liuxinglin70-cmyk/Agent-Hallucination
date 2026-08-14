@@ -1,92 +1,77 @@
-# SEHD-RISE2 — 重构工作区（第一里程碑：冻结检测器）
+# SEHD-RISE2 — 彻底重构工作区（第一里程碑：最小独立检测器）
 
-本目录是重构后的代码框架工作区，与旧库 `sehd_rise/` 完全独立：**旧库保持
-原样不动**；本目录中的代码从旧库**抽取**并重新组织（详见文末"抽取来源"）。
+本目录是**从零重写**的检测器框架，与旧库 `sehd_rise/` 完全独立（旧库
+原样不动，仅作为行为参考）。旧检测器的复杂积累（上诉、复本、多路由
+法庭、构造性续跑……）全部留在旧库；这里只保留检测器的本质：
 
-> 纪律：`sehd_rise2` 与 `sehd_rise` 之间禁止任何 import 依赖（由
-> `tools/check_layers.py` 机械强制）。检测器基座冻结；一切改进必须来自
-> 未来的两个可进化面（L1 Skill / L2 裁决策略），通过显式部署参数注入，
-> 不引入框架级全局状态。
-
-## 验证状态（第一里程碑）
-
-- [x] `python sehd_rise2/tools/check_layers.py` → 44 文件、0 违例
-- [x] 包可导入：`api` / `replay` / `evolution_api` / `authority`
-- [x] `python -m sehd_rise2.detector --help` 正常（`--config` 缺省随包配置）
-- [x] `detector_v3_5.json` 与基线基因组加载正常
-- [x] 输入防火墙：合法记录通过；含 gold 字段（如 `is_hallucination`）被拒
-- [ ] 真实 provider 端到端冒烟（需 API 额度，未执行）
+> **census（候选发现）→ verification（证据核验）→ defense（对抗复核）
+> → 确定性法庭聚合 → fail-closed 权威信封**
 
 ## 目录结构
 
 ```text
 sehd_rise2/
-├── detector/                     # 冻结检测器包（可独立运行）
-│   ├── cli.py                    # 唯一 CLI：python -m sehd_rise2.detector
-│   ├── api.py                    # 公共门面（detect / 批量 / 复本聚合 / 加载器）
-│   ├── authority.py              # fail-closed 结果读取（从 causal/signals 抽取）
-│   ├── replay.py                 # 进化接口：候选基因组重放（从 execution/replay 抽取）
-│   ├── evolution_api.py          # 进化接口：skill 加载 + Detection Truth 投影
-│   ├── configs/detector_v3_5.json
-│   ├── runtime/                  # 平台层：env / routes / models / usage / gold / jsonio
-│   ├── court/                    # 证明法庭：engine / contract / audit / identity
-│   ├── pipeline/                 # 检测流水线：core / packet / transport / egress /
-│   │                             #   policy / injection / continuation /
-│   │                             #   route_replay / replicas / batch
-│   └── skills/                   # L1/L2 可进化面运行时：genome / rule / action /
-│                                 #   binding / anchors / capabilities /
-│                                 #   l1_execution / policy / vocabulary
-├── evolution/                    # 未来自进化框架（占位；接口契约见 INTERFACES.md）
-└── tools/check_layers.py         # 层级守卫（机械强制依赖边界）
-```
-
-层级规则（`tools/check_layers.py`）：
-
-```text
-runtime -> 无
-skills  -> runtime
-engine  -> runtime, skills      （court 与 pipeline 构成同一 engine 层）
-core    -> runtime, skills, engine   （api/cli/replay/authority/evolution_api）
-evolution -> detector 任意子层（单向）
+├── detector/                     # 最小冻结检测器（可独立运行）
+│   ├── api.py                    # 唯一 Detector API：Detector.detect / detect()
+│   ├── court.py                  # 最小法庭：三阶段 provider + 确定性裁决
+│   ├── provider.py               # provider 传输：直连 HTTPS / 重试 / JSON 修复
+│   ├── packet.py                 # 轨迹数据包 + gold 输入防火墙
+│   ├── result.py                 # 冻结输出信封 + fail-closed 权威读取
+│   ├── config.py                 # 配置解析（env 覆盖优先级）
+│   ├── env.py                    # 仓库 .env 加载
+│   ├── skills.py                 # 进化接口：load_skill_genome / load_policy_genome
+│   ├── evolution_api.py          # 进化接口：Detection Truth 只读投影
+│   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
+│   └── configs/detector_v1.json  # 三路由最小配置
+├── evolution/                    # 未来自进化框架（占位；契约见 INTERFACES.md）
+└── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 ```
 
 ## 独立运行
 
 ```bash
-python -m sehd_rise2.detector --record trajectory.json \
-    --output-dir out [--genome genome.json] [--policy-genome policy.json]
+python -m sehd_rise2.detector --record trajectory.json --output-dir out
 ```
 
-- `--config` 缺省使用随包发布的 `detector/configs/detector_v3_5.json`；
-- 凭据从进程环境或仓库根 `.env` 读取（`runtime/env.py` 逻辑原样抽取）；
-- 单案例输出 `out/prediction.json`；批处理 `--records` 输出 `out/summary.json`。
+- `--config` 缺省使用随包 `configs/detector_v1.json`；
+- 凭据从进程环境或仓库根 `.env` 读取（env-var 名不落盘）；
+- 输出 `out/prediction.json`（冻结信封 `sehd2.detection_result.v1`）。
 
-## 为自进化预留的接口（detector 侧，冻结）
+## Detector API
+
+```python
+from sehd_rise2.detector.api import Detector, detect
+
+detector = Detector()                      # 缺省加载随包配置
+result = detector.detect(
+    {"history": [{"role": "user", "content": "..."},
+                 {"role": "assistant", "content": "..."}]},
+    case_id="case_1",
+    genome=...,        # 可选：进化出的 skill genome 载荷
+    policy_genome=..., # 可选：进化出的策略 genome 载荷
+)
+print(result["state"], result["decision_authority"])
+```
+
+- 输入必须是 label-free（含 `is_hallucination` 等 gold 字段会被拒绝）；
+- genome / policy_genome 是**不透明载荷**：加载校验 + provenance 记录，
+  执行语义由未来的进化框架定义（见 `evolution/INTERFACES.md`）。
+
+## 为自进化预留的接口
 
 | 用途 | 接口 |
 |---|---|
-| 加载 skill | `api.load_skill_genome` / `api.load_policy_genome` / `evolution_api.create_baseline_genome` |
-| 部署执行 | `api.detect(record, genome=..., policy_genome=...)` |
-| 候选重放 | `replay.run_replay` / `replay.run_constructive_replay` |
+| 加载 skill | `skills.load_skill_genome` / `load_policy_genome` |
+| 部署执行 | `api.detect(..., genome=..., policy_genome=...)` |
 | 数据供给 | `evolution_api.project_for_evolution(result)` |
-| 终态读取 | `authority.resolve_evolution_state` 等 |
-| gold 隔离 | `FORBIDDEN_INPUT_FIELDS` / `EVALUATOR_ONLY_FIELDS` |
+| 终态读取 | `result.resolve_evolution_state` 等 |
+| gold 隔离 | `packet.EVALUATOR_ONLY_FIELDS` |
 
-详细契约与进化框架的责任边界见 `evolution/INTERFACES.md`。
+## 设计纪律（继承自旧库，重新固化）
 
-## 抽取来源与刻意未抽取
-
-- **抽取**（代码内容按模块抽取后落入新结构，import 前缀随新结构改写）：
-  - `runtime/` ← 旧 `platform/`；
-  - `court/` ← 旧 `detection/court/`；
-  - `pipeline/` ← 旧 `detection/` 其余（其中 `detector.py` 拆分出 CLI 后落为
-    `pipeline/core.py`，CLI 单独新写为 `detector/cli.py`，消除旧库的双 CLI）；
-  - `skills/` ← 旧 `skills/` 运行时子集；
-  - `authority.py` ← 旧 `causal/signals.py` 的 fail-closed 读取助手（跨文件抽取）；
-  - `replay.py` ← 旧 `execution/replay.py` 的重放封装（跨文件抽取，去掉进化侧
-    预算计数）。
-- **刻意未抽取**：
-  - `skills/vocabulary/evolution.py`（L2 词表进化 planner，属进化侧）；
-  - 旧库 `causal/ experience/ learning/ typing/ planning/ execution/
-    evaluation/ meta/ loop/` 整层（进化框架，将在 `evolution/` 内重建）；
-  - 旧库的调用预算/账本逻辑（属于进化侧职责）。
+1. **检测器冻结**：一切改进必须来自未来的可进化面，经显式参数部署。
+2. **证据驱动，不手调阈值**：裁决是封闭词表的确定性聚合，无 LLM 定终态。
+3. **失败即关闭**：provider/契约失败 → `runtime_valid=False`、
+   `state=unresolved`、`decision_authority=invalid`，绝不冒充裁决。
+4. **Gold 隔离**：gold 只属于评测侧，永不进入检测器提示词或产物。
+5. **单一真源**：每个判定只写一次；`tools/check_layers.py` 机械强制依赖边界。

@@ -1,0 +1,23 @@
+{
+  "schema_version": "sehd2.detector_config.v1",
+  "provider": {
+    "endpoint": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "temperature": 0.0,
+    "max_tokens": 4096,
+    "timeout_seconds": 120,
+    "total_timeout_seconds": 360,
+    "transport_retries": 2,
+    "timeout_growth_factor": 1.5
+  },
+  "census_route": {
+    "max_tokens": 4096
+  },
+  "verification_route": {
+    "max_tokens": 8192
+  },
+  "defense_route": {
+    "max_tokens": 8192
+  }
+}
