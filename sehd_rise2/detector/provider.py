@@ -172,10 +172,19 @@ def provider_call(
         message = (data.get("choices") or [{}])[0].get("message") or {}
         content = str(message.get("content") or "")
         parsed = extract_json_object(content)
+        usage = dict(data.get("usage") or {})
+        # cache_hit reflects SERVER-SIDE PROMPT caching only (the API
+        # reports prompt_cache_hit_tokens when a prompt prefix was served
+        # from its cache). This transport performs NO response replay: every
+        # call is a fresh HTTPS request and the completion is newly
+        # generated model output either way.
         meta: dict[str, Any] = {
             "attempts": attempts,
-            "usage": dict(data.get("usage") or {}),
-            "cache_hit": False,
+            "usage": usage,
+            "cache_hit": bool(usage.get("prompt_cache_hit_tokens")),
+            "prompt_cache_hit_tokens": int(
+                usage.get("prompt_cache_hit_tokens") or 0
+            ),
             "purpose": purpose,
             "model": str(data.get("model") or route.get("model") or ""),
         }
