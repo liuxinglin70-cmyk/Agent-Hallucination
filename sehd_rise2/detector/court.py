@@ -399,6 +399,16 @@ def run_court(
     runtime_valid = True
     reasons: list[dict[str, Any]] = []
 
+    def _audit_dict() -> dict[str, Any]:
+        return {
+            "census_ok": audit.census_ok,
+            "verification_ok": audit.verification_ok,
+            "defense_ok": audit.defense_ok,
+            "defense_needed": audit.defense_needed,
+            "candidate_count": audit.census_candidate_count,
+            "certificate_count": audit.certificate_count,
+        }
+
     def _run_stage(
         name: str, system: str, user: str,
     ) -> Any:
@@ -458,15 +468,23 @@ def run_court(
         proof["state"] = "unresolved"
         proof["terminal_basis"]["state"] = "unresolved"
         proof["authority_failure_reasons"] = [dict(r) for r in reasons]
-        stage_audit = {
-            "census_ok": audit.census_ok,
-            "verification_ok": audit.verification_ok,
-            "defense_ok": audit.defense_ok,
-            "defense_needed": audit.defense_needed,
-            "candidate_count": audit.census_candidate_count,
-            "certificate_count": audit.certificate_count,
-        }
-        return proof, providers, stage_audit
+        return proof, providers, _audit_dict()
+
+    if not census:
+        # A well-formed EMPTY census is itself the clean verdict: there is
+        # nothing to verify, so the verification/defense stages are skipped
+        # entirely (a later stage can never invent candidates the census
+        # did not declare).
+        audit.verification_ok = True
+        audit.defense_ok = True
+        proof = adjudicate(
+            packet=packet, census=census, certificates=[],
+            decisions={}, audit=audit, runtime_valid=runtime_valid,
+        )
+        proof["census"] = []
+        proof["certificates"] = []
+        proof["defense_decisions"] = {}
+        return proof, providers, _audit_dict()
 
     verification_raw = _run_stage(
         "verification", VERIFICATION_SYSTEM,
@@ -539,12 +557,4 @@ def run_court(
         proof["authority_failure_reasons"] = [
             dict(reason) for reason in reasons
         ] or proof["authority_failure_reasons"]
-    stage_audit = {
-        "census_ok": audit.census_ok,
-        "verification_ok": audit.verification_ok,
-        "defense_ok": audit.defense_ok,
-        "defense_needed": audit.defense_needed,
-        "candidate_count": audit.census_candidate_count,
-        "certificate_count": audit.certificate_count,
-    }
-    return proof, providers, stage_audit
+    return proof, providers, _audit_dict()
