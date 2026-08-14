@@ -151,6 +151,7 @@ def _policy_rejection_signature(
 def _normalize_candidate_from_repair_plan(
     candidate: Mapping[str, Any],
     repair_frontier: Sequence[Mapping[str, Any]],
+    plans: Sequence[Any] = (),
 ) -> dict[str, Any]:
     """Fill framework-known execution fields that the reflection model no
     longer generates.
@@ -162,15 +163,35 @@ def _normalize_candidate_from_repair_plan(
     - ``action`` = f"{operation}: {output_field or edge.field}" (the opcode
       slot ``compile_action_spec`` accepts)
 
-    A candidate that already carries ``target_module`` and ``action`` (the
-    full-form candidate) is returned unchanged. A candidate without a
-    selectable edge is returned as-is; ``_prevalidate_candidate`` then
-    rejects it with the existing edge-binding checks.
+    When exactly one RepairPlan exists, every one of those fields is
+    framework-known and the model's omissions or malformed restatements are
+    repaired deterministically (an action missing its ``: target`` gets the
+    plan's unique opcode + edge field) — the model owns only the
+    applicability condition. A candidate that already carries valid
+    ``target_module`` and ``action`` is returned unchanged; ambiguity (more
+    than one plan) leaves everything untouched and
+    ``_prevalidate_candidate`` rejects fail-closed.
     """
     if not isinstance(candidate, Mapping):
         return dict(candidate) if isinstance(candidate, dict) else {}
     normalized = dict(candidate)
+    unique_plan = plans[0] if len(tuple(plans)) == 1 else None
+    unique_edge = None
+    unique_op = ""
+    if unique_plan is not None:
+        edge = getattr(unique_plan, "target_causal_edge", None)
+        edge_dict = edge.to_dict() if hasattr(edge, "to_dict") else None
+        if isinstance(edge_dict, Mapping):
+            unique_edge = edge_dict
+        legal = tuple(getattr(unique_plan, "legal_operations", ()) or ())
+        unique_op = (
+            str(getattr(unique_plan, "auto_selected_operation", "") or "")
+            or (legal[0] if len(legal) == 1 else "")
+        )
     selected_edge_id = str(normalized.get("repair_edge_id") or "")
+    if not selected_edge_id and unique_edge:
+        selected_edge_id = str(unique_edge.get("edge_id") or "")
+        normalized["repair_edge_id"] = selected_edge_id
     if not selected_edge_id:
         return normalized
     selected_edge = next(
@@ -178,7 +199,7 @@ def _normalize_candidate_from_repair_plan(
             dict(edge) for edge in repair_frontier
             if str(edge.get("edge_id") or "") == selected_edge_id
         ),
-        None,
+        unique_edge,
     )
     if selected_edge is None:
         return normalized
@@ -188,15 +209,32 @@ def _normalize_candidate_from_repair_plan(
             normalized["target_module"] = edge_owner
     edit_operation = str(normalized.get("operation") or "").strip()
     opcode = str(normalized.get("opcode") or "").strip()
-    if edit_operation in {"add_rule", "modify_rule"} and not str(
-        normalized.get("action") or ""
-    ).strip():
+    action = str(normalized.get("action") or "").strip()
+    if edit_operation in {"add_rule", "modify_rule"} and not action:
         if opcode:
             edge_field = str(normalized.get("output_field") or "") or str(
                 selected_edge.get("field") or ""
             )
             if edge_field:
                 normalized["action"] = f"{opcode}: {edge_field}"
+        elif unique_op:
+            edge_field = str(
+                normalized.get("output_field") or ""
+            ) or str(selected_edge.get("field") or "")
+            normalized["opcode"] = unique_op
+            if edge_field:
+                normalized["output_field"] = edge_field
+                normalized["action"] = f"{unique_op}: {edge_field}"
+    elif action and ":" not in action and unique_op:
+        # The model named the opcode but dropped the framework-known target:
+        # the unique plan restores the deterministic action string.
+        if action.split(":", 1)[0].strip() == unique_op:
+            edge_field = str(
+                normalized.get("output_field") or ""
+            ) or str(selected_edge.get("field") or "")
+            if edge_field:
+                normalized["output_field"] = edge_field
+                normalized["action"] = f"{unique_op}: {edge_field}"
     return normalized
 
 

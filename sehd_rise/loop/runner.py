@@ -2952,6 +2952,7 @@ class EvolutionLoop:
                     generated_candidates = [
                         _normalize_candidate_from_repair_plan(
                             candidate, repair_frontier_dicts,
+                            plans=_identity_plans,
                         )
                         for candidate in generated_candidates
                     ]
@@ -3192,6 +3193,7 @@ class EvolutionLoop:
                 if parsed:
                     parsed = _normalize_candidate_from_repair_plan(
                         parsed, repair_frontier_dicts,
+                        plans=_identity_plans,
                     )
                 final_prevalidation_reason = (
                     _prevalidate_candidate(
