@@ -243,6 +243,13 @@ class Representative:
     action_spec: dict[str, Any]
     outcome: dict[str, Any]
     rule_text: str = ""
+    # Semantic payload of a route-guidance representative: the guidance text
+    # that was injected, the diagnosed mechanism it targeted, and the local
+    # effect the reflection predicted. Without these the memory knows a
+    # mechanism succeeded but not *which semantics* succeeded.
+    route_guidance: str = ""
+    failure_mechanism: str = ""
+    expected_local_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -254,6 +261,9 @@ class Representative:
             "action_spec": dict(self.action_spec),
             "outcome": dict(self.outcome),
             "rule_text": self.rule_text,
+            "route_guidance": self.route_guidance,
+            "failure_mechanism": self.failure_mechanism,
+            "expected_local_effect": self.expected_local_effect,
         }
 
     @classmethod
@@ -267,6 +277,9 @@ class Representative:
             action_spec=dict(value.get("action_spec") or {}),
             outcome=dict(value.get("outcome") or {}),
             rule_text=str(value.get("rule_text") or ""),
+            route_guidance=str(value.get("route_guidance") or ""),
+            failure_mechanism=str(value.get("failure_mechanism") or ""),
+            expected_local_effect=str(value.get("expected_local_effect") or ""),
         )
 
 
@@ -407,6 +420,9 @@ class ExperienceMemory:
                 "downstream_court_delta": list(attempt.downstream_court_delta),
             },
             rule_text=" ".join(str(attempt.proposal_content or "").split()),
+            route_guidance=str(attempt.route_guidance or ""),
+            failure_mechanism=str(attempt.failure_mechanism or ""),
+            expected_local_effect=str(attempt.expected_local_effect or ""),
         )
         if _better(candidate, entry.representatives.get(slot)):
             entry.representatives[slot] = candidate
@@ -481,6 +497,9 @@ class ExperienceMemory:
                 dict(representative.outcome)
                 if representative.outcome else None
             ),
+            route_guidance=representative.route_guidance,
+            failure_mechanism=representative.failure_mechanism,
+            expected_local_effect=representative.expected_local_effect,
         )
 
     def _refs_for_entry(

@@ -27,13 +27,16 @@ from sehd_rise.skills.rule import sanitize_route_guidance, validate_route_guidan
 
 
 def _condition_spec() -> dict:
+    # A certificate-domain predicate: ``atomic_verifier_instruction`` binds in
+    # the ``certificate`` domain, so the guidance fires only when a certificate
+    # entity is not yet evidence-verified.
     return {
         "schema_version": "sehd.condition_spec.v3",
         "feature_source": "court_result",
-        "feature": "coverage_state",
-        "operator": "contains",
-        "value_type": "string",
-        "value": "complete",
+        "feature": "evidence_verified",
+        "operator": "not_equals",
+        "value_type": "boolean",
+        "value": True,
         "scope": "l1_court_transform",
         "evidence_binding": "post_court_projection",
         "combinator": "atom",

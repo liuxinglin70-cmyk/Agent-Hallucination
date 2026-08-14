@@ -496,6 +496,39 @@ def match_condition_bindings(
     return BindingMatch(BINDING_BOUND, domain, cardinality, matches, "entity_grounded")
 
 
+def match_condition_in_domains(
+    condition_spec: Mapping[str, Any] | None,
+    result: Mapping[str, Any],
+    *,
+    domains: Sequence[str],
+    record: Mapping[str, Any] | None = None,
+) -> tuple[bool, tuple[Binding, ...]]:
+    """Whether a condition is true on at least one entity in any domain.
+
+    The route-guidance applicability check: a guidance is injected only when
+    its entity-scoped predicate actually fires on some entity of the owner's
+    binding domains — not when the predicate happens to be a member of a
+    case-wide feature union. Returns the matched entities so the caller can
+    record the grounding anchor of the injection.
+    """
+    sanitized = sanitize_condition_spec(condition_spec)
+    if not sanitized:
+        return False, ()
+    for domain in domains:
+        if domain not in BINDING_DOMAINS:
+            continue
+        universe_items = project_binding_universe(
+            result, domain=domain, record=record,
+        )
+        universe = {binding.key: binding for binding in universe_items}
+        matches = tuple(
+            _evaluate(ConditionSpec.from_dict(sanitized), universe).values()
+        )
+        if matches:
+            return True, matches
+    return False, ()
+
+
 def predicate_matches_binding(
     condition_spec: Mapping[str, Any] | None, binding: Binding,
 ) -> bool:
@@ -610,6 +643,7 @@ __all__ = [
     "BINDING_AMBIGUOUS", "BINDING_BOUND", "BINDING_CARDINALITIES",
     "BINDING_DOMAIN_MISMATCH", "BINDING_DOMAINS", "BINDING_NOT_FOUND",
     "Binding", "BindingMatch", "match_condition_bindings",
+    "match_condition_in_domains",
     "predicate_matches_binding", "project_binding_universe",
     "render_binding_menu", "sanitize_binding_proof",
     "validate_binding_contract",

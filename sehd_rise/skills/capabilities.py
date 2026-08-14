@@ -48,6 +48,21 @@ OWNER_PRODUCER_ROUTE: Mapping[str, str] = MappingProxyType({
     "earliest_origin_tiebreak": "boundary_route",
 })
 
+# Single source of the owner -> binding domains for a route-guidance skill's
+# applicability predicate. The guidance is injected into the owner's producer
+# route only when its ``condition_spec`` is true on at least one entity in one
+# of these domains — the entity-scoped counterpart of a deterministic rule's
+# binding. The causal RouteAddressability table derives its ``binding_domains``
+# from this mapping, so detection, causal and planning never drift.
+OWNER_BINDING_DOMAINS: Mapping[str, tuple[str, ...]] = MappingProxyType({
+    "candidate_trigger": ("claim_anchor", "candidate"),
+    "candidate_to_verifier_route": ("candidate",),
+    "causal_link_test": ("candidate", "origin"),
+    "atomic_verifier_instruction": ("certificate",),
+    "evidence_obligation": ("certificate", "coverage"),
+    "earliest_origin_tiebreak": ("origin", "boundary"),
+})
+
 
 @dataclass(frozen=True)
 class SkillCapability:
@@ -790,6 +805,7 @@ __all__ = [
     "L2_ADJUDICATION_POLICY_EXECUTOR",
     "NON_REPAIR_RUNTIME_OPERATIONS",
     "OWNER_PRODUCER_ROUTE",
+    "OWNER_BINDING_DOMAINS",
     "SKILL_CAPABILITY_REGISTRY",
     "SkillCapability",
     "SkillCapabilityRegistry",

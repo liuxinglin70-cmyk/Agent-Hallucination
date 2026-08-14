@@ -16,7 +16,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from sehd_rise.skills.action import sanitize_action_spec
-from sehd_rise.skills.binding import sanitize_binding_proof
+from sehd_rise.skills.binding import (
+    match_condition_in_domains,
+    sanitize_binding_proof,
+)
+from sehd_rise.skills.capabilities import OWNER_BINDING_DOMAINS
 from sehd_rise.skills.genome import (
     MODULE_IDS,
     SkillGenome,
@@ -24,8 +28,6 @@ from sehd_rise.skills.genome import (
     create_baseline_genome,
 )
 from sehd_rise.skills.rule import (
-    evaluate_condition_spec,
-    project_result_condition_features,
     sanitize_condition_spec,
     sanitize_route_guidance,
 )
@@ -324,22 +326,25 @@ def select_route_guidance(
     result: Mapping[str, Any],
     record: Mapping[str, Any] | None = None,
 ) -> dict[str, tuple[str, ...]]:
-    """Evaluate each guidance entry's condition against a court result.
+    """Evaluate each guidance entry's condition against the owner's entities.
 
-    Only entries whose ``condition_spec`` matches the result's projected
-    features are returned, keyed by owner. This is the route-guidance
-    counterpart of ``match_condition_bindings`` for deterministic rules: a
-    guidance whose condition does not hold on the case is not injected, so an
-    accepted guidance never leaks onto an unrelated case or canary.
+    A guidance is injected only when its ``condition_spec`` fires on at least
+    one entity of the owner's declared binding domains — the entity-scoped
+    counterpart of ``match_condition_bindings`` for deterministic rules. An
+    entity-scoped predicate that merely happens to be a member of a case-wide
+    feature union is not a match, so an accepted guidance cannot leak onto an
+    unrelated entity or canary. Entries are keyed by owner.
     """
-    features = project_result_condition_features(result, record)
     selected: dict[str, list[str]] = {}
     for owner, entries in compiled.items():
+        domains = OWNER_BINDING_DOMAINS.get(owner, ())
         for entry in entries:
             if entry.condition_spec is None:
                 continue
-            evaluation = evaluate_condition_spec(entry.condition_spec, features)
-            if evaluation.matched:
+            matched, _ = match_condition_in_domains(
+                entry.condition_spec, result, domains=domains, record=record,
+            )
+            if matched:
                 selected.setdefault(owner, []).append(entry.text)
     return {owner: tuple(texts) for owner, texts in selected.items()}
 

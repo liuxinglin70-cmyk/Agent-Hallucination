@@ -573,6 +573,9 @@ def _flush_shadow_batch_impl(
                     "expected_delta_observed" if accepted_deltas else ""
                 ),
                 proposal_content=item.edit.new_content,
+                route_guidance=str(item.edit.route_guidance or ""),
+                failure_mechanism=str(item.edit.failure_mechanism or ""),
+                expected_local_effect=str(item.edit.expected_local_effect or ""),
             )
             step.episode = state.active_episode_payload
 
@@ -746,6 +749,9 @@ def _flush_shadow_batch_impl(
                     else ""
                 ),
                 proposal_content=item.edit.new_content,
+                route_guidance=str(item.edit.route_guidance or ""),
+                failure_mechanism=str(item.edit.failure_mechanism or ""),
+                expected_local_effect=str(item.edit.expected_local_effect or ""),
             )
             step.episode = state.active_episode_payload
 

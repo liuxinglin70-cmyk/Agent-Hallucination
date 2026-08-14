@@ -625,6 +625,9 @@ def _record_attempt(
     downstream_court_delta: Sequence[str] = (),
     no_effect_reason: str = "",
     proposal_content: str = "",
+    route_guidance: str = "",
+    failure_mechanism: str = "",
+    expected_local_effect: str = "",
 ) -> dict[str, Any] | None:
     """Append one execution outcome to the current episode.
 
@@ -662,6 +665,9 @@ def _record_attempt(
         no_effect_reason=no_effect_reason,
         decision=decision,
         proposal_content=" ".join(str(proposal_content).split()),
+        route_guidance=" ".join(str(route_guidance).split()),
+        failure_mechanism=" ".join(str(failure_mechanism).split()),
+        expected_local_effect=" ".join(str(expected_local_effect).split()),
     )
     updated = replace(episode, attempts=(*episode.attempts, attempt))
     causal_memory.upsert_attempt(updated, attempt)

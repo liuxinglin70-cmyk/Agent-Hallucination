@@ -208,6 +208,9 @@ def _intervention_from_reference(
         "condition": reference.rule_condition,
         "action_spec": reference.action_spec,
         "outcome": reference.local_outcome,
+        "route_guidance": reference.route_guidance,
+        "failure_mechanism": reference.failure_mechanism,
+        "expected_local_effect": reference.expected_local_effect,
     }
 
 
@@ -341,6 +344,26 @@ def format_experience_for_prompt(
             value = str(action.get(key) or "")
             if value:
                 lines.append(f"        <{tag}>{escape(value)}</{tag}>")
+        # Route-guidance representatives carry no ActionSpec; their reusable
+        # semantics are the guidance text itself plus the diagnosed mechanism
+        # and predicted local effect. Rendering them turns a mechanism-level
+        # "this family once succeeded" note into an actually reusable
+        # intervention.
+        route_guidance = str(intervention.get("route_guidance") or "")
+        if route_guidance:
+            lines.append(
+                f"        <route_guidance>{escape(route_guidance[:800])}</route_guidance>"
+            )
+        mechanism = str(intervention.get("failure_mechanism") or "")
+        if mechanism:
+            lines.append(
+                f"        <failure_mechanism>{escape(mechanism[:400])}</failure_mechanism>"
+            )
+        local_effect = str(intervention.get("expected_local_effect") or "")
+        if local_effect:
+            lines.append(
+                f"        <expected_local_effect>{escape(local_effect[:240])}</expected_local_effect>"
+            )
         lines.append(
             f"        <outcome>{escape(str(outcome.get('decision') or 'unknown'))}</outcome>"
         )

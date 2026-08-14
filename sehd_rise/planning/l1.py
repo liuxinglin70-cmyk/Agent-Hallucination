@@ -47,6 +47,7 @@ from sehd_rise.skills.action import (
 )
 from sehd_rise.skills.binding import render_binding_menu
 from sehd_rise.skills.capabilities import (
+    OWNER_BINDING_DOMAINS,
     SKILL_CAPABILITY_REGISTRY,
     render_capability_contracts,
 )
@@ -109,6 +110,17 @@ def _enum_value(value: Any) -> str:
     if value is None:
         return ""
     return getattr(value, "value", str(value))
+
+
+def _route_guidance_binding_domains_text(modules: Sequence[str]) -> str:
+    """Render the binding-domain scoping for route-guidance conditions."""
+    lines: list[str] = []
+    for module in modules:
+        domains = OWNER_BINDING_DOMAINS.get(str(module), ())
+        if not domains:
+            continue
+        lines.append(f"- {module}: bindable in {', '.join(domains)}")
+    return "\n".join(lines)
 
 
 def _strip_evaluator_fields(value: Any) -> Any:
@@ -631,6 +643,11 @@ its own verification. In that form, instead of "action", supply:
 Leave "opcode" and "action" empty; the framework binds the guidance to the
 owner's route and re-runs the frozen downstream verification to measure it.
 The applicability condition_spec and repair_edge_id are still mandatory.
+
+For a route-guidance edit the condition_spec is ENTITY-SCOPED: it fires only on
+the entities of the owner's declared binding domains below, never on a
+case-wide feature union. Name only features bindable in the owner's own domains.
+""" + _route_guidance_binding_domains_text(allowed_modules) + """
 
 <module_charters>
 """

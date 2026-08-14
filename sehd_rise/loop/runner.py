@@ -205,7 +205,13 @@ from sehd_rise.skills.capabilities import (
     L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
     SKILL_CAPABILITY_REGISTRY,
 )
-from sehd_rise.skills.binding import render_binding_menu, sanitize_binding_proof
+from sehd_rise.skills.binding import (
+    match_condition_in_domains,
+    render_binding_menu,
+    sanitize_binding_proof,
+)
+from sehd_rise.skills.capabilities import OWNER_BINDING_DOMAINS
+from sehd_rise.detection.route_replay import replay_route_guidance_focused
 from sehd_rise.learning.protocol import (
     ARCHIVE_SIGNAL_ANCHOR_PROJECTION,
     ARCHIVE_SIGNAL_DSL_CURRICULUM,
@@ -331,50 +337,58 @@ def _classify_mutation_failure(reason: str) -> str:
 def _decisive_route_guidance_reconfirmation(
     loop: "EvolutionLoop",
     *,
-    candidate_genome: Any,
     case_id: str,
     detection_result: Mapping[str, Any],
     expected_terminal: str,
     assessment: FitnessAssessment,
+    edit: SkillEdit,
 ) -> tuple[FitnessAssessment, dict[str, Any]]:
-    """D3 decisive re-confirmation for a route-guidance edit.
+    """Unguided control for a route-guidance edit (D3 causal control).
 
     A route-guidance edit has no deterministic backend, so its acceptance
-    evidence is a single provider re-run — indistinguishable from sampling
-    drift. Re-run the same candidate genome once more and require the terminal
-    to reach the same improved state before the improvement counts as decisive.
-    A disagreement downgrades the assessment to no_effect: a single-sample
-    terminal flip is not an acceptance gate.
+    evidence is a provider re-run. A single guided terminal flip is
+    indistinguishable from sampling drift. The causal control is the frozen
+    route replay run WITHOUT the guidance — the same frozen scope and re-run
+    routes, only the guidance text removed. The improvement counts as decisive
+    only when the guided replay reaches the improved terminal while the control
+    stays at the baseline terminal: if the control flips on its own, the flip
+    is sampling drift, not the guidance, and the edit is downgraded to
+    ``no_effect``.
     """
     expected_terminal = str(expected_terminal or "")
+    baseline_terminal = str(detection_result.get("state") or "")
     try:
-        reconfirm = loop.run_detection(
-            budget_kind="source",
-            genome=candidate_genome,
-            case_id=case_id,
-            policy_genome=(
-                loop.state.policy_genome
-                if loop.state.policy_genome.items_for_scope("working")
-                else None
-            ),
-            base_result=detection_result,
+        control = replay_route_guidance_focused(
+            detection_result,
+            owner=str(edit.target_module or ""),
+            guidance_blocks=(),
+            record=loop.records[case_id],
+            config=loop.config,
+            provider_usage_ledger=loop.provider_usage_ledger,
         )
-        reconfirm_terminal = str(reconfirm.get("state") or "")
+        control_terminal = str(control.get("state") or "")
     except Exception as exc:
         return FitnessAssessment(
             "no_effect",
-            ("route_guidance_reconfirmation_runtime_error",),
+            ("route_guidance_control_runtime_error",),
             assessment.task_score_before,
             assessment.task_score_after,
             assessment.local_score_before,
             assessment.local_score_after,
         ), {"status": "runtime_error", "error": f"{type(exc).__name__}:{exc}"}
 
-    decisive = reconfirm_terminal == expected_terminal
+    # Causal control: the guided replay reached the improved terminal and the
+    # unguided control stayed at baseline. A control that flips away from the
+    # baseline means the flip is not attributable to the guidance.
+    decisive = (
+        expected_terminal != baseline_terminal
+        and control_terminal == baseline_terminal
+    )
     audit = {
         "status": "decisive" if decisive else "not_decisive",
-        "expected_terminal": expected_terminal,
-        "reconfirm_terminal": reconfirm_terminal,
+        "baseline_terminal": baseline_terminal,
+        "guided_terminal": expected_terminal,
+        "control_terminal": control_terminal,
     }
     if decisive:
         return assessment, audit
@@ -1389,6 +1403,8 @@ class EvolutionLoop:
         observable_delta: Sequence[str] = (),
         downstream_court_delta: Sequence[str] = (),
         no_effect_reason: str = "", proposal_content: str = "",
+        route_guidance: str = "", failure_mechanism: str = "",
+        expected_local_effect: str = "",
     ) -> None:
         """Append one execution outcome to the current episode."""
         self.state.active_episode_payload = _record_attempt(
@@ -1401,6 +1417,9 @@ class EvolutionLoop:
             downstream_court_delta=downstream_court_delta,
             no_effect_reason=no_effect_reason,
             proposal_content=proposal_content,
+            route_guidance=route_guidance,
+            failure_mechanism=failure_mechanism,
+            expected_local_effect=expected_local_effect,
         )
 
     def _run_registry_reflection(self, *,
@@ -1649,6 +1668,10 @@ class EvolutionLoop:
                                 if isinstance(cut.evidence, Mapping) else ()
                             ),
                             cut.secondary_owner,
+                            (
+                                cut.evidence.get("owner_alternatives", ())
+                                if isinstance(cut.evidence, Mapping) else ()
+                            ),
                         ),
                     )
                     episode_payload = episode.to_dict()
@@ -1668,6 +1691,10 @@ class EvolutionLoop:
                                 if isinstance(cut.evidence, Mapping) else ()
                             ),
                             cut.secondary_owner,
+                            (
+                                cut.evidence.get("owner_alternatives", ())
+                                if isinstance(cut.evidence, Mapping) else ()
+                            ),
                         )
                         if cut.skill_layer == LAYER_L1 else ()
                     ),
@@ -2795,6 +2822,10 @@ class EvolutionLoop:
                 if isinstance(cut.evidence, Mapping) else ()
             ),
             cut.secondary_owner,
+            (
+                cut.evidence.get("owner_alternatives", ())
+                if isinstance(cut.evidence, Mapping) else ()
+            ),
         )
         type_guidance = self.type_evolution.generate_type_guidance(
             type_result.primary_type, evolution_direction,
@@ -3382,9 +3413,18 @@ class EvolutionLoop:
                         expected_local_effect_text = str(
                             parsed.get("expected_local_effect") or ""
                         )
+                        # The rule text is the genome's content identity, so
+                        # it carries the full guidance fingerprint; the
+                        # readable prefix keeps the text human-auditable.
+                        guidance_fingerprint = hashlib.sha256(
+                            route_guidance_text.encode("utf-8")
+                        ).hexdigest()[:12]
                         new_content = render_rule(RuleSpec(
                             condition=condition,
-                            action=route_guidance_text[:80],
+                            action=(
+                                f"{route_guidance_text[:80]} "
+                                f"[guidance_sha256:{guidance_fingerprint}]"
+                            ),
                             evidence_anchor=evidence_anchor,
                             module_id=target_module,
                             direction="process",
@@ -3859,6 +3899,9 @@ class EvolutionLoop:
                         structural_result="rejected",
                         compiled=bool(edit.action_spec or pending_action_spec),
                         proposal_content=edit.new_content,
+                        route_guidance=str(edit.route_guidance or ""),
+                        failure_mechanism=str(edit.failure_mechanism or ""),
+                        expected_local_effect=str(edit.expected_local_effect or ""),
                     )
                     self.record_step(EvolutionStep(
                         case_id=case_id,
@@ -3984,6 +4027,9 @@ class EvolutionLoop:
                     structural_result="rejected",
                     compiled=bool(edit.action_spec or pending_action_spec),
                     proposal_content=edit.new_content,
+                    route_guidance=str(edit.route_guidance or ""),
+                    failure_mechanism=str(edit.failure_mechanism or ""),
+                    expected_local_effect=str(edit.expected_local_effect or ""),
                 )
                 if not retry_scheduled:
                     self._case_transition(None, outcome=Outcome.INVALID_PROPOSAL)
@@ -4095,6 +4141,9 @@ class EvolutionLoop:
                 structural_result="accepted",
                 compiled=bool(edit.action_spec or pending_action_spec),
                 proposal_content=edit.new_content,
+                route_guidance=str(edit.route_guidance or ""),
+                failure_mechanism=str(edit.failure_mechanism or ""),
+                expected_local_effect=str(edit.expected_local_effect or ""),
             )
             self.record_step(EvolutionStep(
                 case_id=case_id,
@@ -4130,6 +4179,31 @@ class EvolutionLoop:
                     case_id=case_id,
                     budget_usage=self.budget_usage,
                     records=self.records,
+                    config=self.config,
+                    provider_usage_ledger=self.provider_usage_ledger,
+                )
+            elif edit.route_guidance and not edit.action_spec:
+                # Route-guidance source replay: freeze every upstream provider
+                # artifact and re-run only the owner's producer route plus its
+                # deterministic downstream, then recompute the proof court.
+                # The guidance is injected only when its entity-scoped
+                # condition actually fires on the baseline; otherwise the
+                # frozen replay is the unguided control (no injection), which
+                # the attribution layer reads as ``not_executed``.
+                guidance_condition_matched, _ = match_condition_in_domains(
+                    edit.condition_spec,
+                    detection_result,
+                    domains=OWNER_BINDING_DOMAINS.get(edit.target_module, ()),
+                    record=self.records[case_id],
+                )
+                candidate_result = replay_route_guidance_focused(
+                    detection_result,
+                    owner=edit.target_module,
+                    guidance_blocks=(
+                        (str(edit.route_guidance or ""),)
+                        if guidance_condition_matched else ()
+                    ),
+                    record=self.records[case_id],
                     config=self.config,
                     provider_usage_ledger=self.provider_usage_ledger,
                 )
@@ -4176,6 +4250,9 @@ class EvolutionLoop:
                 compiled=bool(edit.action_spec or pending_action_spec),
                 no_effect_reason="unresolved_no_effect",
                 proposal_content=edit.new_content,
+                route_guidance=str(edit.route_guidance or ""),
+                failure_mechanism=str(edit.failure_mechanism or ""),
+                expected_local_effect=str(edit.expected_local_effect or ""),
             )
             self._case_transition(None, outcome=Outcome.EXECUTION_RUNTIME_FAILURE)
             self.record_step(EvolutionStep(
@@ -4216,6 +4293,9 @@ class EvolutionLoop:
                 compiled=True,
                 no_effect_reason=binding_failure.lower(),
                 proposal_content=edit.new_content,
+                route_guidance=str(edit.route_guidance or ""),
+                failure_mechanism=str(edit.failure_mechanism or ""),
+                expected_local_effect=str(edit.expected_local_effect or ""),
             )
             self.record_step(EvolutionStep(
                 case_id=case_id,
@@ -4261,6 +4341,9 @@ class EvolutionLoop:
                 applied=bool(construction_evidence.get("fired")),
                 no_effect_reason=construction_failure.lower(),
                 proposal_content=edit.new_content,
+                route_guidance=str(edit.route_guidance or ""),
+                failure_mechanism=str(edit.failure_mechanism or ""),
+                expected_local_effect=str(edit.expected_local_effect or ""),
             )
             self.record_step(EvolutionStep(
                 case_id=case_id,
@@ -4327,13 +4410,14 @@ class EvolutionLoop:
             baseline_result=detection_result,
         )
 
-        # D3 decisive re-confirmation for route-guidance edits. A deterministic
-        # opcode edit is accepted only on its fired transform + postcondition,
-        # which is already deterministic evidence. A route-guidance edit has no
+        # D3 causal control for route-guidance edits. A deterministic opcode
+        # edit is accepted only on its fired transform + postcondition, which
+        # is already deterministic evidence. A route-guidance edit has no
         # deterministic backend: its whole evidence is a provider re-run, so a
-        # single terminal flip is indistinguishable from sampling drift. Require
-        # the same candidate genome to reach the improved terminal consistently
-        # across re-runs before the improvement counts as decisive.
+        # single terminal flip is indistinguishable from sampling drift. Run the
+        # unguided control (same frozen scope, guidance removed) and require the
+        # guided replay to reach the improved terminal while the control stays
+        # at baseline before the improvement counts as decisive.
         route_guidance_reconfirmation: dict[str, Any] | None = None
         if edit.route_guidance and not edit.action_spec and (
             assessment.decision in {"strong_improvement", "local_improvement"}
@@ -4341,11 +4425,11 @@ class EvolutionLoop:
             assessment, route_guidance_reconfirmation = (
                 _decisive_route_guidance_reconfirmation(
                     self,
-                    candidate_genome=candidate_genome,
                     case_id=case_id,
                     detection_result=detection_result,
                     expected_terminal=candidate_signal.state,
                     assessment=assessment,
+                    edit=edit,
                 )
             )
 
@@ -4590,10 +4674,18 @@ class EvolutionLoop:
         )
         # §13: the typed EvaluationEvidence is the fitness input record — the
         # deterministic effect facts every downstream fitness consumer reads.
+        # The edge/blocker booleans derive from the causal-execution audit, not
+        # from a hardcoded success: a route-guidance or not-instrumented edit
+        # that never proved its postcondition must not claim a moved edge.
+        _causal = causal_execution_audit or {}
+        if edit.route_guidance and not edit.action_spec:
+            fired_evidence = bool(_causal.get("route_guidance_injected"))
+        else:
+            fired_evidence = bool(_causal.get("transform_fired"))
         fitness_audit["evaluation_evidence"] = EvaluationEvidence(
-            fired=bool(construction_evidence.get("fired")),
-            target_edge_changed=True,
-            blocker_cleared=True,
+            fired=fired_evidence,
+            target_edge_changed=bool(_causal.get("target_edge_changed")),
+            blocker_cleared=bool(_causal.get("edge_counterfactual_met")),
             terminal_transition=f"{signal.state}->{candidate_signal.state}",
             decision=assessment.decision,
             promotable=assessment.passed or assessment.evidence_only,
@@ -4674,6 +4766,9 @@ class EvolutionLoop:
                         else ()
                     ),
                     proposal_content=edit.new_content,
+                    route_guidance=str(edit.route_guidance or ""),
+                    failure_mechanism=str(edit.failure_mechanism or ""),
+                    expected_local_effect=str(edit.expected_local_effect or ""),
                 )
                 self.rejected_buffer.append(RejectedEditEntry(
                     proposal=RejectedEditProposal(
@@ -4806,6 +4901,9 @@ class EvolutionLoop:
                     str(causal_execution_audit.get("status") or ""),
                 ),
                 proposal_content=edit.new_content,
+                route_guidance=str(edit.route_guidance or ""),
+                failure_mechanism=str(edit.failure_mechanism or ""),
+                expected_local_effect=str(edit.expected_local_effect or ""),
             )
             fitness_audit["retry_scheduled"] = retry_scheduled
             fitness_audit["retry_reason"] = rejected_entry.feedback_summary()

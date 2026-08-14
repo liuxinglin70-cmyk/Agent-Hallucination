@@ -36,7 +36,7 @@ below makes that state unreachable.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Any, Mapping
 
 from sehd_rise.skills.capabilities import OWNER_PRODUCER_ROUTE
 from sehd_rise.skills.vocabulary.contracts import MODULE_IDS
@@ -124,8 +124,38 @@ def address_for(owner: str) -> RouteAddress | None:
     return ROUTE_ADDRESSABILITY.get(str(owner or ""))
 
 
+def route_observable_delta(
+    before_result: Mapping[str, Any],
+    after_result: Mapping[str, Any],
+    owner: str,
+) -> dict[str, Any]:
+    """Drift-tolerant before/after comparison of one owner's observable.
+
+    The ``observable_postcondition`` a RouteAddress declares is the fingerprint
+    object the attribution layer reads after a route-guidance replay.  This
+    returns whether that object moved and its stable before/after signatures,
+    so a provider re-minting positional ids never reads as movement.
+    """
+    from sehd_rise.detection.route_replay import route_observable_fingerprints
+
+    address = address_for(owner)
+    if address is None:
+        return {"owner": owner, "observable": "", "moved": False, "reason": "no_address"}
+    key = address.observable_postcondition
+    before = route_observable_fingerprints(before_result or {}).get(key)
+    after = route_observable_fingerprints(after_result or {}).get(key)
+    return {
+        "owner": owner,
+        "observable": key,
+        "before": before,
+        "after": after,
+        "moved": before != after,
+    }
+
+
 __all__ = [
     "ROUTE_ADDRESSABILITY",
     "RouteAddress",
     "address_for",
+    "route_observable_delta",
 ]

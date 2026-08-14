@@ -188,6 +188,7 @@ def allowed_l1_modules(
     owner: str,
     artifact_frontier: Sequence[Mapping[str, Any]] = (),
     secondary_owner: str = "",
+    owner_alternatives: Sequence[str] = (),
 ) -> tuple[str, ...]:
     """Return the executable owner set shared by every trigger consumer.
 
@@ -201,6 +202,11 @@ def allowed_l1_modules(
     polarity pool — the same guard that kept a polarity-crossing process
     owner out — so it can never open a surface that moves the verdict the
     wrong way.
+
+    ``owner_alternatives`` carries the hypothesis owners the cut could not
+    rule out (e.g. a gold FN-clean with existing candidates). They are
+    admitted through the same polarity filter, so the hypothesis widens the
+    repair frontier without letting a polarity-crossing owner in.
     """
     modules = [str(owner)] if str(owner) else []
     frontier_owners: set[str] = set()
@@ -216,14 +222,14 @@ def allowed_l1_modules(
     )
     if is_gold_polarity:
         polarity_pool = signal_polarity_pool(signal)
-        partner = str(secondary_owner)
-        if (
-            polarity_pool is not None
-            and partner in MODULE_IDS
-            and partner in polarity_pool
-            and partner not in modules
-        ):
-            modules.append(partner)
+        for partner in (str(secondary_owner), *(str(a) for a in owner_alternatives)):
+            if (
+                polarity_pool is not None
+                and partner in MODULE_IDS
+                and partner in polarity_pool
+                and partner not in modules
+            ):
+                modules.append(partner)
     return tuple(modules)
 
 # ============================================================
@@ -683,7 +689,7 @@ def _gold_step_correct(signal: DetectionSignal) -> bool | None:
 
 def _gold_polarity_mismatch_owner(
     signal: DetectionSignal, facts: Any,
-) -> tuple[str, str, str] | None:
+) -> tuple[str, str, str, tuple[str, ...]] | None:
     """Gold-locked owner for a verdict that flipped the wrong way.
 
     Only the FP and FN-clean shapes are addressable here; unresolved shapes
@@ -699,6 +705,15 @@ def _gold_polarity_mismatch_owner(
       ``candidate_trigger``; otherwise the evidence/verifier pair owns the
       missing certificate. The repairability authority then reports the
       unavailable constructive primitive as CAPABILITY_GAP.
+
+    The returned fourth element names the alternative owners the attribution
+    could not rule out. A nonempty tuple marks the owner as a *hypothesis*:
+    ``candidate_count > 0`` proves candidates exist, but not that candidate
+    generation succeeded — the truly hallucinated claim may be missing
+    (``candidate_trigger``), misqualified (``candidate_to_verifier_route``),
+    or correctly surfaced but disconnected downstream
+    (``causal_link_test``). The repair edge selected from the frontier, not
+    this fallback, carries the causal claim.
     """
     gold_token = _gold_error_type_token(signal)
     if gold_token == "false_positive":
@@ -710,18 +725,24 @@ def _gold_polarity_mismatch_owner(
             default_secondary="atomic_verifier_instruction",
             surviving_error_count=facts.surviving_error_count,
         )
-        return owner, secondary, REASON_GOLD_FALSE_POSITIVE
+        return owner, secondary, REASON_GOLD_FALSE_POSITIVE, ()
     if gold_token == "false_negative_clean":
         if signal.candidate_count == 0:
             return (
                 "candidate_trigger",
                 "candidate_to_verifier_route",
                 REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+                (),
             )
         return (
             "evidence_obligation",
             "atomic_verifier_instruction",
             REASON_GOLD_FALSE_NEGATIVE_CLEAN,
+            (
+                "candidate_trigger",
+                "candidate_to_verifier_route",
+                "causal_link_test",
+            ),
         )
     return None
 
@@ -888,7 +909,7 @@ def build_causal_cut(
     # mislocalization of a real error).
     gold_mismatch = _gold_polarity_mismatch_owner(signal, facts)
     if gold_mismatch is not None:
-        owner, secondary, reason = gold_mismatch
+        owner, secondary, reason, owner_alternatives = gold_mismatch
         return _enforce_executable_gate(_cut(
             signal=signal,
             skill_layer=LAYER_L1,
@@ -903,6 +924,11 @@ def build_causal_cut(
                 "surviving_error_count": facts.surviving_error_count,
                 "prosecution_coverage": signal.prosecution_coverage.state,
                 "defense_coverage": signal.defense_coverage.state,
+                # A hypothesis owner is the repair starting point, not the
+                # established minimal cause; downstream statistics and Meta
+                # must not learn it as settled attribution.
+                "owner_is_hypothesis": bool(owner_alternatives),
+                "owner_alternatives": list(owner_alternatives),
             },
             blocking_predicate="gold_polarity_mismatch",
         ))

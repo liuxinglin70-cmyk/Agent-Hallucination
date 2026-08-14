@@ -33,6 +33,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
+from sehd_rise.causal.route_addressability import route_observable_delta
 from sehd_rise.causal.signals import DetectionSignal
 from sehd_rise.evaluation.fitness import (
     CONTRACT_DIRECTION_DELTA_TOKENS,
@@ -220,6 +221,61 @@ def _verify_edge_level_counterfactual(
     }
 
 
+def _attribute_route_guidance_fitness(
+    assessment: FitnessAssessment,
+    *,
+    edit: SkillEdit,
+    result: Mapping[str, Any],
+    baseline_result: Mapping[str, Any] | None,
+) -> tuple[FitnessAssessment, dict[str, Any]]:
+    """Bind a route-guidance replay improvement to the injected guidance.
+
+    A route-guidance edit has no deterministic backend, so causal credit
+    cannot come from a fired transform. It comes from the frozen route replay:
+    the guidance must have been injected into the owner's producer route, the
+    owner's declared observable postcondition must have moved (drift-tolerant
+    fingerprint comparison), and the repair edge's blocking predicate must have
+    cleared. An improvement without all three is sampling drift, not skill
+    effect, and is demoted to ``no_effect``.
+    """
+    owner = str(edit.target_module or "")
+    injection = result.get("route_guidance_injection") or {}
+    injected = bool(
+        isinstance(injection, Mapping) and injection.get("injected")
+    )
+    observable = route_observable_delta(baseline_result, result, owner)
+    edge_counterfactual = _verify_edge_level_counterfactual(
+        edit.repair_edge, baseline_result, result,
+    )
+    executed = bool(
+        injected and observable.get("moved") and edge_counterfactual["met"]
+    )
+    audit = {
+        "status": "executed" if executed else "not_executed",
+        "route_guidance_injected": injected,
+        "injection": dict(injection) if isinstance(injection, Mapping) else {},
+        "target_edge_changed": bool(injected and observable.get("moved")),
+        "edge_counterfactual_met": bool(edge_counterfactual["met"]),
+        "observable": observable,
+        "edge_counterfactual": edge_counterfactual,
+        "baseline_terminal": (
+            str(baseline_result.get("state") or "")
+            if isinstance(baseline_result, Mapping) else ""
+        ),
+        "replay_terminal": str(result.get("state") or ""),
+    }
+    if executed or not (assessment.passed or assessment.evidence_only):
+        return assessment, audit
+    return FitnessAssessment(
+        "no_effect",
+        ("route_guidance_not_executed",),
+        assessment.task_score_before,
+        assessment.task_score_after,
+        assessment.local_score_before,
+        assessment.local_score_after,
+    ), audit
+
+
 def _attribute_intervention_fitness(
     assessment: FitnessAssessment,
     *,
@@ -255,6 +311,11 @@ def _attribute_intervention_fitness(
         if isinstance(edit.operation, SkillOp)
         else str(edit.operation)
     )
+    if not action_spec and edit.route_guidance:
+        return _attribute_route_guidance_fitness(
+            assessment, edit=edit, result=result,
+            baseline_result=baseline_result,
+        )
     if not action_spec or operation == SkillOp.REMOVE_RULE.value:
         return assessment, {"status": "not_instrumented"}
 

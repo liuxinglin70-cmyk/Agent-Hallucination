@@ -720,13 +720,13 @@ class SkillGenome:
 
         ``content_hash`` stays the stable text-lineage id so historical
         checkpoints remain readable when bookkeeping is updated. Runtime
-        compilation also consumes the typed rule condition and ActionSpec
-        stored in ``rule_meta``; those executable fields must therefore
-        participate in a separate behavior identity. Fitness, provenance
-        and promotion status remain excluded.
+        compilation also consumes the typed rule condition, the ActionSpec
+        and the route-guidance text stored in ``rule_meta``; those executable
+        fields must therefore participate in a separate behavior identity.
+        Fitness, provenance and promotion status remain excluded.
         """
         state = {
-            "schema_version": "sehd.skill_execution_identity.v2",
+            "schema_version": "sehd.skill_execution_identity.v3",
             "modules": {
                 mid: {
                     "active": self.modules[mid].active,
@@ -746,6 +746,15 @@ class SkillGenome:
                             "condition_spec": sanitize_condition_spec(
                                 self.modules[mid].get_rule_meta(index).get(
                                     "condition_spec"
+                                )
+                            ),
+                            # Route-guidance text changes provider-route
+                            # behavior at runtime, so it is part of behavior
+                            # identity; fitness/provenance bookkeeping stays
+                            # excluded.
+                            "route_guidance": sanitize_route_guidance(
+                                self.modules[mid].get_rule_meta(index).get(
+                                    "route_guidance"
                                 )
                             ),
                         }
@@ -882,63 +891,72 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
         if edit.route_guidance:
             # Route-guidance edit (design D1/D2): no deterministic backend,
             # so the intervention is a firewall-checked guidance block plus a
-            # label-free applicability predicate. No action_spec or binding
-            # proof exists for a provider-route intervention.
-            return _validate_route_guidance_edit(edit)
-        slots = _sanitize_rule_slots(edit.rule_slots)
-        slot_contract_active = bool(
-            slots and set(slots) == set(_RULE_SLOT_LIMITS)
-        )
-        slots_valid, slots_reason = _validate_persisted_rule_slots(edit)
-        if not slots_valid:
-            return False, slots_reason
-        if edit.condition_spec:
-            condition_valid, condition_reason = validate_condition_spec(
-                edit.condition_spec
+            # label-free applicability predicate. Only the genuinely
+            # inapplicable deterministic-backend proofs (rule slots, action
+            # spec, binding proof, action↔domain/edge checks) are exempt; the
+            # shared invariants below (feature/effect provenance, confidence,
+            # routing provenance, forbidden content, capacity, dedup, and the
+            # modify-side immutable/protected guards) apply unchanged.
+            guidance_valid, guidance_reason = _validate_route_guidance_edit(edit)
+            if not guidance_valid:
+                return False, guidance_reason
+            slots = {}
+            slot_contract_active = False
+        else:
+            slots = _sanitize_rule_slots(edit.rule_slots)
+            slot_contract_active = bool(
+                slots and set(slots) == set(_RULE_SLOT_LIMITS)
             )
-            if not condition_valid:
-                return False, condition_reason
-        binding_proof = sanitize_binding_proof(edit.binding_proof)
-        if not binding_proof:
-            return False, "source_binding_proof_missing"
-        persisted_action = sanitize_action_spec(edit.action_spec)
-        if not persisted_action:
-            return False, "action_spec_missing"
-        action_contract = ActionSpec.from_dict(persisted_action)
-        if edit.condition_spec:
-            domain_ok, domain_reason = validate_condition_spec_for_domain(
-                edit.condition_spec, action_contract.input_binding_domain,
-            )
-            if not domain_ok:
-                return False, domain_reason
-        proof_bindings = tuple(
-            Binding.from_dict(item)
-            for item in binding_proof.get("bindings") or ()
-            if isinstance(item, Mapping)
-        )
-        binding_status, binding_reason = validate_binding_contract(
-            proof_bindings,
-            domain=action_contract.input_binding_domain,
-            required_fields=action_contract.required_binding_fields,
-            cardinality=action_contract.cardinality,
-        )
-        if binding_status != BINDING_BOUND:
-            return False, f"source_binding_proof_invalid:{binding_reason}"
-        repair_edge = _sanitize_repair_edge(edit.repair_edge)
-        if repair_edge:
-            if not repair_edge.get("edge_id"):
-                return False, "repair_edge_id_missing"
-            edge_owner = str(repair_edge.get("owner_module") or "")
-            if edge_owner and edge_owner != edit.target_module:
-                return False, "repair_edge_owner_mismatch"
+            slots_valid, slots_reason = _validate_persisted_rule_slots(edit)
+            if not slots_valid:
+                return False, slots_reason
+            if edit.condition_spec:
+                condition_valid, condition_reason = validate_condition_spec(
+                    edit.condition_spec
+                )
+                if not condition_valid:
+                    return False, condition_reason
+            binding_proof = sanitize_binding_proof(edit.binding_proof)
+            if not binding_proof:
+                return False, "source_binding_proof_missing"
             persisted_action = sanitize_action_spec(edit.action_spec)
-            edge_field = str(repair_edge.get("field") or "")
-            output_field = str(persisted_action.get("output_field") or "")
-            repair_targets = {edge_field}
-            if edit.target_module == "atomic_verifier_instruction":
-                repair_targets.update(ERROR_CHECK_FIELDS.get(edge_field, ()))
-            if output_field not in repair_targets:
-                return False, "action_spec_repair_edge_mismatch"
+            if not persisted_action:
+                return False, "action_spec_missing"
+            action_contract = ActionSpec.from_dict(persisted_action)
+            if edit.condition_spec:
+                domain_ok, domain_reason = validate_condition_spec_for_domain(
+                    edit.condition_spec, action_contract.input_binding_domain,
+                )
+                if not domain_ok:
+                    return False, domain_reason
+            proof_bindings = tuple(
+                Binding.from_dict(item)
+                for item in binding_proof.get("bindings") or ()
+                if isinstance(item, Mapping)
+            )
+            binding_status, binding_reason = validate_binding_contract(
+                proof_bindings,
+                domain=action_contract.input_binding_domain,
+                required_fields=action_contract.required_binding_fields,
+                cardinality=action_contract.cardinality,
+            )
+            if binding_status != BINDING_BOUND:
+                return False, f"source_binding_proof_invalid:{binding_reason}"
+            repair_edge = _sanitize_repair_edge(edit.repair_edge)
+            if repair_edge:
+                if not repair_edge.get("edge_id"):
+                    return False, "repair_edge_id_missing"
+                edge_owner = str(repair_edge.get("owner_module") or "")
+                if edge_owner and edge_owner != edit.target_module:
+                    return False, "repair_edge_owner_mismatch"
+                persisted_action = sanitize_action_spec(edit.action_spec)
+                edge_field = str(repair_edge.get("field") or "")
+                output_field = str(persisted_action.get("output_field") or "")
+                repair_targets = {edge_field}
+                if edit.target_module == "atomic_verifier_instruction":
+                    repair_targets.update(ERROR_CHECK_FIELDS.get(edge_field, ()))
+                if output_field not in repair_targets:
+                    return False, "action_spec_repair_edge_mismatch"
 
     feature_valid, feature_reason = validate_feature_description(
         edit.feature_description
@@ -953,7 +971,15 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     )
     if not contract_valid:
         return False, contract_reason
-    if edit.expected_effect.strip() and not edit.expected_effect_contract:
+    # The delta-token contract vocabulary cannot name route-local observable
+    # postconditions; a route-guidance edit's observable contract is the
+    # owner's RouteAddressability postcondition instead, so the structured
+    # contract requirement applies only to deterministic-backend edits.
+    if (
+        not edit.route_guidance
+        and edit.expected_effect.strip()
+        and not edit.expected_effect_contract
+    ):
         return False, "expected_effect_contract_missing"
     try:
         confidence = float(edit.type_confidence)
@@ -978,15 +1004,19 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     if edit.operation == SkillOp.ADD_RULE:
         if module.is_full:
             return False, f"module_full: {len(module.rules)} >= {module.capacity}"
-        valid_rule, rule_reason = validate_runtime_rule(
-            edit.new_content,
-            edit.target_module,
-            condition_scope=(
-                slots.get("condition") if slot_contract_active else None
-            ),
-        )
-        if not valid_rule:
-            return False, rule_reason
+        if not edit.route_guidance:
+            # The runtime-rule contract is slot-render oriented; a guidance
+            # edit's content boundary is the D1 firewall checked by
+            # ``_validate_route_guidance_edit`` instead.
+            valid_rule, rule_reason = validate_runtime_rule(
+                edit.new_content,
+                edit.target_module,
+                condition_scope=(
+                    slots.get("condition") if slot_contract_active else None
+                ),
+            )
+            if not valid_rule:
+                return False, rule_reason
         # Semantic duplicate check against existing rules (tiered)
         for existing_rule in module.rules:
             overlap = semantic_overlap(existing_rule, edit.new_content)
@@ -1018,15 +1048,16 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
             meta = module.get_rule_meta(edit.rule_index)
             status = meta.get("fitness_status", "unknown")
             return False, f"protected_rule: fitness_status={status}"
-        valid_rule, rule_reason = validate_runtime_rule(
-            edit.new_content,
-            edit.target_module,
-            condition_scope=(
-                slots.get("condition") if slot_contract_active else None
-            ),
-        )
-        if not valid_rule:
-            return False, rule_reason
+        if not edit.route_guidance:
+            valid_rule, rule_reason = validate_runtime_rule(
+                edit.new_content,
+                edit.target_module,
+                condition_scope=(
+                    slots.get("condition") if slot_contract_active else None
+                ),
+            )
+            if not valid_rule:
+                return False, rule_reason
         # A modification that reproduces the rule it replaces is rejected
         # here so the structural gate and apply_edit speak one contract:
         # apply_edit raises semantically_equivalent on the same overlap.

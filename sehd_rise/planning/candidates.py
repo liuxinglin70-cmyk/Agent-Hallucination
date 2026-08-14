@@ -32,6 +32,7 @@ from sehd_rise.skills.binding import (
     predicate_matches_binding,
     project_binding_universe,
 )
+from sehd_rise.skills.capabilities import OWNER_BINDING_DOMAINS
 from sehd_rise.skills.genome import (
     EXPECTED_DIRECTIONS,
     EXPECTED_SCOPES,
@@ -310,12 +311,24 @@ def _prevalidate_route_guidance_candidate(
     producer route, so there is no action spec or source binding to validate:
     admission is the label-free applicability predicate plus a guidance text
     that crosses the D1 authority firewall, bound to the selected repair edge.
+
+    The applicability predicate is still entity-scoped: it must be fully
+    bindable within at least one of the owner's binding domains, or it can
+    never fire on any entity and the guidance never reaches a provider route.
     """
     condition_ok, condition_reason = validate_condition_spec(
         candidate.get("condition_spec")
     )
     if not condition_ok:
         return condition_reason
+    domains = OWNER_BINDING_DOMAINS.get(target_module, ())
+    if not any(
+        validate_condition_spec_for_domain(
+            candidate.get("condition_spec"), domain,
+        )[0]
+        for domain in domains
+    ):
+        return f"condition_feature_not_bindable_in_owner_domains:{target_module}"
     guidance = sanitize_route_guidance(candidate.get("local_guidance"))
     if not guidance:
         return "route_guidance_rejected_by_firewall"

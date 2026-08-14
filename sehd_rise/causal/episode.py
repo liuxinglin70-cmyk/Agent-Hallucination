@@ -363,6 +363,13 @@ class FailureAttempt:
     no_effect_reason: str
     decision: str
     proposal_content: str = ""
+    # Semantic payload of a route-guidance intervention. A deterministic edit
+    # carries its reusable semantics in ``action_spec``; a route-guidance edit
+    # has no ActionSpec, so without these fields the experience memory could
+    # never answer *what guidance text worked for this mechanism*.
+    route_guidance: str = ""
+    failure_mechanism: str = ""
+    expected_local_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -380,6 +387,9 @@ class FailureAttempt:
             "no_effect_reason": self.no_effect_reason,
             "decision": self.decision,
             "proposal_content": self.proposal_content,
+            "route_guidance": self.route_guidance,
+            "failure_mechanism": self.failure_mechanism,
+            "expected_local_effect": self.expected_local_effect,
         }
 
     @classmethod
@@ -403,6 +413,9 @@ class FailureAttempt:
             no_effect_reason=str(value.get("no_effect_reason") or ""),
             decision=str(value.get("decision") or ""),
             proposal_content=str(value.get("proposal_content") or ""),
+            route_guidance=str(value.get("route_guidance") or ""),
+            failure_mechanism=str(value.get("failure_mechanism") or ""),
+            expected_local_effect=str(value.get("expected_local_effect") or ""),
         )
 
 
@@ -424,6 +437,12 @@ class HistoricalEpisodeReference:
     rule_condition: str
     action_spec: dict[str, Any] | None
     local_outcome: dict[str, Any] | None
+    # Semantic payload of a route-guidance representative (empty for
+    # deterministic ActionSpec representatives, whose reusable semantics live
+    # in ``action_spec``).
+    route_guidance: str = ""
+    failure_mechanism: str = ""
+    expected_local_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -435,6 +454,9 @@ class HistoricalEpisodeReference:
             "rule_condition": self.rule_condition,
             "action_spec": dict(self.action_spec or {}),
             "local_outcome": dict(self.local_outcome or {}),
+            "route_guidance": self.route_guidance,
+            "failure_mechanism": self.failure_mechanism,
+            "expected_local_effect": self.expected_local_effect,
         }
 
 
