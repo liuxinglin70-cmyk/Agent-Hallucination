@@ -45,6 +45,7 @@ from sehd_rise.causal.cut import (
     REASON_GOLD_FALSE_POSITIVE,
     build_causal_cut,
     infer_evolution_direction,
+    repair_direction,
 )
 from sehd_rise.causal.episode import (
     CausalFailureEpisode,
@@ -1481,21 +1482,40 @@ class EvolutionLoop:
             genome_before = self.state.current_genome.content_hash
 
             # --- [1] Detection with the current working genome ---
-            try:
-                detection_result = self.run_detection(
-                    budget_kind="case",
-                    genome=self.state.current_genome,
-                    case_id=case_id,
-                    policy_genome=(
-                        self.state.policy_genome
-                        if self.state.policy_genome.items_for_scope("working")
-                        else None
-                    ),
-                )
-            except Exception as exc:
+            # One full re-detection retry on infrastructure failure: a single
+            # provider blip must not turn a case into INFRA_FAILURE when the
+            # transport layer already exhausted its own bounded retries. The
+            # retry is counted in the failure record, never in evolution
+            # evidence.
+            detection_result = None
+            detection_exc: Exception | None = None
+            for detection_attempt in range(2):
+                try:
+                    detection_result = self.run_detection(
+                        budget_kind="case",
+                        genome=self.state.current_genome,
+                        case_id=case_id,
+                        policy_genome=(
+                            self.state.policy_genome
+                            if self.state.policy_genome.items_for_scope(
+                                "working"
+                            )
+                            else None
+                        ),
+                    )
+                    break
+                except Exception as exc:
+                    detection_exc = exc
+                    if detection_attempt == 0:
+                        self.budget_usage["detection_retries"] = (
+                            self.budget_usage.get("detection_retries", 0) + 1
+                        )
+            if detection_result is None:
+                assert detection_exc is not None
                 self._case_transition(None, outcome=Outcome.INFRA_FAILURE)
                 self._record_runtime_invalid(
-                    idx, case_id, genome_before, exc, "detection_runtime",
+                    idx, case_id, genome_before, detection_exc,
+                    "detection_runtime",
                 )
                 continue
             detection_state = resolve_evolution_state(detection_result)
@@ -1523,9 +1543,7 @@ class EvolutionLoop:
             type_result = self.type_classifier.classify(
                 detection_result, signal,
             )
-            evolution_direction = infer_evolution_direction(
-                signal.state, signal.gold_label,
-            )
+            evolution_direction = repair_direction(signal, cut)
             # The cut is the L2 routing authority: when it lands on the
             # adjudication surface, the classifier row is recorded so the L2
             # path can open independently of the step trigger (a stable

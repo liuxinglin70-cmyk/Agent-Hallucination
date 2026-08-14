@@ -131,6 +131,23 @@ def infer_evolution_direction(state: str, gold: Any) -> str:
     return "process_repair"
 
 
+def repair_direction(signal: Any, cut: "CausalCut") -> str:
+    """The direction a repair on this cut must move, derived once.
+
+    A gold-correct verdict infers ``no_evolution`` from the label alone, but
+    the cut can still carry a process defect (a temporal-fallback
+    localization, a hollow coverage claim, a quarantined certificate): those
+    shapes repair toward ``process_repair`` and must never read as
+    unrepairable gaps. An actionable cut therefore upgrades
+    ``no_evolution`` to ``process_repair``; a non-actionable cut keeps it so
+    the case stays NON_EVOLVABLE.
+    """
+    direction = infer_evolution_direction(signal.state, signal.gold_label)
+    if direction == "no_evolution" and cut.actionable:
+        return "process_repair"
+    return direction
+
+
 # Error-type string vocabulary (the classifier's closed ``error_type``
 # values, kept as strings so this layer needs no typing import).
 _ERRORWARD_ERROR_TYPES = frozenset({
@@ -1271,5 +1288,6 @@ __all__ = [
     "classify_malformed_origin",
     "infer_evolution_direction",
     "origin_layer",
+    "repair_direction",
     "signal_polarity_pool",
 ]

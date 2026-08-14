@@ -51,6 +51,7 @@ from sehd_rise.causal.cut import (
     allowed_l1_modules,
     build_causal_cut,
     infer_evolution_direction,
+    repair_direction,
 )
 from sehd_rise.causal.episode import CausalFailureEpisode, build_causal_episode
 from sehd_rise.causal.plan import build_repair_plan
@@ -370,7 +371,7 @@ def triggered_episode(
     if signal.diagnostic_only:
         return False
     cut = build_causal_cut(signal)
-    direction = infer_evolution_direction(signal.state, signal.gold_label)
+    direction = repair_direction(signal, cut)
     modules = allowed_l1_modules(
         signal,
         cut.owner,
