@@ -289,18 +289,30 @@ def _repair_plans_section(
     for plan in repair_plans:
         edge = plan.target_causal_edge
         op_enum = ", ".join(plan.legal_operations)
-        if plan.auto_selected_operation:
-            lines.append(
-                f"- edge_id={edge.edge_id} "
-                f"owner={plan.owner} "
-                f"route={edge.producer_route} "
-                f"object={edge.output_object} "
-                f"field={edge.field} "
-                f"observed={edge.observed}->required={edge.required} "
-                f"legal_operations=[{op_enum}] "
-                f"AUTO_SELECTED={plan.auto_selected_operation} "
-                f"(must not be overridden)"
-            )
+        if plan.legal_operations:
+            if plan.auto_selected_operation:
+                lines.append(
+                    f"- edge_id={edge.edge_id} "
+                    f"owner={plan.owner} "
+                    f"route={edge.producer_route} "
+                    f"object={edge.output_object} "
+                    f"field={edge.field} "
+                    f"observed={edge.observed}->required={edge.required} "
+                    f"legal_operations=[{op_enum}] "
+                    f"AUTO_SELECTED={plan.auto_selected_operation} "
+                    f"(must not be overridden)"
+                )
+            else:
+                lines.append(
+                    f"- edge_id={edge.edge_id} "
+                    f"owner={plan.owner} "
+                    f"route={edge.producer_route} "
+                    f"object={edge.output_object} "
+                    f"field={edge.field} "
+                    f"observed={edge.observed}->required={edge.required} "
+                    f"legal_operations=[{op_enum}] "
+                    f"choose exactly one"
+                )
         else:
             lines.append(
                 f"- edge_id={edge.edge_id} "
@@ -309,8 +321,9 @@ def _repair_plans_section(
                 f"object={edge.output_object} "
                 f"field={edge.field} "
                 f"observed={edge.observed}->required={edge.required} "
-                f"legal_operations=[{op_enum}] "
-                f"choose exactly one"
+                f"legal_operations=[] (no deterministic backend; write "
+                f"failure_mechanism + local_guidance + expected_local_effect "
+                f"+ condition_spec, and leave opcode/action empty)"
             )
     lines.append("</mechanism_repair_plans>")
     return "\n".join(lines) + "\n"
@@ -446,14 +459,15 @@ Use this causal design sequence BEFORE writing a rule:
    describe. If the causal edge is a missing object, only a registered
    constructive capability (e.g. construct_candidate) may lift it; never
    translate a missing object into a suppression.
-2. Query the supplied capability contracts. Never imagine a provider action.
-3. Induce only an applicability condition -> the exact executable primitive.
-   If none repairs the edge, upstream repairability must return CAPABILITY_GAP;
-   never translate a constructive failure into suppression.
+2. Query the supplied capability contracts to find the executable primitive.
+3. If a mechanism_repair_plan lists legal_operations=[], the owner has no
+   deterministic backend but DOES own a replayable provider route: write a
+   ROUTE-GUIDANCE edit (see ROUTE-GUIDANCE FORM below). Do not return no_edit
+   and do not force a suppression just because no opcode exists.
 4. Compare it with current rules. The condition must add a genuinely distinct
    discriminator; if it only restates an existing rule, return no_edit.
-5. Predict the registry-declared observable field and direction that source
-   replay measures. Never substitute a nearby field.
+5. Predict the observable field and direction that source replay measures.
+   Never substitute a nearby field.
 
 REPAIR-FRONTIER BINDING (mandatory): for an L1 episode, select exactly one
 edge from ``repair_frontier`` and return its ``edge_id`` as repair_edge_id.
@@ -469,8 +483,9 @@ Read downstream_consumption and repair_frontier inside
 structured_runtime_observation to locate the existing object that carried the
 verdict. Then select only a capability whose module, operation target, reads,
 writes, direction, and binding requirements all match that edge. The registry
-contract is authoritative; do not infer a constructive action from a module
-name or from an older rule's prose.
+contract is authoritative for opcodes; when no opcode exists for the edge but
+the plan marks it route-addressable, the intervention is route guidance (below),
+never an invented opcode and never an inferred constructive action.
 
 VERDICT-CARRIER RULE (binding): court_balance.verdict_carriers lists, by
 certificate_id, the surviving prosecution certificates that actually carry
@@ -493,11 +508,14 @@ a capability-gap invariant.
 
 - verdict clean/unresolved + a missing candidate/certificate/evidence object:
   only a capability whose contract declares it constructs that object may be
-  selected; when the registry lists no such constructive capability for this
-  failure shape, upstream repairability classifies CAPABILITY_GAP. Never select
-  a suppress/withhold primitive for a missing-object failure.
-If no listed capability repairs the causal edge, do not force an edit into a
-nearby module; reaching reflection in that state is a routing invariant fault.
+  selected as a deterministic opcode; when the registry lists no such
+  constructive capability for this failure shape, the plan is route-addressable
+  and you write a ROUTE-GUIDANCE edit (the provider re-runs its own
+  verification under your guidance). Never select a suppress/withhold primitive
+  for a missing-object failure.
+If no listed capability repairs the causal edge and no route-addressable plan
+exists, do not force an edit into a nearby module; reaching reflection in that
+state is a routing invariant fault.
 
 A legal rule:
 - has one or two trajectory-observable conditions;
@@ -575,7 +593,9 @@ sentence yourself, and a slot payload that fails the slot contract is
 discarded as an invalid mutation, never rewritten into free text. The
 condition must describe a situation the post-court executor can
 observe at runtime, and the action must be one of the executable_action_specs
-listed for the target module in runtime_output_contracts.
+listed for the target module in runtime_output_contracts. This opcode form is
+for a deterministic post-court transform only; a route-addressable plan
+(legal_operations=[]) uses the ROUTE-GUIDANCE FORM instead and has no action.
 
 TYPED APPLICABILITY CONTRACT: the framework decides applicability on the
 completed proof-court result. Natural-language condition prose is not executable. Supply one
@@ -596,6 +616,21 @@ invent an entity_id: only values literally present in the menu are accepted.
 Do not try to make the condition predicate uniquely select one entity — a
 predicate true on several entities is fine, because the id disambiguates the
 training entity while the predicate stays general.
+
+ROUTE-GUIDANCE FORM: when the selected plan lists legal_operations=[] but names
+a producer route, the owner has no deterministic post-court transform; its
+intervention is a guidance block the target provider route applies while re-doing
+its own verification. In that form, instead of "action", supply:
+  - "local_guidance": a verification principle the route must apply (e.g.
+    "verify that a cited event actually supports the claim before accepting
+    it"). This text is firewall-checked: it may steer verification but must
+    never instruct the route to create a certificate/evidence, emit a verdict,
+    or mark an example. Do not write such instructions.
+  - "failure_mechanism": why this edge failed on this case (audit only).
+  - "expected_local_effect": what the re-verification should observably change.
+Leave "opcode" and "action" empty; the framework binds the guidance to the
+owner's route and re-runs the frozen downstream verification to measure it.
+The applicability condition_spec and repair_edge_id are still mandatory.
 
 <module_charters>
 """
@@ -631,9 +666,12 @@ training entity while the predicate stays general.
             "Return one edit object or {\"operation\":\"no_edit\","
             "\"rationale\":\"...\"}. An edit object must contain "
             '"target_module", "operation", "rule_index", "condition", '
-            '"condition_spec", "repair_edge_id", "action", '
-            '"evidence_anchor", "feature_description", and '
-            '"rationale"; when an <entity_menu> is supplied, also include '
+            '"condition_spec", "repair_edge_id", "evidence_anchor", '
+            '"feature_description", and "rationale"; for a deterministic '
+            'opcode also include "action". When the plan is route-addressable '
+            '(legal_operations=[]), omit "action" and instead include '
+            '"local_guidance", "failure_mechanism", and "expected_local_effect". '
+            "When an <entity_menu> is supplied, also include "
             '"target_entity_id" naming one menu entity_id. '
             "You may optionally include \"diagnosis\" as a nested object "
             'with "failed_output", "owner_module" and "existing_rule_gap"; '
@@ -1015,6 +1053,14 @@ def _candidate_shape_valid(candidate: Mapping[str, Any]) -> bool:
     if not str(candidate.get("target_module") or "").strip():
         return False
     if operation in {"add_rule", "modify_rule"}:
+        # Route-guidance form: a skill with no deterministic backend names
+        # its applicability predicate, its guidance text and the edge it
+        # targets — no action/opcode exists for a provider-route intervention.
+        if str(candidate.get("local_guidance") or "").strip():
+            return bool(
+                str(candidate.get("condition") or "").strip()
+                and str(candidate.get("repair_edge_id") or "").strip()
+            )
         # Slot schema: the rule text is a deterministic render of these two
         # slots. Two admissible shapes:
         #   - full form: condition + action

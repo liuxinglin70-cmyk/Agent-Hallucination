@@ -26,6 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from sehd_rise.skills.capabilities import BINDING_DOMAINS, SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.registry import L2_REGISTRY
 
 
@@ -405,3 +406,137 @@ DEFENSE_RELATIONAL_INVARIANTS = frozenset({
 
 ERROR_INVARIANT_TARGETS = tuple(sorted(ERROR_CHECK_FIELDS))
 DEFENSE_INVARIANT_TARGETS = tuple(sorted(DEFENSE_CHECK_FIELDS))
+
+
+# ============================================================
+# L1 condition-feature contract
+# ============================================================
+# The single source of the predicate vocabulary a typed L1 condition
+# (skills.rule.ConditionSpec) may speak. For every feature the table owns
+# the allowed operators, the closed value domain, the binding domains whose
+# projection emits it, and the call stage at which the fact exists.
+# skills.rule derives validation and the prompt contract from this table,
+# and each branch of skills.binding.project_binding_universe emits exactly
+# the per-domain sets derived here, so a new projected feature is declared
+# in this table once and every consumer follows.
+
+CONDITION_STAGE_FIRST_CALL = "first_call"
+CONDITION_STAGE_RETRY_DIAGNOSTIC = "retry_diagnostic"
+
+_CONDITION_OPERATORS_MEMBERSHIP = frozenset({"contains"})
+_CONDITION_OPERATORS_SCALAR = frozenset({"equals", "not_equals"})
+
+_CANDIDATE_KINDS = frozenset({
+    "omission", "unsupported_claim", "contradiction", "invalid_tool_use",
+    "invalid_action", "other",
+})
+_CANDIDATE_AXES = frozenset({"F", "Fa", "P", "S"})
+# The AgentHallu hallucination category the census assigned, normalized from
+# the schema's hyphenated tags ("Tool-Use" -> "tool_use").
+_MODULE_TAGS = frozenset({
+    "planning", "retrieval", "reasoning", "tool_use", "human_interaction",
+    "loop_detection", "redundancy_check", "factuality", "faithfulness",
+    "completion", "scope",
+})
+_COVERAGE_STATES = frozenset({"none", "incomplete", "complete", "unknown"})
+_QUALIFICATION_STATES = frozenset({"held", "qualified", "rejected", "unknown"})
+_EVENT_ROLES = frozenset({"system", "user", "assistant", "tool"})
+_ANCHOR_KINDS = frozenset({
+    "assistant_assertion", "tool_grounded_claim", "question", "code",
+})
+# Every runtime field any registered operation can target; the set follows
+# the capability registry, the field vocabulary's owner.
+_RUNTIME_TARGET_FIELDS = frozenset({
+    target
+    for module_id in MODULE_IDS
+    for capability in SKILL_CAPABILITY_REGISTRY.for_module(module_id)
+    for target in capability.operation_targets
+})
+_AUDIT_INVARIANTS = ERROR_RELATIONAL_INVARIANTS | DEFENSE_RELATIONAL_INVARIANTS
+_BOOLEANS = frozenset({True, False})
+
+_COMMON_DOMAINS = frozenset({
+    "candidate", "certificate", "origin", "coverage", "boundary", "event",
+})
+_ENTITY_DOMAINS = frozenset({"candidate", "certificate", "origin"})
+
+
+@dataclass(frozen=True)
+class ConditionFeatureSpec:
+    """Closed contract of one condition-predicate feature."""
+
+    operators: frozenset[str]
+    values: frozenset[Any]
+    domains: frozenset[str]
+    value_type: str
+    stage: str
+
+
+def _scalar(
+    values: frozenset[Any],
+    domains: frozenset[str],
+    *,
+    value_type: str = "boolean",
+) -> ConditionFeatureSpec:
+    return ConditionFeatureSpec(
+        operators=_CONDITION_OPERATORS_SCALAR, values=values,
+        domains=domains, value_type=value_type,
+        stage=CONDITION_STAGE_FIRST_CALL,
+    )
+
+
+def _membership(
+    values: frozenset[Any],
+    domains: frozenset[str],
+    *,
+    stage: str = CONDITION_STAGE_FIRST_CALL,
+) -> ConditionFeatureSpec:
+    return ConditionFeatureSpec(
+        operators=_CONDITION_OPERATORS_MEMBERSHIP, values=values,
+        domains=domains, value_type="string", stage=stage,
+    )
+
+
+CONDITION_FEATURES: Mapping[str, ConditionFeatureSpec] = {
+    "anchor_kind": _membership(_ANCHOR_KINDS, frozenset({"claim_anchor"})),
+    "anchor_role": _membership(
+        frozenset({"assistant"}), frozenset({"claim_anchor"}),
+    ),
+    "anchor_depends_on_tool": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "anchor_has_number": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "anchor_has_citation": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "anchor_is_final_assistant": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "anchor_is_first_in_event": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "anchor_is_last_in_event": _scalar(_BOOLEANS, frozenset({"claim_anchor"})),
+    "candidate_kind": _membership(_CANDIDATE_KINDS, _ENTITY_DOMAINS),
+    "candidate_axis": _membership(_CANDIDATE_AXES, _ENTITY_DOMAINS),
+    "module_tag": _membership(_MODULE_TAGS, _ENTITY_DOMAINS),
+    "missing_field": _membership(
+        _RUNTIME_TARGET_FIELDS, _ENTITY_DOMAINS,
+        stage=CONDITION_STAGE_RETRY_DIAGNOSTIC,
+    ),
+    "failed_invariant": _membership(
+        _AUDIT_INVARIANTS, _ENTITY_DOMAINS,
+        stage=CONDITION_STAGE_RETRY_DIAGNOSTIC,
+    ),
+    "coverage_state": _membership(
+        _COVERAGE_STATES, frozenset({"coverage"}),
+    ),
+    "coverage_side": _membership(
+        frozenset({"prosecution", "defense"}), frozenset({"coverage"}),
+    ),
+    "qualification_state": _membership(_QUALIFICATION_STATES, _ENTITY_DOMAINS),
+    "evidence_verified": _scalar(_BOOLEANS, _ENTITY_DOMAINS),
+    "event_role": _membership(_EVENT_ROLES, _COMMON_DOMAINS),
+    "has_tool_call": _scalar(_BOOLEANS, _COMMON_DOMAINS),
+    "has_tool_error": _scalar(_BOOLEANS, _COMMON_DOMAINS),
+    "has_tool_retry": _scalar(_BOOLEANS, _COMMON_DOMAINS),
+}
+
+DOMAIN_CONDITION_FEATURES: Mapping[str, frozenset[str]] = {
+    domain: frozenset(
+        name for name, spec in CONDITION_FEATURES.items()
+        if domain in spec.domains
+    )
+    for domain in sorted(BINDING_DOMAINS)
+}

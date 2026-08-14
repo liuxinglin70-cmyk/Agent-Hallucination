@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from sehd_rise.skills.action import sanitize_action_spec
@@ -22,7 +23,12 @@ from sehd_rise.skills.genome import (
     SkillModule,
     create_baseline_genome,
 )
-from sehd_rise.skills.rule import sanitize_condition_spec
+from sehd_rise.skills.rule import (
+    evaluate_condition_spec,
+    project_result_condition_features,
+    sanitize_condition_spec,
+    sanitize_route_guidance,
+)
 
 
 def _stable_hash(value: Any) -> str:
@@ -255,4 +261,92 @@ def compile_genome_rules(
     return rules
 
 
-__all__ = ["compile_genome_rules"]
+@dataclass(frozen=True)
+class RouteGuidanceEntry:
+    """One compiled route-guidance skill: its applicability predicate plus
+    the firewall-checked guidance text. The predicate gates whether the
+    guidance is injected at all, symmetric with a deterministic rule's
+    ``condition_spec`` gate."""
+    condition_spec: Mapping[str, Any] | None
+    text: str
+
+
+def compile_route_guidance(
+    genome: SkillGenome,
+    *,
+    baseline: SkillGenome | None = None,
+) -> dict[str, tuple[RouteGuidanceEntry, ...]]:
+    """Compile route-guidance skills into owner-keyed, condition-carrying
+    entries.
+
+    A route-guidance skill has no deterministic backend: its intervention is
+    the firewall-checked ``route_guidance`` text the reflection model wrote,
+    gated by the same ``condition_spec`` a deterministic rule carries. This
+    returns one entry per owner (module id); the owner -> provider-route
+    mapping lives in the causal RouteAddressability table, applied by the
+    execution layer (which may import causal). Text that fails the firewall,
+    or a rule with no condition, is dropped here — never surfaced to a
+    provider.
+    """
+    baseline = baseline or create_baseline_genome()
+    if set(genome.modules) != set(MODULE_IDS):
+        raise ValueError("genome must contain exactly the six registered modules")
+    by_owner: dict[str, list[RouteGuidanceEntry]] = {}
+    for module_id in MODULE_IDS:
+        module = genome.modules[module_id]
+        baseline_module = baseline.modules[module_id]
+        unmatched_baseline = list(baseline_module.rules)
+        for index, rule in enumerate(module.rules):
+            if rule in unmatched_baseline:
+                unmatched_baseline.remove(rule)
+                continue
+            meta = module.get_rule_meta(index)
+            guidance = sanitize_route_guidance(str(meta.get("route_guidance") or ""))
+            if not guidance:
+                continue
+            condition = sanitize_condition_spec(meta.get("condition_spec"))
+            if not condition:
+                # A route-guidance skill with no applicability predicate is
+                # unconditional — the exact generalization hazard the D1
+                # firewall exists to prevent. Drop it: it never fires.
+                continue
+            by_owner.setdefault(module_id, []).append(
+                RouteGuidanceEntry(condition_spec=condition, text=guidance)
+            )
+    return {
+        owner: tuple(entries) for owner, entries in by_owner.items()
+    }
+
+
+def select_route_guidance(
+    compiled: Mapping[str, tuple[RouteGuidanceEntry, ...]],
+    *,
+    result: Mapping[str, Any],
+    record: Mapping[str, Any] | None = None,
+) -> dict[str, tuple[str, ...]]:
+    """Evaluate each guidance entry's condition against a court result.
+
+    Only entries whose ``condition_spec`` matches the result's projected
+    features are returned, keyed by owner. This is the route-guidance
+    counterpart of ``match_condition_bindings`` for deterministic rules: a
+    guidance whose condition does not hold on the case is not injected, so an
+    accepted guidance never leaks onto an unrelated case or canary.
+    """
+    features = project_result_condition_features(result, record)
+    selected: dict[str, list[str]] = {}
+    for owner, entries in compiled.items():
+        for entry in entries:
+            if entry.condition_spec is None:
+                continue
+            evaluation = evaluate_condition_spec(entry.condition_spec, features)
+            if evaluation.matched:
+                selected.setdefault(owner, []).append(entry.text)
+    return {owner: tuple(texts) for owner, texts in selected.items()}
+
+
+__all__ = [
+    "compile_genome_rules",
+    "compile_route_guidance",
+    "select_route_guidance",
+    "RouteGuidanceEntry",
+]

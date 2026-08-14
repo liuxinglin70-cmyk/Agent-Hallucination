@@ -35,9 +35,11 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.episode import CausalFailureEpisode, FailureEdge
+from sehd_rise.causal.route_addressability import address_for
 from sehd_rise.skills.capabilities import (
     L1_COURT_TRANSFORM_EXECUTOR,
     L1_CONSTRUCTIVE_HARNESS_EXECUTOR,
+    L1_ROUTE_GUIDANCE_EXECUTOR,
     L2_ADJUDICATION_POLICY_EXECUTOR,
     SKILL_CAPABILITY_REGISTRY,
 )
@@ -53,10 +55,12 @@ from sehd_rise.skills.vocabulary.contracts import (
 
 EXECUTOR_L1_COURT_TRANSFORM = L1_COURT_TRANSFORM_EXECUTOR
 EXECUTOR_L1_CONSTRUCTIVE_HARNESS = L1_CONSTRUCTIVE_HARNESS_EXECUTOR
+EXECUTOR_L1_ROUTE_GUIDANCE = L1_ROUTE_GUIDANCE_EXECUTOR
 EXECUTOR_ADJUDICATION_POLICY = L2_ADJUDICATION_POLICY_EXECUTOR
 EXECUTORS = frozenset({
     EXECUTOR_L1_COURT_TRANSFORM,
     EXECUTOR_L1_CONSTRUCTIVE_HARNESS,
+    EXECUTOR_L1_ROUTE_GUIDANCE,
     EXECUTOR_ADJUDICATION_POLICY,
 })
 
@@ -70,10 +74,16 @@ class RepairPlan:
     """One canonical repair plan targeting one causal failure edge.
 
     Fields are the §2.7 protocol surface. ``legal_operations`` is the closed
-    opcode (L1) or action (L2) set the plan may propose; the reflection model
-    picks one item from the enum and the framework re-evaluates deterministically.
-    ``auto_selected_operation`` is set when exactly one operation can lift the
-    target edge, so the model does not need to choose.
+    opcode (L1) or action (L2) set the plan may propose; it is empty when the
+    registry offers no deterministic backend for the edge, in which case the
+    plan's intervention point is the provider route named by the
+    RouteAddressability table and ``executor`` is ``l1_route_guidance``.
+    ``available_deterministic_backends`` is the wider owner/direction/shape
+    match before the edge-field filter — a pure optimization hint so the
+    funnel can tell "no deterministic support at all" from "support exists
+    for a neighbouring field". ``auto_selected_operation`` is set when
+    exactly one operation can lift the target edge, so the model does not
+    need to choose.
 
     The plan does NOT carry the proposal payload (rule text, rationale,
     mechanism hypothesis); that is the planning layer's contribution and
@@ -86,7 +96,7 @@ class RepairPlan:
     skill_layer: str  # LAYER_L1 or LAYER_L2
     owner: str
     target_causal_edge: FailureEdge
-    executor: str  # registry executor identifier
+    executor: str  # one of EXECUTORS
     legal_operations: tuple[str, ...]
     effect_contract: Mapping[str, Any]
     evaluation_contract: Mapping[str, Any]
@@ -94,6 +104,7 @@ class RepairPlan:
     grounding_query: Mapping[str, Any] = field(default_factory=dict)
     required_binding_schema: Mapping[str, Any] = field(default_factory=dict)
     auto_selected_operation: str = ""
+    available_deterministic_backends: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -110,6 +121,9 @@ class RepairPlan:
             "grounding_query": dict(self.grounding_query),
             "required_binding_schema": dict(self.required_binding_schema),
             "auto_selected_operation": self.auto_selected_operation,
+            "available_deterministic_backends": list(
+                self.available_deterministic_backends
+            ),
         }
 
     @classmethod
@@ -136,6 +150,11 @@ class RepairPlan:
             grounding_query=dict(value.get("grounding_query") or {}),
             required_binding_schema=dict(value.get("required_binding_schema") or {}),
             auto_selected_operation=str(value.get("auto_selected_operation") or ""),
+            available_deterministic_backends=tuple(
+                str(item)
+                for item in (value.get("available_deterministic_backends") or ())
+                if str(item)
+            ),
         )
 
 
@@ -192,15 +211,20 @@ def _l1_effect_contract(
 
     Cached deterministically from the edge: producer route, output object,
     field, observed/required postcondition, and the carrier the verdict
-    traveled on (certificate_id source artifact) when present.
+    traveled on (certificate_id source artifact) when present. Without a
+    deterministic backend the intervention route comes from the
+    RouteAddressability table, which also names the frozen replay scope and
+    the fingerprint-compared postcondition. ``capability`` is the
+    shape-exact match from ``build_repair_plan``; a shape-mismatched module
+    capability must never lend its route or output object to the contract.
     """
-    if capability is None:
-        capabilities = SKILL_CAPABILITY_REGISTRY.for_module(owner)
-        capability = capabilities[0] if capabilities else None
+    address = address_for(owner)
     return {
         "producer_route": (
             capability.route_ids[0]
-            if capability and capability.route_ids else edge.producer_route
+            if capability and capability.route_ids
+            else address.producer_route if address
+            else edge.producer_route
         ),
         "output_object": (
             capability.output_object if capability else edge.output_object
@@ -210,6 +234,10 @@ def _l1_effect_contract(
         "required": edge.required,
         "blocking_predicate": edge.blocking_predicate,
         "source_artifact_id": edge.source_artifact_id,
+        "replay_scope": list(address.replay_scope) if address else [],
+        "observable_postcondition": (
+            address.observable_postcondition if address else ""
+        ),
     }
 
 
@@ -265,23 +293,24 @@ def build_repair_plan(
     L2 mode routes via ``ADJUDICATION_POLICY`` over the L2 action vocabulary.
 
     For L1: each repair_frontier edge whose owner is in ``allowed_modules``
-    and whose field is executable in the given direction produces one
-    RepairPlan. The capability lookup is exact: ``failure_shape`` (the
-    episode's ``reason_code``), owner, direction and target field must all
-    match a registered capability, so a shape the registry never promised to
-    repair compiles zero plans instead of borrowing a foreign operation.
+    produces one RepairPlan. When the capability lookup finds an exact
+    deterministic backend (``failure_shape`` + owner + direction + target
+    field all match), the plan carries it in ``legal_operations`` and the
+    registry's executor; when it does not but the owner has a replayable
+    provider route in the RouteAddressability table, the plan compiles with
+    empty ``legal_operations`` and the ``l1_route_guidance`` executor.
     ``auto_selected_operation`` is set when exactly one operation can lift
     the edge.
 
     For L2: the episode carries a single synthetic edge for the L2 surface;
-    its legal_operations is the closed L2 action set the policy may propose.
-    Phase 6 narrows this with the candidate's `params` whitelist.
+    the adjudication-policy surface is always the intervention point, so a
+    plan compiles unconditionally and an empty ``legal_operations`` is the
+    vocabulary-extension signal the registry reflection consumes. Phase 6
+    narrows this with the candidate's `params` whitelist.
 
-    Edges whose owner is not in ``allowed_modules`` or whose field is not
-    executable in the given direction are skipped: they cannot compile a
-    plan. The empty tuple returned from this function is the C2 invariant
-    witness the repairability authority consumes to dispatch
-    ``UNADDRESSABLE_FRAMEWORK_DEFECT``.
+    Only an L1 edge with neither a deterministic backend nor a route
+    address is skipped: its absence from the compiled plans is the witness
+    the repairability authority reads as a true ``CAPABILITY_GAP``.
     """
     if episode.skill_layer not in (LAYER_L1, LAYER_L2):
         return ()
@@ -307,11 +336,13 @@ def build_repair_plan(
                 op for op in direction_ops
                 if field in SKILL_CAPABILITY_REGISTRY.require(op).operation_targets
             )
-            if not executable_ops:
+            address = address_for(owner)
+            if not executable_ops and address is None:
                 continue
             auto_op = executable_ops[0] if len(executable_ops) == 1 else ""
-            capability = SKILL_CAPABILITY_REGISTRY.require(
-                auto_op or executable_ops[0]
+            capability = (
+                SKILL_CAPABILITY_REGISTRY.require(executable_ops[0])
+                if executable_ops else None
             )
             plans.append(RepairPlan(
                 plan_id=_plan_id(episode.episode_id, edge.edge_id, LAYER_L1),
@@ -319,11 +350,17 @@ def build_repair_plan(
                 skill_layer=LAYER_L1,
                 owner=owner,
                 target_causal_edge=edge,
-                executor=capability.executor,
+                executor=(
+                    capability.executor
+                    if capability else EXECUTOR_L1_ROUTE_GUIDANCE
+                ),
                 legal_operations=executable_ops,
                 effect_contract=_l1_effect_contract(edge, owner, capability),
                 evaluation_contract=_l1_evaluation_contract(edge, evolution_direction),
-                target_domain=capability.input_binding_domain,
+                target_domain=(
+                    capability.input_binding_domain
+                    if capability else address.binding_domains[0]
+                ),
                 grounding_query={
                     "semantics": "entity_scoped_binding_algebra",
                     "causal_target_field": edge.field,
@@ -331,11 +368,20 @@ def build_repair_plan(
                     "blocking_predicate": edge.blocking_predicate,
                 },
                 required_binding_schema={
-                    "domain": capability.input_binding_domain,
-                    "required_fields": list(capability.required_binding_fields),
-                    "cardinality": capability.cardinality,
+                    "domain": (
+                        capability.input_binding_domain
+                        if capability else address.binding_domains[0]
+                    ),
+                    "required_fields": (
+                        list(capability.required_binding_fields)
+                        if capability else []
+                    ),
+                    "cardinality": (
+                        capability.cardinality if capability else "one_or_many"
+                    ),
                 },
                 auto_selected_operation=auto_op,
+                available_deterministic_backends=direction_ops,
             ))
         return tuple(plans)
 
@@ -350,10 +396,11 @@ def build_repair_plan(
             failure_shape=episode.reason_code,
             direction=evolution_direction,
         )
-        if not legal_ops:
-            continue
         auto_op = legal_ops[0] if len(legal_ops) == 1 else ""
-        capability = SKILL_CAPABILITY_REGISTRY.require(auto_op or legal_ops[0])
+        capability = (
+            SKILL_CAPABILITY_REGISTRY.require(legal_ops[0])
+            if legal_ops else None
+        )
         plans.append(RepairPlan(
             plan_id=_plan_id(episode.episode_id, edge.edge_id, LAYER_L2),
             episode_id=episode.episode_id,
@@ -364,18 +411,23 @@ def build_repair_plan(
             legal_operations=legal_ops,
             effect_contract=_l2_effect_contract(edge, owner),
             evaluation_contract=_l2_evaluation_contract(edge),
-            target_domain=capability.input_binding_domain,
+            target_domain=(
+                capability.input_binding_domain if capability else ""
+            ),
             grounding_query={
                 "semantics": "entity_scoped_binding_algebra",
                 "causal_target_field": edge.field,
                 "blocking_predicate": edge.blocking_predicate,
             },
             required_binding_schema={
-                "domain": capability.input_binding_domain,
-                "required_fields": list(capability.required_binding_fields),
-                "cardinality": capability.cardinality,
+                "domain": capability.input_binding_domain if capability else "",
+                "required_fields": (
+                    list(capability.required_binding_fields) if capability else []
+                ),
+                "cardinality": capability.cardinality if capability else "",
             },
             auto_selected_operation=auto_op,
+            available_deterministic_backends=legal_ops,
         ))
     return tuple(plans)
 

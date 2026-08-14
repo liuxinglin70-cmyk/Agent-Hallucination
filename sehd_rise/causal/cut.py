@@ -94,7 +94,6 @@ REASON_GOLD_FALSE_NEGATIVE_CLEAN = "gold_false_negative_clean"
 # Names an episode whose nominally-L1 surface compiled no executable
 # obligation: a cut carrying this reason is a capability-gap witness, never
 # NON_EVOLVABLE or a framework defect (``repairability.analyze`` resolves it).
-REASON_DEMOTED_L1_NO_EXECUTABLE = "demoted_l1_no_executable_obligation"
 
 
 # ============================================================
@@ -227,33 +226,6 @@ def allowed_l1_modules(
             modules.append(partner)
     return tuple(modules)
 
-# Self-supervised defect reasons carrying their executable field canonically
-# (rather than on the artifact frontier). The quarantine reason's owner is
-# overridden to ``evidence_obligation`` when evidence_missing is the dominant
-# quarantine sub-reason (see ``_compile_executable_field``).
-_REASON_SYNTHESIZED_FIELD: dict[str, tuple[str, str]] = {
-    REASON_LOCALIZATION_FALLBACK: (
-        "earliest_origin_tiebreak", "responsible_event_id",
-    ),
-    REASON_RESPONSIBLE_STEP_MISSING: (
-        "earliest_origin_tiebreak", "responsible_event_id",
-    ),
-    REASON_QUARANTINE_PATTERN: (
-        "atomic_verifier_instruction", "certificate_id",
-    ),
-    REASON_GOLD_FALSE_POSITIVE: (
-        "evidence_obligation", "coverage_state",
-    ),
-}
-
-# Reasons that carry executable fields directly on the artifact frontier
-# (missing_fields / failed_invariants / failed_fields) versus synthesized.
-_REASON_CARRIES_ARTIFACT_FIELDS = frozenset({
-    REASON_PROVIDER_MISSING,
-    REASON_PROVIDER_MALFORMED,
-})
-
-
 # ============================================================
 # Malformed-origin taxonomy (plan §2.5 -- detector/evolution boundary)
 # ============================================================
@@ -377,68 +349,6 @@ def _resolve_l1_module(artifact: Mapping[str, Any], reason: str) -> str:
     if kind in _ARTIFACT_OWNER:
         return _ARTIFACT_OWNER[kind]
     return "evidence_obligation"
-
-
-def _module_has_executable_field(module: str, field: str) -> bool:
-    """Direction-agnostic registry query for one operation target."""
-    return bool(SKILL_CAPABILITY_REGISTRY.query(
-        skill_layer=LAYER_L1, modules=(module,), target_field=field,
-    ))
-
-
-def can_compile_repair_obligation(
-    *, owner: str, reason_code: str, evidence: Mapping[str, Any]
-) -> bool:
-    """Return True iff this L1 cut can compile at least one executable repair
-    edge with owner / route / object / field / operation / postcondition.
-
-    Source-side enforcement of the strong invariant ``LAYER_L1 => executable``
-    (plan §2.4 -- a cut not repairable from the L1 surface is not a cut). It
-    does not compile the episode; it checks that the owner module has
-    registered opcodes and that the evidence carries at least one field
-    belonging to an opcode target. When this returns False the cut is
-    demoted to ``LAYER_NONE`` so no "nominally L1 but no execution semantics"
-    intermediate reaches the evolution side.
-    """
-    if not SKILL_CAPABILITY_REGISTRY.for_module(owner):
-        return False
-    if reason_code in _REASON_CARRIES_ARTIFACT_FIELDS:
-        for key in ("failed_invariants", "failed_fields", "missing_fields"):
-            raw = evidence.get(key)
-            if isinstance(raw, (list, tuple, set, frozenset)):
-                for value in raw:
-                    field = "certificate_id" if str(value) == "certificate" else str(value)
-                    if _module_has_executable_field(owner, field):
-                        return True
-        frontier = evidence.get("artifact_frontier")
-        if isinstance(frontier, list):
-            for row in frontier:
-                if not isinstance(row, Mapping):
-                    continue
-                for key in ("failed_invariants", "failed_fields", "missing_fields"):
-                    raw = row.get(key)
-                    if isinstance(raw, (list, tuple, set, frozenset)):
-                        for value in raw:
-                            field = (
-                                "certificate_id"
-                                if str(value) == "certificate"
-                                else str(value)
-                            )
-                            if _module_has_executable_field(owner, field):
-                                return True
-        return False
-
-    if reason_code in _REASON_SYNTHESIZED_FIELD:
-        synth_owner, field = _REASON_SYNTHESIZED_FIELD[reason_code]
-        if reason_code == REASON_QUARANTINE_PATTERN:
-            dominant = str(evidence.get("dominant_reason") or "")
-            if dominant == "evidence_missing":
-                synth_owner = "evidence_obligation"
-        if owner != synth_owner:
-            return _module_has_executable_field(owner, field)
-        return _module_has_executable_field(synth_owner, field)
-
-    return False
 
 
 # ============================================================
@@ -1272,7 +1182,6 @@ __all__ = [
     "REASON_APPEAL_PENDING",
     "REASON_BOUNDARY_CONFLICT",
     "REASON_CONSENSUS_BLOCKED",
-    "REASON_DEMOTED_L1_NO_EXECUTABLE",
     "REASON_HOLLOW_DEFENSE",
     "REASON_HOLLOW_PROSECUTION",
     "REASON_INTERNAL_INCONSISTENCY",
@@ -1284,7 +1193,6 @@ __all__ = [
     "REASON_RESPONSIBLE_STEP_MISSING",
     "allowed_l1_modules",
     "build_causal_cut",
-    "can_compile_repair_obligation",
     "classify_malformed_origin",
     "infer_evolution_direction",
     "origin_layer",

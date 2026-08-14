@@ -240,8 +240,9 @@ def detect_record(
     """Detect one trajectory and return a label-free result.
 
     ``genome`` applies the evolved L1 Skill deterministically as post-court
-    transforms; ``policy_genome`` supplies the evolved L2
-    adjudication-policy items to the proof court. Either may be supplied
+    transforms and compiles its route-guidance skills into route-local
+    provider guidance (design D1/D2); ``policy_genome`` supplies the evolved
+    L2 adjudication-policy items to the proof court. Either may be supplied
     independently, so a deployed detector can carry the complete two-layer
     capability.
     """
@@ -257,6 +258,35 @@ def detect_record(
     policy_registry = (
         policy_genome.registry if policy_genome is not None else None
     )
+    route_guidance: dict[str, tuple[str, ...]] | None = None
+    if genome is not None:
+        from sehd_rise.detection.injection import (
+            compile_route_guidance,
+            select_route_guidance,
+        )
+        from sehd_rise.skills.capabilities import OWNER_PRODUCER_ROUTE
+        compiled = compile_route_guidance(genome)
+        if compiled:
+            # Two-phase gate: the guidance predicate names a court-result
+            # feature, so it can only be evaluated against an already-computed
+            # court result. Run one guidance-free pass first, then inject only
+            # the guidance whose condition holds on that result.
+            prior = adjudicate_case(
+                case_id=case_id, record=record, config=config,
+                **(
+                    {"policy_items": policy_items, "policy_registry": policy_registry}
+                    if policy_items is not None else {}
+                ),
+            )
+            selected = select_route_guidance(
+                compiled, result=prior, record=record,
+            )
+            if selected:
+                route_guidance = {
+                    OWNER_PRODUCER_ROUTE[owner]: blocks
+                    for owner, blocks in selected.items()
+                    if owner in OWNER_PRODUCER_ROUTE
+                }
     run_adjudication = adjudicator or adjudicate_case
     result = run_adjudication(
         case_id=case_id, record=record, config=config,
@@ -264,8 +294,9 @@ def detect_record(
             {
                 "policy_items": policy_items,
                 "policy_registry": policy_registry,
+                "route_guidance": route_guidance,
             }
-            if policy_items is not None else {}
+            if policy_items is not None or route_guidance is not None else {}
         ),
     )
     if not isinstance(result, dict):

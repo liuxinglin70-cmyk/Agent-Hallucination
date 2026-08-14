@@ -23,6 +23,7 @@ from sehd_rise.skills.rule import (
     normalize_module_tag,
     sanitize_condition_spec,
 )
+from sehd_rise.skills.vocabulary.contracts import DOMAIN_CONDITION_FEATURES
 
 
 BINDING_BOUND = "BOUND"
@@ -352,10 +353,18 @@ def project_binding_universe(
                 or boundary.get("responsible_event_id")
                 or "boundary_path"
             )
+            # The boundary payload is court-controlled and carries opaque
+            # identities; only the declared domain features may enter the
+            # conditionable surface.
+            declared = DOMAIN_CONDITION_FEATURES[domain]
             bindings.append(Binding(
                 domain=domain, entity_id=boundary_id,
                 identifiers={"boundary_id": boundary_id},
-                features={**common, **dict(boundary)},
+                features={
+                    key: value
+                    for key, value in {**common, **dict(boundary)}.items()
+                    if key in declared
+                },
                 evidence_refs=_evidence_refs(boundary),
             ))
     elif domain == "event" and isinstance(record, Mapping):
@@ -383,6 +392,10 @@ def _atom_matches(spec: ConditionSpec, binding: Binding) -> bool:
         if isinstance(observed, (list, tuple, set, frozenset)):
             return spec.value in observed
         return observed == spec.value
+    if spec.operator == "not_equals":
+        # An absent feature never satisfies not_equals: absence is not a
+        # value.
+        return observed is not None and observed != spec.value
     return observed == spec.value
 
 

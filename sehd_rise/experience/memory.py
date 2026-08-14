@@ -5,9 +5,9 @@ truth. This module stores the structural failure-mechanism index keyed by the
 episode's deterministic mechanism signature. Per signature it holds:
 
 - observation count and outcome counts;
-- four deterministic representative slots (effective / no-effect /
-  structural-reject / no-proposal) holding the most informative recent
-  attempt of that class;
+- five deterministic representative slots (effective / no-effect /
+  structural-reject / no-proposal / semantic-unavailable) holding the most
+  informative recent attempt of that class;
 - a bounded dedup ledger of opaque episode ids so checkpoint resume never
   double-counts an observation.
 
@@ -78,7 +78,13 @@ NO_EFFECT_REASONS = frozenset({
     "unresolved_no_effect",
 })
 
-_SLOT_KEYS = ("effective", "no_effect", "structural_reject", "no_proposal")
+_SLOT_KEYS = (
+    "effective",
+    "no_effect",
+    "structural_reject",
+    "no_proposal",
+    "semantic_unavailable",
+)
 # Bounded dedup ledger: opaque episode-id prefixes keep resume idempotent
 # without persisting full episode lists. A 64-bit prefix collision is
 # negligible for episode ids (sha256 hex); the window covers any realistic
@@ -157,6 +163,11 @@ def episode_signature(episode: CausalFailureEpisode) -> tuple[str, ...]:
 
 def _slot_for(attempt: FailureAttempt) -> str | None:
     decision = str(attempt.decision or "")
+    if decision == "semantic_unavailable":
+        # A capability-gap attempt never executed, so it is neither
+        # effective nor no-effect; it is the retrievable evidence that this
+        # mechanism had no available repair semantics.
+        return "semantic_unavailable"
     if attempt.no_effect_reason in NO_EFFECT_REASONS:
         # An accepted-but-ineffective attempt (e.g. a policy accepted
         # without a terminal-state change) is a no-effect observation;
@@ -481,7 +492,11 @@ class ExperienceMemory:
     ) -> list[HistoricalEpisodeReference]:
         reps = entry.representatives
         effective = reps.get("effective")
-        negative = reps.get("no_effect") or reps.get("structural_reject")
+        negative = (
+            reps.get("no_effect")
+            or reps.get("semantic_unavailable")
+            or reps.get("structural_reject")
+        )
         refs: list[HistoricalEpisodeReference] = []
         effective_added = False
         if effective is not None and effective.episode_id != exclude_episode_id:

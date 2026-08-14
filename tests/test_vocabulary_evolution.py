@@ -1,6 +1,8 @@
-"""B6 L2 vocabulary-evolution acceptance: registration enters the pending
-validation queue, promotion needs independent observations, and a promoted
-``<operator>_instance`` alias is proposable and contract-valid."""
+"""B6 L2 vocabulary-evolution acceptance: a real L2 cut reason routed to
+``no_registered_runtime_action`` by the policy planner opens registry
+reflection, registration enters the pending validation queue, promotion
+needs independent observations, and a promoted ``<operator>_instance``
+alias is proposable and contract-valid."""
 
 from __future__ import annotations
 
@@ -8,6 +10,7 @@ from types import SimpleNamespace
 
 from sehd_rise.detection.policy import build_adjudication_facts
 from sehd_rise.loop.runner import _run_registry_reflection_impl
+from sehd_rise.planning.l2 import plan_policy_candidates
 from sehd_rise.skills.policy import (
     PENDING_STATUS_PENDING,
     PENDING_STATUS_VALIDATED,
@@ -15,8 +18,11 @@ from sehd_rise.skills.policy import (
     PolicyItem,
     _validate_item_contract,
 )
+from sehd_rise.skills.vocabulary.contracts import (
+    ROUTE_EXECUTED,
+    ROUTE_NO_REGISTERED_RUNTIME_ACTION,
+)
 from sehd_rise.skills.vocabulary.evolution import (
-    REGISTRATION_REASON_NO_ACTION,
     REGISTRY_REQUIRED_VALIDATION,
     enqueue_registry_validation,
     plan_registry_candidates,
@@ -33,22 +39,30 @@ def _facts() -> object:
 
 
 def _attribution() -> SimpleNamespace:
+    # A real L2 cut reason the capability registry owns no runtime action
+    # for, so the policy planner routes it to no_registered_runtime_action —
+    # the same attribution shape the runner forwards in production.
     return SimpleNamespace(
-        reason_code=REGISTRATION_REASON_NO_ACTION,
+        reason_code="appeal_pending_blocked",
         layer="l2_adjudication_policy",
+        evidence={"appeal_status": "pending", "terminal_state": "unresolved"},
         to_dict=lambda: {
-            "reason_code": REGISTRATION_REASON_NO_ACTION,
+            "reason_code": "appeal_pending_blocked",
             "layer": "l2_adjudication_policy",
         },
     )
 
 
-def test_registry_reflection_enqueues_pending_validation(tmp_path) -> None:
+def test_real_cut_reason_opens_registry_reflection_through_route(tmp_path) -> None:
     attribution = _attribution()
     genome = PolicyGenome(genome_id="g1", registry=L2_REGISTRY)
+    plan = plan_policy_candidates(attribution=attribution, genome=genome)
+    assert plan.route_result == ROUTE_NO_REGISTERED_RUNTIME_ACTION
     candidates = plan_registry_candidates(
         attribution=attribution, registry=genome.registry,
+        route_result=plan.route_result,
     )
+    assert candidates
     action_index = next(
         index for index, candidate in enumerate(candidates)
         if (
@@ -70,6 +84,7 @@ def test_registry_reflection_enqueues_pending_validation(tmp_path) -> None:
         facts=_facts(),
         facts_summary={},
         case_id="case_1",
+        route_result=plan.route_result,
         policy_genome=genome,
         mutation_route={},
         run_mutation_call=fake_run_mutation_call,
@@ -93,6 +108,14 @@ def test_registry_reflection_enqueues_pending_validation(tmp_path) -> None:
     assert "downgrade_coverage_instance" not in genome.registry.action_names()
 
 
+def test_registry_planner_gates_on_route_not_attribution_reason() -> None:
+    attribution = _attribution()
+    assert plan_registry_candidates(
+        attribution=attribution, registry=L2_REGISTRY,
+        route_result=ROUTE_EXECUTED,
+    ) == ()
+
+
 def test_promoted_instance_becomes_proposable_and_contract_valid() -> None:
     facts = _facts()
     registered = apply_registry_edit(
@@ -100,7 +123,7 @@ def test_promoted_instance_becomes_proposable_and_contract_valid() -> None:
         operation="register_action",
         target="downgrade_coverage_instance",
         operator="downgrade_coverage",
-        reason_codes=(REGISTRATION_REASON_NO_ACTION,),
+        reason_codes=(ROUTE_NO_REGISTERED_RUNTIME_ACTION,),
     )
     genome = PolicyGenome(genome_id="g2", registry=registered)
     enqueue_registry_validation(
@@ -118,12 +141,12 @@ def test_promoted_instance_becomes_proposable_and_contract_valid() -> None:
 
     second = promote_pending_registry_entries(
         genome=genome, facts=facts, case_id="case_2",
-        reason_code=REGISTRATION_REASON_NO_ACTION,
+        route_result=ROUTE_NO_REGISTERED_RUNTIME_ACTION,
     )
     assert second[0]["outcome"] == "still_pending"
     third = promote_pending_registry_entries(
         genome=genome, facts=facts, case_id="case_3",
-        reason_code=REGISTRATION_REASON_NO_ACTION,
+        route_result=ROUTE_NO_REGISTERED_RUNTIME_ACTION,
     )
     assert third[0]["outcome"] == "promoted"
 

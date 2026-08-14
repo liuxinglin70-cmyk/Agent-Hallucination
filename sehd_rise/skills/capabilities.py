@@ -24,11 +24,29 @@ from typing import Iterable, Mapping, Sequence
 L1_COURT_TRANSFORM_EXECUTOR = "l1_court_transform"
 L1_CONSTRUCTIVE_HARNESS_EXECUTOR = "l1_constructive_harness"
 L2_ADJUDICATION_POLICY_EXECUTOR = "l2_adjudication_policy"
+# Executor id for plans whose intervention point is a provider route with
+# compiled guidance instead of a deterministic opcode (causal D2 table).
+L1_ROUTE_GUIDANCE_EXECUTOR = "l1_route_guidance"
 BINDING_DOMAINS = frozenset({
     "claim_anchor", "candidate", "certificate", "origin", "coverage",
     "boundary", "event",
 })
 BINDING_CARDINALITIES = frozenset({"exactly_one", "one_or_many"})
+
+# Single source of the owner -> detector provider route mapping (design D2).
+# Each evolvable L1 owner's failure edge is produced by exactly one detector
+# provider route; a route-guidance skill for that owner compiles into a
+# route-local guidance block on this route. The causal RouteAddressability
+# table derives its ``producer_route`` from this mapping (causal may import
+# skills), so the detection layer and the causal layer never drift.
+OWNER_PRODUCER_ROUTE: Mapping[str, str] = MappingProxyType({
+    "candidate_trigger": "construct_census_route",
+    "candidate_to_verifier_route": "qualification_route",
+    "causal_link_test": "propagation_route",
+    "atomic_verifier_instruction": "focused_prosecution_route",
+    "evidence_obligation": "focused_prosecution_route",
+    "earliest_origin_tiebreak": "boundary_route",
+})
 
 
 @dataclass(frozen=True)
@@ -742,7 +760,7 @@ def render_capability_contracts(
         failure_shape=failure_shape,
     )
     if not capabilities:
-        return "(no executable capability; return capability_gap)"
+        return "(no deterministic backend; express the repair as a route-guidance edit)"
     lines: list[str] = []
     for capability in capabilities:
         observable, effect = capability.expected_local_effect
@@ -771,6 +789,7 @@ __all__ = [
     "L1_CONSTRUCTIVE_HARNESS_EXECUTOR",
     "L2_ADJUDICATION_POLICY_EXECUTOR",
     "NON_REPAIR_RUNTIME_OPERATIONS",
+    "OWNER_PRODUCER_ROUTE",
     "SKILL_CAPABILITY_REGISTRY",
     "SkillCapability",
     "SkillCapabilityRegistry",

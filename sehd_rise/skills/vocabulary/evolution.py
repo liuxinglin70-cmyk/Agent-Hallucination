@@ -1,10 +1,12 @@
 """L2 vocabulary evolution: constrained registration planning and promotion.
 
-When the deterministic failure classifier attributes a failure to the L2
-layer but no registered runtime action can repair it
-(``no_registered_runtime_action``), the vocabulary itself may be extended.
-This module owns the constrained registration path and the audited
-pending-to-working promotion:
+When the L2 policy planner finds no registered runtime action for an
+attribution (route ``no_registered_runtime_action``), the vocabulary itself
+may be extended. The open/close decision lives solely in that route word
+owned by the policy planner; this module consumes it verbatim and never
+re-derives it from the causal attribution's reason vocabulary. This module
+owns the constrained registration path and the audited pending-to-working
+promotion:
 
 - ``plan_registry_candidates`` enumerates deterministic, precomputed
   registration templates (a new predicate over the facts whitelist, or a new
@@ -68,12 +70,10 @@ from sehd_rise.skills.vocabulary.registry import (
 class FailureAttribution(Protocol):
     """Structural view of an L2 failure classification.
 
-    Only the fields this module consumes are declared. The unified causal
+    Only the shape this module consumes is declared. The unified causal
     object that owns attribution semantics lands with the causal layer;
     skills declares the shape it needs and stays below it.
     """
-    reason_code: str
-    layer: str
 
     def to_dict(self) -> dict[str, Any]: ...
 
@@ -150,16 +150,19 @@ def plan_registry_candidates(
     *,
     attribution: FailureAttribution,
     registry: VocabularyRegistry,
+    route_result: str,
 ) -> tuple[RegistryCandidate, ...]:
     """Enumerate deterministic registration candidates for one attribution.
 
-    Only an L2 attribution with no registered runtime action opens the
-    vocabulary planner. Candidates are confined to the registry's existing
-    court-local operators (for actions) and the facts whitelist (for
-    predicates); the model cannot invent operator semantics or reach outside
-    the addressable facts.
+    ``route_result`` is the policy planner's route word for the same
+    attribution and is the single authority that opens the vocabulary
+    planner: only ``no_registered_runtime_action`` does. The causal
+    attribution's own reason vocabulary plays no part in that decision.
+    Candidates are confined to the registry's existing court-local operators
+    (for actions) and the facts whitelist (for predicates); the model cannot
+    invent operator semantics or reach outside the addressable facts.
     """
-    if attribution.reason_code != REGISTRATION_REASON_NO_ACTION:
+    if route_result != REGISTRATION_REASON_NO_ACTION:
         return ()
     candidates: list[RegistryCandidate] = []
 
@@ -431,13 +434,13 @@ def promote_pending_registry_entries(
     genome: PolicyGenome,
     facts: AdjudicationFacts,
     case_id: str,
-    reason_code: str,
+    route_result: str,
 ) -> list[dict[str, Any]]:
     """Advance pending registry entries that have earned working promotion.
 
-    Fail-closed: only ``no_registered_runtime_action`` observations count
-    (the only route that opens registrations), every counted case must be
-    distinct, a predicate must fire on the current facts, an action
+    Fail-closed: only ``no_registered_runtime_action`` route observations
+    count (the only route that opens registrations), every counted case must
+    be distinct, a predicate must fire on the current facts, an action
     instance must resolve to an executable operator, and the entry must
     still exist and be pending in the registry.  A promotion re-enables the
     entry (``registered``) and marks the queue entry validated; an entry
@@ -445,7 +448,7 @@ def promote_pending_registry_entries(
     considered entry.
     """
     audit: list[dict[str, Any]] = []
-    if reason_code != REGISTRATION_REASON_NO_ACTION:
+    if route_result != REGISTRATION_REASON_NO_ACTION:
         return audit
     for entry in list(genome.pending_queue):
         # Re-read the genome's registry each iteration: a promotion rebinds
@@ -489,7 +492,7 @@ def promote_pending_registry_entries(
                 registry,
                 operation="enable",
                 target=entry.subject_id,
-                reason_codes=(reason_code,),
+                reason_codes=(route_result,),
             )
         except ValueError as exc:
             entry.status = PENDING_STATUS_REJECTED

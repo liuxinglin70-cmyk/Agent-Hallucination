@@ -44,6 +44,7 @@ from sehd_rise.skills.rule import (
     RuleSpec,
     evaluate_condition_spec,
     render_rule,
+    sanitize_route_guidance,
     validate_condition_spec,
     validate_condition_spec_for_domain,
     validate_rule_spec,
@@ -298,6 +299,45 @@ def _resolve_source_binding(
     )
 
 
+def _prevalidate_route_guidance_candidate(
+    candidate: Mapping[str, Any],
+    target_module: str,
+    repair_frontier: Sequence[Mapping[str, Any]],
+) -> str | None:
+    """Admission for a route-guidance candidate (no deterministic backend).
+
+    The intervention is a firewall-checked guidance block for the owner's
+    producer route, so there is no action spec or source binding to validate:
+    admission is the label-free applicability predicate plus a guidance text
+    that crosses the D1 authority firewall, bound to the selected repair edge.
+    """
+    condition_ok, condition_reason = validate_condition_spec(
+        candidate.get("condition_spec")
+    )
+    if not condition_ok:
+        return condition_reason
+    guidance = sanitize_route_guidance(candidate.get("local_guidance"))
+    if not guidance:
+        return "route_guidance_rejected_by_firewall"
+    if repair_frontier:
+        selected_edge_id = str(candidate.get("repair_edge_id") or "")
+        if not selected_edge_id:
+            return "repair_edge_id_missing"
+        selected_edge = next(
+            (
+                dict(edge) for edge in repair_frontier
+                if str(edge.get("edge_id") or "") == selected_edge_id
+            ),
+            None,
+        )
+        if selected_edge is None:
+            return f"repair_edge_id_unknown:{selected_edge_id}"
+        edge_owner = str(selected_edge.get("owner_module") or "")
+        if edge_owner and edge_owner != target_module:
+            return f"repair_edge_owner_mismatch:{edge_owner}->{target_module}"
+    return None
+
+
 def _prevalidate_candidate(
     candidate: Mapping[str, Any],
     allowed_modules: Sequence[str],
@@ -324,6 +364,12 @@ def _prevalidate_candidate(
         return f"target_module_outside_allowed:{target_module or 'missing'}"
     if operation not in {"add_rule", "modify_rule", "remove_rule"}:
         return f"unknown_operation:{operation or 'missing'}"
+    if operation in {"add_rule", "modify_rule"} and str(
+        candidate.get("local_guidance") or ""
+    ).strip():
+        return _prevalidate_route_guidance_candidate(
+            candidate, target_module, repair_frontier,
+        )
     if operation == "remove_rule":
         rule_index = candidate.get("rule_index")
         if rule_index is None:

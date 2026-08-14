@@ -68,15 +68,28 @@ def test_repair_plan_does_not_borrow_foreign_capability() -> None:
     """A provider_artifact_missing cut must not borrow construct_candidate.
 
     ``construct_candidate`` declares gold_false_negative_clean only, so a
-    provider_artifact_missing episode on candidate_trigger compiles zero
-    plans instead of a REPAIRABLE plan the planner could never execute.
+    provider_artifact_missing episode on candidate_trigger compiles a plan
+    with an empty opcode set: the no-borrow invariant is that the foreign
+    operation never enters ``legal_operations``, while the route-addressable
+    owner still answers where to intervene via the guidance executor.
     """
     plans = build_repair_plan(
         _episode("provider_artifact_missing"),
         allowed_modules=("candidate_trigger",),
         evolution_direction="clean_to_error",
     )
-    assert plans == ()
+    assert len(plans) == 1
+    plan = plans[0]
+    assert plan.legal_operations == ()
+    assert plan.executor == "l1_route_guidance"
+    assert "construct_candidate" not in plan.available_deterministic_backends
+    assert plan.target_domain == "claim_anchor"
+    assert plan.effect_contract["producer_route"] == "construct_census_route"
+    assert plan.effect_contract["output_field"] == "anchor_id"
+    assert plan.effect_contract["observable_postcondition"] == (
+        "census_candidate_fingerprints"
+    )
+    assert plan.evaluation_contract["target_predicate"] == "gold_polarity_mismatch"
 
 
 # --- P0-3: domain-scoped condition DSL ------------------------------------
@@ -119,10 +132,12 @@ def test_condition_domain_accepts_bindable_feature() -> None:
 
 
 def test_condition_contract_render_is_domain_scoped() -> None:
-    """The claim_anchor contract never renders candidate_kind to the model."""
+    """The claim_anchor contract offers no candidate_kind predicate line and
+    names it once as explicitly not bindable on the domain."""
     text = render_condition_spec_contract(binding_domains=("claim_anchor",))
-    assert "anchor_has_number" in text
-    assert "candidate_kind" not in text
+    assert "anchor_has_number /" in text
+    assert "- candidate_kind /" not in text
+    assert "- candidate_kind is NOT bindable in the claim_anchor domain" in text
 
 
 # --- P0-1/3: prompt contract primitives agree with the registry ------------

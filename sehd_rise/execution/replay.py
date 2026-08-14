@@ -27,7 +27,11 @@ from sehd_rise.skills.capabilities import (
 )
 from sehd_rise.detection.continuation import execute_constructive_rules
 from sehd_rise.skills.rule import project_result_condition_features
-from sehd_rise.detection.injection import compile_genome_rules
+from sehd_rise.detection.injection import (
+    compile_genome_rules,
+    compile_route_guidance,
+    select_route_guidance,
+)
 from sehd_rise.detection.court.engine import adjudicate_case
 from sehd_rise.detection.detector import _detector_record
 from sehd_rise.detection.egress import conflict_gate_call, l1_call
@@ -89,6 +93,7 @@ def _run_detection_with_genome(
     policy_genome: PolicyGenome | None = None,
     policy_scope: str | None = "working",
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    base_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run PACA-TCL v3.5 with deterministic L1 rule post-processing (plan B).
 
@@ -98,6 +103,16 @@ def _run_detection_with_genome(
     prompts: the frozen detector runs once, then ``execute_l1_rules`` applies
     each rule's compiled transform to the court result. If ``genome`` ==
     baseline (no delta rules), the result is the plain court result unchanged.
+
+    Route-guidance skills are the D2 two-phase counterpart: their applicability
+    predicate names a court-result feature that only exists AFTER the court
+    runs, so a guidance can only be gated against a prior result. When
+    ``base_result`` is supplied (source/canary/contrast replay), each guidance's
+    ``condition_spec`` is evaluated against that prior court result and only the
+    matching entries are injected into the target provider route. Without a
+    prior result (the initial base detection) no guidance is injected, because
+    there is nothing to evaluate its predicate against — an unconditional
+    injection would leak an accepted guidance onto every case.
     """
     baseline = create_baseline_genome()
 
@@ -127,6 +142,33 @@ def _run_detection_with_genome(
         policy_genome.registry if policy_genome is not None else None
     )
 
+    route_guidance: dict[str, tuple[str, ...]] | None = None
+    compiled_guidance = compile_route_guidance(genome, baseline=baseline)
+    if compiled_guidance:
+        from sehd_rise.skills.capabilities import OWNER_PRODUCER_ROUTE
+        prior = base_result
+        if prior is None:
+            # Two-phase gate: the guidance's applicability predicate names a
+            # court-result feature, so it can only be evaluated against an
+            # already-computed court result. Run one guidance-free pass to
+            # obtain that prior, then decide which guidance (if any) to inject.
+            prior = adjudicate_case(
+                case_id=case_id, record=record, config=config,
+                policy_items=policy_items, policy_registry=policy_registry,
+                provider_usage_ledger=provider_usage_ledger, route_guidance=None,
+            )
+            if not isinstance(prior, dict):
+                raise RuntimeError("detector returned a non-object result")
+        selected = select_route_guidance(
+            compiled_guidance, result=prior, record=record,
+        )
+        if selected:
+            route_guidance = {
+                OWNER_PRODUCER_ROUTE[owner]: blocks
+                for owner, blocks in selected.items()
+                if owner in OWNER_PRODUCER_ROUTE
+            }
+
     result = adjudicate_case(
         case_id=case_id,
         record=record,
@@ -134,6 +176,7 @@ def _run_detection_with_genome(
         policy_items=policy_items,
         policy_registry=policy_registry,
         provider_usage_ledger=provider_usage_ledger,
+        route_guidance=route_guidance,
     )
     if not isinstance(result, dict):
         raise RuntimeError("detector returned a non-object result")
@@ -325,8 +368,16 @@ def _run_counted_detection(
     provider_usage_ledger: ProviderUsageLedger,
     policy_genome: PolicyGenome | None = None,
     policy_scope: str | None = "working",
+    base_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run one detector call in a counted, label-free envelope."""
+    """Run one detector call in a counted, label-free envelope.
+
+    ``base_result`` is the prior court result used to gate route-guidance
+    skills: only a guidance whose condition matches the prior result is
+    injected into the replay. Without it (initial base detection) no guidance
+    is injected — an unconditional injection would leak an accepted guidance
+    onto every case.
+    """
     budget_usage["provider_calls"] += 1
     budget_usage["detector_calls"] += 1
     budget_field = {
@@ -343,6 +394,8 @@ def _run_counted_detection(
     if policy_genome is not None:
         replay_kwargs["policy_genome"] = policy_genome
         replay_kwargs["policy_scope"] = policy_scope
+    if base_result is not None:
+        replay_kwargs["base_result"] = base_result
     result = _run_detection_with_genome(
         genome=genome,
         case_id=case_id,

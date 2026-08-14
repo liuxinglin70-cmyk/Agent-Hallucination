@@ -58,6 +58,7 @@ from sehd_rise.causal.cut import (
     REASON_RESPONSIBLE_STEP_MISSING,
     CausalCut,
 )
+from sehd_rise.causal.route_addressability import address_for
 from sehd_rise.causal.signals import DetectionSignal
 from sehd_rise.skills.action import MODULE_OUTPUT_OBJECT, MODULE_ROUTE_IDS
 from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
@@ -91,9 +92,10 @@ _SYNTHESIZED_FIELD_REASONS: dict[str, tuple[str, str]] = {
     REASON_GOLD_FALSE_POSITIVE: (
         "evidence_obligation", "coverage_state",
     ),
-    REASON_GOLD_FALSE_NEGATIVE_CLEAN: (
-        "candidate_trigger", "anchor_id",
-    ),
+    # ``REASON_GOLD_FALSE_NEGATIVE_CLEAN`` is handled inline in
+    # ``_compile_failure_edges``: its missing object depends on the owner
+    # (candidate_trigger misses a candidate; evidence_obligation misses an
+    # error_certificate), so a single static field cannot describe it.
 }
 
 _EVIDENCE_REF_KEYS = (
@@ -837,10 +839,16 @@ def _field_is_executable(
     operations = _direction_operations(
         module=module, evolution_direction=evolution_direction
     )
-    return any(
+    if any(
         operation in operations and field in targets
         for operation, targets in MODULE_OPERATION_TARGETS.get(module, {}).items()
-    )
+    ):
+        return True
+    # No deterministic backend targets this field. The owner may still own a
+    # replayable intervention point (design D2): the edge then compiles as a
+    # route-guidance locus instead of being dropped from the frontier. The
+    # capability registry no longer decides admission.
+    return address_for(module) is not None
 
 
 def _terminal_blocking_predicates(
@@ -971,6 +979,17 @@ def _compile_failure_edges(
                 raw_fields = row.get(key)
                 if isinstance(raw_fields, (list, tuple, set, frozenset)):
                     field_values.extend(str(value) for value in raw_fields)
+        elif cut.reason_code == REASON_GOLD_FALSE_NEGATIVE_CLEAN:
+            # The missing object is owner-dependent, so no static synthesized
+            # field can name it: candidate_trigger misses a candidate while the
+            # evidence/verifier pair misses an error certificate (whose
+            # intervention point is the producer route, not a field opcode).
+            if owner == "candidate_trigger":
+                field_values.append("anchor_id")
+            else:
+                field_values.append(
+                    MODULE_OUTPUT_OBJECT.get(owner, "error_certificate")
+                )
         elif cut.reason_code in _SYNTHESIZED_FIELD_REASONS:
             synth_owner, synth_field = _SYNTHESIZED_FIELD_REASONS[cut.reason_code]
             if cut.reason_code == REASON_QUARANTINE_PATTERN:
@@ -1008,7 +1027,12 @@ def _compile_failure_edges(
                 )
             )
             capability = matching_capabilities[0] if matching_capabilities else None
-            routes = capability.route_ids if capability else MODULE_ROUTE_IDS.get(owner, ())
+            address = address_for(owner)
+            routes = (
+                capability.route_ids
+                if capability else
+                (address.producer_route,) if address else MODULE_ROUTE_IDS.get(owner, ())
+            )
             output_object = (
                 capability.output_object
                 if capability else MODULE_OUTPUT_OBJECT.get(owner, owner)

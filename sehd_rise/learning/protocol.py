@@ -229,12 +229,22 @@ class RepairIntent:
 
 @dataclass(frozen=True)
 class ExecutableCandidate:
-    """How the current capability space implements one RepairIntent."""
+    """How the current capability space implements one RepairIntent.
 
-    operation: str
-    target_module: str
+    ``operation`` names a deterministic backend opcode; it is empty for a
+    route-guidance candidate, whose intervention point is the provider route
+    named by the RouteAddressability table and whose semantic payload is
+    ``mechanism`` + ``guidance`` + ``expected_local_effect`` (the D1 typed
+    contract compiled into a route-local guidance block, not free prose).
+    """
+
+    operation: str = ""
+    target_module: str = ""
     action: str = ""
     condition: str = ""
+    mechanism: str = ""
+    guidance: str = ""
+    expected_local_effect: str = ""
     stage: str = STAGE_RAW_HYPOTHESIS
     failure_class: str = FAILURE_CLASS_EXECUTABLE
     reason: str = ""
@@ -245,6 +255,9 @@ class ExecutableCandidate:
             "target_module": self.target_module,
             "action": self.action,
             "condition": self.condition,
+            "mechanism": self.mechanism,
+            "guidance": self.guidance,
+            "expected_local_effect": self.expected_local_effect,
             "stage": self.stage,
             "failure_class": self.failure_class,
             "reason": self.reason,

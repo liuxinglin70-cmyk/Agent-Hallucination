@@ -63,7 +63,11 @@ def test_boundary_domain_binds_the_court_boundary_path() -> None:
     bindings = project_binding_universe(result, domain="boundary")
     assert len(bindings) == 1
     assert bindings[0].identifiers["boundary_id"] == "event_009"
-    assert bindings[0].features["state"] == "verified_clean"
+    # The court-controlled payload keys (state, opaque event identities,
+    # verdict rationale) never enter the conditionable feature surface.
+    assert set(bindings[0].features) <= frozenset({
+        "event_role", "has_tool_call", "has_tool_error", "has_tool_retry",
+    })
     # A result carrying only the retired clean_boundary key binds nothing.
     retired_key = {"clean_boundary": {"state": "verified_clean"}}
     assert project_binding_universe(retired_key, domain="boundary") == ()

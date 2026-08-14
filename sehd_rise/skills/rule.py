@@ -22,13 +22,13 @@ from typing import Any, Mapping, Sequence
 
 from sehd_rise.skills.vocabulary.charters import (
     MODULE_ACTION_OPCODES,
-    MODULE_OPERATION_TARGETS,
     validate_action_surface,
 )
 from sehd_rise.skills.vocabulary.contracts import (
     ALLOWED_VERDICTS,
-    DEFENSE_RELATIONAL_INVARIANTS,
-    ERROR_RELATIONAL_INVARIANTS,
+    CONDITION_FEATURES,
+    CONDITION_STAGE_RETRY_DIAGNOSTIC,
+    DOMAIN_CONDITION_FEATURES,
     FINAL_VERDICT_RE,
     FORBIDDEN_CONTENT_MARKERS,
     INSTANCE_ID_RE,
@@ -95,6 +95,58 @@ _ACTION_POISON_RE = re.compile(
     r"\b[a-z][a-z_]+/\d+\b",
     re.IGNORECASE,
 )
+
+# Authority-boundary markers for route-guidance text (design D1): a skill
+# may steer a target provider route's verification principle but never
+# instruct it to author evidence, certificates, or a verdict — those stay
+# with the deterministic validator and proof court. The optional-article
+# group absorbs "a"/"an"/"the" so "create a certificate" and "create
+# certificate" are the same violation.
+_GUIDANCE_AUTHORITY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"create\s+(?:a\s+|an\s+|the\s+)?certificate"), "create_certificate"),
+    (re.compile(r"construct\s+(?:a\s+|an\s+|the\s+)?certificate"), "construct_certificate"),
+    (re.compile(r"emit\s+(?:a\s+|an\s+|the\s+)?certificate"), "emit_certificate"),
+    (re.compile(r"(?:create|fabricate|write|invent)\s+(?:a\s+|an\s+|the\s+)?evidence"), "author_evidence"),
+    (re.compile(r"mark\s+this\s+example"), "mark_this_example"),
+    (re.compile(r"(?:force|set)\s+verdict"), "force_verdict"),
+    (re.compile(r"return\s+(?:clean|error|unresolved)"), "return_verdict"),
+    (re.compile(r"创建证书|构造证书|伪造证据|写入证据|标记为幻觉|强制判定|直接判定|直接输出"), "zh_authority_violation"),
+)
+
+
+def validate_route_guidance(content: str) -> tuple[bool, str]:
+    """Fail-closed firewall for compiled route-guidance text (design D1).
+
+    The guidance is a typed skill's ``local_guidance`` field compiled into a
+    provider-route block; it must never carry verdict emission, evidence or
+    certificate construction, case/gold identity, or a prompt-injection
+    override. The rejection reason is closed vocabulary so a poisoned skill
+    is discarded at compile time, never surfaced to the provider.
+    """
+    normalized = " ".join(str(content or "").split())
+    if not normalized:
+        return True, ""
+    if len(normalized) > 2000:
+        return False, "route_guidance_too_long"
+    lowered = normalized.lower()
+    for marker in FORBIDDEN_CONTENT_MARKERS:
+        if marker in lowered:
+            return False, f"route_guidance_forbidden_content:{marker}"
+    if _ACTION_POISON_RE.search(normalized):
+        return False, "route_guidance_prompt_or_case_pollution"
+    if FINAL_VERDICT_RE.search(normalized):
+        return False, "route_guidance_verdict_instruction"
+    for pattern, token in _GUIDANCE_AUTHORITY_PATTERNS:
+        if pattern.search(lowered):
+            return False, f"route_guidance_authority_violation:{token}"
+    return True, ""
+
+
+def sanitize_route_guidance(content: str) -> str:
+    """Return a firewall-clean route-guidance text or an empty sentinel."""
+    normalized = " ".join(str(content or "").split())[:2000]
+    valid, _ = validate_route_guidance(normalized)
+    return normalized if valid else ""
 
 
 @dataclass(frozen=True)
@@ -290,83 +342,16 @@ def rules_semantic_overlap(spec_a: RuleSpec, spec_b: RuleSpec) -> float:
 
 SCHEMA_VERSION = "sehd.condition_spec.v3"
 
-_CANDIDATE_KINDS = frozenset({
-    "omission", "unsupported_claim", "contradiction", "invalid_tool_use",
-    "invalid_action", "other",
-})
-_AXES = frozenset({"F", "Fa", "P", "S"})
-# Census ``module_tag``: the AgentHallu category the candidate was assigned.
-# Normalized from the census schema's hyphenated tags ("Tool-Use" ->
-# "tool_use") so a rule can discriminate on hallucination category.
-_MODULE_TAGS = frozenset({
-    "planning", "retrieval", "reasoning", "tool_use", "human_interaction",
-    "loop_detection", "redundancy_check", "factuality", "faithfulness",
-    "completion", "scope",
-})
-_COVERAGE_STATES = frozenset({"none", "incomplete", "complete", "unknown"})
-_QUALIFICATION_STATES = frozenset({"held", "qualified", "rejected", "unknown"})
-_EVENT_ROLES = frozenset({"system", "user", "assistant", "tool"})
-_ANCHOR_KINDS = frozenset({
-    "assistant_assertion", "tool_grounded_claim", "question", "code",
-})
-_RUNTIME_FIELDS = frozenset({
-    str(target)
-    for operations in MODULE_OPERATION_TARGETS.values()
-    for targets in operations.values()
-    for target in targets
-})
-_INVARIANTS = frozenset(
-    set(ERROR_RELATIONAL_INVARIANTS) | set(DEFENSE_RELATIONAL_INVARIANTS)
-)
-
-# Features available in the FIRST provider call (pre-call causal antecedents).
-# These exist in the initial provider input before any failure or retry, so a
-# Skill built on them can prevent the first failure, not just steer a retry.
-_FIRST_CALL_FEATURES = frozenset({
-    "candidate_kind", "candidate_axis", "event_role",
-    "has_tool_call", "has_tool_error", "has_tool_retry",
-})
-
-# Features that only appear in retry-diagnostic prompts (after a failure).
-# ``missing_field`` and ``failed_invariant`` are projected from audit failures
-# that exist only after the validator has run and rejected content. A Skill
-# built on them can only trigger in the repair-retry stage, not prevent the
-# first failure — they are retry-diagnostic, not causal antecedents.
-_RETRY_DIAGNOSTIC_FEATURES = frozenset({
-    "missing_field", "failed_invariant",
-})
-
-# Set-valued features use ``contains``. Scalar/boolean features use ``equals``.
-_FEATURE_CONTRACT: Mapping[str, tuple[str, frozenset[Any]]] = {
-    "anchor_kind": ("contains", _ANCHOR_KINDS),
-    "anchor_role": ("contains", frozenset({"assistant"})),
-    "anchor_depends_on_tool": ("equals", frozenset({True, False})),
-    "anchor_has_number": ("equals", frozenset({True, False})),
-    "anchor_has_citation": ("equals", frozenset({True, False})),
-    "anchor_is_final_assistant": ("equals", frozenset({True, False})),
-    "anchor_is_first_in_event": ("equals", frozenset({True, False})),
-    "anchor_is_last_in_event": ("equals", frozenset({True, False})),
-    "candidate_kind": ("contains", _CANDIDATE_KINDS),
-    "candidate_axis": ("contains", _AXES),
-    "module_tag": ("contains", _MODULE_TAGS),
-    "missing_field": ("contains", _RUNTIME_FIELDS),
-    "failed_invariant": ("contains", _INVARIANTS),
-    "coverage_state": ("contains", _COVERAGE_STATES),
-    "coverage_side": ("contains", frozenset({"prosecution", "defense"})),
-    "qualification_state": ("contains", _QUALIFICATION_STATES),
-    "evidence_verified": ("equals", frozenset({True, False})),
-    "event_role": ("contains", _EVENT_ROLES),
-    "has_tool_call": ("equals", frozenset({True, False})),
-    "has_tool_error": ("equals", frozenset({True, False})),
-    "has_tool_retry": ("equals", frozenset({True, False})),
-}
+# The condition predicate vocabulary (feature names, operators, value
+# domains, emitting binding domains, call stage) is owned by
+# skills.vocabulary.contracts.CONDITION_FEATURES; everything below derives
+# from it so this module can never drift from the projection contract.
 
 # Boolean-typed atom features: their ``value`` must be a real bool, and the
-# value_type must be "boolean". Kept as one closed set so the feature contract
-# and the validator cannot drift apart on which atoms are scalar.
+# value_type must be "boolean".
 _BOOLEAN_FEATURES = frozenset(
-    name for name, (operator, _values) in _FEATURE_CONTRACT.items()
-    if operator == "equals"
+    name for name, spec in CONDITION_FEATURES.items()
+    if spec.value_type == "boolean"
 )
 
 # Typed boolean composition: ``atom`` is the single-predicate form;
@@ -376,51 +361,6 @@ _COMBINATORS = frozenset({"atom", "all_of", "any_of", "not"})
 # L1 evaluates one proof-court result projection. Instance operations then
 # resolve a matched atom to an existing candidate/certificate/origin.
 _BINDINGS = frozenset({"entity_scoped"})
-
-# Each capability binding domain projects only these condition features. A
-# condition_spec feature outside its target domain's set cannot bind: the
-# ``claim_anchor`` domain (construct_candidate) observes only the eight span
-# facts, so a ``candidate_kind`` predicate on it is un-bindable regardless of
-# whether the global contract registers the feature. This table is the single
-# source of truth for both the prompt contract render and the domain-specific
-# prevalidation; it mirrors the feature set each branch of
-# ``skills.binding.project_binding_universe`` actually emits.
-_DOMAIN_FEATURES: Mapping[str, frozenset[str]] = {
-    "claim_anchor": frozenset({
-        "anchor_kind", "anchor_role", "anchor_depends_on_tool",
-        "anchor_has_number", "anchor_has_citation",
-        "anchor_is_final_assistant", "anchor_is_first_in_event",
-        "anchor_is_last_in_event",
-    }),
-    "candidate": frozenset({
-        "candidate_kind", "candidate_axis", "module_tag",
-        "qualification_state", "missing_field", "failed_invariant",
-        "evidence_verified", "event_role", "has_tool_call",
-        "has_tool_error", "has_tool_retry",
-    }),
-    "certificate": frozenset({
-        "candidate_kind", "candidate_axis", "module_tag",
-        "qualification_state", "missing_field", "failed_invariant",
-        "evidence_verified", "event_role", "has_tool_call",
-        "has_tool_error", "has_tool_retry",
-    }),
-    "origin": frozenset({
-        "candidate_kind", "candidate_axis", "module_tag",
-        "qualification_state", "missing_field", "failed_invariant",
-        "evidence_verified", "event_role", "has_tool_call",
-        "has_tool_error", "has_tool_retry",
-    }),
-    "coverage": frozenset({
-        "coverage_state", "coverage_side", "event_role", "has_tool_call",
-        "has_tool_error", "has_tool_retry",
-    }),
-    "boundary": frozenset({
-        "event_role", "has_tool_call", "has_tool_error", "has_tool_retry",
-    }),
-    "event": frozenset({
-        "event_role", "has_tool_call", "has_tool_error", "has_tool_retry",
-    }),
-}
 
 
 @dataclass(frozen=True)
@@ -483,11 +423,10 @@ class ConditionEvaluation:
 
 def _validate_atom_spec(spec: ConditionSpec) -> tuple[bool, str]:
     """Validate a single atomic predicate (v1 form or v2 atom combinator)."""
-    contract = _FEATURE_CONTRACT.get(spec.feature)
+    contract = CONDITION_FEATURES.get(spec.feature)
     if contract is None:
         return False, f"condition_feature_unregistered:{spec.feature or 'missing'}"
-    operator, allowed_values = contract
-    if spec.operator != operator:
+    if spec.operator not in contract.operators:
         return False, (
             f"condition_operator_invalid:{spec.feature}:{spec.operator or 'missing'}"
         )
@@ -501,7 +440,7 @@ def _validate_atom_spec(spec: ConditionSpec) -> tuple[bool, str]:
         if spec.value_type != "string":
             return False, f"condition_value_type_invalid:{spec.feature}:{spec.value_type}"
         normalized_value = str(normalized_value)
-    if normalized_value not in allowed_values:
+    if normalized_value not in contract.values:
         return False, f"condition_value_unregistered:{spec.feature}:{normalized_value}"
     return True, ""
 
@@ -575,7 +514,7 @@ def validate_condition_spec_for_domain(
     """
     if not isinstance(value, Mapping):
         return False, "condition_spec_not_object"
-    domain_features = _DOMAIN_FEATURES.get(str(domain))
+    domain_features = DOMAIN_CONDITION_FEATURES.get(str(domain))
     if domain_features is None:
         return False, f"condition_domain_unregistered:{domain or 'missing'}"
     spec = ConditionSpec.from_dict(value)
@@ -592,17 +531,18 @@ def _render_feature_lines(features: frozenset[str]) -> list[str]:
     """Render one predicate line per feature, ordered for determinism."""
     lines: list[str] = []
     for feature in sorted(features):
-        operator, values = _FEATURE_CONTRACT[feature]
+        contract = CONDITION_FEATURES[feature]
+        operators = " | ".join(sorted(contract.operators))
         rendered = ", ".join(
             json.dumps(value, ensure_ascii=False)
-            for value in sorted(values, key=lambda item: str(item))
+            for value in sorted(contract.values, key=lambda item: str(item))
         )
         tag = (
             " (retry-diagnostic: only present after a failure)"
-            if feature in _RETRY_DIAGNOSTIC_FEATURES
+            if contract.stage == CONDITION_STAGE_RETRY_DIAGNOSTIC
             else " (first-call: present before any failure)"
         )
-        lines.append(f"- {feature} / {operator} / one of: {rendered}{tag}")
+        lines.append(f"- {feature} / {operators} / one of: {rendered}{tag}")
     return lines
 
 
@@ -630,10 +570,20 @@ def render_condition_spec_contract(
     if domains:
         features: set[str] = set()
         for domain in domains:
-            features.update(_DOMAIN_FEATURES.get(domain, ()))
+            features.update(DOMAIN_CONDITION_FEATURES.get(domain, ()))
         lines.extend(_render_feature_lines(frozenset(features)))
+        foreign = sorted(set(CONDITION_FEATURES) - features)
+        if foreign:
+            # Naming the legal-but-unbindable features explicitly is cheaper
+            # than failing closed on the model's guess and spending a retry.
+            lines.append("")
+            joined = "/".join(domains)
+            lines.extend(
+                f"- {feature} is NOT bindable in the {joined} domain"
+                for feature in foreign
+            )
     else:
-        lines.extend(_render_feature_lines(frozenset(_FEATURE_CONTRACT)))
+        lines.extend(_render_feature_lines(frozenset(CONDITION_FEATURES)))
     lines.extend([
         "",
         "For typed boolean composition, use combinator all_of / any_of / not",
@@ -672,12 +622,12 @@ def normalize_module_tag(value: Any) -> str:
     """Fold the census ``module_tag`` enum to its canonical closed value.
 
     The census emits hyphenated, Title-Case tags ("Tool-Use"); normalization
-    lowercases and collapses separators so the closed ``_MODULE_TAGS`` set
-    matches without fuzzy keyword guessing. Anything unregistered returns ""
-    so a stray tag never becomes a spurious match.
+    lowercases and collapses separators so the closed module-tag set matches
+    without fuzzy keyword guessing. Anything unregistered returns "" so a
+    stray tag never becomes a spurious match.
     """
     tag = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
-    return tag if tag in _MODULE_TAGS else ""
+    return tag if tag in CONDITION_FEATURES["module_tag"].values else ""
 
 
 def project_result_condition_features(
@@ -699,6 +649,11 @@ def project_result_condition_features(
         "module_tag": set(), "coverage_state": set(), "missing_field": set(),
         "failed_invariant": set(), "event_role": set(),
     }
+    axis_values = CONDITION_FEATURES["candidate_axis"].values
+    coverage_values = CONDITION_FEATURES["coverage_state"].values
+    runtime_fields = CONDITION_FEATURES["missing_field"].values
+    invariants = CONDITION_FEATURES["failed_invariant"].values
+    event_roles = CONDITION_FEATURES["event_role"].values
 
     census = result.get("census")
     if isinstance(census, list):
@@ -712,26 +667,26 @@ def project_result_condition_features(
             axes = row.get("axes")
             values = axes if isinstance(axes, (list, tuple, set)) else (axes,)
             sets["candidate_axis"].update(
-                str(item) for item in values if str(item) in _AXES
+                str(item) for item in values if str(item) in axis_values
             )
 
     proof = result.get("proof_adjudication")
     if isinstance(proof, Mapping):
         for key in ("prosecution_coverage", "defense_coverage"):
             value = str(proof.get(key) or "unknown").lower()
-            if value in _COVERAGE_STATES:
+            if value in coverage_values:
                 sets["coverage_state"].add(value)
         for audit in proof.get("error_audits") or []:
             if not isinstance(audit, Mapping):
                 continue
             for value in audit.get("missing_fields") or []:
-                if str(value) in _RUNTIME_FIELDS:
+                if str(value) in runtime_fields:
                     sets["missing_field"].add(str(value))
             for value in audit.get("failed_invariants") or []:
-                if str(value) in _INVARIANTS:
+                if str(value) in invariants:
                     sets["failed_invariant"].add(str(value))
             for value in audit.get("failed_checks") or []:
-                if str(value) in _INVARIANTS:
+                if str(value) in invariants:
                     sets["failed_invariant"].add(str(value))
 
     has_tool_call = False
@@ -742,7 +697,7 @@ def project_result_condition_features(
             if not isinstance(row, Mapping):
                 continue
             role = str(row.get("role") or "")
-            if role in _EVENT_ROLES:
+            if role in event_roles:
                 sets["event_role"].add(role)
             calls = row.get("tool_calls")
             if isinstance(calls, list) and calls:
@@ -786,6 +741,10 @@ def evaluate_condition_spec(
                 isinstance(observed, (list, tuple, set, frozenset))
                 and spec.value in observed
             )
+        elif spec.operator == "not_equals":
+            # An absent feature never satisfies not_equals: absence is not
+            # a value.
+            matched = observed is not None and observed != spec.value
         else:
             matched = observed == spec.value
         return ConditionEvaluation(

@@ -274,7 +274,33 @@ def _empty_candidate_path(state: str) -> dict[str, Any]:
     }
 
 
-def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], provider_usage_ledger: ProviderUsageLedger | None = None) -> dict[str, Any]:
+def _guidance_suffix(
+    route_name: str,
+    route_guidance: Mapping[str, tuple[str, ...]] | None,
+) -> str:
+    """Compile framework-owned guidance into a route-local system block.
+
+    ``route_guidance`` is keyed by detector route name (the config key), each
+    value being firewall-checked guidance texts for that route. Guidance
+    steers the route's verification principle; it never carries authority
+    instructions (the compile-time firewall already rejected those). An
+    absent or empty entry returns the plain system prompt unchanged.
+    """
+    if not route_guidance:
+        return ""
+    blocks = route_guidance.get(route_name)
+    if not blocks:
+        return ""
+    lines = [
+        "",
+        "[route guidance — framework-compiled skill; follow the verification "
+        "principle below, never author evidence/certificates/verdicts]",
+    ]
+    lines.extend(f"{index}. {block}" for index, block in enumerate(blocks, 1))
+    return "\n".join(lines)
+
+
+def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dict[str, Any], provider_usage_ledger: ProviderUsageLedger | None = None, route_guidance: Mapping[str, tuple[str, ...]] | None = None) -> dict[str, Any]:
     built = build_packet(record)
     providers: dict[str, Any] = {}
     try:
@@ -296,7 +322,8 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
     try:
         if census:
             q_value, providers["qualification"] = detection_call(
-                route=config["qualification_route"], system=QUALIFICATION_SYSTEM,
+                route=config["qualification_route"],
+                system=QUALIFICATION_SYSTEM + _guidance_suffix("qualification_route", route_guidance),
                 user=_provider_user(built, census=census),
                 purpose="detector:qualification", ledger=provider_usage_ledger,
             )
@@ -309,7 +336,8 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
             qualified_census = [row for row in census if row["candidate_id"] in qualified_ids]
             if qualified_census:
                 p_value, providers["propagation"] = detection_call(
-                    route=config["propagation_route"], system=PROPAGATION_SYSTEM,
+                    route=config["propagation_route"],
+                    system=PROPAGATION_SYSTEM + _guidance_suffix("propagation_route", route_guidance),
                     user=_provider_user(built, census=qualified_census, qualification=qualified),
                     purpose="detector:propagation", ledger=provider_usage_ledger,
                 )
@@ -332,7 +360,9 @@ def adjudicate_layered_case(*, case_id: str, record: dict[str, Any], config: dic
 
     try:
         boundary_value, providers["boundary"] = detection_call(
-            route=config["boundary_route"], system=BOUNDARY_SYSTEM, user=_provider_user(built),
+            route=config["boundary_route"],
+            system=BOUNDARY_SYSTEM + _guidance_suffix("boundary_route", route_guidance),
+            user=_provider_user(built),
             purpose="detector:boundary", ledger=provider_usage_ledger,
         )
         boundary_path = _validate_boundary(boundary_value, built)
@@ -809,6 +839,7 @@ def _run_focused_prosecution_for_candidate(
     *, candidate: dict[str, Any], built: dict[str, Any], base: dict[str, Any],
     config: dict[str, Any], max_retries: int | None = None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    route_guidance: Mapping[str, tuple[str, ...]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Run one candidate through a uniform envelope + certificate repair loop.
 
@@ -832,7 +863,9 @@ def _run_focused_prosecution_for_candidate(
 
     for attempt in range(max_retries + 1):
         if attempt == 0:
-            system = FOCUSED_PROSECUTION_SYSTEM
+            system = FOCUSED_PROSECUTION_SYSTEM + _guidance_suffix(
+                "focused_prosecution_route", route_guidance,
+            )
             user = _focused_prosecution_user(
                 built=built, candidate=candidate, base=base,
             )
@@ -955,6 +988,7 @@ def _run_focused_prosecution_for_candidate(
 def _run_focused_prosecution(
     *, built: dict[str, Any], base: dict[str, Any], config: dict[str, Any],
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    route_guidance: Mapping[str, tuple[str, ...]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Run focused prosecution for all candidates in parallel.
 
@@ -976,6 +1010,7 @@ def _run_focused_prosecution(
                 _run_focused_prosecution_for_candidate,
                 candidate=candidate, built=built, base=base,
                 config=config, provider_usage_ledger=provider_usage_ledger,
+                route_guidance=route_guidance,
             ): candidate
             for candidate in candidates
         }
@@ -2299,6 +2334,7 @@ def adjudicate_case(
     policy_items: Sequence[Mapping[str, Any]] | None = None,
     policy_registry=None,
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    route_guidance: Mapping[str, tuple[str, ...]] | None = None,
 ) -> dict[str, Any]:
     built = build_packet(record)
 
@@ -2307,15 +2343,17 @@ def adjudicate_case(
         base_future = executor.submit(
             adjudicate_layered_case, case_id=case_id, record=record, config=config,
             provider_usage_ledger=provider_usage_ledger,
+            route_guidance=route_guidance,
         )
         construct_future = executor.submit(
-            detection_call, route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
+            detection_call, route=config["construct_census_route"],
+            system=CONSTRUCT_CENSUS_SYSTEM + _guidance_suffix("construct_census_route", route_guidance),
             user=_provider_user(built),
             purpose="detector:construct_census", ledger=provider_usage_ledger,
         )
         base = base_future.result()
         construct_census, construct_audit, construct_provider = (
-            _resolve_construct_census(construct_future, built, config, provider_usage_ledger)
+            _resolve_construct_census(construct_future, built, config, provider_usage_ledger, route_guidance=route_guidance)
         )
 
     construct_authoritative, construct_authority_reasons = _construct_authority(
@@ -2351,9 +2389,11 @@ def adjudicate_case(
                 _run_focused_prosecution,
                 built=built, base=base, config=config,
                 provider_usage_ledger=provider_usage_ledger,
+                route_guidance=route_guidance,
             )
             defense_future = executor.submit(
-                detection_call, route=config["defense_route"], system=DEFENSE_SYSTEM,
+                detection_call, route=config["defense_route"],
+                system=DEFENSE_SYSTEM + _guidance_suffix("defense_route", route_guidance),
                 user=user,
                 purpose="detector:defense", ledger=provider_usage_ledger,
             )
@@ -2593,6 +2633,7 @@ def _resolve_construct_census(
     construct_future, built: dict[str, Any],
     config: dict[str, Any],
     provider_usage_ledger: ProviderUsageLedger | None = None,
+    route_guidance: Mapping[str, tuple[str, ...]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     """Resolve the construct census from a concurrent provider future.
 
@@ -2638,7 +2679,8 @@ def _resolve_construct_census(
             )
             repair_user = _provider_user(built) + repair_hint
             repair_value, repair_provider = detection_call(
-                route=config["construct_census_route"], system=CONSTRUCT_CENSUS_SYSTEM,
+                route=config["construct_census_route"],
+                system=CONSTRUCT_CENSUS_SYSTEM + _guidance_suffix("construct_census_route", route_guidance),
                 user=repair_user,
                 purpose="detector:construct_census", ledger=provider_usage_ledger,
             )

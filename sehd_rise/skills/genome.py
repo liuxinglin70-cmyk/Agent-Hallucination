@@ -43,6 +43,7 @@ from sehd_rise.skills.rule import (
     RuleSpec,
     render_rule,
     sanitize_condition_spec,
+    sanitize_route_guidance,
     validate_condition_spec,
     validate_condition_spec_for_domain,
     validate_rule_spec,
@@ -488,6 +489,10 @@ class SkillModule:
             )
         if "repair_edge" in meta:
             meta["repair_edge"] = _sanitize_repair_edge(meta.get("repair_edge"))
+        if "route_guidance" in meta:
+            meta["route_guidance"] = sanitize_route_guidance(
+                meta.get("route_guidance")
+            )
 
     @property
     def capacity(self) -> int:
@@ -575,6 +580,14 @@ class SkillEdit:
     condition_spec: dict[str, Any] = field(default_factory=dict)
     binding_proof: dict[str, Any] = field(default_factory=dict)
     repair_edge: dict[str, Any] = field(default_factory=dict)
+    # Route-guidance semantic payload (design D1): a route-guidance skill has
+    # no deterministic backend, so its intervention is a compiled, firewall-
+    # checked guidance block for the owner's producer route. ``mechanism`` and
+    # ``expected_local_effect`` are audit fields; ``route_guidance`` is the
+    # text the injection layer compiles into the provider route.
+    route_guidance: str = ""
+    failure_mechanism: str = ""
+    expected_local_effect: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -611,6 +624,9 @@ class SkillEdit:
             "condition_spec": sanitize_condition_spec(self.condition_spec),
             "binding_proof": sanitize_binding_proof(self.binding_proof),
             "repair_edge": _sanitize_repair_edge(self.repair_edge),
+            "route_guidance": sanitize_route_guidance(self.route_guidance),
+            "failure_mechanism": self.failure_mechanism[:500],
+            "expected_local_effect": self.expected_local_effect[:240],
         }
 
     @classmethod
@@ -653,6 +669,11 @@ class SkillEdit:
             condition_spec=sanitize_condition_spec(data.get("condition_spec")),
             binding_proof=sanitize_binding_proof(data.get("binding_proof")),
             repair_edge=_sanitize_repair_edge(data.get("repair_edge")),
+            route_guidance=sanitize_route_guidance(data.get("route_guidance")),
+            failure_mechanism=str(data.get("failure_mechanism") or "")[:500],
+            expected_local_effect=str(
+                data.get("expected_local_effect") or ""
+            )[:240],
         )
 
 
@@ -809,6 +830,34 @@ def _validate_persisted_rule_slots(
     return True, ""
 
 
+def _validate_route_guidance_edit(edit: SkillEdit) -> tuple[bool, str]:
+    """Validate a route-guidance edit: applicability + firewall-clean guidance.
+
+    The applicability predicate is the label-free ``condition_spec``; the
+    guidance text must pass the D1 authority firewall (no verdict, evidence,
+    certificate construction, case/gold identity). Neither an action spec nor
+    a binding proof exists for a provider-route intervention.
+    """
+    if not edit.condition_spec:
+        return False, "route_guidance_condition_spec_missing"
+    condition_valid, condition_reason = validate_condition_spec(
+        edit.condition_spec
+    )
+    if not condition_valid:
+        return False, condition_reason
+    guidance = sanitize_route_guidance(edit.route_guidance)
+    if not guidance:
+        return False, "route_guidance_rejected_by_firewall"
+    repair_edge = _sanitize_repair_edge(edit.repair_edge)
+    if repair_edge:
+        if not repair_edge.get("edge_id"):
+            return False, "repair_edge_id_missing"
+        edge_owner = str(repair_edge.get("owner_module") or "")
+        if edge_owner and edge_owner != edit.target_module:
+            return False, "repair_edge_owner_mismatch"
+    return True, ""
+
+
 def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     """Validate an edit against structural constraints."""
     if edit.target_module not in MODULE_IDS:
@@ -830,6 +879,12 @@ def validate_edit(edit: SkillEdit, genome: SkillGenome) -> tuple[bool, str]:
     module = genome.modules[edit.target_module]
 
     if operation_value in {SkillOp.ADD_RULE.value, SkillOp.MODIFY_RULE.value}:
+        if edit.route_guidance:
+            # Route-guidance edit (design D1/D2): no deterministic backend,
+            # so the intervention is a firewall-checked guidance block plus a
+            # label-free applicability predicate. No action_spec or binding
+            # proof exists for a provider-route intervention.
+            return _validate_route_guidance_edit(edit)
         slots = _sanitize_rule_slots(edit.rule_slots)
         slot_contract_active = bool(
             slots and set(slots) == set(_RULE_SLOT_LIMITS)
@@ -1066,6 +1121,9 @@ def apply_edit(genome: SkillGenome, edit: SkillEdit) -> SkillGenome:
         "condition_spec": sanitize_condition_spec(edit.condition_spec),
         "binding_proof": sanitize_binding_proof(edit.binding_proof),
         "repair_edge": _sanitize_repair_edge(edit.repair_edge),
+        "route_guidance": sanitize_route_guidance(edit.route_guidance),
+        "failure_mechanism": edit.failure_mechanism[:500],
+        "expected_local_effect": edit.expected_local_effect[:240],
     }
 
     if edit.operation == SkillOp.ADD_RULE:

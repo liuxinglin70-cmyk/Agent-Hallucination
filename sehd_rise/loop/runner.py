@@ -328,6 +328,66 @@ def _classify_mutation_failure(reason: str) -> str:
     return "mutation_invalid_schema"
 
 
+def _decisive_route_guidance_reconfirmation(
+    loop: "EvolutionLoop",
+    *,
+    candidate_genome: Any,
+    case_id: str,
+    detection_result: Mapping[str, Any],
+    expected_terminal: str,
+    assessment: FitnessAssessment,
+) -> tuple[FitnessAssessment, dict[str, Any]]:
+    """D3 decisive re-confirmation for a route-guidance edit.
+
+    A route-guidance edit has no deterministic backend, so its acceptance
+    evidence is a single provider re-run — indistinguishable from sampling
+    drift. Re-run the same candidate genome once more and require the terminal
+    to reach the same improved state before the improvement counts as decisive.
+    A disagreement downgrades the assessment to no_effect: a single-sample
+    terminal flip is not an acceptance gate.
+    """
+    expected_terminal = str(expected_terminal or "")
+    try:
+        reconfirm = loop.run_detection(
+            budget_kind="source",
+            genome=candidate_genome,
+            case_id=case_id,
+            policy_genome=(
+                loop.state.policy_genome
+                if loop.state.policy_genome.items_for_scope("working")
+                else None
+            ),
+            base_result=detection_result,
+        )
+        reconfirm_terminal = str(reconfirm.get("state") or "")
+    except Exception as exc:
+        return FitnessAssessment(
+            "no_effect",
+            ("route_guidance_reconfirmation_runtime_error",),
+            assessment.task_score_before,
+            assessment.task_score_after,
+            assessment.local_score_before,
+            assessment.local_score_after,
+        ), {"status": "runtime_error", "error": f"{type(exc).__name__}:{exc}"}
+
+    decisive = reconfirm_terminal == expected_terminal
+    audit = {
+        "status": "decisive" if decisive else "not_decisive",
+        "expected_terminal": expected_terminal,
+        "reconfirm_terminal": reconfirm_terminal,
+    }
+    if decisive:
+        return assessment, audit
+    return FitnessAssessment(
+        "no_effect",
+        ("route_guidance_not_decisive",),
+        assessment.task_score_before,
+        assessment.task_score_after,
+        assessment.local_score_before,
+        assessment.local_score_after,
+    ), audit
+
+
 def _localization_bias_signal(
     detection_result: Mapping[str, Any] | None,
     *,
@@ -434,6 +494,7 @@ def _run_registry_reflection_impl(
     facts: Any,
     facts_summary: Mapping[str, Any],
     case_id: str,
+    route_result: str,
     policy_genome: PolicyGenome,
     mutation_route: dict[str, Any] | None,
     run_mutation_call: Any,
@@ -450,6 +511,7 @@ def _run_registry_reflection_impl(
         return
     candidates = plan_registry_candidates(
         attribution=attribution, registry=policy_genome.registry,
+        route_result=route_result,
     )
     if not candidates:
         return
@@ -1234,14 +1296,19 @@ class EvolutionLoop:
         budget_kind: str, genome: SkillGenome, case_id: str,
         policy_genome: PolicyGenome | None = None,
         policy_scope: str | None = "working",
+        base_result: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Run one detector call in a counted, label-free envelope."""
+        """Run one detector call in a counted, label-free envelope.
+
+        ``base_result`` gates route-guidance skills against a prior court
+        result (see ``execution.replay._run_counted_detection``)."""
         return _run_counted_detection(
             budget_kind=budget_kind, genome=genome, case_id=case_id,
             budget_usage=self.budget_usage,
             records=self.records, config=self.config,
             provider_usage_ledger=self.provider_usage_ledger,
             policy_genome=policy_genome, policy_scope=policy_scope,
+            base_result=base_result,
         )
 
     def run_mutation_call(self, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -1339,11 +1406,13 @@ class EvolutionLoop:
     def _run_registry_reflection(self, *,
         attribution: Any, facts: Any,
         facts_summary: Mapping[str, Any], case_id: str,
+        route_result: str,
     ) -> None:
         _run_registry_reflection_impl(
             attribution=attribution, facts=facts,
             facts_summary=facts_summary,
-            case_id=case_id, policy_genome=self.state.policy_genome,
+            case_id=case_id, route_result=route_result,
+            policy_genome=self.state.policy_genome,
             mutation_route=self.mutation_route,
             run_mutation_call=self.run_mutation_call,
             output_dir=self.output_dir,
@@ -1705,6 +1774,20 @@ class EvolutionLoop:
                         "fn_family": fn_family,
                     },
                 ), next_case_index=idx + 1)
+                # The gap must stay retrievable: without an attempt record
+                # the mechanism entry has no representative, so a later case
+                # with the same mechanism would see an empty history and
+                # repeat the search the registry already proved unavailable.
+                self.record_attempt(
+                    decision="semantic_unavailable",
+                    operation="capability_gap",
+                    target_module=episode.failure_owner,
+                    action_spec=repair_intent.to_dict(),
+                    structural_result="capability_gap",
+                    proposal_content=(
+                        f"capability_gap:{missing_capability}"
+                    ),
+                )
                 print(
                     f"  [{idx}] CAPABILITY_GAP {case_id}: "
                     f"{verdict.evidence.get('missing_capability', '')}"
@@ -2062,7 +2145,7 @@ class EvolutionLoop:
                 genome=self.state.policy_genome,
                 facts=facts,
                 case_id=case_id,
-                reason_code=plan.route_result,
+                route_result=plan.route_result,
             ):
                 if promotion_row["outcome"] in ("promoted", "rejected"):
                     self.l2_registry_registrations.append(promotion_row)
@@ -2351,6 +2434,7 @@ class EvolutionLoop:
                         facts=facts,
                         facts_summary=facts_summary,
                         case_id=case_id,
+                        route_result=plan.route_result,
                     )
             if not planned_candidates:
                 finish(
@@ -3266,7 +3350,46 @@ class EvolutionLoop:
                         {},
                     )
                 new_content = ""
-                if operation in {"add_rule", "modify_rule"}:
+                route_guidance_text = ""
+                failure_mechanism = ""
+                expected_local_effect_text = ""
+                if operation in {"add_rule", "modify_rule"} and str(
+                    parsed.get("local_guidance") or ""
+                ).strip():
+                    # Route-guidance candidate (design D1/D2): no deterministic
+                    # backend, so the model returns the applicability predicate,
+                    # the guidance text and the failure mechanism instead of an
+                    # action slot. The rule text is a deterministic render for
+                    # genome identity; the guidance lives in rule_meta.
+                    if not all(
+                        key in parsed
+                        for key in ("condition", "repair_edge_id")
+                    ):
+                        invalid_mutation_reason = (
+                            "route_guidance:missing_slots"
+                        )
+                    else:
+                        condition = str(parsed.get("condition") or "")
+                        evidence_anchor = str(
+                            parsed.get("evidence_anchor") or ""
+                        )
+                        route_guidance_text = str(
+                            parsed.get("local_guidance") or ""
+                        )
+                        failure_mechanism = str(
+                            parsed.get("failure_mechanism") or ""
+                        )
+                        expected_local_effect_text = str(
+                            parsed.get("expected_local_effect") or ""
+                        )
+                        new_content = render_rule(RuleSpec(
+                            condition=condition,
+                            action=route_guidance_text[:80],
+                            evidence_anchor=evidence_anchor,
+                            module_id=target_module,
+                            direction="process",
+                        ))
+                elif operation in {"add_rule", "modify_rule"}:
                     if not all(
                         key in parsed
                         for key in ("condition", "action", "evidence_anchor")
@@ -3437,7 +3560,8 @@ class EvolutionLoop:
                 elif operation == "remove_rule" and rule_index is None:
                     invalid_mutation_reason = "remove_rule_missing_rule_index"
                 elif operation in {"add_rule", "modify_rule", "remove_rule"} and (
-                    not expected_effect or not contract_present
+                    not route_guidance_text
+                    and (not expected_effect or not contract_present)
                 ):
                     invalid_mutation_reason = (
                         "invalid_intervention_contract:missing"
@@ -3532,6 +3656,9 @@ class EvolutionLoop:
                         condition_spec=pending_condition_spec,
                         binding_proof=pending_binding_proof,
                         repair_edge=pending_repair_edge,
+                        route_guidance=route_guidance_text,
+                        failure_mechanism=failure_mechanism,
+                        expected_local_effect=expected_local_effect_text,
                     )
                     print(
                         f"    LLM generated: {target_module}/{operation}: "
@@ -4016,6 +4143,7 @@ class EvolutionLoop:
                         if self.state.policy_genome.items_for_scope("working")
                         else None
                     ),
+                    base_result=detection_result,
                 )
         except Exception as exc:
             reason = (
@@ -4199,6 +4327,28 @@ class EvolutionLoop:
             baseline_result=detection_result,
         )
 
+        # D3 decisive re-confirmation for route-guidance edits. A deterministic
+        # opcode edit is accepted only on its fired transform + postcondition,
+        # which is already deterministic evidence. A route-guidance edit has no
+        # deterministic backend: its whole evidence is a provider re-run, so a
+        # single terminal flip is indistinguishable from sampling drift. Require
+        # the same candidate genome to reach the improved terminal consistently
+        # across re-runs before the improvement counts as decisive.
+        route_guidance_reconfirmation: dict[str, Any] | None = None
+        if edit.route_guidance and not edit.action_spec and (
+            assessment.decision in {"strong_improvement", "local_improvement"}
+        ):
+            assessment, route_guidance_reconfirmation = (
+                _decisive_route_guidance_reconfirmation(
+                    self,
+                    candidate_genome=candidate_genome,
+                    case_id=case_id,
+                    detection_result=detection_result,
+                    expected_terminal=candidate_signal.state,
+                    assessment=assessment,
+                )
+            )
+
         canary_audit: list[dict[str, Any]] = []
         canary_regressions: list[str] = []
         promotion_canaries = (
@@ -4241,6 +4391,7 @@ class EvolutionLoop:
                             )
                             else None
                         ),
+                        base_result=parent_canary,
                     )
                     preserved, audit = canary_preserved(
                         parent_canary, child_canary,
@@ -4297,6 +4448,10 @@ class EvolutionLoop:
             "canary_audit": canary_audit,
             "canary_regressions": canary_regressions,
         }
+        if route_guidance_reconfirmation is not None:
+            fitness_audit["route_guidance_reconfirmation"] = (
+                route_guidance_reconfirmation
+            )
         if canary_regressions:
             assessment = FitnessAssessment(
                 "worse",

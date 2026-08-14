@@ -132,12 +132,32 @@ def test_gold_fn_clean_is_repairable_and_triggered() -> None:
 
 
 def test_missing_candidate_gap_is_an_active_failure() -> None:
-    """A failure that fell from repairable to CAPABILITY_GAP is still an
-    active failure: the trigger must NOT close."""
+    """A missing-candidate failure is route-addressable (design D2): it now
+    compiles a route-guidance plan instead of terminating as CAPABILITY_GAP,
+    and it stays an active failure — the trigger must NOT close."""
     result = _gap_result()
     verdict = _verdict(result)
-    assert verdict.status is RepairabilityStatus.CAPABILITY_GAP
+    assert verdict.status is RepairabilityStatus.REPAIRABLE
+    assert verdict.evidence["primary_executor"] == "l1_route_guidance"
     assert triggered_episode(result, use_gold=False, gold_label=None) is True
+
+
+def test_construct_certificate_family_is_route_guidance_not_gap() -> None:
+    """The 10d dominant gap: gold=error, detector=clean, candidate present,
+    evidence_obligation owns a missing error_certificate. It must compile a
+    route-guidance plan (the provider route is the intervention point), never
+    terminate as CAPABILITY_GAP — the field can no longer be dropped at
+    frontier compile time merely for lacking a deterministic opcode."""
+    result = {**_fn_clean_result(), "gold_label": True}
+    result["census"] = [
+        {"candidate_id": "c1", "origin_hypothesis_event_id": "event_001"},
+    ]
+    result["prosecution"] = {"coverage_state": "complete", "candidates": []}
+    result["proof_adjudication"]["prosecution_coverage"] = "complete"
+    verdict = _verdict(result)
+    assert verdict.status is RepairabilityStatus.REPAIRABLE
+    assert verdict.evidence["primary_executor"] == "l1_route_guidance"
+    assert verdict.evidence["primary_legal_operations"] == []
 
 
 def test_gold_false_positive_is_an_active_failure_with_canonical_context() -> None:

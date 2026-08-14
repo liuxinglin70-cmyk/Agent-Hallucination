@@ -41,20 +41,18 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from sehd_rise.causal.cut import (
-    ORIGIN_PROVIDER_GENERATION,
     ORIGIN_ROUTE_CONFIG,
     ORIGIN_TRANSPORT_PARSE,
     ORIGIN_VALIDATOR_CONTRACT,
-    REASON_DEMOTED_L1_NO_EXECUTABLE,
     REASON_INTERNAL_INCONSISTENCY,
     REASON_NO_FAILURE_SHAPE,
     allowed_l1_modules,
     build_causal_cut,
-    infer_evolution_direction,
     repair_direction,
 )
 from sehd_rise.causal.episode import CausalFailureEpisode, build_causal_episode
 from sehd_rise.causal.plan import build_repair_plan
+from sehd_rise.causal.route_addressability import address_for
 from sehd_rise.causal.signals import project_detection
 from sehd_rise.skills.capabilities import SKILL_CAPABILITY_REGISTRY
 from sehd_rise.skills.vocabulary.contracts import (
@@ -112,7 +110,6 @@ REASON_CAPABILITY_GAP_NO_EXECUTABLE_PRIMITIVE = (
     "capability_gap_no_executable_primitive"
 )
 REASON_UNADDRESSABLE_NO_LEGAL_PLAN = "unaddressable_no_legal_repair_plan"
-REASON_UNADDRESSABLE_DEMOTED_L1 = "unaddressable_demoted_l1_no_executable"
 REASON_FRAMEWORK_DEFECT_TRANSPORT_PARSE = "framework_defect_transport_or_parse_fault"
 REASON_FRAMEWORK_DEFECT_VALIDATOR_CONTRACT = "framework_defect_validator_contract_fault"
 REASON_FRAMEWORK_DEFECT_ROUTE_CONFIG = "framework_defect_route_or_config_fault"
@@ -175,12 +172,16 @@ def analyze(
     3. Non-evolvable skill layer (DETECTOR internal inconsistency or
        NONE) -> ``NON_EVOLVABLE`` with the matching closed reason.
     4. Evolvable surface (L1 / L2) declared:
-       - Compile at least one legal ``RepairPlan``.
+       - Compile at least one legal ``RepairPlan``. A plan compiles from an
+         exact deterministic backend (registry) or, for L1, from a
+         replayable provider route in the RouteAddressability table; the
+         L2 adjudication surface always compiles (an empty action set is
+         the vocabulary-extension signal).
        - If a plan exists -> ``REPAIRABLE``.
-       - If no plan exists and the registry has no matching primitive ->
-         ``CAPABILITY_GAP``.
-       - If the registry says an exact primitive exists but no plan compiled ->
-         ``UNADDRESSABLE_FRAMEWORK_DEFECT`` (semantic-closure invariant).
+       - If no plan exists and no frontier edge is route-addressable ->
+         ``CAPABILITY_GAP`` (true framework/runtime gap).
+       - If a route-addressable edge exists but no plan compiled ->
+         ``UNADDRESSABLE_FRAMEWORK_DEFECT`` (D2 mapping broken).
     """
     # --- 1. Detector boundary origin (C4) ---------------------------
     if episode.failure_origin in _DETECTOR_ORIGIN_REASON:
@@ -227,25 +228,6 @@ def analyze(
         )
 
     if episode.skill_layer == LAYER_NONE:
-        if episode.reason_code == REASON_DEMOTED_L1_NO_EXECUTABLE:
-            classified_owner = str(
-                episode.attribution_snapshot.get("owner")
-                or episode.attribution_snapshot.get("classified_owner")
-                or episode.failure_owner
-            )
-            gap = SKILL_CAPABILITY_REGISTRY.gap_for(
-                failure_shape=str(
-                    episode.attribution_snapshot.get("classified_reason")
-                    or episode.reason_code
-                ),
-                owner=classified_owner,
-                desired_transition=evolution_direction,
-            )
-            return RepairabilityVerdict(
-                status=RepairabilityStatus.CAPABILITY_GAP,
-                reason=REASON_CAPABILITY_GAP_NO_EXECUTABLE_PRIMITIVE,
-                evidence={"registry_queried": True, **gap.to_dict()},
-            )
         if episode.reason_code == REASON_NO_FAILURE_SHAPE:
             return RepairabilityVerdict(
                 status=RepairabilityStatus.NON_EVOLVABLE,
@@ -291,56 +273,50 @@ def analyze(
                 "primary_executor": primary.executor,
                 "primary_legal_operations": list(primary.legal_operations),
                 "primary_auto_selected_operation": primary.auto_selected_operation,
+                "available_deterministic_backends": list(
+                    primary.available_deterministic_backends
+                ),
             },
         )
 
-    exact_capabilities = tuple(
-        capability
+    # No plan compiled. The registry no longer decides admission; the
+    # RouteAddressability table (design D2) does. A frontier edge whose
+    # owner has a replayable provider route but compiled no plan is the
+    # §2.2 invariant violation (the D2 mapping is broken); an episode with
+    # no route-addressable edge at all is the true capability gap.
+    route_addressable = any(
+        address_for(edge.owner_module or episode.failure_owner) is not None
         for edge in episode.causal_failure_edge_frontier
-        for capability in SKILL_CAPABILITY_REGISTRY.query(
-            skill_layer=episode.skill_layer,
-            modules=((
-                edge.owner_module or episode.failure_owner
-                if episode.skill_layer == LAYER_L1
-                else edge.output_object or episode.failure_owner
-            ),),
-            failure_shape=episode.reason_code,
-            direction=evolution_direction,
-            target_field=(edge.field if episode.skill_layer == LAYER_L1 else ""),
-        )
     )
-    if not exact_capabilities:
-        gap = SKILL_CAPABILITY_REGISTRY.gap_for(
-            failure_shape=episode.reason_code,
-            owner=episode.failure_owner,
-            desired_transition=evolution_direction,
-        )
+    if route_addressable:
         return RepairabilityVerdict(
-            status=RepairabilityStatus.CAPABILITY_GAP,
-            reason=REASON_CAPABILITY_GAP_NO_EXECUTABLE_PRIMITIVE,
+            status=RepairabilityStatus.UNADDRESSABLE_FRAMEWORK_DEFECT,
+            reason=REASON_UNADDRESSABLE_NO_LEGAL_PLAN,
             evidence={
-                "registry_queried": True,
                 "skill_layer": episode.skill_layer,
+                "failure_owner": episode.failure_owner,
+                "reason_code": episode.reason_code,
                 "frontier_size": len(episode.causal_failure_edge_frontier),
                 "allowed_modules": list(allowed_modules),
-                **gap.to_dict(),
+                "evolution_direction": evolution_direction,
+                "route_addressable": True,
             },
         )
-
-    # An evolvable surface was declared (LAYER_L1 / LAYER_L2) but no legal
-    # RepairPlan compiled. Plan §2.2: this is a framework invariant
-    # violation, NOT a no-edit/abstention; Phase 9 routes it to its own
-    # funnel bucket.
+    gap = SKILL_CAPABILITY_REGISTRY.gap_for(
+        failure_shape=episode.reason_code,
+        owner=episode.failure_owner,
+        desired_transition=evolution_direction,
+    )
     return RepairabilityVerdict(
-        status=RepairabilityStatus.UNADDRESSABLE_FRAMEWORK_DEFECT,
-        reason=REASON_UNADDRESSABLE_NO_LEGAL_PLAN,
+        status=RepairabilityStatus.CAPABILITY_GAP,
+        reason=REASON_CAPABILITY_GAP_NO_EXECUTABLE_PRIMITIVE,
         evidence={
+            "registry_queried": True,
+            "route_addressable": False,
             "skill_layer": episode.skill_layer,
-            "failure_owner": episode.failure_owner,
-            "reason_code": episode.reason_code,
             "frontier_size": len(episode.causal_failure_edge_frontier),
             "allowed_modules": list(allowed_modules),
-            "evolution_direction": evolution_direction,
+            **gap.to_dict(),
         },
     )
 
@@ -411,7 +387,6 @@ __all__ = [
     "REASON_NON_EVOLVABLE_NO_FAILURE_SHAPE",
     "REASON_NON_EVOLVABLE_RUNTIME_INVALID",
     "REASON_REPAIRABLE_LEGAL_PLAN_AVAILABLE",
-    "REASON_UNADDRESSABLE_DEMOTED_L1",
     "REASON_UNADDRESSABLE_NO_LEGAL_PLAN",
     "RepairabilityStatus",
     "RepairabilityVerdict",
