@@ -49,8 +49,15 @@ CENSUS_SYSTEM = (
     '"evidence_refs": ["event_XXX"]}]}\n'
     "- candidate_id: short unique id c1, c2, ...\n"
     "- claim: the exact deviating action or statement, in contrast form.\n"
-    "- locus_event_id: the event id where the deviation occurred (the tool "
-    "call or the message).\n"
+    "- locus_event_id: the EARLIEST event where the deviation FIRST "
+    "occurred — the step where the wrong action was taken, the wrong "
+    "argument was used, or the wrong statement was first made. If the "
+    "same deviation surfaces again in later events, still point at the "
+    "FIRST occurrence, never at a later message that only repeats or "
+    "reveals it. Example: if the agent called a tool with a wrong "
+    "argument at step 1 and only described the wrong result in a message "
+    "at step 4, the locus is the step-1 tool call, NOT the step-4 "
+    "message.\n"
     "- evidence_refs: event ids that prove the correct or required "
     "behavior (observations, user requirements).\n"
     'If nothing deviates, return {"candidates": []}. No commentary.'
@@ -262,9 +269,17 @@ def _parse_defense(
 def _event_ordinal(
     packet: Mapping[str, Any], event_id: str,
 ) -> int:
+    """Position of an event id; interaction ids resolve to their parent."""
+    if not event_id:
+        return 0
     for event in packet.get("events") or []:
         if event.get("event_id") == event_id:
             return int(event.get("position") or 0)
+    parent = str(event_id).rsplit("_tool_", 1)[0]
+    if parent != event_id:
+        for event in packet.get("events") or []:
+            if event.get("event_id") == parent:
+                return int(event.get("position") or 0)
     return 0
 
 
@@ -336,23 +351,41 @@ def adjudicate(
         state = "unresolved"
     if complete:
         # The locus lives on the CENSUS candidate, not the certificate:
-        # join back by candidate_id to locate the earliest responsible event.
+        # join back by candidate_id. The responsible event is the EARLIEST
+        # trajectory event the upheld certificates themselves cite — the
+        # union of each candidate's locus and its evidence_refs. Evidence
+        # refs name the observations that prove the deviation, so their
+        # earliest position is the deviation origin.
         census_by_id = {
             str(c.get("candidate_id")): c for c in census
         }
-        loci = [
-            str(
-                census_by_id.get(str(cert.get("candidate_id")), {}).get(
-                    "locus_event_id"
-                ) or ""
+        cited_events: set[str] = set()
+        for cert in complete:
+            candidate = census_by_id.get(
+                str(cert.get("candidate_id")), {}
             )
-            for cert in complete
+            locus = str(candidate.get("locus_event_id") or "")
+            if locus:
+                cited_events.add(locus)
+            for ref in candidate.get("evidence_refs") or ():
+                if str(ref):
+                    cited_events.add(str(ref))
+        ordered = [
+            (event_id, _event_ordinal(packet, event_id))
+            for event_id in cited_events
         ]
-        loci = [locus for locus in loci if locus]
+        ordered = [
+            (event_id, position)
+            for event_id, position in ordered
+            if position > 0
+        ]
         responsible_event_id = (
-            min(loci, key=lambda eid: _event_ordinal(packet, eid))
-            if loci else None
+            min(ordered, key=lambda pair: pair[1])[0] if ordered else None
         )
+        if responsible_event_id and "_tool_" in responsible_event_id:
+            responsible_event_id = responsible_event_id.rsplit(
+                "_tool_", 1,
+            )[0]
     else:
         responsible_event_id = None
     prosecution_coverage = (

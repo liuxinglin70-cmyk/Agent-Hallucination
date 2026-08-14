@@ -58,7 +58,8 @@ __pycache__/
 
 # Output artifacts
 outputs/
-runs/
+runs/*
+!runs/README.md
 eval/
 fitness_batches/
 champion_snapshots/

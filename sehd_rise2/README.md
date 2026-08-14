@@ -21,9 +21,11 @@ sehd_rise2/
 │   ├── env.py                    # 仓库 .env 加载
 │   ├── skills.py                 # 进化接口：load_skill_genome / load_policy_genome
 │   ├── evolution_api.py          # 进化接口：Detection Truth 只读投影
+│   ├── runs.py                   # 运行记录：每案例过程落盘 + 台账推导统计（runs/）
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
 │   └── configs/detector_v1.json  # 三路由最小配置
 ├── evolution/                    # 未来自进化框架（占位；契约见 INTERFACES.md）
+├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 ```
 
@@ -56,6 +58,14 @@ print(result["state"], result["decision_authority"])
 - 输入必须是 label-free（含 `is_hallucination` 等 gold 字段会被拒绝）；
 - genome / policy_genome 是**不透明载荷**：加载校验 + provenance 记录，
   执行语义由未来的进化框架定义（见 `evolution/INTERFACES.md`）。
+
+## 运行结果目录（runs/）
+
+每次运行落一个 `runs/<run_id>/`（schema `sehd2.run_record.v1`）：`run.json`
+运行元信息、`summary.json` 由案例台账**重新推导**的无标签统计（单一真源）、
+`cases/<case_id>/{input,packet,result,audit}.json` 每案例全量过程记录。
+目录内一切产物 label-free；含真值的评测报告由评测侧写
+`runs/<run_id>/eval_gold.json`。详见 `runs/README.md`。
 
 ## 为自进化预留的接口
 
