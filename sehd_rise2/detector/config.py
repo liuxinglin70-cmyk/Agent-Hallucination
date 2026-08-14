@@ -37,7 +37,9 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
     "model": "deepseek-chat",
     "api_key_env": "DEEPSEEK_API_KEY",
     "temperature": 0.0,
-    "max_tokens": 4096,
+    # No max_tokens default: a reasoning model shares the output budget
+    # between thinking and the reply, so capping it truncates JSON bodies.
+    # When the route carries no max_tokens the provider default applies.
     "timeout_seconds": 120,
     "total_timeout_seconds": 360,
     "transport_retries": 2,

@@ -113,9 +113,13 @@ def provider_call(
             {"role": "user", "content": user},
         ],
         "temperature": float(route.get("temperature", 0.0)),
-        "max_tokens": int(route.get("max_tokens", 4096)),
         "stream": False,
     }
+    # max_tokens is sent ONLY when explicitly configured; otherwise the
+    # provider default applies (a reasoning model shares the budget between
+    # thinking and the reply, so capping it truncates JSON bodies).
+    if route.get("max_tokens") is not None:
+        payload["max_tokens"] = int(route["max_tokens"])
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
@@ -187,6 +191,9 @@ def provider_call(
             ),
             "purpose": purpose,
             "model": str(data.get("model") or route.get("model") or ""),
+            # Bounded preview of the raw model reply: fail-closed diagnostics
+            # must keep the cause on disk when the JSON contract rejects it.
+            "raw_content_preview": content[:300],
         }
         if parsed is None and not needs_recovery:
             needs_recovery = True

@@ -23,34 +23,68 @@ from sehd_rise2.detector.packet import render_packet
 from sehd_rise2.detector.provider import ProviderError, provider_call
 
 CENSUS_SYSTEM = (
-    "You are the candidate census of a hallucination detector. Given one "
-    "trajectory, list the specific claims or actions by the assistant that "
-    "could be factual errors: statements that contradict cited evidence, "
-    "unsupported factual assertions, wrong numbers, or fabricated tool "
-    "results.\n"
+    "You are the candidate census of a hallucination detector. A candidate "
+    "is ANY assistant action or statement that deviates from what the "
+    "trajectory evidence supports or from what the user's task requires. "
+    "The official agent-hallucination taxonomy you must scan for:\n"
+    "1. TOOL-USE: unnecessary tool call; missing required call; incorrect "
+    "tool arguments; wrong tool for the step; parallel-call conflict; "
+    "fabricated, misreported or reordered tool results; placeholder values "
+    "(e.g. {{...}}) written instead of real tool output.\n"
+    "2. RETRIEVAL: the answer or summary misaligns the retrieved content, "
+    "the query misaligns the user intent, or facts are stated without "
+    "retrieved support.\n"
+    "3. REASONING: math, science, general or factual reasoning errors.\n"
+    "4. PLANNING: task-decomposition errors, or facts derived from nowhere "
+    "(a claimed result no tool observation ever produced).\n"
+    "5. HUMAN-INTERACTION: misinterpreting user instructions, requirements "
+    "or user-stated facts.\n"
+    "For every assistant message AND every tool call, compare it against "
+    "(a) the tool observations in the trajectory, (b) the user's earlier "
+    "statements, and (c) the task the user set. Name the deviation in the "
+    "contrast form: 'the agent did X instead of the required Y'.\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
-    '{"candidates": [{"candidate_id": "c1", "claim": "the exact claim text", '
-    '"locus_event_id": "event_XXX", "evidence_refs": ["event_XXX"]}]}\n'
+    '{"candidates": [{"candidate_id": "c1", "claim": "the agent did X '
+    'instead of the required Y", "locus_event_id": "event_XXX", '
+    '"evidence_refs": ["event_XXX"]}]}\n'
     "- candidate_id: short unique id c1, c2, ...\n"
-    "- claim: quote the claim exactly.\n"
-    "- locus_event_id: the event id where the claim appears.\n"
-    "- evidence_refs: event ids of the evidence that should support or "
-    "contradict the claim.\n"
-    'If nothing is suspicious, return {"candidates": []}. No commentary.'
+    "- claim: the exact deviating action or statement, in contrast form.\n"
+    "- locus_event_id: the event id where the deviation occurred (the tool "
+    "call or the message).\n"
+    "- evidence_refs: event ids that prove the correct or required "
+    "behavior (observations, user requirements).\n"
+    'If nothing deviates, return {"candidates": []}. No commentary.'
 )
 
 VERIFICATION_SYSTEM = (
     "You are the verification stage of a hallucination detector. For each "
-    "candidate below, test the claim ONLY against the cited trajectory "
-    "evidence. Do not override trajectory facts with outside knowledge, "
-    "except for universally known facts (arithmetic, dates, geography, "
-    "public reference facts).\n"
+    "candidate below, test the claimed deviation ONLY against the cited "
+    "trajectory evidence. Do not override trajectory facts with outside "
+    "knowledge, except for universally known facts (arithmetic, dates, "
+    "geography, public reference facts).\n"
+    "- TOOL-USE candidates: check the tool call's own observation and the "
+    "task requirement. The question is whether the chosen tool, its "
+    "arguments, and the agent's report of its output match what the "
+    "trajectory actually required and produced.\n"
+    "- RETRIEVAL candidates: compare the agent's answer/summary against "
+    "the retrieved content it cites.\n"
+    "- REASONING candidates: recompute or re-derive the result from the "
+    "cited numbers and facts.\n"
+    "- PLANNING candidates: check whether every claimed intermediate fact "
+    "is grounded in a tool observation or a user statement.\n"
+    "A certificate is supported when the cited evidence shows the "
+    "deviation is real (the action contradicts the observations, or the "
+    "task required something else and nothing in the evidence excuses it). "
+    "It is rejected only when the evidence shows the action or statement "
+    "was correct or adequate. Uncertainty is not a reason to reject: if "
+    "the evidence cannot excuse the deviation, support it.\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"certificates": [{"candidate_id": "c1", "verdict": '
     '"supported|rejected", "rationale": "..."}]}\n'
-    "- verdict=supported: the trajectory evidence shows the claim is "
-    "factually wrong or unsupported by its cited evidence.\n"
-    "- verdict=rejected: the claim is correct or adequately grounded.\n"
+    "- verdict=supported: the trajectory evidence shows the deviation is "
+    "real and unexcused.\n"
+    "- verdict=rejected: the action or statement was correct or adequately "
+    "grounded after all.\n"
     "- verdict is EXACTLY one word: supported or rejected. Put ALL "
     "reasoning in rationale.\n"
     "One certificate per candidate. No commentary."
@@ -59,14 +93,17 @@ VERIFICATION_SYSTEM = (
 DEFENSE_SYSTEM = (
     "You are the defense stage of a hallucination detector. Challenge each "
     "supported certificate below: the certificate claims the assistant "
-    "made a factual error. Find any legitimate reading under which the "
-    "assistant's claim is acceptable, or the cited evidence is "
-    "insufficient to convict.\n"
+    "deviated from the required behavior. Find any legitimate reading "
+    "under which the assistant's action or statement is correct, or the "
+    "cited evidence is insufficient to convict.\n"
+    "Do not excuse a deviation by pointing to a later step that happened "
+    "to work, unless that later step actually corrects the error. Do not "
+    "excuse an action merely because the user did not complain.\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"decisions": [{"candidate_id": "c1", "verdict": '
     '"upheld|overturned", "rationale": "..."}]}\n'
-    "- upheld: the error stands after adversarial review.\n"
-    "- overturned: the claim is defensible or the evidence cannot "
+    "- upheld: the deviation stands after adversarial review.\n"
+    "- overturned: the action is defensible or the evidence cannot "
     "convict.\n"
     "- verdict is EXACTLY ONE word: upheld or overturned. Never write a "
     "sentence for verdict; put reasoning in rationale only.\n"
@@ -437,9 +474,11 @@ def run_court(
 
     census_raw = _run_stage("census", CENSUS_SYSTEM, _census_user(packet))
     census = _parse_census(census_raw, audit)
-    if not audit.census_ok:
-        # One contract-repair pass: name the exact violation and re-ask.
-        # The model re-emits the corrected object; we never reinterpret.
+    for _repair_attempt in range(2):
+        if audit.census_ok:
+            break
+        # Contract-repair pass: name the exact violation and re-ask. The
+        # model re-emits the corrected object; we never reinterpret.
         repair_user = _census_user(packet) + (
             "\n\nCONTRACT_REPAIR: Your previous reply violated the census "
             "contract: " + audit.census_error + ". Return the complete "
@@ -491,7 +530,9 @@ def run_court(
         _verification_user(packet, census),
     )
     certificates = _parse_certificates(verification_raw, audit)
-    if not audit.verification_ok:
+    for _repair_attempt in range(2):
+        if audit.verification_ok:
+            break
         repair_user = _verification_user(packet, census) + (
             "\n\nCONTRACT_REPAIR: Your previous reply violated the "
             "certificate contract: " + audit.verification_error + ". "
@@ -520,7 +561,9 @@ def run_court(
             "defense", DEFENSE_SYSTEM, _defense_user(packet, supported),
         )
         decisions = _parse_defense(defense_raw, supported, audit)
-        if not audit.defense_ok:
+        for _repair_attempt in range(2):
+            if audit.defense_ok:
+                break
             repair_user = _defense_user(packet, supported) + (
                 "\n\nCONTRACT_REPAIR: Your previous reply violated the "
                 "defense contract: " + audit.defense_error + ". Verdict "
