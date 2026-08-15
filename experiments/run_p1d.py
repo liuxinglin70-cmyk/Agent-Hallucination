@@ -41,7 +41,7 @@ from sehd_rise2.detector.runs import (
 MANIFEST = Path("datasets/eval_splits/v1/manifest.json")
 DATASET_ROOT = Path("datasets/raw/agenthallu/AgentHallu")
 RUN_PREFIX = {"canary": "p1d_canary", "frozen": "p1d_frozen100"}
-WORKERS = 10
+WORKERS = 20
 
 
 def load_gold(case_path: str) -> tuple[dict, bool | None, int | None]:

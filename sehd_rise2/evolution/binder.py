@@ -14,7 +14,7 @@ guessing — fail-closed perception, mirroring the detector's authority
 design. A model answer outside the closed vocabulary is a hard error,
 never a silent downgrade.
 
-CLI (serial calls, incremental output, resume by re-running):
+CLI (concurrent per-case calls, incremental output, resume by re-running):
 
     python -m sehd_rise2.evolution.binder bind \
         --run runs/random100_20260815_142446 \
@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -318,8 +320,14 @@ def normalize_binding(
 
 def bind_all(
     *, run_dir: Path, out_path: Path, limit: int | None = None,
+    workers: int = 20,
 ) -> int:
-    """Bind every case's surviving certificates, one serial call each."""
+    """Bind every case's surviving certificates, one call per case.
+
+    Cases are independent, so calls run concurrently (``workers``);
+    persistence is lock-guarded and the output file stays a valid
+    resumable checkpoint after every completed case.
+    """
     run_tree = load_run_packets(run_dir)
     if not run_tree:
         print(f"no cases found under {run_dir}")
@@ -339,6 +347,7 @@ def bind_all(
     config = load_config()
     route = dict(config["verification_route"])
     route["_route_name"] = "binder"
+    lock = threading.Lock()
 
     def _persist() -> None:
         payload = {
@@ -351,7 +360,7 @@ def bind_all(
             },
             "binding_source": (
                 f"runtime binder route {route.get('model')} "
-                "(verification route, serial per-case batches, "
+                "(verification route, per-case batches, "
                 "label-free inputs)"
             ),
             "review_status": "machine_generated",
@@ -363,21 +372,20 @@ def bind_all(
             encoding="utf-8",
         )
 
-    failures = 0
-    for case_input in inputs:
+    def _bind_case(case_input: dict[str, Any]) -> int:
         case_id = case_input["case_id"]
         pending = [
             entry for entry in case_input["certificates"]
             if (case_id, entry["candidate_id"]) not in done
         ]
         if not pending:
-            continue
+            return 0
         user = json.dumps(
             {"case_id": case_id, "certificates": pending},
             ensure_ascii=False, indent=1,
         )
         try:
-            parsed, meta = provider_call(
+            parsed, _ = provider_call(
                 route=route, system=BINDER_SYSTEM, user=user,
                 purpose="binder",
             )
@@ -389,17 +397,23 @@ def bind_all(
             )
         except (ProviderError, ValueError) as exc:
             print(f"FAIL {case_id}: {exc}")
-            failures += 1
-            continue
-        for record in records:
-            done[(record["case_id"], record["candidate_id"])] = record
-        _persist()
+            return 1
+        with lock:
+            for record in records:
+                done[(record["case_id"], record["candidate_id"])] = record
+            _persist()
         print(
             f"bound {case_id}: "
             + ", ".join(
                 f"{r['candidate_id']}={r['certificate_class']}"
                 for r in records
             )
+        )
+        return 0
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        failures = sum(
+            executor.map(_bind_case, inputs),
         )
     remaining = total - len(done)
     print(
@@ -413,7 +427,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     bind_parser = sub.add_parser(
-        "bind", help="bind every surviving certificate (serial, resumable)",
+        "bind", help="bind every surviving certificate (concurrent, resumable)",
     )
     bind_parser.add_argument("--run", type=Path, required=True)
     bind_parser.add_argument("--out", type=Path, required=True)
@@ -421,9 +435,14 @@ def main() -> int:
         "--limit", type=int, default=None,
         help="bind only the first N certificates (smoke runs)",
     )
+    bind_parser.add_argument(
+        "--workers", type=int, default=20,
+        help="concurrent per-case binder calls",
+    )
     args = parser.parse_args()
     return bind_all(
         run_dir=args.run, out_path=args.out, limit=args.limit,
+        workers=args.workers,
     )
 
 

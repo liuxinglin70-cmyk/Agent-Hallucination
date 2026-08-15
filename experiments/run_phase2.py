@@ -38,7 +38,7 @@ DATASET_ROOT = Path("datasets/raw/agenthallu/AgentHallu")
 LIBRARY = Path("datasets/policy_library/v1")
 BATCH_SEED = 20260819
 BATCH_COUNT = 5
-WORKERS = 10
+WORKERS = 20
 DETECTOR_ENV_KEYS = (
     "SEHD_ROUTE_CENSUS_MODEL",
     "SEHD_ROUTE_VERIFICATION_MODEL",
