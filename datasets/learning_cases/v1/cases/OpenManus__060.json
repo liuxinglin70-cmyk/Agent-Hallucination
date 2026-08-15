@@ -1,0 +1,81 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "observation",
+      "name": "unsupported_claim_grounding",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "final-answer entity grounding against retrieved content"
+  },
+  "case_id": "OpenManus/060.json",
+  "detector_execution": {
+    "census": [],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 0,
+      "certificate_count": 0,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 0
+    },
+    "defense": {
+      "decisions": {}
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash"
+    },
+    "verification": {
+      "certificates": []
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "empty census on a trajectory whose final answer contains an invented named entity",
+    "failed_stage": "census",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "census proposed no candidate; the gold error never entered the evidence pipeline",
+    "failure_type": "FN",
+    "missed_candidates": [
+      {
+        "claim": "the agent stated a specific high school for Linda Lingle that no retrieval observation supports",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "locus_event_id": "event_006"
+      }
+    ],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "census returned zero candidates; the gold error is a concrete invented school name at step 6",
+    "initial_hypothesis": "specific named entities in the final answer that no observation contains are not being proposed as candidates on long search trajectories"
+  },
+  "ground_truth": {
+    "gold_step": 6,
+    "hallucination_label": true,
+    "hallucination_type": "Retrieval Hallucination / Summarize Misalign",
+    "root_cause": "gold step 6: the agent invented 'Granada Hills High School' as Linda Lingle's alma mater instead of Birmingham High School"
+  },
+  "input": {
+    "agent_behavior": "search assistant that fills factual gaps with confident specifics",
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "7 events (roles: {'assistant': 7}); tools: browser_use, terminate; content 0 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "OpenManus",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

@@ -1,0 +1,957 @@
+{
+  "schema_version": "sehd2.learning_annotations.v1",
+  "annotator": "agent-first-pass + final review (2026-08-15): 18 overrides re-audited against run-tree facts and confirmed; 3 proposed gaps kept (single-case evidence each) and frozen into the taxonomy",
+  "review_status": "human_reviewed",
+  "notes": "Human layer of the Learning Case dataset. Facts come from the run tree (assembled mechanically); every entry here is a first-pass hypothesis/capability judgement produced by the annotating agent from the run-tree evidence and dataset gold, and is pending human review. failed_stage_override records where the semantic analysis disagreed with the mechanical stage and why.",
+  "cases": {
+    "BFCL/067.json": {
+      "agent_behavior": "vehicle-control assistant that narrates system requirements while skipping the required pre-start actions",
+      "root_cause": "gold step 3: the agent skipped the required lockDoors and pressBrakePedal calls and attempted to start the engine right after the fuel-status check",
+      "missed_candidates": [
+        {
+          "claim": "the agent skipped the required lockDoors and pressBrakePedal calls before attempting to start the engine",
+          "locus_event_id": "event_003",
+          "evidence_refs": [
+            "event_001"
+          ]
+        }
+      ],
+      "evidence_gap": "the census saw the doors statement but framed it as an unsupported-rationale wording issue instead of the missing required actions",
+      "failed_stage_override": {
+        "stage": "census",
+        "reason": "the overturned certificate targeted a side detail ('for safety reasons') that defense rightly excused; the gold error (missing required calls) was never proposed as a candidate, so the loss happened at census"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "census lacks required-action awareness: it can flag wording on stated requirements but does not enumerate the task's required tool calls and check each was performed",
+        "hypothesis_basis": "c1 focused on the 'for safety reasons' phrasing (event_004) while the gold error is the omitted lockDoors/pressBrakePedal calls at step 3; verification supported and defense overturned the wording candidate, which is the correct outcome for that candidate"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "missing_required_action",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "required-action awareness: deriving the set of task-mandated tool calls and checking execution"
+      }
+    },
+    "BFCL/071.json": {
+      "agent_behavior": "tire-diagnostics assistant that adds advisory speculation on top of the observed data",
+      "root_cause": "gold step 4: the agent skipped the required lockDoors and pressBrakePedal steps and attempted to start the engine after the fuel check",
+      "missed_candidates": [
+        {
+          "claim": "the agent skipped the required lockDoors and pressBrakePedal calls before attempting to start the engine",
+          "locus_event_id": "event_004",
+          "evidence_refs": [
+            "event_001"
+          ]
+        }
+      ],
+      "evidence_gap": "same family as BFCL/067: the required pre-start actions were never enumerated, so their omission was invisible",
+      "failed_stage_override": {
+        "stage": "census",
+        "reason": "the supported-then-overturned candidate was about advisory speculation; defense was right to excuse it, and the gold error (missing required calls) never became a candidate"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "same mechanism as BFCL/067: no required-call inventory, so omission cannot be observed",
+        "hypothesis_basis": "census proposed only the wheel-alignment/tire-shop speculations; gold error at step 4 untouched"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "missing_required_action",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "required-action awareness shared with BFCL/067"
+      }
+    },
+    "BFCL/103.json": {
+      "agent_behavior": "portfolio assistant that explains why it cannot execute the requested order instead of executing it",
+      "root_cause": "gold step 7: the agent invented a funding/balance narrative and never executed the required place_order for 150 BDX shares",
+      "evidence_gap": "verification weighed the account-balance observation over the explicit task requirement to place the order",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the gold error WAS proposed (c2: order not executed) but verification rejected it on an affordability excuse; the defense overturns (c1/c3 company-name details) were separately correct"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "verification dismisses true requirement deviations using plausible out-of-requirement excuses (here: insufficient funds) that the task semantics do not accept",
+        "hypothesis_basis": "c2 rejection rationale cites the $10,000 balance vs $37,500 cost as excusing the missing place_order, but the task requirement is unconditional in this benchmark"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "verification",
+          "name": "excuse_based_rejection",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "requirement-priority verification: an explicit task requirement cannot be excused by in-trajectory resource narratives"
+      }
+    },
+    "BFCL/104.json": {
+      "agent_behavior": "calendar assistant that closes tasks with self-congratulatory filler",
+      "root_cause": "gold step 12: the agent added the unnecessary self-evaluation sentence 'Everything was streamlined and handled efficiently' in the resolution argument",
+      "evidence_gap": "empty census: the completion/efficiency claim was never surfaced as a candidate",
+      "failure_hypothesis": {
+        "initial_hypothesis": "ungrounded completion/quality self-evaluations in tool arguments escape the census despite the prompt asking for them; single-run evidence cannot separate a systematic blind spot from intermittent miss",
+        "hypothesis_basis": "census returned zero candidates on a trajectory whose gold error is an invented efficiency claim at step 12"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "unsupported_claim_grounding",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "completion-claim grounding: flag self-evaluations with no observation support"
+      }
+    },
+    "BFCL/159.json": {
+      "agent_behavior": "booking assistant that pushes the user's requested confirmation tweet through a failed pipeline",
+      "root_cause": "gold step 1: the agent used departure airport code 'RIV' instead of the required 'RMS', breaking the search before any booking existed",
+      "missed_candidates": [
+        {
+          "claim": "the agent used the departure airport code 'RIV' for Rivermist without any observation or user statement grounding that code",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001"
+          ]
+        }
+      ],
+      "evidence_gap": "the wrong-code error needs the city-to-code mapping the trajectory never contains; detecting the ungrounded argument value needs no gold knowledge, but convicting it would",
+      "failed_stage_override": {
+        "stage": "census",
+        "reason": "the rejected candidate (c1, premature booking tweet) was excused correctly per the user-supplied message; the gold error (wrong airport code at step 1) was never proposed"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "argument values with no in-trajectory source (invented code mappings) are not proposed as candidates; grounding the argument value itself, not just the call, is the missing observation",
+        "hypothesis_basis": "census's only candidate targeted the tweet at event_005; the RIV/RMS argument error at event_001 went unmentioned"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "unsupported_claim_grounding",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "argument-value grounding: tool arguments must trace to user input or an observation"
+      }
+    },
+    "Camel/053.json": {
+      "agent_behavior": "physics-analysis assistant that adopts the user's suggested weighting without checking it against the problem's own assumptions",
+      "root_cause": "gold step 3: the agent treated the inclination distribution as proportional to cos(i) (the user's suggestion) where isotropy implies sin(i)",
+      "evidence_gap": "defense had the supported certificate naming the cos/sin discrepancy and overturned it anyway",
+      "failure_hypothesis": {
+        "initial_hypothesis": "defense over-excuses correct convictions when the deviation originates from a user-suggested premise: 'followed the user' outweighs the domain-correctness check",
+        "hypothesis_basis": "c1 was exactly the gold error and was supported (isotropy implies sin(i)); the overturn accepted the user-suggestion framing as excusing"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "adversarial_defense_overturn",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "defense boundary: adopting a user-supplied wrong premise does not excuse a stated physical falsehood"
+      }
+    },
+    "Magentic_One/024.json": {
+      "agent_behavior": "research assistant that upgrades a partial trivia fact into a universal claim",
+      "root_cause": "gold step 11: the agent misread 'wrote songs for the series' as 'composed music for all 13 episodes'",
+      "evidence_gap": "defense overturned a certificate whose evidentiary basis (the actual trivia text) was correctly quoted as insufficient",
+      "failure_hypothesis": {
+        "initial_hypothesis": "defense treats an over-generalization whose source text IS cited in the certificate as adequately grounded, because the retrieval event exists",
+        "hypothesis_basis": "the supported rationale correctly noted the trivia only mentions the art director; the overturn nonetheless accepted the 'contributed to all episodes' reading"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "adversarial_defense_overturn",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "quantifier-strength check in defense: 'all episodes' vs source scope"
+      }
+    },
+    "OpenDeepSearch/061.json": {
+      "agent_behavior": "web-research assistant that resolves contradictory sources by picking one and calling it definitive",
+      "root_cause": "gold step 5: the agent fabricated a Spanish-language source confirming April 19, 2011 and presented it as definitive against the April 25 result",
+      "evidence_gap": "verification resolved the April 25 vs April 19 contradiction by preferring one in-trajectory source without any credibility weighing",
+      "failure_hypothesis": {
+        "initial_hypothesis": "when cited sources conflict, verification has no credibility-conflict rule and defaults to 'grounded in a cited event', which fabricated or weaker sources survive",
+        "hypothesis_basis": "c2 rejection says the final answer is grounded in event_005 (the fabricated corroboration) while event_003/004 held the contradicting April 25 result"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "verification",
+          "name": "source_credibility_conflict",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "conflicting-source adjudication: a contradiction between cited sources must be resolved, not flattened"
+      }
+    },
+    "OpenManus/060.json": {
+      "agent_behavior": "search assistant that fills factual gaps with confident specifics",
+      "root_cause": "gold step 6: the agent invented 'Granada Hills High School' as Linda Lingle's alma mater instead of Birmingham High School",
+      "missed_candidates": [
+        {
+          "claim": "the agent stated a specific high school for Linda Lingle that no retrieval observation supports",
+          "locus_event_id": "event_006",
+          "evidence_refs": [
+            "event_005"
+          ]
+        }
+      ],
+      "evidence_gap": "empty census on a trajectory whose final answer contains an invented named entity",
+      "failure_hypothesis": {
+        "initial_hypothesis": "specific named entities in the final answer that no observation contains are not being proposed as candidates on long search trajectories",
+        "hypothesis_basis": "census returned zero candidates; the gold error is a concrete invented school name at step 6"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "unsupported_claim_grounding",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "final-answer entity grounding against retrieved content"
+      }
+    },
+    "OpenManus/093.json": {
+      "agent_behavior": "physics-design assistant that invents an ambiguity in a well-posed problem and resolves it with fabricated physics",
+      "root_cause": "gold step 1: the agent invented a non-existent ambiguity in the problem statement and resolved it with a fabricated physical argument",
+      "missed_candidates": [
+        {
+          "claim": "the agent asserted the problem contains an ambiguity requiring a choice, where the user's statement is unambiguous",
+          "locus_event_id": "event_002",
+          "evidence_refs": [
+            "event_001"
+          ]
+        }
+      ],
+      "evidence_gap": "the invented ambiguity itself was never proposed; the downstream physics claim was excused as user-instructed",
+      "failed_stage_override": {
+        "stage": "census",
+        "reason": "c1's rejection (user did instruct the λ2 approximation) is defensible on the trajectory; the gold error is the invented ambiguity at step 1, which never became a candidate"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "interpretation-level hallucinations (inventing ambiguity in the task) are invisible to a census that scans statements and tool calls but not the task-model vs task-text fit",
+        "hypothesis_basis": "gold locates the error in the problem reinterpretation at step 1; census's only candidate was the derived physics conclusion at event_002"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "observation",
+          "name": "unsupported_claim_grounding",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "task-model fidelity: flag introduced ambiguities/assumptions absent from the user's statement"
+      }
+    },
+    "SmolAgents/002.json": {
+      "agent_behavior": "chemistry-reasoning agent that presents a guessed structure as deduced logic",
+      "root_cause": "gold step 7: the agent fabricated the epoxide bridge position and misidentified the attack site, producing the wrong product",
+      "evidence_gap": "verification accepted 'deduced by organic logic' as grounding without re-deriving the deduction",
+      "failure_hypothesis": {
+        "initial_hypothesis": "verification does not re-derive claimed reasoning chains: an agent-stated derivation counts as grounded even when the derivation contains an invented structural premise",
+        "hypothesis_basis": "c1 rejection rationale: event_007 'deduced by organic logic' was accepted as grounding; the gold error is precisely a wrong premise inside that deduction"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "verification",
+          "name": "unverified_derivation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "derivation re-computation for REASONING candidates, not just source citation"
+      }
+    },
+    "SmolAgents/031.json": {
+      "agent_behavior": "data-lookup assistant that quietly substitutes a rounded media figure for the official statistic",
+      "root_cause": "gold step 4: the agent used the rounded media figure 557.0 thousand men where the official census value is 556.9 thousand",
+      "evidence_gap": "verification applied the rounding-tolerance exemption to a task whose precision requirement forbids it",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the gold-relevant candidate (c1: 557.0 vs 556.9) was rejected at verification under the rounding exemption; the later defense overturn of c2 was a separate, correct call"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "the blanket rounding tolerance ignores whether the task demands the official value; when retrieved precision exists, substituting a coarser source is a real deviation",
+        "hypothesis_basis": "c1 rejection cites both figures being present and treats 557.0 as acceptable rounding; the gold judges the substitution itself as the error"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "verification",
+          "name": "exactness_boundary",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "precision-requirement-aware tolerance: exactness exemptions conditioned on task semantics"
+      }
+    },
+    "BFCL/114.json": {
+      "agent_behavior": "market-briefing assistant that characterizes marginal indicator positions loosely",
+      "root_cause": "gold: clean trajectory; the agent's 'trading just above its 20-day moving average' differs from 150.0 vs 150.2 only at presentation granularity",
+      "evidence_gap": "defense did not apply its own micro-difference rule to a near-tie indicator reading",
+      "failed_stage_override": {
+        "stage": "defense",
+        "reason": "the conviction rests on a 0.13% indicator margin; the defense stage owns the micro-difference carve-out and upheld anyway"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "near-tie quantitative characterizations ('just above' a value it marginally sits below) should be excused as presentation granularity, but the micro-difference rule only fires on reported numbers, not on directional characterizations",
+        "hypothesis_basis": "cert+defense rationales both quote 150.0 vs MA 150.2 and treat the direction wording as a real contradiction; gold is clean"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "expression_tolerance",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "extend micro-difference tolerance to near-tie directional characterizations"
+      }
+    },
+    "BFCL/127.json": {
+      "agent_behavior": "flight-booking assistant that expands codes into names and adds currency units when reporting",
+      "root_cause": "gold: clean trajectory; expanding airport codes to city names and writing '1000.0' as '$1,000 USD' is acceptable reporting",
+      "evidence_gap": "verification applied exact-match semantics to prose reports instead of tool arguments",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "both upheld candidates convict presentational enrichment (code-to-name expansion, currency unit) that the tool-argument exact-match convention does not cover"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "the exact-match doctrine leaks from tool arguments into reported prose: enriching observations with names/units is convicted as unsupported addition",
+        "hypothesis_basis": "c1/c3 rationales compare observation content to report wording and treat any added token as a deviation; gold tolerates both"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "expression_tolerance",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "prose/argument boundary: exact-match applies to arguments, not to report enrichment"
+      }
+    },
+    "BFCL/142.json": {
+      "agent_behavior": "expense-report assistant that summarizes invoice coverage slightly beyond the invoice fields",
+      "root_cause": "gold: clean trajectory; the coverage summary is an acceptable reading of the retrieved documents in context",
+      "evidence_gap": "verification convicted a summary-level overstatement as an unsupported claim",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld certificate treats 'invoice covered flight and insurance' vs flight-only invoice fields as a substantive fabrication rather than summary tolerance"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "field-level absence in one cited document is read as disproving a multi-document summary, without weighing the other evidence the summary drew on",
+        "hypothesis_basis": "cert rationale enumerates only the invoice fields; gold accepts the summary"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "summary-vs-document strictness: absence in one source is not fabrication when the summary spans sources"
+      }
+    },
+    "Camel/061.json": {
+      "agent_behavior": "chemistry tutor whose explanatory framing echoes the human guidance it received",
+      "root_cause": "gold: clean trajectory; the disputed ortho/para framing restates guidance present in the conversation",
+      "evidence_gap": "verification did not treat the human guidance event as grounding for the restated framing",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the certificate convicts a statement whose source is the human guidance in event_003; citing the user as origin should have rejected the candidate"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "statements grounded in the user's own guidance are convicted when their domain content looks questionable, because user-grounding is not weighted against outside correctness intuitions",
+        "hypothesis_basis": "cert rationale acknowledges the human guidance in event_003 and still supports the deviation"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "user-grounding weight: restating user guidance is not a detector-level deviation"
+      }
+    },
+    "Camel/064.json": {
+      "agent_behavior": "astronomy assistant that paraphrases the user's advice in its own derivation narrative",
+      "root_cause": "gold: clean trajectory; the paraphrase of the human advice is not a misrepresentation at benchmark tolerance",
+      "evidence_gap": "verification convicted a paraphrase-level difference between the agent's restatement and the user's exact advice",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld candidate reads 'wrote that the user instructed X' vs the user's actual wording as misrepresentation; at benchmark tolerance this is a paraphrase"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "restatements of user advice are checked with exact-match strictness, so any rewording risks a fabrication charge",
+        "hypothesis_basis": "cert compares event_004's restatement to event_003's advice and supports on the wording gap; gold is clean"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "expression_tolerance",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "paraphrase tolerance for restated instructions"
+      }
+    },
+    "Magentic_One/014.json": {
+      "agent_behavior": "bioinformatics assistant that adds evaluative adjectives to reported findings",
+      "root_cause": "gold: clean trajectory; 'robust' signal and 'well established' are acceptable evaluative phrasing over the data",
+      "evidence_gap": "verification convicted evaluative characterization beyond the data's literal content",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld certificate treats evaluative adjectives ('robust', 'well established') as fabricated facts rather than interpretation"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "interpretive/evaluative language on top of real data is convicted under the unsupported-addition rule, with no interpretation-vs-fact distinction",
+        "hypothesis_basis": "cert rationale: event_001 gives no signal-strength characterization, so event_007's adjectives count as unsupported"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "interpretation-vs-fact boundary in verification"
+      }
+    },
+    "Magentic_One/065.json": {
+      "agent_behavior": "award-lookup assistant that answers from the national organization page and shortcuts the instructed search procedure",
+      "root_cause": "gold: clean trajectory; the national-page answer and the shortcut procedure are within benchmark tolerance",
+      "evidence_gap": "verification treated instruction-following procedure deviations as factual hallucinations",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "c2 convicts using answer_question instead of the instructed new-tab searches; c1 convicts the sourced answer itself; both are procedure/answer-quality concerns, not fabricated facts"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "process instructions (how to search) are enforced as hard factual requirements, so any deviation convicts regardless of answer correctness",
+        "hypothesis_basis": "c2's rationale quotes the event_006/008 instructions and supports deviation-on-procedure"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "requirement typing: procedural vs factual requirements carry different weights"
+      }
+    },
+    "Magentic_One/066.json": {
+      "agent_behavior": "research assistant that runs a subset of the requested queries before answering",
+      "root_cause": "gold: clean trajectory; performing one of three requested searches is a thoroughness matter, not a fabricated result",
+      "evidence_gap": "verification convicted incomplete instruction execution as a factual deviation",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld candidate convicts running one query instead of three; no fabricated or misreported content is involved"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "quantified instruction scope ('three queries') is enforced exactly, so partial compliance convicts even with accurate reporting",
+        "hypothesis_basis": "cert rationale counts the queries in event_002 vs event_003 and supports on the shortfall"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "completeness-vs-accuracy distinction: under-execution without fabrication is not a hallucination"
+      }
+    },
+    "Octotools/016.json": {
+      "agent_behavior": "tool-following agent that answers the identification task with a short explanation attached",
+      "root_cause": "gold: clean trajectory; the benchmark's own answer format is multi-part, so the explanatory answer is acceptable",
+      "evidence_gap": "the court read 'write only the word' as a hard output-format requirement the benchmark does not enforce",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld candidate convicts a multi-part answer where the gold explanation's own format is multi-part; the requirement interpretation, not any fact, drove the conviction"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "output-format phrasing in the task text is treated as a hard constraint, convicting answers whose content is correct",
+        "hypothesis_basis": "cert quotes the 'only the word' instruction; gold's structured explanation shows the format is advisory"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "format-instruction weight: advisory formats do not convict correct content"
+      }
+    },
+    "Octotools/028.json": {
+      "agent_behavior": "tv-lookup assistant that over-claims source confirmation and lists a generous tool plan",
+      "root_cause": "gold: clean trajectory; the confirmation phrasing and the extra planned tool are within benchmark tolerance",
+      "evidence_gap": "verification convicted absence-of-evidence readings ('searches confirmed') and plan hygiene (irrelevant tool listed)",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "c1 convicts an attribution-of-confirmation phrasing; c4 convicts listing an irrelevant tool in a plan; neither fabricates task-relevant content"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "meta-claims about process ('confirmed by searches') and planning artifacts are convicted as content fabrications",
+        "hypothesis_basis": "both upheld rationales reason from absence (no episode evidence / irrelevant tool) rather than from a contradicted fact"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "content-vs-meta distinction: process narration and plans are not verdict-bearing facts"
+      }
+    },
+    "OpenManus/048.json": {
+      "agent_behavior": "extraction assistant that terminates the run after identifying the answer internally",
+      "root_cause": "gold: clean trajectory; the answer was extracted and the terminate-with-success closure is accepted by the benchmark",
+      "evidence_gap": "verification required an explicit user-facing final answer the benchmark does not demand",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the upheld candidate convicts calling terminate with success instead of emitting the answer as a message; the extraction itself succeeded"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "delivery-form expectations (answer must be a user message) are enforced as factual requirements",
+        "hypothesis_basis": "cert rationale acknowledges event_004 identified the winner and convicts only the termination"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "strictness_miscalibration",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "delivery-form vs content: termination after successful extraction is not fabrication"
+      }
+    },
+    "SmolAgents/082.json": {
+      "agent_behavior": "math-reasoning agent that asserts the root structure its physical setup presupposes",
+      "root_cause": "gold: clean trajectory; within the task's construction the algebra is carried through consistently and the benchmark accepts it",
+      "evidence_gap": "verification overrode the task's stated premise with outside mathematical correctness",
+      "failed_stage_override": {
+        "stage": "verification",
+        "reason": "the conviction rests on external algebra (discriminant sign) contradicting the premise the task text itself establishes; the trajectory is internally consistent"
+      },
+      "failure_hypothesis": {
+        "initial_hypothesis": "outside knowledge is applied against a task-stated premise without weighing which authority the benchmark assigns",
+        "hypothesis_basis": "cert rationale recomputes the roots externally; gold's explanation works within the task's construction"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "policy",
+          "name": "evidence_weighting",
+          "status": "known"
+        },
+        "generalization": "case_specific",
+        "proposed_intervention": "premise-awareness: task-stated premises outrank external corrections"
+      }
+    },
+    "BFCL/006.json": {
+      "root_cause": "gold step 6: the agent fabricated experimental results; the detector's only candidate sat at the later manifestation (step 2)",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the census locates the visible wrong statement, not the step where the fabrication first entered the trajectory",
+        "hypothesis_basis": "sole upheld locus at position 2, gold step 6 is where the fabricated experiment claim originates per gold_reason"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only: earliest-locus selection needs provenance tracing, not a new detector capability"
+      }
+    },
+    "BFCL/030.json": {
+      "root_cause": "gold step 12: false completion claim about file deletions; a candidate at the gold step WAS upheld (c4) but the earliest-locus rule selected c3 at step 5",
+      "failure_hypothesis": {
+        "initial_hypothesis": "earliest-locus selection among multiple upheld certificates does not prefer the certificate matching the gold error",
+        "hypothesis_basis": "upheld loci c3@5 and c4@12; gold step 12; selection picked position 5"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "tie_ambiguity",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only: selection rule among upheld certificates needs an error-type preference, not a new capability"
+      }
+    },
+    "BFCL/080.json": {
+      "root_cause": "gold step 7: skipped required lockDoors/pressBrakePedal; the candidate targeted the step-5 narration instead",
+      "failure_hypothesis": {
+        "initial_hypothesis": "missing-action roots surface as narration candidates at adjacent earlier steps; no candidate names the omission point",
+        "hypothesis_basis": "sole locus at 5, gold step 7; same required-action family as the FN cases BFCL/067/071"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "BFCL/081.json": {
+      "root_cause": "gold step 7: unnecessary releaseBrakePedal call; candidates sat at steps 3 and 8",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the unnecessary-call root lies between the proposed loci; adjacency-based candidate placement misses the exact action step",
+        "hypothesis_basis": "loci at 3 and 8, gold step 7"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "BFCL/089.json": {
+      "root_cause": "gold step 4: unnecessary get_watchlist call; candidates started at step 5",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the unnecessary call precedes every proposed locus; earliest-locus still lands after the root",
+        "hypothesis_basis": "loci at 5,5,7; gold step 4"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "BFCL/094.json": {
+      "root_cause": "gold step 1: wrong stock identifier in the first call; candidates started at step 2",
+      "failure_hypothesis": {
+        "initial_hypothesis": "argument-error roots at the first tool call are skipped; candidates attach to the following report",
+        "hypothesis_basis": "loci at 2 and 4; gold step 1"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "BFCL/146.json": {
+      "root_cause": "gold step 2: empty booking_id argument; the candidate sat at the step-8 consequence",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the empty-argument root precedes the visible failure by six steps; candidate placement followed the symptom",
+        "hypothesis_basis": "sole locus at 8; gold step 2"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/003.json": {
+      "root_cause": "gold step 13: ordinal-multiplicity assumption error; candidates at gold step 13 existed and were upheld, but earlier loci (9/10) won the selection",
+      "failure_hypothesis": {
+        "initial_hypothesis": "with eight upheld certificates the earliest-locus rule systematically under-selects; the gold-matching certificates lose to earlier weaker ones",
+        "hypothesis_basis": "upheld loci span 9,10,13; gold step 13"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "tie_ambiguity",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/052.json": {
+      "root_cause": "gold step 3: replaced the correct total-mass relation; candidates started at step 4",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the substituted relation at step 3 is the root; the candidate attaches to its first downstream use",
+        "hypothesis_basis": "loci at 4,5; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/056.json": {
+      "root_cause": "gold step 3: adopted the misleading human hint treating (3i,4) as normalized; all candidates sat far downstream (11+)",
+      "failure_hypothesis": {
+        "initial_hypothesis": "premise-adoption roots at user-interaction steps are never proposed; only much later computation errors surface",
+        "hypothesis_basis": "loci at 11,13,15; gold step 3; gold_reason names the hint adoption"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/059.json": {
+      "root_cause": "gold step 3: accepted a user prompt that altered the physics problem; candidates sat at steps 4-7",
+      "failure_hypothesis": {
+        "initial_hypothesis": "root is the acceptance of the altered problem; candidates target the later computations it corrupted",
+        "hypothesis_basis": "loci at 4,5,7; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/060.json": {
+      "root_cause": "gold step 3: accepted the user's incorrect DNA molecule count; candidates sat at step 5",
+      "failure_hypothesis": {
+        "initial_hypothesis": "user-premise adoption at step 3 is the root; the step-5 computations are manifestations",
+        "hypothesis_basis": "loci all at 5; gold step 3; gold_reason names the user's wrong count"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Camel/074.json": {
+      "root_cause": "gold step 3: adopted the human's incorrect claim about Dirac neutrino components; the candidate sat at step 8",
+      "failure_hypothesis": {
+        "initial_hypothesis": "same user-premise adoption family: root at the interaction step, candidate at the propagated conclusion",
+        "hypothesis_basis": "sole locus at 8; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Magentic_One/013.json": {
+      "root_cause": "gold step 3: trusted a misleading search snippet; candidates sat at steps 10-11",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the snippet trust at step 3 is the root; the answer built on it at step 10 is the manifestation",
+        "hypothesis_basis": "loci at 10,11; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Magentic_One/016.json": {
+      "root_cause": "gold step 3: relied on a misleading search-engine result; the candidate sat at step 4",
+      "failure_hypothesis": {
+        "initial_hypothesis": "root at the retrieval-trust step; candidate one step later at the derived statement",
+        "hypothesis_basis": "sole locus at 4; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Magentic_One/043.json": {
+      "root_cause": "gold step 3: wrong geometric assumption (point B as second vertex); candidates at 1 and 13+",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the assumption step is skipped entirely; an early planning locus (1) and late consequence loci bracket it",
+        "hypothesis_basis": "loci at 1,13,17,19; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Magentic_One/075.json": {
+      "root_cause": "gold step 3: Coder's hydrogen mass-fraction mistake; candidates at the gold step existed and were upheld, but an earlier locus (step 1) won the selection",
+      "failure_hypothesis": {
+        "initial_hypothesis": "earliest-locus selection prefers an upheld step-1 candidate over the upheld gold-step candidates",
+        "hypothesis_basis": "upheld loci include 3 (c2-c4) but c1 at 1 was also upheld and won"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "tie_ambiguity",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "Octotools/022.json": {
+      "root_cause": "gold step 3: misframed the problem; the candidate sat at step 4",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the misframing step is the root; the first wrong output under the wrong frame is the candidate",
+        "hypothesis_basis": "sole locus at 4; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenDeepSearch/007.json": {
+      "root_cause": "gold step 2: oversimplified the NMR data treatment; thirteen candidates all sat at steps 3-4",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the data-interpretation root at step 2 precedes every candidate; the mass of later candidates reflects the propagated corruption",
+        "hypothesis_basis": "all loci at 3-4; gold step 2"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenDeepSearch/031.json": {
+      "root_cause": "gold step 2: misinterpreted the sampled values; candidates sat at steps 8-9",
+      "failure_hypothesis": {
+        "initial_hypothesis": "root at the sampling-interpretation step; candidates at the much later reported conclusions",
+        "hypothesis_basis": "loci at 8,9; gold step 2"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenDeepSearch/034.json": {
+      "root_cause": "gold step 3: arbitrarily introduced the year 2023; a candidate at the gold step (c1) existed but did not survive the chain, later loci (7-8) were upheld",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the gold-step candidate was rejected while its downstream consequences convicted; the chain and the selection together lost the root",
+        "hypothesis_basis": "c1 at gold step 3 present but not upheld; upheld loci at 7-8"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenManus/067.json": {
+      "root_cause": "gold step 1: unnecessarily queried a 'human' tool; the candidate sat at step 5",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the unnecessary tool choice at step 1 is the root; the candidate attaches to the step-5 handling of its result",
+        "hypothesis_basis": "sole locus at 5; gold step 1"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenManus/072.json": {
+      "root_cause": "gold step 3: falsely claimed the Agnew clan crest animal; candidates at steps 1 and 4",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the false claim at step 3 was bracketed by a planning locus (1) and a report locus (4) but never selected",
+        "hypothesis_basis": "loci at 1,4; gold step 3"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "OpenManus/076.json": {
+      "root_cause": "gold step 1: hallucinated Barvainis radius formula; candidates sat at step 2",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the formula error at step 1 is the root; the step-2 usage is the first visible manifestation",
+        "hypothesis_basis": "loci at 2; gold step 1"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    },
+    "SmolAgents/079.json": {
+      "root_cause": "gold step 1: planning fallacy in the initial plan; candidates sat at step 7",
+      "failure_hypothesis": {
+        "initial_hypothesis": "the plan-level root is never a candidate; only the step-7 execution consequence is",
+        "hypothesis_basis": "loci at 7; gold step 1; gold_reason names the planning fallacy"
+      },
+      "capability_analysis": {
+        "capability_gap": {
+          "category": "attribution",
+          "name": "locus_vs_manifestation",
+          "status": "known"
+        },
+        "generalization": "cross_case",
+        "proposed_intervention": "diagnostic only"
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "capability_analysis": null,
+  "case_id": "BFCL/057.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent posted the tweet with content 'Just started my journey!' via post_tweet in parallel with startEngine before confirming the engine had started, even though startEngine returned an error, instead of waiting until the engine had actually started before posting the journey-start tweet",
+        "evidence_refs": [
+          "event_007"
+        ],
+        "locus_event_id": "event_007"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_007",
+    "responsible_step": 7,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_007 shows startEngine returned an error indicating the engine could not start because doors were unlocked, yet the agent still posted the tweet 'Just started my journey!' without first resolving the error or confirming the engine had started. The tweet content states the journey just started, which is contradicted by the startEngine failure, so the claimed deviation is grounded in the cited evidence.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 7,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Missing Required Call",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "8 events (roles: {'assistant': 8}); tools: estimate_distance, fillFuelTank, get_zipcode_based_on_city, liter_to_gallon, post_tweet, startEngine; content 626 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

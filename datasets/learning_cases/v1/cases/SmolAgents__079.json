@@ -1,0 +1,109 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "SmolAgents/079.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "The agent treated the first planet's impact parameter b=0.2 as if it applied to the second planet and solved a2=(R_star-R_p2)/0.2, instead of using the shared orbital plane to set b2=b1*(a2/a1) and imposing the occultation limit b2≤(R_star-R_p2)/R_star; this produced P2≈1.57 d instead of ≈33 d.",
+        "evidence_refs": [
+          "event_006",
+          "event_005",
+          "event_003"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "The agent wrote the transit/occultation impact-parameter constraints as b≤(R_star±R_planet)/a, with the semi-major axis in the denominator, instead of b≤(R_star±R_planet)/R_star.",
+        "evidence_refs": [
+          "event_003",
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 2,
+      "error_certificate_count": 2,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_007",
+    "responsible_step": 7,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "event_006 derived cos_i = b1*R_star/a1, which gives the shared orbital-plane relation; but event_007 does not use it. It sets b=0.2 directly for planet 2 and computes max_a2=(R_star-R_planet2)/b = 805.9 Earth radii. This treats the first planet's impact parameter as if it applied to the second planet, rather than requiring b2=b1*(a2/a1). The resulting semi-major axis corresponds to P2 about 1.57 d, far from the ~33 d produced by the shared-plane scaling.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "event_007 explicitly writes the impact-parameter constraints as b <= (R_star+R_planet)/a and b <= (R_star-R_planet)/a, placing the semi-major axis a in the denominator. Since the impact parameter is normalized to the stellar radius, the dimensionless threshold should use (R_star±R_planet)/R_star, as event_006's own definition b=(a/R_star)*cos_i indicates. The trajectory therefore contains the claimed denominator error.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 1 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci at 7; gold step 1; gold_reason names the planning fallacy",
+    "initial_hypothesis": "the plan-level root is never a candidate; only the step-7 execution consequence is"
+  },
+  "ground_truth": {
+    "gold_step": 1,
+    "hallucination_label": true,
+    "hallucination_type": "Planning Hallucination / Task Decompose",
+    "root_cause": "gold step 1: planning fallacy in the initial plan; candidates sat at step 7"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "10 events (roles: {'?': 10}); tools: final_answer, python_interpreter, web_search; content 3325 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "SmolAgents",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

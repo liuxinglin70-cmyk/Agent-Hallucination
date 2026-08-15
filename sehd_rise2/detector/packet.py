@@ -38,8 +38,31 @@ FORBIDDEN_PACKET_KEYS = EVALUATOR_ONLY_FIELDS | {
     "model_id",
 }
 
-_MAX_EVENT_CONTENT = 4000
-_MAX_PACKET_CHARS = 24000
+_MAX_EVENT_CONTENT = 16000
+_MAX_TOOL_TEXT = 8000
+_MAX_QUESTION_CHARS = 4000
+_MAX_PACKET_CHARS = 96000
+
+# Two-phase evidence-access budgets.
+# Phase 1 (census): a complete event INDEX plus the chronological tail at
+# full detail. Every event is nameable (id/role/preview/length/tool lines),
+# and the tail carries the final answer — the most hallucination-relevant
+# part — so it is rendered at full detail first.
+INDEX_VIEW_CHARS = 48000
+INDEX_TAIL_EVENTS = 8
+INDEX_EVENT_PREVIEW = 300
+INDEX_TOOL_PREVIEW = 120
+# Phase 2 (verification/defense): ONLY the events cited by the candidates
+# (locus + evidence refs) plus their chronological neighbours, each at a
+# large per-event budget. A cited event that still cannot fit marks the
+# view truncated: the court fails closed on an incomplete evidence view.
+# The ceilings are RESOURCE budgets for full-fidelity evidence rendering,
+# not decision thresholds: the court stays fail-closed beyond them, and
+# only the rare cases that cite very large tool observations pay the
+# larger prompts.
+EVIDENCE_VIEW_CHARS = 400_000
+EVIDENCE_EVENT_CHARS = 200_000
+EVIDENCE_WINDOW = 1
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -224,39 +247,206 @@ def _truncate(value: Any, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + "…[truncated]"
 
 
-def render_packet(packet: Mapping[str, Any]) -> str:
-    """Render a bounded, provider-safe text view of the packet."""
+def _render_event(
+    event: Mapping[str, Any], *, event_cap: int, tool_cap: int,
+) -> tuple[str, bool]:
+    """Render one event at full detail; returns (block, field_truncated)."""
+    lines = [
+        f"EVENT {event['event_id']} (position={event['position']}, "
+        f"role={event.get('role') or '?'})",
+    ]
+    truncated = False
+    content = event.get("content")
+    if content not in (None, ""):
+        text = str(content)
+        if len(text) > event_cap:
+            text = text[:event_cap] + "…[truncated]"
+            truncated = True
+        lines.append(text)
+    for interaction in event.get("tool_interactions") or []:
+        args = interaction.get("arguments")
+        args_text = _truncate(args, tool_cap) if args not in (None, "") else "{}"
+        if str(args or "") and len(str(args)) > tool_cap:
+            truncated = True
+        obs = interaction.get("observation")
+        obs_text = _truncate(obs, tool_cap) if obs not in (None, "") else "(none)"
+        if str(obs or "") and len(str(obs)) > tool_cap:
+            truncated = True
+        lines.append(
+            f"  TOOL {interaction['interaction_id']} "
+            f"name={interaction.get('tool_name')} "
+            f"arguments={args_text}\n  -> observation: {obs_text}"
+        )
+    return "\n".join(lines), truncated
+
+
+def _fresh_view_meta() -> dict[str, Any]:
+    return {
+        "rendered_event_ids": [],
+        "truncated_event_ids": [],
+        "packet_truncated": False,
+    }
+
+
+def render_full_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Bounded full-detail render; returns (text, meta)."""
     lines: list[str] = []
+    meta = _fresh_view_meta()
     question = packet.get("question")
     if question:
-        lines.append(f"QUESTION: {_truncate(question, 2000)}")
+        lines.append(f"QUESTION: {_truncate(question, _MAX_QUESTION_CHARS)}")
     budget = _MAX_PACKET_CHARS
     for event in packet.get("events") or []:
-        block = [
-            f"EVENT {event['event_id']} (position={event['position']}, "
-            f"role={event.get('role') or '?'})",
-        ]
-        content = event.get("content")
-        if content not in (None, ""):
-            block.append(_truncate(content, _MAX_EVENT_CONTENT))
-        for interaction in event.get("tool_interactions") or []:
-            args = _truncate(
-                interaction.get("arguments"), 1500,
-            ) if interaction.get("arguments") not in (None, "") else "{}"
-            obs = interaction.get("observation")
-            obs_text = (
-                _truncate(obs, 1500) if obs not in (None, "") else "(none)"
-            )
-            block.append(
-                f"  TOOL {interaction['interaction_id']} "
-                f"name={interaction.get('tool_name')} "
-                f"arguments={args}\n  -> observation: {obs_text}"
-            )
-        chunk = "\n".join(block)
+        chunk, truncated = _render_event(
+            event, event_cap=_MAX_EVENT_CONTENT, tool_cap=_MAX_TOOL_TEXT,
+        )
         if len(chunk) > budget:
-            chunk = chunk[:budget] + "\n…[packet truncated]"
-            lines.append(chunk)
+            lines.append(chunk[:budget] + "\n…[packet truncated]")
+            meta["packet_truncated"] = True
             break
         lines.append(chunk)
+        meta["rendered_event_ids"].append(event["event_id"])
+        if truncated:
+            meta["truncated_event_ids"].append(event["event_id"])
         budget -= len(chunk)
-    return "\n".join(lines)
+    return "\n".join(lines), meta
+
+
+def render_index_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Census view: complete event index + chronological tail at full detail.
+
+    Every event gets one index line (id, position, role, content preview
+    and length, tool names with argument previews and observation lengths)
+    so the census can name ANY event as locus/evidence. The last
+    ``INDEX_TAIL_EVENTS`` events are additionally rendered at full detail:
+    the tail carries the final answer, the most hallucination-relevant
+    part, and must be visible even when the middle is only indexed.
+    """
+    events = list(packet.get("events") or [])
+    lines: list[str] = []
+    meta = _fresh_view_meta()
+    question = packet.get("question")
+    if question:
+        lines.append(f"QUESTION: {_truncate(question, _MAX_QUESTION_CHARS)}")
+    lines.append("\nEVENT INDEX:")
+    budget = INDEX_VIEW_CHARS
+    index_hit_budget = False
+    for event in events:
+        content = event.get("content")
+        content_text = str(content) if content not in (None, "") else ""
+        preview = (
+            _truncate(content_text, INDEX_EVENT_PREVIEW)
+            if content_text else "(no content)"
+        )
+        tools: list[str] = []
+        for interaction in event.get("tool_interactions") or []:
+            args = interaction.get("arguments")
+            args_preview = (
+                _truncate(args, INDEX_TOOL_PREVIEW)
+                if args not in (None, "") else "{}"
+            )
+            obs = interaction.get("observation")
+            obs_len = len(str(obs)) if obs not in (None, "") else 0
+            tools.append(
+                f"tool={interaction.get('tool_name')} args={args_preview} "
+                f"obs_chars={obs_len}"
+            )
+        tool_txt = (" tools=[" + "; ".join(tools) + "]") if tools else ""
+        line = (
+            f"{event['event_id']} (position={event['position']}, "
+            f"role={event.get('role') or '?'}, content_chars={len(content_text)}, "
+            f"preview={preview!r}){tool_txt}"
+        )
+        if len(line) > budget:
+            index_hit_budget = True
+            break
+        lines.append(line)
+        budget -= len(line)
+    if index_hit_budget:
+        lines.append("…[event index truncated]")
+        meta["packet_truncated"] = True
+    lines.append("\nTAIL EVENTS (full detail, chronological end):")
+    for event in events[-INDEX_TAIL_EVENTS:]:
+        chunk, truncated = _render_event(
+            event, event_cap=_MAX_EVENT_CONTENT, tool_cap=_MAX_TOOL_TEXT,
+        )
+        if len(chunk) > budget:
+            lines.append(chunk[:budget] + "\n…[packet truncated]")
+            meta["packet_truncated"] = True
+            break
+        lines.append(chunk)
+        meta["rendered_event_ids"].append(event["event_id"])
+        if truncated:
+            meta["truncated_event_ids"].append(event["event_id"])
+        budget -= len(chunk)
+    return "\n".join(lines), meta
+
+
+def render_evidence_view(
+    packet: Mapping[str, Any], event_ids: Sequence[str],
+    *, window: int = EVIDENCE_WINDOW,
+) -> tuple[str, dict[str, Any]]:
+    """Verification/defense view: cited events at full detail + neighbours.
+
+    Only the events named by candidate locus/evidence refs (interaction
+    ids resolve to their parent event) plus ``window`` chronological
+    neighbours are rendered, each at the large ``EVIDENCE_EVENT_CHARS``
+    budget. If a CITED event still cannot fit fully (budget cut or field
+    truncation), the view is marked ``packet_truncated`` and the court
+    must fail closed: a verdict built on an incomplete evidence view is
+    not authoritative. Window-only events may truncate without failing
+    the view (they are context, not conviction basis).
+    """
+    events = list(packet.get("events") or [])
+    by_id = {str(e.get("event_id")): e for e in events}
+    cited: set[str] = set()
+    for event_id in event_ids:
+        eid = str(event_id)
+        parent = eid.rsplit("_tool_", 1)[0] if "_tool_" in eid else eid
+        if parent in by_id:
+            cited.add(parent)
+    expanded: set[str] = set(cited)
+    for event in events:
+        if event["event_id"] not in cited:
+            continue
+        pos = int(event.get("position") or 0)
+        for other in events:
+            if abs(int(other.get("position") or 0) - pos) <= window:
+                expanded.add(other["event_id"])
+    lines: list[str] = []
+    meta = _fresh_view_meta()
+    question = packet.get("question")
+    if question:
+        lines.append(f"QUESTION: {_truncate(question, _MAX_QUESTION_CHARS)}")
+    budget = EVIDENCE_VIEW_CHARS
+    for event in events:
+        if event["event_id"] not in expanded:
+            continue
+        tag = "CITED" if event["event_id"] in cited else "WINDOW"
+        chunk, truncated = _render_event(
+            event, event_cap=EVIDENCE_EVENT_CHARS, tool_cap=EVIDENCE_EVENT_CHARS,
+        )
+        if tag == "CITED" and truncated:
+            # A cited event that could not be rendered in full means the
+            # conviction basis is incomplete: fail closed upstream.
+            meta["packet_truncated"] = True
+        if len(chunk) > budget:
+            lines.append(chunk[:budget] + "\n…[packet truncated]")
+            meta["packet_truncated"] = True
+            break
+        block = f"[{tag}] " + chunk
+        lines.append(block)
+        meta["rendered_event_ids"].append(event["event_id"])
+        if truncated:
+            meta["truncated_event_ids"].append(event["event_id"])
+        budget -= len(block)
+    meta["omitted_event_ids"] = [
+        e["event_id"] for e in events if e["event_id"] not in expanded
+    ]
+    return "\n".join(lines), meta
+
+
+def render_packet(packet: Mapping[str, Any]) -> str:
+    """Render a bounded, provider-safe text view of the packet."""
+    text, _meta = render_full_view(packet)
+    return text

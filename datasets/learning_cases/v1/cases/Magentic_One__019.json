@@ -1,0 +1,97 @@
+{
+  "capability_analysis": null,
+  "case_id": "Magentic_One/019.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "The agent searched 'Dire Maul release date World of Warcraft' instead of a query specifying the original/vanilla release date, so the search returned the WoW Classic release date (October 15, 2019) rather than the original 2006 release date.",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "The agent stated that Dire Maul was originally released on October 15, 2019 (the WoW Classic release date) instead of the correct original World of Warcraft release date of March 7, 2006.",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned",
+        "c2": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_002 instructed finding the date Dire Maul was 'originally added.' The actual web_search query in event_003 was only 'Dire Maul release date World of Warcraft,' lacking any original/vanilla qualifier, and the observation shows the results returned the WoW Classic release on October 15, 2019. Thus the search arguments were not sufficiently aligned with the original-date requirement.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Event_005 reports the original release date as October 15, 2019, but the only cited date evidence in event_003 identifies that date as the WoW Classic release, not the original World of Warcraft addition. The requested fact was the original addition date, so the agent's statement conflates WoW Classic with the original game and is not grounded in the cited observations.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 5,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Factual Reasoning",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "6 events (roles: {'MagenticOneOrchestrator': 4, 'WebSurfer': 2}); tools: web_search; content 2404 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Magentic_One",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

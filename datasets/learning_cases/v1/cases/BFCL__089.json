@@ -1,0 +1,119 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "BFCL/089.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent supplied fabricated placeholder credentials 'your_username' and 'your_password' to trading_login instead of using real user credentials or asking the user for them",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent called get_available_stocks with sector 'Technology' a second time at event_005 even though the identical list had already been returned at event_004, instead of reusing the previous result",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent stated the watchlist contained company names 'Apple Inc.', 'Alphabet Inc.', 'Microsoft Corporation', and 'NVIDIA Corporation' in the final summary instead of only listing the symbols returned by the tool observations",
+        "evidence_refs": [
+          "event_004",
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The trajectory shows event_004 returned an authentication error, and event_005 then called trading_login with literal placeholder strings 'your_username' and 'your_password'. No user credentials were provided or requested, so the agent fabricated placeholder credentials instead of asking the user.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The agent did call get_available_stocks again with sector 'Technology' after the identical list was already returned, and the second call returned the same valid list. This is redundant but does not contradict the observations or a task requirement, so it is not a supported deviation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "The final summary listed the symbols returned by the tool observations, with accurate company names added parenthetically. The user asked for stock symbols, and the agent supplied them; adding well-known company names is equivalent, accurate clarification, not a deviation.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 4 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci at 5,5,7; gold step 4",
+    "initial_hypothesis": "the unnecessary call precedes every proposed locus; earliest-locus still lands after the root"
+  },
+  "ground_truth": {
+    "gold_step": 4,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Unnecessary Tool Call",
+    "root_cause": "gold step 4: unnecessary get_watchlist call; candidates started at step 5"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "7 events (roles: {'assistant': 7}); tools: add_to_watchlist, get_available_stocks, get_stock_info, get_symbol_by_name, get_watchlist, trading_login; content 471 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

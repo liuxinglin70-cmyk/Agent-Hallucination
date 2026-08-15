@@ -7,18 +7,19 @@ tmp_pull_*/
 tmp_upload_*/
 *.txt
 
-# Pre-refactor SEHD-v6 frozen baseline: local historical backup only,
-# superseded by sehd_rise/ (see src/README.md)
+# Pre-refactor SEHD-v6 baseline: removed from the repo 2026-08-15
+# (git history retains it; no local backup tree remains)
 src/
 
 # Experiment workspace (run artifacts are local-only; the README is tracked)
 experiments/*
 !experiments/README.md
 
-# Raw datasets (large, local-only)
+# Raw datasets (large, local-only); learning-case projections are tracked
 datasets/raw/
 datasets/**/*.json
 datasets/**/*.jsonl
+!datasets/learning_cases/v1/**
 
 # Python
 __pycache__/

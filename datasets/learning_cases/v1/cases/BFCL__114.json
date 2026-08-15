@@ -1,0 +1,105 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "expression_tolerance",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "extend micro-difference tolerance to near-tie directional characterizations"
+  },
+  "case_id": "BFCL/114.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent stated that ZETA was trading just above its 20-day moving average instead of reporting that the price ($150.00) was below the 20-day MA ($150.20)",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent identified NVDA as 'NVIDIA Corporation' even though the watchlist observation contained only the ticker 'NVDA' and no tool result or user statement provided that company name",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_007",
+    "responsible_step": 7,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "event_006 shows price 150.0 and MA(20) 150.2, so ZETA was below its 20-day MA; event_007 says it was trading just above, contradicting the cited observation.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "NVDA is the universally known ticker for NVIDIA Corporation, so the agent's expansion of the ticker is factually correct and not an unexcused deviation even though the observation only listed the ticker.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "defense did not apply its own micro-difference rule to a near-tie indicator reading",
+    "failed_stage": "defense",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "the conviction rests on a 0.13% indicator margin; the defense stage owns the micro-difference carve-out and upheld anyway"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "cert+defense rationales both quote 150.0 vs MA 150.2 and treat the direction wording as a real contradiction; gold is clean",
+    "initial_hypothesis": "near-tie quantitative characterizations ('just above' a value it marginally sits below) should be excused as presentation granularity, but the micro-difference rule only fires on reported numbers, not on directional characterizations"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; the agent's 'trading just above its 20-day moving average' differs from 150.0 vs 150.2 only at presentation granularity"
+  },
+  "input": {
+    "agent_behavior": "market-briefing assistant that characterizes marginal indicator positions loosely",
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "11 events (roles: {'assistant': 11}); tools: add_to_watchlist, fund_account, get_stock_info, get_symbol_by_name, get_watchlist, place_order; content 1424 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

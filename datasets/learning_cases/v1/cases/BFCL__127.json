@@ -1,0 +1,119 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "expression_tolerance",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "prose/argument boundary: exact-match applies to arguments, not to report enrichment"
+  },
+  "case_id": "BFCL/127.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent added unsupported airport names (e.g., Rivermist, Stonebrook, Maplecrest, Silverpine, Shadowridge, Sunset Valley, Oakendale, Willowbend, Autumnville, Greenfield) to the airport list instead of reporting only the airport codes returned by list_all_airports",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_002"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent claimed CRH was the most convenient option for international travel instead of only reporting that get_nearest_airport_by_city returned CRH as the nearest airport",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent stated the business-class fare as $1,000 USD instead of reporting the numeric cost 1000.0 returned by get_flight_cost without an unsupported currency unit",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "locus_event_id": "event_006"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 2,
+      "error_certificate_count": 2,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c3": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_002",
+    "responsible_step": 2,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "event_001's observation returns only airport codes, but event_002 adds airport names such as Rivermist, Stonebrook, Maplecrest, Silverpine, Shadowridge, Sunset Valley, Oakendale, Willowbend, Autumnville, and Greenfield that are not in the tool output or otherwise grounded in the cited evidence. This is an unsupported embellishment of the tool result.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "event_003's observation gives CRH as the nearest airport, and event_004 correctly reports that CRH is the closest airport to Crescent Hollow. Describing CRH as the most convenient option for international travel is a reasonable evaluative paraphrase grounded in its being the closest airport, not a material factual deviation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "event_005's observation returns only the numeric cost 1000.0 with no currency unit, while event_006 states the fare as '$1,000 USD.' The numeric amount matches, but the USD currency unit is unsupported by the tool output and task evidence.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification applied exact-match semantics to prose reports instead of tool arguments",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "both upheld candidates convict presentational enrichment (code-to-name expansion, currency unit) that the tool-argument exact-match convention does not cover"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "c1/c3 rationales compare observation content to report wording and treat any added token as a deviation; gold tolerates both",
+    "initial_hypothesis": "the exact-match doctrine leaks from tool arguments into reported prose: enriching observations with names/units is convicted as unsupported addition"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; expanding airport codes to city names and writing '1000.0' as '$1,000 USD' is acceptable reporting"
+  },
+  "input": {
+    "agent_behavior": "flight-booking assistant that expands codes into names and adds currency units when reporting",
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "6 events (roles: {'assistant': 6}); tools: get_flight_cost, get_nearest_airport_by_city, list_all_airports; content 1094 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

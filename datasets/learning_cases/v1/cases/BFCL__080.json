@@ -1,0 +1,93 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "BFCL/080.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent filled the tank as if it had a 50-gallon capacity (fillFuelTank fuelAmount=39.5) and then stated that the tank was filled completely to its 50-gallon capacity, instead of basing the fill and completion claim on an observed tank capacity or a full-tank status; no observation contained a capacity or full status, only fuelLevel 10.5 and fuelLevel 50.0",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The cited evidence only shows an initial fuelLevel of 10.5, a fillFuelTank call adding 39.5, and a resulting fuelLevel of 50.0. It contains no observed tank capacity or full-tank status. Therefore the agent's claim that the tank was filled completely to a 50-gallon capacity, and its choice of amount based on that assumed capacity, is not grounded in the trajectory observations.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 7 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "sole locus at 5, gold step 7; same required-action family as the FN cases BFCL/067/071",
+    "initial_hypothesis": "missing-action roots surface as narration candidates at adjacent earlier steps; no candidate names the omission point"
+  },
+  "ground_truth": {
+    "gold_step": 7,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Missing Required Call",
+    "root_cause": "gold step 7: skipped required lockDoors/pressBrakePedal; the candidate targeted the step-5 narration instead"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "11 events (roles: {'assistant': 11}); tools: check_tire_pressure, displayCarStatus, estimate_distance, estimate_drive_feasibility_by_mileage, fillFuelTank, find_nearest_tire_shop, startEngine; content 1533 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

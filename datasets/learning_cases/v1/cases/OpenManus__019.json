@@ -1,0 +1,113 @@
+{
+  "capability_analysis": null,
+  "case_id": "OpenManus/019.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "The agent solved only the two base-period equations x=34y^2=y and x=34y^2=2-y, instead of solving over all 4-periodic shifted segments x=34y^2=y+4n and x=34y^2=4n+2-y, so it omitted all shifted-period intersections required by the question.",
+        "evidence_refs": [
+          "event_001_tool_01",
+          "event_004_tool_01"
+        ],
+        "locus_event_id": "event_001_tool_01"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "The agent stated 'The sum of all y-coordinates is 0,' but the tool observation only supplied the sum of the four base-period roots; the complete intersection set has additional periodic roots and the required sum is nonzero, namely (1+5*sqrt(185))/68.",
+        "evidence_refs": [
+          "event_004_tool_01",
+          "event_001_tool_01"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "The agent concluded a=0, b=0, c=1, d=1 and a+b+c+d=2, instead of the required positive a,b,d with squarefree c; the complete sum gives a=1, b=5, c=185, d=68 and a+b+c+d=259.",
+        "evidence_refs": [
+          "event_001",
+          "event_001_tool_01",
+          "event_004_tool_01"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 3,
+      "error_certificate_count": 3,
+      "supported_certificate_count": 3
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld",
+        "c3": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The cited tool calls solve only Eq(34*y^2, y) and Eq(34*y^2, 2 - y), i.e. only the base-period segments x=34y^2=y and x=34y^2=2-y. The periodic definition f(x+4)=f(x) requires also considering shifted segments such as x=34y^2=y+4n and x=34y^2=4n+2-y, but the trajectory never does so. Thus the claimed omission of shifted-period intersections is real.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The tool observation in event_004_tool_01 supplies only the four base-period roots and their sum 0, and event_005 incorrectly treats that as the sum of all y-coordinates. The periodic extension adds shifted intersections; recomputing from the shifted segment equations gives the complete sum (1+5*sqrt(185))/68, not 0. The deviation is therefore supported.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "Since the complete sum of all periodic intersection y-coordinates is (1+5*sqrt(185))/68, the required positive integers are a=1, b=5, c=185, d=68, with a+b+c+d=259. The agent instead concluded a=0, b=0, c=1, d=1 and a+b+c+d=2, which contradicts the required form and is unsupported by the complete intersection set. The deviation is real.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 1,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Math Reasoning",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Math / AIME2025",
+    "trajectory_summary": "5 events (roles: {'assistant': 5}); tools: python_execute, terminate; content 2902 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "OpenManus",
+    "question_domain": "Math",
+    "question_source": "AIME2025",
+    "run_id": ""
+  }
+}

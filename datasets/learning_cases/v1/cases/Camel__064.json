@@ -1,0 +1,133 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "expression_tolerance",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "paraphrase tolerance for restated instructions"
+  },
+  "case_id": "Camel/064.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent misrepresented the human user's advice, writing that the user instructed to compute semi-major axes from equilibrium temperature ratios and then apply the corrected Kepler law, instead of preserving the user's actual instruction to use Newton's law of gravitation and the mass ratios to derive semi-major axes",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent initially derived a2/a1 = (T1/T2)^{-2} ≈ 0.51 in the temperature-to-distance step, instead of the correct a2/a1 = (T1/T2)^2 ≈ 1.96",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "locus_event_id": "event_006"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent computed (a3/a1)^3 ≈ 1116.5, instead of the correct ≈1115.2 for the stated a3/a1 ≈ 10.37",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent invented an unspecified stellar mass (M_star = 1000 units) and presented P3/P1 ≈ 33.4 as the definite answer, instead of noting that the exact period ratio depends on the undeclared M_star or explicitly labeling the result as the M_star >> M_planet approximation",
+        "evidence_refs": [
+          "event_001",
+          "event_003"
+        ],
+        "locus_event_id": "event_007"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 4,
+      "certificate_count": 4,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_004",
+    "responsible_step": 4,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_003's human reply instructed using Newton's law of gravitation and the mass ratios to derive semi-major axes. Event_004 then wrote that the user instructed to calculate semi-major axes using the equilibrium temperature ratios, which was not in the user's actual instruction and therefore misrepresents it.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Event_005 established that a2/a1 = (T1/T2)^2. Event_006 initially wrote a2/a1 = (T1/T2)^{-2} ≈ 0.510 before correcting it; the initial derivation contradicts the correct relation.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "For a3/a1 ≈ 10.37, (10.37)^3 ≈ 1115.16, so the agent's 1116.5 differs by only about 0.12%, which is under the 0.5% rounding/approximation tolerance and is not a certifiable deviation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c4",
+          "rationale": "Event_007 explicitly presents M_star = 1000 as an estimate, notes the mass correction is very small, and states the period as approximately 33.4, so it adequately labels the result as the M_star >> M_planet approximation rather than presenting an unqualified exact answer.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification convicted a paraphrase-level difference between the agent's restatement and the user's exact advice",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "the upheld candidate reads 'wrote that the user instructed X' vs the user's actual wording as misrepresentation; at benchmark tolerance this is a paraphrase"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "cert compares event_004's restatement to event_003's advice and supports on the wording gap; gold is clean",
+    "initial_hypothesis": "restatements of user advice are checked with exact-match strictness, so any rewording risks a fabrication charge"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; the paraphrase of the human advice is not a misrepresentation at benchmark tolerance"
+  },
+  "input": {
+    "agent_behavior": "astronomy assistant that paraphrases the user's advice in its own derivation narrative",
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "9 events (roles: {'Planner': 1, 'Coordinator': 1, 'Search Agent': 7}); tools: append_note, ask_human_via_console, read_note; content 2730 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Camel",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

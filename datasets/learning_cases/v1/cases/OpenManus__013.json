@@ -1,0 +1,151 @@
+{
+  "capability_analysis": null,
+  "case_id": "OpenManus/013.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent identified compound A as 3-methylcyclopentene instead of 1-isopropylidene-3-methylcyclopentane, whose ozonolysis gives 3-methylcyclopentanone and acetone",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_001"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent claimed that H2SO4 under heat converts the alkene into the alkane methylcyclopentane instead of an acid-catalyzed addition/rearrangement product; H2SO4 does not hydrogenate a C=C bond",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_001"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent changed the structure of A to 3-methylcyclohexene instead of the required 1-isopropylidene-3-methylcyclopentane; ozonolysis of 3-methylcyclohexene would not give cyclopentanone plus acetone",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent claimed H2SO4/heat converts 3-methylcyclohexene into 3-methylcyclohexane instead of an acid-catalyzed addition/rearrangement product; no hydrogenation step is present",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c5",
+        "claim": "the agent identified compound A as 1-isopropenyl-3-methylcyclopentane instead of 1-isopropylidene-3-methylcyclopentane; cleavage of the isopropenyl double bond would give formaldehyde and an acetylcyclopentane, not acetone and 3-methylcyclopentanone",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c6",
+        "claim": "the agent claimed the H2SO4/heat product from A is the alkane 1-isopropyl-3-methylcyclopentane instead of an acid-catalyzed hydration/rearrangement product; protonation and rearrangement alone do not reduce the alkene to an alkane",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_004"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 6,
+      "certificate_count": 6,
+      "complete_chain_certificate_count": 6,
+      "error_certificate_count": 6,
+      "supported_certificate_count": 6
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld",
+        "c3": "upheld",
+        "c4": "upheld",
+        "c5": "upheld",
+        "c6": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_001 explicitly identifies A as 3-methylcyclopentene, but the ozonolysis products 3-methylcyclopentanone and acetone require an exocyclic isopropylidene double bond, i.e., 1-isopropylidene-3-methylcyclopentane. The claimed structure is chemically inconsistent with the given products.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Event_001 claims the H2SO4/heat product is methylcyclopentane, an alkane. Starting from an alkene, this would require hydrogenation, which sulfuric acid does not provide; the agent's protonation/rearrangement/elimination explanation cannot produce an alkane.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "Event_003 changes the structure to 3-methylcyclohexene, but ozonolysis of 3-methylcyclohexene would open the six-membered ring to give an acyclic dialdehyde/ketoaldehyde product, not 3-methylcyclopentanone plus acetone.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c4",
+          "rationale": "Event_003 claims the H2SO4/heat product is 3-methylcyclohexane, an alkane. Sulfuric acid under heat does not hydrogenate an alkene to an alkane; the claimed product is not a valid acid-catalyzed addition/rearrangement outcome.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c5",
+          "rationale": "Event_004 identifies A as 1-isopropenyl-3-methylcyclopentane. Ozonolysis of an isopropenyl substituent would give formaldehyde and an acetyl-substituted cyclopentane, not acetone and 3-methylcyclopentanone. The correct structure is 1-isopropylidene-3-methylcyclopentane.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c6",
+          "rationale": "Event_004 claims the H2SO4/heat product is 1-isopropyl-3-methylcyclopentane, a saturated alkane. This would require reduction/hydrogenation of the double bond, which is not accomplished by H2SO4/heat alone, so the claimed product is chemically unsupported.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 1,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Science Reasoning",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "6 events (roles: {'assistant': 6}); tools: terminate; content 5907 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "OpenManus",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

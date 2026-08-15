@@ -1,0 +1,111 @@
+{
+  "capability_analysis": null,
+  "case_id": "SmolAgents/083.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent assumed y = z because the coefficients of y^2 and z^4 are equal, instead of minimizing over all positive x, y, z subject to xyz = 2; the true optimum is x = y = sqrt(2), z = 1, giving value 16",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_001"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent called CRootOf with an undefined symbol y and root index 0 instead of defining y or using the already-found positive root index 1, so the tool call failed with an InterpreterError",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent reported 17.50 as the global minimum, attained at y = z ≈ 1.16 and x ≈ 1.49, instead of the true minimum 16 attained at x = y = sqrt(2) and z = 1",
+        "evidence_refs": [
+          "event_001",
+          "event_005"
+        ],
+        "locus_event_id": "event_006"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 3,
+      "error_certificate_count": 3,
+      "supported_certificate_count": 3
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld",
+        "c3": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "event_001 explicitly shows the agent adopting the assumption y = z because the coefficients of y^2 and z^4 are the same. Solving the actual constrained minimization gives the true optimum x = y = sqrt(2), z = 1, with value 16, so the y = z assumption is invalid and the claimed true optimum is correct.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "event_002 returned a CRootOf result with root index 1, but event_003 calls CRootOf(2*y**12 + y**10 - 16, 0) without defining y, and the observation confirms an InterpreterError: variable y is not defined. Thus the tool call failed as described.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "event_005 computes the value as 17.504833948641505 and event_006 reports 17.50 as the minimum with y = z ≈ 1.16 and x ≈ 1.49. The true minimum from the constraint is 16 at x = y = sqrt(2), z = 1, so the final answer is numerically incorrect and the wrong minimizer is reported.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 1,
+    "hallucination_label": true,
+    "hallucination_type": "Planning Hallucination / Task Decompose",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Math / MATH-500",
+    "trajectory_summary": "6 events (roles: {'?': 6}); tools: final_answer, python_interpreter; content 2302 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "SmolAgents",
+    "question_domain": "Math",
+    "question_source": "MATH-500",
+    "run_id": ""
+  }
+}

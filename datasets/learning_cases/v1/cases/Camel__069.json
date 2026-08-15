@@ -1,0 +1,62 @@
+{
+  "capability_analysis": null,
+  "case_id": "Camel/069.json",
+  "detector_execution": {
+    "census": [],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 0,
+      "certificate_count": 0,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 0
+    },
+    "defense": {
+      "decisions": {}
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash"
+    },
+    "verification": {
+      "certificates": []
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "6 events (roles: {'Planner': 1, 'Coordinator': 1, 'Developer Agent': 4}); tools: ask_human_via_console, read_note, shell_exec; content 2163 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Camel",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

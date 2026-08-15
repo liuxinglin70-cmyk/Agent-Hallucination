@@ -1,0 +1,140 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "strictness_miscalibration",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "content-vs-meta distinction: process narration and plans are not verdict-bearing facts"
+  },
+  "case_id": "Octotools/028.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent claimed the Wikipedia searches confirmed 'Placebo Effect' as Season 2, Episode 9, instead of reporting that the Wikipedia observations contained no episode number or title and that the episode number came from the Google search results",
+        "evidence_refs": [
+          "event_002",
+          "event_003",
+          "event_004",
+          "event_005",
+          "event_006",
+          "event_007"
+        ],
+        "locus_event_id": "event_008"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent repeated the identical Wikipedia search 'Placebo Effect episode Archer' at event_004 instead of performing each unique search only once",
+        "evidence_refs": [
+          "event_003",
+          "event_004"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent repeated the identical Wikipedia search 'Archer Placebo Effect episode details' at events 006 and 007 instead of stopping after the first occurrence of that search",
+        "evidence_refs": [
+          "event_005",
+          "event_006",
+          "event_007"
+        ],
+        "locus_event_id": "event_006"
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent included the irrelevant Nature_News_Fetcher_Tool in the relevant tools for a TV-series lookup instead of limiting the plan to search and reference tools appropriate for the query",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_001"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 4,
+      "certificate_count": 4,
+      "complete_chain_certificate_count": 2,
+      "error_certificate_count": 2,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c4": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_008 attributes confirmation of Season 2, Episode 9 to the Wikipedia searches, but the cited Wikipedia observations (events 003-007) contain no episode number or title for 'Placebo Effect'; the episode title and S2E9/season 2 details are present in the Google search results at event_002. The source attribution is therefore false.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "There is no cited trajectory requirement that each unique search be performed only once. Repeating the same Wikipedia search after an unhelpful observation is redundant but not a contradiction of any stated instruction or observation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "Although events 005-007 repeat the same Wikipedia query, no cited trajectory evidence requires stopping after the first occurrence of a search, so this repetition is not an evidenced deviation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c4",
+          "rationale": "Event_001 lists Nature_News_Fetcher_Tool as a relevant tool for a TV-series episode lookup, which is irrelevant to the query and not excused by the cited evidence.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification convicted absence-of-evidence readings ('searches confirmed') and plan hygiene (irrelevant tool listed)",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "c1 convicts an attribution-of-confirmation phrasing; c4 convicts listing an irrelevant tool in a plan; neither fabricates task-relevant content"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "both upheld rationales reason from absence (no episode evidence / irrelevant tool) rather than from a contradicted fact",
+    "initial_hypothesis": "meta-claims about process ('confirmed by searches') and planning artifacts are convicted as content fabrications"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; the confirmation phrasing and the extra planned tool are within benchmark tolerance"
+  },
+  "input": {
+    "agent_behavior": "tv-lookup assistant that over-claims source confirmation and lists a generous tool plan",
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "8 events (roles: {'?': 8}); tools: Google_Search_Tool, Wikipedia_Knowledge_Searcher_Tool; content 2555 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Octotools",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

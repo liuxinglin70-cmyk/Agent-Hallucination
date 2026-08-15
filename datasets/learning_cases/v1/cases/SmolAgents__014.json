@@ -1,0 +1,95 @@
+{
+  "capability_analysis": null,
+  "case_id": "SmolAgents/014.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent claimed the question asks for 'the final number' and planned to extract a numeric value, instead of recognizing that the question asks who the Scotsman founder was",
+        "evidence_refs": [
+          "event_002"
+        ],
+        "locus_event_id": "event_001"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent answered '1898' (the formation year) instead of the required name of the Scotsman, 'Daddy' McCloud, who formed Clyde Pinelands Football Club",
+        "evidence_refs": [
+          "event_002"
+        ],
+        "locus_event_id": "event_003"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 2,
+      "error_certificate_count": 2,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The task question asks for the identity of the Scotsman who formed Clyde Pinelands Football Club, not for 'the final number.' In event_001, the agent explicitly reframed the question as asking for 'the final number' and planned to extract a numeric value, which contradicts the actual question wording in the trajectory.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The question requires the name of the Scotsman founder. The search observation in event_002 identifies him as 'Daddy' McCloud, but the final answer in event_003 gives only '1898,' the formation year. This fails to answer the required who question and ignores the retrieved evidence naming the founder.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 1,
+    "hallucination_label": true,
+    "hallucination_type": "Planning Hallucination / Fact Derive",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "3 events (roles: {'?': 3}); tools: final_answer, web_search; content 2066 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "SmolAgents",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

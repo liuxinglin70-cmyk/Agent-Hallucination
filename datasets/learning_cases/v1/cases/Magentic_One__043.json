@@ -1,0 +1,152 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "Magentic_One/043.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent stated that the square is ABCD, treating the heptagon vertex B as if it were a square vertex, instead of recognizing from the diagram that B is a heptagon vertex and the square's labeled vertices are A, C, D and an unlabeled fourth vertex",
+        "evidence_refs": [
+          "event_015",
+          "event_019"
+        ],
+        "locus_event_id": "event_001"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent placed heptagon vertex B at angular direction 2*(360/7)=102.857 degrees from A, treating it as the second vertex counterclockwise from A, instead of placing B at the adjacent heptagon vertex on the other side of AD, where ray AB makes the 128.571-degree heptagon interior angle with AD",
+        "evidence_refs": [
+          "event_001",
+          "event_015"
+        ],
+        "locus_event_id": "event_013"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent placed the square vertex C at (1,1), directly above D, in the A=(0,0), D=(1,0) coordinate setup instead of placing the diagram's labeled C at (0,1), directly above A",
+        "evidence_refs": [
+          "event_001",
+          "event_015"
+        ],
+        "locus_event_id": "event_013"
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent concluded that angle BAC is 405/7 degrees instead of the correct 270/7 degrees",
+        "evidence_refs": [
+          "event_001",
+          "event_015"
+        ],
+        "locus_event_id": "event_017"
+      },
+      {
+        "candidate_id": "c5",
+        "claim": "the agent wrote |102.857 - 90| = 57.857 and |720/7 - 90| = 405/7 instead of computing the actual difference 12.857 = 90/7",
+        "evidence_refs": [
+          "event_019"
+        ],
+        "locus_event_id": "event_019"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 5,
+      "certificate_count": 5,
+      "complete_chain_certificate_count": 5,
+      "error_certificate_count": 5,
+      "supported_certificate_count": 5
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld",
+        "c3": "upheld",
+        "c4": "upheld",
+        "c5": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_001 explicitly states 'The square is ABCD,' which treats heptagon vertex B as a square vertex. The diagram in the question labels B as a heptagon vertex and only labels A, C, D on the square, with the fourth square vertex unlabeled, so the statement contradicts the diagram evidence.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Event_013 and event_015 set angle_AB = 2*(360/7) = 102.857 degrees. In the cited diagram, B is the adjacent heptagon vertex on the other side of A from D; with AD horizontal, ray AB makes the regular-heptagon interior angle 900/7 = 128.571 degrees with AD, so the placement is incorrect.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "Event_013 and event_015 place C = (1,1), described as directly above D for A=(0,0), D=(1,0). The diagram construction C = A + dir(90)*(F-A), with F labeled D, gives C=(0,1), directly above A, so the labeled C was placed at the unlabeled fourth square vertex instead.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c4",
+          "rationale": "Event_017 and event_019 conclude angle BAC = 405/7 degrees. From the diagram geometry, with C=(0,1) making ray AC vertical at 90 degrees and B at the adjacent heptagon vertex making ray AB at 900/7 = 128.571 degrees, the angle is 900/7 - 90 = 270/7 degrees, so the conclusion is incorrect.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c5",
+          "rationale": "Event_019 writes |102.857 - 90| = 57.857 and |720/7 - 90| = 405/7. The actual arithmetic difference is 720/7 - 630/7 = 90/7 = 12.857, so the claimed separation is wrong.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 3 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci at 1,13,17,19; gold step 3",
+    "initial_hypothesis": "the assumption step is skipped entirely; an early planning locus (1) and late consequence loci bracket it"
+  },
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Math Reasoning",
+    "root_cause": "gold step 3: wrong geometric assumption (point B as second vertex); candidates at 1 and 13+"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Math / MATH-500",
+    "trajectory_summary": "22 events (roles: {'MagenticOneOrchestrator': 12, 'Coder': 7, 'ComputerTerminal': 3}); tools: PythonInterpreterTool; content 19943 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Magentic_One",
+    "question_domain": "Math",
+    "question_source": "MATH-500",
+    "run_id": ""
+  }
+}

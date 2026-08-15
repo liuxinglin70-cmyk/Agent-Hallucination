@@ -1,0 +1,120 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "Camel/060.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent claimed the 10 uL aliquot of 10 uM DNA contains approximately 10^16 DNA molecules instead of computing the correct ~6x10^13 molecules (order 10^14) from the stated volume and concentration",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent concluded that the maximum protein diversity is 10^15 and that DNA copy number does not limit diversity (asserting all 20^12 combinations are present) instead of recognizing that the aliquot's correct molecule count (~6x10^13) caps the number of unique translatable sequences at ~10^14",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent stated there are 10^6 more DNA molecules than sequence variants instead of noting that its own numbers (10^16 vs 10^15) differ by only 10x, and with the correct count there are fewer molecules than variants",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 3,
+      "error_certificate_count": 3,
+      "supported_certificate_count": 3
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld",
+        "c3": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The original stated quantities are 10 uL of 10 uM DNA. This gives 10^-5 L * 10^-5 mol/L = 10^-10 mol, or about 6.02 x 10^13 molecules (order 10^14 when rounded by magnitude). The agent instead claimed approximately 10^16 DNA molecules in event_005. That is wrong by about 100x in order-of-magnitude terms and is not supported by event_001.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "With the correct DNA copy count of about 6 x 10^13, the aliquot cannot contain all 20^12 (~4 x 10^15) combinations; the physical number of DNA templates caps the maximum unique translatable sequences at roughly 10^14. The agent's conclusion of 10^15 diversity, based on the incorrect 10^16 molecule count and the assertion that all 20^12 combinations are present, is therefore a real deviation.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "In event_005 the agent's own stated numbers are 10^16 DNA molecules and 10^15 sequence variants, which differ by only a factor of 10, not by 10^6. The claim of '10^6 more DNA molecules than variants' is arithmetically inconsistent with the cited numbers, and with the correct molecule count (~6 x 10^13) there are fewer molecules than possible variants.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 3 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci all at 5; gold step 3; gold_reason names the user's wrong count",
+    "initial_hypothesis": "user-premise adoption at step 3 is the root; the step-5 computations are manifestations"
+  },
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Human-Interaction Hallucination / Human-Interaction Hallucination",
+    "root_cause": "gold step 3: accepted the user's incorrect DNA molecule count; candidates sat at step 5"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "7 events (roles: {'Planner': 1, 'Coordinator': 1, 'Search Agent': 5}); tools: append_note, ask_human_via_console, read_note; content 2341 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Camel",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

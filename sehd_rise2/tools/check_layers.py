@@ -7,8 +7,8 @@ future evolution framework:
     evolution  -> detector (one-way)
     root       -> detector, evolution
 
-Forbidden everywhere: imports of the OLD packages (``sehd_rise`` without
-the ``2``, ``sehd_v6``) and relative imports.
+Forbidden everywhere: imports of the removed packages (``sehd_rise``
+without the ``2``, ``sehd_v6``) and relative imports.
 
 Run from the repository root:
 
@@ -63,8 +63,9 @@ def import_layer(dotted: str) -> str | None:
     return ROOT_LAYER
 
 
-def _is_old_package(dotted: str) -> bool:
-    """Old-tree imports are forbidden: ``sehd_rise`` without the ``2``."""
+def _is_removed_package(dotted: str) -> bool:
+    """Imports of the removed trees are forbidden: ``sehd_rise`` without the
+    ``2`` and ``sehd_v6`` no longer exist in the repository."""
     if dotted == "sehd_rise" or dotted.startswith("sehd_rise."):
         return True
     if dotted == "sehd_v6" or dotted.startswith("sehd_v6."):
@@ -89,7 +90,7 @@ def check_file(path: Path) -> list[str]:
         else:
             continue
         for target in targets:
-            if _is_old_package(target):
+            if _is_removed_package(target):
                 violations.append(
                     f"{path.name}:{node.lineno}: import of the old package "
                     f"{target!r} is forbidden inside sehd_rise2"

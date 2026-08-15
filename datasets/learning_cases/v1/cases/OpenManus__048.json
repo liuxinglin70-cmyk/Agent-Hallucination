@@ -1,0 +1,93 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "strictness_miscalibration",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "delivery-form vs content: termination after successful extraction is not fabrication"
+  },
+  "case_id": "OpenManus/048.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent did terminate the interaction with status success instead of providing the extracted answer to the user's question",
+        "evidence_refs": [
+          "event_002",
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The extracted content in event_004 identified the 2018 Jerlov Award winner as Dr. Raymond C. Smith, but event_005 only called terminate with status 'success' and did not provide that extracted answer to the user. Since the user's question required the answer to be stated, terminating without providing it is a real, unexcused deviation.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification required an explicit user-facing final answer the benchmark does not demand",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "the upheld candidate convicts calling terminate with success instead of emitting the answer as a message; the extraction itself succeeded"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "cert rationale acknowledges event_004 identified the winner and convicts only the termination",
+    "initial_hypothesis": "delivery-form expectations (answer must be a user message) are enforced as factual requirements"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; the answer was extracted and the terminate-with-success closure is accepted by the benchmark"
+  },
+  "input": {
+    "agent_behavior": "extraction assistant that terminates the run after identifying the answer internally",
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "5 events (roles: {'assistant': 5}); tools: ask_human, browser_use, terminate; content 0 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "OpenManus",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

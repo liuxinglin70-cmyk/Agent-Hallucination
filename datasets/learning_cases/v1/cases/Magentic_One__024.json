@@ -1,0 +1,93 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "adversarial_defense_overturn",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "quantifier-strength check in defense: 'all episodes' vs source scope"
+  },
+  "case_id": "Magentic_One/024.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent claimed the series' trivia noted that Van Dyke Parks contributed music to all episodes, instead of the trivia only noting that art director Michael Sporn had the idea to hire Parks to write the series' songs",
+        "evidence_refs": [
+          "event_007",
+          "event_009"
+        ],
+        "locus_event_id": "event_013"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "In event_013 the agent stated that Van Dyke Parks 'contributed music to all episodes, as noted in the series' trivia.' However, the cited trivia text in event_009 only says that art director Michael Sporn had the idea to hire Parks to write the series' songs; it does not state that Parks contributed music to all episodes. The earlier page text in event_007 says the songs throughout the show were written and sung by Parks, but that is not the trivia section the agent cited. Thus the agent misattr",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "defense overturned a certificate whose evidentiary basis (the actual trivia text) was correctly quoted as insufficient",
+    "failed_stage": "defense",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "1 supported certificate(s) overturned at defense",
+    "failure_type": "FN",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "the supported rationale correctly noted the trivia only mentions the art director; the overturn nonetheless accepted the 'contributed to all episodes' reading",
+    "initial_hypothesis": "defense treats an over-generalization whose source text IS cited in the certificate as adequately grounded, because the retrieval event exists"
+  },
+  "ground_truth": {
+    "gold_step": 11,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Factual Reasoning",
+    "root_cause": "gold step 11: the agent misread 'wrote songs for the series' as 'composed music for all 13 episodes'"
+  },
+  "input": {
+    "agent_behavior": "research assistant that upgrades a partial trivia fact into a universal claim",
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "14 events (roles: {'MagenticOneOrchestrator': 8, 'WebSurfer': 6}); tools: answer_question, click, scroll_down, web_search; content 4256 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Magentic_One",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

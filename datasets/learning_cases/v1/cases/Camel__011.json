@@ -1,0 +1,95 @@
+{
+  "capability_analysis": null,
+  "case_id": "Camel/011.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent wrote the boric acid dissociation as H₃BO₃(aq) ⇌ H⁺(aq) + B(OH)₄⁻(aq), an unbalanced equation that omits the water reactant, instead of writing the correct equilibrium H₃BO₃ + H₂O ⇌ H⁺ + B(OH)₄⁻ (or B(OH)₃ + H₂O ⇌ H⁺ + B(OH)₄⁻)",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent neglected water autoionization by setting [H⁺] = x = [B(OH)₄⁻] and using Ka = x²/(C−x), reporting the final pH as ≈7.08, instead of solving the full equilibrium with [H⁺] = [OH⁻] + [B(OH)₄⁻] and obtaining the correct acidic pH of about 6.89",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_003"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 2,
+      "error_certificate_count": 2,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld",
+        "c2": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The agent's equation in event_003 is H₃BO₃(aq) ⇌ H⁺(aq) + B(OH)₄⁻(aq), which omits the H₂O reactant and is unbalanced. The correct boric acid equilibrium should include water, so the claimed deviation is real.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The agent explicitly set [H⁺] = x = [B(OH)₄⁻] and used Ka = x²/(C−x), neglecting water autoionization, and reported pH ≈ 7.08. The full equilibrium must satisfy [H⁺] = [OH⁻] + [B(OH)₄⁻]; solving with Kw = 1e-14 gives [H⁺] ≈ 1.30e−7 and pH ≈ 6.89, so the claimed deviation is real and unexcused.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Reasoning Hallucination / Science Reasoning",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "3 events (roles: {'Planner': 1, 'Coordinator': 1, 'Developer Agent': 1}); tools: none; content 1435 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Camel",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

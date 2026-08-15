@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from http.client import IncompleteRead
 from typing import Any, Mapping
 from urllib import error as urlerror
 from urllib import request as urlrequest
@@ -153,7 +154,9 @@ def provider_call(
             with DIRECT_PROVIDER_OPENER.open(request, timeout=timeout) as resp:
                 status = int(getattr(resp, "status", 0) or 0)
                 raw = resp.read()
-        except (urlerror.URLError, TimeoutError, OSError, ValueError) as exc:
+        except (
+            urlerror.URLError, TimeoutError, OSError, ValueError, IncompleteRead,
+        ) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             if attempt < retries:
                 time.sleep(min(30.0, 2.0 ** attempt))

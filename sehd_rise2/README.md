@@ -1,11 +1,13 @@
-# SEHD-RISE2 — 彻底重构工作区（第一里程碑：最小独立检测器）
+# SEHD-RISE2 — 最小冻结检测器 + Phase 0 失败理解层
 
-本目录是**从零重写**的检测器框架，与旧库 `sehd_rise/` 完全独立（旧库
-原样不动，仅作为行为参考）。旧检测器的复杂积累（上诉、复本、多路由
-法庭、构造性续跑……）全部留在旧库；这里只保留检测器的本质：
+本目录是**从零重写**的检测器框架，只保留检测器的本质：
 
 > **census（候选发现）→ verification（证据核验）→ defense（对抗复核）
 > → 确定性法庭聚合 → fail-closed 权威信封**
+
+`detector/` 是冻结基座（可独立运行）；`evolution/` 是 Phase 0 失败理解层
+（已落地：Learning Case 装配 + 冻结能力缺口词表 + 诊断协议），详见根
+README 的 Phase 0 一节。
 
 ## 目录结构
 
@@ -24,7 +26,11 @@ sehd_rise2/
 │   ├── runs.py                   # 运行记录：每案例过程落盘 + 台账推导统计（runs/）
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
 │   └── configs/detector_v1.json  # 三路由最小配置
-├── evolution/                    # 未来自进化框架（占位；契约见 INTERFACES.md）
+├── evolution/                    # Phase 0 失败理解层（已落地）
+│   ├── gap_taxonomy.py           #   冻结能力缺口词表（单一真源）
+│   ├── diagnosis.py              #   机械失败分类 + 诊断协议校验
+│   ├── learning_case.py          #   Learning Case schema + 三层校验器
+│   └── assemble.py               #   装配 / 校验 / 报告 CLI
 ├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 ```
@@ -76,8 +82,9 @@ print(result["state"], result["decision_authority"])
 | 数据供给 | `evolution_api.project_for_evolution(result)` |
 | 终态读取 | `result.resolve_evolution_state` 等 |
 | gold 隔离 | `packet.EVALUATOR_ONLY_FIELDS` |
+| 学习案例装配（离线复盘） | `python -m sehd_rise2.evolution.assemble` |
 
-## 设计纪律（继承自旧库，重新固化）
+## 设计纪律（从重建中固化）
 
 1. **检测器冻结**：一切改进必须来自未来的可进化面，经显式参数部署。
 2. **证据驱动，不手调阈值**：裁决是封闭词表的确定性聚合，无 LLM 定终态。

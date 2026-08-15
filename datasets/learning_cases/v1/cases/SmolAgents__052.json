@@ -1,0 +1,82 @@
+{
+  "capability_analysis": null,
+  "case_id": "SmolAgents/052.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent answered that the dye absorbs red light because it emits green light and red is the complementary color of green, instead of recognizing that the 2.3393 eV photon energy corresponds to 530.37 nm green light and that any absorbed light enabling that emission must be at the same or higher energy (green or a shorter wavelength), not lower-energy red",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The trajectory evidence shows the emitted photon energy 2.3393 eV corresponds to 530.37 nm, i.e. green light. The agent then answered that the dye absorbs red because red is complementary to green. But red light (about 625-700 nm) has lower energy than 2.3393 eV, so it cannot be the absorbed light that enables green emission at 2.3393 eV; the exciting absorbed light must have the same or higher energy (wavelength around 530 nm or shorter). The cited Britannica material on color mixing does not e",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "5 events (roles: {'?': 5}); tools: final_answer, python_interpreter, visit_webpage, web_search; content 1976 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "SmolAgents",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

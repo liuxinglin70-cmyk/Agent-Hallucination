@@ -1,0 +1,113 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "observation",
+      "name": "missing_required_action",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "required-action awareness shared with BFCL/067"
+  },
+  "case_id": "BFCL/071.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent suggested checking wheel alignment or suspension as possible causes instead of confining its response to the tire-pressure data returned by the check_tire_pressure tool",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent offered a recommendation for a nearby tire shop even though no tool observation or user statement contains any tire-shop or location information",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The check_tire_pressure observation contains only tire-pressure readings and healthy_tire_pressure=true. In event_007, the agent adds that the vibration may be due to wheel alignment or suspension, which is not grounded in the cited tool output or any user statement.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Event_007 does not actually provide or identify a nearby tire shop; it merely asks whether the user would like further assistance or such a recommendation. No ungrounded location or tire-shop factual claim is made.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "same family as BFCL/067: the required pre-start actions were never enumerated, so their omission was invisible",
+    "failed_stage": "census",
+    "failed_stage_source": "human_override",
+    "failure_observation": "1 supported certificate(s) overturned at defense",
+    "failure_type": "FN",
+    "missed_candidates": [
+      {
+        "claim": "the agent skipped the required lockDoors and pressBrakePedal calls before attempting to start the engine",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_004"
+      }
+    ],
+    "override_reason": "the supported-then-overturned candidate was about advisory speculation; defense was right to excuse it, and the gold error (missing required calls) never became a candidate"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "census proposed only the wheel-alignment/tire-shop speculations; gold error at step 4 untouched",
+    "initial_hypothesis": "same mechanism as BFCL/067: no required-call inventory, so omission cannot be observed"
+  },
+  "ground_truth": {
+    "gold_step": 4,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Missing Required Call",
+    "root_cause": "gold step 4: the agent skipped the required lockDoors and pressBrakePedal steps and attempted to start the engine after the fuel check"
+  },
+  "input": {
+    "agent_behavior": "tire-diagnostics assistant that adds advisory speculation on top of the observed data",
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "7 events (roles: {'assistant': 7}); tools: check_tire_pressure, fillFuelTank, liter_to_gallon, startEngine; content 862 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "Camel/052.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "The agent based the mass calculation on the erroneous scaling (M1+M2) ∝ P×(K1^2+K2^2)^(3/2) and reported M1/M2 ≈ 0.48, instead of using the correct Keplerian mass-function scaling (M1+M2) ∝ P×(K1+K2)^3, which gives M1/M2 = (2/1)×(15/25)^3 = 0.432.",
+        "evidence_refs": [
+          "event_001",
+          "event_005",
+          "event_007"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "The agent stated 325^(3/2) = 325 × 18.03 = 5,858, instead of the correct value 325 × 18.03 = 5,859.75 (and 325×sqrt(325) ≈ 5,859.0).",
+        "evidence_refs": [
+          "event_005",
+          "event_007"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "The agent recorded the system-to-system ratio formula as (P1/P2)×[(K1_2^2+K2_2^2)/(K1_1^2+K2_1^2)]^(3/2), which evaluates to about 8.39, instead of the approximately 2 ratio stated in the ask_human_via_console observation; the correct M2/M1 expression would use P2/P1 (or the K ratio would need to be inverted for M1/M2).",
+        "evidence_refs": [
+          "event_003",
+          "event_004"
+        ],
+        "locus_event_id": "event_004"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c3": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_004",
+    "responsible_step": 4,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The cited trajectory shows the user explicitly instructed via ask_human_via_console to use the scaling (M1+M2) ∝ P*(K1^2+K2^2)^(3/2), and the agent followed that instruction in reporting ≈0.48. Therefore the claimed deviation to the correct Keplerian formula is not a trajectory deviation; the action was grounded in the provided instruction.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The trajectory does contain the stated multiplication, but the difference between 5,858 and 325×18.03=5,859.75 (or 325×sqrt(325)≈5,859.0) is a relative error well under 0.5%, so it is treated as a rounding/approximation-level discrepancy rather than a supportable deviation.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "event_003's observation states the system-to-system ratio as (P1/P2)*[(15^2+25^2)/(25^2+15^2)]^(3/2) ≈ 2, whereas event_004 records the formula as (P1/P2)*[(K1_2^2+K2_2^2)/(K1_1^2+K2_1^2)]^(3/2). With the given amplitudes this evaluates to 2*(325/125)^(3/2) ≈ 8.39, not the instructed ≈2, so the recorded intermediate formula is not grounded in the user statement.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 3 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci at 4,5; gold step 3",
+    "initial_hypothesis": "the substituted relation at step 3 is the root; the candidate attaches to its first downstream use"
+  },
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Human-Interaction Hallucination / Human-Interaction Hallucination",
+    "root_cause": "gold step 3: replaced the correct total-mass relation; candidates started at step 4"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "7 events (roles: {'Planner': 1, 'Coordinator': 1, 'Search Agent': 5}); tools: append_note, ask_human_via_console, read_note; content 2175 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Camel",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}

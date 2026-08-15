@@ -1,0 +1,109 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "Magentic_One/013.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent presented a fabricated Hollywood-only Box Office Mojo 2020 Worldwide top 10 (Bad Boys for Life, Tenet, Sonic the Hedgehog, Dolittle, Birds of Prey, Onward, Mulan, The Invisible Man, Wonder Woman 1984, Trolls World Tour) instead of using Box Office Mojo's actual 2020 Worldwide top 10, which includes films such as The Eight Hundred, Demon Slayer: Mugen Train, and My People, My Homeland and does not include Mulan or The Invisible Man",
+        "evidence_refs": [
+          "event_001",
+          "event_003",
+          "event_009"
+        ],
+        "locus_event_id": "event_010"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent reported the final overlap count as 5 instead of the correct count of 4 based on the actual Box Office Mojo 2020 lists (only Bad Boys for Life, Sonic the Hedgehog, Dolittle, and Birds of Prey appear in both actual top-10 lists)",
+        "evidence_refs": [
+          "event_001",
+          "event_009",
+          "event_010"
+        ],
+        "locus_event_id": "event_011"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_010",
+    "responsible_step": 10,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The task required Box Office Mojo's actual 2020 Worldwide list, but the agent relied on a Bing search-result snippet (event_003) that presented an unverified Hollywood-only list. Event_003 also shows a Box Office Mojo world-page snippet with other titles, and the agent never retrieved the actual BOM 2020 Worldwide page before repeating the list in event_010. Thus the deviation is real.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The final count of 5 is not reliable, but the certificate's proposed corrected overlap set/count is not supported: actual Box Office Mojo 2020 lists do not yield the stated 'only Bad Boys for Life, Sonic, Dolittle, and Birds of Prey' overlap. For example, Tenet is in the actual worldwide top 10 and also in a release-year domestic top 10, while Birds of Prey is not in the actual worldwide top 10. Therefore the certificate's specific claim is inaccurate.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; no candidate ever carried the gold step 3 as locus",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "loci at 10,11; gold step 3",
+    "initial_hypothesis": "the snippet trust at step 3 is the root; the answer built on it at step 10 is the manifestation"
+  },
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Retrieval Hallucination / Context Misalign",
+    "root_cause": "gold step 3: trusted a misleading search snippet; candidates sat at steps 10-11"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "General Assistant / GAIA",
+    "trajectory_summary": "12 events (roles: {'MagenticOneOrchestrator': 7, 'WebSurfer': 4, 'Coder': 1}); tools: click, visit_url, web_search; content 6280 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Magentic_One",
+    "question_domain": "General Assistant",
+    "question_source": "GAIA",
+    "run_id": ""
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "attribution",
+      "name": "locus_vs_manifestation",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "diagnostic only"
+  },
+  "case_id": "OpenDeepSearch/034.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent added the unsupported year 2023 to the search query instead of refraining from specifying a year until the search results provided one",
+        "evidence_refs": [
+          "event_002"
+        ],
+        "locus_event_id": "event_003"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent added the unsupported years 2022 and 2023 to the search query instead of using only years established by the retrieved observations",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent specified January in the search query instead of using the less specific 'early 2022' that the retrieved observation actually provided",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent reported that the previous search result showed the initial plan included 55 Eurofighter Typhoons instead of accurately reporting that it said 90 Eurofighters",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c5",
+        "claim": "the agent stated that the search result confirmed the initial announcement was made in 2022 instead of noting that the cited observation did not give a year for the initial announcement",
+        "evidence_refs": [
+          "event_006",
+          "event_007"
+        ],
+        "locus_event_id": "event_008"
+      },
+      {
+        "candidate_id": "c6",
+        "claim": "the agent reasoned that the initial announcement was likely in Q1 2022 even though the final decision was announced in January 2022, so the initial announcement should have been earlier rather than later",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "locus_event_id": "event_008"
+      },
+      {
+        "candidate_id": "c7",
+        "claim": "the agent asserted that major defense decisions are commonly made during parliamentary sessions instead of confining itself to facts supported by the retrieved observations",
+        "evidence_refs": [
+          "event_007"
+        ],
+        "locus_event_id": "event_008"
+      },
+      {
+        "candidate_id": "c8",
+        "claim": "the agent inserted March 2022 into the search query instead of searching without that unsupported month",
+        "evidence_refs": [
+          "event_004",
+          "event_007"
+        ],
+        "locus_event_id": "event_008"
+      },
+      {
+        "candidate_id": "c9",
+        "claim": "the agent answered that the plan was reported in March 2022, but the observation only said the decision was confirmed in March 2022, not that the report or announcement occurred then",
+        "evidence_refs": [
+          "event_008"
+        ],
+        "locus_event_id": "event_009"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 9,
+      "certificate_count": 9,
+      "complete_chain_certificate_count": 3,
+      "error_certificate_count": 3,
+      "supported_certificate_count": 8
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned",
+        "c2": "overturned",
+        "c3": "overturned",
+        "c4": "upheld",
+        "c5": "overturned",
+        "c6": "upheld",
+        "c7": "upheld",
+        "c8": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_007",
+    "responsible_step": 7,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_002's observation provided no year, and nothing else in the prior evidence supported 2023, yet event_003 inserted 'in 2023' into the search query. The added year was unsupported and unexcused.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "Neither event_002 nor event_003's observations established 2022 or 2023 as the relevant year, but event_004 inserted 'in 2022 or 2023'. Both years were unsupported by the retrieved observations at that point.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "Event_004's observation only said 'early 2022', but event_005 narrowed the query to 'January 2022'. January was a more specific, unsupported month not justified by the cited evidence.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c4",
+          "rationale": "Event_006's observation stated the initial plans included a split buy of 90 Eurofighters, 30 Super Hornets, and 15 Growlers, but event_007 reported the initial plan as including 55 Eurofighter Typhoons. This directly misreports the cited observation.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c5",
+          "rationale": "Event_007's observation did not give a year for the initial announcement, and event_006 only dated a later/different announcement. Event_008's statement that the search result confirmed the initial announcement was in 2022 is therefore unsupported by the cited evidence.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c6",
+          "rationale": "Event_005 shows the final F-35-based decision was announced in January 2022, so the earlier initial plan should have predated January 2022. The agent's inference that the initial announcement was likely in Q1 2022, and the subsequent March search, conflicts with that temporal evidence.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c7",
+          "rationale": "No cited observation mentions parliamentary sessions or supports the claim that major defense decisions are commonly made then. The assertion was an ungrounded intermediate fact used to justify searching March 2022.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c8",
+          "rationale": "Event_004 only gave 'early 2022' and event_007 gave no specific month, so 'March 2022' was an unsupported month inserted into the search query in event_008.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c9",
+          "rationale": "Event_008's observation says the decision was confirmed in March 2022, and the question asks for the month/year the plan was reported. Treating the confirmed decision as the report date is adequately grounded, so the final answer 'March 2022' is not a substantive deviation.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "adjudication",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity correct; responsible step != gold step; gold step 3 was a candidate locus (c1) that did not survive the chain",
+    "failure_type": "LOCALIZATION",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "c1 at gold step 3 present but not upheld; upheld loci at 7-8",
+    "initial_hypothesis": "the gold-step candidate was rejected while its downstream consequences convicted; the chain and the selection together lost the root"
+  },
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Retrieval Hallucination / Query Misalign",
+    "root_cause": "gold step 3: arbitrarily introduced the year 2023; a candidate at the gold step (c1) existed but did not survive the chain, later loci (7-8) were upheld"
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "World Knowledge / SimpleQA",
+    "trajectory_summary": "9 events (roles: {'?': 9}); tools: Code Action Space; content 3362 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "OpenDeepSearch",
+    "question_domain": "World Knowledge",
+    "question_source": "SimpleQA",
+    "run_id": ""
+  }
+}

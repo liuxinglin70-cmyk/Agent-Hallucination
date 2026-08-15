@@ -1,0 +1,81 @@
+{
+  "capability_analysis": null,
+  "case_id": "BFCL/025.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent wrote and later reported the logarithm result as '2.0000' instead of restating the tool-observed value '2.0' from the logarithm tool",
+        "evidence_refs": [
+          "event_003_tool_01"
+        ],
+        "locus_event_id": "event_003_tool_02"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The logarithm tool observation returned mpf('2.0'), which is the authoritative tool-produced value. The agent then passed '2.0000' to the echo tool and later reported '2.0000'. Under the exact-restatement rule for tool-produced values, echoing '2.0' as '2.0000' is a deviation even though the task requested four-decimal precision.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": 3,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Incorrect Tool Arguments",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "4 events (roles: {'assistant': 4}); tools: cat, echo, logarithm, wc; content 329 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

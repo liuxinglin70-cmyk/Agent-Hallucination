@@ -1,0 +1,121 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "verification",
+      "name": "excuse_based_rejection",
+      "status": "known"
+    },
+    "generalization": "cross_case",
+    "proposed_intervention": "requirement-priority verification: an explicit task requirement cannot be excused by in-trajectory resource narratives"
+  },
+  "case_id": "BFCL/103.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent added company names 'NVIDIA Corporation' and 'Becton, Dickinson and Company' to the watchlist summary, but the get_watchlist observation returned only stock symbols, so those names were stated without retrieved support",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_002"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent did not execute the user's requested acquisition of 150 BDX shares; it only computed the cost, presented funding/adjustment options, and later summarized a pre-existing AAPL order instead of reporting a completed BDX order",
+        "evidence_refs": [
+          "event_005",
+          "event_006",
+          "event_009"
+        ],
+        "locus_event_id": "event_007"
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent identified the order as 'AAPL (Apple Inc.)' in the summary, but the get_order_details observation returned only the symbol 'AAPL' and no company name",
+        "evidence_refs": [
+          "event_009"
+        ],
+        "locus_event_id": "event_010"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 3,
+      "certificate_count": 3,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 2
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned",
+        "c3": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The cited get_watchlist observation returned only the symbols [\"NVDA\", \"BDX\"], but the assistant added company names \"NVIDIA Corporation\" and \"Becton, Dickinson and Company\" in event_002. Those names are not grounded in the cited retrieved output, so the claimed unsupported addition is real.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The cited evidence shows the account balance was $10,000 while 150 BDX shares at $250/share would cost $37,500. The agent therefore could not properly execute the requested full purchase and instead correctly identified the shortfall and offered funding/adjustment options. Later, the user asked for the most recent order details, and get_order_details returned an AAPL order, which the agent accurately summarized. The claimed deviation is adequately excused by the cited evidence.",
+          "verdict": "rejected"
+        },
+        {
+          "candidate_id": "c3",
+          "rationale": "The cited get_order_details observation returned only the symbol \"AAPL\" with price, shares, and status, but the assistant added \"Apple Inc.\" in the summary. That company name was not present in the retrieved output, so the claimed unsupported addition is real.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification weighed the account-balance observation over the explicit task requirement to place the order",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "2 supported certificate(s) overturned at defense",
+    "failure_type": "FN",
+    "missed_candidates": [],
+    "override_reason": "the gold error WAS proposed (c2: order not executed) but verification rejected it on an affordability excuse; the defense overturns (c1/c3 company-name details) were separately correct"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "c2 rejection rationale cites the $10,000 balance vs $37,500 cost as excusing the missing place_order, but the task requirement is unconditional in this benchmark",
+    "initial_hypothesis": "verification dismisses true requirement deviations using plausible out-of-requirement excuses (here: insufficient funds) that the task semantics do not accept"
+  },
+  "ground_truth": {
+    "gold_step": 7,
+    "hallucination_label": true,
+    "hallucination_type": "Tool-Use Hallucination / Missing Required Call",
+    "root_cause": "gold step 7: the agent invented a funding/balance narrative and never executed the required place_order for 150 BDX shares"
+  },
+  "input": {
+    "agent_behavior": "portfolio assistant that explains why it cannot execute the requested order instead of executing it",
+    "task_type": "Tool Use / BFCL_v3_multi_turn_base",
+    "trajectory_summary": "10 events (roles: {'assistant': 10}); tools: get_account_info, get_order_details, get_order_history, get_stock_info, get_watchlist, remove_stock_from_watchlist; content 1409 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "BFCL",
+    "question_domain": "Tool Use",
+    "question_source": "BFCL_v3_multi_turn_base",
+    "run_id": ""
+  }
+}

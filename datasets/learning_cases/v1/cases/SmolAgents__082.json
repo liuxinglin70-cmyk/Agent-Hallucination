@@ -1,0 +1,92 @@
+{
+  "capability_analysis": {
+    "capability_gap": {
+      "category": "policy",
+      "name": "evidence_weighting",
+      "status": "known"
+    },
+    "generalization": "case_specific",
+    "proposed_intervention": "premise-awareness: task-stated premises outrank external corrections"
+  },
+  "case_id": "SmolAgents/082.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent claimed the roots of z^2 - φz + 1 = 0 are real, that z is not on the unit circle, and set z = (1+√5)/4, instead of recognizing the actual complex conjugate unit-modulus roots z = e^{±iπ/5}",
+        "evidence_refs": [
+          "event_001"
+        ],
+        "locus_event_id": "event_001"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 1,
+      "certificate_count": 1,
+      "complete_chain_certificate_count": 1,
+      "error_certificate_count": 1,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "upheld"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_error",
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "Event_001 explicitly states that both roots of z^2 - φz + 1 = 0 are real, that z is not on the unit circle, and sets z = (1+√5)/4. For φ = (1+√5)/2, the discriminant is φ^2 - 4 = (√5 - 5)/2 < 0, so the roots are non-real complex conjugates on the unit circle, z = e^{±iπ/5}. The trajectory evidence therefore shows the claimed misidentification is real and mathematically unexcused.",
+          "verdict": "supported"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": "verification overrode the task's stated premise with outside mathematical correctness",
+    "failed_stage": "verification",
+    "failed_stage_source": "human_override",
+    "failure_observation": "conviction chain complete (census -> supported -> upheld); the failing link needs semantic attribution",
+    "failure_type": "FP",
+    "missed_candidates": [],
+    "override_reason": "the conviction rests on external algebra (discriminant sign) contradicting the premise the task text itself establishes; the trajectory is internally consistent"
+  },
+  "failure_hypothesis": {
+    "hypothesis_basis": "cert rationale recomputes the roots externally; gold's explanation works within the task's construction",
+    "initial_hypothesis": "outside knowledge is applied against a task-stated premise without weighing which authority the benchmark assigns"
+  },
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": "gold: clean trajectory; within the task's construction the algebra is carried through consistently and the benchmark accepts it"
+  },
+  "input": {
+    "agent_behavior": "math-reasoning agent that asserts the root structure its physical setup presupposes",
+    "task_type": "Math / MATH-500",
+    "trajectory_summary": "3 events (roles: {'?': 3}); tools: final_answer, python_interpreter; content 2370 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "SmolAgents",
+    "question_domain": "Math",
+    "question_source": "MATH-500",
+    "run_id": ""
+  }
+}

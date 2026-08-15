@@ -1,15 +1,22 @@
 # evolution/ — 自进化框架落点与接口契约
 
-本目录预留给重建的自进化框架。第一阶段只承诺接口与目录，不实现任何
-进化权威。
+Phase 0（失败理解层）已落地，本目录不再是占位。当前内容只承诺**理解失败**，
+不实现任何进化权威（不生成 Skill、不做 promotion）：
+
+- `gap_taxonomy.py` — 能力缺口词表（已冻结，`gap_allowed` 是唯一门函数）；
+- `diagnosis.py` — 机械失败分类（`classify_failure` / `derive_failure_stage` /
+  `localization_facts`）+ 诊断协议 `sehd2.capability_diagnosis.v1` 校验；
+- `learning_case.py` — Learning Case schema（事实 → 假设 → 能力三层）校验；
+- `assemble.py` — 装配 / 校验 / 报告 CLI（投影式，人工层单一真源 =
+  `datasets/learning_cases/v1/annotations.json`）。
 
 ## 允许的依赖方向（由 `tools/check_layers.py` 机械强制）
 
 - `evolution/` 可以 import `detector`（单向）。
 - `detector/` 永不 import `evolution/`（反向依赖直接判违规）。
-- 新旧包之间禁止任何 import（旧库 `sehd_rise` 保持原样不动）。
+- `evolution/` 内部禁止 import 已移除的旧包（`sehd_rise`、`sehd_v6`）。
 
-## 第一阶段已提供的接口（detector 侧，冻结）
+## 已提供的接口（detector 侧，冻结）
 
 | 用途 | 接口 |
 |---|---|

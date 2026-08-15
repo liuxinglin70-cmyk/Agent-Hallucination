@@ -1,0 +1,96 @@
+{
+  "capability_analysis": null,
+  "case_id": "Octotools/036.json",
+  "detector_execution": {
+    "census": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent assumed and inserted an unsupported mass-radius scaling of R ∝ M^0.27 for the same-composition planets into the Python query and final reasoning instead of grounding the density comparison in the user's stated mass/radius/composition information or the retrieved search results, which contained no such exponent",
+        "evidence_refs": [
+          "event_001",
+          "event_002",
+          "event_003"
+        ],
+        "locus_event_id": "event_004"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent wrote '5 / (3.65) × 5.5 ≈ 7.47' for option c's density, but 5/3.65 × 5.5 ≈ 7.53, so it used an inconsistent rounded cube and reported the unrounded result instead of computing consistently with the true 1.54³ ≈ 3.68 to obtain ≈7.47",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "locus_event_id": "event_005"
+      }
+    ],
+    "census_deterministic_augment": null,
+    "census_second_pass": null,
+    "decisive_facts": {
+      "candidate_count": 2,
+      "certificate_count": 2,
+      "complete_chain_certificate_count": 0,
+      "error_certificate_count": 0,
+      "supported_certificate_count": 1
+    },
+    "defense": {
+      "decisions": {
+        "c1": "overturned"
+      }
+    },
+    "evidence_coverage": {
+      "census": "complete",
+      "defense": "complete",
+      "verification": "complete"
+    },
+    "final_decision": "verified_clean",
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "routes": {
+      "census": "deepseek-v4-flash",
+      "defense": "deepseek-v4-pro",
+      "verification": "deepseek-v4-pro"
+    },
+    "verification": {
+      "certificates": [
+        {
+          "candidate_id": "c1",
+          "rationale": "The cited searches (event_002, event_003) do not contain an R ∝ M^0.27 exponent, and the user prompt only gives 'same composition as Earth' with no mass-radius scaling. The Python query in event_004 simply inserts 'radius scales as mass^0.27', so this exponent is unsupported by the trajectory evidence.",
+          "verdict": "supported"
+        },
+        {
+          "candidate_id": "c2",
+          "rationale": "The final density 7.47 g/cm^3 matches the Python tool observation (density_c = 7.467...), so the substantive result is correct. The written intermediate '5/(3.65) × 5.5 ≈ 7.47' is a rounding/approximation inconsistency, not a substantive deviation from the computed result.",
+          "verdict": "rejected"
+        }
+      ]
+    }
+  },
+  "failure_analysis": {
+    "evidence_gap": null,
+    "failed_stage": "none",
+    "failed_stage_source": "mechanical",
+    "failure_observation": "polarity and localization both match gold",
+    "failure_type": "CORRECT",
+    "missed_candidates": [],
+    "override_reason": null
+  },
+  "failure_hypothesis": null,
+  "ground_truth": {
+    "gold_step": null,
+    "hallucination_label": false,
+    "hallucination_type": "",
+    "root_cause": null
+  },
+  "input": {
+    "agent_behavior": null,
+    "task_type": "Science / GPQA",
+    "trajectory_summary": "5 events (roles: {'?': 5}); tools: Google_Search_Tool, Python_Code_Generator_Tool, Wikipedia_Knowledge_Searcher_Tool; content 3880 chars"
+  },
+  "schema_version": "sehd2.learning_case.v1",
+  "source": {
+    "dataset": "datasets\\raw\\agenthallu\\AgentHallu",
+    "family": "Octotools",
+    "question_domain": "Science",
+    "question_source": "GPQA",
+    "run_id": ""
+  }
+}
