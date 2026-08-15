@@ -13,7 +13,7 @@ SEHD-RISE2 是 SEHD-RISE 的重建工作区（`sehd_rise2/`）。当前形态由
 
 100 例真实实验（`runs/random100_20260815_142446`）决定性准确率 76.0%、
 FN=12 / FP=12；49 个失败案例的能力归因与 Phase 0 交付见
-[SEHD_RISE2_Phase0_失败理解层实施文档.md](SEHD_RISE2_Phase0_失败理解层实施文档.md)。
+[EvoGuard 实验计划与迭代路线文档](EvoGuard_experiment_plan_and_iteration_roadmap.md)。
 
 ## 核心目标与设计纪律（必读 / Mandatory）
 
@@ -202,7 +202,7 @@ Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy
 
 上限（全部触发且零回归）FP 12→0、决定性准确率 76%→88%——是上限不是承诺。
 候选集 `review_status: first_pass`，复核通过后进入 P1-B 离线重放。
-交付详情见 [SEHD_RISE2_Phase1A_策略假设提取实施文档.md](SEHD_RISE2_Phase1A_策略假设提取实施文档.md)。
+交付详情见 [EvoGuard 实验计划与迭代路线文档](EvoGuard_experiment_plan_and_iteration_roadmap.md)。
 
 ## Phase 1-B 离线策略重放（交付摘要，2026-08-15）
 
@@ -223,7 +223,7 @@ Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy
 
 候选集保持 `first_pass`（评审纪律：重放不等于晋升）。P2-P5 四类零 gold-error
 证书的过拟合张力已写入报告——部署前须先有可复现绑定器。
-交付详情见 [SEHD_RISE2_Phase1B_离线策略重放实施文档.md](SEHD_RISE2_Phase1B_离线策略重放实施文档.md)。
+交付详情见 [EvoGuard 实验计划与迭代路线文档](EvoGuard_experiment_plan_and_iteration_roadmap.md)。
 
 ## Phase 1-C 策略运行时契约 + 证书绑定（交付摘要，2026-08-15）
 
@@ -252,7 +252,7 @@ Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy
    已由 NS-1 首次行使——不是所有能力缺口都必须产出策略，
    「当前证据表示下不可分 → 弃权」是合法且更健康的进化结论。
 
-交付详情见 [SEHD_RISE2_Phase1C_策略运行时契约实施文档.md](SEHD_RISE2_Phase1C_策略运行时契约实施文档.md)。
+交付详情见 [EvoGuard 实验计划与迭代路线文档](EvoGuard_experiment_plan_and_iteration_roadmap.md)。
 
 ## Phase 1-C.5 Binder Calibration（交付摘要，2026-08-15）
 
