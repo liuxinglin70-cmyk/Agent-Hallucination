@@ -9,8 +9,8 @@ split is two-way:
   decisive random100 run are forced into this pool: the deployed
   P2-P5 policies were trained on their failures, so keeping them out of
   verification is what makes the verification claim honest.
-- final verification set — 200 fresh-stratified cases (100 gold-error +
-  100 gold-clean, framework-proportional within polarity) that no
+- final verification set — 300 fresh-stratified cases (150 gold-error +
+  150 gold-clean, framework-proportional within polarity) that no
   evolution decision may touch; only the final report reads them.
 
 Committed before any Phase 2 detector run; v1 is never edited.
@@ -35,7 +35,7 @@ P1D_MANIFEST = REPO / "datasets/eval_splits/v1/manifest.json"
 OUT_DIR = REPO / "datasets/eval_splits/phase2_v1"
 SPLIT_SCHEMA = "sehd2.eval_split.phase2.v1"
 SEED = 20260817
-VERIFY_SIZE = 100  # per gold polarity
+VERIFY_SIZE = 150  # per gold polarity
 EVOLUTION_RUN = "random100_20260815_142446"
 FROZEN_DETECTOR = {
     "config_fingerprint": "76d6fd60b069420c",
@@ -185,7 +185,7 @@ def write_report(manifest: dict[str, object]) -> None:
         f"{len(manifest['evolution_pool']['cases'])} cases "
         "(includes the 100 policy-training cases)",
         f"- final verification: {len(verification)} cases "
-        "(100 gold-error / 100 gold-clean)", "",
+        "(150 gold-error / 150 gold-clean)", "",
         "## Verification set by framework", "",
         "| framework | seats |", "|---|---|",
     ]

@@ -83,7 +83,7 @@ def trajectory(library: dict, verification: dict) -> list[dict]:
             "tp_lost": len(candidate.get("tp_lost") or []),
         })
     rows.append({
-        "stage": "final verification (n=200) — evolved chain",
+        "stage": f"final verification (n={len(tree)}) — evolved chain",
         "accuracy": verification["final"]["accuracy"],
         "fp": verification["final"]["fp"],
         "tp_lost": len(verification["final"]["tp_lost"]),
@@ -149,7 +149,8 @@ def main() -> int:
 
     lines = [
         "# Phase 2 Full Self-Evolution — Final Report", "",
-        f"- verification run: {args.run} (200 frozen cases)",
+        f"- verification run: {args.run}"
+        f" ({len(tree)} frozen cases)",
         f"- final genome: {result['genome_final']['file']}"
         f" (hash {result['genome_final']['content_hash'][:12]}…)",
         "", "## Verification set (200 cases, never read by evolution)", "",
