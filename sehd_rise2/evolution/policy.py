@@ -39,49 +39,105 @@ from sehd_rise2.evolution.gap_taxonomy import GAP_CATEGORIES
 
 POLICY_CANDIDATES_SCHEMA = "sehd2.policy_candidates.v1"
 
-# Conviction-basis typing of a surviving certificate. ``content_contradiction``
-# is the baseline: it carries no policy and convicts on its own.
+# Conviction-basis typing of a surviving certificate, Phase 1-C.5
+# discriminative form: every definition is a boundary, not a description —
+# ``CONVICTS WHEN`` is the test the certificate must pass, ``NOT WHEN``
+# redirects the confusable neighbour. ``content_contradiction`` is the
+# baseline residual: it carries no policy and binds only after every
+# specific class has failed its test; the declaration order mirrors
+# that procedure.
 CERTIFICATE_CLASSES: dict[str, str] = {
-    "content_contradiction": (
-        "baseline conviction, carries no policy: a task-relevant "
-        "deviation in what the agent asserted or did — fabricated, "
-        "misreported or contradicted content (entity, value, argument, "
-        "result, self-assessment), a wrong or unnecessary tool action, a "
-        "missing required action, or an instruction violation with a "
-        "factual consequence"
-    ),
     "requirement_compliance": (
-        "non-compliance with an instruction about how to work (output "
-        "form, procedure, tool or effort-scope choice, plan content, "
-        "answer-quality preference) with no fabricated, misreported or "
-        "contradicted content asserted"
+        "CONVICTS WHEN the certificate's complaint is the violation of "
+        "an instruction about HOW to work — which channel or source to "
+        "use, output form or format, internal procedure or tool-prompt "
+        "composition, effort-scope or plan content, answer-quality "
+        "preference — and the violation is the channel, procedure or "
+        "quality itself: no wrong, fabricated or missing content is "
+        "asserted (asking the human instead of the required source, "
+        "offloading the solving to the user, answering below the "
+        "preferred identification under partial retrieval are "
+        "archetypes). NOT WHEN the certificate names content the agent "
+        "got wrong or omitted: a wrong tool argument, fabricated "
+        "placeholder inputs, a redundant or unnecessary action, an "
+        "unanswered user question, a wrong derived value or conclusion "
+        "convicts as content_contradiction even though the phrasing "
+        "reads like a procedure complaint ('instead of ...', 'failed "
+        "to ...')"
     ),
     "delivery_form": (
-        "the session was closed (or the answer withheld from the "
-        "expected channel) after the content was already extracted; "
-        "carries NO policy — the abstain class recorded as "
+        "CONVICTS WHEN the session was closed (or the answer withheld "
+        "from the expected channel) after the content was already "
+        "extracted; carries NO policy — the abstain class recorded as "
         "non-separable under the current evidence representation "
-        "(gold labels diverge on certificate-level-identical evidence)"
+        "(gold labels diverge on certificate-level-identical evidence). "
+        "NOT WHEN the certificate asserts any defect in the content "
+        "itself beyond non-delivery (the defect's own class binds)"
     ),
     "presentational_addition": (
-        "interpretive or presentational material layered over content the "
-        "cited observations already contain, introducing no new checkable "
-        "specific"
+        "CONVICTS WHEN the convicted material is interpretive or "
+        "presentational layering over specifics the cited observations "
+        "already contain — evaluative qualifiers, code-to-name or "
+        "unit-and-format renderings of an observed figure, prose "
+        "expansion of an observed list — introducing no new "
+        "independently checkable specific. NOT WHEN the added material "
+        "asserts a specific the observations do not contain and that is "
+        "not a conventional rendering of one they do (fabrication → "
+        "content_contradiction)"
     ),
     "expression_variance": (
-        "a prose restatement differing from its cited source only in "
-        "wording, formatting or near-tie directionality, outside tool "
-        "arguments and without changing the referent"
+        "CONVICTS WHEN a prose restatement differs from its cited source "
+        "only in wording, formatting, rounding or near-tie directionality "
+        "— a direction flip inside the source's own precision — "
+        "preserving the referent, the operative meaning and the claimed "
+        "precision (no more significant digits than the source gave), "
+        "outside tool arguments. NOT WHEN the restatement changes what "
+        "is claimed beyond rounding granularity or near-tie tolerance, "
+        "changes the referent or instruction content, or restates an "
+        "observed value with more significant digits than the source "
+        "gave — asserted precision the source did not make is a "
+        "content claim (content_contradiction)"
     ),
     "premise_conflict": (
-        "content traceable to premises the task text or user statements "
-        "establish, convicted by outside knowledge rather than by cited "
-        "trajectory evidence"
+        "CONVICTS WHEN the convicted specific is inherited from premises "
+        "the task text or user statements establish — the agent "
+        "restated, applied or followed a premise rather than authoring "
+        "the specific; quote the premise sentence as the basis — and "
+        "the certificate's whole authority is outside knowledge, with "
+        "no cited observation contradicting the content (a user "
+        "message or the task text is a premise, not an observation). "
+        "NOT WHEN the agent authored the deviating specific: its own "
+        "computed value, conclusion, classification, endorsement or "
+        "claim, even one convicted by outside calculation, is "
+        "content_contradiction"
     ),
     "absence_based": (
-        "a multi-source summary or process-narration claim convicted "
-        "because one cited evidence slice lacks it while the material is "
-        "grounded elsewhere in the trajectory or no slice contradicts it"
+        "CONVICTS WHEN the certificate convicts a summary or "
+        "process-narration claim because one cited slice lacks the "
+        "material while no cited slice contradicts it and the material "
+        "is grounded elsewhere in the trajectory. NOT WHEN some cited "
+        "slice positively contradicts the claim (content_contradiction)"
+    ),
+    "content_contradiction": (
+        "the residual baseline class, carries no policy and binds only "
+        "after every specific class has failed its test. CONVICTS WHEN "
+        "the certificate asserts the agent authored or performed a "
+        "wrong, fabricated, redundant or missing checkable specific — "
+        "a wrong value, argument, entity, quantity, result, "
+        "classification or self-assessment, fabricated inputs or "
+        "outputs, a missing required answer, or an instruction "
+        "violation with a factual consequence — where the deviation "
+        "is in WHAT the agent asserted or delivered, not merely in "
+        "which channel, procedure or effort level it used. NOT WHEN "
+        "the defect is a channel, procedure or quality violation with "
+        "no wrong content named (requirement_compliance), only "
+        "interpretive or presentational layering over observed "
+        "specifics (presentational_addition), only wording, formatting "
+        "or near-tie restatement (expression_variance), only one "
+        "slice's silence while the material is grounded elsewhere "
+        "(absence_based), premise-inherited content convicted only by "
+        "outside knowledge (premise_conflict), or non-delivery through "
+        "the expected channel (delivery_form)"
     ),
 }
 

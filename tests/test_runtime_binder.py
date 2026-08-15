@@ -91,7 +91,7 @@ def test_normalize_binding_accepts_vocabulary_and_abstention():
     records = normalize_binding(
         {"bindings": [
             {"candidate_id": "c1", "class": "content_contradiction",
-             "evidence_basis": "b"},
+             "confidence": "high", "evidence_basis": "b"},
             {"candidate_id": "c2", "class": "unclassified"},
         ]},
         case_id="A", expected_ids=["c1", "c2"],
@@ -101,7 +101,16 @@ def test_normalize_binding_accepts_vocabulary_and_abstention():
     with pytest.raises(ValueError, match="closed vocabulary"):
         normalize_binding(
             {"bindings": [
-                {"candidate_id": "c1", "class": "vibe_based"},
+                {"candidate_id": "c1", "class": "vibe_based",
+                 "confidence": "high", "evidence_basis": "b"},
+            ]},
+            case_id="A", expected_ids=["c1"],
+        )
+    with pytest.raises(ValueError, match="confidence"):
+        normalize_binding(
+            {"bindings": [
+                {"candidate_id": "c1", "class": "premise_conflict",
+                 "evidence_basis": "b"},
             ]},
             case_id="A", expected_ids=["c1"],
         )
@@ -109,7 +118,7 @@ def test_normalize_binding_accepts_vocabulary_and_abstention():
         normalize_binding(
             {"bindings": [
                 {"candidate_id": "c1", "class": "premise_conflict",
-                 "evidence_basis": ""},
+                 "confidence": "high", "evidence_basis": ""},
             ]},
             case_id="A", expected_ids=["c1"],
         )
@@ -127,6 +136,38 @@ def test_normalize_binding_accepts_vocabulary_and_abstention():
             ]},
             case_id="A", expected_ids=["c1"],
         )
+
+
+def test_low_confidence_binding_demotes_to_unclassified():
+    records = normalize_binding(
+        {"bindings": [
+            {"candidate_id": "c1", "class": "premise_conflict",
+             "confidence": "low", "evidence_basis": "plausible only"},
+        ]},
+        case_id="A", expected_ids=["c1"],
+    )
+    assert records[0]["certificate_class"] == "unclassified"
+    assert records[0]["binding_status"] == "unclassified"
+    assert records[0]["basis"] == (
+        "low-confidence demotion from premise_conflict: plausible only"
+    )
+
+
+def test_class_definitions_are_discriminative_boundaries():
+    names = list(CERTIFICATE_CLASSES)
+    assert names[-1] == "content_contradiction"
+    for name, definition in CERTIFICATE_CLASSES.items():
+        assert "CONVICTS WHEN" in definition, name
+        assert "NOT WHEN" in definition, name
+    premise = CERTIFICATE_CLASSES["premise_conflict"]
+    assert "quote the premise sentence" in premise
+    assert "authored the deviating specific" in premise
+    residual = CERTIFICATE_CLASSES["content_contradiction"]
+    assert "wrong, fabricated, redundant or missing checkable specific" in (
+        residual
+    )
+    compliance = CERTIFICATE_CLASSES["requirement_compliance"]
+    assert "violation of an instruction about HOW to work" in compliance
 
 
 def test_unclassified_certificate_keeps_baseline_behaviour():

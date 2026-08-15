@@ -254,6 +254,42 @@ Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy
 
 交付详情见 [SEHD_RISE2_Phase1C_策略运行时契约实施文档.md](SEHD_RISE2_Phase1C_策略运行时契约实施文档.md)。
 
+## Phase 1-C.5 Binder Calibration（交付摘要，2026-08-15）
+
+三项校准任务全部落地，交付形态是**可迭代的校准闭环**而非一次性调参：
+
+1. **判别式证书类定义**（`policy.py::CERTIFICATE_CLASSES`）：七个类从描述性
+   prose 改为边界定义——每类 `CONVICTS WHEN`（必须通过的正判据）+
+   `NOT WHEN`（易混邻类重定向）；`content_contradiction` 降为**残余基线类**
+   （声明序末位，仅在所有特定类测试失败后绑定）。premise_conflict 收紧为
+   三重正判据：具体值**继承自任务前提**（要求引用前提原句）+ 定罪权威为
+   外部知识 + 无引用观察反对；agent 自 authored 的错误推导（即使靠外部
+   计算定罪）明确排除到 content_contradiction。
+2. **弃权结构化**（`binder.py`）：绑定答案新增必填 `confidence` 字段，
+   `normalize_binding` 将 low 置信**机械降级**为 unclassified（harness 强制，
+   不信任模型自觉）；提示词改为有序判别流程——特定类先行、content 残余、
+   绑 content 前强制双边对照测试（前提 / 近平价 / 呈现性展开 / 单切片缺席）。
+3. **校准读出仪器**（`replay.py compare`）：类间混淆矩阵（oracle × runtime）
+   + 过绑/漏绑方向计数，每轮迭代的分歧簇直接定位下一个定义修正点。
+
+**三轮校准迭代 + 一次模型扩容探针的实证轨迹**（162 证书，oracle 绑定为靶）：
+
+- 一致率 84.0%（1-C3 基线）→ 81.5% → 88.9% → **92.0%**；
+  content 侧精度 140/142，premise_conflict 过绑（1-C3 的 FN 源）降为
+  **0**，FN 回归消除（全集 12 = baseline），**全部 32 配置 TP 损失 = 0**；
+- 中间迭代的混淆矩阵捕获并修复了两次回归（requirement_compliance 过绑
+  19 例：错误的动作条款 + content 证明门槛过高），证明仪器本身是必要的；
+- **v4-pro 探针**（8 个 FP 侧漏绑案例定向重绑）只修复 2/10——模型扩容
+  无法关闭缺口。
+
+**结论与残余**：runtime 全集 78%（oracle 87%），FP 12→10。剩余 10 例 FP
+全部同向：证书自身以 "contradiction" 措辞断言偏差，flash 与 pro 均继承该
+框架；部分案例（如码→名展开的正确性）所需的验证材料不在 label-free 输入
+表示内。**瓶颈已从「binder 推理」重新定位为「证据表示」**——verification
+LLM 生产 rationale 时知道自己的定罪依据（对照措辞 / 外部知识 / 单切片
+缺席），但该信号在证书表示中被丢弃。表示层修复（证书生产时记录 basis
+信号）属检测器侧变更，冻结检测器的 P1-D 不动它；进入 Phase 2 进化清单。
+
 ## 学习口径（label-free 设计边界）
 
 - **框架不宣称能发现漏检。** label-free 运行没有任何信号能判定「gold 为 error
@@ -265,12 +301,13 @@ Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy
 
 ## 下一步
 
-Phase 1-C 已交付：语义层闭环（oracle 全集 87% 零损失 + genome 冻结），
-感知层缺口量化（runtime 77% vs oracle 87%，一致率 84%）。下一步是
-**binder 校准迭代**（弃权校准 / 判别式类定义 / premise_conflict 收紧），
-然后 **P1-D fresh unseen evaluation**：AgentHallu 剩余样本 fresh split +
-定向 canary 集，走 冻结检测器 → 运行时 binder → policy genome → 进化侧
-裁决 → join gold 的完整链路；fresh 集零已知回归 + 净改善才允许 `promoted`。
+Phase 1-C.5 已交付：binder 校准闭环（判别式定义 + 结构化弃权 + 混淆矩阵
+仪器），一致率 84%→92%、FN 回归消除、全配置零 TP 损失、pro 探针证明残余
+为证据表示层瓶颈。下一步是 **P1-D fresh unseen evaluation**：
+AgentHallu 剩余样本 fresh split + 定向 canary 集，走 冻结检测器 →
+运行时 binder → policy genome → 进化侧裁决 → join gold 的完整链路；
+fresh 集零已知回归 + 净改善才允许 `promoted`。证书表示层的 basis 信号
+记录进入 Phase 2 进化清单。
 
 ## 历史沿革
 

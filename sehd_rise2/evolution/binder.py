@@ -59,25 +59,51 @@ BINDER_SYSTEM = (
     "below, decide which conviction-basis class it belongs to, using "
     "ONLY the certificate, its candidate and the cited trajectory "
     "events.\n\n"
-    "Classes:\n"
+    "Classes (each definition is a boundary: CONVICTS WHEN is the test "
+    "to run, NOT WHEN redirects to the confusable class):\n"
     + "\n".join(
         f"- {name}: {definition}"
         for name, definition in CERTIFICATE_CLASSES.items()
     )
-    + "\n- unclassified: the evidence shown does not let you decide "
-    "confidently; the policy layer then keeps baseline behaviour.\n\n"
-    "Rules:\n"
-    "1. Judge each CERTIFICATE's asserted deviation, not the agent.\n"
-    "2. A class only fits if that certificate itself asserts the basis; "
-    "do not infer deviations the certificate does not claim.\n"
-    "3. Bind every certificate in this case; certificates of the same "
+    + "\n- unclassified: the evidence shown does not let you run the "
+    "decisive test confidently; the policy layer then keeps baseline "
+    "behaviour.\n\n"
+    "Decision procedure, per certificate:\n"
+    "1. Test every specific class BEFORE content_contradiction — it is "
+    "the residual and binds only when every other class's test fails.\n"
+    "2. Judge what the asserted deviation actually IS, not how the "
+    "certificate words it: a certificate phrasing a wording-level, "
+    "near-tie, presentational, absence-based or premise-level "
+    "difference as a 'contradiction' or 'failure' still binds to the "
+    "specific class whose test the underlying difference passes.\n"
+    "3. Before binding content_contradiction on a deviation from a "
+    "cited source, put the two sides side by side and run the "
+    " neighbour tests on the pair: (a) if the opposing source is the "
+    "task text or a user statement — a premise, not an observation — "
+    "and the agent's content inherits it, bind premise_conflict; "
+    "(b) if the pair differs only in wording, formatting, rounding or "
+    "a near-tie margin inside the source's precision, bind "
+    "expression_variance; (c) if the added material unpacks, renders "
+    "or evaluatively qualifies an observed specific, bind "
+    "presentational_addition; (d) if the source merely lacks the "
+    "material while no cited slice contradicts it and it is grounded "
+    "elsewhere, bind absence_based. content_contradiction needs a "
+    "genuine contradiction: a source asserting what the agent's "
+    "specific denies, or an agent-authored specific no source "
+    "supports.\n"
+    "4. Bind every certificate in this case; certificates of the same "
     "case may legitimately get different classes.\n"
-    "4. When in doubt, answer unclassified — a wrong class suppresses "
-    "or keeps a conviction incorrectly.\n"
+    "5. Abstaining is a normal answer for this layer. Answer confidence "
+    "high only when your quoted phrase settles the class test by "
+    "itself; answer low when two classes stayed plausible or you had "
+    "to weigh material not shown. Low confidence falls back to "
+    "baseline behaviour — a guessed class suppresses or keeps a "
+    "conviction incorrectly.\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"bindings": [{"candidate_id": "c1", "class": "<class name or '
-    'unclassified>", "evidence_basis": "<one sentence quoting the '
-    'decisive phrase>"}]}'
+    'unclassified>", "confidence": "<high or low>", "evidence_basis": '
+    '"<one sentence quoting the decisive phrase; for premise_conflict '
+    'quote the premise sentence>"}]}'
 )
 
 
@@ -229,7 +255,9 @@ def normalize_binding(
 
     Every listed certificate must receive exactly one binding inside the
     closed vocabulary; anything else is a hard error, never a silent
-    downgrade.
+    downgrade. A ``low`` confidence on a classified answer is demoted
+    mechanically to ``unclassified`` — the fail-closed abstention gate,
+    enforced here rather than trusted to the model's own hesitation.
     """
     if not isinstance(parsed, Mapping):
         raise ValueError(f"{case_id}: binder returned no JSON object")
@@ -247,16 +275,26 @@ def normalize_binding(
                 f"{candidate_id!r}"
             )
         certificate_class = str(answer.get("class") or "")
+        confidence = str(answer.get("confidence") or "")
         basis = str(answer.get("evidence_basis") or "")
         if certificate_class == UNCLASSIFIED:
-            status = UNCLASSIFIED
+            record_class, status = UNCLASSIFIED, UNCLASSIFIED
         elif certificate_class in CERTIFICATE_CLASSES:
-            status = "classified"
+            if confidence not in ("high", "low"):
+                raise ValueError(
+                    f"{case_id}/{candidate_id}: classified binding "
+                    f"without high/low confidence"
+                )
             if not basis:
                 raise ValueError(
                     f"{case_id}/{candidate_id}: classified binding "
                     f"without basis"
                 )
+            if confidence == "low":
+                record_class, status = UNCLASSIFIED, UNCLASSIFIED
+                basis = f"low-confidence demotion from {certificate_class}: {basis}"
+            else:
+                record_class, status = certificate_class, "classified"
         else:
             raise ValueError(
                 f"{case_id}/{candidate_id}: answer {certificate_class!r} "
@@ -265,7 +303,7 @@ def normalize_binding(
         records.append({
             "case_id": case_id,
             "candidate_id": candidate_id,
-            "certificate_class": certificate_class,
+            "certificate_class": record_class,
             "basis": basis or "binder abstained",
             "binding_status": status,
         })

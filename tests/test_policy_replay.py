@@ -270,3 +270,53 @@ def test_real_replay_metrics_match_reported_summary():
     for config in result["configurations"]:
         assert config["must_survive_violations"] == []
         assert config["tp_lost"] == []
+
+
+def _comparison_result() -> dict:
+    return {"configurations": [
+        {"configuration": "baseline", "accuracy": 0.76, "fp": 12,
+         "fn": 12, "tp_lost": []},
+        {"configuration": "full_set", "accuracy": 0.87, "fp": 1,
+         "fn": 12, "tp_lost": []},
+    ]}
+
+
+def test_compare_binding_layers_reports_confusion_and_directions():
+    from sehd_rise2.evolution.replay import compare_binding_layers
+    oracle = {
+        ("A/1.json", "c1"): {"certificate_class": "content_contradiction",
+                             "basis": "b"},
+        ("A/2.json", "c1"): {"certificate_class": "premise_conflict",
+                             "basis": "b"},
+        ("A/3.json", "c1"): {"certificate_class": "expression_variance",
+                             "basis": "b"},
+        ("A/4.json", "c1"): {"certificate_class": "content_contradiction",
+                             "basis": "b"},
+    }
+    runtime = {
+        ("A/1.json", "c1"): {"certificate_class": "premise_conflict",
+                             "basis": "b"},
+        ("A/2.json", "c1"): {"certificate_class": "content_contradiction",
+                             "basis": "b"},
+        ("A/3.json", "c1"): {"certificate_class": "unclassified",
+                             "basis": "b"},
+        ("A/4.json", "c1"): {"certificate_class": "content_contradiction",
+                             "basis": "b"},
+    }
+    comparison = compare_binding_layers(
+        oracle=oracle, runtime=runtime,
+        oracle_result=_comparison_result(),
+        runtime_result=_comparison_result(),
+    )
+    assert comparison["certificates"] == 4
+    assert comparison["agreement_rate"] == 0.25
+    assert comparison["calibration"]["over_bound"] == {
+        "premise_conflict": 1,
+    }
+    assert comparison["calibration"]["under_bound"] == {
+        "premise_conflict": 1,
+    }
+    assert comparison["class_confusion"]["content_contradiction"][
+        "premise_conflict"] == 1
+    assert comparison["class_confusion"]["expression_variance"][
+        "unclassified"] == 1

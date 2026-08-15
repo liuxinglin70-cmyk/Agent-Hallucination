@@ -399,8 +399,12 @@ def compare_binding_layers(
 ) -> dict[str, Any]:
     """Oracle vs runtime binding layers over the same certificates.
 
-    P1-C3's headline numbers: does runtime-compatible perception preserve
-    the oracle-replay gains?
+    The calibration read-out: agreement and decision deltas, plus the
+    per-class confusion matrix and the over/under-binding directions
+    that drive the next definition tightening. Over-bound = the runtime
+    fired a policy class where the oracle kept the baseline residual;
+    under-bound = the runtime kept the baseline where the oracle fired a
+    policy class.
     """
     keys = set(oracle) | set(runtime)
     unclassified = sorted(
@@ -414,6 +418,26 @@ def compare_binding_layers(
             != runtime.get(key, {}).get("certificate_class")
         }
     )
+    class_names = sorted(
+        set(CERTIFICATE_CLASSES) | {"unclassified"},
+    )
+    confusion: dict[str, dict[str, int]] = {
+        name: {column: 0 for column in class_names}
+        for name in class_names
+    }
+    specific = set(CERTIFICATE_CLASSES) - {BASELINE_CLASS}
+    over_bound: dict[str, int] = {name: 0 for name in specific}
+    under_bound: dict[str, int] = {name: 0 for name in specific}
+    for key in keys:
+        oracle_class = oracle.get(key, {}).get("certificate_class")
+        runtime_class = runtime.get(key, {}).get("certificate_class")
+        confusion.setdefault(oracle_class, {
+            column: 0 for column in class_names
+        })[runtime_class] += 1
+        if oracle_class == BASELINE_CLASS and runtime_class in specific:
+            over_bound[runtime_class] += 1
+        if oracle_class in specific and runtime_class == BASELINE_CLASS:
+            under_bound[oracle_class] += 1
     oracle_decisions = {
         config["configuration"]: config
         for config in oracle_result["configurations"]
@@ -461,6 +485,17 @@ def compare_binding_layers(
             }
             for case_id, candidate_id in disagreements
         ],
+        "class_confusion": confusion,
+        "calibration": {
+            "over_bound": {
+                name: count for name, count in over_bound.items()
+                if count
+            },
+            "under_bound": {
+                name: count for name, count in under_bound.items()
+                if count
+            },
+        },
         "per_configuration": per_config_delta,
     }
 
@@ -622,7 +657,7 @@ def write_comparison_report(
     comparison: Mapping[str, Any], out_path: Path,
 ) -> None:
     lines = [
-        "# Phase 1-C3 Runtime-Binding Replay — Oracle vs Runtime", "",
+        "# Runtime-Binding Replay — Oracle vs Runtime", "",
         f"- certificates compared: {comparison['certificates']}",
         f"- binding agreement: {comparison['agreement_rate']:.1%}",
         f"- unclassified: {comparison['unclassified_count']} "
@@ -644,7 +679,38 @@ def write_comparison_report(
                 f"{entry['oracle_tp_lost']} -> "
                 f"{entry['runtime_tp_lost']} |"
             )
+    confusion = comparison["class_confusion"]
+    columns = sorted(confusion)
     lines += [
+        "", "## Class confusion (rows = oracle, columns = runtime)", "",
+        "| oracle \\ runtime | " + " | ".join(columns) + " |",
+        "|---" * (len(columns) + 1) + "|",
+    ]
+    for row in sorted(confusion):
+        lines.append(
+            f"| {row} | "
+            + " | ".join(
+                str(confusion[row][column]) for column in columns
+            )
+            + " |"
+        )
+    calibration = comparison["calibration"]
+    lines += [
+        "", "## Calibration directions", "",
+        "- over-bound (oracle baseline -> runtime policy class): "
+        + (
+            ", ".join(
+                f"{name} x{count}"
+                for name, count in calibration["over_bound"].items()
+            ) or "none"
+        ),
+        "- under-bound (oracle policy class -> runtime baseline): "
+        + (
+            ", ".join(
+                f"{name} x{count}"
+                for name, count in calibration["under_bound"].items()
+            ) or "none"
+        ),
         "", "## Binding disagreements (oracle vs runtime)", "",
     ]
     for entry in comparison["disagreements"]:
