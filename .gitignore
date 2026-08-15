@@ -15,11 +15,13 @@ src/
 experiments/*
 !experiments/README.md
 
-# Raw datasets (large, local-only); learning-case projections are tracked
+# Raw datasets (large, local-only); learning-case projections and the
+# policy-candidate/binding/replay artifacts are tracked
 datasets/raw/
 datasets/**/*.json
 datasets/**/*.jsonl
 !datasets/learning_cases/v1/**
+!datasets/policy_candidates/v1/**
 
 # Python
 __pycache__/

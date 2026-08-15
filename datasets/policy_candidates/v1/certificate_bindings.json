@@ -1,0 +1,984 @@
+{
+  "binding_source": "analyst binding over the label-free worksheet (ZCode session, 2026-08-15); policy-class and boundary certificates carry hand-written bases, clear content certificates carry the claim fragment; delivery_form abstain bindings record the NS-1 finding",
+  "bindings": [
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported 'Observation 2: Anomaly detected' and 'Observation 4: Anomaly detected' as two separate matching lines from grep, instead",
+      "candidate_id": "c1",
+      "case_id": "BFCL/006.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "tool-produced value restated inexactly into a later tool argument ('2.0' as '2.0000'); observation-exactness domain, outside prose tolerance",
+      "candidate_id": "c1",
+      "case_id": "BFCL/025.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent wrote the raw values 5000, 3000, and 2000 to statistics.txt and presented them as the means instead of computing the mean of reven",
+      "candidate_id": "c1",
+      "case_id": "BFCL/027.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called 'ls -a' twice more with identical arguments and no intervening state change instead of acting on the already-observed direc",
+      "candidate_id": "c3",
+      "case_id": "BFCL/030.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "second user question never answered; missing required deliverable",
+      "candidate_id": "c4",
+      "case_id": "BFCL/030.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used destination 'Reports' for the cp call instead of the required destination 'Documents/Reports' (the Reports directory inside D",
+      "candidate_id": "c2",
+      "case_id": "BFCL/032.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called fillFuelTank with fuelAmount=50 instead of first checking the current fuel level and adding only the amount needed to reach",
+      "candidate_id": "c1",
+      "case_id": "BFCL/044.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated that the tank's maximum capacity is 50 gallons instead of reporting only what the fillFuelTank error observation contained,",
+      "candidate_id": "c2",
+      "case_id": "BFCL/044.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "requested top-up not performed; missing required action, not advisory form",
+      "candidate_id": "c3",
+      "case_id": "BFCL/044.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent declared the car ready for the road trip instead of first ensuring the fuel tank was topped up to the requested 50 gallons, since ",
+      "candidate_id": "c4",
+      "case_id": "BFCL/044.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent passed placeholder credentials 'your_username' and 'your_password' to authenticate_twitter instead of using the user's real Twitte",
+      "candidate_id": "c1",
+      "case_id": "BFCL/046.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent posted the tweet with content 'Just started my journey!' via post_tweet in parallel with startEngine before confirming the engine ",
+      "candidate_id": "c1",
+      "case_id": "BFCL/057.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent filled the tank as if it had a 50-gallon capacity (fillFuelTank fuelAmount=39.5) and then stated that the tank was filled complete",
+      "candidate_id": "c1",
+      "case_id": "BFCL/080.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated the fuel tank had been filled to its maximum capacity of 50 gallons instead of reporting only the observed post-fill fuel l",
+      "candidate_id": "c1",
+      "case_id": "BFCL/081.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent supplied fabricated placeholder credentials 'your_username' and 'your_password' to trading_login instead of using real user creden",
+      "candidate_id": "c1",
+      "case_id": "BFCL/089.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent stated that the provided functions were insufficient for the task after add_to_watchlist and get_watchlist had already succeeded, ",
+      "candidate_id": "c1",
+      "case_id": "BFCL/094.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "requested watchlist contents and stock details never presented; missing required deliverable",
+      "candidate_id": "c2",
+      "case_id": "BFCL/094.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "near-tie directional characterization (150.00 vs 150.20, 0.13% margin) inside the micro-difference tolerance",
+      "candidate_id": "c1",
+      "case_id": "BFCL/114.json",
+      "certificate_class": "expression_variance"
+    },
+    {
+      "basis": "code-to-name expansion of the observed airport codes in a prose list",
+      "candidate_id": "c1",
+      "case_id": "BFCL/127.json",
+      "certificate_class": "presentational_addition"
+    },
+    {
+      "basis": "currency-unit rendering of the observed numeric fare in prose",
+      "candidate_id": "c3",
+      "case_id": "BFCL/127.json",
+      "certificate_class": "presentational_addition"
+    },
+    {
+      "basis": "insurance absence in the one cited invoice read as fabrication of a summary spanning retrieved documents",
+      "candidate_id": "c1",
+      "case_id": "BFCL/142.json",
+      "certificate_class": "absence_based"
+    },
+    {
+      "basis": "explicit empty-string tool-argument requirement violated with substantive content; tool-argument exactness domain, not advisory form",
+      "candidate_id": "c1",
+      "case_id": "BFCL/146.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent asserted that any countable sequence of functions ω→ω can be pointwise dominated by a single g, instead of recognizing that counta",
+      "candidate_id": "c1",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent inferred from the existence of an unbounded ω1-sized family that λ=ω1 fails, instead of requiring a family with no uncountable poi",
+      "candidate_id": "c2",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent listed X as {1,2,...,ℵ0}, omitting the cardinal 0, instead of including 0 because the empty set x=∅ satisfies the defining propert",
+      "candidate_id": "c3",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called read_note with note_name '4.2', which was never created, instead of reading the available note 'continuum_hypothesis_facts'",
+      "candidate_id": "c4",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent computed (ω+1)·ω1 by left-distributing as ω·ω1+1·ω1 and then asserted ω1+ω1=ω1, instead of using the ordinal multiplication defini",
+      "candidate_id": "c5",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent replaced γ·ω1=(ω+1)·ω1 with ω1·(ω+1)=ω1·ω+ω1, reversing the order of multiplication, instead of keeping the factors in the order r",
+      "candidate_id": "c6",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed ω1+ω+1=ω1+1 because adding ω after ω1 is absorbed, instead of keeping ω1+ω+1 as an ordinal strictly larger than ω1+1",
+      "candidate_id": "c7",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent gave answer E, whereas γ·ω1+γ = ω1+ω+1, which is answer D",
+      "candidate_id": "c8",
+      "case_id": "Camel/003.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent wrote the boric acid dissociation as H₃BO₃(aq) ⇌ H⁺(aq) + B(OH)₄⁻(aq), an unbalanced equation that omits the water reactant, inste",
+      "candidate_id": "c1",
+      "case_id": "Camel/011.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent neglected water autoionization by setting [H⁺] = x = [B(OH)₄⁻] and using Ka = x²/(C−x), reporting the final pH as ≈7.08, instead o",
+      "candidate_id": "c2",
+      "case_id": "Camel/011.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent computed the heat ratio as 64 by ignoring the planet's 2× larger circumference and treating the question as heat per unit area, in",
+      "candidate_id": "c1",
+      "case_id": "Camel/032.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "channel choice: asked the human instead of the required search; no content error asserted by this certificate; content corroboration exists via the c3 misreport",
+      "candidate_id": "c1",
+      "case_id": "Camel/039.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "misreports what the searches produced; cited evidence positively contradicts the report",
+      "candidate_id": "c3",
+      "case_id": "Camel/039.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent recorded the system-to-system ratio formula as (P1/P2)×[(K1_2^2+K2_2^2)/(K1_1^2+K2_1^2)]^(3/2), which evaluates to about 8.39, ins",
+      "candidate_id": "c3",
+      "case_id": "Camel/052.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed in an append_note that the user had clarified to treat (3i,4) as normalized and to use S_y = ħ·σ_y, but the user's origina",
+      "candidate_id": "c1",
+      "case_id": "Camel/056.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent treated the non-normalized spinor (3i,4) as already normalized and omitted the normalization factor: ⟨ψ|ψ⟩ = 9+16 = 25; instead of",
+      "candidate_id": "c2",
+      "case_id": "Camel/056.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used S_y = ħ·σ_y in the calculation instead of the standard electron spin-1/2 operator S_y = (ħ/2)·σ_y required for the problem.",
+      "candidate_id": "c3",
+      "case_id": "Camel/056.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported the final answer ⟨S_y⟩ = −24ħ instead of the correct ⟨S_y⟩ = −12ħ/25 for the normalized spin-1/2 electron.",
+      "candidate_id": "c4",
+      "case_id": "Camel/056.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent introduced arbitrary phase angles θ_1...θ_4 without specifying how they encode the given message pairs (xa,pa), (xb,pb), (xc,pc) w",
+      "candidate_id": "c2",
+      "case_id": "Camel/059.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assigned distinct rotations θ_2 and θ_3 to P2's modes 2 and 3 even though the user specified a single P2 message (xb,pb) for those",
+      "candidate_id": "c3",
+      "case_id": "Camel/059.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent gave only generic symbolic formulas for phase-rotated quadratures instead of deriving the actual Bell-measurement output of the 4-",
+      "candidate_id": "c4",
+      "case_id": "Camel/059.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed that the parties' encoded information can be extracted from the joint measurement outcomes although no decoding relation w",
+      "candidate_id": "c5",
+      "case_id": "Camel/059.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed the 10 uL aliquot of 10 uM DNA contains approximately 10^16 DNA molecules instead of computing the correct ~6x10^13 molecu",
+      "candidate_id": "c1",
+      "case_id": "Camel/060.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent concluded that the maximum protein diversity is 10^15 and that DNA copy number does not limit diversity (asserting all 20^12 combi",
+      "candidate_id": "c2",
+      "case_id": "Camel/060.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated there are 10^6 more DNA molecules than sequence variants instead of noting that its own numbers (10^16 vs 10^15) differ by ",
+      "candidate_id": "c3",
+      "case_id": "Camel/060.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "the ortho/para framing restates the user guidance in event_003; the certificate's authority is outside chemistry, not cited trajectory evidence",
+      "candidate_id": "c1",
+      "case_id": "Camel/061.json",
+      "certificate_class": "premise_conflict"
+    },
+    {
+      "basis": "paraphrase of the user's advice; only wording differs from the cited user text",
+      "candidate_id": "c1",
+      "case_id": "Camel/064.json",
+      "certificate_class": "expression_variance"
+    },
+    {
+      "basis": "offloaded the solving to the user instead of solving from the stated IUPAC name; no content error asserted by this certificate; content corroboration exists via the c2-c7 chemistry errors",
+      "candidate_id": "c1",
+      "case_id": "Camel/070.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent interpreted prop-1-en-2-ylcyclopentane as cyclopentyl-CH2-CH=CH2 (allylcyclopentane/cyclopentylallyl) instead of isopropenylcyclop",
+      "candidate_id": "c2",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent applied peroxide-promoted anti-Markovnikov HCl addition to give a primary chloride instead of the Markovnikov HCl addition require",
+      "candidate_id": "c3",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent described alcoholic KOH as Hofmann-selective E2 giving a terminal vinyl/isopropenyl alkene instead of the actual elimination behav",
+      "candidate_id": "c4",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent replaced the stated reductive ozonolysis reagent O3/(CH3)2S with oxidative ozonolysis O3/H2O2 instead of using the reagent specifi",
+      "candidate_id": "c5",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed ozonolysis yields cyclopentanecarboxylic acid and formic acid instead of the actual products cyclopentyl methyl ketone and",
+      "candidate_id": "c6",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported only sodium cyclopentanecarboxylate and sodium formate as final products instead of the aldol product formed from cyclope",
+      "candidate_id": "c7",
+      "case_id": "Camel/070.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "specific physics assertion (absence of the charge-conjugate antiparticle) contradicted by the standard model's particle content",
+      "candidate_id": "c1",
+      "case_id": "Camel/074.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent presented a fabricated Hollywood-only Box Office Mojo 2020 Worldwide top 10 (Bad Boys for Life, Tenet, Sonic the Hedgehog, Dolittl",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "evaluative qualifiers 'robust'/'well established' over the observed detection facts; no new checkable specific",
+      "candidate_id": "c3",
+      "case_id": "Magentic_One/014.json",
+      "certificate_class": "presentational_addition"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated Sweden did not win any bronze medals at the 1956 Summer Olympics, instead of reporting the bronze medal won by John Sundber",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/016.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported the shift-10 script output as 'Picnic is is Picnic Parkz.' instead of the actual decryption 'Picnic is in Polybius Plaza.",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/017.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent concluded the meeting location is Picnic Park instead of telling the user that the decoded message places the picnic in Polybius P",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/017.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent stated that Dire Maul was originally released on October 15, 2019 (the WoW Classic release date) instead of the correct original W",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated that the square is ABCD, treating the heptagon vertex B as if it were a square vertex, instead of recognizing from the diag",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/043.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent placed heptagon vertex B at angular direction 2*(360/7)=102.857 degrees from A, treating it as the second vertex counterclockwise ",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/043.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent placed the square vertex C at (1,1), directly above D, in the A=(0,0), D=(1,0) coordinate setup instead of placing the diagram's l",
+      "candidate_id": "c3",
+      "case_id": "Magentic_One/043.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent concluded that angle BAC is 405/7 degrees instead of the correct 270/7 degrees",
+      "candidate_id": "c4",
+      "case_id": "Magentic_One/043.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent wrote |102.857 - 90| = 57.857 and |720/7 - 90| = 405/7 instead of computing the actual difference 12.857 = 90/7",
+      "candidate_id": "c5",
+      "case_id": "Magentic_One/043.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "answer-quality preference under partial retrieval; cites no observation contradicting the answer, only evidence that did not establish the preferred chapter identification",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/065.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "proof basis is the instructed new-tab search procedure; the answer was already sourced",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/065.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "proof basis is the requested query count; nothing fabricated or misreported",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/066.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent stated that benzene and toluene are solvents with a hydrogen mass fraction around 14.28%, instead of recognizing that their H frac",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent labelled C8H10 as 'octane' and C10H16 as 'decane', instead of using the correct formulas C8H18 for octane and C10H22 for decane.",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent identified Z as C7H14 'heptane' (a 'well-known solvent') and repeated this in event_006, instead of identifying Z as cyclohexane C",
+      "candidate_id": "c3",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent concluded that the two liquids in X are C7H14 alkenes that hydrogenate to Z and contain 28 H atoms in total, instead of recognizin",
+      "candidate_id": "c4",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent proposed X = cyclohexene + methylcyclopentene (C6H10 + C6H10, total 20 H) and dismissed cyclohexadiene as incompatible, instead of",
+      "candidate_id": "c5",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent claimed that methylcyclopentane ring-opens and isomerizes to cyclohexane under severe hydrogenation, instead of using the actual d",
+      "candidate_id": "c6",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent stated that the total number of H atoms in mixture X is 33, instead of 18 (and inconsistent with its own premise that two C7H14 mo",
+      "candidate_id": "c7",
+      "case_id": "Magentic_One/075.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assumed the two roots must be swapped by c -> c^2-2 (d = c^2-2 and c = d^2-2) instead of recognizing that c^2-2 may equal c itself",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/087.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed each value of c gives a distinct quadratic equation and counted c-values instead of recognizing that both roots of a 2-cyc",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/087.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent expanded c=(c^2-2)^2-2 as c^4-4c^2+2c+2=0 instead of the correct c^4-4c^2-c+2=0",
+      "candidate_id": "c3",
+      "case_id": "Magentic_One/087.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent concluded there are 3 distinct quadratic equations instead of reporting the tool-computed 4 and the mathematically correct count o",
+      "candidate_id": "c4",
+      "case_id": "Magentic_One/087.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent minimized r^2 over the continuum of valid boxes instead of maximizing the space diagonal to get the radius of the smallest sphere ",
+      "candidate_id": "c1",
+      "case_id": "Magentic_One/091.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent treated a floating-point scan result as an exact reduced fraction, reporting r^2 = 2637046/322607 and p+q = 2959653 via Fraction(.",
+      "candidate_id": "c2",
+      "case_id": "Magentic_One/091.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent computed square totals with the incorrect formula 2(n-1)+(n-2)+1 and concluded n=25 gives 72 squares, instead of counting the thre",
+      "candidate_id": "c1",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent's tool call at event_004 produced the unrelated/fabricated result n=4900 from a loop that contains no print statement and cannot p",
+      "candidate_id": "c2",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent used the formula 2(n-1)+(n-2)+0 = 3n-4 in event_005 and the final answer, omitting the tilted sqrt(2) diamonds and instead invokin",
+      "candidate_id": "c3",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent's event_006 code counted point rows/columns rather than intervals (1x1 as 3n, 2x2 as 2(n-1), 3x3 as n-2), producing the erroneous ",
+      "candidate_id": "c4",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent concluded n=20 gives exactly 70 squares, directly contradicting its own event_006 execution ('70 is not in list' for n=1..24) and ",
+      "candidate_id": "c5",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent's final answer stated 3(23)-4=69 and 3(22)-4=66, although those expressions equal 65 and 62 respectively.",
+      "candidate_id": "c6",
+      "case_id": "Octotools/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "proof basis is the 'write only the word' output-form instruction; no fabricated or contradicted content asserted",
+      "candidate_id": "c2",
+      "case_id": "Octotools/016.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "omitted the required circuit input from the tool prompt; no content error asserted by this certificate; content corroboration exists via c2-c6",
+      "candidate_id": "c1",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent's tool output asserted the unsupported answer 'cghm' without deriving the conflict sets from the circuit structure, instead of com",
+      "candidate_id": "c2",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent fabricated equations x=a+b+c, y=d+e+f, and z=g+x and then gave variable-level sets {a,b,c,x}, {d,e,f,y}, {g,x,z}, instead of produ",
+      "candidate_id": "c3",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent's final answer 'chl' contradicts the earlier tool output 'cghm' and is supported by no tool observation, instead of giving a singl",
+      "candidate_id": "c4",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed z=h(g,x,y) gives 12 for g=2, x=10, y=9 even though no function h is defined in the problem and no such relation appears in",
+      "candidate_id": "c5",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent asserted x=4 from an unspecified x=f(a,b,c) and y=7 from an unspecified y=g(d,e,f), inventing functional forms not present in the ",
+      "candidate_id": "c6",
+      "case_id": "Octotools/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent presented the lower bound 1982 as the exact minimum answer instead of proving that a family of 2024 sets of size 45 with pairwise ",
+      "candidate_id": "c1",
+      "case_id": "Octotools/022.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "confirmation attributed to the Wikipedia searches whose slices lack the episode details; the details are grounded in the Google results of event_002",
+      "candidate_id": "c1",
+      "case_id": "Octotools/028.json",
+      "certificate_class": "absence_based"
+    },
+    {
+      "basis": "plan hygiene: irrelevant tool listed in the plan; no content claim involved",
+      "candidate_id": "c4",
+      "case_id": "Octotools/028.json",
+      "certificate_class": "requirement_compliance"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called CH3NHCOOCH2CH3 'ethyl carbamate' instead of the required ethyl N-methylcarbamate",
+      "candidate_id": "c1",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called CH3CH2NHCOOCH3 'ethyl carbamate' instead of the required methyl N-ethylcarbamate",
+      "candidate_id": "c2",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called CH3CH2OCH2CONH2 'ethyl carbamate' instead of the required 2-ethoxyacetamide",
+      "candidate_id": "c3",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assigned CH3NHCOOCH2CH3 a 1H NMR pattern of singlet CH3, triplet CH2 adjacent to nitrogen, and broad NH instead of the required NC",
+      "candidate_id": "c4",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assigned CH3CH2NHCOOCH3 a 1H NMR pattern of singlet CH3, triplet CH2 adjacent to nitrogen, and broad NH instead of the required CH",
+      "candidate_id": "c5",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assigned CH3CH2OCH2CONH2 a 1H NMR pattern of triplet ethyl, singlet OCH2, and broad NH2 instead of the required CH3 triplet, OCH2 ",
+      "candidate_id": "c6",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent inferred the three other compounds might be the same compound or very similar instead of recognizing they are distinct constitutio",
+      "candidate_id": "c7",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated a triplet indicates three equivalent protons instead of the required statement that a triplet is a three-line signal caused",
+      "candidate_id": "c8",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated a quartet indicates four equivalent protons instead of the required statement that a quartet is a four-line signal caused b",
+      "candidate_id": "c9",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated m/z 30 could correspond to a CHNO fragment (mass 43) instead of the required CH4N+ fragment such as CH2NH2+",
+      "candidate_id": "c10",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated m/z 58 could correspond to a C2H2NO2 fragment (mass 72) instead of the required C2H4NO+ fragment such as CH3NHCO+",
+      "candidate_id": "c11",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed the 1H NMR data match CH3CH2NHCOOCH3 and CH3CH2OCH2CONH2 instead of recognizing that CH3NHCOOCH2CH3 also matches and is th",
+      "candidate_id": "c12",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent concluded the product was CH3CH2NHCOOCH3 instead of the required CH3NHCOOCH2CH3",
+      "candidate_id": "c13",
+      "case_id": "OpenDeepSearch/007.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent arbitrarily assumed the octahedron edge length is sqrt(2) and assigned the five given distances to five fixed vertices, instead of",
+      "candidate_id": "c1",
+      "case_id": "OpenDeepSearch/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent asserted the false constant identity d1^2+...+d6^2 = 6R^2+3a^2 and used it to write 3^2+7^2+8^2+9^2+11^2+d6^2 = 12, instead of usi",
+      "candidate_id": "c2",
+      "case_id": "OpenDeepSearch/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent set the constant sum of squares to 72 in the code immediately after stating the same constant was 12, instead of using a single co",
+      "candidate_id": "c3",
+      "case_id": "OpenDeepSearch/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent submitted 6 as the final answer even though the code had just computed d6 as an imaginary number, instead of reporting the real si",
+      "candidate_id": "c4",
+      "case_id": "OpenDeepSearch/012.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed the exact number of intersections is 5 instead of the correct count (384)",
+      "candidate_id": "c1",
+      "case_id": "OpenDeepSearch/031.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used a coarse 1001-point rounded-grid count of approximate F/G matches and treated that result as the exact answer instead of solv",
+      "candidate_id": "c2",
+      "case_id": "OpenDeepSearch/031.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported that the previous search result showed the initial plan included 55 Eurofighter Typhoons instead of accurately reporting ",
+      "candidate_id": "c4",
+      "case_id": "OpenDeepSearch/034.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reasoned that the initial announcement was likely in Q1 2022 even though the final decision was announced in January 2022, so the ",
+      "candidate_id": "c6",
+      "case_id": "OpenDeepSearch/034.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "ungrounded general claim about parliamentary sessions used as an intermediate fact; a specific assertion no observation contains",
+      "candidate_id": "c7",
+      "case_id": "OpenDeepSearch/034.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent identified compound A as 3-methylcyclopentene instead of 1-isopropylidene-3-methylcyclopentane, whose ozonolysis gives 3-methylcyc",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed that H2SO4 under heat converts the alkene into the alkane methylcyclopentane instead of an acid-catalyzed addition/rearran",
+      "candidate_id": "c2",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent changed the structure of A to 3-methylcyclohexene instead of the required 1-isopropylidene-3-methylcyclopentane; ozonolysis of 3-m",
+      "candidate_id": "c3",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed H2SO4/heat converts 3-methylcyclohexene into 3-methylcyclohexane instead of an acid-catalyzed addition/rearrangement produ",
+      "candidate_id": "c4",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent identified compound A as 1-isopropenyl-3-methylcyclopentane instead of 1-isopropylidene-3-methylcyclopentane; cleavage of the isop",
+      "candidate_id": "c5",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed the H2SO4/heat product from A is the alkane 1-isopropyl-3-methylcyclopentane instead of an acid-catalyzed hydration/rearra",
+      "candidate_id": "c6",
+      "case_id": "OpenManus/013.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent solved only the two base-period equations x=34y^2=y and x=34y^2=2-y, instead of solving over all 4-periodic shifted segments x=34y",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent stated 'The sum of all y-coordinates is 0,' but the tool observation only supplied the sum of the four base-period roots; the comp",
+      "candidate_id": "c2",
+      "case_id": "OpenManus/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent concluded a=0, b=0, c=1, d=1 and a+b+c+d=2, instead of the required positive a,b,d with squarefree c; the complete sum gives a=1, ",
+      "candidate_id": "c3",
+      "case_id": "OpenManus/019.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "answer extracted then session closed by terminate(success) without delivery through the expected channel; abstain class (NS-1: gold diverges on certificate-level-identical evidence)",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/048.json",
+      "certificate_class": "delivery_form"
+    },
+    {
+      "basis": "answer extracted then session closed by terminate(success) without delivery through the expected channel; abstain class (NS-1: gold diverges on certificate-level-identical evidence)",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/067.json",
+      "certificate_class": "delivery_form"
+    },
+    {
+      "basis": "answer extracted then session closed by terminate(success) without delivery through the expected channel; abstain class (NS-1: gold diverges on certificate-level-identical evidence)",
+      "candidate_id": "c2",
+      "case_id": "OpenManus/072.json",
+      "certificate_class": "delivery_form"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported 8.15 m (8.62e-16 ly) as the inner torus radius instead of the correct Barvainis value ~2.98 pc (~9.7 ly), because it omit",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/076.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used L_bol = 1.5e46 erg/s directly in the formula and ignored the bolometric correction of 5, instead of first deriving L_UV = L_b",
+      "candidate_id": "c2",
+      "case_id": "OpenManus/076.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent described C2 of the 2,2-dimethylbut-3-en-1-yl group as tertiary instead of recognizing that C2 is quaternary (it is bonded to C1, ",
+      "candidate_id": "c1",
+      "case_id": "OpenManus/082.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed the SN1 carbocation would form at a benzylic/allylic/tertiary position instead of recognizing that direct ether cleavage g",
+      "candidate_id": "c2",
+      "case_id": "OpenManus/082.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent proposed and finally asserted '2-bromo-2,2-dimethylbut-3-ene' as the rearranged bromide instead of the valid rearranged product 3-",
+      "candidate_id": "c3",
+      "case_id": "OpenManus/082.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used SMILES 'C=C(C)(C)CBr' to draw the product instead of a SMILES matching the expected bromide (e.g. 'C=CC(Br)(C)CC'), so the to",
+      "candidate_id": "c4",
+      "case_id": "OpenManus/082.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent defined region X as the annulus between the middle and inner circles (area 36π−16π = 20π) instead of the innermost disk of radius ",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/001.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent defined region Y as the annulus between the outer and middle circles (area 49π−36π = 13π) instead of the annulus between radii 4 a",
+      "candidate_id": "c2",
+      "case_id": "SmolAgents/001.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent defined region Z as the entire outermost disk of radius 7 (area 49π) instead of the outer annulus between radii 6 and 7 (area 13π)",
+      "candidate_id": "c3",
+      "case_id": "SmolAgents/001.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent computed the largest region as Z=49π and the smallest as Y=13π with difference 36π instead of the correct largest Y=20π, smallest ",
+      "candidate_id": "c4",
+      "case_id": "SmolAgents/001.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent passed final_answer(13*math.pi) as the requested difference instead of 7π; 13π is the outer-annulus area, not the greatest-minus-s",
+      "candidate_id": "c5",
+      "case_id": "SmolAgents/001.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "task misread as numeric extraction with a factual consequence; the wrong answer c2 corroborates",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/014.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent answered '1898' (the formation year) instead of the required name of the Scotsman, 'Daddy' McCloud, who formed Clyde Pinelands Foo",
+      "candidate_id": "c2",
+      "case_id": "SmolAgents/014.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent solved the system using the circle equation (x+3)^2 + (y-12)^2 = 36 instead of the correctly completed-square equation (x+3)^2 + (",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/051.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent used the hyperbola in the form (x+3)^2 - (y+8)^2 = 122 instead of completing the square to (x+3)^2 - (y-8)^2 = -9",
+      "candidate_id": "c2",
+      "case_id": "SmolAgents/051.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent printed points obtained by solving each equation separately at x=-3 as 'Real intersection points' (including non-real points) inst",
+      "candidate_id": "c4",
+      "case_id": "SmolAgents/051.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent stated that the correct hyperbola standard form is (x+3)^2 - (y+8)^2 = 122 instead of the actual (x+3)^2 - (y-8)^2 = -9",
+      "candidate_id": "c5",
+      "case_id": "SmolAgents/051.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent returned 0 as the final answer even though the curves are stated to intersect at four points and the computed real-intersection li",
+      "candidate_id": "c6",
+      "case_id": "SmolAgents/051.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent planned to rely on the assumption that increasing solvent polarity always decreases nucleophilic substitution rates irrespective o",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/078.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent claimed methanol is actually more reactive than propionate while placing methanol below propionate in the final ranking, instead o",
+      "candidate_id": "c4",
+      "case_id": "SmolAgents/078.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent endorsed statement 1 including the false parenthetical that a charged reactant in the rate-determining step is higher in energy th",
+      "candidate_id": "c5",
+      "case_id": "SmolAgents/078.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "'stabilized but less hindered' is a specific chemical evaluation inconsistent with the hindered secondary alkoxide, not a rendering of observed content",
+      "candidate_id": "c6",
+      "case_id": "SmolAgents/078.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent treated the first planet's impact parameter b=0.2 as if it applied to the second planet and solved a2=(R_star-R_p2)/0.2, instead o",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/079.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: The agent wrote the transit/occultation impact-parameter constraints as b≤(R_star±R_planet)/a, with the semi-major axis in the denominator, ",
+      "candidate_id": "c2",
+      "case_id": "SmolAgents/079.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "external algebra against the construction the task text itself states; no cited in-trajectory evidence contradicts the content",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/082.json",
+      "certificate_class": "premise_conflict"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent assumed y = z because the coefficients of y^2 and z^4 are equal, instead of minimizing over all positive x, y, z subject to xyz = ",
+      "candidate_id": "c1",
+      "case_id": "SmolAgents/083.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent called CRootOf with an undefined symbol y and root index 0 instead of defining y or using the already-found positive root index 1,",
+      "candidate_id": "c2",
+      "case_id": "SmolAgents/083.json",
+      "certificate_class": "content_contradiction"
+    },
+    {
+      "basis": "claim asserts a content-level deviation: the agent reported 17.50 as the global minimum, attained at y = z ≈ 1.16 and x ≈ 1.49, instead of the true minimum 16 attained at x = y = sq",
+      "candidate_id": "c3",
+      "case_id": "SmolAgents/083.json",
+      "certificate_class": "content_contradiction"
+    }
+  ],
+  "derived_from": {
+    "class_definitions": "sehd_rise2/evolution/policy.py::CERTIFICATE_CLASSES",
+    "run": "runs/random100_20260815_142446",
+    "worksheet": "datasets/policy_candidates/v1/bindings_worksheet.json"
+  },
+  "review_status": "first_pass",
+  "schema_version": "sehd2.certificate_bindings.v1"
+}

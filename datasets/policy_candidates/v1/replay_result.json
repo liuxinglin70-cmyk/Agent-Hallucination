@@ -1,0 +1,3347 @@
+{
+  "cases": 100,
+  "class_exposure": {
+    "absence_based": {
+      "gold_clean": 2,
+      "gold_error": 0
+    },
+    "content_contradiction": {
+      "gold_clean": 0,
+      "gold_error": 142
+    },
+    "delivery_form": {
+      "gold_clean": 1,
+      "gold_error": 2
+    },
+    "expression_variance": {
+      "gold_clean": 2,
+      "gold_error": 0
+    },
+    "premise_conflict": {
+      "gold_clean": 2,
+      "gold_error": 0
+    },
+    "presentational_addition": {
+      "gold_clean": 3,
+      "gold_error": 0
+    },
+    "requirement_compliance": {
+      "gold_clean": 5,
+      "gold_error": 3
+    },
+    "unclassified": {
+      "gold_clean": 0,
+      "gold_error": 0
+    }
+  },
+  "configurations": [
+    {
+      "accuracy": 0.76,
+      "changed_cases": [],
+      "configuration": "baseline",
+      "decision_changes": 0,
+      "firing_cases": [],
+      "fn": 12,
+      "fp": 12,
+      "fp_fixed": [],
+      "must_survive_violations": [],
+      "policy_evaluation": {},
+      "policy_ids": [],
+      "tn": 26,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.79,
+      "changed_cases": [
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "configuration": "L2-P1",
+      "decision_changes": 3,
+      "firing_cases": [
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 9,
+      "fp_fixed": [
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1"
+      ],
+      "tn": 29,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.78,
+      "changed_cases": [
+        "BFCL/127.json",
+        "Magentic_One/014.json"
+      ],
+      "configuration": "L2-P2",
+      "decision_changes": 2,
+      "firing_cases": [
+        "BFCL/127.json",
+        "Magentic_One/014.json"
+      ],
+      "fn": 12,
+      "fp": 10,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "Magentic_One/014.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2"
+      ],
+      "tn": 28,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.78,
+      "changed_cases": [
+        "BFCL/114.json",
+        "Camel/064.json"
+      ],
+      "configuration": "L2-P3",
+      "decision_changes": 2,
+      "firing_cases": [
+        "BFCL/114.json",
+        "Camel/064.json"
+      ],
+      "fn": 12,
+      "fp": 10,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "Camel/064.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P3"
+      ],
+      "tn": 28,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.78,
+      "changed_cases": [
+        "Camel/061.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P4",
+      "decision_changes": 2,
+      "firing_cases": [
+        "Camel/061.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 10,
+      "fp_fixed": [
+        "Camel/061.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P4"
+      ],
+      "tn": 28,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.77,
+      "changed_cases": [
+        "BFCL/142.json"
+      ],
+      "configuration": "L2-P5",
+      "decision_changes": 1,
+      "firing_cases": [
+        "BFCL/142.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 11,
+      "fp_fixed": [
+        "BFCL/142.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P5"
+      ],
+      "tn": 27,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/127.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "configuration": "L2-P1+L2-P2",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/127.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/114.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "configuration": "L2-P1+L2-P3",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/114.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P3"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P4",
+      "decision_changes": 5,
+      "firing_cases": [
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P4"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/142.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "configuration": "L2-P1+L2-P5",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/142.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/142.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P5"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.8,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json"
+      ],
+      "configuration": "L2-P2+L2-P3",
+      "decision_changes": 4,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json"
+      ],
+      "fn": 12,
+      "fp": 8,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P3"
+      ],
+      "tn": 30,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.8,
+      "changed_cases": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P2+L2-P4",
+      "decision_changes": 4,
+      "firing_cases": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 8,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P4"
+      ],
+      "tn": 30,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.79,
+      "changed_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json"
+      ],
+      "configuration": "L2-P2+L2-P5",
+      "decision_changes": 3,
+      "firing_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 9,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P5"
+      ],
+      "tn": 29,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.8,
+      "changed_cases": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P3+L2-P4",
+      "decision_changes": 4,
+      "firing_cases": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 8,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P3",
+        "L2-P4"
+      ],
+      "tn": 30,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.79,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json"
+      ],
+      "configuration": "L2-P3+L2-P5",
+      "decision_changes": 3,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 9,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P3",
+        "L2-P5"
+      ],
+      "tn": 29,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.79,
+      "changed_cases": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P4+L2-P5",
+      "decision_changes": 3,
+      "firing_cases": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 9,
+      "fp_fixed": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 29,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P3",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P3"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P4",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P4"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P5",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P5"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P3+L2-P4",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P3",
+        "L2-P4"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "configuration": "L2-P1+L2-P3+L2-P5",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P3",
+        "L2-P5"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P4+L2-P5",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.82,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P2+L2-P3+L2-P4",
+      "decision_changes": 6,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 6,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P3",
+        "L2-P4"
+      ],
+      "tn": 32,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json"
+      ],
+      "configuration": "L2-P2+L2-P3+L2-P5",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P3",
+        "L2-P5"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P2+L2-P4+L2-P5",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.81,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P3+L2-P4+L2-P5",
+      "decision_changes": 5,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 7,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P3",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 31,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.85,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P3+L2-P4",
+      "decision_changes": 9,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 3,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P3",
+        "L2-P4"
+      ],
+      "tn": 35,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.85,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P3+L2-P5",
+      "decision_changes": 9,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "fn": 12,
+      "fp": 3,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P3",
+        "L2-P5"
+      ],
+      "tn": 35,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.85,
+      "changed_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P2+L2-P4+L2-P5",
+      "decision_changes": 9,
+      "firing_cases": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 3,
+      "fp_fixed": [
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 35,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.85,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P1+L2-P3+L2-P4+L2-P5",
+      "decision_changes": 9,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 3,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P3",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 35,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.83,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "L2-P2+L2-P3+L2-P4+L2-P5",
+      "decision_changes": 7,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 5,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P2",
+        "L2-P3",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 33,
+      "tp": 50,
+      "tp_lost": []
+    },
+    {
+      "accuracy": 0.87,
+      "changed_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "configuration": "full_set",
+      "decision_changes": 11,
+      "firing_cases": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "fn": 12,
+      "fp": 1,
+      "fp_fixed": [
+        "BFCL/114.json",
+        "BFCL/127.json",
+        "BFCL/142.json",
+        "Camel/061.json",
+        "Camel/064.json",
+        "Magentic_One/014.json",
+        "Magentic_One/065.json",
+        "Magentic_One/066.json",
+        "Octotools/016.json",
+        "Octotools/028.json",
+        "SmolAgents/082.json"
+      ],
+      "must_survive_violations": [],
+      "policy_evaluation": {
+        "BFCL/114.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/127.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            },
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "BFCL/142.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/061.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Camel/064.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "expression_variance",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/014.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "presentational_addition",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/065.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Magentic_One/066.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/016.json": {
+          "fired": [
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "Octotools/028.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "absence_based",
+              "effect": "withheld"
+            },
+            {
+              "action": "require_corroborating_content_error",
+              "certificate_class": "requirement_compliance",
+              "effect": "sole_basis_removed"
+            }
+          ],
+          "skipped": []
+        },
+        "SmolAgents/082.json": {
+          "fired": [
+            {
+              "action": "withhold_conviction",
+              "certificate_class": "premise_conflict",
+              "effect": "withheld"
+            }
+          ],
+          "skipped": []
+        }
+      },
+      "policy_ids": [
+        "L2-P1",
+        "L2-P2",
+        "L2-P3",
+        "L2-P4",
+        "L2-P5"
+      ],
+      "tn": 37,
+      "tp": 50,
+      "tp_lost": []
+    }
+  ],
+  "schema_version": "sehd2.policy_replay.v1"
+}

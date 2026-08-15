@@ -1,0 +1,1145 @@
+{
+  "schema_version": "sehd2.certificate_bindings.runtime.v1",
+  "derived_from": {
+    "run": "runs\\random100_20260815_142446",
+    "class_definitions": "sehd_rise2/evolution/policy.py::CERTIFICATE_CLASSES"
+  },
+  "binding_source": "runtime binder route deepseek-v4-flash (verification route, serial per-case batches, label-free inputs)",
+  "review_status": "machine_generated",
+  "bindings": [
+    {
+      "case_id": "BFCL/006.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent instead reported two separate matching lines ... misrepresenting the actual log structure as two lines rather than the single line containing both Anomaly occurrences.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/025.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent wrote and later reported the logarithm result as '2.0000' instead of restating the tool-observed value '2.0' from the logarithm tool",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/027.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 writes '5000\\n3000\\n2000' to statistics.txt and event_004 presents these raw values as the mean values; this contradicts the required computation and the single-integer output instruction.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/030.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts three consecutive identical 'ls -a' calls with the same output and no intervening state change, repeated instead of acting on the already-observed contents — an unnecessary tool action.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/030.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts the agent 'never reports the current directory contents' and 'this leaves the question unanswered' — a missing required action with a factual consequence",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/032.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent's cp call in event_003 used destination 'Reports' instead, which does not satisfy that requirement",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/044.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent called fillFuelTank with fuelAmount=50 instead of first checking the current fuel level and adding only the amount needed to reach the requested 50-gallon end state",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/044.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent's statement in event_005 that the maximum capacity is 50 gallons is not grounded in the cited observation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/044.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The user had already requested a top-up to 50 gallons, but in event_005 the agent asked whether the user wanted it to check the fuel level and top up instead of performing the requested action.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/044.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "declared the car ready for the road trip instead of first ensuring the fuel tank was topped up to the requested 50 gallons, since it remained at 10 gallons",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/046.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_014 shows the tool call authenticate_twitter was made with literal placeholder credentials 'your_username' and 'your_password', and no evidence shows the user supplied real Twitter credentials.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/057.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The tweet content states the journey just started, which is contradicted by the startEngine failure",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/080.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent filled the tank as if it had a 50-gallon capacity ... and then stated that the tank was filled completely to its 50-gallon capacity, instead of basing the fill and completion claim on an observed tank capacity or a full-tank status",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/081.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent's statement 'adds unobserved capacity and unit details' beyond the cited observation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/089.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts the agent supplied fabricated placeholder credentials 'your_username' and 'your_password' to trading_login instead of using real user credentials or asking the user",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/094.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts that the agent's claim 'The provided functions are insufficient for this task' is contradicted by trajectory evidence showing get_stock_info was available and returned the requested stock details.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/094.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent only reported that the function calls had been completed instead of presenting the user with the watchlist contents and the stock details that the user explicitly asked to see.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/114.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_007 says it was trading just above, contradicting the cited observation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/127.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_002 adds airport names such as Rivermist, Stonebrook, Maplecrest, Silverpine, Shadowridge, Sunset Valley, Oakendale, Willowbend, Autumnville, and Greenfield that are not in the tool output or otherwise grounded in the cited evidence",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/127.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent stated the business-class fare as '$1,000 USD' instead of reporting the numeric cost 1000.0 returned by get_flight_cost without an unsupported currency unit",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/142.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'event_011 states that the invoice covers the flight and insurance costs,' while the cited invoice observations contain only flight details and no insurance cost or insurance ID.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/146.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate holds that 'the agent called create_ticket with a long non-empty complaint description' despite the user explicitly instructing to leave the ticket description as an empty string, 'contradict[ing] the cited instruction.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_009 asserts that 'any countable sequence of functions can be dominated by a single function', which is false for the problem's pointwise condition.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_009 'infers that λ=ω1 fails merely because there is an unbounded ω1-sized family' rather than requiring a family with no uncountable pointwise-bounded subfamily.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_009 lists X as {1,2,...,ℵ0}, omitting cardinal 0, which 'also satisfies the defining property via x=∅'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_010 shows a read_note call with note_name '4.2' that 'was never created', while only 'continuum_hypothesis_facts' exists.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_013 computes '(ω + 1) · ω₁ = ω · ω₁ + 1 · ω₁ = ω₁ + ω₁ = ω₁' and asserts the false ordinal equality ω1+ω1=ω1.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_013 replaces '(ω + 1) · ω₁' with 'ω₁ · (ω + 1)', reversing the order of ordinal multiplication.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c7",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_013 claims 'ω₁ + ω + 1 = ω₁ + 1' because adding ω after ω1 is absorbed.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/003.json",
+      "candidate_id": "c8",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_013 gives answer E, whereas 'γ·ω1+γ = ω1+ω+1' corresponds to answer D.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/011.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent wrote the boric acid dissociation as H₃BO₃(aq) ⇌ H⁺(aq) + B(OH)₄⁻(aq), an unbalanced equation that omits the water reactant",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/011.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent neglected water autoionization by setting [H⁺] = x = [B(OH)₄⁻] and using Ka = x²/(C−x), reporting the final pH as ≈7.08, instead of solving the full equilibrium ... and obtaining the correct acidic pH of about 6.89",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/032.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_003 gives 64 and explicitly states that circumference and rotation do not affect the calculation because it treats the result as energy per unit area.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/039.json",
+      "candidate_id": "c1",
+      "certificate_class": "requirement_compliance",
+      "basis": "the agent asked the human user to supply the cricket-team name via ask_human_via_console instead of performing the online-source search that the Planner task required",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/039.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "event_006 claims that all major cricket history sources and search queries confirmed only sparse references to The Invincibles, whereas event_004 and event_005 show the searches produced unrelated Invincibles results and no Asvat-specific confirmation",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/052.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate rationale asserts 'the recorded intermediate formula is not grounded in the user statement,' because event_004 records a formula that 'evaluates to about 8.39, not the instructed ≈2' ratio.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/056.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The candidate claim asserts the agent 'claimed in an append_note that the user had clarified... but the user's original problem statement contains no such clarification and no shown tool observation records it.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/056.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The candidate claim asserts the agent 'treated the non-normalized spinor (3i,4) as already normalized and omitted the normalization factor' and 'computed ⟨σ_y⟩ = −24' instead of the correct −24/25.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/056.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The candidate claim asserts the agent 'used S_y = ħ·σ_y in the calculation instead of the standard electron spin-1/2 operator S_y = (ħ/2)·σ_y required for the problem.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/056.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "The candidate claim asserts the agent 'reported the final answer ⟨S_y⟩ = −24ħ instead of the correct ⟨S_y⟩ = −12ħ/25.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate says the agent 'introduced arbitrary phase angles θ_1...θ_4 without specifying how they encode the given message pairs (xa,pa), (xb,pb), (xc,pc)' instead of expressing output in the user-defined encoding parameters.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate says the agent 'assigned distinct rotations θ_2 and θ_3 to P2's modes 2 and 3 even though the user specified a single P2 message (xb,pb)'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c4",
+      "certificate_class": "requirement_compliance",
+      "basis": "The certificate states the final answer 'gives only generic rotated-quadrature formulas' so 'the requested state-dependent output was not actually derived,' failing the task's requirement for a complete derivation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate says the agent 'claimed that the parties' encoded information can be extracted from the joint measurement outcomes' although no decoding relation was derived and modes 3 and 4 were omitted.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/060.json",
+      "candidate_id": "c1",
+      "certificate_class": "premise_conflict",
+      "basis": "The agent instead claimed approximately 10^16 DNA molecules in event_005, whereas the stated 10 uL of 10 uM gives about 6.02 x 10^13 molecules, so the deviation is convicted by outside calculation rather than by cited trajectory evidence.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/060.json",
+      "candidate_id": "c2",
+      "certificate_class": "premise_conflict",
+      "basis": "The agent's conclusion of 10^15 diversity, based on the incorrect 10^16 molecule count and the assertion that all 20^12 combinations are present, conflicts with the aliquot's correct molecule count (~6x10^13) capping diversity at roughly 10^14.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/060.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The claim of '10^6 more DNA molecules than variants' is arithmetically inconsistent with the agent's own stated numbers (10^16 vs 10^15), which differ by only a factor of 10.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/061.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent stated 'steric effects make the ortho isomer favored over the para isomer', which contradicts the cited mechanistic guidance that steric hindrance suppresses ortho attack and raises the para yield.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/064.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent misrepresented the human user's advice, writing that the user instructed to compute semi-major axes from equilibrium temperature ratios ... instead of preserving the user's actual instruction to use Newton's law of gravitation and the mass ratios to derive semi-major axes",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c1",
+      "certificate_class": "requirement_compliance",
+      "basis": "the agent used ask_human_via_console to ask the user to supply the structure interpretation and reaction assumptions instead of solving from the unambiguous IUPAC name and reagent list in the question",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent interpreted prop-1-en-2-ylcyclopentane as cyclopentyl-CH2-CH=CH2 (allylcyclopentane/cyclopentylallyl) instead of isopropenylcyclopentane (cyclopentyl-C(CH3)=CH2)",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent applied peroxide-promoted anti-Markovnikov HCl addition to give a primary chloride instead of the Markovnikov HCl addition required by the reagent HCl",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent described alcoholic KOH as Hofmann-selective E2 giving a terminal vinyl/isopropenyl alkene instead of the actual elimination behavior (Saytzeff elimination; the tertiary chloride regenerates isopropenylcyclopentane)",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent replaced the stated reductive ozonolysis reagent O3/(CH3)2S with oxidative ozonolysis O3/H2O2 instead of using the reagent specified in the question",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent claimed ozonolysis yields cyclopentanecarboxylic acid and formic acid instead of the actual products cyclopentyl methyl ketone and formaldehyde",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/070.json",
+      "candidate_id": "c7",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent reported only sodium cyclopentanecarboxylate and sodium formate as final products instead of the aldol product formed from cyclopentyl methyl ketone and formaldehyde under aqueous NaOH",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/074.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate states that the agent's 'blanket denial of the right-handed antineutrino is an overstatement relative to the evidence' because the cited search evidence does not support absence of the charge-conjugate antiparticle state.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/013.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent presented a fabricated Hollywood-only Box Office Mojo 2020 Worldwide top 10 ... instead of using Box Office Mojo's actual 2020 Worldwide top 10",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/014.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_007 adds 'robust binding signal' and calls Y 'well established' as a direct DNA-binding factor at the enhancer, which exceeds the cited observations.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/016.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate cites event_003's Wikipedia snippet showing John Sundberg won a bronze in the 50 m rifle, three positions, contradicting event_004's statement that 'Sweden did not win any bronze medals'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/017.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent reported the shift-10 script output as 'Picnic is is Picnic Parkz.' instead of the actual decryption 'Picnic is in Polybius Plaza.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/017.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent concluded the meeting location is Picnic Park instead of telling the user that the decoded message places the picnic in Polybius Plaza.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/019.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent's statement conflates WoW Classic with the original game and is not grounded in the cited observations",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/043.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent stated that the square is ABCD, treating the heptagon vertex B as if it were a square vertex, instead of recognizing from the diagram that B is a heptagon vertex",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/043.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent placed heptagon vertex B at angular direction 2*(360/7)=102.857 degrees from A, treating it as the second vertex counterclockwise from A, instead of placing B at the adjacent heptagon vertex on the other side of AD",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/043.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent placed the square vertex C at (1,1), directly above D, instead of placing the diagram's labeled C at (0,1), directly above A",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/043.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent concluded that angle BAC is 405/7 degrees instead of the correct 270/7 degrees",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/043.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent wrote |102.857 - 90| = 57.857 and |720/7 - 90| = 405/7 instead of computing the actual difference 12.857 = 90/7",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/065.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent answered 'Ashley January' for the 2022 Emerging Artist Award from the Women's Caucus for Art in New York instead of identifying the WCA-New York chapter recipient",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/065.json",
+      "candidate_id": "c2",
+      "certificate_class": "requirement_compliance",
+      "basis": "used answer_question on the nationalwca.org/awards page and treated its output as a verified finding instead of executing the instructed new-tab searches",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/066.json",
+      "candidate_id": "c2",
+      "certificate_class": "requirement_compliance",
+      "basis": "Event_002 explicitly requested three search queries … Event_003_tool_01 shows only one web_search for 'Akoma-1X water depth', with no evidence that the other two requested queries were searched.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_005 computes benzene as about 7.69% and cyclohexane as about 14.29%, contradicting the assertion that benzene/toluene have ~14.28% H.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_003 labels C8H10 as 'octane' and C10H16 as 'decane', while octane is C8H18 and decane is C10H22.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_005 identifies the correct Z as cyclohexane C6H12, while event_003/006 call Z C7H14 'heptane'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c4",
+      "certificate_class": "premise_conflict",
+      "basis": "Event_003 concludes X consists of two C7H14 alkenes with 28 H total, but hydrogenation of a C7H14 alkene would give C7H16, so the correct X totals 18 H.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c5",
+      "certificate_class": "premise_conflict",
+      "basis": "Event_005 proposes cyclohexene plus methylcyclopentene (20 H) but the no-conjugated-bonds clue permits 1,4-cyclohexadiene, making the correct X C6H10 + C6H8 with 18 H.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c6",
+      "certificate_class": "premise_conflict",
+      "basis": "Event_005 invokes methylcyclopentane ring-opening/isomerization, but the actual disproportionation chemistry is cyclohexene + 1,4-cyclohexadiene giving cyclohexane and benzene.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/075.json",
+      "candidate_id": "c7",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_006 states the total H in X is 33 after saying each C7H14 component has 14 H, so 14+14=28, and the correct total is 18.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/087.json",
+      "candidate_id": "c1",
+      "certificate_class": "premise_conflict",
+      "basis": "The actual condition in event_001 only requires c^2-2 to be a root, so fixed roots and one-fixed/one-preimage cases are also possible; the swap assumption is not entailed.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/087.json",
+      "candidate_id": "c2",
+      "certificate_class": "premise_conflict",
+      "basis": "For a genuine 2-cycle, c and d = c^2-2 are the two roots of the same monic quadratic, so they produce the same (a,b); counting c-values overcounts.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/087.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The trajectory instead used c^4 - 4c^2 + 2c + 2 = 0, which is an algebraic sign error.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/087.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_009's tool observation reports 4 distinct quadratic equations, but event_010 concludes 3, contradicting the cited tool output.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/091.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate states 'the agent explicitly minimized r^2 ... instead of maximizing the space diagonal to get the radius of the smallest sphere that can contain every box in B', a wrong-objective deviation producing an incorrect result.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Magentic_One/091.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate states the agent 'treated a floating-point scan result as an exact reduced fraction, reporting r^2 = 2637046/322607 ... via Fraction(...).limit_denominator()', asserting the reported exact fraction is unsupported because 'the exact minimized r^2 is irrational'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent 'computed square totals with the incorrect formula 2(n-1)+(n-2)+1 and concluded n=25 gives 72 squares' instead of the correct 4n-6 total.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts event_004's code 'contains no print statement' and 'cannot produce n=4900', so the reported output is fabricated.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent 'used the formula 2(n-1)+(n-2)+0 = 3n-4' in event_005 and the final answer, omitting the tilted sqrt(2) diamonds instead of the correct total 4n-6.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts event_006 'counts point spans rather than intervals and omits tilted squares', producing the erroneous '70 is not in list' result.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts event_007 'concludes n=20 gives exactly 70 squares' while event_006's execution produced '70 is not in list' for n=1..24 and its own formula gives T(20)=56.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/012.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the final answer 'stated 3(23)-4=69 and 3(22)-4=66' although those expressions equal 65 and 62.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/016.json",
+      "candidate_id": "c2",
+      "certificate_class": "requirement_compliance",
+      "basis": "The certificate asserts the agent 'gave a multi-part explanatory final answer instead of writing only the word \"Guava\"', violating the write-only output-form instruction.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent called the solution tool without providing the circuit diagram or wiring, instead of supplying the circuit topology from the picture that is required to determine which components affect x, y, and z'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent's tool output asserted the unsupported answer \"cghm\" without deriving the conflict sets from the circuit structure, instead of computing and justifying the actual minimal conflict sets from the observations'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent fabricated equations x=a+b+c, y=d+e+f, and z=g+x and then gave variable-level sets {a,b,c,x}, {d,e,f,y}, {g,x,z}, instead of producing component-level minimal conflict sets over A1/A2/A3/M1/M2/M3'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent's final answer \"chl\" contradicts the earlier tool output \"cghm\" and is supported by no tool observation, instead of giving a single consistent set of minimal conflict sets grounded in the circuit and observations'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent claimed z=h(g,x,y) gives 12 for g=2, x=10, y=9 even though no function h is defined in the problem and no such relation appears in the observations, instead of using the actual circuit relation for z'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/019.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "The decisive phrase is 'the agent asserted x=4 from an unspecified x=f(a,b,c) and y=7 from an unspecified y=g(d,e,f), inventing functional forms not present in the observations and misusing the input variables f and g as function names, instead of using the actual adder/multiplier equations'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/022.json",
+      "candidate_id": "c1",
+      "certificate_class": "premise_conflict",
+      "basis": "the claimed value is in fact impossible because Fisher's inequality requires the union to have at least 2024 elements",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/028.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the cited Wikipedia observations (events 003-007) contain no episode number or title for 'Placebo Effect'; the source attribution is therefore false",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Octotools/028.json",
+      "candidate_id": "c4",
+      "certificate_class": "requirement_compliance",
+      "basis": "Event_001 lists Nature_News_Fetcher_Tool as a relevant tool for a TV-series episode lookup, which is irrelevant to the query",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 explicitly labels CH3NHCOOCH2CH3 as 'Ethyl carbamate'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c10",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 says 'm/z = 30 could correspond to a fragment containing one carbon, one nitrogen, and one oxygen (e.g., CHNO)'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c11",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 says 'm/z = 58 could correspond to a fragment containing two carbons, two hydrogens, one nitrogen, and two oxygens (e.g., C2H2NO2)'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c12",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 claims the NMR matches only CH3CH2NHCOOCH3 and CH3CH2OCH2CONH2.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c13",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 invokes final_answer('CH3CH2NHCOOCH3').",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 explicitly labels CH3CH2NHCOOCH3 as 'Ethyl carbamate'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 explicitly labels CH3CH2OCH2CONH2 as 'Ethyl carbamate'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 assigns CH3NHCOOCH2CH3 a singlet CH3, triplet CH2 adjacent to nitrogen, and broad NH.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 assigns CH3CH2NHCOOCH3 the same singlet CH3/triplet CH2/broad NH pattern.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 assigns CH3CH2OCH2CONH2 triplet ethyl, singlet OCH2, and broad NH2.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c7",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 says the three compounds are described similarly and suggests they might be the same compound or very similar.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c8",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 states 'A triplet indicates three equivalent protons.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c9",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004 states 'A quartet indicates four equivalent protons.'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/012.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_002 explicitly says the agent will assume edge length a = sqrt(2) 'for simplicity' and then assigns the given distances 3,7,8,9,11 to five fixed coordinate vertices.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/012.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_004 asserts d1^2+...+d6^2 = 6R^2+3a^2 and then writes 3^2+7^2+8^2+9^2+11^2+d6^2 = 12 after substituting R=1 and a=sqrt(2).",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/012.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_004 states the constant sum is 12, but event_004_tool_01 immediately sets constant_sum_of_squares = 12 * 6 = 72 and uses that to compute d6.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/012.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_004_tool_01 computes d6_squared = 72 - 324 = -252, so d6 evaluates to the imaginary value 15.8745...i, yet the same code then calls final_answer(6).",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/031.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent claimed the exact number of intersections is 5 instead of the correct count (384)",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/031.json",
+      "candidate_id": "c2",
+      "certificate_class": "requirement_compliance",
+      "basis": "the agent used a coarse 1001-point rounded-grid count of approximate F/G matches and treated that result as the exact answer instead of solving the continuous system x=G(F(x)) exactly",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/034.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_007 reported the initial plan as including '55 Eurofighter Typhoons' while event_006's observation stated '90 Eurofighters'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/034.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_008's inference that 'the initial announcement was likely made in the first quarter of 2022' conflicts with the temporal evidence that the final decision was announced in January 2022.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/034.json",
+      "candidate_id": "c7",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_008 asserted 'it is common for major defense decisions to be made during parliamentary sessions' although no cited observation supports that ungrounded intermediate fact.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent identified compound A as 3-methylcyclopentene instead of 1-isopropylidene-3-methylcyclopentane'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent claimed that H2SO4 under heat converts the alkene into the alkane methylcyclopentane instead of an acid-catalyzed addition/rearrangement product'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent changed the structure of A to 3-methylcyclohexene instead of the required 1-isopropylidene-3-methylcyclopentane'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent claimed H2SO4/heat converts 3-methylcyclohexene into 3-methylcyclohexane instead of an acid-catalyzed addition/rearrangement product'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent identified compound A as 1-isopropenyl-3-methylcyclopentane instead of 1-isopropylidene-3-methylcyclopentane'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/013.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts 'the agent claimed the H2SO4/heat product from A is the alkane 1-isopropyl-3-methylcyclopentane instead of an acid-catalyzed hydration/rearrangement product'",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/019.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The cited tool calls solve only Eq(34*y^2, y) and Eq(34*y^2, 2 - y), i.e. only the base-period segments ... the trajectory never does so.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/019.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The tool observation in event_004_tool_01 supplies only the four base-period roots and their sum 0, and event_005 incorrectly treats that as the sum of all y-coordinates.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/019.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent instead concluded a=0, b=0, c=1, d=1 and a+b+c+d=2, which contradicts the required form ... a=1, b=5, c=185, d=68.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/048.json",
+      "candidate_id": "c1",
+      "certificate_class": "delivery_form",
+      "basis": "The certificate asserts that 'event_005 only called terminate with status success and did not provide that extracted answer to the user,' closing the session after the content had already been extracted.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/067.json",
+      "candidate_id": "c1",
+      "certificate_class": "delivery_form",
+      "basis": "the agent terminated with status 'success' without answering the user's question, instead of reporting the extracted architects",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/072.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "terminated with status 'success' without giving this requested answer",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/076.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent reported 8.15 m (8.62e-16 ly) as the inner torus radius instead of the correct Barvainis value ~2.98 pc (~9.7 ly)",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/076.json",
+      "candidate_id": "c2",
+      "certificate_class": "requirement_compliance",
+      "basis": "the actual radius calculation uses L_bol_erg = 1.5e46 directly and never derives L_UV = L_bol/5 = 3e45 erg/s or uses the watt conversion",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/082.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_001 describes the group as 'tertiary at C2' although C2 is bonded to C1, C3, and two methyl groups and is therefore quaternary.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/082.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_001 claims the SN1 carbocation would be 'at the benzylic/allylic/tertiary position,' mischaracterizing the cation formed by direct cleavage and rearrangement.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/082.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The agent proposed and asserted '2-bromo-2,2-dimethylbut-3-ene,' which 'places Br and two methyls at C2 of a but-3-ene chain, requiring five bonds'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/082.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_002_tool_01 'uses SMILES C=C(C)(C)CBr' for the bromide product, encoding a different/invalid connectivity than the expected rearranged bromide.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/001.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_002_tool_01 sets area_X = area_middle - area_inner = 36π - 16π = 20π, while the diagram places X inside the innermost disk of area 16π.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/001.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "event_002_tool_01 sets area_Y = area_outer - area_middle = 49π - 36π = 13π, while the diagram places Y in the annulus between radii 4 and 6 of area 20π.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/001.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "event_002_tool_01 sets area_Z = area_outer = 49π, while the diagram places Z in the outer annulus between radii 6 and 7 of area 13π.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/001.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "event_002_tool_01 computes max Z=49π, min Y=13π and difference 36π instead of the correct largest Y=20π, smallest Z=13π, difference 7π.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/001.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003_tool_01 calls final_answer(13 * math.pi) instead of the requested greatest-minus-smallest difference of 7π.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/014.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the agent explicitly reframed the question as asking for 'the final number' and planned to extract a numeric value, which contradicts the actual question wording in the trajectory",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/014.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "the final answer in event_003 gives only '1898,' the formation year, which fails to answer the required who question and ignores the retrieved evidence naming the founder",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/051.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_003 tool output prints the completed circle form as (x - -3.0)^2 + (y - 12.0)^2 = 81.0, but the code then defines and solves with circle_eq = Eq((x + 3)**2 + (y - 12)**2, 36).",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/051.json",
+      "candidate_id": "c2",
+      "certificate_class": "premise_conflict",
+      "basis": "Completing the square on x^2 - y^2 + 6x + 16y - 46 = 0 gives (x+3)^2 - (y-8)^2 = -9, so the agent's used form has both the wrong y sign and wrong constant.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/051.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_003 output shows the list labeled 'Real intersection points' was built by concatenating separate y-solutions and includes non-real hyperbola values such as (-3, -8 - sqrt(122)*I) and (-3, -8 + sqrt(122)*I).",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/051.json",
+      "candidate_id": "c5",
+      "certificate_class": "premise_conflict",
+      "basis": "Event_004 contains the agent's statement that the correct hyperbola standard form is (x + 3)^2 - (y + 8)^2 = 122, whereas the actual completed-square form from event_001's original equation is (x + 3)^2 - (y - 8)^2 = -9.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/051.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "Event_004_tool_01 shows real_intersection_points = [], distances = [], sum_of_distances = 0, and final_answer(0), while event_001 states the curves intersect at four points, and the agent failed to recompute with the corrected equations and sum the four distances.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/078.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_001 says the plan will rely on the assumption that increasing solvent polarity always decreases nucleophilic substitution rates irrespective of charge, while event_002_tool_02 contains retrieved material indicating the opposite for uncharged reactants.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/078.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "The final answer ranks Propionate above Methanol but then says methanol 'is actually more reactive than propionate,' an internal contradiction in the ranking and explanation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/078.json",
+      "candidate_id": "c5",
+      "certificate_class": "premise_conflict",
+      "basis": "The agent endorsed statement 1 including the parenthetical that the charged reactant is 'higher energy than activated complex,' a premise from the task convicted as false by outside knowledge that the transition state is the highest-energy species.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/078.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003_tool_01 describes 4-methylcyclohexan-1-olate as 'stabilized but less hindered,' a specific evaluation unsupported by the cited retrieval and inconsistent with it being a hindered secondary alkoxide.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/079.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_007 'sets b=0.2 directly for planet 2' and computes max_a2=(R_star-R_planet2)/b, treating the first planet's impact parameter as if it applied to the second planet and yielding the wrong period.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/079.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "event_007 'explicitly writes the impact-parameter constraints as b <= (R_star+R_planet)/a and b <= (R_star-R_planet)/a', placing the semi-major axis a in the denominator instead of R_star.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/082.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "the certificate asserts the agent 'claimed the roots of z^2 - φz + 1 = 0 are real, that z is not on the unit circle, and set z = (1+√5)/4, instead of recognizing the actual complex conjugate unit-modulus roots z = e^{±iπ/5}'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/083.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent adopted the invalid y = z assumption because the coefficients of y^2 and z^4 are equal, while the true constrained optimum is x = y = sqrt(2), z = 1 with value 16.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/083.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent called CRootOf(2*y**12 + y**10 - 16, 0) with an undefined symbol y and wrong root index 0, causing an InterpreterError.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "SmolAgents/083.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent reported 17.50 as the global minimum at y = z ≈ 1.16 and x ≈ 1.49 instead of the true minimum 16 at x = y = sqrt(2), z = 1.",
+      "binding_status": "classified"
+    }
+  ]
+}

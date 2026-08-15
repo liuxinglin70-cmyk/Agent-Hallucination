@@ -75,11 +75,14 @@ sehd_rise2/
 │   ├── runs.py                   # 运行记录：每案例过程落盘 + 台账推导统计
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
 │   └── configs/detector_v1.json  # 三路由最小配置
-├── evolution/                    # Phase 0 失败理解层（已落地，见 §Phase 0）
+├── evolution/                    # 进化框架（Phase 0 + Phase 1-A/B/C 策略进化）
 │   ├── gap_taxonomy.py           #   冻结能力缺口词表（单一真源）
 │   ├── diagnosis.py              #   机械失败分类 + 诊断协议校验
 │   ├── learning_case.py          #   Learning Case schema + 三层校验器
-│   └── assemble.py               #   装配 / 校验 / 报告 CLI
+│   ├── assemble.py               #   装配 / 校验 / 报告 CLI
+│   ├── policy.py                 #   L2 策略层：词表 + 候选集 + genome 构建
+│   ├── replay.py                 #   离线重放：绑定校验 + 裁决重放 + oracle/runtime 对比
+│   └── binder.py                 #   运行时证书类绑定器（label-free 感知阶段）
 ├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 
@@ -88,7 +91,15 @@ datasets/learning_cases/v1/       # Phase 0 数据资产（进版本控制）
 ├── cases/*.json                  #   100 个 Learning Case（投影，可重装配）
 └── REPORT.md                     #   能力缺口分布报告
 
-tests/                            # 状态机单元测试（284 例全绿）
+datasets/policy_candidates/v1/    # Phase 1-A/B/C 数据资产（进版本控制）
+├── policy_candidates.json        #   L2 策略候选集（5 条 replayed + NS-1 弃权发现）
+├── certificate_bindings.json     #   oracle 证书类绑定（162 条，label-free 纪律）
+├── runtime_bindings.json         #   运行时绑定器产物（machine_generated）
+├── policy_genome.json            #   P2-P5 冻结 genome（load_policy_genome 可加载）
+├── replay_result.json / REPORT.md            # oracle 重放结果与报告
+├── runtime_replay_result.json / RUNTIME_REPLAY_REPORT.md   # 对比结果
+
+tests/                            # 状态机单元测试（107 例全绿）
 experiments/                      # 本地实验工作区（产物被 git 忽略）
 ```
 
@@ -172,6 +183,77 @@ from sehd_rise2.detector.skills import load_skill_genome, load_policy_genome
 policy（L2 决策边界）14 例 > observation（L1 候选发现）6 例 > verification
 （evidence skill）4 例；attribution 是测量层改进，不生成能力。
 
+## Phase 1-A L2 策略候选集（交付摘要，2026-08-15）
+
+Phase 1 立项为 **L2 决策边界进化**（评审裁决：12 FP 全部 policy 类，且可在
+100 例 run 树上零 provider 成本离线重放）。P1-A 把 12 个 policy 类 FP 提取为
+第一批 **L2 Policy Candidate Set**，保持评审要求的三层结构
+（failure case → policy hypothesis → candidate policy item）：
+
+- **5 条策略、12/12 FP 全覆盖**，机制聚类横切 Phase 0 的 gap name：
+  L2-P1 建议性要求不承担定罪（5 例）、L2-P2 表现层添加≠捏造（2 例）、
+  L2-P3 散文重述粒度≠误报（2 例）、L2-P4 任务/用户前提优先于外部纠错（2 例）、
+  L2-P5 单切片缺席不定罪（2 例）；
+- **防案例级规则化的机械约束**：trigger 是封闭证书类词表（`policy.py` 单一真源），
+  校验器拒绝单案例策略与含 case id 的 trigger 定义；
+- **FN/TP 风险显性化**：每条策略强制声明 `fn_risk`、`do_not_apply` 反例
+  （BFCL/027、Camel/053、BFCL/104 等）与 `tp_must_survive` 证据；
+  动作词表含 `require_corroborating_content_error`（Camel/039 反例驱动）。
+
+上限（全部触发且零回归）FP 12→0、决定性准确率 76%→88%——是上限不是承诺。
+候选集 `review_status: first_pass`，复核通过后进入 P1-B 离线重放。
+交付详情见 [SEHD_RISE2_Phase1A_策略假设提取实施文档.md](SEHD_RISE2_Phase1A_策略假设提取实施文档.md)。
+
+## Phase 1-B 离线策略重放（交付摘要，2026-08-15）
+
+`sehd_rise2/evolution/replay.py` 在 100 例 run 树上**只重放确定性裁决**
+（三阶段 provider 输出原样读取，零 provider 调用），fail-closed：绑定不全、
+类出词表、baseline 无法复现记录状态一律拒绝重放。策略通过**证书类绑定层**
+起作用：162 张幸存证书逐一绑定六类之一（label-free 工作表纪律 + basis 审计
++ gold 极性暴露表）。32 个配置（baseline / 5 单策略 / 26 组合 / 全集）结果：
+
+- **P2+P3+P4+P5 零 TP 损失**：FP 12→5、准确率 76%→83%——通过评审最低
+  晋升门（acc ≥ baseline + FP 明显降 + FN +0）；
+- **全集 86%（FP 12→0）但 FN +2**：OpenManus/048（gold=clean）与
+  067/072（gold=error）的定罪证书机制完全同构（terminate 不交付已提取
+  答案），证书层不可分——P1 的 delivery-form 子机制需精化后才能全集部署；
+- **corroboration 动作验证有效**：Camel/039、Camel/070、Octotools/019 的
+  requirement_compliance 证书被同案例 content 证书佐证，定罪存活；
+- **全部 32 配置 must-survive 违例 = 0**（P1-A 声明的四例 TP 哨兵全存活）。
+
+候选集保持 `first_pass`（评审纪律：重放不等于晋升）。P2-P5 四类零 gold-error
+证书的过拟合张力已写入报告——部署前须先有可复现绑定器。
+交付详情见 [SEHD_RISE2_Phase1B_离线策略重放实施文档.md](SEHD_RISE2_Phase1B_离线策略重放实施文档.md)。
+
+## Phase 1-C 策略运行时契约 + 证书绑定（交付摘要，2026-08-15）
+
+评审最终裁决落地 + L2 从离线分析工具走向运行时能力的三步：
+
+1. **裁决落地**：证书类词表新增 `delivery_form` **弃权类**（不挂策略）；
+   NS-1 不可分发现入册（048 gold-clean vs 067/072 gold-error 证书层同构，
+   分离需要 L1 证据能力而非更细规则）；P1 触发定义剔除 delivery-channel。
+   零已知回归原则下 oracle 重放：**精化 P1 与 P2-P5 全部零 TP 损失，
+   全集 87.0%（FP 12→1，FN +0）**。
+2. **C1 Policy Runtime Contract**：`build_policy_genome` 把过门策略冻结为
+   `sehd2.policy_genome.v1`（动作词表封闭且仅含 withhold /
+   require_corroborating，绝不改写裁决）；`policy_genome.json`
+   （P2-P5）经检测器侧 `load_policy_genome` 无适配加载（跨层测试证明）。
+3. **C2/C3 感知闭环**：`binder.py` 运行时绑定器——输入契约 8 字段封闭
+   allowlist + 三重 label-free 机械扫描 + **unclassified 弃权**（不确定
+   → 策略不触发 → baseline 行为）；`replay.py compare` 输出 oracle vs
+   runtime 的 agreement / unclassified rate / 逐证书分歧 / 逐配置
+   decision delta。**实测（v4-flash，162 证书）**：绑定一致率 84.0%，
+   但 runtime 全集仅 77%（oracle 87%）——oracle 的 11 例 FP 修复只回收
+   2 例（难例系统性偏向 content），premise_conflict 过宽损失 1 例 TP，
+   unclassified 0 使用（从不弃权）。**结论：语义已验证、感知是瓶颈**，
+   binder 校准是 P1-D 前的迭代清单；正面信号是 binder 独立复现了
+   NS-1 弃权簇（048/067 → delivery_form）。
+4. Meta Skill 新输出类型 `non_separable_under_current_representation`
+   已由 NS-1 首次行使——不是所有能力缺口都必须产出策略，
+   「当前证据表示下不可分 → 弃权」是合法且更健康的进化结论。
+
+交付详情见 [SEHD_RISE2_Phase1C_策略运行时契约实施文档.md](SEHD_RISE2_Phase1C_策略运行时契约实施文档.md)。
+
 ## 学习口径（label-free 设计边界）
 
 - **框架不宣称能发现漏检。** label-free 运行没有任何信号能判定「gold 为 error
@@ -183,10 +265,12 @@ policy（L2 决策边界）14 例 > observation（L1 候选发现）6 例 > veri
 
 ## 下一步
 
-Phase 0 已收尾（最终复核 + 词表冻结，见实施文档 §6）。下一步是 **Phase 1 立项**：
-依据 §能力分布选择第一个进化目标（数据支持 policy 优先），并在
-`sehd_rise2/evolution/` 中实现对应的确定性可进化面，经过跨案例可验证结局奖励
-证明后再谈推广。
+Phase 1-C 已交付：语义层闭环（oracle 全集 87% 零损失 + genome 冻结），
+感知层缺口量化（runtime 77% vs oracle 87%，一致率 84%）。下一步是
+**binder 校准迭代**（弃权校准 / 判别式类定义 / premise_conflict 收紧），
+然后 **P1-D fresh unseen evaluation**：AgentHallu 剩余样本 fresh split +
+定向 canary 集，走 冻结检测器 → 运行时 binder → policy genome → 进化侧
+裁决 → join gold 的完整链路；fresh 集零已知回归 + 净改善才允许 `promoted`。
 
 ## 历史沿革
 
