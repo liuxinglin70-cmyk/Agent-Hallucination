@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -136,6 +137,31 @@ def gold_join(run_id: str, cases: list[str]) -> dict:
     return report
 
 
+def _drop_transport_failures(run_dir: Path) -> int:
+    """Remove recorded unresolved cases whose failure was transport-side.
+
+    Only provider/transport errors are retried — an evidence-view budget
+    failure is a deterministic frozen-detector limitation and stays
+    recorded as an honest unresolved outcome.
+    """
+    dropped = 0
+    for result_path in sorted(run_dir.glob("*/result.json")):
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        if result.get("state") != "unresolved":
+            continue
+        reasons = result.get("authority_failure_reasons") or []
+        transport = any(
+            str(reason.get("error_type")) in {
+                "provider_error", "transport_error",
+            }
+            for reason in reasons
+        )
+        if transport:
+            shutil.rmtree(result_path.parent)
+            dropped += 1
+    return dropped
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     select = parser.add_mutually_exclusive_group(required=True)
@@ -154,6 +180,12 @@ def main() -> int:
         "--detect-only", action="store_true",
         help="record cases only; the caller owns run meta and gold join"
              " (used by the Phase 2 orchestrator)",
+    )
+    parser.add_argument(
+        "--retry-unresolved", action="store_true",
+        help="delete recorded cases whose unresolved state came from a "
+             "transport/provider error so the resumable loop re-detects "
+             "them (deterministic authority failures stay recorded)",
     )
     args = parser.parse_args()
 
@@ -186,6 +218,12 @@ def main() -> int:
         cases = case_list(manifest, args.set)
     run_id = args.run_id or new_run_id(RUN_PREFIX[args.set])
     run_dir = default_runs_root() / run_id / "cases"
+    if args.retry_unresolved:
+        retried = _drop_transport_failures(run_dir)
+        print(
+            f"retry: dropped {retried} transport-failed case records",
+            flush=True,
+        )
     pending = [
         case for case in cases
         if not (run_dir / case.replace("/", "__") / "result.json").exists()

@@ -269,6 +269,7 @@ def main() -> int:
         json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True)
         + "\n", encoding="utf-8",
     )
+    write_report(result)
     print(
         f"baseline fp={baseline['fp']} acc={baseline['accuracy']} | "
         f"deployed fp={deployed['fp']} acc={deployed['accuracy']} | "
@@ -278,6 +279,93 @@ def main() -> int:
     )
     print(f"result -> {out_path}")
     return 0
+
+
+def write_report(result: dict) -> None:
+    baseline = result["baseline"]
+    deployed = result["deployed"]
+    lines = [
+        "# Phase 1-D Fresh Evaluation Report", "",
+        f"- frozen set: 100 cases ({result['frozen_run']})",
+        f"- canary set: {len(result['canary_gate']['verdicts'])} "
+        "gold-error sentinels "
+        f"({result['canary_run']})", "",
+        "## Overall improvement (baseline vs deployed chain)", "",
+        "| chain | TP | FP | FN | TN | accuracy | TP lost | FP fixed |",
+        "|---|---|---|---|---|---|---|---|",
+        f"| baseline (frozen detector) | {baseline['tp']} |"
+        f" {baseline['fp']} | {baseline['fn']} | {baseline['tn']} |"
+        f" {baseline['accuracy']:.1%} | — | — |",
+        f"| EvoGuard (binder + genome) | {deployed['tp']} |"
+        f" {deployed['fp']} | {deployed['fn']} | {deployed['tn']} |"
+        f" {deployed['accuracy']:.1%} |"
+        f" {len(deployed['tp_lost'])} | {len(deployed['fp_fixed'])} |",
+        "", "## Policy contribution", "",
+        "| policy | class | triggers | correct | false activations |"
+        " missed |",
+        "|---|---|---|---|---|---|",
+    ]
+    for row in result["policy_contribution"]:
+        lines.append(
+            f"| {row['policy_id']} | {row['target_class']} |"
+            f" {row['trigger_count']} |"
+            f" {len(row['correct_improvements'])} |"
+            f" {len(row['false_activations'])} |"
+            f" {len(row['missed_opportunities'])} |"
+        )
+    lines += [
+        "", "### Trigger detail", "",
+    ]
+    for row in result["policy_contribution"]:
+        if not row["trigger_cases"]:
+            continue
+        lines.append(
+            f"- {row['policy_id']} fired on: "
+            + ", ".join(row["trigger_cases"])
+        )
+        if row["correct_improvements"]:
+            lines.append(
+                "  - correct improvements: "
+                + ", ".join(row["correct_improvements"])
+            )
+        if row["false_activations"]:
+            lines.append(
+                "  - FALSE activations (TP lost): "
+                + ", ".join(row["false_activations"])
+            )
+    lines += [
+        "", "## Canary regression gate", "",
+        f"- verdict: **"
+        f"{'PASSED' if result['canary_gate']['passed'] else 'FAILED'}**",
+    ]
+    for verdict in result["canary_gate"]["verdicts"]:
+        lines.append(
+            f"- {verdict['case_id']}: baseline "
+            f"{verdict['baseline_state']} -> deployed "
+            f"{verdict['deployed_state']} ({verdict['verdict']})"
+        )
+    lines += [
+        "", "## Evolution trajectory", "",
+        "| stage | accuracy |", "|---|---|",
+    ]
+    for row in result["trajectory"]:
+        lines.append(
+            f"| {row['stage']} | {row['accuracy']:.1%} |"
+        )
+    lines += [
+        "", "## Promotion gate", "",
+    ]
+    for check, passed in result["promotion_gate"]["checks"].items():
+        lines.append(f"- {'PASS' if passed else 'FAIL'} {check}")
+    lines += [
+        "",
+        f"**Verdict: genome "
+        f"{'PROMOTED' if result['promotion_gate']['promoted'] else 'NOT promoted'}**"
+        " on fresh-set evidence.", "",
+    ]
+    (OUT_DIR / "FRESH_EVAL_REPORT.md").write_text(
+        "\n".join(lines), encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":

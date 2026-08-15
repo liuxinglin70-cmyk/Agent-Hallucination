@@ -25,8 +25,8 @@ from sehd_rise2.evolution.cycle import (
     adjudicate,
     gate_metrics,
     load_library,
-    load_genome_items,
 )
+from sehd_rise2.evolution.proposal import load_genome_items
 from sehd_rise2.evolution.replay import load_bindings, load_run_tree
 
 LIBRARY = Path("datasets/policy_library/v1")
