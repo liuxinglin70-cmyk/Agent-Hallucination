@@ -14,6 +14,10 @@ src/
 # Experiment workspace (run artifacts are local-only; the README is tracked)
 experiments/*
 !experiments/README.md
+!experiments/run_p1d.py
+!experiments/p1d_analyze.py
+!experiments/run_phase2.py
+!experiments/phase2_final.py
 
 # Raw datasets (large, local-only); learning-case projections and the
 # policy-candidate/binding/replay artifacts are tracked
