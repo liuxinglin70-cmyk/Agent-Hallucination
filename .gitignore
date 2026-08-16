@@ -18,6 +18,8 @@ experiments/*
 !experiments/p1d_analyze.py
 !experiments/run_phase2.py
 !experiments/phase2_final.py
+!experiments/fixval_resample.py
+!experiments/run_fixval_round.py
 
 # Raw datasets (large, local-only); learning-case projections and the
 # policy-candidate/binding/replay artifacts are tracked
@@ -26,6 +28,8 @@ datasets/**/*.json
 datasets/**/*.jsonl
 !datasets/learning_cases/v1/**
 !datasets/policy_candidates/v1/**
+!datasets/eval_splits/**
+!datasets/policy_library/**
 
 # Python
 __pycache__/

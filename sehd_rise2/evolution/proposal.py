@@ -39,6 +39,7 @@ from sehd_rise2.evolution.policy import (
     CERTIFICATE_CLASSES,
     POLICY_ACTIONS,
 )
+from sehd_rise2.evolution.convention_evolution import attribute_miss
 
 PROPOSAL_SCHEMA = "sehd2.policy_proposals.v1"
 POLICY_GAP_NAMES = frozenset(GAP_CATEGORIES["policy"])
@@ -53,8 +54,9 @@ PROPOSAL_SYSTEM = (
     "with every surviving certificate, its class, claim and rationale), "
     "true-positive sentinels (gold-error cases currently convicted — a "
     "policy must never acquit them), and recorded misses (gold-error "
-    "cases the detector acquitted — NOT actionable here: the policy "
-    "layer can only withhold convictions, never create them).\n\n"
+    "cases the detector acquitted, each with its mechanical FN-triage "
+    "attribution — NOT actionable here: the policy layer can only "
+    "withhold convictions, never create them).\n\n"
     "Current deployed policies follow the worksheet.\n\n"
     "Propose ONLY mechanism-level adjustments:\n"
     "1. 'new' — a withheld conviction pattern supported by at least two "
@@ -179,7 +181,12 @@ def build_worksheet(
                 "surviving_certificates": surviving.get(case_id, []),
             })
         elif gold and state == "verified_clean":
-            misses.append({"case_id": case_id})
+            misses.append({
+                "case_id": case_id,
+                "attribution": attribute_miss(
+                    run_tree[case_id]["result"],
+                ),
+            })
     return {
         "schema_version": "sehd2.policy_worksheet.v1",
         "source": source,

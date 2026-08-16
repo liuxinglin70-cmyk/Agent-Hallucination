@@ -19,12 +19,15 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from sehd_rise2.detector.conventions import (
+    packet_features,
+    render_convention_block,
+    render_evolved_block,
+    route_conventions,
+)
 from sehd_rise2.detector.packet import (
-    INDEX_EVENT_PREVIEW,
-    INDEX_TAIL_EVENTS,
+    render_census_view,
     render_evidence_view,
-    render_full_view,
-    render_index_view,
 )
 from sehd_rise2.detector.provider import ProviderError, provider_call
 
@@ -38,14 +41,7 @@ CENSUS_SYSTEM = (
     "fabricated, misreported or reordered tool results; placeholder values "
     "(e.g. {{...}}) written instead of real tool output; extra details "
     "invented inside tool arguments or summaries that no tool observation "
-    "contains. Tool arguments are matched EXACTLY against what the task "
-    "requires: an argument that differs from the required argument even "
-    "only in formatting (e.g. writing '2.0000' where the task requires "
-    "'2.0', or the wrong code 'RIV' where 'RMS' is required) is a "
-    "deviation candidate. When a later tool argument or assistant report "
-    "RESTATES a value a tool observation produced, compare it exactly "
-    "against the observation too: an observation that returned '2.0' "
-    "being echoed as '2.0000' is a misreported tool result.\n"
+    "contains.\n"
     "2. RETRIEVAL: the answer or summary misaligns the retrieved content, "
     "the query misaligns the user intent, or facts are stated without "
     "retrieved support.\n"
@@ -62,6 +58,8 @@ CENSUS_SYSTEM = (
     "details (numbers, names, completion claims, evaluations) that no tool "
     "observation and no user statement contains — even when the tool call "
     "itself succeeded.\n"
+    "{convention_block}"
+    "{evolved_block}"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"candidates": [{"candidate_id": "c1", "claim": "the agent did X '
     'instead of the required Y", "locus_event_id": "event_XXX", '
@@ -91,18 +89,7 @@ VERIFICATION_SYSTEM = (
     "- TOOL-USE candidates: check the tool call's own observation and the "
     "task requirement. The question is whether the chosen tool, its "
     "arguments, and the agent's report of its output match what the "
-    "trajectory actually required and produced. Tool arguments are "
-    "compared EXACTLY against the task requirement: a formatting-only "
-    "argument difference (e.g. '2.0000' where the task requires '2.0') "
-    "IS a deviation. When a later argument or report restates a value "
-    "PRODUCED BY a tool observation, the observation is the AUTHORITATIVE "
-    "value: the task's precision/format instructions were already applied "
-    "by the tool call, so the restatement must match the observation "
-    "exactly. An observation of '2.0' echoed as '2.0000' is a deviation "
-    "even when the task text mentions decimal precision. (A value the "
-    "agent computed MANUALLY may follow the task's formatting "
-    "instructions; a value PRODUCED BY a tool call must be restated "
-    "exactly as the tool produced it.)\n"
+    "trajectory actually required and produced.\n"
     "- RETRIEVAL candidates: compare the agent's answer/summary against "
     "the retrieved content it cites.\n"
     "- REASONING candidates: recompute or re-derive the result from the "
@@ -111,26 +98,33 @@ VERIFICATION_SYSTEM = (
     "0.5% — is NOT a deviation: do not support a certificate for it.\n"
     "- PLANNING candidates: check whether every claimed intermediate fact "
     "is grounded in a tool observation or a user statement.\n"
-    "Formatting variations (e.g. 2.0 vs 2.0000) and equivalent rephrasing "
-    "are not deviations in PROSE reports. Exception: TOOL-ARGUMENT "
-    "candidates use exact-match semantics — an argument that differs from "
-    "the task requirement even only in formatting is a deviation; support "
-    "the certificate for it.\n"
+    "In PROSE reports, formatting variations and equivalent rephrasing "
+    "that preserve the referent, the operative meaning and the claimed "
+    "precision are not deviations.\n"
+    "{convention_block}"
     "A certificate is supported when the cited evidence shows the "
     "deviation is real (the action contradicts the observations, or the "
-    "task required something else and nothing in the evidence excuses it). "
-    "It is rejected only when the evidence shows the action or statement "
-    "was correct or adequate. Uncertainty is not a reason to reject: if "
-    "the evidence cannot excuse the deviation, support it.\n"
+    "task required something else and nothing in the evidence excuses "
+    "it). It is rejected when the evidence shows the action or statement "
+    "was correct or adequately grounded. When the evidence leans toward "
+    "a real deviation and cannot excuse it, support — uncertainty is "
+    "not a reason to reject. Reserve verdict insufficient_evidence for "
+    "the one situation where the cited evidence cannot settle the "
+    "question AT ALL: the observation the candidate is about is absent "
+    "from the evidence view, or the claim concerns material the shown "
+    "evidence does not contain. Difficulty or close judgement is never "
+    "insufficient_evidence.\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"certificates": [{"candidate_id": "c1", "verdict": '
-    '"supported|rejected", "rationale": "..."}]}\n'
+    '"supported|rejected|insufficient_evidence", "rationale": "..."}]}\n'
     "- verdict=supported: the trajectory evidence shows the deviation is "
     "real and unexcused.\n"
     "- verdict=rejected: the action or statement was correct or adequately "
     "grounded after all.\n"
-    "- verdict is EXACTLY one word: supported or rejected. Put ALL "
-    "reasoning in rationale.\n"
+    "- verdict=insufficient_evidence: the cited evidence cannot settle "
+    "the question at all (state in the rationale WHICH decisive "
+    "observation is missing).\n"
+    "- verdict is EXACTLY one word. Put ALL reasoning in rationale.\n"
     "One certificate per candidate. No commentary."
 )
 
@@ -139,48 +133,28 @@ RATIONALE_MAX_CHARS = 2000
 DEFENSE_SYSTEM = (
     "You are the defense stage of a hallucination detector. Challenge each "
     "supported certificate below: the certificate claims the assistant "
-    "deviated from the required behavior. Find any legitimate reading "
-    "under which the assistant's action or statement is correct, or the "
-    "cited evidence is insufficient to convict.\n"
+    "deviated from the required behavior. Find the reading under which "
+    "the assistant's action or statement is correct — but only a reading "
+    "the TASK TEXT or a TRAJECTORY OBSERVATION actually supports. A "
+    "merely possible or plausible interpretation is NOT a defense: the "
+    "task must have explicitly permitted the behaviour, or an observation "
+    "must have actually returned what the agent claimed. Inventing "
+    "context the trajectory does not contain, or stretching an "
+    "instruction beyond what its words fix, is not a defense either.\n"
     "Do not excuse a deviation by pointing to a later step that happened "
     "to work, unless that later step actually corrects the error. Do not "
     "excuse an action merely because the user did not complain.\n"
-    "Overturn certificates whose only basis is a trivial rounding, "
-    "approximation or formatting difference in a REPORTED number "
-    "(e.g. 1116.5 vs 1115.2, 33.44 vs 33.42): such micro-differences are "
-    "normal numerical presentation, not hallucinations. Do NOT overturn a "
-    "TOOL-ARGUMENT deviation for formatting alone: tool arguments are "
-    "exact-match interfaces, so an argument that differs from the task "
-    "requirement even only in formatting (e.g. '2.0000' where '2.0' is "
-    "required) is a real deviation. Do not excuse a misrestated tool "
-    "observation by pointing to the task's precision/format phrasing: the "
-    "tool call already applied the task's transformation, so its "
-    "observation is the authoritative value.\n"
+    "{convention_block}"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"decisions": [{"candidate_id": "c1", "verdict": '
     '"upheld|overturned", "rationale": "..."}]}\n'
     "- upheld: the deviation stands after adversarial review.\n"
-    "- overturned: the action is defensible or the evidence cannot "
-    "convict.\n"
+    "- overturned: the action is defensible on evidence the task or an "
+    "observation actually contains, or the evidence cannot convict.\n"
     "- verdict is EXACTLY ONE word: upheld or overturned. Never write a "
     "sentence for verdict; put reasoning in rationale only.\n"
     "One decision per certificate. No commentary."
 )
-
-
-class _StageAudit:
-    """Per-stage outcome record (provider + contract status)."""
-
-    def __init__(self) -> None:
-        self.census_ok = False
-        self.verification_ok = False
-        self.defense_ok = False
-        self.defense_needed = False
-        self.census_error = ""
-        self.verification_error = ""
-        self.defense_error = ""
-        self.census_candidate_count = 0
-        self.certificate_count = 0
 
 
 class _StageAudit:
@@ -200,16 +174,18 @@ class _StageAudit:
         self.defense_batches = 0
         # Evidence-view telemetry: whether each stage's provider view was
         # truncated. Verification/defense views are the CONVICTION basis:
-        # a truncated view there fails the run closed. A truncated census
-        # view only degrades discovery (recall), so it is recorded, not
-        # fatal.
+        # a truncated view there fails the run closed. A degraded census
+        # view only reduces discovery (recall), so it is recorded for FN
+        # triage, not fatal.
         self.census_view_meta: dict[str, Any] = {}
         self.verification_view_meta: dict[str, Any] = {}
         self.defense_view_meta: dict[str, Any] = {}
 
     @staticmethod
     def _coverage(meta: Mapping[str, Any]) -> str:
-        return "reduced" if meta.get("packet_truncated") else "complete"
+        if meta.get("degraded") or meta.get("packet_truncated"):
+            return "degraded"
+        return "complete"
 
 
 def _referenced_event_ids(
@@ -230,7 +206,7 @@ def _referenced_event_ids(
 def _census_user(
     packet: Mapping[str, Any], audit: _StageAudit,
 ) -> str:
-    text, meta = render_index_view(packet)
+    text, meta = render_census_view(packet)
     audit.census_view_meta = meta
     return (
         "Find every candidate factual error in the assistant's trajectory.\n\n"
@@ -338,7 +314,7 @@ def _parse_certificates(
             audit.verification_error = "certificate_contract_invalid"
             return []
         verdict = str(raw.get("verdict") or "")
-        if verdict not in ("supported", "rejected"):
+        if verdict not in ("supported", "rejected", "insufficient_evidence"):
             audit.verification_error = (
                 f"certificate_verdict_invalid:{verdict!r}"
             )
@@ -406,104 +382,6 @@ def _event_ordinal(
     return 0
 
 
-_NUMERIC = __import__("re").compile(r"-?[0-9]+(?:\.[0-9]+)?")
-
-
-def _numeric_literals(text: Any) -> dict[str, str]:
-    """ASCII numeric string form -> float value for every numeric literal."""
-    out: dict[str, str] = {}
-    for match in _NUMERIC.finditer(str(text or "")):
-        form = match.group(0)
-        try:
-            value = float(form)
-        except ValueError:
-            continue
-        out.setdefault(form, value)
-    return out
-
-
-def _observation_restatement_check(
-    packet: Mapping[str, Any], census: Sequence[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    """Deterministic census augment: misrestated tool observations.
-
-    BFCL/025 class: a tool observation produces a value (mpf('2.0')) and a
-    LATER tool argument restates it with a numerically equal but
-    differently formatted literal ('2.0000'). The benchmark's tool-argument
-    convention condemns that restatement; the LLM census catches it only
-    intermittently, so the court adds a deterministic candidate whenever
-    the pattern matches. The candidate still travels the full
-    verification/defense chain: the verdict is never taken here.
-
-    Precision guards (each eliminates a noise class observed in the data):
-    - only ASCII numeric literals (Unicode digits in data tables are not
-      agent restatements),
-    - the restatement must be a tool ARGUMENT in a strictly later
-      (event, interaction) position than the observation — prose reports
-      are not covered by the exact-match convention,
-    - both forms must carry a decimal point, so pure leading-zero
-      variants ('01' vs '1') from tabular content never fire.
-    """
-    events = list(packet.get("events") or [])
-    produced: dict[float, list[tuple[str, tuple[int, int]]]] = {}
-    for event in events:
-        epos = int(event.get("position") or 0)
-        for iindex, interaction in enumerate(
-            event.get("tool_interactions") or [],
-        ):
-            obs = interaction.get("observation")
-            for form, value in _numeric_literals(obs).items():
-                produced.setdefault(value, []).append(
-                    (form, (epos, iindex)),
-                )
-    existing = " ".join(str(c.get("claim") or "") for c in census)
-    added: list[dict[str, Any]] = []
-    seen_pairs: set[tuple[str, str]] = set()
-    index = len(census)
-    for event in events:
-        epos = int(event.get("position") or 0)
-        for iindex, interaction in enumerate(
-            event.get("tool_interactions") or [],
-        ):
-            args = interaction.get("arguments")
-            if args in (None, ""):
-                continue
-            locus_id = (
-                interaction.get("interaction_id") or event["event_id"]
-            )
-            for form, value in _numeric_literals(args).items():
-                if "." not in form:
-                    continue
-                for produced_form, (opos, oindex) in produced.get(value, []):
-                    if "." not in produced_form:
-                        continue
-                    if (opos, oindex) >= (epos, iindex):
-                        continue
-                    if produced_form == form:
-                        continue
-                    if (produced_form, form) in seen_pairs:
-                        continue
-                    if form in existing and produced_form in existing:
-                        continue
-                    seen_pairs.add((produced_form, form))
-                    index += 1
-                    added.append({
-                        "candidate_id": f"c{index}",
-                        "claim": (
-                            f"the agent restated the tool-observed value "
-                            f"'{produced_form}' (from an earlier tool "
-                            f"observation) as '{form}' — numerically equal "
-                            f"but differently formatted, without the task "
-                            f"instructing that reformatting"
-                        ),
-                        "locus_event_id": locus_id,
-                        "evidence_refs": [
-                            f"event_{opos:03d}_tool_{oindex + 1:02d}",
-                        ],
-                    })
-    return added
-
-
 def _partition_by_evidence(
     packet: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]],
 ) -> list[list[Mapping[str, Any]]]:
@@ -560,8 +438,18 @@ def adjudicate(
         return _proof("unresolved", True, reasons, audit, packet)
     coverage_complete = len(cert_ids) >= len(census_ids)
     supported = [c for c in certificates if c["verdict"] == "supported"]
+    abstained = [
+        c for c in certificates if c["verdict"] == "insufficient_evidence"
+    ]
+    defense_abstained = set(
+        audit.defense_view_meta.get("abstained_ids") or [],
+    )
+    reviewable = [
+        c for c in supported
+        if str(c.get("candidate_id")) not in defense_abstained
+    ]
     error_certs: list[dict[str, Any]] = []
-    if supported:
+    if reviewable:
         if not audit.defense_ok:
             reasons.append({
                 "component": "defense",
@@ -570,7 +458,7 @@ def adjudicate(
             })
             return _proof("unresolved", True, reasons, audit, packet)
         error_certs = [
-            c for c in supported
+            c for c in reviewable
             if (decisions.get(str(c.get("candidate_id"))) or {}).get(
                 "verdict"
             ) == "upheld"
@@ -667,6 +555,33 @@ def adjudicate(
     proof["surviving_error_certificate_count"] = len(complete)
     proof["prosecution_coverage"] = prosecution_coverage
     proof["defense_coverage"] = defense_coverage
+    proof["abstained_certificates"] = [
+        {
+            "candidate_id": str(c.get("candidate_id")),
+            "rationale": str(c.get("rationale") or ""),
+        }
+        for c in abstained
+    ]
+    # FN-triage facts: the mechanical inputs the evaluator side joins with
+    # gold to attribute every miss (view degraded / census miss / evidence
+    # abstained / defense overturn). Label-free by construction.
+    proof["miss_triage_facts"] = {
+        "census_candidates": audit.census_candidate_count,
+        "abstained_count": len(abstained),
+        "supported_count": len(supported),
+        "overturned_count": sum(
+            1
+            for c in reviewable
+            if (decisions.get(str(c.get("candidate_id"))) or {}).get(
+                "verdict"
+            ) == "overturned"
+        ),
+        "census_view_degraded": bool(audit.census_view_meta.get("degraded")),
+        "evidence_view_truncated": bool(
+            (audit.verification_view_meta.get("packet_truncated"))
+            or (audit.defense_view_meta.get("packet_truncated"))
+        ),
+    }
     proof["terminal_basis"] = {
         "state": state,
         "decisive_facts": {
@@ -700,7 +615,8 @@ def _proof(
         "error_certificate_count": 0,
         "prosecution_coverage": "incomplete",
         "defense_coverage": "incomplete",
-        "policy_evaluation": {"fired": [], "skipped": []},
+        "abstained_certificates": [],
+        "miss_triage_facts": {},
         "authority_failure_reasons": [dict(reason) for reason in reasons],
         "terminal_basis": {
             "state": state,
@@ -719,10 +635,16 @@ def _proof(
 
 def run_court(
     packet: Mapping[str, Any], config: Mapping[str, Any],
+    *,
+    evolved_conventions: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Run the three provider stages and the deterministic adjudication.
 
-    Returns ``(proof, providers, stage_audit_dict)``. Provider failures are
+    ``evolved_conventions`` are the deployed convention-genome entries
+    (the evolution framework's output): each dual-boundary entry whose
+    mechanical trigger features all hold for this packet injects its
+    directive + exclusion into all three stage prompts. Returns
+    ``(proof, providers, stage_audit_dict)``. Provider failures are
     recorded per route and the run fails closed; they never raise out of
     the court.
     """
@@ -730,6 +652,32 @@ def run_court(
     providers: dict[str, Any] = {}
     runtime_valid = True
     reasons: list[dict[str, Any]] = []
+    features = packet_features(packet)
+    conventions = route_conventions(features)
+    convention_block = render_convention_block(conventions)
+    evolved_block = render_evolved_block(evolved_conventions, features)
+    census_system = (
+        CENSUS_SYSTEM
+        .replace("{convention_block}", convention_block)
+        .replace("{evolved_block}", evolved_block)
+    )
+    verification_system = VERIFICATION_SYSTEM.replace(
+        "{convention_block}", convention_block,
+    )
+    defense_system = DEFENSE_SYSTEM.replace(
+        "{convention_block}", convention_block,
+    )
+
+    def _route_facts(proof: dict[str, Any]) -> dict[str, Any]:
+        proof["convention_routes"] = conventions
+        proof["active_evolved_conventions"] = [
+            str(entry.get("convention_id"))
+            for entry in evolved_conventions
+            if {str(name) for name in entry.get("trigger_features") or ()}
+            and {str(name) for name in entry.get("trigger_features") or ()}
+            <= features
+        ]
+        return proof
 
     def _audit_dict() -> dict[str, Any]:
         return {
@@ -741,12 +689,8 @@ def run_court(
             "certificate_count": audit.certificate_count,
             "verification_batches": audit.verification_batches,
             "defense_batches": audit.defense_batches,
-            "census_second_pass": bool(
-                audit.census_view_meta.get("second_pass")
-            ),
-            "census_deterministic_augment": int(
-                audit.census_view_meta.get("deterministic_augment") or 0
-            ),
+            "packet_features": sorted(features),
+            "convention_routes": conventions,
             "evidence_coverage": {
                 "census": _StageAudit._coverage(audit.census_view_meta),
                 "verification": _StageAudit._coverage(
@@ -788,7 +732,9 @@ def run_court(
         providers[name] = meta
         return parsed
 
-    census_raw = _run_stage("census", CENSUS_SYSTEM, _census_user(packet, audit))
+    census_raw = _run_stage(
+        "census", census_system, _census_user(packet, audit),
+    )
     census = _parse_census(census_raw, audit)
     for _repair_attempt in range(2):
         if audit.census_ok:
@@ -800,7 +746,7 @@ def run_court(
             "contract: " + audit.census_error + ". Return the complete "
             "corrected JSON object, starting with {."
         )
-        census_raw = _run_stage("census", CENSUS_SYSTEM, repair_user)
+        census_raw = _run_stage("census", census_system, repair_user)
         census = _parse_census(census_raw, audit)
     if not audit.census_ok:
         runtime_valid = False
@@ -810,17 +756,6 @@ def run_court(
             "error_type": audit.census_error,
         })
         census = []
-
-    if audit.census_ok:
-        # Deterministic recall augment: misrestated tool observations
-        # (BFCL/025 class) are proposed mechanically so the verification
-        # and defense stages can judge them instead of the case silently
-        # clearing on a census miss.
-        augment = _observation_restatement_check(packet, census)
-        if augment:
-            census = list(census) + augment
-            audit.census_candidate_count = len(census)
-            audit.census_view_meta["deterministic_augment"] = len(augment)
 
     if not runtime_valid:
         # The census is the evidence source for every later stage: a broken
@@ -834,62 +769,7 @@ def run_court(
         proof["state"] = "unresolved"
         proof["terminal_basis"]["state"] = "unresolved"
         proof["authority_failure_reasons"] = [dict(r) for r in reasons]
-        return proof, providers, _audit_dict()
-
-    if not census:
-        # A well-formed EMPTY census normally IS the clean verdict — but
-        # only if the census could actually SEE the trajectory. The index
-        # view renders the middle of long trajectories as 300-char
-        # previews, so a hallucination buried in long middle content can
-        # be invisible to the first pass. When any non-tail event carried
-        # more content than the index preview could show, run ONE
-        # second census pass over a bounded full-detail render of the
-        # whole trajectory (a different lens; truncation there is a
-        # recall degradation, not a conviction basis). A second pass that
-        # fails provider-wise or contract-wise never damages the clean
-        # verdict of the first pass: it is ignored.
-        tail_ids = {
-            str(event.get("event_id"))
-            for event in list(packet.get("events") or [])[-INDEX_TAIL_EVENTS:]
-        }
-        middle_undetailed = [
-            event for event in packet.get("events") or []
-            if str(event.get("event_id")) not in tail_ids
-            and event.get("content") not in (None, "")
-            and len(str(event.get("content"))) > INDEX_EVENT_PREVIEW
-        ]
-        if middle_undetailed:
-            audit.census_view_meta["second_pass"] = True
-            second_text, _second_meta = render_full_view(packet)
-            route = dict(config["census_route"])
-            route["_route_name"] = "census_pass2"
-            try:
-                second_parsed, second_meta = provider_call(
-                    route=route, system=CENSUS_SYSTEM, purpose="census_pass2",
-                    user=(
-                        "Find every candidate factual error in the "
-                        "assistant's trajectory. The full trajectory follows "
-                        "(long events may be truncated for space).\n\n"
-                        + second_text
-                    ),
-                )
-            except ProviderError as exc:
-                providers["census_pass2"] = {
-                    "error_type": exc.error_type,
-                    "error": exc.message[:300],
-                    "attempts": exc.attempts,
-                }
-            else:
-                providers["census_pass2"] = second_meta
-                second_census = _parse_census(second_parsed, audit)
-                if audit.census_ok and second_census:
-                    census = second_census
-                else:
-                    # The first pass stands: restore its well-formed
-                    # empty verdict (the second pass is advisory).
-                    audit.census_ok = True
-                    audit.census_error = ""
-                    audit.census_candidate_count = 0
+        return _route_facts(proof), providers, _audit_dict()
 
     if not census:
         # Nothing to verify: the verification/defense stages are skipped
@@ -904,7 +784,7 @@ def run_court(
         proof["census"] = []
         proof["certificates"] = []
         proof["defense_decisions"] = {}
-        return proof, providers, _audit_dict()
+        return _route_facts(proof), providers, _audit_dict()
 
     verification_batches = _partition_by_evidence(packet, census)
     audit.verification_batches = len(verification_batches)
@@ -916,11 +796,22 @@ def run_court(
         )
         if meta.get("packet_truncated"):
             # Only a single-candidate batch can reach this point (the
-            # partition already splits anything larger): the cited events
-            # cannot fit even alone. Fail closed on an irreducible view.
+            # partition already splits anything larger): the cited
+            # observation physically exceeds any renderable view. The
+            # candidate cannot be judged on partial evidence, so it
+            # mechanically abstains — never a conviction, never a
+            # rejection, and the degradation is recorded for triage.
             verification_truncated = True
+            certificates.extend([{
+                "candidate_id": str(candidate.get("candidate_id")),
+                "verdict": "insufficient_evidence",
+                "rationale": (
+                    "cited observation exceeded the evidence view budget"
+                ),
+            } for candidate in batch])
+            continue
         verification_raw = _run_stage(
-            "verification", VERIFICATION_SYSTEM,
+            "verification", verification_system,
             _verification_user(packet, census, audit, subset=batch),
         )
         # Reset per-batch parse state: a previous batch's success must not
@@ -936,12 +827,13 @@ def run_court(
             ) + (
                 "\n\nCONTRACT_REPAIR: Your previous reply violated the "
                 "certificate contract: " + audit.verification_error + ". "
-                "Verdict must be EXACTLY supported or rejected; put all "
-                "reasoning in rationale only. Return the complete corrected "
-                "JSON object, starting with {."
+                "Verdict must be EXACTLY supported, rejected or "
+                "insufficient_evidence; put all reasoning in rationale "
+                "only. Return the complete corrected JSON object, "
+                "starting with {."
             )
             verification_raw = _run_stage(
-                "verification", VERIFICATION_SYSTEM, repair_user,
+                "verification", verification_system, repair_user,
             )
             batch_certs = _parse_certificates(verification_raw, audit)
         if not audit.verification_ok:
@@ -963,15 +855,6 @@ def run_court(
         "batches": len(verification_batches),
         "packet_truncated": verification_truncated,
     }
-    if verification_truncated:
-        # Some cited event could not be rendered in full even after
-        # batching: the conviction basis is incomplete — fail closed.
-        runtime_valid = False
-        reasons.append({
-            "component": "verification",
-            "code": "evidence_view_incomplete",
-            "error_type": "cited events exceeded the evidence view budget",
-        })
 
     supported = [c for c in certificates if c["verdict"] == "supported"]
     decisions: dict[str, dict[str, str]] = {}
@@ -981,19 +864,27 @@ def run_court(
         defense_batches = _partition_by_evidence(packet, supported)
         audit.defense_batches = len(defense_batches)
         defense_truncated = False
+        defense_abstained: list[str] = []
         for batch in defense_batches:
             _text, meta = render_evidence_view(
                 packet, _referenced_event_ids(batch),
             )
             if meta.get("packet_truncated"):
+                # The batch's conviction basis cannot be rendered whole:
+                # adversarial review on partial evidence is unsafe, so
+                # these certificates mechanically abstain from conviction
+                # (recorded, never silent, never fatal).
                 defense_truncated = True
-            defense_raw = _run_stage(
-                "defense", DEFENSE_SYSTEM,
-                _defense_user(packet, supported, census, audit, subset=batch),
-            )
-            # Reset per-batch parse state (see verification batching).
+                defense_abstained.extend(
+                    str(cert.get("candidate_id")) for cert in batch
+                )
+                continue
             audit.defense_ok = False
             audit.defense_error = ""
+            defense_raw = _run_stage(
+                "defense", defense_system,
+                _defense_user(packet, supported, census, audit, subset=batch),
+            )
             batch_decisions = _parse_defense(defense_raw, batch, audit)
             for _repair_attempt in range(2):
                 if audit.defense_ok:
@@ -1008,7 +899,7 @@ def run_court(
                     "object, starting with {."
                 )
                 defense_raw = _run_stage(
-                    "defense", DEFENSE_SYSTEM, repair_user,
+                    "defense", defense_system, repair_user,
                 )
                 batch_decisions = _parse_defense(defense_raw, batch, audit)
             if not audit.defense_ok:
@@ -1026,6 +917,7 @@ def run_court(
         missing = [
             str(cert.get("candidate_id")) for cert in supported
             if str(cert.get("candidate_id")) not in decisions
+            and str(cert.get("candidate_id")) not in defense_abstained
         ]
         if missing and runtime_valid:
             runtime_valid = False
@@ -1037,17 +929,8 @@ def run_court(
         audit.defense_view_meta = {
             "batches": len(defense_batches),
             "packet_truncated": defense_truncated,
+            "abstained_ids": sorted(defense_abstained),
         }
-        if defense_truncated:
-            # Same fail-closed rule for the adversarial review stage.
-            runtime_valid = False
-            reasons.append({
-                "component": "defense",
-                "code": "evidence_view_incomplete",
-                "error_type": (
-                    "cited events exceeded the evidence view budget"
-                ),
-            })
     else:
         audit.defense_ok = True
 
@@ -1061,6 +944,7 @@ def run_court(
     proof["census"] = [dict(c) for c in census]
     proof["certificates"] = [dict(c) for c in certificates]
     proof["defense_decisions"] = dict(decisions)
+    _route_facts(proof)
     if not runtime_valid:
         proof["decision_authority"] = "invalid"
         proof["state"] = "unresolved"

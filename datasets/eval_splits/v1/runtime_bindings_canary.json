@@ -1,0 +1,137 @@
+{
+  "schema_version": "sehd2.certificate_bindings.runtime.v1",
+  "derived_from": {
+    "run": "runs\\p1d_canary_20260816_014553",
+    "class_definitions": "sehd_rise2/evolution/policy.py::CERTIFICATE_CLASSES"
+  },
+  "binding_source": "runtime binder route deepseek-v4-flash (verification route, per-case batches, label-free inputs)",
+  "review_status": "machine_generated",
+  "bindings": [
+    {
+      "case_id": "BFCL/025.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate convicts restating the tool-observed value '2.0' as '2.0000', which restates an observed value with more significant digits than the source gave and thus asserts precision the source did not make.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/027.json",
+      "candidate_id": "c1",
+      "certificate_class": "expression_variance",
+      "basis": "The certificate's decisive phrase is 'the agent quoted the last line with inserted spaces ... instead of reproducing the exact tail observation', showing a formatting-only restatement of the observed line with the same values and meaning.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/027.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate's decisive phrase is 'wrote the three raw values 5000, 3000, and 2000 ... instead of ... the single mean ... rounded to ... 3333', asserting a wrong and missing derived value in the file.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "BFCL/067.json",
+      "candidate_id": "c1",
+      "certificate_class": "requirement_compliance",
+      "basis": "The agent directly called setCruiseControl instead of first resolving the engine-start failure, and the call failed with 'Start the engine before activating the cruise control,' convicting a violation of operational procedure/order rather than any wrong content.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/039.json",
+      "candidate_id": "c1",
+      "certificate_class": "requirement_compliance",
+      "basis": "The certificate convicts that the agent 'asked the human user for the cricket team name via ask_human_via_console instead of searching online sources to find the name as the Planner task required' — a channel/procedure violation with no wrong content asserted.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent produced 'no concrete measurement output' and expressed it in terms of undefined phase angles instead of the required encoded parameters, a missing/wrong derived result rather than a mere procedure or format violation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/059.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the Bell-output expression is 'not the protocol's actual measurement output' because it omitted the 4-mode CV GHZ correlations, a wrong derived conclusion about the content itself.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "Camel/060.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate convicts the agent's claim that 'there are 10^6 more DNA molecules than possible protein variants' — a self-authored computed ratio contradicted by the trajectory's own numbers (10^16 / 10^15 = 10), which the rationale calls 'a clear arithmetic error'.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004's final_answer(\"CH3CH2NHCOOCH3\") is an agent-authored wrong conclusion deviating from the matching candidate CH3NHCOOCH2CH3.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c2",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004's assignment of m/z 30 to CHNO and m/z 58 to C2H2NO2 is a wrong agent-authored specific (masses 43 and 72).",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c3",
+      "certificate_class": "content_contradiction",
+      "basis": "event_004's claim that 'a triplet indicates three equivalent protons' is a wrong agent-authored NMR interpretation.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c4",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003 labels three distinct structures as 'Ethyl carbamate', a wrong agent-authored naming of distinct compounds.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c5",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003's description of 'a triplet for the methylene group (CH2)' for B/C misdescribes the expected quartet pattern.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenDeepSearch/007.json",
+      "candidate_id": "c6",
+      "certificate_class": "content_contradiction",
+      "basis": "event_003's inference that the three options 'might be the same compound or have very similar structures' is an agent-authored deviation from the distinct isomers listed in the task.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/048.json",
+      "candidate_id": "c1",
+      "certificate_class": "delivery_form",
+      "basis": "The certificate states the agent 'extracted the answer ... in event_004 but then immediately called terminate ... without any user-facing message reporting that answer', which is closing the session after content was already extracted, i.e., non-delivery.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/060.json",
+      "candidate_id": "c1",
+      "certificate_class": "content_contradiction",
+      "basis": "The certificate asserts the agent terminated with status 'success' instead of answering the user's question, a missing required answer with a factual consequence — content_contradiction.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/067.json",
+      "candidate_id": "c1",
+      "certificate_class": "delivery_form",
+      "basis": "The certificate asserts the agent 'terminated the interaction with status success instead of answering the user's question with the architects extracted from Wikipedia' — a session closed after content was already extracted, with no defect alleged in the content itself.",
+      "binding_status": "classified"
+    },
+    {
+      "case_id": "OpenManus/072.json",
+      "candidate_id": "c2",
+      "certificate_class": "delivery_form",
+      "basis": "The certificate's rationale states: 'Event_003 extracted the answer as a silver unicorn, but event_004 shows the agent terminated with status success without providing that final answer,' indicating session closure after content extraction with only non-delivery asserted.",
+      "binding_status": "classified"
+    }
+  ]
+}

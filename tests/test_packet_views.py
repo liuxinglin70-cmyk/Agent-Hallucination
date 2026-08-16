@@ -1,12 +1,12 @@
-"""Packet view tests: two-phase evidence access + truncation-aware fail-closed.
+"""Packet view tests: full-fidelity census + selective fail-closed evidence.
 
 Locks the sehd_rise2 packet rendering contract:
 
-- ``render_full_view``: bounded full-detail render whose raised budget keeps
-  the chronological TAIL visible for moderate trajectories (the old 24k cap
-  dropped the tail — the most hallucination-relevant part).
-- ``render_index_view`` (census): every event is nameable via the index;
-  the tail is additionally rendered at full detail.
+- ``render_full_view``: full-detail render at the census budgets; the
+  census view degrades to index+tail only beyond the budget, and the
+  degradation is recorded, never silent.
+- ``render_index_view`` (degraded fallback): every event is nameable via
+  the index; the tail is additionally rendered at full detail.
 - ``render_evidence_view`` (verification/defense): only cited events plus
   neighbours; a CITED event that cannot be rendered in full marks the view
   truncated, and the court fails closed (unresolved) instead of convicting
@@ -24,10 +24,12 @@ import pytest  # noqa: E402
 
 from sehd_rise2.detector import court as court_module  # noqa: E402
 from sehd_rise2.detector.packet import (  # noqa: E402
+    CENSUS_VIEW_CHARS,
     EVIDENCE_EVENT_CHARS,
     INDEX_TAIL_EVENTS,
     _MAX_EVENT_CONTENT,
     build_packet,
+    render_census_view,
     render_evidence_view,
     render_full_view,
     render_index_view,
@@ -55,25 +57,40 @@ def _record_with_giant_observation() -> dict:
 
 
 # --------------------------------------------------------------------------
-# full view: the raised budget keeps the tail visible
+# full view: census budgets, tail visible for moderate trajectories
 # --------------------------------------------------------------------------
 
 
 def test_full_view_keeps_tail_for_moderate_trajectory() -> None:
     packet = build_packet(_record(20, 3000))
     text, meta = render_full_view(packet)
-    # 20 x ~3k chars fits under the 96k budget: the final event must be
-    # visible. Under the old 24k cap the tail was cut off.
     assert "EVENT event_020" in text
     assert len(meta["rendered_event_ids"]) == 20
     assert meta["packet_truncated"] is False
 
 
 def test_full_view_truncates_only_when_budget_exhausted() -> None:
-    packet = build_packet(_record(50, 3000))
+    packet = build_packet(_record(200, 3000))
     _text, meta = render_full_view(packet)
     assert meta["packet_truncated"] is True
-    assert len(meta["rendered_event_ids"]) < 50
+    assert len(meta["rendered_event_ids"]) < 200
+
+
+def test_census_view_degrades_recorded_beyond_budget() -> None:
+    packet = build_packet(_record(200, 3000))
+    text, meta = render_census_view(packet)
+    assert meta["degraded"] is True
+    assert meta["full_render_chars"] > CENSUS_VIEW_CHARS
+    # The degraded view is the index view: previews, not full content.
+    assert "EVENT INDEX:" in text
+    assert "preview=" in text
+
+
+def test_census_view_full_fidelity_within_budget() -> None:
+    packet = build_packet(_record(20, 3000))
+    _text, meta = render_census_view(packet)
+    assert meta["degraded"] is False
+    assert len(meta["rendered_event_ids"]) == 20
 
 
 # --------------------------------------------------------------------------
@@ -105,11 +122,11 @@ def test_evidence_view_renders_only_cited_plus_window() -> None:
     packet = build_packet(_record(20, 1000))
     text, meta = render_evidence_view(packet, ["event_005_tool_01"])
     assert meta["rendered_event_ids"] == [
-        "event_004", "event_005", "event_006",
+        "event_003", "event_004", "event_005", "event_006", "event_007",
     ]
     assert "event_001" not in text
     assert "event_020" not in text
-    assert len(meta["omitted_event_ids"]) == 17
+    assert len(meta["omitted_event_ids"]) == 15
 
 
 def test_evidence_view_full_fidelity_for_cited_event() -> None:
@@ -142,7 +159,7 @@ def test_evidence_view_resolves_interaction_refs_to_parent_event() -> None:
     # resolves to the existing parent event (plus window).
     _text, meta = render_evidence_view(packet, ["event_003_tool_99"])
     assert meta["rendered_event_ids"] == [
-        "event_002", "event_003", "event_004",
+        "event_001", "event_002", "event_003", "event_004", "event_005",
     ]
     assert meta["packet_truncated"] is False
 
@@ -173,7 +190,7 @@ def _fake_provider(census_parsed: dict, certificate_parsed: dict):
     return _call
 
 
-def test_court_fails_closed_on_truncated_verification_view(
+def test_court_abstains_on_truncated_verification_view(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record = _record_with_giant_observation()
@@ -194,13 +211,14 @@ def test_court_fails_closed_on_truncated_verification_view(
         "census_route": {}, "verification_route": {}, "defense_route": {},
     }
     proof, _providers, audit = court_module.run_court(packet, config)
-    # The verification stage saw a truncated evidence view: the run must
-    # fail closed instead of convicting on partial evidence.
-    assert audit["evidence_coverage"]["verification"] == "reduced"
-    assert proof["state"] == "unresolved"
-    assert proof["runtime_valid"] is False
-    codes = [r["code"] for r in proof["authority_failure_reasons"]]
-    assert "evidence_view_incomplete" in codes
+    # The cited 600k observation exceeds any renderable view: the
+    # candidate mechanically abstains — never a conviction on partial
+    # evidence, never an unresolved case, degradation recorded.
+    assert audit["evidence_coverage"]["verification"] == "degraded"
+    assert proof["state"] == "verified_clean"
+    assert proof["runtime_valid"] is True
+    assert proof["abstained_certificates"][0]["candidate_id"] == "c1"
+    assert proof["miss_triage_facts"]["evidence_view_truncated"] is True
 
 
 def test_court_runs_clean_on_complete_views(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -347,195 +365,3 @@ def test_court_batches_oversized_verification_views(
     assert proof["certificate_count"] == 5
 
 
-# --------------------------------------------------------------------------
-# census second pass: empty first census re-scans long middle content
-# --------------------------------------------------------------------------
-
-
-def test_census_second_pass_recovers_middle_hallucination(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    history = [
-        {"role": "assistant" if i % 2 == 0 else "user",
-         "content": f"message {i} " + ("y" * 1000)}
-        for i in range(1, 31)
-    ]
-    record = {"question": "second pass", "history": history}
-    packet = build_packet(record)
-    state: dict[str, int] = {"census": 0}
-
-    def _call(*, route, system, user, purpose, **_kwargs) -> tuple[dict, dict]:
-        if purpose == "census":
-            state["census"] += 1
-            return {"candidates": []}, {"attempts": 1}
-        if purpose == "census_pass2":
-            return {"candidates": [{
-                "candidate_id": "c1", "claim": "middle error",
-                "locus_event_id": "event_010", "evidence_refs": ["event_010"],
-            }]}, {"attempts": 1}
-        if purpose == "verification":
-            return {"certificates": [
-                {"candidate_id": "c1", "verdict": "supported", "rationale": "r"},
-            ]}, {"attempts": 1}
-        if purpose == "defense":
-            return {"decisions": [
-                {"candidate_id": "c1", "verdict": "upheld", "rationale": "r"},
-            ]}, {"attempts": 1}
-        raise AssertionError(f"unexpected purpose {purpose!r}")
-
-    monkeypatch.setattr(court_module, "provider_call", _call)
-    config = {
-        "census_route": {}, "verification_route": {}, "defense_route": {},
-    }
-    proof, providers, _audit = court_module.run_court(packet, config)
-    assert state["census"] == 1
-    assert "census_pass2" in providers
-    assert proof["state"] == "verified_error"
-
-
-# --------------------------------------------------------------------------
-# anti-noise contract scoping: formatting tolerance must not swallow
-# exact-match tool-argument deviations (BFCL/025 class)
-# --------------------------------------------------------------------------
-
-
-def test_formatting_tolerance_is_scoped_to_prose_not_tool_arguments() -> None:
-    """'2.0000' vs '2.0' is a deviation when it is a tool ARGUMENT the task
-    requires exactly, but not in prose reports. All three stage contracts
-    must carry the scoped rule."""
-    assert "exact-match interfaces" in court_module.DEFENSE_SYSTEM
-    assert "exact-match semantics" in court_module.VERIFICATION_SYSTEM
-    assert "even " + "only in formatting" in court_module.VERIFICATION_SYSTEM
-    assert "even " + "only in formatting" in court_module.DEFENSE_SYSTEM
-    assert "matched EXACTLY" in court_module.CENSUS_SYSTEM
-    # The census must also compare later restatements against tool
-    # observations exactly (BFCL/025: observation '2.0' echoed as '2.0000').
-    assert "RESTATES a value" in court_module.CENSUS_SYSTEM
-    # The old blanket exemption is gone: the tolerance must be scoped to
-    # prose reports, never apply to tool arguments.
-    assert "are not deviations in PROSE" in court_module.VERIFICATION_SYSTEM
-    assert "in a REPORTED number" in court_module.DEFENSE_SYSTEM
-    # A tool observation restated in a later argument/report is
-    # authoritative (BFCL/025: observation '2.0' echoed as '2.0000').
-    assert "observation is the AUTHORITATIVE" in court_module.VERIFICATION_SYSTEM
-    assert "observation is the authoritative value" in court_module.DEFENSE_SYSTEM
-
-
-def test_observation_restatement_check_adds_deterministic_candidate() -> None:
-    """BFCL/025 class: observation '2.0' restated as '2.0000' must be
-    proposed mechanically even when the LLM census returns empty."""
-    history = [
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "logarithm",
-                            "arguments": {"value": 36, "base": 6, "precision": 4}}],
-            "tool_responses": ["{'result': mpf('2.0')}"],
-        },
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "echo",
-                            "arguments": {"content": "2.0000",
-                                          "file_name": "result.txt"}}],
-            "tool_responses": ["None"],
-        },
-        {
-            "role": "assistant", "content": "The result is: **2.0000**",
-        },
-    ]
-    packet = build_packet({"question": "log to 4 decimals", "history": history})
-    added = court_module._observation_restatement_check(packet, [])
-    assert len(added) == 1
-    candidate = added[0]
-    assert candidate["locus_event_id"] == "event_002_tool_01"
-    assert candidate["evidence_refs"] == ["event_001_tool_01"]
-    assert "'2.0'" in candidate["claim"] and "'2.0000'" in candidate["claim"]
-
-
-def test_observation_restatement_check_skips_exact_restatements() -> None:
-    """Identical string forms are not a deviation: no candidate added."""
-    history = [
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "wc",
-                            "arguments": {"file_name": "f", "mode": "c"}}],
-            "tool_responses": ['{"count": 36, "type": "characters"}'],
-        },
-        {
-            "role": "assistant", "content": "The count is 36 characters.",
-        },
-    ]
-    packet = build_packet({"question": "count", "history": history})
-    assert court_module._observation_restatement_check(packet, []) == []
-
-
-def test_observation_restatement_check_ignores_prose_and_noise() -> None:
-    """Prose restatements, leading-zero variants and same-interaction
-    pairs are not covered by the exact-match convention."""
-    # prose restatement: '2.0' -> content '2.0000' (no tool argument)
-    history = [
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "log",
-                            "arguments": {"value": 36}}],
-            "tool_responses": ["{'result': mpf('2.0')}"],
-        },
-        {"role": "assistant", "content": "The result is 2.0000."},
-    ]
-    packet = build_packet({"question": "log", "history": history})
-    assert court_module._observation_restatement_check(packet, []) == []
-    # leading-zero variant without decimal points: '01' -> '1'
-    history2 = [
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "list", "arguments": {}}],
-            "tool_responses": ["{'id': '01'}"],
-        },
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "use", "arguments": {"id": 1}}],
-            "tool_responses": ["None"],
-        },
-    ]
-    packet2 = build_packet({"question": "use", "history": history2})
-    assert court_module._observation_restatement_check(packet2, []) == []
-    # same-interaction pair: observation and argument in one tool call
-    history3 = [
-        {
-            "role": "assistant", "content": "",
-            "tool_calls": [{"name": "echo",
-                            "arguments": {"content": "5.5"}}],
-            "tool_responses": ["{'echoed': '5.50'}"],
-        },
-    ]
-    packet3 = build_packet({"question": "echo", "history": history3})
-    assert court_module._observation_restatement_check(packet3, []) == []
-
-
-def test_census_second_pass_contract_failure_keeps_clean_verdict(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    history = [
-        {"role": "assistant" if i % 2 == 0 else "user",
-         "content": f"message {i} " + ("y" * 1000)}
-        for i in range(1, 31)
-    ]
-    record = {"question": "second pass", "history": history}
-    packet = build_packet(record)
-
-    def _call(*, route, system, user, purpose, **_kwargs) -> tuple[dict, dict]:
-        if purpose == "census":
-            return {"candidates": []}, {"attempts": 1}
-        if purpose == "census_pass2":
-            # Contract violation in the advisory pass: the first pass's
-            # well-formed clean verdict must stand.
-            return {"candidates": "not-a-list"}, {"attempts": 1}
-        raise AssertionError(f"unexpected purpose {purpose!r}")
-
-    monkeypatch.setattr(court_module, "provider_call", _call)
-    config = {
-        "census_route": {}, "verification_route": {}, "defense_route": {},
-    }
-    proof, providers, _audit = court_module.run_court(packet, config)
-    assert "census_pass2" in providers
-    assert proof["runtime_valid"] is True
-    assert proof["state"] == "verified_clean"

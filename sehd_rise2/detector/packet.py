@@ -41,28 +41,30 @@ FORBIDDEN_PACKET_KEYS = EVALUATOR_ONLY_FIELDS | {
 _MAX_EVENT_CONTENT = 16000
 _MAX_TOOL_TEXT = 8000
 _MAX_QUESTION_CHARS = 4000
-_MAX_PACKET_CHARS = 96000
 
-# Two-phase evidence-access budgets.
-# Phase 1 (census): a complete event INDEX plus the chronological tail at
-# full detail. Every event is nameable (id/role/preview/length/tool lines),
-# and the tail carries the final answer — the most hallucination-relevant
-# part — so it is rendered at full detail first.
-INDEX_VIEW_CHARS = 48000
+# Evidence-access budgets. The census default is FULL fidelity: the
+# median full render is ~5.6K chars and 98% of cases stay under 100K, so
+# compression buys nothing on the overwhelming majority and silently
+# hides mid-trajectory content (the structural false-negative source).
+# Cases whose full render exceeds the census budget degrade to the
+# index+tail view — the degradation is recorded, never silent.
+CENSUS_VIEW_CHARS = 400_000
+CENSUS_EVENT_CHARS = 200_000
+CENSUS_TOOL_CHARS = 100_000
+# Degraded census fallback: complete event index plus the chronological
+# tail at full detail (the final answer stays visible even when the
+# middle collapses to previews).
+INDEX_VIEW_CHARS = 48_000
 INDEX_TAIL_EVENTS = 8
 INDEX_EVENT_PREVIEW = 300
 INDEX_TOOL_PREVIEW = 120
-# Phase 2 (verification/defense): ONLY the events cited by the candidates
-# (locus + evidence refs) plus their chronological neighbours, each at a
-# large per-event budget. A cited event that still cannot fit marks the
-# view truncated: the court fails closed on an incomplete evidence view.
-# The ceilings are RESOURCE budgets for full-fidelity evidence rendering,
-# not decision thresholds: the court stays fail-closed beyond them, and
-# only the rare cases that cite very large tool observations pay the
-# larger prompts.
+# Verification/defense: cited events (locus + evidence refs) plus
+# chronological neighbours, each at a large per-event budget. A cited
+# event that still cannot fit marks the view truncated: the court fails
+# closed on an incomplete evidence view.
 EVIDENCE_VIEW_CHARS = 400_000
 EVIDENCE_EVENT_CHARS = 200_000
-EVIDENCE_WINDOW = 1
+EVIDENCE_WINDOW = 2
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -289,16 +291,16 @@ def _fresh_view_meta() -> dict[str, Any]:
 
 
 def render_full_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    """Bounded full-detail render; returns (text, meta)."""
+    """Full-fidelity render at the census budgets; (text, meta)."""
     lines: list[str] = []
     meta = _fresh_view_meta()
     question = packet.get("question")
     if question:
         lines.append(f"QUESTION: {_truncate(question, _MAX_QUESTION_CHARS)}")
-    budget = _MAX_PACKET_CHARS
+    budget = CENSUS_VIEW_CHARS
     for event in packet.get("events") or []:
         chunk, truncated = _render_event(
-            event, event_cap=_MAX_EVENT_CONTENT, tool_cap=_MAX_TOOL_TEXT,
+            event, event_cap=CENSUS_EVENT_CHARS, tool_cap=CENSUS_TOOL_CHARS,
         )
         if len(chunk) > budget:
             lines.append(chunk[:budget] + "\n…[packet truncated]")
@@ -310,6 +312,23 @@ def render_full_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
             meta["truncated_event_ids"].append(event["event_id"])
         budget -= len(chunk)
     return "\n".join(lines), meta
+
+
+def render_census_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Census view: full fidelity, degrading to index+tail beyond budget.
+
+    The degradation is a recorded fact: ``meta["degraded"]`` with the full
+    render size, so downstream FN triage can tell "could not see" apart
+    from "saw and missed".
+    """
+    text, meta = render_full_view(packet)
+    if not meta["packet_truncated"]:
+        meta["degraded"] = False
+        return text, meta
+    degraded_text, degraded_meta = render_index_view(packet)
+    degraded_meta["degraded"] = True
+    degraded_meta["full_render_chars"] = len(text)
+    return degraded_text, degraded_meta
 
 
 def render_index_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:

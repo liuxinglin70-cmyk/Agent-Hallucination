@@ -43,14 +43,28 @@ class Detector:
         record: Mapping[str, Any],
         *,
         case_id: str = "case",
+        evolved_conventions: Mapping[str, Any] | None = None,
         genome: Mapping[str, Any] | None = None,
         policy_genome: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Detect one label-free trajectory and return the frozen envelope."""
+        """Detect one label-free trajectory and return the frozen envelope.
+
+        ``evolved_conventions`` is the deployed convention genome: its
+        route-matched dual-boundary entries enter all stage prompts.
+        """
         validate_record(record)
         packet = build_packet(record)
-        proof, providers, stage_audit = run_court(packet, self.config)
+        proof, providers, stage_audit = run_court(
+            packet, self.config,
+            evolved_conventions=list(
+                (evolved_conventions or {}).get("conventions") or []
+            ),
+        )
         provenance: dict[str, Any] = {}
+        if evolved_conventions is not None:
+            provenance["convention_genome_hash"] = (
+                evolved_conventions.get("content_hash") or ""
+            )
         if genome is not None:
             provenance["genome_hash"] = genome.get("content_hash") or ""
         if policy_genome is not None:
@@ -80,14 +94,15 @@ def detect(
     *,
     case_id: str = "case",
     config: Mapping[str, Any] | None = None,
+    evolved_conventions: Mapping[str, Any] | None = None,
     genome: Mapping[str, Any] | None = None,
     policy_genome: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Convenience entry: one detection with an explicit or default config."""
     detector = Detector(config) if config is not None else _default_detector()
     return detector.detect(
-        record, case_id=case_id, genome=genome,
-        policy_genome=policy_genome,
+        record, case_id=case_id, evolved_conventions=evolved_conventions,
+        genome=genome, policy_genome=policy_genome,
     )
 
 

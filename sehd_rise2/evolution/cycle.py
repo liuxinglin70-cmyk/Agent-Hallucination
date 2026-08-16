@@ -427,8 +427,18 @@ def run_cycle(
         )
         candidate_audit = adjudicate(tree, bindings, candidate_items)
         candidate_metrics = gate_metrics(tree, candidate_audit)
+        # Repository promotion gate (README): accuracy >= baseline,
+        # FP clearly reduced, FN increase <= 1, no must-survive
+        # violations. Against the CURRENT genome: the candidate must
+        # not lose a true positive the current genome keeps, must not
+        # add more than one false negative the baseline did not have,
+        # and must strictly improve FP or recover current TP losses.
+        new_fn_vs_baseline = (
+            candidate_metrics["fn"] - baseline_metrics["fn"]
+        )
         dominates = (
             not candidate_metrics["tp_lost"]
+            and new_fn_vs_baseline <= 1
             and (
                 candidate_metrics["fp"] < current_metrics["fp"]
                 or len(candidate_metrics["tp_lost"]) < len(
