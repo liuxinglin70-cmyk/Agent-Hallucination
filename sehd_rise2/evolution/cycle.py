@@ -5,22 +5,20 @@ One cycle consumes a batch of fresh evolution-pool detections:
     batch run tree + runtime bindings
         -> failure worksheet (this cycle's new wrongful convictions)
         -> policy proposals (provider, mechanically validated)
-        -> candidate genome (new / amend / retire applied)
+        -> candidate artifact registry (new / amend / retire applied)
         -> replay gate over the CUMULATIVE evidence (every tree seen
-           so far): the candidate must dominate the current genome —
+           so far): the candidate must dominate the current registry —
            zero true-positive losses overall AND a strict gain (either
            fewer wrongful convictions, or true positives recovered that
-           the current genome was already losing)
-        -> promotion writes genome_v{N+1} and appends the cycle record
+           the current registry was already losing)
+        -> promotion writes artifacts_v{N+1} and appends the cycle record
 
-Runtime policy semantics are class-keyed (certificate class -> action);
-the definition text documents the boundary for humans and for future
-binder calibration, it does not execute. So an executable change is
-arming, re-arming or disarming a class action, and the gate attributes
-every regression to the proposal that armed the offending class — or,
-when the CURRENT genome was already losing a true positive, treats the
-retire of the offending policy as the remedy and drops it only when it
-fails to cure the loss.
+Runtime policy semantics are class-keyed (certificate class -> action)
+and shared with the detector court (``detector.artifacts``); the gate
+attributes every regression to the proposal that armed the offending
+class — or, when the CURRENT registry was already losing a true positive,
+treats the retire of the offending policy as the remedy and drops it only
+when it fails to cure the loss.
 
 The policy layer can only withhold convictions, so gold-error misses
 are recorded per cycle as non-actionable context (L1/evidence surface).
@@ -35,19 +33,25 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from sehd_rise2.evolution.policy import POLICY_GENOME_SCHEMA
+from sehd_rise2.detector.artifacts import (
+    ARTIFACT_REGISTRY_SCHEMA,
+    POLICY_ACTIONS,
+    load_artifact_registry,
+    policy_actions_of,
+    registry_hash,
+    validate_registry,
+)
+from sehd_rise2.evolution.gates import load_calibration
 from sehd_rise2.evolution.proposal import (
     build_worksheet,
     generate_proposals,
-    load_genome_items,
 )
 from sehd_rise2.evolution.replay import (
-    class_actions,
+    baseline_matches_records,
     load_bindings,
     load_run_tree,
     replay_case,
@@ -56,7 +60,9 @@ from sehd_rise2.evolution.replay import (
 
 LIBRARY_SCHEMA = "sehd2.policy_library.v1"
 CYCLE_RESULT_SCHEMA = "sehd2.policy_cycle.v1"
-PHASE1_GENOME = Path("datasets/policy_candidates/v1/policy_genome.json")
+PHASE1_REGISTRY = Path(
+    "datasets/policy_candidates/v1/policy_artifacts.json",
+)
 PHASE1_BINDINGS = Path(
     "datasets/policy_candidates/v1/runtime_bindings.json",
 )
@@ -75,6 +81,11 @@ def _write_json(path: Path, payload: Any) -> None:
     )
 
 
+def load_registry_artifacts(path: Path) -> list[dict[str, Any]]:
+    """Load one persisted artifact registry; returns its artifact list."""
+    return load_artifact_registry(Path(path))["artifacts"]
+
+
 def load_library(library_dir: Path) -> dict[str, Any]:
     library = _read_json(Path(library_dir) / "library.json")
     if library.get("schema_version") != LIBRARY_SCHEMA:
@@ -82,9 +93,9 @@ def load_library(library_dir: Path) -> dict[str, Any]:
     return library
 
 
-def current_genome_path(library_dir: Path) -> Path:
+def current_registry_path(library_dir: Path) -> Path:
     library = load_library(library_dir)
-    return Path(library_dir) / library["genomes"][-1]["file"]
+    return Path(library_dir) / library["registries"][-1]["file"]
 
 
 def merge_trees(run_dirs: list[Path]) -> dict[str, dict[str, Any]]:
@@ -114,18 +125,10 @@ def merge_bindings(
 def adjudicate(
     run_tree: Mapping[str, Mapping[str, Any]],
     bindings: Mapping[tuple[str, str], Mapping[str, str]],
-    items: list[Mapping[str, Any]],
+    artifacts: list[Mapping[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    """Per-case replay audit under one genome's items ([] = baseline)."""
-    actions = class_actions([
-        {
-            "trigger": {
-                "certificate_class": item["target_certificate_class"],
-            },
-            "action": item["action"],
-        }
-        for item in items
-    ])
+    """Per-case replay audit under one registry's artifacts ([] = baseline)."""
+    actions = policy_actions_of(artifacts)
     return {
         case_id: replay_case(
             [
@@ -184,82 +187,98 @@ def gate_metrics(
 
 
 def apply_proposals(
-    items: list[Mapping[str, Any]],
+    artifacts: list[Mapping[str, Any]],
     proposals: list[Mapping[str, Any]],
     *,
     cycle: int,
     worksheet_path: str,
 ) -> list[dict[str, Any]]:
-    """Apply proposals to the genome items, returning a new item list."""
+    """Apply proposals to the registry, returning a new artifact list."""
     by_id = {
-        str(item["policy_id"]): dict(item) for item in items
+        str(artifact["artifact_id"]): dict(artifact)
+        for artifact in artifacts
     }
     for proposal in proposals:
-        policy_id = str(proposal["policy_id"])
+        artifact_id = str(proposal["policy_id"])
         kind = str(proposal["kind"])
         if kind == "retire":
-            del by_id[policy_id]
+            del by_id[artifact_id]
             continue
         trigger = proposal.get("trigger") or {}
+        hypothesis = proposal.get("hypothesis") or {}
+        boundary = proposal.get("risk_boundary") or {}
+        source_names = [
+            str(name) for name in hypothesis.get("source_gap_names") or []
+        ]
+        if not source_names:
+            raise ValueError(
+                f"proposal {artifact_id}: no source gap name — the gap "
+                "block cannot be derived"
+            )
+        certificate_class = str(proposal.get("target_certificate_class"))
+        action = str(proposal.get("action"))
         provenance = {
             "cycle": cycle,
             "worksheet": worksheet_path,
             "failure_cases": sorted({
                 str(entry.get("case_id"))
-                for entry in (
-                    proposal.get("hypothesis") or {}
-                ).get("case_evidence") or []
+                for entry in hypothesis.get("case_evidence") or []
                 if isinstance(entry, Mapping)
             }),
         }
-        item = {
-            "policy_id": policy_id,
+        artifact = {
+            "artifact_id": artifact_id,
             "version": (
                 "v1" if kind == "new" else _bump(
-                    by_id[policy_id].get("version", "v1"),
+                    by_id[artifact_id].get("version", "v1"),
                 )
             ),
-            "target_certificate_class": str(
-                proposal.get("target_certificate_class"),
-            ),
-            "precondition": str(trigger.get("definition") or ""),
-            "exclusions": list(trigger.get("must_not_match") or []),
-            "action": str(proposal.get("action")),
-            "risk_boundary": {
-                "statement": str(
-                    (proposal.get("risk_boundary") or {}).get("statement")
-                    or "",
+            "kind": "adjudication_policy",
+            "execution_point": "adjudication",
+            "gap": {
+                "category": "policy",
+                "name": source_names[0],
+                "gap_type": "precision",
+                "failure_signature": str(
+                    hypothesis.get("statement") or ""
                 ),
+                "affected_stage": "adjudication",
+                "expected_capability": POLICY_ACTIONS[action],
+            },
+            "trigger": {"certificate_class": certificate_class},
+            "intervention": {
+                "action": action,
+                "exclusions": list(trigger.get("must_not_match") or []),
+            },
+            "capability_delta": {
+                "before_capability": (
+                    f"a surviving {certificate_class} certificate convicts "
+                    "like any other"
+                ),
+                "after_capability": (
+                    f"a surviving {certificate_class} certificate "
+                    f"{POLICY_ACTIONS[action]}"
+                ),
+            },
+            "risk_boundary": {
+                "statement": str(boundary.get("statement") or ""),
                 "do_not_apply": list(
-                    (proposal.get("risk_boundary") or {}).get(
-                        "do_not_apply",
-                    ) or [],
+                    boundary.get("do_not_apply") or []
                 ),
             },
             "provenance": provenance,
         }
         if kind == "amend":
-            item["provenance"] = {
-                "amends": dict(by_id[policy_id].get("provenance") or {}),
+            artifact["provenance"] = {
+                "amends": dict(by_id[artifact_id].get("provenance") or {}),
                 **provenance,
             }
-        by_id[policy_id] = item
+        by_id[artifact_id] = artifact
     return [by_id[key] for key in sorted(by_id)]
 
 
 def _bump(version: str) -> str:
     return f"v{int(version[1:]) + 1}"
-
-
-def genome_hash(payload: Mapping[str, Any]) -> str:
-    hashable = {
-        key: value for key, value in payload.items()
-        if key != "content_hash"
-    }
-    canonical = json.dumps(
-        hashable, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def fired_classes(
@@ -274,7 +293,7 @@ def fired_classes(
 def _culprit(
     *,
     survivors: list[Mapping[str, Any]],
-    items: list[Mapping[str, Any]],
+    artifacts: list[Mapping[str, Any]],
     lost_case: str,
     candidate_audit: Mapping[str, Mapping[str, Any]],
     current_audit: Mapping[str, Mapping[str, Any]],
@@ -282,8 +301,8 @@ def _culprit(
     """The first survivor responsible for one true-positive loss.
 
     A new/amend proposal arming a class that fired on the lost case
-    under the candidate is the culprit when the current genome was not
-    already losing the case. When the current genome WAS already losing
+    under the candidate is the culprit when the current registry was not
+    already losing the case. When the current registry WAS already losing
     it, the intended remedy is the retire of the policy whose class
     fired — dropping that retire (or any other survivor that re-arms a
     firing class) is the only consistent move.
@@ -292,29 +311,31 @@ def _culprit(
     current_loses = (
         current_audit[lost_case]["state"] != "verified_error"
     )
-    class_of_policy = {
-        str(item["policy_id"]): str(item["target_certificate_class"])
-        for item in items
+    class_of_artifact = {
+        str(artifact["artifact_id"]): str(
+            artifact["trigger"]["certificate_class"]
+        )
+        for artifact in artifacts
     }
     for proposal in survivors:
-        policy_id = str(proposal["policy_id"])
+        artifact_id = str(proposal["policy_id"])
         kind = str(proposal["kind"])
         if kind == "retire":
-            if current_loses and class_of_policy.get(
-                policy_id,
+            if current_loses and class_of_artifact.get(
+                artifact_id,
             ) in candidate_classes:
-                return policy_id
+                return artifact_id
             continue
         if str(
             proposal.get("target_certificate_class"),
         ) in candidate_classes and not current_loses:
-            return policy_id
+            return artifact_id
     return None
 
 
 def _idle(
     survivors: list[Mapping[str, Any]],
-    items: list[Mapping[str, Any]],
+    artifacts: list[Mapping[str, Any]],
     current_audit: Mapping[str, Mapping[str, Any]],
     current: Mapping[str, Any],
     candidate: Mapping[str, Any],
@@ -322,8 +343,8 @@ def _idle(
     """Survivors that earn nothing on the cumulative evidence.
 
     A new/amend proposal earns its slot by fixing at least one
-    wrongful conviction the current genome does not fix; a retire
-    earns its slot by recovering a true positive the current genome
+    wrongful conviction the current registry does not fix; a retire
+    earns its slot by recovering a true positive the current registry
     was losing (the recovered case fired the retired policy's class).
     """
     fixed_by_class: dict[str, set[str]] = {}
@@ -338,25 +359,27 @@ def _idle(
                     certificate_class, set(),
                 ).add(case_id)
     recovered = set(current["tp_lost"]) - set(candidate["tp_lost"])
-    class_of_policy = {
-        str(item["policy_id"]): str(item["target_certificate_class"])
-        for item in items
+    class_of_artifact = {
+        str(artifact["artifact_id"]): str(
+            artifact["trigger"]["certificate_class"]
+        )
+        for artifact in artifacts
     }
     idle: set[str] = set()
     for proposal in survivors:
-        policy_id = str(proposal["policy_id"])
+        artifact_id = str(proposal["policy_id"])
         if str(proposal["kind"]) == "retire":
-            armed = class_of_policy.get(policy_id)
+            armed = class_of_artifact.get(artifact_id)
             earned = any(
                 armed in fired_classes(current_audit, case_id)
                 for case_id in recovered
             )
             if not earned:
-                idle.add(policy_id)
+                idle.add(artifact_id)
             continue
         target = str(proposal.get("target_certificate_class"))
         if not fixed_by_class.get(target):
-            idle.add(policy_id)
+            idle.add(artifact_id)
     return idle
 
 
@@ -367,11 +390,16 @@ def run_cycle(
     batch_bindings: Path,
     prior_runs: list[Path],
     prior_bindings: list[Path],
+    calibration: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    calibration = dict(
+        calibration if calibration is not None else load_calibration()
+    )
+    gate_limits = dict(calibration["policy_cycle"])
     library = load_library(library_dir)
     cycle = len(library["cycles"]) + 1
-    genome_path = current_genome_path(library_dir)
-    items = load_genome_items(genome_path)
+    registry_path = current_registry_path(library_dir)
+    artifacts = load_registry_artifacts(registry_path)
 
     run_dirs = [Path(PHASE1_RUN), *prior_runs, Path(batch_run)]
     binding_files = [
@@ -379,13 +407,32 @@ def run_cycle(
     ]
     tree = merge_trees(run_dirs)
     bindings = merge_bindings(binding_files)
+    # Fail closed before any provider call: an incompletely bound tree
+    # silently degrades the worksheet's class evidence and would only
+    # crash at replay time.
+    unbound = sorted(
+        f"{case_id}/{candidate_id}"
+        for case_id, entry in tree.items()
+        for candidate_id in surviving_ids(entry["result"])
+        if (case_id, candidate_id) not in bindings
+    )
+    if unbound:
+        raise ValueError(
+            f"bindings do not cover {len(unbound)} surviving "
+            f"certificates (first: {', '.join(unbound[:5])})"
+        )
+    if not baseline_matches_records(tree):
+        raise ValueError(
+            "recorded states do not reproduce under the no-policy "
+            "replay — the tree cannot ground a cycle"
+        )
     batch_tree = load_run_tree(Path(batch_run))
     batch_only, _ = load_bindings(Path(batch_bindings))
 
     worksheet = build_worksheet(
         run_tree=batch_tree,
         bindings=batch_only,
-        genome_items=items,
+        genome_artifacts=artifacts,
         source=f"cycle {cycle} batch {batch_run}",
     )
     worksheet_path = (
@@ -394,7 +441,7 @@ def run_cycle(
     _write_json(worksheet_path, worksheet)
 
     accepted, meta = generate_proposals(
-        worksheet=worksheet, genome_path=genome_path,
+        worksheet=worksheet, registry_path=registry_path,
     )
     proposals_path = (
         Path(library_dir) / "cycles" / f"c{cycle}_proposals.json"
@@ -407,7 +454,7 @@ def run_cycle(
     })
 
     baseline_metrics = gate_metrics(tree, adjudicate(tree, bindings, []))
-    current_audit = adjudicate(tree, bindings, items)
+    current_audit = adjudicate(tree, bindings, artifacts)
     current_metrics = gate_metrics(tree, current_audit)
 
     survivors = list(accepted)
@@ -421,24 +468,29 @@ def run_cycle(
         "prior_runs": prior_runs, "prior_bindings": prior_bindings,
     }
     while survivors:
-        candidate_items = apply_proposals(
-            items, survivors, cycle=cycle,
+        candidate_artifacts = apply_proposals(
+            artifacts, survivors, cycle=cycle,
             worksheet_path=str(worksheet_path),
         )
-        candidate_audit = adjudicate(tree, bindings, candidate_items)
+        candidate_audit = adjudicate(tree, bindings, candidate_artifacts)
         candidate_metrics = gate_metrics(tree, candidate_audit)
         # Repository promotion gate (README): accuracy >= baseline,
-        # FP clearly reduced, FN increase <= 1, no must-survive
-        # violations. Against the CURRENT genome: the candidate must
-        # not lose a true positive the current genome keeps, must not
-        # add more than one false negative the baseline did not have,
-        # and must strictly improve FP or recover current TP losses.
+        # FP clearly reduced, FN increase within the calibrated
+        # tolerance, no must-survive violations. Against the CURRENT
+        # registry: the candidate must not lose a true positive the
+        # current registry keeps beyond the calibrated tolerance, must
+        # not add more false negatives than the baseline tolerance, and
+        # must strictly improve FP or recover current TP losses. The
+        # tolerances come from the gate calibration (noise-floor
+        # referenced, never from the frozen verification split).
         new_fn_vs_baseline = (
             candidate_metrics["fn"] - baseline_metrics["fn"]
         )
         dominates = (
-            not candidate_metrics["tp_lost"]
-            and new_fn_vs_baseline <= 1
+            len(candidate_metrics["tp_lost"])
+            <= gate_limits["max_tp_lost"]
+            and new_fn_vs_baseline
+            <= gate_limits["max_added_fn_vs_baseline"]
             and (
                 candidate_metrics["fp"] < current_metrics["fp"]
                 or len(candidate_metrics["tp_lost"]) < len(
@@ -450,7 +502,7 @@ def run_cycle(
             if candidate_metrics["tp_lost"]:
                 lost = candidate_metrics["tp_lost"][0]
                 culprit = _culprit(
-                    survivors=survivors, items=items,
+                    survivors=survivors, artifacts=artifacts,
                     lost_case=lost,
                     candidate_audit=candidate_audit,
                     current_audit=current_audit,
@@ -463,7 +515,7 @@ def run_cycle(
                 )
             else:
                 culprit = None
-                reason = "no strict improvement over the current genome"
+                reason = "no strict improvement over the current registry"
             if culprit is None:
                 dropped.append({
                     "policy_id": "<batch>", "reason": reason,
@@ -477,14 +529,13 @@ def run_cycle(
             dropped.append({"policy_id": culprit, "reason": reason})
             continue
         idle = _idle(
-            survivors, items, current_audit,
+            survivors, artifacts, current_audit,
             current_metrics, candidate_metrics,
         )
         if idle:
             for policy_id in sorted(idle):
                 dropped.append({
-                    "policy_id": policy_id,
-                    "reason": (
+                    "policy_id": policy_id, "reason": (
                         "no attributed fix on the cumulative evidence"
                     ),
                 })
@@ -495,7 +546,7 @@ def run_cycle(
             continue
         return _promote(
             candidate_metrics=candidate_metrics,
-            candidate_items=candidate_items,
+            candidate_artifacts=candidate_artifacts,
             survivors=survivors,
             dropped=dropped,
             **context,
@@ -547,7 +598,7 @@ def _metric_view(metrics: Mapping[str, Any]) -> dict[str, Any]:
 def _promote(
     *, library: dict[str, Any], library_dir: Path, cycle: int,
     candidate_metrics: Mapping[str, Any],
-    candidate_items: list[Mapping[str, Any]],
+    candidate_artifacts: list[Mapping[str, Any]],
     survivors: list[Mapping[str, Any]],
     dropped: list[dict[str, str]], meta: Mapping[str, Any],
     worksheet: Mapping[str, Any], baseline: Mapping[str, Any],
@@ -555,17 +606,17 @@ def _promote(
     batch_bindings: Path, prior_runs: list[Path],
     prior_bindings: list[Path],
 ) -> dict[str, Any]:
-    genome = {
-        "schema_version": POLICY_GENOME_SCHEMA,
-        "items": [dict(item) for item in candidate_items],
+    registry = {
+        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
+        "artifacts": [dict(artifact) for artifact in candidate_artifacts],
     }
-    genome["content_hash"] = genome_hash(genome)
-    version = len(library["genomes"]) + 1
-    genome_file = f"genomes/genome_v{version}.json"
-    _write_json(library_dir / genome_file, genome)
+    registry["content_hash"] = registry_hash(registry)
+    version = len(library["registries"]) + 1
+    registry_file = f"artifacts/registry_v{version}.json"
+    _write_json(library_dir / registry_file, registry)
 
     result = _outcome_record(
-        cycle=cycle, outcome=f"promoted {genome_file}", meta=meta,
+        cycle=cycle, outcome=f"promoted {registry_file}", meta=meta,
         worksheet=worksheet,
         survivors=[str(proposal["policy_id"]) for proposal in survivors],
         dropped=dropped,
@@ -580,16 +631,20 @@ def _promote(
         batch_run=batch_run, batch_bindings=batch_bindings,
         prior_runs=prior_runs, prior_bindings=prior_bindings,
     )
-    result["genome"] = {
-        "file": genome_file,
-        "content_hash": genome["content_hash"],
-        "policy_ids": [item["policy_id"] for item in candidate_items],
+    result["registry"] = {
+        "file": registry_file,
+        "content_hash": registry["content_hash"],
+        "artifact_ids": [
+            artifact["artifact_id"] for artifact in candidate_artifacts
+        ],
     }
     _write_json(
         library_dir / "cycles" / f"c{cycle}_result.json", result,
     )
 
-    active = {str(item["policy_id"]) for item in candidate_items}
+    active = {
+        str(artifact["artifact_id"]) for artifact in candidate_artifacts
+    }
     for policy_id, facts in library["policies"].items():
         facts["status"] = (
             "active" if policy_id in active else "retired"
@@ -614,11 +669,11 @@ def _promote(
         "prior_runs": [str(path) for path in prior_runs],
         "prior_bindings": [str(path) for path in prior_bindings],
         "survivors": result["survivors"], "dropped": dropped,
-        "genome": result["genome"],
+        "registry": result["registry"],
     })
-    library["genomes"].append({
-        "file": genome_file,
-        "content_hash": genome["content_hash"],
+    library["registries"].append({
+        "file": registry_file,
+        "content_hash": registry["content_hash"],
         "cycle": cycle,
         "origin": f"cycle {cycle} promotion",
     })
@@ -654,35 +709,36 @@ def _no_change(
         "prior_runs": [str(path) for path in prior_runs],
         "prior_bindings": [str(path) for path in prior_bindings],
         "survivors": [], "dropped": dropped,
-        "genome": library["genomes"][-1],
+        "registry": library["registries"][-1],
     })
     _write_json(library_dir / "library.json", library)
     return result
 
 
 def init_library(library_dir: Path) -> dict[str, Any]:
-    """Seed the library from the frozen Phase 1 genome."""
-    genome = _read_json(PHASE1_GENOME)
+    """Seed the library from the frozen Phase 1 artifact registry."""
+    registry = _read_json(PHASE1_REGISTRY)
+    validate_registry(registry)
     library_dir = Path(library_dir)
-    _write_json(library_dir / "genomes" / "genome_v1.json", genome)
+    _write_json(library_dir / "artifacts" / "registry_v1.json", registry)
     library = {
         "schema_version": LIBRARY_SCHEMA,
-        "genomes": [{
-            "file": "genomes/genome_v1.json",
-            "content_hash": genome["content_hash"],
+        "registries": [{
+            "file": "artifacts/registry_v1.json",
+            "content_hash": registry["content_hash"],
             "cycle": 0,
-            "origin": "phase 1-C.5 frozen genome (P2-P5)",
+            "origin": "phase 1-C.5 frozen registry (P2-P5)",
         }],
         "policies": {
-            str(item["policy_id"]): {
+            str(artifact["artifact_id"]): {
                 "status": "active",
                 "born_cycle": 0,
                 "events": [{
                     "cycle": 0, "event": "seeded",
-                    "origin": "phase 1-C.5 frozen genome",
+                    "origin": "phase 1-C.5 frozen registry",
                 }],
             }
-            for item in genome["items"]
+            for artifact in registry["artifacts"]
         },
         "prior_evidence": {
             "runs": [str(PHASE1_RUN)],
@@ -697,7 +753,7 @@ def init_library(library_dir: Path) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    init_parser = sub.add_parser("init", help="seed from the frozen genome")
+    init_parser = sub.add_parser("init", help="seed from the frozen registry")
     init_parser.add_argument("--library", type=Path, required=True)
     run_parser = sub.add_parser("run", help="execute one evolution cycle")
     run_parser.add_argument("--library", type=Path, required=True)

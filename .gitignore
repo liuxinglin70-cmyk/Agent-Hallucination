@@ -30,6 +30,8 @@ datasets/**/*.jsonl
 !datasets/policy_candidates/v1/**
 !datasets/eval_splits/**
 !datasets/policy_library/**
+!datasets/convention_library/**
+!datasets/calibration/**
 
 # Python
 __pycache__/

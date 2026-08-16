@@ -9,11 +9,13 @@ A candidate policy adjusts the INTERPRETATION of adjudication evidence —
 which certificates may convict, and under what corroboration. It never
 produces a verdict of its own, never edits evidence, and never patches a
 single case: a trigger is a certificate class from the closed vocabulary
-below, and every policy must be supported by at least two failure cases.
+in ``detector.artifacts``, and every policy must be supported by at least
+two failure cases.
 
 Vocabulary governance mirrors the frozen gap taxonomy: the classes and
-actions are code constants (single source of truth); extending them is a
-code review backed by dataset evidence, never a runtime proposal.
+actions are code constants (single source of truth, detector-owned);
+extending them is a code review backed by dataset evidence, never a
+runtime proposal.
 
 CLI:
 
@@ -24,140 +26,32 @@ CLI:
         --file datasets/policy_candidates/v1/policy_candidates.json \
         --cases datasets/learning_cases/v1/cases \
         --out datasets/policy_candidates/v1/REPORT.md
+    python -m sehd_rise2.evolution.policy artifacts \
+        --file datasets/policy_candidates/v1/policy_candidates.json \
+        --out datasets/policy_candidates/v1/policy_artifacts.json
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
+from sehd_rise2.detector.artifacts import (
+    ARTIFACT_REGISTRY_SCHEMA,
+    CERTIFICATE_CLASSES,
+    POLICY_ACTIONS,
+    registry_hash,
+)
 from sehd_rise2.evolution.gap_taxonomy import GAP_CATEGORIES
 
 POLICY_CANDIDATES_SCHEMA = "sehd2.policy_candidates.v1"
 
-# Conviction-basis typing of a surviving certificate, Phase 1-C.5
-# discriminative form: every definition is a boundary, not a description —
-# ``CONVICTS WHEN`` is the test the certificate must pass, ``NOT WHEN``
-# redirects the confusable neighbour. ``content_contradiction`` is the
-# baseline residual: it carries no policy and binds only after every
-# specific class has failed its test; the declaration order mirrors
-# that procedure.
-CERTIFICATE_CLASSES: dict[str, str] = {
-    "requirement_compliance": (
-        "CONVICTS WHEN the certificate's complaint is the violation of "
-        "an instruction about HOW to work — which channel or source to "
-        "use, output form or format, internal procedure or tool-prompt "
-        "composition, effort-scope or plan content, answer-quality "
-        "preference — and the violation is the channel, procedure or "
-        "quality itself: no wrong, fabricated or missing content is "
-        "asserted (asking the human instead of the required source, "
-        "offloading the solving to the user, answering below the "
-        "preferred identification under partial retrieval are "
-        "archetypes). NOT WHEN the certificate names content the agent "
-        "got wrong or omitted: a wrong tool argument, fabricated "
-        "placeholder inputs, a redundant or unnecessary action, an "
-        "unanswered user question, a wrong derived value or conclusion "
-        "convicts as content_contradiction even though the phrasing "
-        "reads like a procedure complaint ('instead of ...', 'failed "
-        "to ...')"
-    ),
-    "delivery_form": (
-        "CONVICTS WHEN the session was closed (or the answer withheld "
-        "from the expected channel) after the content was already "
-        "extracted; carries NO policy — the abstain class recorded as "
-        "non-separable under the current evidence representation "
-        "(gold labels diverge on certificate-level-identical evidence). "
-        "NOT WHEN the certificate asserts any defect in the content "
-        "itself beyond non-delivery (the defect's own class binds)"
-    ),
-    "presentational_addition": (
-        "CONVICTS WHEN the convicted material is interpretive or "
-        "presentational layering over specifics the cited observations "
-        "already contain — evaluative qualifiers, code-to-name or "
-        "unit-and-format renderings of an observed figure, prose "
-        "expansion of an observed list — introducing no new "
-        "independently checkable specific. NOT WHEN the added material "
-        "asserts a specific the observations do not contain and that is "
-        "not a conventional rendering of one they do (fabrication → "
-        "content_contradiction)"
-    ),
-    "expression_variance": (
-        "CONVICTS WHEN a prose restatement differs from its cited source "
-        "only in wording, formatting, rounding or near-tie directionality "
-        "— a direction flip inside the source's own precision — "
-        "preserving the referent, the operative meaning and the claimed "
-        "precision (no more significant digits than the source gave), "
-        "outside tool arguments. NOT WHEN the restatement changes what "
-        "is claimed beyond rounding granularity or near-tie tolerance, "
-        "changes the referent or instruction content, or restates an "
-        "observed value with more significant digits than the source "
-        "gave — asserted precision the source did not make is a "
-        "content claim (content_contradiction)"
-    ),
-    "premise_conflict": (
-        "CONVICTS WHEN the convicted specific is inherited from premises "
-        "the task text or user statements establish — the agent "
-        "restated, applied or followed a premise rather than authoring "
-        "the specific; quote the premise sentence as the basis — and "
-        "the certificate's whole authority is outside knowledge, with "
-        "no cited observation contradicting the content (a user "
-        "message or the task text is a premise, not an observation). "
-        "NOT WHEN the agent authored the deviating specific: its own "
-        "computed value, conclusion, classification, endorsement or "
-        "claim, even one convicted by outside calculation, is "
-        "content_contradiction"
-    ),
-    "absence_based": (
-        "CONVICTS WHEN the certificate convicts a summary or "
-        "process-narration claim because one cited slice lacks the "
-        "material while no cited slice contradicts it and the material "
-        "is grounded elsewhere in the trajectory. NOT WHEN some cited "
-        "slice positively contradicts the claim (content_contradiction)"
-    ),
-    "content_contradiction": (
-        "the residual baseline class, carries no policy and binds only "
-        "after every specific class has failed its test. CONVICTS WHEN "
-        "the certificate asserts the agent authored or performed a "
-        "wrong, fabricated, redundant or missing checkable specific — "
-        "a wrong value, argument, entity, quantity, result, "
-        "classification or self-assessment, fabricated inputs or "
-        "outputs, a missing required answer, or an instruction "
-        "violation with a factual consequence — where the deviation "
-        "is in WHAT the agent asserted or delivered, not merely in "
-        "which channel, procedure or effort level it used. NOT WHEN "
-        "the defect is a channel, procedure or quality violation with "
-        "no wrong content named (requirement_compliance), only "
-        "interpretive or presentational layering over observed "
-        "specifics (presentational_addition), only wording, formatting "
-        "or near-tie restatement (expression_variance), only one "
-        "slice's silence while the material is grounded elsewhere "
-        "(absence_based), premise-inherited content convicted only by "
-        "outside knowledge (premise_conflict), or non-delivery through "
-        "the expected channel (delivery_form)"
-    ),
-}
-
-POLICY_ACTIONS: dict[str, str] = {
-    "withhold_conviction": (
-        "a matching surviving certificate cannot convict"
-    ),
-    "require_corroborating_content_error": (
-        "a matching certificate cannot be the sole conviction basis; a "
-        "surviving content_contradiction certificate on the same case "
-        "still convicts"
-    ),
-}
-
 POLICY_STATUSES = frozenset({"candidate", "replayed", "promoted", "rejected"})
 
 FINDING_STATUSES = frozenset({"non_separable_under_current_representation"})
-
-POLICY_GENOME_SCHEMA = "sehd2.policy_genome.v1"
-POLICY_ITEM_VERSION = "v1"
 
 POLICY_GAP_CATEGORY = "policy"
 CASE_ID_IN_TEXT = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*/\d+\.json\b")
@@ -402,34 +296,19 @@ def validate_policy_set(
     }
 
 
-def _genome_hash(payload: Mapping[str, Any]) -> str:
-    """Canonical sha256, mirroring ``detector.skills.load_genome_payload``.
-
-    Same canonicalization (sorted keys, compact separators, utf-8 text)
-    so a genome built here loads through the detector's fail-closed
-    reader without any adapter.
-    """
-    hashable = {
-        key: value for key, value in payload.items()
-        if key != "content_hash"
-    }
-    canonical = json.dumps(
-        hashable, ensure_ascii=False, sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def build_policy_genome(
+def build_policy_artifacts(
     payload: Mapping[str, Any], include_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Freeze the replay-gated policies into the deployable genome.
+    """Freeze the replay-gated policies into the deployable artifact registry.
 
-    The genome is the runtime contract: one item per policy with the
-    closed action vocabulary — no verdict rewriting, no free-form
-    rules. ``include_ids`` selects the promotion candidate subset
-    (default: every policy that passed the oracle replay gate, i.e.
-    status ``replayed``).
+    Each policy becomes one adjudication_policy artifact: trigger = its
+    certificate class, intervention = the closed action. The gap and
+    capability_delta blocks are derived mechanically from the candidate
+    fields — category policy, direction precision, stage adjudication —
+    and the loader rejects anything less, so the capability contract is
+    part of the deployment, not an afterthought. ``include_ids`` selects
+    the promotion candidate subset (default: every policy that passed
+    the oracle replay gate, i.e. status ``replayed``).
     """
     policies = _policies(payload)
     if include_ids is None:
@@ -445,20 +324,51 @@ def build_policy_genome(
         if unknown:
             raise ValueError(f"unknown policy ids: {unknown}")
         selected = [by_id[pid] for pid in include_ids]
-    items = []
+    artifacts = []
     for policy in selected:
         trigger = policy.get("trigger") or {}
         boundary = policy.get("risk_boundary") or {}
         hypothesis = policy.get("hypothesis") or {}
-        items.append({
-            "policy_id": str(policy.get("policy_id")),
-            "version": POLICY_ITEM_VERSION,
-            "target_certificate_class": str(
-                trigger.get("certificate_class")
-            ),
-            "precondition": str(trigger.get("definition") or ""),
-            "exclusions": list(trigger.get("must_not_match") or []),
-            "action": str(policy.get("action")),
+        source_names = [
+            str(name) for name in hypothesis.get("source_gap_names") or []
+        ]
+        if not source_names:
+            raise ValueError(
+                f"policy {policy.get('policy_id')}: no source gap name — "
+                "the gap block cannot be derived"
+            )
+        certificate_class = str(trigger.get("certificate_class"))
+        action = str(policy.get("action"))
+        artifacts.append({
+            "artifact_id": str(policy.get("policy_id")),
+            "version": "v1",
+            "kind": "adjudication_policy",
+            "execution_point": "adjudication",
+            "gap": {
+                "category": POLICY_GAP_CATEGORY,
+                "name": source_names[0],
+                "gap_type": "precision",
+                "failure_signature": str(
+                    hypothesis.get("statement") or ""
+                ),
+                "affected_stage": "adjudication",
+                "expected_capability": POLICY_ACTIONS[action],
+            },
+            "trigger": {"certificate_class": certificate_class},
+            "intervention": {
+                "action": action,
+                "exclusions": list(trigger.get("must_not_match") or []),
+            },
+            "capability_delta": {
+                "before_capability": (
+                    f"a surviving {certificate_class} certificate convicts "
+                    "like any other"
+                ),
+                "after_capability": (
+                    f"a surviving {certificate_class} certificate "
+                    f"{POLICY_ACTIONS[action]}"
+                ),
+            },
             "risk_boundary": {
                 "statement": str(boundary.get("statement") or ""),
                 "do_not_apply": list(
@@ -467,9 +377,7 @@ def build_policy_genome(
             },
             "provenance": {
                 "derived_from": dict(payload.get("derived_from") or {}),
-                "source_gap_names": list(
-                    hypothesis.get("source_gap_names") or []
-                ),
+                "source_gap_names": source_names,
                 "failure_cases": sorted({
                     str(entry.get("case_id"))
                     for entry in hypothesis.get("case_evidence") or []
@@ -478,12 +386,12 @@ def build_policy_genome(
                 "candidate_set_status": str(payload.get("review_status")),
             },
         })
-    genome: dict[str, Any] = {
-        "schema_version": POLICY_GENOME_SCHEMA,
-        "items": items,
+    registry: dict[str, Any] = {
+        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
+        "artifacts": artifacts,
     }
-    genome["content_hash"] = _genome_hash(genome)
-    return genome
+    registry["content_hash"] = registry_hash(registry)
+    return registry
 
 
 def build_report(
@@ -575,33 +483,36 @@ def main() -> int:
     report_parser.add_argument("--file", type=Path, required=True)
     report_parser.add_argument("--cases", type=Path, required=True)
     report_parser.add_argument("--out", type=Path, required=True)
-    genome_parser = sub.add_parser(
-        "genome", help="freeze replay-gated policies into a policy genome",
+    artifacts_parser = sub.add_parser(
+        "artifacts",
+        help="freeze replay-gated policies into an artifact registry",
     )
-    genome_parser.add_argument("--file", type=Path, required=True)
-    genome_parser.add_argument(
+    artifacts_parser.add_argument("--file", type=Path, required=True)
+    artifacts_parser.add_argument(
         "--include", default=None,
         help="comma-separated policy ids (default: all status=replayed)",
     )
-    genome_parser.add_argument("--out", type=Path, required=True)
+    artifacts_parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    if args.command == "genome":
+    if args.command == "artifacts":
         payload = json.loads(args.file.read_text(encoding="utf-8"))
         include = (
             [item.strip() for item in args.include.split(",")]
             if args.include else None
         )
-        genome = build_policy_genome(payload, include)
+        registry = build_policy_artifacts(payload, include)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(
-            json.dumps(genome, ensure_ascii=False, indent=2) + "\n",
+            json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        ids = [item["policy_id"] for item in genome["items"]]
+        ids = [
+            item["artifact_id"] for item in registry["artifacts"]
+        ]
         print(
-            f"genome written -> {args.out} "
-            f"({len(ids)} items: {', '.join(ids)}; "
-            f"hash {genome['content_hash'][:12]}...)"
+            f"artifact registry written -> {args.out} "
+            f"({len(ids)} artifacts: {', '.join(ids)}; "
+            f"hash {registry['content_hash'][:12]}...)"
         )
         return 0
     payload = json.loads(args.file.read_text(encoding="utf-8"))

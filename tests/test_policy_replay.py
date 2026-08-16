@@ -129,6 +129,29 @@ def test_corroboration_removes_sole_basis():
     ] == "sole_basis_removed"
 
 
+def test_unclassified_fellow_makes_corroboration_unverifiable():
+    # Runtime parity: the court maps an abstained (unclassified) binder
+    # record to an UNBOUND certificate, and an unbound fellow survivor
+    # makes the corroboration premise unverifiable — the conviction
+    # STANDS. The offline replay must convict identically.
+    outcome = replay_case(
+        ["requirement_compliance", "unclassified"],
+        {"requirement_compliance":
+         "require_corroborating_content_error"},
+    )
+    assert outcome["state"] == "verified_error"
+    assert outcome["policy_evaluation"]["skipped"][0][
+        "effect"
+    ] == "corroboration_unverifiable"
+
+
+def test_unclassified_certificate_keeps_baseline_conviction():
+    outcome = replay_case(
+        ["unclassified"], {"presentational_addition": "withhold_conviction"},
+    )
+    assert outcome["state"] == "verified_error"
+
+
 def test_inactive_class_passes_through():
     outcome = replay_case(["presentational_addition"], {})
     assert outcome["state"] == "verified_error"

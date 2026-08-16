@@ -154,6 +154,7 @@ def _routes(audit: Mapping[str, Any]) -> dict[str, str]:
 def build_learning_case(
     *, case_id: str, run_entry: Mapping[str, Any],
     dataset_root: Path, annotation: Mapping[str, Any] | None,
+    run_id: str,
 ) -> dict[str, Any]:
     result = run_entry["result"]
     audit = run_entry["audit"]
@@ -215,7 +216,7 @@ def build_learning_case(
         "schema_version": LEARNING_CASE_SCHEMA,
         "case_id": case_id,
         "source": {
-            "run_id": audit.get("run_id") or "",
+            "run_id": run_id,
             "dataset": str(dataset_root),
             "family": case_id.split("/", 1)[0],
             "question_domain": raw.get("question_domain"),
@@ -247,10 +248,6 @@ def build_learning_case(
             "defense": {"decisions": proof.get("defense_decisions") or {}},
             "decisive_facts": decisive,
             "evidence_coverage": stage_audit.get("evidence_coverage") or {},
-            "census_second_pass": stage_audit.get("census_second_pass"),
-            "census_deterministic_augment": stage_audit.get(
-                "census_deterministic_augment"
-            ),
             "routes": _routes(audit),
         },
         "failure_analysis": analysis,
@@ -285,6 +282,7 @@ def assemble(
             case_id=case_id, run_entry=index[case_id],
             dataset_root=dataset_root,
             annotation=annotations.get(case_id),
+            run_id=Path(run_dir).name,
         )
         checks = validate_learning_case(case)
         if not all(checks.values()):

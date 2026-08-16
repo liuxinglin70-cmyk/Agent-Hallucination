@@ -1,5 +1,5 @@
 """Convention evolution: misses and wrongful convictions to dual-boundary
-judgement conventions.
+prompt-directive artifacts.
 
 Measured foundation (2026-08-16 disk re-diagnosis): single-run failure
 censuses are ~half non-reproducible sampling noise — cross-run verdict
@@ -18,22 +18,27 @@ temperature 0. Three consequences are wired into this module:
    the convention reshapes the candidate set is not deployable evidence
    (the census-probe channel's falsified failure mode).
 
-The evolved unit is the SAME shape as the hand conventions that
-measurably worked (detector/conventions.py): a judgement directive with
-an explicit NOT-WHEN exclusion, routed by mechanical packet features,
-injected into ALL THREE stage prompts by the court.
+The evolved unit is a prompt_directive EvolutionArtifact carrying the
+SAME judgement shape as the hand conventions that measurably worked
+(detector/conventions.py): a directive with an explicit NOT-WHEN
+exclusion, routed by mechanical packet features, injected into ALL THREE
+stage prompts by the court. The gap and capability_delta blocks are part
+of the artifact: the extractor authors the mechanism signature and the
+capability claim, the gate pins them to the frozen gap taxonomy, and the
+loader rejects anything less.
 
     evolution-set detections + gold
         -> failure worksheet (reproduced misses with attribution +
            reproduced wrongful convictions with their upheld
            certificates)
-        -> one provider call extracts dual-boundary convention drafts,
-           each supported by >= 2 same-mechanism reproduced cases
+        -> one provider call extracts dual-boundary convention drafts
+           with gap name + capability delta, each supported by >= 2
+           same-mechanism reproduced cases
         -> G1 mechanical gate: closed vocabularies, >= 2 supporting
            cases per direction, no case ids, mandatory exclusion,
-           trigger features inside the packet-feature vocabulary
-        -> convention genome: [{convention_id, trigger_features,
-           directive, exclusion, case_evidence}]
+           trigger features inside the packet-feature vocabulary,
+           gap name inside the frozen taxonomy
+        -> artifact registry of prompt_directive artifacts
         -> G2 paired replay, ONE convention at a time (attribution):
            frozen-census guided vs unguided over the convention's
            target cases, the convicted sentinels and the trigger-
@@ -47,8 +52,8 @@ CLI:
         --run runs/<id> --out conventions_raw.json
     python -m sehd_rise2.evolution.convention_evolution gate \
         --raw conventions_raw.json --out conventions_gated.json
-    python -m sehd_rise2.evolution.convention_evolution genome \
-        --conventions conventions_gated.json --out convention_genome.json
+    python -m sehd_rise2.evolution.convention_evolution registry \
+        --conventions conventions_gated.json --out convention_registry.json
     python -m sehd_rise2.evolution.convention_evolution validate \
         --run runs/<id> --conventions conventions_gated.json --out-dir <dir>
 """
@@ -56,7 +61,6 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import threading
@@ -65,12 +69,18 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from sehd_rise2.detector.api import Detector
+from sehd_rise2.detector.artifacts import (
+    ARTIFACT_REGISTRY_SCHEMA,
+    registry_hash,
+    validate_registry,
+)
 from sehd_rise2.detector.config import load_config
 from sehd_rise2.detector.conventions import PACKET_FEATURES
 from sehd_rise2.detector.packet import EVALUATOR_ONLY_FIELDS
 from sehd_rise2.detector.provider import ProviderError, provider_call
+from sehd_rise2.evolution.gap_taxonomy import GAP_CATEGORIES
+from sehd_rise2.evolution.gates import load_calibration
 
-CONVENTION_GENOME_SCHEMA = "sehd2.convention_genome.v1"
 CONVENTION_RAW_SCHEMA = "sehd2.convention_proposals.v1"
 VALIDATION_SCHEMA = "sehd2.convention_validation.v1"
 CASE_ID_IN_TEXT = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*/\d+\.json\b")
@@ -78,6 +88,33 @@ MIN_SUPPORT_CASES = 2
 TEXT_MAX_CHARS = 400
 
 TRIGGER_VOCABULARY = frozenset(PACKET_FEATURES)
+GAP_NAME_CATEGORY: dict[str, str] = {
+    name: category
+    for category, names in GAP_CATEGORIES.items()
+    for name in names
+}
+WRONGFUL_CONVICTION_ATTRIBUTION = "wrongful_conviction"
+# Miss attribution -> the stage where the failure manifested; wrongful
+# convictions manifest as defence-upheld certificates.
+MISS_GAP_STAGE: dict[str, str] = {
+    "census_miss": "census",
+    "evidence_insufficient": "verification",
+    "verification_reject": "verification",
+    "defense_overturn": "defense",
+    "view_degraded": "census",
+}
+
+GAP_NAME_LIST = sorted(
+    name
+    for category, names in GAP_CATEGORIES.items()
+    if category in ("observation", "verification", "policy")
+    for name in names
+)
+# Conventions may only acquire detector capabilities; the diagnostic-only
+# categories (attribution/infrastructural/no_gap) never spawn one, so a
+# gap name outside this set cannot deploy even though the taxonomy
+# knows it.
+DEPLOYABLE_GAP_NAMES = frozenset(GAP_NAME_LIST)
 
 EXTRACTOR_SYSTEM = (
     "You are the convention extractor of a hallucination detector's "
@@ -96,12 +133,27 @@ EXTRACTOR_SYSTEM = (
     "convictions, the true deviation it must not start excusing);\n"
     "- trigger_features: the tightest subset of "
     + str(sorted(TRIGGER_VOCABULARY))
-    + " that must ALL hold for the convention to route.\n\n"
+    + " that must ALL hold for the convention to route;\n"
+    "- gap_name: the ONE name from the frozen gap list "
+    + str(GAP_NAME_LIST)
+    + " whose mechanism this convention addresses;\n"
+    "- failure_signature: one sentence naming the class-level observable "
+    "signature the failing cases share — never quoting case-specific "
+    "content;\n"
+    "- expected_capability: one sentence naming the detection capability "
+    "the convention installs;\n"
+    "- capability_delta: before_capability (what the detector cannot do "
+    "today) and after_capability (what it does once the convention "
+    "routes), one short clause each.\n\n"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"conventions": [{"title": "<short>", "trigger_features": '
     '["<feature>", "..."], "directive": "<WHEN it is a deviation>", '
     '"exclusion": "<NOT WHEN boundary>", "failure_direction": '
-    '"miss|wrongful_conviction", "case_evidence": [{"case_id": '
+    '"miss|wrongful_conviction", "gap_name": "<gap list name>", '
+    '"failure_signature": "<shared mechanism signature>", '
+    '"expected_capability": "<installed capability>", '
+    '"capability_delta": {"before_capability": "...", '
+    '"after_capability": "..."}, "case_evidence": [{"case_id": '
     '"<worksheet case>", "observation": "<the shared mechanism>"}]}]}\n'
     "Every convention needs >= 2 supporting cases of the SAME direction "
     "and mechanism. A failure with no class-level reading is dropped. No "
@@ -141,7 +193,7 @@ def attribute_miss(result: Mapping[str, Any]) -> str:
 
 
 def load_run_tree(run_dir: Path) -> dict[str, dict[str, Any]]:
-    """case_id -> {result, gold, gold_step} from the run ledger join."""
+    """case_id -> {result, gold} from the run ledger join."""
     run_dir = Path(run_dir)
     gold_rows = {
         str(entry["case"]): entry
@@ -152,11 +204,9 @@ def load_run_tree(run_dir: Path) -> dict[str, dict[str, Any]]:
         result = _read_json(result_path)
         case_id = str(result.get("case_id") or "")
         if case_id and case_id in gold_rows:
-            row = gold_rows[case_id]
             tree[case_id] = {
                 "result": result,
-                "gold": bool(row["gold"]),
-                "gold_step": row.get("gold_step"),
+                "gold": bool(gold_rows[case_id]["gold"]),
             }
     return tree
 
@@ -351,15 +401,19 @@ def gate_conventions(
     conventions: Sequence[Mapping[str, Any]],
     *,
     worksheet_case_ids: set[str],
+    case_attributions: Mapping[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     """G1 mechanical gate; returns (accepted, rejections).
 
     The exclusion is mandatory: a directive without a NOT-WHEN boundary
     is a one-sided amplifier, and the census-probe channel's measured
-    failure mode.
+    failure mode. The gap block is equally mandatory: a convention that
+    cannot name its frozen gap name and capability delta is a rule, not
+    a capability acquisition.
     """
     rejections: list[dict[str, str]] = []
     accepted: list[dict[str, Any]] = []
+    attributions = dict(case_attributions or {})
     for raw in conventions:
         title = str(raw.get("title") or "<untitled>")
 
@@ -382,6 +436,34 @@ def gate_conventions(
         direction = str(raw.get("failure_direction") or "")
         if direction not in ("miss", "wrongful_conviction"):
             reject(f"failure_direction {direction!r} invalid")
+            continue
+        gap_name = str(raw.get("gap_name") or "")
+        if gap_name not in DEPLOYABLE_GAP_NAMES:
+            reject(
+                f"gap_name {gap_name!r} outside the deployable taxonomy "
+                "(observation/verification/policy)",
+            )
+            continue
+        signature = str(raw.get("failure_signature") or "")
+        capability = str(raw.get("expected_capability") or "")
+        if not signature or len(signature) > TEXT_MAX_CHARS:
+            reject("failure_signature missing or over length")
+            continue
+        if not capability or len(capability) > TEXT_MAX_CHARS:
+            reject("expected_capability missing or over length")
+            continue
+        if (
+            CASE_ID_IN_TEXT.search(signature)
+            or CASE_ID_IN_TEXT.search(capability)
+        ):
+            reject("signature or capability contains a case id")
+            continue
+        delta = raw.get("capability_delta")
+        delta = delta if isinstance(delta, Mapping) else {}
+        before = str(delta.get("before_capability") or "")
+        after = str(delta.get("after_capability") or "")
+        if not before or not after:
+            reject("capability_delta needs both sides")
             continue
         triggers = {
             str(name) for name in raw.get("trigger_features") or ()
@@ -407,6 +489,12 @@ def gate_conventions(
                 f"needs {MIN_SUPPORT_CASES}",
             )
             continue
+        first_attribution = attributions.get(
+            evidence_ids[0], WRONGFUL_CONVICTION_ATTRIBUTION,
+        )
+        if direction == "miss" and first_attribution == "view_degraded":
+            reject("view-degraded miss is infrastructural, not a gap")
+            continue
         accepted.append({
             "convention_id": f"EC-{len(accepted) + 1:02d}",
             "title": title,
@@ -414,6 +502,14 @@ def gate_conventions(
             "directive": directive,
             "exclusion": exclusion,
             "failure_direction": direction,
+            "gap_name": gap_name,
+            "failure_signature": signature,
+            "expected_capability": capability,
+            "capability_delta": {
+                "before_capability": before,
+                "after_capability": after,
+            },
+            "case_attribution": first_attribution,
             "case_evidence": [
                 {"case_id": case_id}
                 for case_id in dict.fromkeys(evidence_ids)
@@ -422,33 +518,113 @@ def gate_conventions(
     return accepted, rejections
 
 
-def build_convention_genome(
+def build_convention_registry(
     conventions: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
-    genome = {
-        "schema_version": CONVENTION_GENOME_SCHEMA,
-        "conventions": [dict(entry) for entry in conventions],
+    """Gated conventions -> the deployable prompt_directive registry.
+
+    The gap block's mechanical fields pin to the frozen taxonomy: the
+    category from the gap name, the direction from the failure
+    direction, the stage from the first evidence case's attribution.
+    """
+    artifacts = []
+    for entry in conventions:
+        direction = str(entry.get("failure_direction"))
+        attribution = str(entry.get("case_attribution"))
+        stage = (
+            MISS_GAP_STAGE.get(attribution, "verification")
+            if attribution != WRONGFUL_CONVICTION_ATTRIBUTION
+            else "defense"
+        )
+        gap_name = str(entry["gap_name"])
+        artifacts.append({
+            "artifact_id": str(entry["convention_id"]),
+            "version": "v1",
+            "kind": "prompt_directive",
+            "execution_point": "stage_prompts",
+            "gap": {
+                "category": GAP_NAME_CATEGORY[gap_name],
+                "name": gap_name,
+                "gap_type": (
+                    "recall" if direction == "miss" else "precision"
+                ),
+                "failure_signature": str(entry["failure_signature"]),
+                "affected_stage": stage,
+                "expected_capability": str(entry["expected_capability"]),
+            },
+            "trigger": {
+                "packet_features": list(entry["trigger_features"]),
+            },
+            "intervention": {
+                "directive": str(entry["directive"]),
+                "exclusion": str(entry["exclusion"]),
+            },
+            "capability_delta": {
+                "before_capability": str(
+                    entry["capability_delta"]["before_capability"]
+                ),
+                "after_capability": str(
+                    entry["capability_delta"]["after_capability"]
+                ),
+            },
+            "provenance": {
+                "failure_direction": direction,
+                "title": str(entry.get("title") or ""),
+                "case_evidence": [
+                    {"case_id": str(item.get("case_id"))}
+                    for item in entry.get("case_evidence") or []
+                ],
+            },
+        })
+    registry: dict[str, Any] = {
+        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
+        "artifacts": artifacts,
     }
-    hashable = {
-        key: value for key, value in genome.items()
-        if key != "content_hash"
-    }
-    genome["content_hash"] = hashlib.sha256(
-        json.dumps(
-            hashable, ensure_ascii=False, sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8"),
-    ).hexdigest()
-    return genome
+    registry["content_hash"] = registry_hash(registry)
+    return registry
 
 
-def load_convention_genome(path: Path) -> dict[str, Any]:
-    genome = _read_json(Path(path))
-    if not isinstance(genome, dict) or genome.get(
+def load_convention_registry(path: Path) -> dict[str, Any]:
+    registry = _read_json(Path(path))
+    if not isinstance(registry, dict) or registry.get(
         "schema_version"
-    ) != CONVENTION_GENOME_SCHEMA:
-        raise ValueError(f"{path}: not a convention genome")
-    return genome
+    ) != ARTIFACT_REGISTRY_SCHEMA:
+        raise ValueError(f"{path}: not an artifact registry")
+    return registry
+
+
+def merge_round_registry(
+    library_path: Path, round_registry: Mapping[str, Any], round_no: int,
+) -> dict[str, Any]:
+    """Fold one round's deployable conventions into the persistent library.
+
+    The library is the accumulating memory of the convention channel: each
+    round's deployables are namespaced ``R<round>-<id>`` and replace that
+    round's previous block (idempotent re-runs), so the deployed detector
+    carries every convention any round ever earned.
+    """
+    prefix = f"R{round_no}-"
+    existing = []
+    if Path(library_path).exists():
+        existing = [
+            artifact for artifact in validate_registry(
+                _read_json(Path(library_path)),
+            )
+            if not str(artifact["artifact_id"]).startswith(prefix)
+        ]
+    incoming = validate_registry(dict(round_registry))
+    namespaced = []
+    for artifact in incoming:
+        artifact = dict(artifact)
+        artifact["artifact_id"] = prefix + str(artifact["artifact_id"])
+        namespaced.append(artifact)
+    payload: dict[str, Any] = {
+        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
+        "artifacts": existing + namespaced,
+    }
+    payload["content_hash"] = registry_hash(payload)
+    _write_json(Path(library_path), payload)
+    return payload
 
 
 def _case_record(case_id: str, dataset_root: Path) -> dict[str, Any]:
@@ -463,14 +639,14 @@ def _case_record(case_id: str, dataset_root: Path) -> dict[str, Any]:
 
 def _detect_with_retry(
     detector: Detector, case_id: str, record: Mapping[str, Any],
-    genome: Mapping[str, Any] | None,
+    artifacts: Mapping[str, Any] | None,
     frozen_census: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """One detection arm with transport-failure retry (verdict-neutral)."""
     result = None
     for _attempt in range(3):
         result = detector.detect(
-            record, case_id=case_id, evolved_conventions=genome,
+            record, case_id=case_id, artifacts=artifacts,
             frozen_census=frozen_census,
         )
         if result.get("state") != "unresolved":
@@ -493,8 +669,9 @@ def validate_conventions(
     dataset_root: Path,
     out_dir: Path,
     workers: int = 20,
+    calibration: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """G2 paired replay, ONE convention at a time (clean attribution).
+    """G2a + G2b paired replay, ONE convention at a time (attribution).
 
     Every scope case gets ONE unguided full roll; that roll's census is
     the frozen prefix every convention's guided arm replays against, so
@@ -507,7 +684,17 @@ def validate_conventions(
     detection twice — a conviction that reproduces in both is harm (or,
     on a census_miss target, a discovery-layer repair that is recorded
     but never gate-decisive).
+
+    G2a (behavioural, hard): the guided arm must carry engagement
+    evidence — the convention's id in ``active_artifacts`` on at least
+    one target — before any capability claim counts. G2b (statistical):
+    sentinel loss / clean conviction / discovery harm tolerances and the
+    minimum paired net gain come from the gate calibration.
     """
+    calibration = dict(
+        calibration if calibration is not None else load_calibration()
+    )
+    g2 = dict(calibration["convention_g2"])
     detector = Detector(load_config())
     lock = threading.Lock()
     miss_rows = triage_misses(run_tree)
@@ -561,6 +748,7 @@ def validate_conventions(
                 "census_miss_targets": census_miss_targets,
             },
             "arms": {},
+            "engaged_paired": set(),
         }
         discovery_cases.update(clean_matched, census_miss_targets)
         scope_union.update(
@@ -592,7 +780,7 @@ def validate_conventions(
             pass
 
     genomes: dict[str, Mapping[str, Any]] = {
-        str(convention["convention_id"]): build_convention_genome(
+        str(convention["convention_id"]): build_convention_registry(
             [convention],
         )
         for convention in conventions
@@ -611,6 +799,14 @@ def validate_conventions(
             per_convention[convention_id]["arms"].setdefault(
                 case_id, {},
             )[arm] = str(result.get("state"))
+            if arm == "paired" and convention_id in set(
+                (result.get("proof_adjudication") or {}).get(
+                    "active_artifacts",
+                ) or [],
+            ):
+                per_convention[convention_id][
+                    "engaged_paired"
+                ].add(case_id)
 
     replay_jobs: list[tuple[str, str, str]] = []
     for convention in conventions:
@@ -689,6 +885,10 @@ def validate_conventions(
         net = len(repaired) + len(acquitted) - len(
             sentinel_lost,
         ) - len(clean_convicted)
+        engaged_targets = [
+            case_id for case_id in targets
+            if case_id in block["engaged_paired"]
+        ]
         reports[convention_id] = {
             "convention": dict(convention),
             "scope": block["scope"],
@@ -705,7 +905,7 @@ def validate_conventions(
                 for case_id in sorted(
                     set(targets)
                     | set(block["scope"]["sentinels"])
-                    | set(clean_matched)
+                    | set(block["scope"]["clean_matched"])
                 )
             },
             "metrics": {
@@ -714,6 +914,7 @@ def validate_conventions(
                 "fp_targets": len(fp_targets),
                 "fp_acquitted_paired": acquitted,
                 "self_recovered_targets": self_recovered,
+                "engaged_target_cases": engaged_targets,
                 "sentinel_lost_paired": sentinel_lost,
                 "clean_convicted_paired": clean_convicted,
                 "discovery_harm_reproduced": discovery_harm,
@@ -724,11 +925,18 @@ def validate_conventions(
                 "net_gain_paired": net,
             },
             "gate": {
+                "engaged_on_targets": bool(engaged_targets),
                 "paired_improvement": bool(repaired or acquitted),
-                "zero_paired_sentinel_loss": not sentinel_lost,
-                "zero_paired_clean_conviction": not clean_convicted,
-                "zero_reproduced_discovery_harm": not discovery_harm,
-                "strictly_positive_paired_net": net > 0,
+                "sentinel_loss_within_tolerance": len(
+                    sentinel_lost,
+                ) <= g2["max_paired_sentinel_loss"],
+                "clean_conviction_within_tolerance": len(
+                    clean_convicted,
+                ) <= g2["max_paired_clean_conviction"],
+                "discovery_harm_within_tolerance": len(
+                    discovery_harm,
+                ) <= g2["max_reproduced_discovery_harm"],
+                "net_gain_meets_minimum": net >= g2["min_paired_net_gain"],
             },
         }
         reports[convention_id]["gate"]["deployable"] = all(
@@ -759,9 +967,9 @@ def main() -> int:
     gate = sub.add_parser("gate", help="G1 mechanical gate")
     gate.add_argument("--raw", type=Path, required=True)
     gate.add_argument("--out", type=Path, required=True)
-    genome = sub.add_parser("genome", help="gated -> genome")
-    genome.add_argument("--conventions", type=Path, required=True)
-    genome.add_argument("--out", type=Path, required=True)
+    registry = sub.add_parser("registry", help="gated -> artifact registry")
+    registry.add_argument("--conventions", type=Path, required=True)
+    registry.add_argument("--out", type=Path, required=True)
     validate = sub.add_parser("validate", help="G2 paired replay")
     validate.add_argument("--run", type=Path, required=True)
     validate.add_argument("--conventions", type=Path, required=True)
@@ -787,6 +995,16 @@ def main() -> int:
                 {str(row["case_id"]) for row in misses}
                 | {str(row["case_id"]) for row in convictions},
             ),
+            "case_attributions": {
+                **{
+                    str(row["case_id"]): str(row["attribution"])
+                    for row in misses
+                },
+                **{
+                    str(row["case_id"]): WRONGFUL_CONVICTION_ATTRIBUTION
+                    for row in convictions
+                },
+            },
             "conventions": conventions,
             "meta": meta,
         })
@@ -810,6 +1028,7 @@ def main() -> int:
         accepted, rejections = gate_conventions(
             raw.get("conventions") or [],
             worksheet_case_ids=worksheet_ids,
+            case_attributions=raw.get("case_attributions") or {},
         )
         _write_json(args.out, {
             "schema_version": CONVENTION_RAW_SCHEMA,
@@ -821,13 +1040,13 @@ def main() -> int:
             f"{len(accepted)} accepted, {len(rejections)} rejected "
             f"-> {args.out}",
         )
-    elif args.command == "genome":
+    elif args.command == "registry":
         payload = _read_json(args.conventions)
-        genome = build_convention_genome(
+        registry = build_convention_registry(
             payload.get("conventions") or [],
         )
-        _write_json(args.out, genome)
-        print(f"convention genome -> {args.out}")
+        _write_json(args.out, registry)
+        print(f"convention artifact registry -> {args.out}")
     elif args.command == "validate":
         payload = _read_json(args.conventions)
         run_tree = load_run_tree(args.run)

@@ -80,14 +80,29 @@ def _bindings(tree, certificate_class):
     }
 
 
-GENOME_ITEMS = [
+GENOME_ARTIFACTS = [
     {
-        "policy_id": "L2-P2",
+        "artifact_id": "L2-P2",
         "version": "v1",
-        "target_certificate_class": "presentational_addition",
-        "precondition": "p",
-        "exclusions": [],
-        "action": "withhold_conviction",
+        "kind": "adjudication_policy",
+        "execution_point": "adjudication",
+        "gap": {
+            "category": "policy", "name": "strictness_miscalibration",
+            "gap_type": "precision",
+            "failure_signature": "presentation-layer certificates convict",
+            "affected_stage": "adjudication",
+            "expected_capability": (
+                "a matching certificate cannot convict"
+            ),
+        },
+        "trigger": {"certificate_class": "presentational_addition"},
+        "intervention": {
+            "action": "withhold_conviction", "exclusions": [],
+        },
+        "capability_delta": {
+            "before_capability": "convicts like any other",
+            "after_capability": "cannot convict",
+        },
         "risk_boundary": {"statement": "s", "do_not_apply": ["x"]},
         "provenance": {},
     },
@@ -135,7 +150,7 @@ def _worksheet():
     return build_worksheet(
         run_tree=tree,
         bindings=_bindings(tree, "content_contradiction"),
-        genome_items=GENOME_ITEMS,
+        genome_artifacts=GENOME_ARTIFACTS,
         source="test",
     )
 
@@ -167,7 +182,7 @@ class TestValidateProposals:
     def test_valid_birth_policy_passes(self):
         rejections = validate_proposals(
             [_proposal()], worksheet=_worksheet(),
-            genome_items=GENOME_ITEMS,
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert rejections == []
 
@@ -178,7 +193,8 @@ class TestValidateProposals:
         ]
         proposal["expected_effect"]["fp_cases"] = ["A/001.json"]
         rejections = validate_proposals(
-            [proposal], worksheet=_worksheet(), genome_items=GENOME_ITEMS,
+            [proposal], worksheet=_worksheet(),
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert rejections and "needs 2" in rejections[0]["reason"]
 
@@ -188,7 +204,8 @@ class TestValidateProposals:
             "fires on A/001.json exactly"
         )
         rejections = validate_proposals(
-            [proposal], worksheet=_worksheet(), genome_items=GENOME_ITEMS,
+            [proposal], worksheet=_worksheet(),
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert any(
             "case id" in record["reason"] for record in rejections
@@ -199,7 +216,8 @@ class TestValidateProposals:
             target_certificate_class="delivery_form",
         )
         rejections = validate_proposals(
-            [proposal], worksheet=_worksheet(), genome_items=GENOME_ITEMS,
+            [proposal], worksheet=_worksheet(),
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert any(
             "policy-free" in record["reason"] for record in rejections
@@ -211,7 +229,8 @@ class TestValidateProposals:
             for entry in row["surviving_certificates"]:
                 entry["certificate_class"] = "expression_variance"
         rejections = validate_proposals(
-            [_proposal()], worksheet=worksheet, genome_items=GENOME_ITEMS,
+            [_proposal()], worksheet=worksheet,
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert any(
             "without a surviving" in record["reason"]
@@ -221,7 +240,7 @@ class TestValidateProposals:
     def test_amend_requires_known_id(self):
         rejections = validate_proposals(
             [_proposal(kind="amend")], worksheet=_worksheet(),
-            genome_items=GENOME_ITEMS,
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert any(
             "unknown policy" in record["reason"] for record in rejections
@@ -233,7 +252,8 @@ class TestValidateProposals:
         )
         proposal["hypothesis"]["case_evidence"] = []
         rejections = validate_proposals(
-            [proposal], worksheet=_worksheet(), genome_items=GENOME_ITEMS,
+            [proposal], worksheet=_worksheet(),
+            registry_artifacts=GENOME_ARTIFACTS,
         )
         assert any(
             "without evidence" in record["reason"] for record in rejections
@@ -251,8 +271,11 @@ class TestGate:
             2, 1, 1,
         )
         withholding = [
-            {**item, "target_certificate_class": "content_contradiction"}
-            for item in GENOME_ITEMS
+            {
+                **item,
+                "trigger": {"certificate_class": "content_contradiction"},
+            }
+            for item in GENOME_ARTIFACTS
         ]
         gated = cycle_mod.gate_metrics(
             tree, cycle_mod.adjudicate(tree, bindings, withholding),
@@ -280,9 +303,12 @@ class TestGate:
             "defense_decisions"
         ]["c2"] = {"verdict": "upheld", "rationale": "r"}
         item = {
-            **GENOME_ITEMS[0],
-            "target_certificate_class": "expression_variance",
-            "action": "require_corroborating_content_error",
+            **GENOME_ARTIFACTS[0],
+            "trigger": {"certificate_class": "expression_variance"},
+            "intervention": {
+                "action": "require_corroborating_content_error",
+                "exclusions": [],
+            },
         }
         audit = cycle_mod.adjudicate(tree, bindings, [item])
         assert audit["A/003.json"]["state"] == "verified_error"
@@ -291,7 +317,7 @@ class TestGate:
 class TestApplyProposals:
     def test_birth_amend_retire(self):
         amended = cycle_mod.apply_proposals(
-            GENOME_ITEMS,
+            GENOME_ARTIFACTS,
             [
                 _proposal(),
                 {
@@ -300,24 +326,31 @@ class TestApplyProposals:
                     "trigger": {"definition": "tighter",
                                 "must_not_match": []},
                     "action": "require_corroborating_content_error",
-                    "hypothesis": {"case_evidence": []},
+                    "hypothesis": {
+                        "case_evidence": [],
+                        "source_gap_names": [
+                            "strictness_miscalibration",
+                        ],
+                    },
                 },
             ],
             cycle=3, worksheet_path="w.json",
         )
-        by_id = {item["policy_id"]: item for item in amended}
+        by_id = {item["artifact_id"]: item for item in amended}
         assert by_id["L2-P2"]["version"] == "v2"
-        assert by_id["L2-P2"]["action"] == (
+        assert by_id["L2-P2"]["intervention"]["action"] == (
             "require_corroborating_content_error"
         )
         assert by_id["L2-P9"]["version"] == "v1"
+        assert by_id["L2-P9"]["gap"]["category"] == "policy"
+        assert by_id["L2-P9"]["capability_delta"]["after_capability"]
         retired = cycle_mod.apply_proposals(
             amended,
             [{"kind": "retire", "policy_id": "L2-P9",
               "hypothesis": {"case_evidence": []}}],
             cycle=4, worksheet_path="w.json",
         )
-        assert [item["policy_id"] for item in retired] == ["L2-P2"]
+        assert [item["artifact_id"] for item in retired] == ["L2-P2"]
 
 
 class TestMergeGuards:
@@ -370,20 +403,35 @@ def _write_bindings(path, rows):
     )
 
 
-SYNTH_GENOME = {
-    "schema_version": "sehd2.policy_genome.v1",
-    "items": [
-        {
-            "policy_id": "L2-X", "version": "v1",
-            "target_certificate_class": "expression_variance",
-            "precondition": "p", "exclusions": [],
-            "action": "withhold_conviction",
-            "risk_boundary": {"statement": "s", "do_not_apply": ["x"]},
-            "provenance": {},
+def _synth_registry():
+    from sehd_rise2.detector.artifacts import registry_hash
+
+    artifact = {
+        "artifact_id": "L2-X", "version": "v1",
+        "kind": "adjudication_policy",
+        "execution_point": "adjudication",
+        "gap": {
+            "category": "policy", "name": "expression_tolerance",
+            "gap_type": "precision",
+            "failure_signature": "wording-level certificates convict",
+            "affected_stage": "adjudication",
+            "expected_capability": "cannot convict",
         },
-    ],
-    "content_hash": "seed",
-}
+        "trigger": {"certificate_class": "expression_variance"},
+        "intervention": {"action": "withhold_conviction", "exclusions": []},
+        "capability_delta": {
+            "before_capability": "convicts like any other",
+            "after_capability": "cannot convict",
+        },
+        "risk_boundary": {"statement": "s", "do_not_apply": ["x"]},
+        "provenance": {},
+    }
+    registry = {
+        "schema_version": "sehd2.evolution_artifact.v1",
+        "artifacts": [artifact],
+    }
+    registry["content_hash"] = registry_hash(registry)
+    return registry
 
 
 def _seed_cycle_env(tmp_path, monkeypatch):
@@ -397,11 +445,13 @@ def _seed_cycle_env(tmp_path, monkeypatch):
     _write_bindings(
         prior_bindings, {("P/001.json", "c1"): "expression_variance"},
     )
-    genome_file = tmp_path / "genome_seed.json"
-    genome_file.write_text(json.dumps(SYNTH_GENOME), encoding="utf-8")
+    registry_file = tmp_path / "registry_seed.json"
+    registry_file.write_text(
+        json.dumps(_synth_registry()), encoding="utf-8",
+    )
     monkeypatch.setattr(cycle_mod, "PHASE1_RUN", prior_run)
     monkeypatch.setattr(cycle_mod, "PHASE1_BINDINGS", prior_bindings)
-    monkeypatch.setattr(cycle_mod, "PHASE1_GENOME", genome_file)
+    monkeypatch.setattr(cycle_mod, "PHASE1_REGISTRY", registry_file)
     library_dir = tmp_path / "library"
     cycle_mod.init_library(library_dir)
     return library_dir
@@ -446,6 +496,21 @@ def _seed_batch(tmp_path, *, batch_name="batch", content_only_tp=False):
     return batch, batch_bindings
 
 
+CALIBRATION = {
+    "schema_version": "sehd2.gate_calibration.v1",
+    "test_retest_flip_rate": None,
+    "convention_g2": {
+        "max_paired_sentinel_loss": 0,
+        "max_paired_clean_conviction": 0,
+        "max_reproduced_discovery_harm": 0,
+        "min_paired_net_gain": 1,
+    },
+    "policy_cycle": {
+        "max_added_fn_vs_baseline": 1, "max_tp_lost": 0,
+    },
+}
+
+
 class TestRunCycle:
     def test_promote_birth_and_retire(self, tmp_path, monkeypatch):
         library_dir = _seed_cycle_env(tmp_path, monkeypatch)
@@ -474,20 +539,55 @@ class TestRunCycle:
             library_dir=library_dir, batch_run=batch,
             batch_bindings=batch_bindings,
             prior_runs=[], prior_bindings=[],
+            calibration=CALIBRATION,
         )
-        assert result["outcome"] == "promoted genomes/genome_v2.json"
+        assert result["outcome"] == "promoted artifacts/registry_v2.json"
         assert result["survivors"] == ["L2-P9", "L2-X"]
         assert result["gate"]["candidate"]["tp_lost"] == []
         assert result["gate"]["candidate"]["fp"] == 0
         library = cycle_mod.load_library(library_dir)
         assert library["policies"]["L2-P9"]["status"] == "active"
         assert library["policies"]["L2-X"]["status"] == "retired"
-        genome = json.loads(
-            (library_dir / "genomes/genome_v2.json").read_text(
+        registry = json.loads(
+            (library_dir / "artifacts/registry_v2.json").read_text(
                 encoding="utf-8",
             ),
         )
-        assert [item["policy_id"] for item in genome["items"]] == ["L2-P9"]
+        assert [
+            artifact["artifact_id"] for artifact in registry["artifacts"]
+        ] == ["L2-P9"]
+
+    def test_incomplete_bindings_fail_closed_before_any_proposal(
+        self, tmp_path, monkeypatch,
+    ):
+        library_dir = _seed_cycle_env(tmp_path, monkeypatch)
+        batch, batch_bindings = _seed_batch(tmp_path, batch_name="b_gap")
+        rows = json.loads(
+            batch_bindings.read_text(encoding="utf-8"),
+        )
+        rows["bindings"] = [
+            entry for entry in rows["bindings"]
+            if not (
+                entry["case_id"] == "A/003.json"
+                and entry["candidate_id"] == "c2"
+            )
+        ]
+        batch_bindings.write_text(json.dumps(rows), encoding="utf-8")
+        called = {"proposals": False}
+
+        def _must_not_run(**_kwargs):
+            called["proposals"] = True
+            raise AssertionError("provider call on an unbound tree")
+
+        monkeypatch.setattr(cycle_mod, "generate_proposals", _must_not_run)
+        with pytest.raises(ValueError, match="do not cover"):
+            cycle_mod.run_cycle(
+                library_dir=library_dir, batch_run=batch,
+                batch_bindings=batch_bindings,
+                prior_runs=[], prior_bindings=[],
+                calibration=CALIBRATION,
+            )
+        assert called["proposals"] is False
 
     def test_no_change_when_no_dominance(self, tmp_path, monkeypatch):
         library_dir = _seed_cycle_env(tmp_path, monkeypatch)
@@ -507,11 +607,14 @@ class TestRunCycle:
             library_dir=library_dir, batch_run=batch,
             batch_bindings=batch_bindings,
             prior_runs=[], prior_bindings=[],
+            calibration=CALIBRATION,
         )
         assert result["outcome"] == "no_change"
         assert result["gate"]["current"]["fp"] > 0
         library = cycle_mod.load_library(library_dir)
-        assert library["genomes"][-1]["file"] == "genomes/genome_v1.json"
+        assert library["registries"][-1]["file"] == (
+            "artifacts/registry_v1.json"
+        )
 
     def test_tp_loss_culprit_dropped(self, tmp_path, monkeypatch):
         library_dir = _seed_cycle_env(tmp_path, monkeypatch)
@@ -530,6 +633,7 @@ class TestRunCycle:
             library_dir=library_dir, batch_run=batch,
             batch_bindings=batch_bindings,
             prior_runs=[], prior_bindings=[],
+            calibration=CALIBRATION,
         )
         assert result["outcome"] == "no_change"
         assert any(
@@ -537,3 +641,58 @@ class TestRunCycle:
             and "true-positive loss" in record["reason"]
             for record in result["dropped"]
         )
+
+    def test_gate_tolerance_comes_from_calibration(
+        self, tmp_path, monkeypatch,
+    ):
+        library_dir = _seed_cycle_env(tmp_path, monkeypatch)
+        batch = tmp_path / "b_tol"
+        for case_id in ("A/001.json", "A/002.json", "A/003.json"):
+            _write_run(
+                batch, case_id,
+                gold=(case_id == "A/003.json"),
+                state="verified_error",
+                supported=["c1"], upheld={"c1": "upheld"},
+            )
+        _write_gold(batch, [
+            ("A/001.json", False), ("A/002.json", False),
+            ("A/003.json", True),
+        ])
+        batch_bindings = tmp_path / "tol_bindings.json"
+        _write_bindings(batch_bindings, {
+            (case_id, "c1"): "content_contradiction"
+            for case_id in ("A/001.json", "A/002.json", "A/003.json")
+        })
+        monkeypatch.setattr(
+            cycle_mod, "generate_proposals",
+            lambda **kwargs: ([_proposal()], {
+                "model": "test", "raw_proposals": 1, "accepted": 1,
+                "rejections": [],
+            }),
+        )
+        absolute = cycle_mod.run_cycle(
+            library_dir=library_dir, batch_run=batch,
+            batch_bindings=batch_bindings,
+            prior_runs=[], prior_bindings=[],
+            calibration=CALIBRATION,
+        )
+        assert absolute["outcome"] == "no_change"
+        tolerant = cycle_mod.run_cycle(
+            library_dir=library_dir, batch_run=batch,
+            batch_bindings=batch_bindings,
+            prior_runs=[], prior_bindings=[],
+            calibration={
+                **CALIBRATION,
+                "policy_cycle": {
+                    # the current registry already loses the prior-run
+                    # sentinel (P/001), and the candidate adds A/003 —
+                    # the tolerances must cover both to let the strict
+                    # FP gain decide
+                    "max_added_fn_vs_baseline": 2, "max_tp_lost": 2,
+                },
+            },
+        )
+        assert tolerant["outcome"] == "promoted artifacts/registry_v2.json"
+        assert tolerant["gate"]["candidate"]["tp_lost"] == [
+            "A/003.json", "P/001.json",
+        ]

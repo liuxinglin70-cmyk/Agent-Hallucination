@@ -51,15 +51,20 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any, Mapping
 
-from sehd_rise2.evolution.policy import (
+from sehd_rise2.detector.artifacts import (
+    BASELINE_CLASS,
     CERTIFICATE_CLASSES,
+    UNCLASSIFIED,
+    apply_policy_actions,
+    strongest_actions,
+)
+from sehd_rise2.evolution.policy import (
     POLICY_CANDIDATES_SCHEMA,
     policies_of,
 )
 
 BINDINGS_SCHEMA = "sehd2.certificate_bindings.v1"
 RUNTIME_BINDINGS_SCHEMA = "sehd2.certificate_bindings.runtime.v1"
-BASELINE_CLASS = "content_contradiction"
 REPLAY_RESULT_SCHEMA = "sehd2.policy_replay.v1"
 
 
@@ -193,24 +198,14 @@ def validate_bindings(
         "surviving_fully_bound": set(bindings) == surviving,
         "classes_in_vocabulary": classes_ok,
         "basis_stated": basis_ok,
-        "baseline_matches_records": baseline_matches_records(
-            run_tree,
-            {key: value["certificate_class"] for key, value in
-             bindings.items()},
-        ),
+        "baseline_matches_records": baseline_matches_records(run_tree),
     }
 
 
 def baseline_matches_records(
     run_tree: Mapping[str, Mapping[str, Any]],
-    classes: Mapping[tuple[str, str], str] | None = None,
 ) -> bool:
-    """The no-policy adjudication rule must reproduce every recorded state.
-
-    When ``classes`` is given the check also runs under each single-policy
-    configuration to guard against binding drift; the baseline itself is
-    class-independent.
-    """
+    """The no-policy adjudication rule must reproduce every recorded state."""
     for entry in run_tree.values():
         result = entry["result"]
         replayed = (
@@ -225,49 +220,42 @@ def class_actions(
     policies: list[Mapping[str, Any]],
 ) -> dict[str, str]:
     """certificate class -> strongest action across the policy list."""
-    actions: dict[str, str] = {}
-    for policy in policies:
-        trigger = policy.get("trigger") or {}
-        certificate_class = str(trigger.get("certificate_class"))
-        action = str(policy.get("action"))
-        current = actions.get(certificate_class)
-        if action == "withhold_conviction" or current is None:
-            actions[certificate_class] = action
-    return actions
+    return strongest_actions([
+        (
+            str((policy.get("trigger") or {}).get("certificate_class")),
+            str(policy.get("action")),
+        )
+        for policy in policies
+    ])
 
 
 def replay_case(
     surviving_classes: list[str], actions: Mapping[str, str],
 ) -> dict[str, Any]:
-    """Deterministic policy adjudication of one case."""
-    has_content = BASELINE_CLASS in surviving_classes
-    fired: list[dict[str, str]] = []
-    skipped: list[dict[str, str]] = []
-    convicting = False
-    for certificate_class in surviving_classes:
-        action = actions.get(certificate_class)
-        if action == "withhold_conviction":
-            fired.append({
-                "certificate_class": certificate_class,
-                "action": action,
-                "effect": "withheld",
-            })
-        elif action == "require_corroborating_content_error":
-            if has_content:
-                skipped.append({
-                    "certificate_class": certificate_class,
-                    "action": action,
-                    "effect": "corroborated",
-                })
-                convicting = True
-            else:
-                fired.append({
-                    "certificate_class": certificate_class,
-                    "action": action,
-                    "effect": "sole_basis_removed",
-                })
-        else:
-            convicting = True
+    """Deterministic policy adjudication of one case.
+
+    The conviction semantics live in ``detector.artifacts`` (the same
+    implementation the runtime court executes); this wrapper projects
+    class-level replay onto it, so offline evidence and deployed
+    behaviour can never drift apart. The offline view is class-level:
+    the runtime's per-certificate ids do not exist here. ``unclassified``
+    maps to the runtime's unbound certificate (class ``None``): baseline
+    conviction behaviour, and an unverifiable corroboration premise for
+    require_corroborating policies — exactly what the court does.
+    """
+    surviving = [
+        (
+            certificate_class,
+            (
+                None if certificate_class == UNCLASSIFIED
+                else certificate_class
+            ),
+        )
+        for certificate_class in surviving_classes
+    ]
+    convicting, fired, skipped = apply_policy_actions(surviving, actions)
+    for record in (*fired, *skipped):
+        record.pop("candidate_id", None)
     return {
         "state": (
             "verified_error" if convicting else "verified_clean"
@@ -602,42 +590,46 @@ def write_replay_report(result: Mapping[str, Any], out_path: Path) -> None:
         if config["configuration"] not in {"baseline", "full_set"}
         and len(config["policy_ids"]) > 1
     ]
-    best = max(
-        subsets, key=lambda config: (
-            config["accuracy"], -len(config["tp_lost"]),
-        ),
-    )
-    zero_loss = [
-        config for config in subsets if not config["tp_lost"]
-    ]
-    best_zero_loss = max(zero_loss, key=lambda config: config["accuracy"])
+    lines += ["", "## Interpretation anchors", ""]
+    if subsets:
+        best = max(
+            subsets, key=lambda config: (
+                config["accuracy"], -len(config["tp_lost"]),
+            ),
+        )
+        lines.append(
+            f"- best subset by accuracy: {best['configuration']} "
+            f"({best['accuracy']:.1%}, TP lost {len(best['tp_lost'])})"
+        )
+        zero_loss = [
+            config for config in subsets if not config["tp_lost"]
+        ]
+        if zero_loss:
+            best_zero_loss = max(
+                zero_loss, key=lambda config: config["accuracy"],
+            )
+            lines.append(
+                f"- best subset with zero TP loss: "
+                f"{best_zero_loss['configuration']} "
+                f"({best_zero_loss['accuracy']:.1%}, FP "
+                f"{best_zero_loss['fp']})"
+            )
     full_config = next(
         config for config in result["configurations"]
         if config["configuration"] == "full_set"
     )
     lines += [
-        "", "## Interpretation anchors", "",
-        f"- best subset by accuracy: {best['configuration']} "
-        f"({best['accuracy']:.1%}, TP lost {len(best['tp_lost'])})",
-        f"- best subset with zero TP loss: "
-        f"{best_zero_loss['configuration']} "
-        f"({best_zero_loss['accuracy']:.1%}, FP "
-        f"{best_zero_loss['fp']})",
         f"- full set: {full_config['accuracy']:.1%}",
         "- promotion gate (review): accuracy >= baseline, FP clearly "
         "reduced, FN increase <= 1, no must-survive violations",
         "",
     ]
-    lost_lists = {
-        tuple(config["tp_lost"]): config["configuration"]
-        for config in result["configurations"]
-        if config["tp_lost"]
-    }
-    for lost, configuration in lost_lists.items():
-        lines.append(
-            f"- TP lost ({', '.join(lost)}): every configuration "
-            f"containing L2-P1, first seen as {configuration}"
-        )
+    for config in result["configurations"]:
+        if config["tp_lost"]:
+            lines.append(
+                f"- TP lost under {config['configuration']}: "
+                + ", ".join(config["tp_lost"])
+            )
     for config in main:
         if config["must_survive_violations"]:
             lines.append(

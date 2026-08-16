@@ -19,7 +19,7 @@ CLI (worksheet in, validated proposals out):
 
     python -m sehd_rise2.evolution.proposal generate \
         --worksheet datasets/policy_library/v1/cycles/c1_worksheet.json \
-        --genome datasets/policy_library/v1/genomes/genome_v1.json \
+        --registry datasets/policy_library/v1/artifacts/registry_v1.json \
         --out datasets/policy_library/v1/cycles/c1_proposals.json
 """
 
@@ -32,18 +32,19 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from sehd_rise2.detector.artifacts import (
+    CERTIFICATE_CLASSES,
+    POLICY_ACTIONS,
+    POLICY_FREE_CLASSES,
+    load_artifact_registry,
+)
 from sehd_rise2.detector.config import load_config
 from sehd_rise2.detector.provider import ProviderError, provider_call
 from sehd_rise2.evolution.gap_taxonomy import GAP_CATEGORIES
-from sehd_rise2.evolution.policy import (
-    CERTIFICATE_CLASSES,
-    POLICY_ACTIONS,
-)
 from sehd_rise2.evolution.convention_evolution import attribute_miss
 
 PROPOSAL_SCHEMA = "sehd2.policy_proposals.v1"
 POLICY_GAP_NAMES = frozenset(GAP_CATEGORIES["policy"])
-POLICY_FREE_CLASSES = frozenset({"delivery_form"})
 CASE_ID_IN_TEXT = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*/\d+\.json\b")
 MIN_SUPPORT_CASES = 2
 
@@ -106,12 +107,9 @@ PROPOSAL_SYSTEM = (
 )
 
 
-def load_genome_items(path: Path) -> list[dict[str, Any]]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    items = payload.get("items")
-    if not isinstance(items, list):
-        raise ValueError(f"{path}: genome has no items list")
-    return items
+def load_registry_artifacts(path: Path) -> list[dict[str, Any]]:
+    """Load one persisted artifact registry; returns its artifact list."""
+    return load_artifact_registry(Path(path))["artifacts"]
 
 
 def _surviving_entries(
@@ -156,7 +154,7 @@ def build_worksheet(
     *,
     run_tree: Mapping[str, Mapping[str, Any]],
     bindings: Mapping[tuple[str, str], Mapping[str, str]],
-    genome_items: list[Mapping[str, Any]],
+    genome_artifacts: list[Mapping[str, Any]],
     source: str,
 ) -> dict[str, Any]:
     """The cycle's evaluator-side failure view handed to the proposer.
@@ -195,15 +193,19 @@ def build_worksheet(
         "recorded_misses": misses,
         "deployed_policies": [
             {
-                "policy_id": item.get("policy_id"),
-                "target_certificate_class": item.get(
-                    "target_certificate_class",
-                ),
-                "precondition": item.get("precondition"),
-                "action": item.get("action"),
-                "risk_boundary": item.get("risk_boundary"),
+                "policy_id": artifact.get("artifact_id"),
+                "target_certificate_class": (
+                    artifact.get("trigger") or {}
+                ).get("certificate_class"),
+                "precondition": (
+                    artifact.get("intervention") or {}
+                ).get("exclusions"),
+                "action": (
+                    artifact.get("intervention") or {}
+                ).get("action"),
+                "risk_boundary": artifact.get("risk_boundary"),
             }
-            for item in genome_items
+            for artifact in genome_artifacts
         ],
     }
 
@@ -232,7 +234,7 @@ def validate_proposals(
     proposals: list[Mapping[str, Any]],
     *,
     worksheet: Mapping[str, Any],
-    genome_items: list[Mapping[str, Any]],
+    registry_artifacts: list[Mapping[str, Any]],
 ) -> list[dict[str, str]]:
     """Mechanical gate per proposal; returns rejection records.
 
@@ -240,12 +242,14 @@ def validate_proposals(
     the Phase 1-A discipline restated against worksheet facts.
     """
     wrongful, sentinels, classes_of = worksheet_facts(worksheet)
-    known_ids = {str(item.get("policy_id")) for item in genome_items}
+    known_ids = {
+        str(artifact.get("artifact_id"))
+        for artifact in registry_artifacts
+    }
     rejections: list[dict[str, str]] = []
     seen_ids: set[str] = set()
     for proposal in proposals:
         policy_id = str(proposal.get("policy_id") or "")
-        where = policy_id or "<unnamed>"
 
         def reject(reason: str) -> None:
             rejections.append({
@@ -358,10 +362,10 @@ def validate_proposals(
 
 
 def generate_proposals(
-    *, worksheet: Mapping[str, Any], genome_path: Path,
+    *, worksheet: Mapping[str, Any], registry_path: Path,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """One provider call; validated proposals and the call meta."""
-    genome_items = load_genome_items(genome_path)
+    registry_artifacts = load_registry_artifacts(registry_path)
     user = json.dumps(worksheet, ensure_ascii=False, indent=1)
     config = load_config()
     route = dict(config["verification_route"])
@@ -385,7 +389,8 @@ def generate_proposals(
         if isinstance(item, Mapping)
     ]
     rejections = validate_proposals(
-        proposals, worksheet=worksheet, genome_items=genome_items,
+        proposals, worksheet=worksheet,
+        registry_artifacts=registry_artifacts,
     )
     rejected_ids = {
         record["policy_id"] for record in rejections
@@ -408,19 +413,19 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     gen = sub.add_parser("generate", help="worksheet -> proposals")
     gen.add_argument("--worksheet", type=Path, required=True)
-    gen.add_argument("--genome", type=Path, required=True)
+    gen.add_argument("--registry", type=Path, required=True)
     gen.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     worksheet = json.loads(
         args.worksheet.read_text(encoding="utf-8"),
     )
     accepted, meta = generate_proposals(
-        worksheet=worksheet, genome_path=args.genome,
+        worksheet=worksheet, registry_path=args.registry,
     )
     payload = {
         "schema_version": PROPOSAL_SCHEMA,
         "worksheet": str(args.worksheet),
-        "genome": str(args.genome),
+        "registry": str(args.registry),
         "proposals": accepted,
         "generation_meta": meta,
     }

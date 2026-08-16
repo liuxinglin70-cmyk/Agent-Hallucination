@@ -1,0 +1,15 @@
+{
+  "schema_version": "sehd2.gate_calibration.v1",
+  "source": "absolute-zero defaults; recalibrate only from a Round-baseline stability double-run (tools/run_stability.py), never from the frozen verification split",
+  "test_retest_flip_rate": null,
+  "convention_g2": {
+    "max_paired_sentinel_loss": 0,
+    "max_paired_clean_conviction": 0,
+    "max_reproduced_discovery_harm": 0,
+    "min_paired_net_gain": 1
+  },
+  "policy_cycle": {
+    "max_added_fn_vs_baseline": 1,
+    "max_tp_lost": 0
+  }
+}
