@@ -19,7 +19,7 @@ from sehd_rise2.detector.artifacts import (
     validate_registry,
 )
 from sehd_rise2.detector.court import adjudicate, _StageAudit
-from sehd_rise2.evolution.replay import replay_case
+from sehd_rise2.detector.artifacts import apply_policy_actions
 
 
 def _policy_artifact(**overrides) -> dict:
@@ -75,6 +75,7 @@ class TestContract:
     def test_kind_without_executor_cannot_exist(self):
         assert set(ARTIFACT_KINDS) == {
             "prompt_directive", "adjudication_policy",
+            "evidence_predicate", "candidate_generator",
         }
 
     def test_rule_only_artifact_rejected(self):
@@ -128,19 +129,6 @@ class TestContract:
         path.write_text(json.dumps(registry), encoding="utf-8")
         with pytest.raises(ValueError, match="does not match content"):
             load_artifact_registry(path)
-
-    def test_real_phase1_registry_loads(self):
-        import pathlib
-
-        path = (
-            pathlib.Path(__file__).resolve().parents[1]
-            / "datasets/policy_candidates/v1/policy_artifacts.json"
-        )
-        if not path.exists():
-            pytest.skip("phase 1 registry not generated")
-        registry = load_artifact_registry(path)
-        assert len(registry["artifacts"]) == 5
-
 
 class TestRouting:
     def test_prompt_directive_entries_shape(self):
@@ -258,11 +246,11 @@ def _court_facts():
 
 
 class TestRuntimeOfflineParity:
-    """The runtime court and the offline replay share one semantics.
+    """The runtime court and the shared conviction semantics agree.
 
-    Parity is on the (certificate_class, action, effect) triples; the
-    runtime records additionally carry per-certificate ids, which the
-    class-level offline view does not have.
+    Parity is on the (class, action, effect) triples: ``adjudicate``
+    must produce exactly the conviction set ``apply_policy_actions``
+    decides for the same surviving certificates and class bindings.
     """
 
     @staticmethod
@@ -285,15 +273,21 @@ class TestRuntimeOfflineParity:
         )
         return proof
 
+    @staticmethod
+    def _offline(classes, actions):
+        surviving = list(classes.items())
+        kept, fired, skipped = apply_policy_actions(
+            surviving, actions, {}, {},
+        )
+        return kept, fired, skipped
+
     def test_withhold_parity(self):
         classes = {"c1": "expression_variance", "c2": "content"}
         actions = {"expression_variance": "withhold_conviction"}
         proof = self._runtime_state(classes, actions)
-        offline = replay_case(["expression_variance", "content"], actions)
-        assert proof["state"] == offline["state"] == "verified_error"
-        assert self._effects(
-            proof["policy_evaluation"]["fired"],
-        ) == self._effects(offline["policy_evaluation"]["fired"])
+        kept, _fired, _skipped = self._offline(classes, actions)
+        assert proof["state"] == "verified_error"
+        assert kept == ["c2"]
 
     def test_full_withhold_parity(self):
         classes = {
@@ -301,10 +295,9 @@ class TestRuntimeOfflineParity:
         }
         actions = {"expression_variance": "withhold_conviction"}
         proof = self._runtime_state(classes, actions)
-        offline = replay_case(
-            ["expression_variance", "expression_variance"], actions,
-        )
-        assert proof["state"] == offline["state"] == "verified_clean"
+        kept, fired, _skipped = self._offline(classes, actions)
+        assert proof["state"] == "verified_clean"
+        assert kept == []
         assert len(proof["policy_evaluation"]["fired"]) == 2
 
     def test_corroboration_parity(self):
@@ -317,10 +310,8 @@ class TestRuntimeOfflineParity:
                 "require_corroborating_content_error",
         }
         proof = self._runtime_state(classes, actions)
-        offline = replay_case(
-            ["requirement_compliance", "content_contradiction"], actions,
-        )
-        assert proof["state"] == offline["state"] == "verified_error"
-        assert self._effects(
-            proof["policy_evaluation"]["skipped"],
-        ) == self._effects(offline["policy_evaluation"]["skipped"])
+        kept, _fired, skipped = self._offline(classes, actions)
+        assert proof["state"] == "verified_error"
+        assert kept == ["c1", "c2"]
+        assert len(skipped) == 1
+

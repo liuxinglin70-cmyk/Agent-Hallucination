@@ -13,10 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from sehd_rise2.detector.artifacts import (
-    load_artifact_registry,
-    validate_registry,
-)
+from sehd_rise2.detector.artifacts import load_artifact_registry
+from sehd_rise2.detector.deploy import compile_deploy_plan
 from sehd_rise2.detector.config import default_config_path, load_config
 from sehd_rise2.detector.court import run_court
 from sehd_rise2.detector.packet import build_packet, validate_record
@@ -61,10 +59,10 @@ class Detector:
         """
         validate_record(record)
         packet = build_packet(record)
-        deployed = validate_registry(artifacts) if artifacts else []
+        plan = compile_deploy_plan(artifacts)
         proof, providers, stage_audit = run_court(
             packet, self.config,
-            artifacts=deployed,
+            plan=plan,
             frozen_census=(
                 list(frozen_census) if frozen_census is not None else None
             ),

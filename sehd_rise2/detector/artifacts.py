@@ -7,8 +7,13 @@ in this package:
 
 - ``prompt_directive``    -> dual-boundary judgement directive injected
   into all three stage prompts (rendered through ``conventions.py``);
+  this is an execution-reliability patch, NOT a new capability;
 - ``adjudication_policy`` -> conviction rule applied inside
-  ``court.adjudicate``.
+  ``court.adjudicate``;
+- ``evidence_predicate``  -> executable structured check whose verdict is
+  rendered into verification/defense as evidence (``capabilities.py``);
+- ``candidate_generator`` -> recall-side census extension stage whose
+  parsed candidates re-enter the normal verification pipeline.
 
 An artifact whose kind has no executor here cannot load, so a deployable
 payload without runtime semantics is structurally impossible. Every
@@ -29,6 +34,13 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from sehd_rise2.detector.capabilities import (
+    CANDIDATE_GENERATOR_RUNNERS,
+    CAPABILITY_INPUT_FIELDS,
+    GENERATOR_INPUT_FIELDS,
+    PREDICATE_RUNNERS,
+    PREDICATE_VERDICTS,
+)
 from sehd_rise2.detector.conventions import PACKET_FEATURES
 from sehd_rise2.detector.provider import ProviderError, provider_call
 
@@ -39,6 +51,8 @@ ARTIFACT_REGISTRY_SCHEMA = "sehd2.evolution_artifact.v1"
 ARTIFACT_KINDS: dict[str, str] = {
     "prompt_directive": "stage_prompts",
     "adjudication_policy": "adjudication",
+    "evidence_predicate": "verification_predicates",
+    "candidate_generator": "census_extension",
 }
 
 GAP_TYPES = frozenset({"recall", "precision", "boundary"})
@@ -169,6 +183,204 @@ def _require_text(value: Any, field: str) -> str:
     return text
 
 
+def _validate_evidence_predicate(
+    *, artifact_id: str, gap: Mapping[str, Any],
+    trigger: Mapping[str, Any], entry: Mapping[str, Any],
+) -> None:
+    """Closed contract for executable evidence predicates.
+
+    The predicate must be a component, not prose: it carries an input
+    contract, a closed output contract and an implementation runner
+    from the detector-owned vocabulary. The flip gate proves the
+    capability end-to-end; the loader only guarantees the contract is
+    well-formed.
+    """
+    if gap["affected_stage"] != "verification":
+        raise ValueError(
+            f"{artifact_id}: evidence_predicate must affect verification, "
+            f"got {gap['affected_stage']!r}"
+        )
+    features = {
+        str(name) for name in trigger.get("packet_features") or ()
+    }
+    if not features or not features <= set(PACKET_FEATURES):
+        raise ValueError(
+            f"{artifact_id}: evidence_predicate trigger.packet_features "
+            "empty or outside the packet-feature vocabulary"
+        )
+    capability = entry.get("capability")
+    capability = capability if isinstance(capability, Mapping) else {}
+    name = _require_text(
+        capability.get("name"), f"{artifact_id}.capability.name",
+    )
+    _require_text(
+        capability.get("failure_mode"),
+        f"{artifact_id}.capability.failure_mode",
+    )
+    input_schema = capability.get("input")
+    input_schema = input_schema if isinstance(input_schema, Mapping) else {}
+    if not input_schema:
+        raise ValueError(
+            f"{artifact_id}: capability.input must be a non-empty object"
+        )
+    unknown_inputs = sorted(set(input_schema) - CAPABILITY_INPUT_FIELDS)
+    if unknown_inputs:
+        raise ValueError(
+            f"{artifact_id}: capability input fields {unknown_inputs} "
+            "outside the closed predicate vocabulary"
+        )
+    output_schema = capability.get("output")
+    output_schema = (
+        output_schema if isinstance(output_schema, Mapping) else {}
+    )
+    verdict_spec = output_schema.get("verdict")
+    verdict_spec = verdict_spec if isinstance(verdict_spec, Mapping) else {}
+    verdict_enum = verdict_spec.get("enum")
+    if not isinstance(verdict_enum, list) or not verdict_enum:
+        raise ValueError(
+            f"{artifact_id}: capability.output.verdict.enum must be a "
+            "non-empty list"
+        )
+    if not set(verdict_enum) <= PREDICATE_VERDICTS:
+        raise ValueError(
+            f"{artifact_id}: capability output verdicts {sorted(verdict_enum)} "
+            f"outside {sorted(PREDICATE_VERDICTS)}"
+        )
+    guarantees = capability.get("guarantees")
+    if not isinstance(guarantees, list) or not guarantees:
+        raise ValueError(
+            f"{artifact_id}: capability.guarantees must be a non-empty list"
+        )
+    implementation = entry.get("implementation")
+    implementation = (
+        implementation if isinstance(implementation, Mapping) else {}
+    )
+    runner = _require_text(
+        implementation.get("runner"),
+        f"{artifact_id}.implementation.runner",
+    )
+    if runner not in PREDICATE_RUNNERS:
+        raise ValueError(
+            f"{artifact_id}: implementation.runner {runner!r} outside "
+            f"{sorted(PREDICATE_RUNNERS)}"
+        )
+    if runner == "llm_structured":
+        _require_text(
+            implementation.get("system"),
+            f"{artifact_id}.implementation.system",
+        )
+    delta = entry.get("capability_delta")
+    delta = delta if isinstance(delta, Mapping) else {}
+    if str(delta.get("capability_id") or "") != artifact_id:
+        raise ValueError(
+            f"{artifact_id}: capability_delta.capability_id must bind to "
+            "the artifact id"
+        )
+    if str(delta.get("runner") or "") != runner:
+        raise ValueError(
+            f"{artifact_id}: capability_delta.runner must bind to "
+            f"{runner!r}"
+        )
+    _require_text(
+        str(name), f"{artifact_id}.capability.name",
+    )
+
+def _validate_candidate_generator(
+    *, artifact_id: str, gap: Mapping[str, Any],
+    trigger: Mapping[str, Any], entry: Mapping[str, Any],
+) -> None:
+    """Closed contract for recall-side candidate generators.
+
+    Unlike the retired census-probe prompt patch, a candidate generator
+    is a separate LLM stage whose output is parsed, re-identified and
+    re-entered into the normal verification pipeline. It must therefore
+    carry the same component discipline as an evidence predicate.
+    """
+    if gap["affected_stage"] != "census":
+        raise ValueError(
+            f"{artifact_id}: candidate_generator must affect census, "
+            f"got {gap['affected_stage']!r}"
+        )
+    if gap["gap_type"] != "recall":
+        raise ValueError(
+            f"{artifact_id}: candidate_generator requires gap_type=recall, "
+            f"got {gap['gap_type']!r}"
+        )
+    features = {
+        str(name) for name in trigger.get("packet_features") or ()
+    }
+    if not features or not features <= set(PACKET_FEATURES):
+        raise ValueError(
+            f"{artifact_id}: candidate_generator trigger.packet_features "
+            "empty or outside the packet-feature vocabulary"
+        )
+    capability = entry.get("capability")
+    capability = capability if isinstance(capability, Mapping) else {}
+    _require_text(capability.get("name"), f"{artifact_id}.capability.name")
+    _require_text(
+        capability.get("failure_mode"),
+        f"{artifact_id}.capability.failure_mode",
+    )
+    input_schema = capability.get("input")
+    input_schema = input_schema if isinstance(input_schema, Mapping) else {}
+    if not input_schema:
+        raise ValueError(
+            f"{artifact_id}: capability.input must be a non-empty object"
+        )
+    unknown_inputs = sorted(set(input_schema) - GENERATOR_INPUT_FIELDS)
+    if unknown_inputs:
+        raise ValueError(
+            f"{artifact_id}: capability input fields {unknown_inputs} "
+            "outside the closed generator vocabulary"
+        )
+    output_schema = capability.get("output")
+    output_schema = (
+        output_schema if isinstance(output_schema, Mapping) else {}
+    )
+    if output_schema.get("candidates") != {
+        "candidate_id": "text", "claim": "text",
+        "locus_event_id": "text", "evidence_refs": ["text"],
+    }:
+        raise ValueError(
+            f"{artifact_id}: candidate_generator capability.output must "
+            "declare the closed candidates contract"
+        )
+    guarantees = capability.get("guarantees")
+    if not isinstance(guarantees, list) or not guarantees:
+        raise ValueError(
+            f"{artifact_id}: capability.guarantees must be a non-empty list"
+        )
+    implementation = entry.get("implementation")
+    implementation = (
+        implementation if isinstance(implementation, Mapping) else {}
+    )
+    runner = _require_text(
+        implementation.get("runner"),
+        f"{artifact_id}.implementation.runner",
+    )
+    if runner not in CANDIDATE_GENERATOR_RUNNERS:
+        raise ValueError(
+            f"{artifact_id}: candidate_generator runner {runner!r} outside "
+            f"{sorted(CANDIDATE_GENERATOR_RUNNERS)}"
+        )
+    _require_text(
+        implementation.get("system"),
+        f"{artifact_id}.implementation.system",
+    )
+    delta = entry.get("capability_delta")
+    delta = delta if isinstance(delta, Mapping) else {}
+    if str(delta.get("capability_id") or "") != artifact_id:
+        raise ValueError(
+            f"{artifact_id}: capability_delta.capability_id must bind to "
+            "the artifact id"
+        )
+    if str(delta.get("runner") or "") != runner:
+        raise ValueError(
+            f"{artifact_id}: capability_delta.runner must bind to "
+            f"{runner!r}"
+        )
+
+
 def validate_artifact(entry: Mapping[str, Any]) -> None:
     """Closed contract check; any defect raises (fail-closed loading)."""
     artifact_id = _require_text(entry.get("artifact_id"), "artifact_id")
@@ -225,7 +437,7 @@ def validate_artifact(entry: Mapping[str, Any]) -> None:
             _require_text(
                 intervention.get(field), f"{artifact_id}.intervention.{field}",
             )
-    else:
+    elif kind == "adjudication_policy":
         certificate_class = _require_text(
             trigger.get("certificate_class"),
             f"{artifact_id}.trigger.certificate_class",
@@ -248,6 +460,33 @@ def validate_artifact(entry: Mapping[str, Any]) -> None:
                 f"{artifact_id}: action {action!r} outside the closed "
                 "vocabulary"
             )
+        precondition = intervention.get("precondition")
+        if precondition is not None:
+            if not isinstance(precondition, Mapping):
+                raise ValueError(
+                    f"{artifact_id}: intervention.precondition must be an object"
+                )
+            if not str(precondition.get("capability_id") or ""):
+                raise ValueError(
+                    f"{artifact_id}: intervention.precondition.capability_id "
+                    "is required"
+                )
+            expects = precondition.get("expect")
+            if not isinstance(expects, list) or not expects:
+                raise ValueError(
+                    f"{artifact_id}: intervention.precondition.expect must "
+                    "be a non-empty list of predicate verdicts"
+                )
+    elif kind == "candidate_generator":
+        _validate_candidate_generator(
+            artifact_id=artifact_id, gap=gap, trigger=trigger,
+            entry=entry,
+        )
+    else:
+        _validate_evidence_predicate(
+            artifact_id=artifact_id, gap=gap, trigger=trigger,
+            entry=entry,
+        )
 
 
 def registry_hash(payload: Mapping[str, Any]) -> str:
@@ -352,9 +591,42 @@ def policy_actions_of(
     return strongest_actions(pairs)
 
 
+def policy_preconditions_of(
+    artifacts: Sequence[Mapping[str, Any]],
+) -> dict[str, Mapping[str, Any]]:
+    """Class -> capability precondition of the strongest deployed action.
+
+    A precondition ties a conviction-suppressing policy to a structured
+    capability verdict. Without a verdict on the candidate, the policy
+    does not fire (fail-closed to baseline conviction).
+    """
+    selected: dict[str, tuple[str, Mapping[str, Any] | None]] = {}
+    for artifact in artifacts:
+        if artifact.get("kind") != "adjudication_policy":
+            continue
+        trigger = artifact.get("trigger") or {}
+        intervention = artifact.get("intervention") or {}
+        certificate_class = str(trigger.get("certificate_class") or "")
+        action = str(intervention.get("action") or "")
+        precondition = intervention.get("precondition")
+        precondition = (
+            dict(precondition) if isinstance(precondition, Mapping) else None
+        )
+        current = selected.get(certificate_class)
+        if current is None or action == "withhold_conviction":
+            selected[certificate_class] = (action, precondition)
+    return {
+        certificate_class: precondition or {}
+        for certificate_class, (_action, precondition) in selected.items()
+        if precondition
+    }
+
+
 def apply_policy_actions(
     surviving: Sequence[tuple[str, str | None]],
     actions: Mapping[str, str],
+    preconditions: Mapping[str, Mapping[str, Any]] | None = None,
+    predicate_outputs: Mapping[str, Mapping[str, str]] | None = None,
 ) -> tuple[list[str], list[dict[str, str]], list[dict[str, str]]]:
     """Shared conviction semantics of the adjudication execution point.
 
@@ -365,7 +637,15 @@ def apply_policy_actions(
     requirement whose sole-basis premise cannot be verified because a
     fellow surviving certificate is unbound does not fire either — the
     abstention discipline of the binder propagates to the action.
+
+    When a class carries a capability precondition, the action fires only
+    if the predicate produced the expected structured verdict for that
+    candidate. Otherwise the policy is skipped and the conviction stands:
+    a policy can no longer delete a certificate without a capability
+    trace on the same candidate.
     """
+    preconditions = preconditions or {}
+    predicate_outputs = predicate_outputs or {}
     has_content = any(
         certificate_class == BASELINE_CLASS
         for _, certificate_class in surviving
@@ -380,6 +660,27 @@ def apply_policy_actions(
         action = (
             actions.get(certificate_class) if certificate_class else None
         )
+        precondition = preconditions.get(certificate_class) if (
+            certificate_class and action
+        ) else None
+        if precondition:
+            capability_id = str(precondition.get("capability_id") or "")
+            expected = {
+                str(value) for value in precondition.get("expect") or ()
+            }
+            actual = (
+                predicate_outputs.get(candidate_id, {}).get(capability_id)
+                if capability_id else None
+            )
+            if actual not in expected:
+                skipped.append({
+                    "candidate_id": candidate_id,
+                    "certificate_class": str(certificate_class),
+                    "action": action,
+                    "effect": "precondition_unmet",
+                })
+                convicting.append(candidate_id)
+                continue
         if action == "withhold_conviction":
             fired.append({
                 "candidate_id": candidate_id,
@@ -718,9 +1019,16 @@ __all__ = [
     "load_artifact_registry",
     "normalize_binding",
     "policy_actions_of",
+    "policy_preconditions_of",
     "prompt_directive_entries",
     "registry_hash",
     "strongest_actions",
     "validate_artifact",
     "validate_registry",
 ]
+
+
+
+
+
+

@@ -62,7 +62,7 @@ def config_fingerprint(config: Mapping[str, Any]) -> str:
 # different verdict code are NOT the same detector (the rework-era runs
 # shared a config fingerprint across incompatible prompt surfaces).
 _VERDICT_SURFACE_MODULES = (
-    "artifacts.py", "court.py", "conventions.py", "packet.py",
+    "artifacts.py", "capabilities.py", "court.py", "conventions.py", "packet.py",
     "provider.py",
 )
 

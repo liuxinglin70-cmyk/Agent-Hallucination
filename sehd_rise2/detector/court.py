@@ -24,8 +24,13 @@ from sehd_rise2.detector.artifacts import (
     apply_policy_actions,
     bind_surviving,
     binding_entries,
-    policy_actions_of,
-    prompt_directive_entries,
+)
+from sehd_rise2.detector.deploy import DeployPlan
+from sehd_rise2.detector.capabilities import (
+    merge_generated_candidates,
+    render_capability_evidence,
+    run_candidate_generators,
+    run_evidence_predicates,
 )
 from sehd_rise2.detector.conventions import (
     packet_features,
@@ -272,6 +277,7 @@ def _census_user(
 def _verification_user(
     packet: Mapping[str, Any], census: Sequence[Mapping[str, Any]],
     audit: _StageAudit, subset: Sequence[Mapping[str, Any]] | None = None,
+    capability_evidence: str = "",
 ) -> str:
     batch = list(census if subset is None else subset)
     candidates = "\n".join(
@@ -287,7 +293,7 @@ def _verification_user(
     return (
         "Verify each candidate against the cited trajectory evidence.\n\n"
         "CANDIDATES:\n" + candidates + "\n\nTRAJECTORY EVIDENCE:\n"
-        + text
+        + text + capability_evidence
     )
 
 
@@ -295,6 +301,7 @@ def _defense_user(
     packet: Mapping[str, Any], supported: Sequence[Mapping[str, Any]],
     census: Sequence[Mapping[str, Any]], audit: _StageAudit,
     subset: Sequence[Mapping[str, Any]] | None = None,
+    capability_evidence: str = "",
 ) -> str:
     batch = list(supported if subset is None else subset)
     census_by_id = {
@@ -320,7 +327,7 @@ def _defense_user(
     return (
         "Adversarially review every supported certificate below.\n\n"
         "SUPPORTED CERTIFICATES:\n" + "\n".join(rows)
-        + "\n\nTRAJECTORY EVIDENCE:\n" + text
+        + "\n\nTRAJECTORY EVIDENCE:\n" + text + capability_evidence
     )
 
 
@@ -499,6 +506,8 @@ def adjudicate(
     audit: _StageAudit, runtime_valid: bool,
     policy_actions: Mapping[str, str] | None = None,
     certificate_classes: Mapping[str, str] | None = None,
+    policy_preconditions: Mapping[str, Mapping[str, Any]] | None = None,
+    predicate_outputs: Mapping[str, Mapping[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Deterministic, closed-vocabulary terminal adjudication."""
     reasons: list[dict[str, Any]] = []
@@ -556,6 +565,8 @@ def adjudicate(
         ]
         convicting, fired, skipped = apply_policy_actions(
             surviving, policy_actions,
+            preconditions=policy_preconditions,
+            predicate_outputs=predicate_outputs,
         )
         kept = set(convicting)
         error_certs = [
@@ -737,18 +748,20 @@ def _proof(
 def run_court(
     packet: Mapping[str, Any], config: Mapping[str, Any],
     *,
+    plan: "DeployPlan | None" = None,
     artifacts: Sequence[Mapping[str, Any]] = (),
     frozen_census: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Run the three provider stages and the deterministic adjudication.
 
-    ``artifacts`` are the deployed evolution-artifact registry entries:
-    each prompt-directive artifact whose mechanical trigger features all
-    hold for this packet injects its directive + exclusion into all
-    three stage prompts, and each adjudication-policy artifact applies
-    inside the deterministic court (a runtime certificate-class binding
-    runs first; abstained or unbound certificates keep baseline
-    behaviour, so a binder failure never invalidates the run).
+    ``plan`` is the compiled deployment plan of the deployed registry
+    (``detector/deploy.py``): each prompt-directive artifact whose
+    mechanical trigger features all hold for this packet injects its
+    directive + exclusion into all three stage prompts, and each
+    adjudication-policy artifact applies inside the deterministic
+    court (a runtime certificate-class binding runs first; abstained
+    or unbound certificates keep baseline behaviour, so a binder
+    failure never invalidates the run).
 
     ``frozen_census`` replays an earlier roll's candidates instead of
     calling the census stage: the paired-replay anchor that makes
@@ -758,6 +771,11 @@ def run_court(
     recorded per route and the run fails closed; they never raise out of
     the court.
     """
+    if plan is None:
+        plan = (
+            DeployPlan([dict(a) for a in artifacts]) if artifacts
+            else DeployPlan([])
+        )
     audit = _StageAudit()
     providers: dict[str, Any] = {}
     runtime_valid = True
@@ -765,14 +783,13 @@ def run_court(
     features = packet_features(packet)
     conventions = route_conventions(features)
     convention_block = render_convention_block(conventions)
-    evolved_block = render_evolved_block(
-        prompt_directive_entries(artifacts), features,
-    )
-    policy_artifacts = [
-        artifact for artifact in artifacts
-        if artifact.get("kind") == "adjudication_policy"
-    ]
-    policy_actions = policy_actions_of(policy_artifacts)
+    evolved_block = render_evolved_block(plan.prompts, features)
+    policy_actions = plan.policy_actions
+    policy_preconditions = plan.policy_preconditions
+    capability_trace: list[dict[str, Any]] = []
+    capability_outputs: dict[str, list[dict[str, Any]]] = {}
+    capability_evidence = ""
+    candidate_generator_trace: list[dict[str, Any]] = []
     census_system = (
         CENSUS_SYSTEM
         .replace("{convention_block}", convention_block)
@@ -792,16 +809,30 @@ def run_court(
     def _route_facts(proof: dict[str, Any]) -> dict[str, Any]:
         proof["convention_routes"] = conventions
         active: list[str] = []
-        for entry in prompt_directive_entries(artifacts):
-            trigger = {
-                str(name) for name in entry.get("trigger_features") or ()
-            }
-            if trigger and trigger <= features:
-                active.append(str(entry.get("convention_id")))
         active.extend(
-            str(artifact.get("artifact_id")) for artifact in policy_artifacts
+            str(entry.get("convention_id"))
+            for entry in plan.routed_prompts(features)
         )
-        proof["active_artifacts"] = active
+        active.extend(plan.policy_ids)
+        active.extend(
+            str(result.get("capability_id"))
+            for result in capability_trace
+            if result.get("status") == "produced"
+        )
+        active.extend(
+            str(result.get("capability_id"))
+            for result in candidate_generator_trace
+            if result.get("status") == "produced"
+        )
+        proof["active_artifacts"] = sorted(set(active))
+        proof["capability_trace"] = list(capability_trace)
+        proof["candidate_generator_trace"] = list(
+            candidate_generator_trace,
+        )
+        proof["capability_outputs"] = {
+            str(key): [dict(record) for record in records]
+            for key, records in capability_outputs.items()
+        }
         return proof
 
     def _audit_dict() -> dict[str, Any]:
@@ -892,6 +923,23 @@ def run_court(
             })
             census = []
 
+    if runtime_valid and frozen_census is None:
+        candidate_generator_trace, generated = run_candidate_generators(
+            packet=packet, config=config,
+            generators=plan.routed_generators(features),
+            provider_call_fn=provider_call,
+        )
+        census = merge_generated_candidates(census, generated)
+        audit.census_candidate_count = len(census)
+
+    if census and runtime_valid:
+        capability_trace, capability_outputs = run_evidence_predicates(
+            packet=packet, census=census, config=config,
+            predicates=plan.routed_predicates(features),
+            provider_call_fn=provider_call,
+        )
+        capability_evidence = render_capability_evidence(capability_outputs)
+
     if not runtime_valid:
         # The census is the evidence source for every later stage: a broken
         # census means no verification can be authoritative. Fail closed
@@ -947,7 +995,10 @@ def run_court(
             continue
         verification_raw = _run_stage(
             "verification", verification_system,
-            _verification_user(packet, census, audit, subset=batch),
+            _verification_user(
+                packet, census, audit, subset=batch,
+                capability_evidence=capability_evidence,
+            ),
         )
         # Reset per-batch parse state: a previous batch's success must not
         # suppress this batch's contract-repair loop.
@@ -959,6 +1010,7 @@ def run_court(
                 break
             repair_user = _verification_user(
                 packet, census, audit, subset=batch,
+                capability_evidence=capability_evidence,
             ) + (
                 "\n\nCONTRACT_REPAIR: Your previous reply violated the "
                 "certificate contract: " + audit.verification_error + ". "
@@ -1018,7 +1070,10 @@ def run_court(
             audit.defense_error = ""
             defense_raw = _run_stage(
                 "defense", defense_system,
-                _defense_user(packet, supported, census, audit, subset=batch),
+                _defense_user(
+                    packet, supported, census, audit, subset=batch,
+                    capability_evidence=capability_evidence,
+                ),
             )
             batch_decisions = _parse_defense(defense_raw, batch, audit)
             for _repair_attempt in range(2):
@@ -1026,6 +1081,7 @@ def run_court(
                     break
                 repair_user = _defense_user(
                     packet, supported, census, audit, subset=batch,
+                    capability_evidence=capability_evidence,
                 ) + (
                     "\n\nCONTRACT_REPAIR: Your previous reply violated the "
                     "defense contract: " + audit.defense_error + ". Verdict "
@@ -1105,11 +1161,23 @@ def run_court(
                 providers.setdefault("binder_errors", []).append(
                     {"error": str(exc)[:300]}
                 )
+    predicate_outputs = {
+        str(record.get("candidate_id")): {
+            str(capability_id): str(
+                (record.get("output") or {}).get("verdict") or ""
+            )
+        }
+        for capability_id, records in capability_outputs.items()
+        for record in records
+        if record.get("status") == "produced"
+    }
     proof = adjudicate(
         packet=packet, census=census, certificates=certificates,
         decisions=decisions, audit=audit, runtime_valid=runtime_valid,
         policy_actions=policy_actions,
         certificate_classes=certificate_classes,
+        policy_preconditions=policy_preconditions,
+        predicate_outputs=predicate_outputs,
     )
     # Evidence is part of the frozen output: the evolution framework reads
     # the census, the certificates and the defense decisions for causal
@@ -1126,3 +1194,13 @@ def run_court(
             dict(reason) for reason in reasons
         ] or proof["authority_failure_reasons"]
     return proof, providers, _audit_dict()
+
+
+
+
+
+
+
+
+
+
