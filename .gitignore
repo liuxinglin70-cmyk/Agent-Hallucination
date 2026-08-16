@@ -29,8 +29,9 @@ datasets/**/*.jsonl
 !datasets/learning_cases/v1/**
 !datasets/policy_candidates/v1/**
 !datasets/eval_splits/**
-!datasets/policy_library/**
 !datasets/convention_library/**
+!datasets/router_memory.json
+!datasets/calibration/**
 !datasets/calibration/**
 
 # Python

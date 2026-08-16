@@ -1,16 +1,11 @@
-"""Gate calibration: the single source of every promotion tolerance.
+"""Round constraints: runner whitelist and composition tolerance.
 
-The evolution loop promotes on cumulative paired evidence (G2); the
-numbers below say how much noise that evidence may carry. They start at
-absolute-zero discipline (the measured-safe defaults) and are
-recalibrated ONLY from a Round-baseline stability double-run
-(``tools/run_stability.py`` over two same-code runs), never from the
-frozen verification split — that split is the full-experiment acceptance
-surface and must stay outside the loop.
-
-A ``test_retest_flip_rate`` of ``null`` means the noise floor has not
-been measured on the current verdict surface; the paired gates then keep
-their absolute readings (no statistical slack is inferred).
+Research posture: the loop's evidence is the flip itself (a wrong case
+becoming right under the artifact) plus the read-once validation
+report — not pre-calibrated statistical tolerances. The only numbers
+kept here are the two the machinery cannot infer on its own: which
+predicate runners proposals may use this round, and how much net gain
+a composed registry may lose to interaction before it is held.
 """
 
 from __future__ import annotations
@@ -19,17 +14,19 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-GATE_CALIBRATION_SCHEMA = "sehd2.gate_calibration.v1"
+from sehd_rise2.detector.capabilities import PREDICATE_RUNNERS
+
+GATE_CALIBRATION_SCHEMA = "sehd2.gate_calibration.v2"
 DEFAULT_CALIBRATION_PATH = Path(
     "datasets/calibration/gate_calibration.json",
 )
 
-_REQUIRED_SECTIONS: dict[str, tuple[str, ...]] = {
-    "convention_g2": (
-        "max_paired_sentinel_loss", "max_paired_clean_conviction",
-        "max_reproduced_discovery_harm", "min_paired_net_gain",
-    ),
-    "policy_cycle": ("max_added_fn_vs_baseline", "max_tp_lost"),
+_REQUIRED_INT_FIELDS: dict[str, tuple[str, ...]] = {
+    "composition": ("max_interaction_loss",),
+}
+
+_REQUIRED_RUNNER_LIST_FIELDS: dict[str, tuple[str, ...]] = {
+    "capability_proposal": ("predicate_runners",),
 }
 
 
@@ -40,36 +37,50 @@ def validate_calibration(payload: Mapping[str, Any]) -> dict[str, Any]:
             f"gate calibration schema {payload.get('schema_version')!r} "
             f"is not {GATE_CALIBRATION_SCHEMA!r}"
         )
-    flip_rate = payload.get("test_retest_flip_rate")
-    if flip_rate is not None and not (
-        isinstance(flip_rate, (int, float)) and 0 <= flip_rate <= 1
-    ):
-        raise ValueError(
-            "test_retest_flip_rate must be null or a rate in [0, 1]"
-        )
-    for section, fields in _REQUIRED_SECTIONS.items():
+    sections = (
+        set(_REQUIRED_INT_FIELDS)
+        | set(_REQUIRED_RUNNER_LIST_FIELDS)
+    )
+    for section in sorted(sections):
         block = payload.get(section)
         if not isinstance(block, Mapping):
             raise ValueError(f"gate calibration lacks a {section} block")
-        for field in fields:
+        for field in _REQUIRED_INT_FIELDS.get(section, ()):
             value = block.get(field)
             if not isinstance(value, int) or value < 0:
                 raise ValueError(
                     f"gate calibration {section}.{field} must be a "
                     "non-negative integer"
                 )
+        for field in _REQUIRED_RUNNER_LIST_FIELDS.get(section, ()):
+            value = block.get(field)
+            if not (
+                isinstance(value, list)
+                and value
+                and all(isinstance(item, str) for item in value)
+            ):
+                raise ValueError(
+                    f"gate calibration {section}.{field} must be a "
+                    "non-empty list of runner names"
+                )
+            unknown = set(value) - set(PREDICATE_RUNNERS)
+            if unknown:
+                raise ValueError(
+                    f"gate calibration {section}.{field} names runners "
+                    f"outside the closed vocabulary: {sorted(unknown)}"
+                )
     return dict(payload)
 
 
 def load_calibration(path: str | Path | None = None) -> dict[str, Any]:
-    """Load the gate calibration; the tracked file is the single source."""
+    """Load the round constraints; the tracked file is the single source."""
     calibration_path = Path(path) if path is not None else (
         DEFAULT_CALIBRATION_PATH
     )
     if not calibration_path.exists():
         raise ValueError(
             f"gate calibration missing at {calibration_path} — the "
-            "promotion gates refuse to run uncalibrated"
+            "evolution round refuses to run without its constraints file"
         )
     payload = json.loads(calibration_path.read_text(encoding="utf-8"))
     return validate_calibration(payload)
