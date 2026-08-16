@@ -1,6 +1,9 @@
 # 检测器与自进化框架：修复-优化-验证迭代任务文档
 
-状态：**Round 1 已执行，通道 A 被证伪并重设计为约定进化**（2026-08-16）。
+状态：**Round 1.5 底层重诊断完成——主导失效模式是判决噪声地板，
+不是机制缺陷**；稳定性测量、配对重放门与三阶段执行面已落地
+（2026-08-16，见 §零·五）。Round 2 从「跑通 evolve → G2 → 部署 →
+配对验证」起步。
 范围：**持续迭代地修复、优化检测器与自进化框架，每轮在随机重抽的
 100 例数据集上验证有效性，按验证反馈驱动下一轮**。不做完整实验、
 不追求 SOTA 数字。
@@ -68,6 +71,75 @@ FN 18 / TN 24，0 unresolved。FN 归因（进化集 13 例）：defense_overtur
   连带恢复）/ −1 TP 丢失（文本锚定的边缘辩护案例）/ FP 对照 12/12
   不变——净正保留。TP 丢失的边缘案例与未恢复 miss 正是约定进化的
   提取输入。
+
+---
+
+## 零·五、Round 1.5 底层重诊断与机制修复（2026-08-16）
+
+用户裁决「修复一直没用、之前的诊断有问题」成立。全部结论以磁盘
+run 数据重算为准（`tools/run_stability.py` 已把测量固化成仪器）。
+
+### 实证测量（历史 run 免费重算）
+
+| 测量 | 数值 | 含义 |
+|---|---|---|
+| 同 100 例两次运行判决翻面 | 24/100 | 主导信号是 run 间方差 |
+| FP / FN 集合跨 run Jaccard | 0.39 / 0.48 | 每轮错误普查约一半不可再现 |
+| 纯 test-retest（同代码同配置，temp=0） | 10-30% 翻面 | 根源是 provider 非确定性（flash 级） |
+| census 候选集跨 run Jaccard | 均值 0.66，仅 31/89 案例完全一致 | 最大噪声注入点在发现层 |
+| 翻面解剖（24 例） | census 集 17、defense 12、verification 5（可叠合） | 稳定化预算应花在 census/defense |
+| config_fingerprint 覆盖面 | 重构前后同指纹 | 指纹不覆盖 prompt/代码面，跨 run 比较失真 |
+
+推论：**每轮 ~35 例错误质量中，仅 ~17 例（共享 FP 7 + 共享 FN 10）
+是可学习的系统性信号，其余是抽样噪声**。「40 例净翻转 ≥5」的验证
+判据泡在噪声地板里（纯噪声重跑即可达 ~±5），进化有没有真效应在
+这个设计下不可测。
+
+### 自进化「前后没有区别」的三个机制 bug（全部代码证实）
+
+1. **N1 提取输入是噪声**：worksheet 直接取单轮 misses/定罪名单，
+   其中约一半不会在重跑中再现——提取器在学习抽样噪声；
+2. **N2 G2 门不是配对的**：`repaired` 只看 guided 臂定罪、不看
+   unguided 同跑是否自己翻回（纯噪声恢复计入「修复」）；
+   sentinel/clean 零容忍又在 20% 噪声上随机否决——门是掷硬币；
+3. **N3 执行面缺 2/3**：evolved 约定只注入 census prompt（三个
+   system 模板只有 census 带 `{evolved_block}` 占位符），而 69% 的
+   miss 在 defense/verification 层、wrongful-conviction 方向约定在
+   裁决层无任何作用点——部署 genome 后裁决行为不可能改变。
+
+### 已落地修复（140 tests 全绿，pristine 扫描干净）
+
+- **三阶段执行面**（`court.py`）：`{evolved_block}` 进入
+  verification 与 defense system prompt——约定真正作用于判决层；
+- **冻结 census 配对重放**（`run_court(frozen_census=...)` +
+  `Detector.detect(frozen_census=...)`）：一次 unguided 全量滚动
+  冻结候选集，guided 臂只重跑裁决阶段——guided-vs-unguided 差异
+  归因于约定而非 census 重采样；冒烟实测单案例 165s→91s（更便宜）；
+- **worksheet 可再现性过滤**（`confirm_failures`）：提取前对每个
+  miss/定罪做一次 unguided 复跑，只有再现的失败才进 worksheet；
+  复现率本身作为噪声分数落盘；
+- **配对 G2 门**（`validate_conventions` 重写）：`repaired` 配对
+  化（unguided=clean ∧ guided=error）；新增发现层伤害守卫
+  （clean 池 guided 全量 ×2 都定罪才算伤害——伤害须再现，收益须
+  配对）；census_miss 目标的发现层修复记录但不作为部署判据
+  （通道 A 证伪教训）；自恢复目标单列不冒功；
+- **detector_fingerprint**（`runs.py`）：config + 判决面源码
+  （court/conventions/packet/provider）联合哈希，run.json 双指纹
+  落盘；冻结语义从 illusory 变为真实；
+- **稳定性仪器**（`tools/run_stability.py`）：任意两 run 的判决
+  一致率、FP/FN Jaccard、census 集稳定性、翻面阶段解剖。
+
+### Round 2 协议修订
+
+1. **轮基线必附稳定性测量**：同 100 例（或子样本）双跑一次，
+   `run_stability` 报告进轮 manifest——修复是否降低噪声地板成为
+   一级信号；
+2. **进化验证全部走配对重放**（冻结前缀）；40 例 fresh 读取保留，
+   但判据相对噪声地板解释（配对差异 vs 同案例纯重跑翻面的分布）；
+3. **在线判决稳定性是待裁决的成本决策**：判决级 k=3 多数投票
+   （成本 ×3，按 churn 20% 推算翻面率降至 ~10%）或裁决阶段换
+   非 flash 模型——两者都改变预算结构，须用户拍板后才进 Round 2；
+4. 提取-验证循环照 §二 执行，extract 现内建 confirm 步骤。
 
 ---
 

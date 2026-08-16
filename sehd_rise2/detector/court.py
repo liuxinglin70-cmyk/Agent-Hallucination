@@ -102,6 +102,7 @@ VERIFICATION_SYSTEM = (
     "that preserve the referent, the operative meaning and the claimed "
     "precision are not deviations.\n"
     "{convention_block}"
+    "{evolved_block}"
     "A certificate is supported when the cited evidence shows the "
     "deviation is real (the action contradicts the observations, or the "
     "task required something else and nothing in the evidence excuses "
@@ -145,6 +146,7 @@ DEFENSE_SYSTEM = (
     "to work, unless that later step actually corrects the error. Do not "
     "excuse an action merely because the user did not complain.\n"
     "{convention_block}"
+    "{evolved_block}"
     "Reply with ONLY a JSON object of the exact shape:\n"
     '{"decisions": [{"candidate_id": "c1", "verdict": '
     '"upheld|overturned", "rationale": "..."}]}\n'
@@ -183,6 +185,8 @@ class _StageAudit:
 
     @staticmethod
     def _coverage(meta: Mapping[str, Any]) -> str:
+        if meta.get("frozen_replay"):
+            return "replayed"
         if meta.get("degraded") or meta.get("packet_truncated"):
             return "degraded"
         return "complete"
@@ -637,13 +641,19 @@ def run_court(
     packet: Mapping[str, Any], config: Mapping[str, Any],
     *,
     evolved_conventions: Sequence[Mapping[str, Any]] = (),
+    frozen_census: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Run the three provider stages and the deterministic adjudication.
 
     ``evolved_conventions`` are the deployed convention-genome entries
     (the evolution framework's output): each dual-boundary entry whose
     mechanical trigger features all hold for this packet injects its
-    directive + exclusion into all three stage prompts. Returns
+    directive + exclusion into all three stage prompts.
+
+    ``frozen_census`` replays an earlier roll's candidates instead of
+    calling the census stage: the paired-replay anchor that makes
+    guided-vs-unguided comparisons attributable to the adjudication
+    layer instead of to census resampling noise. Returns
     ``(proof, providers, stage_audit_dict)``. Provider failures are
     recorded per route and the run fails closed; they never raise out of
     the court.
@@ -661,22 +671,27 @@ def run_court(
         .replace("{convention_block}", convention_block)
         .replace("{evolved_block}", evolved_block)
     )
-    verification_system = VERIFICATION_SYSTEM.replace(
-        "{convention_block}", convention_block,
+    verification_system = (
+        VERIFICATION_SYSTEM
+        .replace("{convention_block}", convention_block)
+        .replace("{evolved_block}", evolved_block)
     )
-    defense_system = DEFENSE_SYSTEM.replace(
-        "{convention_block}", convention_block,
+    defense_system = (
+        DEFENSE_SYSTEM
+        .replace("{convention_block}", convention_block)
+        .replace("{evolved_block}", evolved_block)
     )
 
     def _route_facts(proof: dict[str, Any]) -> dict[str, Any]:
         proof["convention_routes"] = conventions
-        proof["active_evolved_conventions"] = [
-            str(entry.get("convention_id"))
-            for entry in evolved_conventions
-            if {str(name) for name in entry.get("trigger_features") or ()}
-            and {str(name) for name in entry.get("trigger_features") or ()}
-            <= features
-        ]
+        active: list[str] = []
+        for entry in evolved_conventions:
+            trigger = {
+                str(name) for name in entry.get("trigger_features") or ()
+            }
+            if trigger and trigger <= features:
+                active.append(str(entry.get("convention_id")))
+        proof["active_evolved_conventions"] = active
         return proof
 
     def _audit_dict() -> dict[str, Any]:
@@ -732,30 +747,40 @@ def run_court(
         providers[name] = meta
         return parsed
 
-    census_raw = _run_stage(
-        "census", census_system, _census_user(packet, audit),
-    )
-    census = _parse_census(census_raw, audit)
-    for _repair_attempt in range(2):
-        if audit.census_ok:
-            break
-        # Contract-repair pass: name the exact violation and re-ask. The
-        # model re-emits the corrected object; we never reinterpret.
-        repair_user = _census_user(packet, audit) + (
-            "\n\nCONTRACT_REPAIR: Your previous reply violated the census "
-            "contract: " + audit.census_error + ". Return the complete "
-            "corrected JSON object, starting with {."
+    if frozen_census is not None:
+        # Paired replay: the caller fixed the candidate set (an earlier
+        # roll's census), so discovery variance cannot leak into the
+        # comparison; only the adjudication stages re-run.
+        census = [dict(candidate) for candidate in frozen_census]
+        audit.census_ok = True
+        audit.census_candidate_count = len(census)
+        audit.census_view_meta = {"frozen_replay": True}
+    else:
+        census_raw = _run_stage(
+            "census", census_system, _census_user(packet, audit),
         )
-        census_raw = _run_stage("census", census_system, repair_user)
         census = _parse_census(census_raw, audit)
-    if not audit.census_ok:
-        runtime_valid = False
-        reasons.append({
-            "component": "census",
-            "code": "contract_error",
-            "error_type": audit.census_error,
-        })
-        census = []
+        for _repair_attempt in range(2):
+            if audit.census_ok:
+                break
+            # Contract-repair pass: name the exact violation and re-ask.
+            # The model re-emits the corrected object; we never
+            # reinterpret.
+            repair_user = _census_user(packet, audit) + (
+                "\n\nCONTRACT_REPAIR: Your previous reply violated the "
+                "census contract: " + audit.census_error + ". Return the "
+                "complete corrected JSON object, starting with {."
+            )
+            census_raw = _run_stage("census", census_system, repair_user)
+            census = _parse_census(census_raw, audit)
+        if not audit.census_ok:
+            runtime_valid = False
+            reasons.append({
+                "component": "census",
+                "code": "contract_error",
+                "error_type": audit.census_error,
+            })
+            census = []
 
     if not runtime_valid:
         # The census is the evidence source for every later stage: a broken

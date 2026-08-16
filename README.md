@@ -4,16 +4,18 @@ SEHD-RISE2 是 SEHD-RISE 的重建工作区（`sehd_rise2/`）。当前形态由
 
 1. **最小冻结检测器**（`sehd_rise2/detector/`）——从零重写的独立检测器：
    census（候选发现）→ verification（证据核验）→ defense（对抗复核）→
-   确定性法庭聚合 → fail-closed 权威信封。它是当前一切工作的冻结基座。
-2. **Phase 0 失败理解层**（`sehd_rise2/evolution/`）——自进化框架的第一阶段
-   基础设施：把检测失败结构化为 **事实 → 假设 → 能力缺口** 三层 Learning Case，
-   从真实失败分布建立并**冻结** Capability Gap Taxonomy（词表），并为未来
-   Meta Skill 定义诊断协议。它只理解失败，不生成 Skill——生成 Skill 的 Phase 1
-   将由数据决定第一个进化目标（capability-driven，不预设 L1）。
+   确定性法庭聚合 → fail-closed 权威信封；判决约定层按机械包特征路由
+   注入三阶段。它是当前一切工作的冻结基座。
+2. **自进化框架**（`sehd_rise2/evolution/`）——失败理解（Learning Case +
+   能力缺口词表）、L2 策略层与离线/运行时重放、门控进化循环、约定进化
+   （复现过滤 → 提取 → G1 → 冻结前缀配对 G2 → 部署三阶段执行面）。
 
-100 例真实实验（`runs/random100_20260815_142446`）决定性准确率 76.0%、
-FN=12 / FP=12；49 个失败案例的能力归因与 Phase 0 交付见
-[EvoGuard 实验计划与迭代路线文档](EvoGuard_experiment_plan_and_iteration_roadmap.md)。
+当前阶段是**修复-验证迭代**（fix-val）：每轮随机重抽 100 例验证有效性，
+过程真源见 [FIX_VALIDATE_ITERATION_PLAN.md](FIX_VALIDATE_ITERATION_PLAN.md)。
+Round 1（fresh 100 基线 acc 0.66）与 Round 1.5（噪声地板重诊断 +
+进化机制修复）已落地；核心实证——判决噪声地板（同 100 例双跑翻面
+24%、单轮 FP/FN 集合约一半不可再现）是此前「修复一直没用」的根源，
+已由稳定性仪器（`tools/run_stability.py`）与配对重放门纳入测量。
 
 ## 核心目标与设计纪律（必读 / Mandatory）
 
@@ -66,25 +68,35 @@ sehd_rise2/
 ├── detector/                     # 最小冻结检测器（可独立运行）
 │   ├── api.py                    # 唯一 Detector API：Detector.detect / detect()
 │   ├── court.py                  # 最小法庭：三阶段 provider + 确定性裁决
+│   ├── conventions.py            # 判决约定层：闭卷词表 + 包特征路由 + 双向边界
 │   ├── provider.py               # provider 传输：直连 HTTPS / 重试 / JSON 修复
-│   ├── packet.py                 # 轨迹数据包 + gold 输入防火墙
+│   ├── packet.py                 # 轨迹数据包 + gold 输入防火墙 + 分阶段视图
 │   ├── result.py                 # 冻结输出信封 + fail-closed 权威读取
 │   ├── config.py / env.py        # 配置解析（env 覆盖优先级）与 .env 加载
 │   ├── skills.py                 # 进化接口：load_skill_genome / load_policy_genome
 │   ├── evolution_api.py          # 进化接口：Detection Truth 只读投影
-│   ├── runs.py                   # 运行记录：每案例过程落盘 + 台账推导统计
+│   ├── runs.py                   # 运行记录：双指纹 + 每案例过程落盘 + 台账推导统计
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
 │   └── configs/detector_v1.json  # 三路由最小配置
-├── evolution/                    # 进化框架（Phase 0 + Phase 1-A/B/C 策略进化）
+├── evolution/                    # 自进化框架
 │   ├── gap_taxonomy.py           #   冻结能力缺口词表（单一真源）
 │   ├── diagnosis.py              #   机械失败分类 + 诊断协议校验
 │   ├── learning_case.py          #   Learning Case schema + 三层校验器
 │   ├── assemble.py               #   装配 / 校验 / 报告 CLI
 │   ├── policy.py                 #   L2 策略层：词表 + 候选集 + genome 构建
 │   ├── replay.py                 #   离线重放：绑定校验 + 裁决重放 + oracle/runtime 对比
-│   └── binder.py                 #   运行时证书类绑定器（label-free 感知阶段）
+│   ├── binder.py                 #   运行时证书类绑定器（label-free 感知阶段）
+│   ├── proposal.py / cycle.py    #   L2 提案生成 + 门控进化循环（累积重放门 + 台账）
+│   └── convention_evolution.py   #   约定进化：复现过滤 → 提取 → G1 → 配对 G2
 ├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
+
+tools/                            # 仓库级测量/审计工具
+├── run_stability.py              #   双 run 判决稳定性：一致率、FP/FN Jaccard、
+│                                 #   census 集稳定性、翻面阶段解剖
+├── audit_packet_ids.py           #   run 树 packet/证据引用完整性审计
+├── build_eval_split.py           #   评测抽样（分层不变量 + manifest）
+└── build_phase2_split.py         #   Phase 2 进化/验证 split
 
 datasets/learning_cases/v1/       # Phase 0 数据资产（进版本控制）
 ├── annotations.json              #   人工层单一真源（49 例，已最终复核）
@@ -99,7 +111,9 @@ datasets/policy_candidates/v1/    # Phase 1-A/B/C 数据资产（进版本控制
 ├── replay_result.json / REPORT.md            # oracle 重放结果与报告
 ├── runtime_replay_result.json / RUNTIME_REPLAY_REPORT.md   # 对比结果
 
-tests/                            # 状态机单元测试（107 例全绿）
+datasets/eval_splits/             # 冻结评测 split 与轮 manifest（进版本控制）
+
+tests/                            # 契约单元测试（140 例全绿）
 experiments/                      # 本地实验工作区（产物被 git 忽略）
 ```
 
@@ -124,6 +138,33 @@ python -m sehd_rise2.detector --record trajectory.json --output-dir out
 Provider 路由解析顺序：`SEHD_ROUTE_<ROUTE>_*` → `SEHD_DETECTOR_*` →
 `SEHD_PROVIDER_*` → JSON 配置 → DeepSeek 官方端点/模型默认值；进程环境优先于
 仓库 `.env`。
+
+### 稳定性测量（噪声地板仪器）
+
+```bash
+python tools/run_stability.py runs/<run_a> runs/<run_b> [--out report.json]
+```
+
+任意两个 run 的判决一致率、FP/FN 集合 Jaccard、census 候选集稳定性与
+翻面阶段解剖。任何「修复前后对比」都必须先对照这个噪声地板再归因。
+
+### 约定进化循环（fix-val Round 2+）
+
+```bash
+python -m sehd_rise2.evolution.convention_evolution extract \
+    --run runs/<id> --out conventions_raw.json   # 内建失败复现过滤
+python -m sehd_rise2.evolution.convention_evolution gate \
+    --raw conventions_raw.json --out conventions_gated.json
+python -m sehd_rise2.evolution.convention_evolution genome \
+    --conventions conventions_gated.json --out convention_genome.json
+python -m sehd_rise2.evolution.convention_evolution validate \
+    --run runs/<id> --conventions conventions_gated.json --out-dir <dir>
+```
+
+`validate` 是冻结 census 前缀的配对重放：每案例一次 unguided 全量滚动
+冻结候选集，guided 臂只重跑裁决阶段并注入约定——配对差异归因于约定；
+发现层伤害须两次全量重放都定罪才算。部署 =
+`Detector.detect(..., evolved_conventions=genome)`（三阶段 prompt 注入）。
 
 ### Phase 0 学习案例装配（离线复盘）
 
@@ -290,6 +331,27 @@ LLM 生产 rationale 时知道自己的定罪依据（对照措辞 / 外部知�
 缺席），但该信号在证书表示中被丢弃。表示层修复（证书生产时记录 basis
 信号）属检测器侧变更，冻结检测器的 P1-D 不动它；进入 Phase 2 进化清单。
 
+## 修复-验证迭代（fix-val，当前阶段）
+
+Phase 0 → Phase 1-D 之后进入持续迭代：每轮随机重抽 100 例（60 进化 +
+40 验证），轮内「重抽 → 轮基线（附双跑稳定性测量）→ 修复 → 进化 →
+配对验证 → 反馈归因」。完整协议、门与判据的真源是
+[FIX_VALIDATE_ITERATION_PLAN.md](FIX_VALIDATE_ITERATION_PLAN.md)。
+
+已落地的关键实证与修复：
+
+- **Round 1**（commit 88392b0）：约定层抽取（prompt 去 BFCL 硬编码）、
+  census 视野全量化、证据窗口 ±2、三态判决 + FN 归因管道；通道 A
+  （census 探针）两轮 G2 后被证伪删除，重设计为约定进化。
+- **Round 1.5**（本轮）：重诊断确立**判决噪声地板**——同 100 例双跑
+  翻面 24%、FP/FN 集合 Jaccard 0.39/0.48（单轮错误普查约一半不可
+  再现）、纯 test-retest（temp=0）翻面 10-30%，census 候选集不稳定
+  （Jaccard 0.66）是最大噪声注入点。自进化「前后无差异」的三个机制
+  bug（提取学噪声 / G2 非配对 / 执行面缺 2/3）全部修复：
+  evolved 约定注入全部三阶段 prompt、`frozen_census` 冻结前缀配对
+  重放、worksheet 失败复现过滤、`detector_fingerprint` 覆盖判决面
+  源码、`tools/run_stability.py` 稳定性仪器。
+
 ## 学习口径（label-free 设计边界）
 
 - **框架不宣称能发现漏检。** label-free 运行没有任何信号能判定「gold 为 error
@@ -301,13 +363,14 @@ LLM 生产 rationale 时知道自己的定罪依据（对照措辞 / 外部知�
 
 ## 下一步
 
-Phase 1-C.5 已交付：binder 校准闭环（判别式定义 + 结构化弃权 + 混淆矩阵
-仪器），一致率 84%→92%、FN 回归消除、全配置零 TP 损失、pro 探针证明残余
-为证据表示层瓶颈。下一步是 **P1-D fresh unseen evaluation**：
-AgentHallu 剩余样本 fresh split + 定向 canary 集，走 冻结检测器 →
-运行时 binder → policy genome → 进化侧裁决 → join gold 的完整链路；
-fresh 集零已知回归 + 净改善才允许 `promoted`。证书表示层的 basis 信号
-记录进入 Phase 2 进化清单。
+Round 2 起步序列（协议见 FIX_VALIDATE_ITERATION_PLAN.md §零·五）：
+重抽 100 → 双跑轮基线附 `run_stability` 报告 → extract（内建复现
+过滤）→ G1 → 冻结前缀配对 G2 → 部署 → 40 例 fresh 配对验证（判据
+相对噪声地板解释）。
+
+待用户拍板的成本决策：在线判决稳定性方案——判决级 k=3 多数投票
+（成本 ×3，按 churn 20% 推算翻面率降至 ~10%）或裁决阶段换非 flash
+模型；两者都改变预算结构，选定后才并入 Round 2。
 
 ## 历史沿革
 

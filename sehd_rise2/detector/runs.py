@@ -55,6 +55,35 @@ def config_fingerprint(config: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+# The modules whose source defines the verdict surface: prompts, packet
+# rendering and transport semantics. The detector fingerprint covers them
+# because two runs with identical configs but different prompt code are
+# NOT the same detector (the rework-era runs shared a config fingerprint
+# across incompatible prompt surfaces).
+_VERDICT_SURFACE_MODULES = (
+    "court.py", "conventions.py", "packet.py", "provider.py",
+)
+
+
+def detector_fingerprint(config: Mapping[str, Any]) -> str:
+    """Identity of the detector's full decision surface.
+
+    Resolved config plus the source of every prompt/rendering module:
+    same fingerprint <=> same verdict law. Never contains credential
+    values (they live only in env vars the config names).
+    """
+    root = Path(__file__).resolve().parent
+    parts = [
+        json.dumps(
+            dict(config), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"),
+        ),
+    ]
+    for name in _VERDICT_SURFACE_MODULES:
+        parts.append((root / name).read_text(encoding="utf-8"))
+    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
 def _atomic_write(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -120,6 +149,9 @@ def write_run_meta(
         "created_at": _now(),
         "config_fingerprint": (
             config_fingerprint(config) if config is not None else ""
+        ),
+        "detector_fingerprint": (
+            detector_fingerprint(config) if config is not None else ""
         ),
         "case_ids": sorted(set(str(value) for value in case_ids)),
     }
@@ -223,6 +255,7 @@ __all__ = [
     "RUN_SCHEMA",
     "config_fingerprint",
     "default_runs_root",
+    "detector_fingerprint",
     "new_run_id",
     "record_case_run",
     "summarize_run",

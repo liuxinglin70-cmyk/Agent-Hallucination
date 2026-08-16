@@ -298,3 +298,99 @@ def test_render_evolved_block_requires_dual_boundary() -> None:
         [one_sided],
         {"numeric_argument_restatement", "numeric_observations"},
     ) == ""
+
+
+# --------------------------------------------------------------------------
+# evolved conventions reach ALL THREE stage prompts; frozen-census replay
+# --------------------------------------------------------------------------
+
+
+def _full_court_provider(seen: dict, *, verify: str = "supported",
+                         defense: str = "upheld"):
+    def _call(*, route, system, user, purpose, **_kwargs):
+        if purpose == "census":
+            seen["census_system"] = system
+            return {"candidates": [{
+                "candidate_id": "c1",
+                "claim": "the agent did X instead of Y",
+                "locus_event_id": "event_002",
+                "evidence_refs": ["event_002"],
+            }]}, {"attempts": 1}
+        if purpose == "verification":
+            seen["verification_system"] = system
+            return {"certificates": [
+                {"candidate_id": "c1", "verdict": verify,
+                 "rationale": "r"},
+            ]}, {"attempts": 1}
+        if purpose == "defense":
+            seen["defense_system"] = system
+            return {"decisions": [
+                {"candidate_id": "c1", "verdict": defense,
+                 "rationale": "r"},
+            ]}, {"attempts": 1}
+        raise AssertionError(f"unexpected purpose {purpose!r}")
+
+    return _call
+
+
+def test_evolved_conventions_reach_all_three_stage_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = build_packet(_record([
+        {
+            "role": "assistant", "content": "",
+            "tool_calls": [{"name": "log", "arguments": {"value": 36}}],
+            "tool_responses": ["{'result': 2.0}"],
+        },
+        {
+            "role": "assistant", "content": "",
+            "tool_calls": [{"name": "echo",
+                            "arguments": {"content": "2.0000"}}],
+            "tool_responses": ["None"],
+        },
+    ], question="compute log to 4 decimals"))
+    config = {
+        "census_route": {}, "verification_route": {}, "defense_route": {},
+    }
+    seen: dict = {}
+    monkeypatch.setattr(
+        court_module, "provider_call", _full_court_provider(seen),
+    )
+    proof, _p, _a = court_module.run_court(
+        packet, config, evolved_conventions=[EVOLVED],
+    )
+    assert proof["state"] == "verified_error"
+    for stage in ("census_system", "verification_system",
+                  "defense_system"):
+        assert "Treat every later tool-argument restatement" in seen[stage]
+        assert "NOT WHEN" in seen[stage]
+
+
+def test_frozen_census_replays_adjudication_without_census_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = build_packet(_record([
+        {"role": "user", "content": "do the task"},
+        {"role": "assistant", "content": "here is the answer"},
+    ]))
+    config = {
+        "census_route": {}, "verification_route": {}, "defense_route": {},
+    }
+    seen: dict = {}
+    monkeypatch.setattr(
+        court_module, "provider_call", _full_court_provider(seen),
+    )
+    frozen = [{
+        "candidate_id": "c1",
+        "claim": "the agent did X instead of Y",
+        "locus_event_id": "event_002",
+        "evidence_refs": ["event_002"],
+    }]
+    proof, providers, audit = court_module.run_court(
+        packet, config, frozen_census=frozen,
+    )
+    assert "census" not in providers
+    assert proof["state"] == "verified_error"
+    assert proof["census"][0]["candidate_id"] == "c1"
+    assert audit["census_ok"] is True
+    assert audit["candidate_count"] == 1

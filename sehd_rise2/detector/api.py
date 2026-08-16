@@ -10,7 +10,7 @@ semantics to the evolution framework.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from sehd_rise2.detector.config import default_config_path, load_config
 from sehd_rise2.detector.court import run_court
@@ -44,6 +44,7 @@ class Detector:
         *,
         case_id: str = "case",
         evolved_conventions: Mapping[str, Any] | None = None,
+        frozen_census: Sequence[Mapping[str, Any]] | None = None,
         genome: Mapping[str, Any] | None = None,
         policy_genome: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -51,6 +52,8 @@ class Detector:
 
         ``evolved_conventions`` is the deployed convention genome: its
         route-matched dual-boundary entries enter all stage prompts.
+        ``frozen_census`` replays that candidate set instead of rolling
+        the census stage (the paired-replay anchor; adjudication only).
         """
         validate_record(record)
         packet = build_packet(record)
@@ -58,6 +61,9 @@ class Detector:
             packet, self.config,
             evolved_conventions=list(
                 (evolved_conventions or {}).get("conventions") or []
+            ),
+            frozen_census=(
+                list(frozen_census) if frozen_census is not None else None
             ),
         )
         provenance: dict[str, Any] = {}
@@ -95,6 +101,7 @@ def detect(
     case_id: str = "case",
     config: Mapping[str, Any] | None = None,
     evolved_conventions: Mapping[str, Any] | None = None,
+    frozen_census: Sequence[Mapping[str, Any]] | None = None,
     genome: Mapping[str, Any] | None = None,
     policy_genome: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -102,7 +109,8 @@ def detect(
     detector = Detector(config) if config is not None else _default_detector()
     return detector.detect(
         record, case_id=case_id, evolved_conventions=evolved_conventions,
-        genome=genome, policy_genome=policy_genome,
+        frozen_census=frozen_census, genome=genome,
+        policy_genome=policy_genome,
     )
 
 

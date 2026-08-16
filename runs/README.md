@@ -5,7 +5,9 @@
 
 ```text
 runs/<run_id>/
-├── run.json            # 运行元信息：schema、created_at、配置指纹、案例清单
+├── run.json            # 运行元信息：schema、created_at、双指纹
+│                       #   （config_fingerprint 配置身份 +
+│                       #    detector_fingerprint 配置+判决面源码身份）、案例清单
 ├── summary.json        # 无标签聚合统计（由案例台账推导，单一真源）
 └── cases/<case_id>/
     ├── input.json      # 送入检测器的 label-free 输入（原样）
