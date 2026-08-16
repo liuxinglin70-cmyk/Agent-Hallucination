@@ -13,8 +13,8 @@ import json
 from pathlib import Path
 
 from sehd_rise2.detector.api import Detector
+from sehd_rise2.detector.artifacts import load_artifact_registry
 from sehd_rise2.detector.config import default_config_path, load_config
-from sehd_rise2.detector.skills import load_policy_genome, load_skill_genome
 
 
 def main() -> int:
@@ -32,26 +32,21 @@ def main() -> int:
         "--output-dir", type=Path, default=Path("detector_output"),
     )
     parser.add_argument(
-        "--genome", type=Path, default=None,
-        help="optional persisted skill genome JSON; loading is explicit and fail-closed",
-    )
-    parser.add_argument(
-        "--policy-genome", type=Path, default=None,
-        help="optional persisted policy genome JSON; loading is explicit and fail-closed",
+        "--artifacts", type=Path, default=None,
+        help="optional persisted evolution-artifact registry JSON; "
+        "loading is explicit and fail-closed",
     )
     args = parser.parse_args()
     config = load_config(
         args.config if args.config is not None else default_config_path(),
     )
     detector = Detector(config=config, require_credentials=False)
-    genome = load_skill_genome(args.genome) if args.genome else None
-    policy_genome = (
-        load_policy_genome(args.policy_genome) if args.policy_genome else None
+    artifacts = (
+        load_artifact_registry(args.artifacts) if args.artifacts else None
     )
     record = json.loads(args.record.read_text(encoding="utf-8"))
     result = detector.detect(
-        record, case_id=args.case_id, genome=genome,
-        policy_genome=policy_genome,
+        record, case_id=args.case_id, artifacts=artifacts,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = args.output_dir / "prediction.json"

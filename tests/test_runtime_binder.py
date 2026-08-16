@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from sehd_rise2.evolution.binder import (
+from sehd_rise2.detector.artifacts import (
+    CERTIFICATE_CLASSES,
     assert_label_free,
-    binding_inputs,
     normalize_binding,
 )
-from sehd_rise2.evolution.policy import CERTIFICATE_CLASSES
+from sehd_rise2.evolution.binder import binding_inputs
 from sehd_rise2.evolution.replay import (
     RUNTIME_BINDINGS_SCHEMA,
     replay_case,
@@ -48,7 +48,8 @@ def _tree():
              "content": "do the task"},
             {"event_id": "event_002", "role": "assistant",
              "content": "done", "tool_interactions": [
-                 {"tool_name": "t", "arguments": {"a": 1}},
+                 {"tool_name": "t", "arguments": {"a": 1},
+                  "observation": "{'total': 542.7}"},
              ]},
         ],
     }
@@ -67,6 +68,10 @@ def test_binding_inputs_carry_only_allowlisted_fields():
         "packet_events",
     }
     assert entry["packet_events"][0]["event_id"] == "event_001"
+    # The observation is the decisive side of every class-boundary test:
+    # it must reach the binder, not just the call arguments.
+    interaction = entry["packet_events"][1]["tool_interactions"][0]
+    assert interaction["observation"] == "{'total': 542.7}"
 
 
 def test_label_free_scan_rejects_gold_bearing_fields():

@@ -8,7 +8,7 @@ The envelope is the frozen output contract every consumer reads:
   basis, coverage, policy evaluation, certificates).
 - ``providers`` / ``authority_failure_reasons``: machine-readable failure
   diagnostics.
-- ``provenance``: which deployed genomes ran.
+- ``provenance``: which deployed evolution-artifact registry ran.
 
 The authority readers below are the ONLY legal way for the evolution
 framework to read a terminal state; they never rewrite factual records.
@@ -21,16 +21,6 @@ from typing import Any, Mapping
 VALID_DETECTION_STATES = frozenset({
     "verified_error", "verified_clean", "unresolved",
 })
-
-_LEGACY_INCIDENT_STATE_MAP = {
-    "verified_error": "verified_error",
-    "verified_hallucination": "verified_error",
-    "verified_incident": "verified_error",
-    "verified_clean": "verified_clean",
-    "verified_non_hallucination": "verified_clean",
-    "no_verified_incident": "verified_clean",
-    "unresolved": "unresolved",
-}
 
 
 def decision_authority_invalid(row: Mapping[str, Any]) -> bool:
@@ -48,20 +38,6 @@ def decision_authority_invalid(row: Mapping[str, Any]) -> bool:
         or bool(top and top != "authoritative")
         or bool(inner and inner != "authoritative")
     )
-
-
-def missing_decision_authority(row: Mapping[str, Any]) -> bool:
-    """Whether the row carries no top-level decision authority at all."""
-    return not str(row.get("decision_authority") or "").strip()
-
-
-def has_explicit_authority(row: Mapping[str, Any]) -> bool:
-    """Whether the row carries the authoritative envelope required for scoring."""
-    proof = row.get("proof_adjudication")
-    proof = proof if isinstance(proof, Mapping) else {}
-    top = str(row.get("decision_authority") or "").strip().lower()
-    inner = str(proof.get("decision_authority") or "").strip().lower()
-    return top == "authoritative" and (not inner or inner == "authoritative")
 
 
 def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
@@ -105,19 +81,16 @@ def resolve_authoritative_state(row: Mapping[str, Any]) -> str:
                     f"Invalid incident_state.occurrence_state: {occurrence!r}"
                 )
             return normalized
-        incident = incident.get("state") or incident.get("verdict")
+        incident = incident.get("state")
     if incident not in (None, ""):
-        normalized = _LEGACY_INCIDENT_STATE_MAP.get(str(incident))
-        if normalized is None:
+        normalized = str(incident)
+        if normalized not in VALID_DETECTION_STATES:
             raise ValueError(f"Invalid incident_state: {incident!r}")
         return normalized
-    legacy_state = str(row.get("state") or "")
-    if legacy_state not in VALID_DETECTION_STATES:
-        normalized_legacy = _LEGACY_INCIDENT_STATE_MAP.get(legacy_state)
-        if normalized_legacy is not None:
-            return normalized_legacy
-        raise ValueError(f"Invalid detector state: {legacy_state!r}")
-    return legacy_state
+    state = str(row.get("state") or "")
+    if state not in VALID_DETECTION_STATES:
+        raise ValueError(f"Invalid detector state: {state!r}")
+    return state
 
 
 def resolve_evolution_state(row: Mapping[str, Any]) -> str:
@@ -170,13 +143,7 @@ def build_detection_output(
         "runtime_valid": runtime_valid,
         "state": state,
         "decision_authority": authority,
-        "incident_state": {
-            "state": (
-                "verified_hallucination" if state == "verified_error"
-                else "verified_non_hallucination" if state == "verified_clean"
-                else "unresolved"
-            ),
-        },
+        "incident_state": {"state": state},
         "responsible_event_id": responsible_event_id,
         "responsible_step": responsible_step,
         "occurrence_state": state,
@@ -229,8 +196,6 @@ __all__ = [
     "VALID_DETECTION_STATES",
     "build_detection_output",
     "decision_authority_invalid",
-    "has_explicit_authority",
-    "missing_decision_authority",
     "prediction_state",
     "resolve_authoritative_state",
     "resolve_evolution_state",

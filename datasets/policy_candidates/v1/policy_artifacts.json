@@ -1,0 +1,264 @@
+{
+  "schema_version": "sehd2.evolution_artifact.v1",
+  "artifacts": [
+    {
+      "artifact_id": "L2-P1",
+      "version": "v1",
+      "kind": "adjudication_policy",
+      "execution_point": "adjudication",
+      "gap": {
+        "category": "policy",
+        "name": "strictness_miscalibration",
+        "gap_type": "precision",
+        "failure_signature": "The court reads instructions about HOW to work — output format, search procedure, effort scope, plan hygiene, answer-quality preferences — as factual requirements, so trajectories whose content is correct are convicted on compliance style. At benchmark tolerance these instructions are advisory: the hallucination taxonomy targets fabricated, misreported or contradicted content, not working style. A compliance deviation may only convict alongside a separately established content error. Delivery-channel deviations are OUT OF SCOPE: they are non-separable under the current evidence representation (NS-1) and the policy abstains on them.",
+        "affected_stage": "adjudication",
+        "expected_capability": "a matching certificate cannot be the sole conviction basis; a surviving content_contradiction certificate on the same case still convicts"
+      },
+      "trigger": {
+        "certificate_class": "requirement_compliance"
+      },
+      "intervention": {
+        "action": "require_corroborating_content_error",
+        "exclusions": [
+          "omission of a call the task defines as a required deliverable (the benchmark convicts omissions: BFCL/027.json survives as a true positive and the observation false negatives BFCL/067.json, BFCL/071.json wait on exactly that capability)",
+          "tool-argument value deviations (the exact-match doctrine stays)",
+          "instruction violations that produced a factual error (a content certificate exists and convicts on its own)",
+          "delivery-channel/termination deviations (answer extracted but session closed via terminate; recorded as non-separable under the current evidence representation — see NS-1)"
+        ]
+      },
+      "capability_delta": {
+        "before_capability": "a surviving requirement_compliance certificate convicts like any other",
+        "after_capability": "a surviving requirement_compliance certificate a matching certificate cannot be the sole conviction basis; a surviving content_contradiction certificate on the same case still convicts"
+      },
+      "risk_boundary": {
+        "statement": "Only certificates whose entire proof basis is the instruction text are covered, and the action removes sole-basis conviction rather than the certificate itself.",
+        "do_not_apply": [
+          "required core-action omissions (BFCL/067.json, BFCL/071.json on the FN side; BFCL/027.json on the TP side)",
+          "tool-argument values (exact-match doctrine)",
+          "instruction violations with a factual consequence",
+          "delivery-channel/termination deviations (NS-1 cluster: OpenManus/048.json, OpenManus/067.json, OpenManus/072.json)"
+        ]
+      },
+      "provenance": {
+        "derived_from": {
+          "learning_cases": "datasets/learning_cases/v1/cases",
+          "run": "runs/random100_20260815_142446"
+        },
+        "source_gap_names": [
+          "strictness_miscalibration"
+        ],
+        "failure_cases": [
+          "Magentic_One/065.json",
+          "Magentic_One/066.json",
+          "Octotools/016.json",
+          "Octotools/028.json"
+        ],
+        "candidate_set_status": "first_pass"
+      }
+    },
+    {
+      "artifact_id": "L2-P2",
+      "version": "v1",
+      "kind": "adjudication_policy",
+      "execution_point": "adjudication",
+      "gap": {
+        "category": "policy",
+        "name": "strictness_miscalibration",
+        "gap_type": "precision",
+        "failure_signature": "Verification convicts qualitative material layered on top of real observations — evaluative characterizations of cited data, code-to-name expansions, unit renderings — treating interpretation as fabrication. These additions introduce no new checkable specific: everything they assert renders content the cited observations already contain.",
+        "affected_stage": "adjudication",
+        "expected_capability": "a matching surviving certificate cannot convict"
+      },
+      "trigger": {
+        "certificate_class": "presentational_addition"
+      },
+      "intervention": {
+        "action": "withhold_conviction",
+        "exclusions": [
+          "agent self-assessments of its own work ('Everything was streamlined and handled efficiently' is the gold error of BFCL/104.json)",
+          "specifics no observation contains (OpenManus/060.json's invented alma mater)",
+          "referent-changing substitutions (OpenDeepSearch/007.json: calling CH3NHCOOCH2CH3 'ethyl carbamate' names a different compound; that is not enrichment)"
+        ]
+      },
+      "capability_delta": {
+        "before_capability": "a surviving presentational_addition certificate convicts like any other",
+        "after_capability": "a surviving presentational_addition certificate a matching surviving certificate cannot convict"
+      },
+      "risk_boundary": {
+        "statement": "The policy protects renderings of observed content only; it never protects a specific the evidence base lacks or a claim about the agent's own performance.",
+        "do_not_apply": [
+          "self-assessments and completion claims (BFCL/104.json)",
+          "invented specifics (OpenManus/060.json)",
+          "referent substitutions (OpenDeepSearch/007.json)"
+        ]
+      },
+      "provenance": {
+        "derived_from": {
+          "learning_cases": "datasets/learning_cases/v1/cases",
+          "run": "runs/random100_20260815_142446"
+        },
+        "source_gap_names": [
+          "strictness_miscalibration",
+          "expression_tolerance"
+        ],
+        "failure_cases": [
+          "BFCL/127.json",
+          "Magentic_One/014.json"
+        ],
+        "candidate_set_status": "first_pass"
+      }
+    },
+    {
+      "artifact_id": "L2-P3",
+      "version": "v1",
+      "kind": "adjudication_policy",
+      "execution_point": "adjudication",
+      "gap": {
+        "category": "policy",
+        "name": "expression_tolerance",
+        "gap_type": "precision",
+        "failure_signature": "The exact-match standard that correctly governs tool arguments leaks into prose restatements: near-tie directional characterizations and paraphrases of user text are convicted as misreports. Outside tool arguments the benchmark tolerates wording, formatting and rounding-granularity differences.",
+        "affected_stage": "adjudication",
+        "expected_capability": "a matching surviving certificate cannot convict"
+      },
+      "trigger": {
+        "certificate_class": "expression_variance"
+      },
+      "intervention": {
+        "action": "withhold_conviction",
+        "exclusions": [
+          "tool arguments and tool-produced values restated in reports (the observation-exactness doctrine; BFCL/025.json survives on it)",
+          "referent substitutions (OpenDeepSearch/007.json)",
+          "value differences beyond the micro-difference tolerance"
+        ]
+      },
+      "capability_delta": {
+        "before_capability": "a surviving expression_variance certificate convicts like any other",
+        "after_capability": "a surviving expression_variance certificate a matching surviving certificate cannot convict"
+      },
+      "risk_boundary": {
+        "statement": "Applies to prose outside tool arguments where the certificate itself cites the source being restated; margins beyond the existing micro-difference tolerance are not covered.",
+        "do_not_apply": [
+          "tool arguments and tool-produced value restatements (BFCL/025.json, BFCL/159.json)",
+          "referent-changing restatements (OpenDeepSearch/007.json)"
+        ]
+      },
+      "provenance": {
+        "derived_from": {
+          "learning_cases": "datasets/learning_cases/v1/cases",
+          "run": "runs/random100_20260815_142446"
+        },
+        "source_gap_names": [
+          "expression_tolerance"
+        ],
+        "failure_cases": [
+          "BFCL/114.json",
+          "Camel/064.json"
+        ],
+        "candidate_set_status": "first_pass"
+      }
+    },
+    {
+      "artifact_id": "L2-P4",
+      "version": "v1",
+      "kind": "adjudication_policy",
+      "execution_point": "adjudication",
+      "gap": {
+        "category": "policy",
+        "name": "strictness_miscalibration",
+        "gap_type": "precision",
+        "failure_signature": "The court convicts internally consistent content that rests on premises the conversation itself establishes — a user's guidance framing, a construction the task text states — by recomputing against outside knowledge. Within a task the stated premise defines what counts as correct; an outside correction without in-trajectory contradiction is not a deviation.",
+        "affected_stage": "adjudication",
+        "expected_capability": "a matching surviving certificate cannot convict"
+      },
+      "trigger": {
+        "certificate_class": "premise_conflict"
+      },
+      "intervention": {
+        "action": "withhold_conviction",
+        "exclusions": [
+          "following a user suggestion against the correct answer the task's own subject matter establishes (Camel/053.json: the user suggested cos(i) where the problem's isotropy implies sin(i); adopting it was the gold error)",
+          "content that cited trajectory evidence positively contradicts (that is content_contradiction)"
+        ]
+      },
+      "capability_delta": {
+        "before_capability": "a surviving premise_conflict certificate convicts like any other",
+        "after_capability": "a surviving premise_conflict certificate a matching surviving certificate cannot convict"
+      },
+      "risk_boundary": {
+        "statement": "Protects restatement of established premises only, never adoption of user suggestions that in-task evidence or the task's own correctness standard contradicts.",
+        "do_not_apply": [
+          "adoption of user-proposed wrong models (Camel/053.json, Camel/059.json, Camel/060.json)",
+          "content contradicted by cited observations (Camel/039.json c3)"
+        ]
+      },
+      "provenance": {
+        "derived_from": {
+          "learning_cases": "datasets/learning_cases/v1/cases",
+          "run": "runs/random100_20260815_142446"
+        },
+        "source_gap_names": [
+          "strictness_miscalibration",
+          "evidence_weighting"
+        ],
+        "failure_cases": [
+          "Camel/061.json",
+          "SmolAgents/082.json"
+        ],
+        "candidate_set_status": "first_pass"
+      }
+    },
+    {
+      "artifact_id": "L2-P5",
+      "version": "v1",
+      "kind": "adjudication_policy",
+      "execution_point": "adjudication",
+      "gap": {
+        "category": "policy",
+        "name": "strictness_miscalibration",
+        "gap_type": "precision",
+        "failure_signature": "Verification treats absence — the cited document or episode list does not contain the claimed material — as proof of fabrication. For summaries that draw on multiple retrieved sources and for process narration about the work, absence in one slice is not contradiction: the claimed material is grounded elsewhere in the trajectory or no slice contradicts it.",
+        "affected_stage": "adjudication",
+        "expected_capability": "a matching surviving certificate cannot convict"
+      },
+      "trigger": {
+        "certificate_class": "absence_based"
+      },
+      "intervention": {
+        "action": "withhold_conviction",
+        "exclusions": [
+          "specific factual claims unsupported anywhere in the trajectory (OpenManus/060.json's invented alma mater convicts regardless of which slice was checked)",
+          "completion or quality self-assessments (BFCL/104.json)",
+          "claims the cited evidence positively contradicts (that is content_contradiction)"
+        ]
+      },
+      "capability_delta": {
+        "before_capability": "a surviving absence_based certificate convicts like any other",
+        "after_capability": "a surviving absence_based certificate a matching surviving certificate cannot convict"
+      },
+      "risk_boundary": {
+        "statement": "Absence alone never protects a specific factual claim, a completion claim, or content any cited evidence positively contradicts.",
+        "do_not_apply": [
+          "specific entities, numbers, results unsupported anywhere (OpenManus/060.json)",
+          "self-assessments (BFCL/104.json)",
+          "positively contradicted reports (Camel/039.json c3)"
+        ]
+      },
+      "provenance": {
+        "derived_from": {
+          "learning_cases": "datasets/learning_cases/v1/cases",
+          "run": "runs/random100_20260815_142446"
+        },
+        "source_gap_names": [
+          "strictness_miscalibration"
+        ],
+        "failure_cases": [
+          "BFCL/142.json",
+          "Octotools/028.json"
+        ],
+        "candidate_set_status": "first_pass"
+      }
+    }
+  ],
+  "content_hash": "1046843e00812a1b5913ae00c5209ee4970496638bf192940c851f6b524bad61"
+}

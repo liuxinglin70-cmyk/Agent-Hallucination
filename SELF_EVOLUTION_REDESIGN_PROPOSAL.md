@@ -6,8 +6,10 @@
 动作单位改为 dual-boundary 约定；Round 1.5 的噪声地板重诊断进一步
 修正了本提案的前提（单轮错误普查约一半是不可再现噪声，故进化验证
 必须是冻结前缀的配对重放）。执行协议与当前状态的真源是
-`FIX_VALIDATE_ITERATION_PLAN.md`；本文保留为论证记录。诊断基于
-2026-08-16 的代码与数据实证。
+`FIX_VALIDATE_ITERATION_PLAN.md`；**架构决策的真源是
+`SEHD_RISE2_V2_REFACTOR_PLAN.md`（统一 Evolution Artifact 层，接棒
+本文 §三）**；本文保留为论证记录（§一失效模型与 §二推翻/保留仍为
+有效实证）。诊断基于 2026-08-16 的代码与数据实证。
 
 ---
 

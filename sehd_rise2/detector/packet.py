@@ -9,7 +9,7 @@ repeated or absent source steps cannot corrupt evidence references.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 PACKET_SCHEMA = "sehd2.ocse_packet.v1"
 
@@ -462,10 +462,15 @@ def render_evidence_view(
     meta["omitted_event_ids"] = [
         e["event_id"] for e in events if e["event_id"] not in expanded
     ]
+    if meta["omitted_event_ids"]:
+        # The view is a selection: silence about an omitted event must
+        # never read as the trajectory lacking it (the abstention
+        # criterion hinges on that difference).
+        shown = meta["omitted_event_ids"][:50]
+        more = len(meta["omitted_event_ids"]) - len(shown)
+        suffix = f" …(+{more})" if more else ""
+        lines.append(
+            "\nEVENTS OMITTED FROM THIS VIEW (present in the trajectory, "
+            "not shown here): " + ", ".join(shown) + suffix
+        )
     return "\n".join(lines), meta
-
-
-def render_packet(packet: Mapping[str, Any]) -> str:
-    """Render a bounded, provider-safe text view of the packet."""
-    text, _meta = render_full_view(packet)
-    return text

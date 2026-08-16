@@ -124,9 +124,13 @@ def test_evidence_view_renders_only_cited_plus_window() -> None:
     assert meta["rendered_event_ids"] == [
         "event_003", "event_004", "event_005", "event_006", "event_007",
     ]
-    assert "event_001" not in text
-    assert "event_020" not in text
+    # Omitted events never show content; their ids appear only inside the
+    # omission notice that keeps "not shown" distinguishable from "absent".
+    assert "message 1 " not in text
+    assert "message 20 " not in text
     assert len(meta["omitted_event_ids"]) == 15
+    assert "event_001" in text
+    assert "EVENTS OMITTED FROM THIS VIEW" in text
 
 
 def test_evidence_view_full_fidelity_for_cited_event() -> None:
@@ -325,7 +329,7 @@ def _batched_provider():
                 for cid in ids
             ]}, {"attempts": 1}
         if purpose == "defense":
-            ids = _re.findall(r"- (c\d+): verdict=supported", user)
+            ids = _re.findall(r"- (c\d+): claim=", user)
             return {"decisions": [
                 {"candidate_id": cid, "verdict": "upheld", "rationale": "r"}
                 for cid in ids

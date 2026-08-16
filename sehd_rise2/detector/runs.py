@@ -56,12 +56,14 @@ def config_fingerprint(config: Mapping[str, Any]) -> str:
 
 
 # The modules whose source defines the verdict surface: prompts, packet
-# rendering and transport semantics. The detector fingerprint covers them
-# because two runs with identical configs but different prompt code are
-# NOT the same detector (the rework-era runs shared a config fingerprint
-# across incompatible prompt surfaces).
+# rendering, transport semantics and the artifact execution plane (the
+# adjudication-policy semantics live in artifacts.py). The detector
+# fingerprint covers them because two runs with identical configs but
+# different verdict code are NOT the same detector (the rework-era runs
+# shared a config fingerprint across incompatible prompt surfaces).
 _VERDICT_SURFACE_MODULES = (
-    "court.py", "conventions.py", "packet.py", "provider.py",
+    "artifacts.py", "court.py", "conventions.py", "packet.py",
+    "provider.py",
 )
 
 

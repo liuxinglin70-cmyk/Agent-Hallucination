@@ -2,21 +2,25 @@
 
 ``Detector`` owns one resolved config; ``detect`` runs the frozen pipeline
 (census -> verification -> defense -> deterministic court) label-free and
-fail-closed. Evolved capability is deployed explicitly through
-``genome`` / ``policy_genome`` payloads (loaded via ``skills.py``); the
-minimal detector records them in provenance and defers their execution
-semantics to the evolution framework.
+fail-closed. Evolved capability deploys through exactly one channel: the
+``artifacts`` registry (``detector/artifacts.py``). Every artifact kind is
+bound to an execution point inside the pipeline — prompt directives inject
+into all three stage prompts, adjudication policies apply inside the
+deterministic court — so deployed evolution always executes.
 """
 
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from sehd_rise2.detector.artifacts import (
+    load_artifact_registry,
+    validate_registry,
+)
 from sehd_rise2.detector.config import default_config_path, load_config
 from sehd_rise2.detector.court import run_court
 from sehd_rise2.detector.packet import build_packet, validate_record
 from sehd_rise2.detector.result import build_detection_output
-from sehd_rise2.detector.skills import load_policy_genome, load_skill_genome
 
 
 class Detector:
@@ -43,39 +47,32 @@ class Detector:
         record: Mapping[str, Any],
         *,
         case_id: str = "case",
-        evolved_conventions: Mapping[str, Any] | None = None,
+        artifacts: Mapping[str, Any] | None = None,
         frozen_census: Sequence[Mapping[str, Any]] | None = None,
-        genome: Mapping[str, Any] | None = None,
-        policy_genome: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Detect one label-free trajectory and return the frozen envelope.
 
-        ``evolved_conventions`` is the deployed convention genome: its
-        route-matched dual-boundary entries enter all stage prompts.
-        ``frozen_census`` replays that candidate set instead of rolling
-        the census stage (the paired-replay anchor; adjudication only).
+        ``artifacts`` is the deployed evolution-artifact registry: its
+        prompt-directive entries route into all stage prompts and its
+        adjudication policies apply inside the deterministic court
+        (validated fail-closed before the run). ``frozen_census`` replays
+        that candidate set instead of rolling the census stage (the
+        paired-replay anchor; adjudication only).
         """
         validate_record(record)
         packet = build_packet(record)
+        deployed = validate_registry(artifacts) if artifacts else []
         proof, providers, stage_audit = run_court(
             packet, self.config,
-            evolved_conventions=list(
-                (evolved_conventions or {}).get("conventions") or []
-            ),
+            artifacts=deployed,
             frozen_census=(
                 list(frozen_census) if frozen_census is not None else None
             ),
         )
         provenance: dict[str, Any] = {}
-        if evolved_conventions is not None:
-            provenance["convention_genome_hash"] = (
-                evolved_conventions.get("content_hash") or ""
-            )
-        if genome is not None:
-            provenance["genome_hash"] = genome.get("content_hash") or ""
-        if policy_genome is not None:
-            provenance["policy_genome_hash"] = (
-                policy_genome.get("content_hash") or ""
+        if artifacts is not None:
+            provenance["artifacts_hash"] = (
+                artifacts.get("content_hash") or ""
             )
         output = build_detection_output(
             case_id=case_id, packet=packet, proof=proof,
@@ -100,17 +97,14 @@ def detect(
     *,
     case_id: str = "case",
     config: Mapping[str, Any] | None = None,
-    evolved_conventions: Mapping[str, Any] | None = None,
+    artifacts: Mapping[str, Any] | None = None,
     frozen_census: Sequence[Mapping[str, Any]] | None = None,
-    genome: Mapping[str, Any] | None = None,
-    policy_genome: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Convenience entry: one detection with an explicit or default config."""
     detector = Detector(config) if config is not None else _default_detector()
     return detector.detect(
-        record, case_id=case_id, evolved_conventions=evolved_conventions,
-        frozen_census=frozen_census, genome=genome,
-        policy_genome=policy_genome,
+        record, case_id=case_id, artifacts=artifacts,
+        frozen_census=frozen_census,
     )
 
 
@@ -119,8 +113,7 @@ __all__ = [
     "build_packet",
     "default_config_path",
     "detect",
+    "load_artifact_registry",
     "load_config",
-    "load_policy_genome",
-    "load_skill_genome",
     "validate_record",
 ]

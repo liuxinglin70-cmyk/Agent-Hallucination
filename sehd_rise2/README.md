@@ -6,11 +6,13 @@
 > → 确定性法庭聚合 → fail-closed 权威信封**
 
 `detector/` 是冻结基座（可独立运行）；`evolution/` 是自进化框架
-（失败理解 → 策略/约定进化 → 门控循环）。检测器的可进化面有且只有
-显式参数：手工约定层（`conventions.py` 按包特征路由注入三阶段）、
-evolved 约定 genome（进化产物，同样注入三阶段）、冻结 census 配对
-重放入口。过程与迭代协议的真源是根目录
-`FIX_VALIDATE_ITERATION_PLAN.md`。
+（失败理解 → gap 归因 → artifact 合成 → 门控循环）。检测器的可进化
+面有且只有一个显式参数 `detect(artifacts=...)`（统一 Evolution
+Artifact 契约，见 `detector/artifacts.py`）：`prompt_directive` 型
+注入三阶段 prompt、`adjudication_policy` 型在确定性裁决内执行；
+另配手工约定层（`conventions.py` 基座）与冻结 census 配对重放入口。
+过程与迭代协议的真源是根目录 `FIX_VALIDATE_ITERATION_PLAN.md`；
+架构决策的真源是 `SEHD_RISE2_V2_REFACTOR_PLAN.md`。
 
 ## 目录结构
 
@@ -25,7 +27,7 @@ sehd_rise2/
 │   ├── result.py                 # 冻结输出信封 + fail-closed 权威读取
 │   ├── config.py                 # 配置解析（env 覆盖优先级）
 │   ├── env.py                    # 仓库 .env 加载
-│   ├── skills.py                 # 进化接口：load_skill_genome / load_policy_genome
+│   ├── artifacts.py              # 进化执行面：artifact 契约 + 词表 + 运行时绑定
 │   ├── evolution_api.py          # 进化接口：Detection Truth 只读投影
 │   ├── runs.py                   # 运行记录：双指纹 + 每案例过程落盘 + 台账推导统计
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
@@ -39,7 +41,8 @@ sehd_rise2/
 │   ├── replay.py                 #   离线重放：绑定校验 + 裁决重放 + oracle/runtime 对比
 │   ├── binder.py                 #   运行时证书类绑定器（label-free 感知阶段）
 │   ├── proposal.py / cycle.py    #   L2 提案生成 + 门控进化循环（累积重放门 + 台账）
-│   └── convention_evolution.py   #   约定进化：复现过滤 → 提取 → G1 → 冻结前缀配对 G2
+│   ├── gates.py                  #   门校准单一真源（datasets/calibration/，默认绝对零容忍）
+│   └── convention_evolution.py   #   约定进化：复现过滤 → 提取 → G1 → G2a/G2b 配对门
 ├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 ```
@@ -64,20 +67,24 @@ result = detector.detect(
     {"history": [{"role": "user", "content": "..."},
                  {"role": "assistant", "content": "..."}]},
     case_id="case_1",
-    evolved_conventions=...,  # 约定 genome：路由命中的双边约定注入三阶段 prompt
-    frozen_census=...,        # 冻结候选集：跳过 census 阶段的配对重放锚
-    genome=...,               # 可选：skill genome 载荷（provenance 记录）
-    policy_genome=...,        # 可选：策略 genome 载荷（provenance 记录）
+    artifacts=...,           # 进化 artifact registry：唯一部署通道
+    frozen_census=...,       # 冻结候选集：跳过 census 阶段的配对重放锚
 )
 print(result["state"], result["decision_authority"])
 ```
 
 - 输入必须是 label-free（含 `is_hallucination` 等 gold 字段会被拒绝）；
-- `evolved_conventions` 是**有执行面的**部署：route 匹配时 directive +
-  NOT-WHEN 排除边界进入 census/verification/defense 三个 system prompt；
+- `artifacts` 是**唯一有执行面的**部署通道（`detector/artifacts.py`
+  统一契约，加载 fail-closed）：`prompt_directive` 型 artifact 路由
+  命中时 directive + NOT-WHEN 排除边界进入 census/verification/defense
+  三个 system prompt；`adjudication_policy` 型 artifact 在确定性裁决内
+  执行（运行时证书类绑定，unclassified 弃权 = 基线行为）。每个 artifact
+  必须携带 gap 块与 capability_delta——只加规则的产物无法加载；
 - `frozen_census` 复用一次先前滚动的候选集、只重跑裁决阶段——
   guided-vs-unguided 差异归因于约定而非 census 重采样噪声；
-- genome / policy_genome 是不透明载荷：加载校验 + provenance 记录。
+- 判决接合事实落盘进 Detection Truth：`proof.active_artifacts` 与
+  `proof.policy_evaluation.fired/skipped`，部署后是否真正执行可被
+  任意 run 复查。
 
 ## 运行结果目录（runs/）
 
@@ -93,13 +100,14 @@ print(result["state"], result["decision_authority"])
 
 | 用途 | 接口 |
 |---|---|
-| 加载 skill | `skills.load_skill_genome` / `load_policy_genome` |
-| 部署约定执行面 | `api.detect(..., evolved_conventions=...)`（三阶段注入） |
+| 加载 artifact registry | `artifacts.load_artifact_registry`（fail-closed） |
+| 部署执行面 | `api.detect(..., artifacts=...)`（三阶段注入 + 裁决内执行） |
 | 配对重放锚 | `api.detect(..., frozen_census=...)`（裁决阶段专用） |
 | 数据供给 | `evolution_api.project_for_evolution(result)` |
 | 终态读取 | `result.resolve_evolution_state` 等 |
 | gold 隔离 | `packet.EVALUATOR_ONLY_FIELDS` |
 | 约定进化循环 | `python -m sehd_rise2.evolution.convention_evolution` |
+| 策略进化循环 | `python -m sehd_rise2.evolution.cycle` |
 | 学习案例装配（离线复盘） | `python -m sehd_rise2.evolution.assemble` |
 
 ## 设计纪律（从重建中固化）

@@ -206,6 +206,61 @@ def test_supported_still_convicts_after_rejection_flips(
     assert proof["miss_triage_facts"]["supported_count"] == 1
 
 
+def test_duplicate_candidate_ids_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet = build_packet(_record([
+        {"role": "user", "content": "do the task"},
+        {"role": "assistant", "content": "here is the answer"},
+    ]))
+    config = {
+        "census_route": {}, "verification_route": {}, "defense_route": {},
+    }
+
+    def _duplicate_census(*, route, system, user, purpose, **_kwargs):
+        if purpose == "census":
+            return {"candidates": [
+                {"candidate_id": "c1", "claim": "wrong A",
+                 "locus_event_id": "event_002", "evidence_refs": ["event_002"]},
+                {"candidate_id": "c1", "claim": "wrong A again",
+                 "locus_event_id": "event_002", "evidence_refs": ["event_002"]},
+            ]}, {"attempts": 1}
+        raise AssertionError(f"unexpected purpose {purpose!r}")
+
+    monkeypatch.setattr(court_module, "provider_call", _duplicate_census)
+    proof, _providers, _audit = court_module.run_court(packet, config)
+    assert proof["state"] == "unresolved"
+    assert proof["runtime_valid"] is False
+    assert any(
+        "census_candidate_id_duplicate" in str(reason.get("error_type"))
+        for reason in proof["authority_failure_reasons"]
+    )
+
+    def _duplicate_certificates(*, route, system, user, purpose, **_kwargs):
+        if purpose == "census":
+            return {"candidates": [{
+                "candidate_id": "c1", "claim": "wrong A",
+                "locus_event_id": "event_002", "evidence_refs": ["event_002"],
+            }]}, {"attempts": 1}
+        if purpose == "verification":
+            return {"certificates": [
+                {"candidate_id": "c1", "verdict": "supported",
+                 "rationale": "r"},
+                {"candidate_id": "c1", "verdict": "rejected",
+                 "rationale": "r"},
+            ]}, {"attempts": 1}
+        raise AssertionError(f"unexpected purpose {purpose!r}")
+
+    monkeypatch.setattr(court_module, "provider_call", _duplicate_certificates)
+    proof, _providers, _audit = court_module.run_court(packet, config)
+    assert proof["state"] == "unresolved"
+    assert proof["runtime_valid"] is False
+    assert any(
+        "certificate_candidate_id_duplicate" in str(reason.get("error_type"))
+        for reason in proof["authority_failure_reasons"]
+    )
+
+
 # --------------------------------------------------------------------------
 # probe execution surface: route-gated injection
 # --------------------------------------------------------------------------
@@ -224,6 +279,17 @@ EVOLVED = {
         "the argument value the task itself fixed differs from the "
         "observation because the task demanded the original form."
     ),
+}
+
+PROMPT_ARTIFACT = {
+    "artifact_id": "EC-01",
+    "kind": "prompt_directive",
+    "execution_point": "stage_prompts",
+    "trigger": {"packet_features": EVOLVED["trigger_features"]},
+    "intervention": {
+        "directive": EVOLVED["directive"],
+        "exclusion": EVOLVED["exclusion"],
+    },
 }
 
 
@@ -264,16 +330,16 @@ def test_convention_injects_only_when_trigger_matches(
         court_module, "provider_call", _capture_provider(seen),
     )
     proof, _p, audit = court_module.run_court(
-        matched, config, evolved_conventions=[EVOLVED],
+        matched, config, artifacts=[PROMPT_ARTIFACT],
     )
     assert "Treat every later tool-argument restatement" in seen[
         "census_system"
     ]
     assert "NOT WHEN" in seen["census_system"]
-    assert proof["active_evolved_conventions"] == ["EC-01"]
+    assert proof["active_artifacts"] == ["EC-01"]
     assert audit["packet_features"] is not None
 
-    court_module.run_court(unmatched, config, evolved_conventions=[EVOLVED])
+    court_module.run_court(unmatched, config, artifacts=[PROMPT_ARTIFACT])
     assert "Treat every later tool-argument restatement" not in seen[
         "census_system"
     ]
@@ -357,7 +423,7 @@ def test_evolved_conventions_reach_all_three_stage_prompts(
         court_module, "provider_call", _full_court_provider(seen),
     )
     proof, _p, _a = court_module.run_court(
-        packet, config, evolved_conventions=[EVOLVED],
+        packet, config, artifacts=[PROMPT_ARTIFACT],
     )
     assert proof["state"] == "verified_error"
     for stage in ("census_system", "verification_system",
