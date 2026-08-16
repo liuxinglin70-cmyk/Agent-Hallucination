@@ -6,16 +6,20 @@ SEHD-RISE2 是 SEHD-RISE 的重建工作区（`sehd_rise2/`）。当前形态由
    census（候选发现）→ verification（证据核验）→ defense（对抗复核）→
    确定性法庭聚合 → fail-closed 权威信封；判决约定层按机械包特征路由
    注入三阶段。它是当前一切工作的冻结基座。
-2. **自进化框架**（`sehd_rise2/evolution/`）——失败理解（Learning Case +
-   能力缺口词表）、L2 策略层与离线/运行时重放、门控进化循环、约定进化
-   （复现过滤 → 提取 → G1 → 冻结前缀配对 G2 → 部署三阶段执行面）。
+2. **自进化框架**（`sehd_rise2/evolution/`）——失败工作表（k=1 稳定性
+   标记，unstable = 一等稳定化目标）、meta-skill 失败路由器（闭词表 +
+   战绩记忆）、提案起草 + 有界修订循环、翻转门（stable 单滚 /
+   unstable 三滚多数）、持久能力库（born/active/retired 台账）。
+   入库即部署：registry 经 `detector/deploy.py` 一次编译进 DeployPlan，
+   四种 artifact 各有确定性执行面。
 
-当前阶段是**修复-验证迭代**（fix-val）：每轮随机重抽 100 例验证有效性，
-过程真源见 [FIX_VALIDATE_ITERATION_PLAN.md](FIX_VALIDATE_ITERATION_PLAN.md)。
-Round 1（fresh 100 基线 acc 0.66）与 Round 1.5（噪声地板重诊断 +
-进化机制修复）已落地；核心实证——判决噪声地板（同 100 例双跑翻面
-24%、单轮 FP/FN 集合约一半不可再现）是此前「修复一直没用」的根源，
-已由稳定性仪器（`tools/run_stability.py`）与配对重放门纳入测量。
+当前阶段是**修复-验证迭代**（fix-val）：每轮重抽案例验证有效性，
+轮编排 = `python -m experiments.run_fixval_round
+{baseline, evolve, deploy, report}`。Round 1（fresh 100 基线 acc
+0.66）与 Round 1.5（噪声地板重诊断 + 进化机制修复）已落地；核心
+实证——判决噪声地板（同 100 例双跑翻面 24%、单轮 FP/FN 集合约一半
+不可再现）——现在是进化的输入而非闸门：worksheet 的 k=1 重滚把失败
+分为 stable（直接教学）与 unstable（稳定化目标，三滚多数验收）。
 
 ## 核心目标与设计纪律（必读 / Mandatory）
 
@@ -73,27 +77,22 @@ sehd_rise2/
 │   ├── packet.py                 # 轨迹数据包 + gold 输入防火墙 + 分阶段视图
 │   ├── result.py                 # 冻结输出信封 + fail-closed 权威读取
 │   ├── config.py / env.py        # 配置解析（env 覆盖优先级）与 .env 加载
-│   ├── skills.py                 # 进化接口：load_skill_genome / load_policy_genome
-│   ├── evolution_api.py          # 进化接口：Detection Truth 只读投影
+│   ├── capabilities.py           # 可执行能力：predicate/generator runner
+│   ├── deploy.py                 # DeployPlan：registry 一次编译（hash 缓存）
 │   ├── runs.py                   # 运行记录：双指纹 + 每案例过程落盘 + 台账推导统计
 │   ├── cli.py / __main__.py      # python -m sehd_rise2.detector
 │   └── configs/detector_v1.json  # 三路由最小配置
-├── evolution/                    # 自进化框架
+├── evolution/                    # 自进化框架（直线依赖：worksheet ← 其他）
+│   ├── worksheet.py              #   失败工作表：k=1 稳定性标记 + FN 归因 + evidence pack
 │   ├── gap_taxonomy.py           #   冻结能力缺口词表（单一真源）
-│   ├── diagnosis.py              #   机械失败分类 + 诊断协议校验
-│   ├── learning_case.py          #   Learning Case schema + 三层校验器
-│   ├── assemble.py               #   装配 / 校验 / 报告 CLI
-│   ├── policy.py                 #   L2 策略层：词表 + 候选集 + genome 构建
-│   ├── replay.py                 #   离线重放：绑定校验 + 裁决重放 + oracle/runtime 对比
-│   ├── binder.py                 #   运行时证书类绑定器（label-free 感知阶段）
-│   ├── proposal.py / cycle.py    #   L2 提案生成 + 门控进化循环（累积重放门 + 台账）
-│   └── convention_evolution.py   #   约定进化：复现过滤 → 提取 → G1 → 配对 G2
+│   ├── router.py                 #   meta-skill 失败路由器（机械先占 + 闭词表 + 战绩记忆）
+│   ├── capability_evolution.py   #   提案起草 + G1 机械门 + 有界修订循环
+│   ├── artifact_validation.py    #   翻转门：stable 单滚 / unstable 三滚多数
+│   └── capability_library.py     #   持久能力库：registry 合并 + held/retired 台账
 ├── runs/                         # 运行结果目录（本地产物；布局见 runs/README.md）
 └── tools/check_layers.py         # 层级守卫（detector ← evolution 单向）
 
 tools/                            # 仓库级测量/审计工具
-├── run_stability.py              #   双 run 判决稳定性：一致率、FP/FN Jaccard、
-│                                 #   census 集稳定性、翻面阶段解剖
 ├── audit_packet_ids.py           #   run 树 packet/证据引用完整性审计
 ├── build_eval_split.py           #   评测抽样（分层不变量 + manifest）
 └── build_phase2_split.py         #   Phase 2 进化/验证 split
@@ -103,7 +102,7 @@ datasets/learning_cases/v1/       # Phase 0 数据资产（进版本控制）
 ├── cases/*.json                  #   100 个 Learning Case（投影，可重装配）
 └── REPORT.md                     #   能力缺口分布报告
 
-datasets/policy_candidates/v1/    # Phase 1-A/B/C 数据资产（进版本控制）
+datasets/policy_candidates/v1/    # Phase 1 数据归档（policy 机制已退役；genome/bindings 仅存档）
 ├── policy_candidates.json        #   L2 策略候选集（5 条 replayed + NS-1 弃权发现）
 ├── certificate_bindings.json     #   oracle 证书类绑定（162 条，label-free 纪律）
 ├── runtime_bindings.json         #   运行时绑定器产物（machine_generated）
@@ -112,8 +111,11 @@ datasets/policy_candidates/v1/    # Phase 1-A/B/C 数据资产（进版本控制
 ├── runtime_replay_result.json / RUNTIME_REPLAY_REPORT.md   # 对比结果
 
 datasets/eval_splits/             # 冻结评测 split 与轮 manifest（进版本控制）
+datasets/convention_library/       # 持久能力库（registry.json）+ 台账（library_state.json）
+datasets/router_memory.json        # router 战绩记忆（闭词表计数；≥3 flips 获得 prefer hint）
+datasets/calibration/              # 轮约束（runner 白名单 + 组合容差）
 
-tests/                            # 契约单元测试（140 例全绿）
+tests/                            # 契约单元测试（93 例全绿）
 experiments/                      # 本地实验工作区（产物被 git 忽略）
 ```
 
@@ -132,62 +134,39 @@ python -m sehd_rise2.detector --record trajectory.json --output-dir out
   `hallucination_step`、`gold_label` 等 gold 字段（检测入口拒绝）；
 - `--config` 缺省使用随包 `configs/detector_v1.json`；
 - 输出 `out/prediction.json`（冻结信封 `sehd2.detection_result.v1`）；
-- 基因组部署是显式的：`--genome` / `--policy-genome` 部署进化出的双层能力，
-  不引入框架级全局状态。
+- artifact 部署是显式的：`--artifacts <registry.json>` 加载进化出的
+  能力库（fail-closed 校验，一次编译进 DeployPlan），不引入框架级
+  全局状态。
 
 Provider 路由解析顺序：`SEHD_ROUTE_<ROUTE>_*` → `SEHD_DETECTOR_*` →
 `SEHD_PROVIDER_*` → JSON 配置 → DeepSeek 官方端点/模型默认值；进程环境优先于
 仓库 `.env`。
 
-### 稳定性测量（噪声地板仪器）
+### 自进化轮编排（fix-val Round 3+）
 
 ```bash
-python tools/run_stability.py runs/<run_a> runs/<run_b> [--out report.json]
+python -m experiments.run_fixval_round baseline --round 3   # 裸检测器全量跑
+python -m experiments.run_fixval_round evolve   --round 3   # 稳定性重滚 → 失败路由 → 提案+修订 → 翻转门 → 入库
+python -m experiments.run_fixval_round deploy   --round 3   # 全库直接部署（paired 臂 + recall 臂）
+python -m experiments.run_fixval_round report   --round 3   # read-once 验证集配对读数 + 漏斗
 ```
 
-任意两个 run 的判决一致率、FP/FN 集合 Jaccard、census 候选集稳定性与
-翻面阶段解剖。任何「修复前后对比」都必须先对照这个噪声地板再归因。
-
-### 约定进化循环（fix-val Round 2+）
-
-```bash
-python -m sehd_rise2.evolution.convention_evolution extract \
-    --run runs/<id> --out conventions_raw.json   # 内建失败复现过滤
-python -m sehd_rise2.evolution.convention_evolution gate \
-    --raw conventions_raw.json --out conventions_gated.json
-python -m sehd_rise2.evolution.convention_evolution genome \
-    --conventions conventions_gated.json --out convention_genome.json
-python -m sehd_rise2.evolution.convention_evolution validate \
-    --run runs/<id> --conventions conventions_gated.json --out-dir <dir>
-```
-
-`validate` 是冻结 census 前缀的配对重放：每案例一次 unguided 全量滚动
-冻结候选集，guided 臂只重跑裁决阶段并注入约定——配对差异归因于约定；
-发现层伤害须两次全量重放都定罪才算。部署 =
-`Detector.detect(..., evolved_conventions=genome)`（三阶段 prompt 注入）。
-
-### Phase 0 学习案例装配（离线复盘）
-
-```bash
-python -m sehd_rise2.evolution.assemble assemble \
-    --run runs/random100_20260815_142446 \
-    --dataset datasets/raw/agenthallu/AgentHallu \
-    --annotations datasets/learning_cases/v1/annotations.json \
-    --out datasets/learning_cases/v1
-python -m sehd_rise2.evolution.assemble validate --dir datasets/learning_cases/v1/cases
-python -m sehd_rise2.evolution.assemble report \
-    --dir datasets/learning_cases/v1/cases --out datasets/learning_cases/v1/REPORT.md
-```
-
-装配是投影：检测事实真源 = run 树，gold 真源 = 数据集原始文件，人工层真源 =
-`annotations.json`。修改标注后重跑 assemble，不手改 `cases/` 投影。
+- `evolve` 内部链条：worksheet k=1 重滚（stable/unstable 标记）→
+  router（机械先占 + 一次闭词表路由调用 + 战绩 hint）→ 提案起草
+  （G1 拒绝理由回灌，≤3 次）→ 翻转门（stable 单滚 / unstable 三滚
+  多数，翻对极性才 deployable）→ `merge_round_registry` 入库 →
+  战绩回写 `datasets/router_memory.json`；
+- `deploy` 没有任何再验证：库里每件 artifact 都带翻转门入场券，
+  读库 → 编译 → 跑（裁决层件走冻结 census 配对臂，recall 件走
+  全管线臂）；
+- `report` 是唯一的代表性测量面：read-once 验证集上的配对翻转表、
+  能力 trace、localization 保持率与轮漏斗（含 unstable_stabilised）。
 
 ## 公共 API
 
 ```python
 from sehd_rise2.detector.api import Detector, detect
-from sehd_rise2.detector.evolution_api import project_for_evolution
-from sehd_rise2.detector.skills import load_skill_genome, load_policy_genome
+from sehd_rise2.detector.deploy import compile_deploy_plan
 ```
 
 层级导入纪律（`detector` 无外部依赖、`evolution → detector` 单向）由
@@ -343,14 +322,17 @@ Phase 0 → Phase 1-D 之后进入持续迭代：每轮随机重抽 100 例（60
 - **Round 1**（commit 88392b0）：约定层抽取（prompt 去 BFCL 硬编码）、
   census 视野全量化、证据窗口 ±2、三态判决 + FN 归因管道；通道 A
   （census 探针）两轮 G2 后被证伪删除，重设计为约定进化。
-- **Round 1.5**（本轮）：重诊断确立**判决噪声地板**——同 100 例双跑
-  翻面 24%、FP/FN 集合 Jaccard 0.39/0.48（单轮错误普查约一半不可
-  再现）、纯 test-retest（temp=0）翻面 10-30%，census 候选集不稳定
-  （Jaccard 0.66）是最大噪声注入点。自进化「前后无差异」的三个机制
-  bug（提取学噪声 / G2 非配对 / 执行面缺 2/3）全部修复：
-  evolved 约定注入全部三阶段 prompt、`frozen_census` 冻结前缀配对
-  重放、worksheet 失败复现过滤、`detector_fingerprint` 覆盖判决面
-  源码、`tools/run_stability.py` 稳定性仪器。
+- **Round 1.5**：重诊断确立**判决噪声地板**——同 100 例双跑翻面
+  24%、FP/FN 集合 Jaccard 0.39/0.48（单轮错误普查约一半不可再现）。
+- **V3 重构（本轮，科研化翻转门）**：循环内的一切统计容差机器删除
+  （test_retest 标定闸 / G2a-d 四门 / leave-one-out 部署筛选 / 组合
+  考试 / 反事实测试套件）；进化判据收敛为**翻转门**——错误案例被
+  翻到正确极性才算数，unstable 案例三滚多数（修对且修稳）。失败
+  分类从硬编码 if 树换成 **router meta-skill**（闭词表 + 确定性
+  战绩记忆 + provider 故障降级）。加载链重造为 DeployPlan 一次
+  编译（hash 缓存），入库即部署，无二次审判。旧栈（Phase-2 策略
+  循环 / binder / replay / Learning Case 装配）与冻结 L2-P1..P5
+  registry 全部移除；detector 判决面零改动。
 
 ## 学习口径（label-free 设计边界）
 
@@ -363,14 +345,12 @@ Phase 0 → Phase 1-D 之后进入持续迭代：每轮随机重抽 100 例（60
 
 ## 下一步
 
-Round 2 起步序列（协议见 FIX_VALIDATE_ITERATION_PLAN.md §零·五）：
-重抽 100 → 双跑轮基线附 `run_stability` 报告 → extract（内建复现
-过滤）→ G1 → 冻结前缀配对 G2 → 部署 → 40 例 fresh 配对验证（判据
-相对噪声地板解释）。
-
-待用户拍板的成本决策：在线判决稳定性方案——判决级 k=3 多数投票
-（成本 ×3，按 churn 20% 推算翻面率降至 ~10%）或裁决阶段换非 flash
-模型；两者都改变预算结构，选定后才并入 Round 2。
+**Round-3：V3 框架的首次真实运转**（split 已冻结：
+`datasets/eval_splits/v3_evo50`，50 例进化池）。代码就绪（93 tests
+全绿），router 记忆与能力库均为空库起步。这一轮的三个首次可测
+读数：router 首轮命中率（无战绩 hint 时的纯事实路由分布 + fallback
+率）、unstable 池大小（k=1 下多少失败案例被判摇摆）、翻转门产量
+（多少提案真的翻对了案例）。
 
 ## 历史沿革
 
