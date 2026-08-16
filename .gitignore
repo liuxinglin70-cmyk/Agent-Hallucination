@@ -128,3 +128,4 @@ detector_output/
 
 # Review virtual environment
 .review_venv/
+.zcode/
