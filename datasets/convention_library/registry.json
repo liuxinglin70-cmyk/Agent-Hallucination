@@ -1,0 +1,46 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "R2-EC-05",
+      "capability_delta": {
+        "after_capability": "acquits preserving wording and format variations unless they change meaning or omit required content",
+        "before_capability": "convicts any format or label variation as a deviation"
+      },
+      "execution_point": "stage_prompts",
+      "gap": {
+        "affected_stage": "defense",
+        "category": "policy",
+        "expected_capability": "The detector tolerates non-substantive format and wording variation when all required content is preserved and only punishes meaning-changing or omitting departures.",
+        "failure_signature": "The detector convicted accurate final content solely because the answer used prose, abbreviations, or text-level reformulations rather than the exact requested format or label.",
+        "gap_type": "precision",
+        "name": "expression_tolerance"
+      },
+      "intervention": {
+        "directive": "It is NOT a deviation when the final answer expresses the required content accurately in different wording or formatting, as long as the requested entities and values are present, correctly ordered, and unaltered in meaning.",
+        "exclusion": "It remains a deviation when the rewording changes the meaning of a value or entity, omits required items, misorders the required result, or reports different core facts."
+      },
+      "kind": "prompt_directive",
+      "provenance": {
+        "case_evidence": [
+          {
+            "case_id": "SmolAgents/013.json"
+          },
+          {
+            "case_id": "Magentic_One/055.json"
+          }
+        ],
+        "failure_direction": "wrongful_conviction",
+        "title": "Format and wording variation preserving exact content is not a deviation"
+      },
+      "trigger": {
+        "packet_features": [
+          "final_prose_report",
+          "task_specifies_values"
+        ]
+      },
+      "version": "v1"
+    }
+  ],
+  "content_hash": "7c7b656e0a309f4418e5978e072730b8115eba3e347a044ac8c7688531f49924",
+  "schema_version": "sehd2.evolution_artifact.v1"
+}

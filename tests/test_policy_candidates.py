@@ -349,49 +349,59 @@ def test_vocabulary_covers_declared_classes_and_actions():
         assert policy["action"] in POLICY_ACTIONS
 
 
-def test_genome_builds_and_loads_through_detector_reader(tmp_path):
-    from sehd_rise2.detector.skills import load_policy_genome
-    from sehd_rise2.evolution.policy import build_policy_genome
+def test_registry_builds_and_loads_through_detector_reader(tmp_path):
+    from sehd_rise2.detector.artifacts import load_artifact_registry
+    from sehd_rise2.evolution.policy import build_policy_artifacts
 
     payload = json.loads(REAL_SET.read_text(encoding="utf-8"))
-    genome = build_policy_genome(payload, ["L2-P2", "L2-P3", "L2-P4", "L2-P5"])
-    assert genome["schema_version"] == "sehd2.policy_genome.v1"
-    assert [item["policy_id"] for item in genome["items"]] == [
-        "L2-P2", "L2-P3", "L2-P4", "L2-P5",
-    ]
-    for item in genome["items"]:
-        assert item["action"] in POLICY_ACTIONS
-        assert item["target_certificate_class"] in CERTIFICATE_CLASSES
-        assert item["precondition"] and item["risk_boundary"]["statement"]
-        assert item["provenance"]["failure_cases"]
-    path = tmp_path / "policy_genome.json"
-    path.write_text(json.dumps(genome), encoding="utf-8")
-    loaded = load_policy_genome(path)
-    assert loaded["content_hash"] == genome["content_hash"]
-
-
-def test_genome_defaults_to_replayed_policies_only():
-    from sehd_rise2.evolution.policy import build_policy_genome
-
-    payload = json.loads(REAL_SET.read_text(encoding="utf-8"))
-    genome = build_policy_genome(payload)
+    registry = build_policy_artifacts(
+        payload, ["L2-P2", "L2-P3", "L2-P4", "L2-P5"],
+    )
+    assert registry["schema_version"] == "sehd2.evolution_artifact.v1"
     assert [
-        item["policy_id"] for item in genome["items"]
+        artifact["artifact_id"] for artifact in registry["artifacts"]
+    ] == ["L2-P2", "L2-P3", "L2-P4", "L2-P5"]
+    for artifact in registry["artifacts"]:
+        assert artifact["kind"] == "adjudication_policy"
+        assert artifact["execution_point"] == "adjudication"
+        assert artifact["intervention"]["action"] in POLICY_ACTIONS
+        assert artifact["trigger"]["certificate_class"] in (
+            CERTIFICATE_CLASSES
+        )
+        assert artifact["gap"]["category"] == "policy"
+        assert artifact["gap"]["gap_type"] == "precision"
+        assert artifact["gap"]["affected_stage"] == "adjudication"
+        assert artifact["capability_delta"]["before_capability"]
+        assert artifact["capability_delta"]["after_capability"]
+        assert artifact["provenance"]["failure_cases"]
+    path = tmp_path / "policy_artifacts.json"
+    path.write_text(json.dumps(registry), encoding="utf-8")
+    loaded = load_artifact_registry(path)
+    assert loaded["content_hash"] == registry["content_hash"]
+
+
+def test_registry_defaults_to_replayed_policies_only():
+    from sehd_rise2.evolution.policy import build_policy_artifacts
+
+    payload = json.loads(REAL_SET.read_text(encoding="utf-8"))
+    registry = build_policy_artifacts(payload)
+    assert [
+        artifact["artifact_id"] for artifact in registry["artifacts"]
     ] == ["L2-P1", "L2-P2", "L2-P3", "L2-P4", "L2-P5"]
-    promoted_only = build_policy_genome(
+    promoted_only = build_policy_artifacts(
         payload, ["L2-P2", "L2-P3", "L2-P4", "L2-P5"],
     )
     assert "L2-P1" not in {
-        item["policy_id"] for item in promoted_only["items"]
+        artifact["artifact_id"] for artifact in promoted_only["artifacts"]
     }
 
 
-def test_genome_rejects_unknown_policy_ids():
-    from sehd_rise2.evolution.policy import build_policy_genome
+def test_registry_rejects_unknown_policy_ids():
+    from sehd_rise2.evolution.policy import build_policy_artifacts
 
     payload = json.loads(REAL_SET.read_text(encoding="utf-8"))
     with pytest.raises(ValueError, match="unknown policy ids"):
-        build_policy_genome(payload, ["L2-P9"])
+        build_policy_artifacts(payload, ["L2-P9"])
 
 
 def test_findings_must_span_both_gold_polarities():

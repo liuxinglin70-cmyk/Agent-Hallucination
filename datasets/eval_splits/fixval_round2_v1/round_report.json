@@ -1,0 +1,85 @@
+{
+  "schema_version": "sehd2.fixval_round_report.v1",
+  "round": 2,
+  "baseline_run": "fixval_r2_baseline_20260816_182901",
+  "deployed_run": "fixval_r2_deployed_20260816_201706",
+  "validation": {
+    "which": "validation (read once)",
+    "cases": 40,
+    "baseline": {
+      "accuracy": 0.675,
+      "tp": 19,
+      "fp": 8,
+      "fn": 5,
+      "tn": 8
+    },
+    "deployed": {
+      "accuracy": 0.675,
+      "tp": 19,
+      "fp": 8,
+      "fn": 5,
+      "tn": 8
+    },
+    "flips": {
+      "fn_fixed": 0,
+      "fp_fixed": 0,
+      "tp_lost": 0,
+      "fp_added": 0,
+      "other": 0,
+      "net_improvement": 0
+    },
+    "flip_table": []
+  },
+  "evolution_checkpoint": {
+    "which": "evolution (decomposition)",
+    "cases": 60,
+    "baseline": {
+      "accuracy": 0.6667,
+      "tp": 31,
+      "fp": 15,
+      "fn": 5,
+      "tn": 9
+    },
+    "deployed": {
+      "accuracy": 0.6667,
+      "tp": 30,
+      "fp": 14,
+      "fn": 6,
+      "tn": 10
+    },
+    "flips": {
+      "fn_fixed": 1,
+      "fp_fixed": 1,
+      "tp_lost": 2,
+      "fp_added": 0,
+      "other": 0,
+      "net_improvement": 0
+    },
+    "flip_table": [
+      {
+        "case": "BFCL/052.json",
+        "gold": true,
+        "before": true,
+        "after": false
+      },
+      {
+        "case": "OpenDeepSearch/013.json",
+        "gold": true,
+        "before": true,
+        "after": false
+      },
+      {
+        "case": "OpenManus/102.json",
+        "gold": true,
+        "before": false,
+        "after": true
+      },
+      {
+        "case": "SmolAgents/013.json",
+        "gold": false,
+        "before": true,
+        "after": false
+      }
+    ]
+  }
+}

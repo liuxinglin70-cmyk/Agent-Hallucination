@@ -3,21 +3,25 @@
 One round over a fresh resampled split (100 = 60 evolution + 40
 validation), driven by four subcommands:
 
-    baseline   run the repaired detector WITHOUT evolved conventions
-               over all 100 cases (the round's pre-evolution anchor)
+    baseline   run the bare detector (no artifacts) over all 100 cases
+               (the round's pre-evolution anchor)
     evolve     miss triage + wrongful-conviction worksheet ->
                dual-boundary convention extraction -> G1 gate ->
-               G2 per-convention targeted replay (evolution set only)
-    deploy     run the detector WITH the deployable convention genome
-               100 cases (the post-evolution arm)
+               G2 per-convention paired replay (evolution set only) ->
+               deployables folded into the PERSISTENT convention library
+    deploy     paired adjudication arm over all 100 cases: each case
+               replays the baseline's frozen census with the COMPOSED
+               registry (convention library + policy registry) deployed,
+               so guided-vs-baseline differences are attributable to the
+               adjudication layer, not to census resampling
     report     paired comparison on the validation set (read once per
                round) plus the evolution-set checkpoint decomposition
 
 Usage:
-    python -m experiments.run_fixval_round baseline --round 1
-    python -m experiments.run_fixval_round evolve --round 1
-    python -m experiments.run_fixval_round deploy --round 1
-    python -m experiments.run_fixval_round report --round 1
+    python -m experiments.run_fixval_round baseline --round 2
+    python -m experiments.run_fixval_round evolve --round 2
+    python -m experiments.run_fixval_round deploy --round 2
+    python -m experiments.run_fixval_round report --round 2
 """
 
 from __future__ import annotations
@@ -30,6 +34,11 @@ from pathlib import Path
 from typing import Any
 
 from sehd_rise2.detector.api import Detector
+from sehd_rise2.detector.artifacts import (
+    ARTIFACT_REGISTRY_SCHEMA,
+    registry_hash,
+    validate_registry,
+)
 from sehd_rise2.detector.config import load_config
 from sehd_rise2.detector.packet import EVALUATOR_ONLY_FIELDS
 from sehd_rise2.detector.result import prediction_state
@@ -41,17 +50,40 @@ from sehd_rise2.detector.runs import (
     write_run_meta,
 )
 from sehd_rise2.evolution.convention_evolution import (
-    build_convention_genome,
+    WRONGFUL_CONVICTION_ATTRIBUTION,
+    build_convention_registry,
+    confirm_failures,
     extract_conventions,
     gate_conventions,
-    load_convention_genome,
+    load_convention_registry,
     load_run_tree,
-    triage_misses,
+    merge_round_registry,
     validate_conventions,
 )
 
 DATASET_ROOT = Path("datasets/raw/agenthallu/AgentHallu")
 WORKERS = 20
+# The accumulating memory of the convention channel and the frozen policy
+# state: the deploy arm composes both, so the round measures the FULL
+# evolved detector against the bare baseline.
+CONVENTION_LIBRARY = Path("datasets/convention_library/registry.json")
+POLICY_REGISTRY = Path("datasets/policy_candidates/v1/policy_artifacts.json")
+
+
+def composed_registry(*registries: Path) -> dict[str, Any]:
+    """Merge validated registries into one deployable payload."""
+    artifacts: list[dict[str, Any]] = []
+    for path in registries:
+        if Path(path).exists():
+            artifacts.extend(
+                validate_registry(load_convention_registry(Path(path))),
+            )
+    payload: dict[str, Any] = {
+        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
+        "artifacts": artifacts,
+    }
+    payload["content_hash"] = registry_hash(payload)
+    return payload
 
 
 def split_dir(round_no: int) -> Path:
@@ -137,7 +169,7 @@ def gold_join(run_id: str, cases: list[str]) -> dict:
 
 def _run_cases(
     run_id: str, cases: list[str],
-    evolved_conventions: dict[str, Any] | None = None,
+    artifacts: dict[str, Any] | None = None,
 ) -> None:
     detector = Detector(load_config())
     run_dir = default_runs_root() / run_id / "cases"
@@ -148,8 +180,7 @@ def _run_cases(
         clean, _gold = _load_gold(case)
         started = time.monotonic()
         result = detector.detect(
-            clean, case_id=case,
-            evolved_conventions=evolved_conventions,
+            clean, case_id=case, artifacts=artifacts,
         )
         for _attempt in range(3):
             if result.get("state") != "unresolved":
@@ -163,8 +194,7 @@ def _run_cases(
             if not transport:
                 break
             result = detector.detect(
-                clean, case_id=case,
-                evolved_conventions=evolved_conventions,
+                clean, case_id=case, artifacts=artifacts,
             )
         record_case_run(
             runs_root=default_runs_root(), run_id=run_id, case_id=case,
@@ -173,7 +203,7 @@ def _run_cases(
         )
         print(
             f"  [case] {case:<32} state={result.get('state'):<15} "
-            f"evolved={result.get('proof_adjudication', {}).get('active_evolved_conventions')}",
+            f"artifacts={result.get('proof_adjudication', {}).get('active_artifacts')}",
             flush=True,
         )
         return case
@@ -230,21 +260,36 @@ def cmd_evolve(round_no: int) -> None:
         for case_id, entry in full_tree.items()
         if case_id in evolution_cases
     }
-    misses = triage_misses(tree)
-    by_attr: dict[str, int] = {}
-    for row in misses:
-        by_attr[row["attribution"]] = by_attr.get(
-            row["attribution"], 0,
-        ) + 1
+    misses, convictions, confirm_stats = confirm_failures(
+        run_tree=tree, dataset_root=DATASET_ROOT, workers=WORKERS,
+    )
     print(
-        f"evolution-set misses: {len(misses)} by attribution {by_attr}",
+        f"reproduced worksheet: {confirm_stats['misses_reproduced']}"
+        f"/{confirm_stats['misses_total']} misses, "
+        f"{confirm_stats['convictions_reproduced']}"
+        f"/{confirm_stats['convictions_total']} convictions",
         flush=True,
     )
     raw, meta = extract_conventions(
-        run_tree=tree, dataset_root=DATASET_ROOT,
+        misses=misses, convictions=convictions,
+        dataset_root=DATASET_ROOT,
     )
+    worksheet_ids = {
+        str(row["case_id"]) for row in misses
+    } | {str(row["case_id"]) for row in convictions}
+    case_attributions = {
+        **{
+            str(row["case_id"]): str(row["attribution"])
+            for row in misses
+        },
+        **{
+            str(row["case_id"]): WRONGFUL_CONVICTION_ATTRIBUTION
+            for row in convictions
+        },
+    }
     accepted, rejections = gate_conventions(
-        raw, run_tree=tree,
+        raw, worksheet_case_ids=worksheet_ids,
+        case_attributions=case_attributions,
     )
     print(
         f"extraction: {meta['raw_conventions']} raw -> "
@@ -255,62 +300,140 @@ def cmd_evolve(round_no: int) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "conventions_raw.json").write_text(
         json.dumps(
-            {"conventions": raw, "meta": meta},
+            {
+                "conventions": raw, "meta": meta,
+                "confirm": confirm_stats,
+                "case_attributions": case_attributions,
+            },
             ensure_ascii=False, indent=2,
         ) + "\n", encoding="utf-8",
     )
     (out_dir / "conventions_gated.json").write_text(
         json.dumps(
-            {"conventions": accepted, "rejections": rejections},
+            {
+                "conventions": accepted, "rejections": rejections,
+                "case_attributions": case_attributions,
+            },
             ensure_ascii=False, indent=2,
         ) + "\n", encoding="utf-8",
     )
     if not accepted:
-        genome = build_convention_genome([])
-        (out_dir / "convention_genome.json").write_text(
-            json.dumps(genome, ensure_ascii=False, indent=2) + "\n",
+        registry = build_convention_registry([])
+        (out_dir / "convention_registry.json").write_text(
+            json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        print("no conventions passed G1; empty genome written", flush=True)
-        return
-    report = validate_conventions(
-        run_tree=tree, conventions=accepted, dataset_root=DATASET_ROOT,
-        out_dir=out_dir, workers=WORKERS,
-    )
-    deployable = report["deployable"]
-    genome = build_convention_genome([
-        entry for entry in accepted
-        if str(entry["convention_id"]) in deployable
-    ])
-    (out_dir / "convention_genome.json").write_text(
-        json.dumps(genome, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+        print("no conventions passed G1; empty round registry written", flush=True)
+    else:
+        report = validate_conventions(
+            run_tree=tree, conventions=accepted, dataset_root=DATASET_ROOT,
+            out_dir=out_dir, workers=WORKERS,
+        )
+        deployable = report["deployable"]
+        registry = build_convention_registry([
+            entry for entry in accepted
+            if str(entry["convention_id"]) in deployable
+        ])
+        (out_dir / "convention_registry.json").write_text(
+            json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(
+            f"deployable conventions: {deployable} -> "
+            f"{out_dir / 'convention_registry.json'}", flush=True,
+        )
+    library = merge_round_registry(
+        CONVENTION_LIBRARY, registry, round_no,
     )
     print(
-        f"deployable conventions: {deployable} -> "
-        f"{out_dir / 'convention_genome.json'}", flush=True,
+        f"convention library -> {CONVENTION_LIBRARY} "
+        f"({len(library['artifacts'])} accumulated artifacts)", flush=True,
     )
+
+
+def _run_paired(
+    run_id: str, baseline_id: str, cases: list[str],
+    artifacts: dict[str, Any],
+) -> None:
+    """Paired deploy arm: the baseline's frozen census + deployed registry.
+
+    Only the adjudication stages re-run (verification, defense and the
+    runtime binder); the candidate set is the baseline arm's recorded
+    census, so baseline-vs-paired flips isolate the registry's
+    adjudication-layer effect from census resampling noise.
+    """
+    detector = Detector(load_config())
+    run_dir = default_runs_root() / run_id / "cases"
+    baseline_dir = default_runs_root() / baseline_id / "cases"
+
+    def run(case: str) -> str:
+        if (run_dir / case.replace("/", "__") / "result.json").exists():
+            return case
+        clean, _gold = _load_gold(case)
+        baseline = json.loads(
+            (
+                baseline_dir / case.replace("/", "__") / "result.json"
+            ).read_text(encoding="utf-8"),
+        )
+        census = (baseline.get("proof_adjudication") or {}).get("census") or []
+        started = time.monotonic()
+        result = detector.detect(
+            clean, case_id=case, artifacts=artifacts, frozen_census=census,
+        )
+        for _attempt in range(3):
+            if result.get("state") != "unresolved":
+                break
+            transport = any(
+                str(reason.get("error_type")) in {
+                    "provider_error", "transport_error", "invalid_json",
+                }
+                for reason in result.get("authority_failure_reasons") or []
+            )
+            if not transport:
+                break
+            result = detector.detect(
+                clean, case_id=case, artifacts=artifacts, frozen_census=census,
+            )
+        record_case_run(
+            runs_root=default_runs_root(), run_id=run_id, case_id=case,
+            input_record=clean, result=result,
+            elapsed_seconds=round(time.monotonic() - started, 1),
+        )
+        print(
+            f"  [case] {case:<32} base={baseline.get('state'):<15} "
+            f"paired={result.get('state'):<15} "
+            f"artifacts={result.get('proof_adjudication', {}).get('active_artifacts')}",
+            flush=True,
+        )
+        return case
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        futures = [executor.submit(run, case) for case in cases]
+        for future in as_completed(futures):
+            future.result()
 
 
 def cmd_deploy(round_no: int, workers: int) -> None:
     global WORKERS
     WORKERS = workers
-    out_dir = split_dir(round_no)
-    genome_path = out_dir / "convention_genome.json"
-    evolved = (
-        load_convention_genome(genome_path)
-        if genome_path.exists() else None
-    )
-    if evolved is None:
-        raise SystemExit(f"no convention genome at {genome_path}")
+    artifacts = composed_registry(CONVENTION_LIBRARY, POLICY_REGISTRY)
+    if not artifacts["artifacts"]:
+        raise SystemExit(
+            "nothing to deploy: convention library and policy registry "
+            "are both empty",
+        )
+    baseline_id = _existing_run(f"fixval_r{round_no}_baseline")
     cases = _all_cases(round_no)
     run_id = new_run_id(f"fixval_r{round_no}_deployed")
+    kinds: dict[str, int] = {}
+    for artifact in artifacts["artifacts"]:
+        kinds[str(artifact["kind"])] = kinds.get(str(artifact["kind"]), 0) + 1
     print(
-        f"deployed run {run_id}: {len(cases)} cases, "
-        f"{len(evolved.get('conventions') or [])} evolved conventions",
-        flush=True,
+        f"paired deploy run {run_id}: {len(cases)} cases, composed registry "
+        f"{kinds} (hash {artifacts['content_hash'][:12]}...), "
+        f"baseline {baseline_id}", flush=True,
     )
-    _run_cases(run_id, cases, evolved_conventions=evolved)
+    _run_paired(run_id, baseline_id, cases, artifacts)
     _finalize_run(run_id, cases)
 
 

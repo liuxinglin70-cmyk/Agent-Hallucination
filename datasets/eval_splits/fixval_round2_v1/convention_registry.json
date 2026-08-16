@@ -1,0 +1,46 @@
+{
+  "schema_version": "sehd2.evolution_artifact.v1",
+  "artifacts": [
+    {
+      "artifact_id": "EC-05",
+      "version": "v1",
+      "kind": "prompt_directive",
+      "execution_point": "stage_prompts",
+      "gap": {
+        "category": "policy",
+        "name": "expression_tolerance",
+        "gap_type": "precision",
+        "failure_signature": "The detector convicted accurate final content solely because the answer used prose, abbreviations, or text-level reformulations rather than the exact requested format or label.",
+        "affected_stage": "defense",
+        "expected_capability": "The detector tolerates non-substantive format and wording variation when all required content is preserved and only punishes meaning-changing or omitting departures."
+      },
+      "trigger": {
+        "packet_features": [
+          "final_prose_report",
+          "task_specifies_values"
+        ]
+      },
+      "intervention": {
+        "directive": "It is NOT a deviation when the final answer expresses the required content accurately in different wording or formatting, as long as the requested entities and values are present, correctly ordered, and unaltered in meaning.",
+        "exclusion": "It remains a deviation when the rewording changes the meaning of a value or entity, omits required items, misorders the required result, or reports different core facts."
+      },
+      "capability_delta": {
+        "before_capability": "convicts any format or label variation as a deviation",
+        "after_capability": "acquits preserving wording and format variations unless they change meaning or omit required content"
+      },
+      "provenance": {
+        "failure_direction": "wrongful_conviction",
+        "title": "Format and wording variation preserving exact content is not a deviation",
+        "case_evidence": [
+          {
+            "case_id": "SmolAgents/013.json"
+          },
+          {
+            "case_id": "Magentic_One/055.json"
+          }
+        ]
+      }
+    }
+  ],
+  "content_hash": "f348172c4523ada7fdd3f59b6e7a62496f6ffca28fff2a6ae0594034545df48b"
+}
