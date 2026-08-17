@@ -1,0 +1,173 @@
+{
+  "schema_version": "detector_v2.intervention_registry.v1",
+  "interventions": [
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-1-001",
+      "type": "evidence_check",
+      "hook": "judge.post",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": []
+      },
+      "body": {
+        "predicate": "required_action_present",
+        "runner": "deterministic",
+        "output_verdicts": [
+          "satisfied",
+          "violated",
+          "not_applicable"
+        ]
+      },
+      "claim": {
+        "expected_behavior": "when trigger fires, proof gains a required_action_present mechanical evidence row after the judge",
+        "target_polarity": "boundary"
+      },
+      "provenance": {
+        "cycle": 1,
+        "failure_family": "FAM-fn-defense_refuted_recall_upgrade",
+        "failure_cases": [
+          "BFCL/066.json",
+          "SmolAgents/028.json"
+        ]
+      },
+      "content_hash": "ba817eabe5026401343efc99427ca6a7635ce515e57eaea4e3262f0d51f8ad8c"
+    },
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-1-002",
+      "type": "decision_guard",
+      "hook": "adjudicate.guard",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": [
+          "positive_source=recall_upgrade",
+          "defense_verdict=refuted",
+          "required_action_present=violated"
+        ]
+      },
+      "body": {
+        "action": "restore_judge_conviction",
+        "action_not_when": "Do not apply when the required_action_present fact is satisfied or not_applicable."
+      },
+      "claim": {
+        "expected_behavior": "when a recall-upgrade positive is refuted while a required action is mechanically violated, the guard restores the conviction",
+        "target_polarity": "recall"
+      },
+      "provenance": {
+        "cycle": 1,
+        "failure_family": "FAM-fn-defense_refuted_recall_upgrade",
+        "failure_cases": [
+          "BFCL/066.json",
+          "SmolAgents/028.json"
+        ]
+      },
+      "content_hash": "ded7e47fe090503401b80214ba5d50bc4d51fd8d91d00b32e5179a58f94d2e0e"
+    },
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-2-001",
+      "type": "decision_guard",
+      "hook": "adjudicate.guard",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": [
+          "judge_positive=true",
+          "defense_verdict=refuted",
+          "judge_confidence=high"
+        ]
+      },
+      "body": {
+        "action": "restore_judge_conviction",
+        "action_not_when": "Do not apply when the positive source is recall_upgrade and required_action_present is satisfied or not_applicable."
+      },
+      "claim": {
+        "expected_behavior": "when defense refutes a high-confidence judge conviction, the guard restores the judge conviction; symmetric with the recall-upgrade restoration guard already admitted",
+        "target_polarity": "recall"
+      },
+      "provenance": {
+        "cycle": 2,
+        "failure_family": "FAM-fn-defense_refuted_judge",
+        "failure_cases": [
+          "Camel/052.json",
+          "BFCL/066.json"
+        ]
+      },
+      "content_hash": "b4143f9c5bed3105f00c240eff0438e8cf2ae1dfb3b68f565b5b04a3f8ab6c74"
+    },
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-2-002",
+      "type": "evidence_check",
+      "hook": "judge.post",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": []
+      },
+      "body": {
+        "predicate": "delivered_anchor_consistency",
+        "runner": "deterministic",
+        "output_verdicts": [
+          "consistent",
+          "inconsistent",
+          "insufficient"
+        ]
+      },
+      "claim": {
+        "expected_behavior": "when trigger fires, proof gains a delivered_anchor_consistency mechanical evidence row after the judge",
+        "target_polarity": "boundary"
+      },
+      "provenance": {
+        "cycle": 2,
+        "failure_family": "FAM-fp-recall_upgrade_conviction",
+        "failure_cases": [
+          "BFCL/033.json",
+          "BFCL/113.json"
+        ]
+      },
+      "content_hash": "5f7ef3331aac00923f567ac01cade3689ccf91d013c05a0770feeb2378ea32b0"
+    },
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-2-003",
+      "type": "decision_guard",
+      "hook": "adjudicate.guard",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": [
+          "positive_source=recall_upgrade",
+          "defense_verdict=substantiated",
+          "delivered_anchor_consistency=consistent"
+        ]
+      },
+      "body": {
+        "action": "withhold_conviction",
+        "action_not_when": "Do not apply when the judge delivered result does not mechanically match the final answer anchor."
+      },
+      "claim": {
+        "expected_behavior": "when a recall-upgrade positive is substantiated but the judge delivered result mechanically matches the final answer anchor, the guard withholds the conviction",
+        "target_polarity": "precision"
+      },
+      "provenance": {
+        "cycle": 2,
+        "failure_family": "FAM-fp-recall_upgrade_conviction",
+        "failure_cases": [
+          "BFCL/033.json",
+          "BFCL/113.json"
+        ]
+      },
+      "content_hash": "b9d825d480782bcd72587cb7fb7ff9fe7b00b6a49943b17405932bb90e8f8b84"
+    }
+  ],
+  "content_hash": "034c5338fd73d34699504f95cb0bc729f35930f44a16b271e3715f5a433a7d89"
+}

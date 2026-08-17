@@ -1,0 +1,22 @@
+{
+  "schema_version": "detector_v2.config.v1",
+  "provider": {
+    "endpoint": "https://www.autodl.art/api/v1",
+    "model": "deepseek-v4-pro",
+    "api_key_env": "AUTODL_API_KEY",
+    "temperature": 0.0,
+    "timeout_seconds": 240,
+    "total_timeout_seconds": 480,
+    "transport_retries": 2,
+    "timeout_growth_factor": 1.5
+  },
+  "judge_route": {
+    "model": "deepseek-v4-pro"
+  },
+  "defense_route": {
+    "model": "deepseek-v4-pro"
+  },
+  "recall_route": {
+    "model": "deepseek-v4-flash"
+  }
+}

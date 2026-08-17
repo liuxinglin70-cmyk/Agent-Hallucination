@@ -129,3 +129,12 @@ detector_output/
 # Review virtual environment
 .review_venv/
 .zcode/
+
+# Detector V2 run artifacts
+runs_v2/
+
+
+# evolution_v3 run artifacts (code/README tracked; run trees local-only)
+evolution_v3/work/
+evolution_v3/registry/state.json
+evolution_v3/registry/snapshots/

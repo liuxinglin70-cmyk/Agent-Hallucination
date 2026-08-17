@@ -1,4 +1,8 @@
-# SEHD-RISE2 — 最小冻结检测器 + 自进化框架
+# SEHD-RISE2 — 最小冻结检测器 + 自进化框架（LEGACY，已冻结）
+
+> 本包已冻结，不再是当前进化方向。当前入口见仓库根目录 `README.md`、
+> `detector_v2/README.md` 与 `SELF_EVOLUTION_V3_DESIGN_FOR_DETECTOR_V2.md`。
+> 本文件只描述本包自身的历史实现。
 
 本目录是**从零重写**的检测器框架，只保留检测器的本质：
 
@@ -13,9 +17,9 @@ Artifact 契约，见 `detector/artifacts.py`，经 `detector/deploy.py`
 注入三阶段 prompt、`evidence_predicate` 在 verification 前执行结构化
 检查、`candidate_generator` 扩展 census、`adjudication_policy` 在确定
 性裁决内执行；另配手工约定层（`conventions.py` 基座）与冻结 census
-配对重放入口。过程与迭代协议的真源是根目录
-`FIX_VALIDATE_ITERATION_PLAN.md`；架构决策的真源是
-`SEHD_RISE2_V2_REFACTOR_PLAN.md`。
+配对重放入口。过程与迭代协议的历史真源在
+`archive/legacy_docs/FIX_VALIDATE_ITERATION_PLAN.md`；架构决策的历史真源是
+`archive/legacy_docs/SEHD_RISE2_V2_REFACTOR_PLAN.md`。
 
 ## 目录结构
 
