@@ -51,7 +51,13 @@ def build_detection_output(
     }
 
 
-def prediction_state(row: Mapping[str, Any]) -> bool | None:
+def prediction_state(
+    row: Mapping[str, Any], *, require_authoritative: bool = True,
+) -> bool | None:
+    if require_authoritative and str(
+        row.get("decision_authority") or ""
+    ) != "authoritative":
+        return None
     state = str(row.get("state") or "")
     if state == "verified_error":
         return True

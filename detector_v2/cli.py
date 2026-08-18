@@ -36,7 +36,7 @@ def _load_artifacts(path: str | None) -> dict[str, Any] | None:
 def _load_interventions(path: str | None) -> dict[str, Any] | None:
     if not path:
         return None
-    return load_intervention_registry(path)
+    return load_intervention_registry(path, require_executable_bounds=True)
 
 
 def _write_output(output_dir: str, payload: dict[str, Any]) -> None:

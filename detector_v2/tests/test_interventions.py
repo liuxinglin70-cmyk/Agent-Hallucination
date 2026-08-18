@@ -100,6 +100,7 @@ def test_guard_conflict_disables_all_actions(sample_packet):
         body={
             "action": "withhold_conviction",
             "action_not_when": "Never when defense substantiated with resolved refs.",
+            "action_not_when_facts": ["defense_verdict=substantiated"],
         },
     )
     second = _candidate(
@@ -109,6 +110,7 @@ def test_guard_conflict_disables_all_actions(sample_packet):
         body={
             "action": "restore_judge_conviction",
             "action_not_when": "Never when defense is substantiated.",
+            "action_not_when_facts": ["defense_verdict=substantiated"],
         },
     )
     registry = build_intervention_registry([first, second])
@@ -296,6 +298,20 @@ def test_frozen_judge_refuses_judge_hook_intervention(sample_record):
             sample_record, case_id="x", interventions=registry,
             frozen_judge=frozen,
         )
+
+
+def test_frozen_judge_rejects_invalid_contract(sample_record):
+    frozen = {
+        "judge_result": {
+            "ok": True,
+            "parsed": {
+                "is_hallucination": "true",
+            },
+        },
+        "judge_status": {"stage": "judge", "state": "ok"},
+    }
+    with pytest.raises(ValueError, match="frozen judge_result contract"):
+        Detector(CONFIG).detect(sample_record, frozen_judge=frozen)
 
 
 def test_runtime_plan_keeps_legacy_artifacts(sample_packet):

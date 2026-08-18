@@ -69,7 +69,9 @@ def make_intervention(
             "failure_cases": [str(x) for x in failure_cases],
         },
     }
-    validate_intervention(payload)
+    if intervention_type == "decision_guard":
+        payload["body"].setdefault("action_not_when_facts", [])
+    validate_intervention(payload, require_executable_bounds=True)
     payload["content_hash"] = intervention_content_hash(payload)
     return payload
 
@@ -120,6 +122,37 @@ def candidate_contains_case_id(entry: Mapping[str, Any]) -> str | None:
     return match.group(0) if match else None
 
 
+def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    """Executable identity for deterministic intervention types.
+
+    Prose similarity is the wrong redundancy test for deterministic hooks:
+    two evidence_check entries that share ``judge.post`` but execute
+    different predicates are distinct and must not be rejected just because
+    their natural-language claims overlap. ``text_boundary`` remains prose
+    compared because its body is natural language by definition.
+    """
+    entry_type = str(entry.get("type") or "")
+    hook = str(entry.get("hook") or "")
+    body = entry.get("body") or {}
+    if entry_type == "evidence_check":
+        return (
+            "evidence_check",
+            hook,
+            str(body.get("predicate") or ""),
+            str(body.get("runner") or ""),
+        )
+    if entry_type == "decision_guard":
+        trigger = entry.get("trigger") or {}
+        facts = [str(item) for item in (trigger.get("facts") or ())]
+        return (
+            "decision_guard",
+            hook,
+            tuple(sorted(facts)),
+            str(body.get("action") or ""),
+        )
+    return None
+
+
 def tokenize(text: str) -> set[str]:
     return {
         token.lower()
@@ -158,5 +191,6 @@ __all__ = [
     "make_intervention",
     "make_registry",
     "save_json",
+    "structured_key",
     "validate_candidate",
 ]

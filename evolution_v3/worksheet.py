@@ -104,6 +104,19 @@ def stable_failure_families(
         gold = row.get("gold")
         if gold is not True and gold is not False:
             continue
+        if str(row.get("authority") or "") != "authoritative":
+            continue
+        result = row.get("result") or {}
+        if result and not bool(result.get("runtime_valid", True)):
+            continue
+        statuses = result.get("stage_status") or {}
+        if any(
+            str((status or {}).get("state") or "").startswith(
+                ("provider_error", "invalid", "contract_error", "degraded")
+            )
+            for status in statuses.values()
+        ):
+            continue
         if row.get("prediction") == gold:
             continue
         family = failure_family(row)

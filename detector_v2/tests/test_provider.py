@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import json
+import base64
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from detector_v2.provider import ProviderError, extract_json_object, provider_call
+import detector_v2.provider as provider_module
+from detector_v2.provider import (
+    ProviderError,
+    _isolated_transport,
+    extract_json_object,
+    provider_call,
+)
 
 
 def test_extract_json_object_fences():
@@ -76,3 +83,125 @@ def test_provider_call_missing_key():
             system="s", user="u", purpose="p",
         )
     assert exc.value.error_type == "missing_credential"
+
+
+def test_provider_call_total_timeout_bounds_all_retries(monkeypatch):
+    """A route-wide deadline must not be spent once per retry."""
+    monkeypatch.setenv("V2_TEST_KEY", "secret")
+    time_values = iter([0.0, 0.0, 2.0, 2.0, 3.0, 3.0])
+    monkeypatch.setattr(provider_module.time, "monotonic", lambda: next(time_values))
+    monkeypatch.setattr(provider_module.time, "sleep", lambda _delay: None)
+    timeouts: list[float] = []
+
+    def _timed_out_transport(*, timeout, **_kwargs):
+        timeouts.append(timeout)
+        raise TimeoutError("simulated")
+
+    monkeypatch.setattr(provider_module, "_isolated_transport", _timed_out_transport)
+    with pytest.raises(ProviderError) as exc:
+        provider_call(
+            route={
+                "endpoint": "http://127.0.0.1:1/v1",
+                "model": "test-model",
+                "api_key_env": "V2_TEST_KEY",
+                "timeout_seconds": 10,
+                "total_timeout_seconds": 3,
+                "transport_retries": 2,
+            },
+            system="sys", user="user", purpose="test",
+        )
+    assert exc.value.attempts == 1
+    assert timeouts == [3.0]
+    assert "total timeout exceeded" in str(exc.value)
+
+
+def test_isolated_transport_strips_inherited_proxy(monkeypatch):
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:7897")
+    captured: dict[str, object] = {}
+
+    def _complete(*_args, **kwargs):
+        captured.update(kwargs)
+        return __import__("subprocess").CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=json.dumps({
+                "status": 200,
+                "body_b64": base64.b64encode(b"{}").decode("ascii"),
+            }).encode("utf-8"),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(provider_module.subprocess, "run", _complete)
+    status, raw = _isolated_transport(
+        url="https://www.autodl.art/api/v1/chat/completions",
+        headers={"Content-Type": "application/json"},
+        body=b"{}",
+        timeout=5,
+    )
+    assert (status, raw) == (200, b"{}")
+    assert "HTTPS_PROXY" not in captured["env"]
+
+
+def test_provider_call_passes_route_scoped_extra_body(monkeypatch):
+    monkeypatch.setenv("V2_TEST_KEY", "secret")
+    captured: dict[str, object] = {}
+
+    def _response(*, body, **_kwargs):
+        captured.update(json.loads(body.decode("utf-8")))
+        return 200, json.dumps({
+            "choices": [{"message": {"content": '{"ok": true}'}}],
+            "model": "test-model",
+        }).encode("utf-8")
+
+    monkeypatch.setattr(provider_module, "_isolated_transport", _response)
+    parsed, _meta = provider_call(
+        route={
+            "endpoint": "https://example.invalid/v1",
+            "model": "test-model",
+            "api_key_env": "V2_TEST_KEY",
+            "transport_retries": 0,
+            "extra_body": {"thinking": {"type": "disabled"}},
+        },
+        system="sys", user="user", purpose="test",
+    )
+    assert parsed == {"ok": True}
+    assert captured["thinking"] == {"type": "disabled"}
+
+
+def test_provider_call_enables_context_cache(monkeypatch):
+    monkeypatch.setenv("V2_TEST_KEY", "secret")
+    captured: dict[str, object] = {}
+
+    def _response(*, body, **_kwargs):
+        captured.update(json.loads(body.decode("utf-8")))
+        return 200, json.dumps({
+            "choices": [{"message": {"content": '{"ok": true}'}}],
+            "usage": {
+                "prompt_cache_hit_tokens": 7,
+                "cache_read_input_tokens": 3,
+                "cache_creation_input_tokens": 2,
+            },
+        }).encode("utf-8")
+
+    monkeypatch.setattr(provider_module, "_isolated_transport", _response)
+    parsed, meta = provider_call(
+        route={
+            "endpoint": "https://example.invalid/v1",
+            "model": "test-model",
+            "api_key_env": "V2_TEST_KEY",
+            "transport_retries": 0,
+            "context_cache": {
+                "enabled": True,
+                "mode": "prompt_cache_key",
+                "key_prefix": "test-cache",
+                "retention": "24h",
+            },
+        },
+        system="sys", user="user", purpose="judge",
+    )
+    assert parsed == {"ok": True}
+    assert captured["prompt_cache_key"] == "test-cache:judge"
+    assert captured["prompt_cache_retention"] == "24h"
+    assert meta["prompt_cache_hit_tokens"] == 7
+    assert meta["prompt_cache_read_tokens"] == 3
+    assert meta["prompt_cache_write_tokens"] == 2

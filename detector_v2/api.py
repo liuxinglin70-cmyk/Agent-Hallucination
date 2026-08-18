@@ -2,17 +2,117 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
 
 from detector_v2.adjudication import adjudicate
 from detector_v2.config import load_config
-from detector_v2.defense import run_defense
-from detector_v2.interventions import compile_runtime_plan
-from detector_v2.judge import run_judge
+from detector_v2.defense import _parse_defense, _validate_defense_evidence, run_defense
+from detector_v2.interventions import compile_runtime_plan, load_intervention_registry
+from detector_v2.judge import _parse_judge, run_judge
 from detector_v2.packet import build_packet, validate_record
-from detector_v2.recaller import run_causal_upgrade, run_recall_scan
+from detector_v2.recaller import (
+    _parse_candidates,
+    _parse_upgrades,
+    run_causal_upgrade,
+    run_recall_scan,
+)
 from detector_v2.result import build_detection_output
-from detector_v2.step_tracer import run_step_tracer
+from detector_v2.step_tracer import _parse_tracer, run_step_tracer
+
+
+def _frozen_stage(
+    frozen: Mapping[str, Any], name: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    result = frozen.get(f"{name}_result")
+    status = frozen.get(f"{name}_status")
+    if not isinstance(result, Mapping) or not isinstance(status, Mapping):
+        raise ValueError(f"frozen {name} replay requires result and status objects")
+    result_copy = dict(result)
+    status_copy = dict(status)
+    if bool(result_copy.get("ok")) != (status_copy.get("state") == "ok"):
+        raise ValueError(f"frozen {name} result/status authority mismatch")
+    return result_copy, status_copy
+
+
+def _validate_frozen_stages(
+    frozen: Mapping[str, Any], packet: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Normalize replay payloads through the same contracts as live stages."""
+    if not isinstance(frozen, Mapping):
+        raise ValueError("frozen stage replay payload must be an object")
+    normalized = dict(frozen)
+    judge_result, judge_status = _frozen_stage(frozen, "judge")
+    if judge_result.get("ok"):
+        parsed, error = _parse_judge(judge_result.get("parsed"), packet)
+        if parsed is None:
+            raise ValueError(f"frozen judge_result contract error: {error}")
+        judge_result["parsed"] = parsed
+    normalized["judge_result"] = judge_result
+    normalized["judge_status"] = judge_status
+
+    if "recall_result" in frozen:
+        recall_result, recall_status = _frozen_stage(frozen, "recall")
+        if recall_result.get("ok"):
+            candidates, error = _parse_candidates(
+                {"candidates": recall_result.get("candidates") or []}, packet,
+            )
+            if candidates is None:
+                raise ValueError(f"frozen recall_result contract error: {error}")
+            recall_result["candidates"] = candidates
+        normalized["recall_result"] = recall_result
+        normalized["recall_status"] = recall_status
+
+    if "upgrade_result" in frozen:
+        upgrade_result, upgrade_status = _frozen_stage(frozen, "upgrade")
+        recall_candidates = (
+            normalized.get("recall_result") or {}
+        ).get("candidates") or []
+        if upgrade_result.get("ok"):
+            upgrades, missing, error = _parse_upgrades(
+                {
+                    "upgrades": upgrade_result.get("upgrades") or [],
+                },
+                recall_candidates,
+            )
+            if upgrades is None or missing:
+                raise ValueError(
+                    f"frozen upgrade_result contract error: {error or missing}"
+                )
+            upgraded = upgrade_result.get("upgraded_candidate")
+            valid_ids = {str(row.get("candidate_id") or "") for row in upgrades}
+            if upgraded is not None:
+                if not isinstance(upgraded, Mapping) or str(
+                    upgraded.get("candidate_id") or ""
+                ) not in valid_ids:
+                    raise ValueError("frozen upgraded_candidate is not a valid row")
+            upgrade_result["upgrades"] = upgrades
+        normalized["upgrade_result"] = upgrade_result
+        normalized["upgrade_status"] = upgrade_status
+
+    if "tracer_result" in frozen:
+        tracer_result, tracer_status = _frozen_stage(frozen, "tracer")
+        if tracer_result.get("ok"):
+            parsed, error = _parse_tracer(tracer_result.get("parsed"), packet)
+            if parsed is None:
+                raise ValueError(f"frozen tracer_result contract error: {error}")
+            tracer_result["parsed"] = parsed
+        normalized["tracer_result"] = tracer_result
+        normalized["tracer_status"] = tracer_status
+
+    if "defense_result" in frozen:
+        defense_result, defense_status = _frozen_stage(frozen, "defense")
+        if defense_result.get("ok"):
+            parsed, error = _parse_defense(defense_result.get("parsed"))
+            if parsed is None:
+                raise ValueError(f"frozen defense_result contract error: {error}")
+            parsed, error = _validate_defense_evidence(parsed, packet)
+            if parsed is None:
+                raise ValueError(f"frozen defense_result evidence error: {error}")
+            defense_result["parsed"] = parsed
+        normalized["defense_result"] = defense_result
+        normalized["defense_status"] = defense_status
+    return normalized
 
 
 class Detector:
@@ -27,6 +127,10 @@ class Detector:
         self.config = (
             config if config is not None
             else load_config(require_credentials=require_credentials)
+        )
+        registry_path = self.config.get("intervention_registry")
+        self.default_interventions_path = (
+            Path(str(registry_path)) if registry_path else None
         )
 
     def detect(
@@ -53,20 +157,37 @@ class Detector:
         """
         validate_record(record)
         packet = build_packet(record)
-        plan = compile_runtime_plan(artifacts, interventions)
+        effective_interventions = (
+            interventions
+            if interventions is not None
+            else load_intervention_registry(
+                self.default_interventions_path,
+                require_executable_bounds=True,
+            )
+            if self.default_interventions_path
+            and self.default_interventions_path.exists()
+            else None
+        )
+        if (
+            interventions is None
+            and self.default_interventions_path is not None
+            and not self.default_interventions_path.exists()
+        ):
+            raise ValueError(
+                "configured intervention registry does not exist: "
+                f"{self.default_interventions_path}"
+            )
+        plan = compile_runtime_plan(artifacts, effective_interventions)
 
         frozen = frozen_judge if frozen_judge is not None else frozen_stages
+        if frozen is not None and any(
+            str(key).endswith(("_result", "_status")) for key in frozen
+        ) and "judge_result" not in frozen:
+            raise ValueError("frozen stage replay must include judge_result")
         if frozen is not None and "judge_result" in frozen:
-            if not isinstance(frozen, Mapping):
-                raise ValueError("frozen stage replay payload must be an object")
-            judge_result = dict(frozen.get("judge_result") or {})
-            judge_status = dict(frozen.get("judge_status") or {})
-            if not judge_result.get("ok") or not isinstance(
-                judge_result.get("parsed"), Mapping
-            ):
-                raise ValueError("frozen judge_result is not a valid ok result")
-            if judge_status.get("state") != "ok":
-                raise ValueError("frozen judge_status.state must be ok")
+            frozen = _validate_frozen_stages(frozen, packet)
+            judge_result = frozen["judge_result"]
+            judge_status = frozen["judge_status"]
             if any(
                 str((entry.get("hook") or "")) == "judge.system"
                 for entry in plan.interventions.entries
@@ -102,7 +223,6 @@ class Detector:
         defense_result = None
         defense_status = None
 
-        frozen = frozen_judge if frozen_judge is not None else frozen_stages
         if judge_status.get("state") == "ok" and not judge_positive:
             if frozen is not None and "recall_result" in frozen:
                 recall_result = dict(frozen.get("recall_result") or {})
@@ -194,7 +314,11 @@ class Detector:
             "positive_source": str((positive or {}).get("source") or "none"),
             "defense_verdict": str(defense_parsed.get("verdict") or "none"),
             "defense_view_degraded": str(
-                (defense_status or {}).get("view") == "degraded"
+                bool(defense_status)
+                and (
+                    (defense_status or {}).get("view") == "degraded"
+                    or (defense_status or {}).get("state") != "ok"
+                )
             ).lower(),
             "upgrade_degraded": str(
                 bool(
@@ -225,9 +349,9 @@ class Detector:
             provenance["artifacts_hash"] = str(
                 artifacts.get("content_hash") or ""
             )
-        if interventions is not None:
+        if effective_interventions is not None:
             provenance["interventions_hash"] = str(
-                interventions.get("content_hash") or ""
+                effective_interventions.get("content_hash") or ""
             )
         if frozen_judge is not None or frozen_stages is not None:
             provenance["frozen_judge_replay"] = True

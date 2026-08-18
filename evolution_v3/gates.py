@@ -16,9 +16,9 @@ from evolution_v3.contracts import (
     candidate_contains_case_id,
     candidate_prose_text,
     jaccard,
-    load_json,
     make_intervention,
     make_registry,
+    structured_key,
 )
 from evolution_v3.metrics import (
     evidence_increment_rows,
@@ -30,6 +30,11 @@ SEMANTICS_KEYS = (
     "JUDGE_SYSTEM", "RECALL_SYSTEM", "UPGRADE_SYSTEM", "TRACER_SYSTEM",
     "DEFENSE_SYSTEM",
 )
+
+UNFREEZING_HOOKS = frozenset({
+    "judge.system", "scanner.system", "upgrade.pre",
+    "upgrade.system", "tracer.system", "defense.pre", "defense.system",
+})
 
 
 def _semantics_text() -> str:
@@ -61,46 +66,17 @@ def _policy_pass(**extra: Any) -> dict[str, Any]:
     return {"passed": True, "reason": "", **extra}
 
 
-def _structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
-    """Executable identity for deterministic intervention types.
-
-    Prose similarity is the wrong redundancy test for deterministic hooks:
-    two evidence_check entries that share ``judge.post`` but execute
-    different predicates are distinct and must not be rejected just because
-    their natural-language claims overlap. ``text_boundary`` remains prose
-    compared because its body is natural language by definition.
-    """
-    entry_type = str(entry.get("type") or "")
-    hook = str(entry.get("hook") or "")
-    body = entry.get("body") or {}
-    if entry_type == "evidence_check":
-        return (
-            "evidence_check",
-            hook,
-            str(body.get("predicate") or ""),
-            str(body.get("runner") or ""),
-        )
-    if entry_type == "decision_guard":
-        trigger = entry.get("trigger") or {}
-        facts = [str(item) for item in (trigger.get("facts") or ())]
-        return (
-            "decision_guard",
-            hook,
-            tuple(sorted(facts)),
-            str(body.get("action") or ""),
-        )
-    return None
-
-
 def v1_structural(
     candidate: Mapping[str, Any],
     *,
     active_entries: Sequence[Mapping[str, Any]],
     config: Mapping[str, Any],
+    allowed_failure_cases: Sequence[str] | None = None,
+    diagnosed_families: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     gate_cfg = config.get("gates") or {}
     try:
-        validate_intervention(candidate)
+        validate_intervention(candidate, require_executable_bounds=True)
     except ValueError as exc:
         return _policy_fail(f"schema/executor rejection: {exc}")
 
@@ -112,16 +88,50 @@ def v1_structural(
     failure_cases = provenance.get("failure_cases") or []
     if len(failure_cases) < 2:
         return _policy_fail("provenance.failure_cases needs at least two cases")
+    if allowed_failure_cases is not None:
+        outside = sorted(set(map(str, failure_cases)) - set(map(str, allowed_failure_cases)))
+        if outside:
+            return _policy_fail(
+                f"provenance contains case(s) outside this cycle patrol: {outside}"
+            )
     family = str(provenance.get("failure_family") or "")
     if not family:
         return _policy_fail("provenance.failure_family is empty")
+    if diagnosed_families is not None:
+        family_members = {
+            str(item.get("failure_family") or ""): {
+                str(case) for case in item.get("failure_cases") or ()
+            }
+            for item in diagnosed_families
+        }
+        if family not in family_members:
+            return _policy_fail(
+                f"provenance failure family {family!r} was not diagnosed this cycle"
+            )
+        outside_family = sorted(
+            set(map(str, failure_cases)) - family_members[family]
+        )
+        if outside_family:
+            return _policy_fail(
+                "provenance case(s) are not members of the diagnosed family: "
+                f"{outside_family}"
+            )
+    polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
+    if family.startswith("FAM-fn-") and polarity != "recall":
+        return _policy_fail(
+            f"FN failure family requires recall polarity, got {polarity!r}"
+        )
+    if family.startswith("FAM-fp-") and polarity != "precision":
+        return _policy_fail(
+            f"FP failure family requires precision polarity, got {polarity!r}"
+        )
 
     candidate_text = candidate_prose_text(candidate)
     base_text = _semantics_text()
     threshold = float(gate_cfg.get("v1_jaccard_threshold", 0.72))
-    candidate_key = _structured_key(candidate)
+    candidate_key = structured_key(candidate)
     for existing in active_entries:
-        existing_key = _structured_key(existing)
+        existing_key = structured_key(existing)
         if candidate_key is not None and existing_key is not None:
             if candidate_key == existing_key:
                 return _policy_fail(
@@ -147,9 +157,26 @@ def v1_structural(
     return _policy_pass(jaccard_base=round(base_score, 4))
 
 
+def _reroll_backend(backend: Any) -> Any:
+    """Return the live detector behind all cache/replay wrappers."""
+    current = backend
+    seen: set[int] = set()
+    while id(current) not in seen:
+        seen.add(id(current))
+        if hasattr(current, "live"):
+            current = current.live
+            continue
+        nested = getattr(current, "backend", None)
+        if nested is None:
+            break
+        current = nested
+    return current
+
+
 def v2_harmlessness(
     candidate: Mapping[str, Any],
     *,
+    active_entries: Sequence[Mapping[str, Any]] = (),
     baseline_rows: Sequence[Mapping[str, Any]],
     backend: Any,
     dataset_root: str,
@@ -159,33 +186,65 @@ def v2_harmlessness(
     workers: int = 1,
 ) -> dict[str, Any]:
     gate_cfg = config.get("gates") or {}
-    registry = make_registry([candidate])
-    candidate_rows = backend.evaluate(
-        list(sentinel_cases),
-        dataset_root=dataset_root,
-        registry=registry,
-        gold_map=gold_map,
-        workers=workers,
-    )
-    delta = paired_delta(list(baseline_rows), candidate_rows)
-    checks = {
-        "new_fn_allowed": int(gate_cfg.get("v2_new_fn_allowed", 0)),
-        "new_fp_allowed": int(gate_cfg.get("v2_new_fp_allowed", 0)),
-        "new_unresolved_allowed": int(
-            gate_cfg.get("v2_new_unresolved_allowed", 0)
-        ),
+    registry = make_registry([*active_entries, candidate])
+    candidate_rows: list[dict[str, Any]]
+    delta: dict[str, Any]
+    base_tolerance = {
+        "new_fn": int(gate_cfg.get("v2_new_fn_allowed", 0)),
+        "new_fp": int(gate_cfg.get("v2_new_fp_allowed", 0)),
+        "new_unresolved": int(gate_cfg.get("v2_new_unresolved_allowed", 0)),
     }
     failures = []
-    if delta["new_fn"] > checks["new_fn_allowed"]:
-        failures.append(f"new_fn={delta['new_fn']}")
-    if delta["new_fp"] > checks["new_fp_allowed"]:
-        failures.append(f"new_fp={delta['new_fp']}")
-    if delta["unresolved_added"] > checks["new_unresolved_allowed"]:
-        failures.append(f"unresolved_added={delta['unresolved_added']}")
+    reroll = None
+    tolerance = dict(base_tolerance)
+    if str(candidate.get("hook") or "") in UNFREEZING_HOOKS and bool(
+        gate_cfg.get("v2_reroll_control", True)
+    ):
+        # Compare two fresh arms with the same deployed registry. Aggregate
+        # noise allowances can hide harm on different cases, so no count-based
+        # subtraction is used.
+        live = _reroll_backend(backend)
+        evaluate_fresh = getattr(live, "evaluate_fresh", live.evaluate)
+        control_rows = evaluate_fresh(
+            list(sentinel_cases),
+            dataset_root=dataset_root,
+            registry=make_registry(active_entries),
+            gold_map=gold_map,
+            workers=workers,
+        )
+        candidate_rows = evaluate_fresh(
+            list(sentinel_cases),
+            dataset_root=dataset_root,
+            registry=registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
+        reroll = paired_delta(list(baseline_rows), control_rows)
+        delta = paired_delta(control_rows, candidate_rows)
+    else:
+        candidate_rows = backend.evaluate(
+            list(sentinel_cases),
+            dataset_root=dataset_root,
+            registry=registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
+        delta = paired_delta(list(baseline_rows), candidate_rows)
+    observed = {
+        "new_fn": int(delta["new_fn"]),
+        "new_fp": int(delta["new_fp"]),
+        "new_unresolved": int(delta["unresolved_added"]),
+    }
+    for key, value in observed.items():
+        if value > tolerance[key]:
+            failures.append(f"{key}={value}")
+    if int(delta.get("health_regressed") or 0) > 0:
+        failures.append(f"health_regressed={delta['health_regressed']}")
     if failures:
         return _policy_fail(
             "sentinel harmlessness violation: " + ", ".join(failures),
             delta=delta,
+            reroll_control=reroll,
             sentinel_manifest={
                 "cases": list(sentinel_cases),
                 "baseline_rows": [
@@ -200,7 +259,7 @@ def v2_harmlessness(
                 ],
             },
         )
-    return _policy_pass(delta=delta)
+    return _policy_pass(delta=delta, reroll_control=reroll)
 
 
 def v3_semantics(
@@ -216,7 +275,7 @@ def v3_semantics(
     claim = candidate.get("claim") or {}
     polarity = str(claim.get("target_polarity") or "")
 
-    rate = fired_rate(candidate_rows)
+    rate = fired_rate(candidate_rows, intervention_id)
     if bool(gate_cfg.get("v3_require_fired", True)) and rate <= 0.0:
         return _policy_fail(
             "claim behavior mismatch: intervention never fired on S union G",
@@ -239,7 +298,8 @@ def v3_semantics(
             ) or {}
             injected += sum(
                 1 for item in deployment.get("fired") or ()
-                if item.get("event") == "text_injected"
+                if str(item.get("intervention_id") or "") == intervention_id
+                and item.get("event") == "text_injected"
             )
         behavior_ok = injected > 0
         behavior_note = f"text_injected_cases={injected}"
@@ -251,7 +311,8 @@ def v3_semantics(
             ) or {}
             guard_fired += sum(
                 1 for item in deployment.get("fired") or ()
-                if item.get("event") in {"guard_fired", "policy_conflict"}
+                if str(item.get("intervention_id") or "") == intervention_id
+                and item.get("event") == "guard_fired"
             )
         behavior_ok = guard_fired > 0
         behavior_note = f"guard_fired_cases={guard_fired}"
@@ -263,6 +324,12 @@ def v3_semantics(
         )
 
     delta = paired_delta(list(baseline_rows), candidate_rows)
+    if int(delta.get("health_regressed") or 0) > 0:
+        return _policy_fail(
+            f"runtime health regressed on {delta['health_regressed']} case(s)",
+            delta=delta,
+            fired_rate=rate,
+        )
     if polarity == "recall":
         if not (_new_tp(delta) > 0 and delta["tp_lost"] == 0 and delta["fp_added"] == 0):
             return _policy_fail(
@@ -293,32 +360,13 @@ def v3_semantics(
     )
 
 
-def _calibration_floor(config: Mapping[str, Any], backend_name: str | None) -> int:
-    path = config.get("gate_calibration")
-    if not path:
-        return 0
-    try:
-        payload = load_json(path)
-    except Exception:
-        return 0
-    if not isinstance(payload, Mapping):
-        return 0
-    if backend_name and payload.get("backend") != backend_name:
-        return 0
-    return max(0, int(payload.get("empty_rerun_positive_net") or 0))
-
-
 def _meets_m(
     delta: Mapping[str, Any],
     config: Mapping[str, Any],
-    backend_name: str | None = None,
 ) -> tuple[bool, list[str]]:
     gate_cfg = config.get("gates") or {}
     failures = []
-    minimum = max(
-        int(gate_cfg.get("m_min_marginal_cases", 1)),
-        _calibration_floor(config, backend_name),
-    )
+    minimum = max(0, int(gate_cfg.get("m_min_marginal_cases", 1)))
     if delta["marginal_cases"] < minimum:
         failures.append(
             f"marginal_cases={delta['marginal_cases']} < {minimum}"
@@ -330,6 +378,8 @@ def _meets_m(
         )
     if delta["unresolved_added"] > 0:
         failures.append(f"unresolved_added={delta['unresolved_added']}")
+    if int(delta.get("health_regressed") or 0) > 0:
+        failures.append(f"health_regressed={delta['health_regressed']}")
     return (not failures), failures
 
 
@@ -346,17 +396,28 @@ def marginal_candidate(
     workers: int = 1,
 ) -> dict[str, Any]:
     registry = make_registry([*active_entries, candidate])
-    rows = backend.evaluate(
+    fresh = str(candidate.get("hook") or "") in UNFREEZING_HOOKS
+    evaluate = backend.evaluate_fresh if fresh else backend.evaluate
+    control_rows = (
+        evaluate(
+            list(gain_cases),
+            dataset_root=dataset_root,
+            registry=make_registry(active_entries),
+            gold_map=gold_map,
+            workers=workers,
+        )
+        if fresh
+        else list(active_rows)
+    )
+    rows = evaluate(
         list(gain_cases),
         dataset_root=dataset_root,
         registry=registry,
         gold_map=gold_map,
         workers=workers,
     )
-    delta = paired_delta(list(active_rows), rows)
-    passed, failures = _meets_m(
-        delta, config, backend_name=getattr(backend, "name", None),
-    )
+    delta = paired_delta(control_rows, rows)
+    passed, failures = _meets_m(delta, config)
     return {
         "candidate": dict(candidate),
         "passed": passed,
@@ -424,17 +485,30 @@ def marginal_selection(
             continue
         entries = [by_id[identifier] for identifier in candidate_ids]
         registry = make_registry([*active_entries, *entries])
-        rows = backend.evaluate(
+        fresh = any(
+            str(entry.get("hook") or "") in UNFREEZING_HOOKS
+            for entry in entries
+        )
+        evaluate = backend.evaluate_fresh if fresh else backend.evaluate
+        control_rows = (
+            evaluate(
+                list(gain_cases),
+                dataset_root=dataset_root,
+                registry=make_registry(active_entries),
+                gold_map=gold_map,
+                workers=workers,
+            )
+            if fresh else list(active_rows)
+        )
+        rows = evaluate(
             list(gain_cases),
             dataset_root=dataset_root,
             registry=registry,
             gold_map=gold_map,
             workers=workers,
         )
-        delta = paired_delta(list(active_rows), rows)
-        passed, failures = _meets_m(
-            delta, config, backend_name=getattr(backend, "name", None),
-        )
+        delta = paired_delta(control_rows, rows)
+        passed, failures = _meets_m(delta, config)
         joint_reports.append({
             "candidate_ids": candidate_ids,
             "passed": passed,
@@ -458,43 +532,112 @@ def marginal_selection(
             report["candidate"],
         ]
         registry = make_registry(trial)
-        rows = backend.evaluate(
+        fresh = any(
+            str(entry.get("hook") or "") in UNFREEZING_HOOKS
+            for entry in [
+                *[item["candidate"] for item in selected_reports],
+                report["candidate"],
+            ]
+        )
+        evaluate = backend.evaluate_fresh if fresh else backend.evaluate
+        control_rows = (
+            evaluate(
+                list(gain_cases),
+                dataset_root=dataset_root,
+                registry=make_registry(active_entries),
+                gold_map=gold_map,
+                workers=workers,
+            )
+            if fresh else list(active_rows)
+        )
+        rows = evaluate(
             list(gain_cases),
             dataset_root=dataset_root,
             registry=registry,
             gold_map=gold_map,
             workers=workers,
         )
-        delta = paired_delta(list(active_rows), rows)
-        passed, _failures = _meets_m(
-            delta, config, backend_name=getattr(backend, "name", None),
-        )
+        delta = paired_delta(control_rows, rows)
+        passed, _failures = _meets_m(delta, config)
         if passed:
             selected_reports.append(report)
             budget -= 1
 
-    # Decompose individual combinations that only add width, not joint gain.
+    # Decompose individual combinations by testing each member leave-one-out.
+    # Keep every selected member whose removal breaks the accepted combined
+    # configuration. Independent candidates are both redundant only when the
+    # full configuration remains accepted after removing each one.
     removed: list[str] = []
     if len(selected_reports) > 1:
-        for kept in selected_reports:
+        full_registry = make_registry([
+            *active_entries,
+            *[item["candidate"] for item in selected_reports],
+        ])
+        full_fresh = any(
+            str(item["candidate"].get("hook") or "") in UNFREEZING_HOOKS
+            for item in selected_reports
+        )
+        full_evaluate = (
+            backend.evaluate_fresh if full_fresh else backend.evaluate
+        )
+        full_control = (
+            full_evaluate(
+                list(gain_cases),
+                dataset_root=dataset_root,
+                registry=make_registry(active_entries),
+                gold_map=gold_map,
+                workers=workers,
+            )
+            if full_fresh else list(active_rows)
+        )
+        full_rows = full_evaluate(
+            list(gain_cases),
+            dataset_root=dataset_root,
+            registry=full_registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
+        full_delta = paired_delta(full_control, full_rows)
+        ordered = sorted(
+            selected_reports,
+            key=lambda item: -int(item["delta"]["marginal_cases"]),
+        )
+        for kept in ordered[1:]:
             without = [item for item in selected_reports if item is not kept]
             if not without:
                 continue
             registry = make_registry([
                 *active_entries, *[item["candidate"] for item in without],
             ])
-            rows = backend.evaluate(
+            fresh = any(
+                str(item["candidate"].get("hook") or "") in UNFREEZING_HOOKS
+                for item in without
+            )
+            evaluate = backend.evaluate_fresh if fresh else backend.evaluate
+            control_rows = (
+                evaluate(
+                    list(gain_cases),
+                    dataset_root=dataset_root,
+                    registry=make_registry(active_entries),
+                    gold_map=gold_map,
+                    workers=workers,
+                )
+                if fresh else list(active_rows)
+            )
+            rows = evaluate(
                 list(gain_cases),
                 dataset_root=dataset_root,
                 registry=registry,
                 gold_map=gold_map,
                 workers=workers,
             )
-            delta = paired_delta(list(active_rows), rows)
-            passed, _failures = _meets_m(
-                delta, config, backend_name=getattr(backend, "name", None),
-            )
-            if passed:
+            delta = paired_delta(control_rows, rows)
+            passed, _failures = _meets_m(delta, config)
+            if (
+                passed
+                and int(delta["marginal_cases"])
+                >= int(full_delta["marginal_cases"])
+            ):
                 removed.append(str(kept["candidate"].get("intervention_id") or ""))
         if removed:
             selected_reports = [
@@ -515,9 +658,41 @@ def marginal_selection(
             continue
         entries = [by_id[identifier] for identifier in joint_report["candidate_ids"]]
         if budget >= len(entries):
-            joint_report["selected"] = True
-            selected_entries.extend(entries)
-            budget -= len(entries)
+            trial = [*active_entries, *selected_entries, *entries]
+            fresh = any(
+                str(entry.get("hook") or "") in UNFREEZING_HOOKS
+                for entry in [*selected_entries, *entries]
+            )
+            evaluate = backend.evaluate_fresh if fresh else backend.evaluate
+            control_rows = (
+                evaluate(
+                    list(gain_cases),
+                    dataset_root=dataset_root,
+                    registry=make_registry(active_entries),
+                    gold_map=gold_map,
+                    workers=workers,
+                )
+                if fresh else list(active_rows)
+            )
+            rows = evaluate(
+                list(gain_cases),
+                dataset_root=dataset_root,
+                registry=make_registry(trial),
+                gold_map=gold_map,
+                workers=workers,
+            )
+            combined_delta = paired_delta(control_rows, rows)
+            combined_passed, failures = _meets_m(combined_delta, config)
+            if combined_passed:
+                joint_report["selected"] = True
+                joint_report["combined_delta"] = combined_delta
+                selected_entries.extend(entries)
+                budget -= len(entries)
+            else:
+                joint_report["reason"] = (
+                    "combined with already selected candidates: "
+                    + "; ".join(failures)
+                )
         else:
             joint_report["reason"] = (
                 f"{joint_report.get('reason') or 'joint M passed'}; "
@@ -552,14 +727,24 @@ def defect_candidates(cycle: int) -> list[dict[str, Any]]:
     )
     noise = make_intervention(
         intervention_id=f"IV-DEFECT-{cycle}-002",
-        intervention_type="text_boundary",
-        hook="scanner.system",
+        # This audit must exercise V2/V3/M without re-running a baseline
+        # provider stage.  A scanner.system text boundary unfreezes recall
+        # and spends real tokens before any candidate exists.  This closed
+        # deterministic evidence check keeps the cached judge/recall/upgrade/
+        # tracer/defense stages frozen while still producing a fired V3 trace
+        # that M must reject for zero marginal gain.
+        intervention_type="evidence_check",
+        hook="judge.post",
         packet_features=["has_tool_calls"],
         body={
-            "directive": "Re-read the trajectory once before writing candidates.",
-            "not_when": "Never apply when the packet has no tool calls.",
+            "predicate": "evidence_refs_resolve",
+            "runner": "deterministic",
+            "output_verdicts": ["resolved", "unresolved", "not_applicable"],
         },
-        expected_behavior="gate audit: fires harmlessly but must fail M for zero marginal gain",
+        expected_behavior=(
+            "gate audit: deterministic evidence fires harmlessly but must "
+            "fail M for zero marginal gain"
+        ),
         target_polarity="boundary",
         cycle=cycle,
         failure_family="AUDIT-NOISE_ZERO_MARGINAL",
@@ -602,6 +787,7 @@ def audit_defects(
         if v1["passed"]:
             v2 = v2_harmlessness(
                 candidate,
+                active_entries=active_entries,
                 baseline_rows=baseline_sentinel_rows,
                 backend=backend,
                 dataset_root=dataset_root,
@@ -612,7 +798,8 @@ def audit_defects(
             )
             report["v2"] = v2
             if v2["passed"]:
-                # V3 needs S union G candidate rows; run candidate on both.
+                # V3 needs S union G rows from the same active->active+candidate
+                # comparison used by M.
                 candidate_rows = []
                 for rows, cases in (
                     (baseline_sentinel_rows, sentinel_cases),
@@ -622,7 +809,7 @@ def audit_defects(
                         backend.evaluate(
                             list(cases),
                             dataset_root=dataset_root,
-                            registry=make_registry([candidate]),
+                            registry=make_registry([*active_entries, candidate]),
                             gold_map=gold_map,
                             workers=workers,
                         )

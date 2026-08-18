@@ -18,6 +18,9 @@ AUTHORITY_DEGRADED_JUDGE_ONLY = "degraded_judge_only"
 AUTHORITY_INVALID = "invalid"
 
 
+from detector_v2.packet import delivered_result as packet_delivered_result
+
+
 def _event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
     if step is None:
         return None
@@ -25,6 +28,18 @@ def _event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | Non
         if int(event.get("position") or 0) == step:
             return str(event.get("event_id") or "")
     return None
+
+
+def _mechanical_anchor(packet: Mapping[str, Any]) -> tuple[str | None, int | None]:
+    """The delivered-answer anchor where a contract violation manifests."""
+    anchor_id = str(packet_delivered_result(packet).get("last_prose_event_id") or "")
+    if not anchor_id:
+        return None, None
+    for event in packet.get("events") or []:
+        if str(event.get("event_id") or "") == anchor_id:
+            position = event.get("position")
+            return anchor_id, int(position) if str(position).isdigit() else None
+    return anchor_id, None
 
 
 def _positive_from_judge(judge_result: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -119,6 +134,33 @@ def adjudicate(
     upgrade_positive = _positive_from_upgrade(upgrade_result) if recall_ok else None
 
     if not judge_positive and not upgrade_positive:
+        if "convict_mechanical_violation" in guards and recall_ok:
+            # A decision_guard may promote a mechanical contract violation
+            # into a conviction even with no preliminary positive. The guard
+            # trigger vocabulary (predicate verdicts written by evidence_check
+            # rows plus the stage facts) decides when this is safe; the
+            # localization is the delivered-answer anchor.
+            anchor_event, anchor_step = _mechanical_anchor(packet)
+            return {
+                "state": STATE_ERROR,
+                "decision_authority": AUTHORITY_AUTHORITATIVE,
+                "runtime_valid": True,
+                "responsible_event_id": anchor_event,
+                "responsible_step": anchor_step,
+                "incident_occurred": True,
+                "terminal_basis": {
+                    "state": STATE_ERROR,
+                    "decisive_facts": {
+                        "positive_source": "mechanical_violation",
+                        "guard_action": "convict_mechanical_violation",
+                        "mechanical_anchor_event": anchor_event,
+                        "judge": "false",
+                        "recall_upgrade": "none",
+                    },
+                    "blocking_facts": [dict(reason) for reason in reasons],
+                },
+                "authority_failure_reasons": reasons,
+            }
         degraded = not recall_ok
         if degraded:
             reasons.append({
@@ -161,7 +203,8 @@ def adjudicate(
         positive["delivered_result"] = ""
         positive["correct_result"] = ""
 
-    if "withhold_conviction" in guards:
+    defense_state = str(defense_status.get("state")) if defense_status else "not_run"
+    if "withhold_conviction" in guards and defense_state == "ok":
         reasons.append({
             "component": "adjudicate.guard",
             "code": "withhold_conviction",
@@ -195,7 +238,6 @@ def adjudicate(
     working_positive = _clean_positive(positive, traced_step)
     working_positive["evidence_refs"] = traced_refs or working_positive.get("evidence_refs", [])
 
-    defense_state = str(defense_status.get("state")) if defense_status else "not_run"
     defense_parsed = (defense_result or {}).get("parsed")
     defense_parsed = defense_parsed if isinstance(defense_parsed, Mapping) else {}
 

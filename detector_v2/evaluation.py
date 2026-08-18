@@ -67,14 +67,12 @@ def evaluate_run(
 ) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
+    missing_cases: list[str] = []
     for case_id in cases:
         result_path = (
             Path(runs_root) / run_id / "cases"
             / safe_case_id(case_id) / "result.json"
         )
-        if not result_path.exists():
-            continue
-        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
         _record, gold = load_case(dataset_root, case_id)
         raw = json.loads(
             (Path(dataset_root) / case_id).read_text(encoding="utf-8-sig")
@@ -89,6 +87,19 @@ def evaluate_run(
             gold_bool = label
         else:
             gold_bool = str(label).strip().lower() == "true"
+        if not result_path.exists():
+            missing_cases.append(case_id)
+            rows.append({
+                "case": case_id,
+                "gold": gold_bool,
+                "prediction": None,
+                "gold_step": gold_step,
+                "responsible_step": None,
+                "state": "missing_result",
+                "authority": "invalid",
+            })
+            continue
+        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
         prediction = prediction_state(result)
         rows.append({
             "case": case_id,
@@ -114,6 +125,9 @@ def evaluate_run(
             })
 
     metrics = binary_metrics(rows)
+    metrics["requested_cases"] = len(cases)
+    metrics["found_results"] = len(cases) - len(missing_cases)
+    metrics["missing_cases"] = len(missing_cases)
     step_hits = 0
     step_total = 0
     for row in rows:
@@ -127,7 +141,13 @@ def evaluate_run(
         "hits": step_hits,
         "accuracy": step_hits / step_total if step_total else None,
     }
-    return {"run_id": run_id, "metrics": metrics, "rows": rows, "errors": errors}
+    return {
+        "run_id": run_id,
+        "metrics": metrics,
+        "rows": rows,
+        "errors": errors,
+        "missing_cases": missing_cases,
+    }
 
 
-__all__ = ["binary_metrics", "evaluate_run", "gold_fields", "prediction_state"]
+__all__ = ["binary_metrics", "evaluate_run", "prediction_state"]

@@ -25,9 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "split_manifest": "datasets/eval_splits/phase2_v1/manifest.json",
     "mini_split_manifest": "datasets/eval_splits/v3_evo50/manifest.json",
     "work_root": "evolution_v3/work",
-    "registry_dir": "evolution_v3/registry",
-    "ledger_path": "datasets/evolution_v2/ledger.jsonl",
-    "gate_calibration": "datasets/evolution_v2/gate_calibration.json",
+    "registry_dir": "evolution_v3/work/runtime_registry",
+    "ledger_path": "evolution_v3/work/runtime_ledger.jsonl",
     "cycles": 3,
     "split": {
         "seed": 20260817,
@@ -58,15 +57,14 @@ DEFAULTS: dict[str, Any] = {
         "m_new_errors_allowed": 0,
     },
     "library": {
-        "max_width": 5,
+        "max_width": 6,
         "max_text_boundary_per_hook": 1,
-        "max_decision_guards": 3,
+        "max_decision_guards": 4,
         "retire_after_cycles_marginal_le0": 2,
         "rollback_after_cycles_net_negative": 2,
     },
     "audit": {
         "enabled": True,
-        "noise_floor_reruns": 2,
     },
     "backend": {
         "name": "detector_v2",
@@ -74,7 +72,9 @@ DEFAULTS: dict[str, Any] = {
         "cache": True,
     },
     "proposer": {
-        "mode": "template",  # template | llm
+        "mode": "llm",
+        "max_output_tokens": 4096,
+        "disable_thinking": True,
     },
 }
 
@@ -118,7 +118,6 @@ def load_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
     for key in (
         "detector_config", "dataset_root", "split_manifest",
         "mini_split_manifest", "work_root", "registry_dir", "ledger_path",
-        "gate_calibration",
     ):
         merged[key] = str(resolve_path(merged[key]))
     merged["config_path"] = str(config_path)
@@ -146,10 +145,6 @@ def ensure_dirs(config: Mapping[str, Any]) -> dict[str, Path]:
     snapshot_dir = registry_dir / "snapshots"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     resolve_path(config["ledger_path"]).parent.mkdir(parents=True, exist_ok=True)
-    if config.get("gate_calibration"):
-        resolve_path(config["gate_calibration"]).parent.mkdir(
-            parents=True, exist_ok=True
-        )
     return paths
 
 

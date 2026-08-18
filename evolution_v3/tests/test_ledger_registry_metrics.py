@@ -69,6 +69,15 @@ def test_paired_delta_counts_only_paired_flips():
     assert binary_metrics(active)["tp"] == 2
 
 
+def test_paired_delta_counts_unresolved_to_wrong_as_new_error():
+    baseline = [{"case": "a", "gold": True, "prediction": None}]
+    active = [{"case": "a", "gold": True, "prediction": False}]
+    delta = paired_delta(baseline, active)
+    assert delta["flips"] == {"U->F": 1}
+    assert delta["new_fn"] == 1
+    assert delta["new_errors"] == 1
+
+
 def test_final_holdout_is_read_once():
     holdout = FinalHoldout([
         {"case_id": "A/001.json", "gold": True},
@@ -92,3 +101,16 @@ def test_final_holdout_marker_survives_new_process(tmp_path):
     )
     with pytest.raises(RuntimeError):
         fresh_holdout.read("final")
+
+
+def test_net_contribution_is_idempotent_per_cycle(tmp_path):
+    """A retried cycle overwrites its own record instead of appending."""
+    registry = ActiveRegistry(tmp_path / "registry")
+    registry.record_net_contribution(3, cycle=1)
+    registry.record_net_contribution(-2, cycle=2)
+    registry.record_net_contribution(0, cycle=2)  # cycle 2 rerun
+    history = registry.state["net_contribution_history"]
+    assert history == [
+        {"cycle": 1, "net_correct_cases": 3},
+        {"cycle": 2, "net_correct_cases": 0},
+    ]

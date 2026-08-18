@@ -108,6 +108,44 @@ def test_run_defense_refuted(sample_packet, monkeypatch):
     assert status["state"] == "ok"
 
 
+def test_run_defense_rejects_refuted_without_resolved_evidence(
+    sample_packet, monkeypatch,
+):
+    def fake_call(*, route, system, user, purpose):
+        return {
+            "verdict": "refuted",
+            "confirmed_step": None,
+            "evidence_refs": [],
+            "reason": "the value is correct",
+        }, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.defense.provider_call", fake_call)
+    result, status = run_defense(
+        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+    )
+    assert result["ok"] is False
+    assert status["state"] == "contract_error"
+
+
+def test_run_defense_rejects_unknown_evidence_reference(
+    sample_packet, monkeypatch,
+):
+    def fake_call(*, route, system, user, purpose):
+        return {
+            "verdict": "refuted",
+            "confirmed_step": None,
+            "evidence_refs": ["event_999"],
+            "reason": "the value is correct",
+        }, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.defense.provider_call", fake_call)
+    result, status = run_defense(
+        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+    )
+    assert result["ok"] is False
+    assert status["state"] == "contract_error"
+
+
 def test_run_defense_inconclusive_keeps_judge_on_failure(
     sample_packet, monkeypatch,
 ):

@@ -288,7 +288,7 @@ python evolution_v3/experiments/run_tuning100.py cycle \
   --cycle 2 --max-proposals 3 --m-min-marginal 2 --no-audit
 
 # 2) 50 例验证（复用 evo3_val_base 基线，active 臂 frozen replay，0 token）
-python evolution_v3/experiments/run_tuning100.py validate --no-noise
+python evolution_v3/experiments/run_tuning100.py validate
 
 # 3) 回归
 python -m pytest detector_v2/tests evolution_v3/tests tests -q

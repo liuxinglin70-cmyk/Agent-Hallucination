@@ -84,8 +84,6 @@ def _rows_from_reports(reports: Sequence[Mapping[str, Any]]) -> list[dict[str, A
 def compute_meta(
     cycle_reports: Sequence[Mapping[str, Any]],
     ledger: Ledger | None = None,
-    *,
-    noise_floor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     rows = _rows_from_reports(cycle_reports)
     audits = [
@@ -179,7 +177,6 @@ def compute_meta(
             ),
             "computed_in_final": True,
         },
-        "noise_floor": noise_floor or {},
         "ledger_integrity": ledger_integrity,
     }
 
@@ -188,12 +185,8 @@ def write_meta_report(
     cycle_reports: Sequence[Mapping[str, Any]],
     ledger: Ledger,
     output_path: str | Path,
-    *,
-    noise_floor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    report = compute_meta(
-        cycle_reports, ledger=ledger, noise_floor=noise_floor,
-    )
+    report = compute_meta(cycle_reports, ledger=ledger)
     save_json(output_path, report)
     return report
 

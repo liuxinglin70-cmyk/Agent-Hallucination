@@ -115,8 +115,13 @@ def paired_delta(
     )
     new_fn = sum(
         1 for r in paired
-        if r["gold"] and r["baseline_prediction"] is True
-        and r["active_prediction"] is not True
+        if r["gold"]
+        and (
+            (r["baseline_prediction"] is True
+             and r["active_prediction"] is not True)
+            or (r["baseline_prediction"] is None
+                and r["active_prediction"] is False)
+        )
     )
     new_fp = fp_added
     unresolved_added = sum(
@@ -130,14 +135,42 @@ def paired_delta(
         and r["active_prediction"] is not None
     )
     flips: dict[str, int] = {}
+    transitions_by_gold: dict[str, dict[str, int]] = {"error": {}, "clean": {}}
+    correctness_improved = 0
+    correctness_worsened = 0
     for r in paired:
         a = r["baseline_prediction"]
         b = r["active_prediction"]
         key = f"{'T' if a is True else ('F' if a is False else 'U')}->"
         key += "T" if b is True else ("F" if b is False else "U")
         flips[key] = flips.get(key, 0) + 1
+        gold_key = "error" if r["gold"] else "clean"
+        transitions_by_gold[gold_key][key] = (
+            transitions_by_gold[gold_key].get(key, 0) + 1
+        )
+        baseline_is_correct = a is not None and a == r["gold"]
+        active_is_correct = b is not None and b == r["gold"]
+        if active_is_correct and not baseline_is_correct:
+            correctness_improved += 1
+        elif baseline_is_correct and not active_is_correct:
+            correctness_worsened += 1
     metrics_base = binary_metrics(baseline_rows)
     metrics_active = binary_metrics(active_rows)
+    baseline_by_case = {
+        str(item.get("case") or ""): item for item in baseline_rows
+    }
+    active_by_case = {
+        str(item.get("case") or ""): item for item in active_rows
+    }
+    health_regressed = 0
+    health_improved = 0
+    for row in paired:
+        baseline_health = _row_health(baseline_by_case.get(row["case"]))
+        active_health = _row_health(active_by_case.get(row["case"]))
+        if baseline_health and not active_health:
+            health_regressed += 1
+        elif not baseline_health and active_health:
+            health_improved += 1
     return {
         "paired_n": len(paired),
         "base_all_case_correct": base_correct,
@@ -150,24 +183,50 @@ def paired_delta(
         "new_errors": new_fn + new_fp,
         "unresolved_added": unresolved_added,
         "unresolved_removed": unresolved_removed,
+        "health_regressed": health_regressed,
+        "health_improved": health_improved,
         "flips": flips,
+        "transitions_by_gold": transitions_by_gold,
+        "correctness_improved": correctness_improved,
+        "correctness_worsened": correctness_worsened,
         "baseline_metrics": metrics_base,
         "active_metrics": metrics_active,
         "rows": paired,
     }
 
 
-def fired_rate(rows: Sequence[Mapping[str, Any]]) -> float:
+def _row_health(row: Mapping[str, Any] | None) -> bool:
+    if not row:
+        return False
+    if str(row.get("authority") or "") != "authoritative":
+        return False
+    result = row.get("result") or {}
+    for status in (result.get("stage_status") or {}).values():
+        if str((status or {}).get("state") or "").startswith(("provider_error", "invalid")):
+            return False
+    return True
+
+
+def fired_rate(
+    rows: Sequence[Mapping[str, Any]],
+    intervention_id: str | None = None,
+) -> float:
     if not rows:
         return 0.0
-    fired = 0
+    fired_count = 0
     for row in rows:
         deployment = ((row.get("result") or {}).get("proof") or {}).get(
             "deployment"
         ) or {}
-        if deployment.get("fired"):
-            fired += 1
-    return fired / len(rows)
+        fired = deployment.get("fired") or []
+        if intervention_id is not None:
+            fired = [
+                item for item in fired
+                if str(item.get("intervention_id") or "") == intervention_id
+            ]
+        if fired:
+            fired_count += 1
+    return fired_count / len(rows)
 
 
 def evidence_increment_rows(

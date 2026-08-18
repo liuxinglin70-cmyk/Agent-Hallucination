@@ -36,6 +36,24 @@ def test_validate_record_rejects_unknown_top_level():
         validate_record({"question": "q", "history": [], "extra": 1})
 
 
+def test_validate_record_requires_nonempty_question(sample_record):
+    for question in (None, "", "  "):
+        bad = {**sample_record, "question": question}
+        with pytest.raises(PacketError):
+            validate_record(bad)
+
+
+def test_validate_record_recurses_through_tool_observations(sample_record):
+    bad = {**sample_record, "history": [
+        {
+            "role": "tool",
+            "tool_responses": [{"nested": {"true_answer": "4"}}],
+        },
+    ]}
+    with pytest.raises(PacketError):
+        validate_record(bad)
+
+
 def test_delivered_result(sample_packet):
     result = delivered_result(sample_packet)
     assert result["last_prose_event_id"] == "event_002"

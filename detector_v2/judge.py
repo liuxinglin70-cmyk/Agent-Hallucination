@@ -56,6 +56,20 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
         not isinstance(x, str) for x in refs
     ):
         return None, "evidence_refs must be a list of event ids"
+    valid_refs = {
+        str(event.get("event_id") or "")
+        for event in packet.get("events") or ()
+        if isinstance(event, Mapping)
+    }
+    for event in packet.get("events") or ():
+        if isinstance(event, Mapping):
+            valid_refs.update(
+                str(item.get("interaction_id") or "")
+                for item in event.get("tool_interactions") or ()
+                if isinstance(item, Mapping)
+            )
+    if any(ref not in valid_refs for ref in refs):
+        return None, "evidence_refs contains an unknown packet event"
     root_cause = parsed.get("root_cause")
     if flag:
         if not isinstance(step_value, int) or isinstance(step_value, bool):

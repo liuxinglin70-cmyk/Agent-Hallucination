@@ -31,6 +31,10 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
     "total_timeout_seconds": 480,
     "transport_retries": 2,
     "timeout_growth_factor": 1.5,
+    "context_cache": {
+        "enabled": True,
+        "mode": "automatic",
+    },
 }
 
 _INT_FIELDS = (
@@ -41,7 +45,7 @@ _INT_FIELDS = (
 
 def default_config_path() -> Path:
     # AutoDL provider is the deployment default; the direct DeepSeek config
-    # (configs/detector_v2.json) is retained only as an explicit rollback path.
+    # (configs/detector_v2.json) is retained as an explicit rollback path.
     return Path(__file__).resolve().parent / "configs" / "detector_v2_autodl.json"
 
 
@@ -111,6 +115,12 @@ def load_config(
     provider_block = raw.get("provider")
     provider_block = provider_block if isinstance(provider_block, dict) else {}
     resolved: dict[str, Any] = {"schema_version": CONFIG_SCHEMA}
+    registry_path = raw.get("intervention_registry")
+    if registry_path:
+        path = Path(str(registry_path))
+        if not path.is_absolute():
+            path = (config_path.parent / path).resolve()
+        resolved["intervention_registry"] = str(path)
     for name in ROUTE_NAMES:
         route_block = raw.get(f"{name}_route")
         route_block = route_block if isinstance(route_block, dict) else {}

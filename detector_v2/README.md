@@ -16,7 +16,7 @@ packet（事件 + 工具交互 + 交付结果锚点）
       ▼
 [1] Outcome Judge        全轨迹端到端判断（主召回来源）
       │ true ────────────────────────────────────────┐
-      │ false（一律运行召回安全网）                    │
+      │ false（一律运行召回安全网）                      │
       ▼                                               │
 [2] Recall Scanner       只找候选偏差，永远不定罪       │
       │                                               │
@@ -90,6 +90,50 @@ DETECTOR_V2_MODEL            # 两个阶段的兜底模型
 DETECTOR_V2_TIMEOUT_SECONDS
 DETECTOR_V2_TRANSPORT_RETRIES
 ```
+
+### 上下文缓存
+
+两份默认配置都开启 `context_cache`（`enabled: true`、`mode: "automatic"`）：
+
+- `automatic`：DeepSeek 兼容类供应商自动缓存重复 prompt 前缀，请求体不额外
+  带字段，避免被严格网关拒绝；
+- `prompt_cache_key`：对需要显式 cache key 的供应商，发送
+  `prompt_cache_key` 与 `prompt_cache_retention`：
+
+```json
+"context_cache": {
+  "enabled": true,
+  "mode": "prompt_cache_key",
+  "key_prefix": "detector-v2",
+  "retention": "24h"
+}
+```
+
+每次调用的 usage 会统一记录 `prompt_cache_hit_tokens` /
+`prompt_cache_miss_tokens` / `prompt_cache_read_tokens` /
+`prompt_cache_write_tokens`，供成本统计使用。
+
+### 思考模式
+
+两份默认配置的 `provider.extra_body` 已关闭 DeepSeek 思考模式
+（`thinking.type: disabled`），避免检测阶段产生过长的推理 token。需要
+推理链时可移除该字段。
+
+### 可选模型分层
+
+`configs/model_profiles.json` 记录各可选模型的分层路由建议与价格
+（￥/M token），不改动默认 endpoint。当前推荐：
+
+| 角色 | 模型 | 输入 | 输出 |
+|---|---|---:|---:|
+| Judge / Defense / Causal Upgrade | `Qwen3.5-397B-A17B` | 0.72 | 4.32 |
+| Recall / Step Tracer | `hy3` | 1.0 | 4.0 |
+| 冲突 / unresolved 升级 | `GLM-5.3` | 8.0 | 28.0 |
+| 主流程备选 | `gpt-5.6-luna` | 0.812 | 4.872 |
+| Benchmark candidate | `MiniMax-H3` | 待定 | 待定 |
+
+接入另一供应商只需替换路由的 `endpoint` / `api_key_env` / `model`，无需
+改动检测器业务代码。
 
 ## 输入契约
 

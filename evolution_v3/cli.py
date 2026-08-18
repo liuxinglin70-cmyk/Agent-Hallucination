@@ -46,6 +46,8 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_cycle(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
     engine = EvolutionEngine(
         config,
@@ -59,6 +61,8 @@ def cmd_cycle(args: argparse.Namespace) -> int:
 
 def cmd_experiment(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
     engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
     report = engine.run_experiment(int(args.cycles))
@@ -71,7 +75,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
 def cmd_final(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     engine = EvolutionEngine(config, mini=False)
-    report = engine.run_final(noise_reruns=args.noise_reruns)
+    report = engine.run_final()
     _print_json(report)
     return 0
 
@@ -104,20 +108,11 @@ def cmd_verify_ledger(args: argparse.Namespace) -> int:
 
 def cmd_preview(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
     engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
     report = engine.preview_cycle(int(args.cycle))
-    _print_json(report)
-    return 0
-
-
-def cmd_calibrate_noise(args: argparse.Namespace) -> int:
-    from evolution_v3.calibration import run_noise_calibration
-    from evolution_v3.backends import make_backend
-
-    config = load_config(args.config)
-    backend = make_backend(config, mode=args.backend) if args.backend else None
-    report = run_noise_calibration(config, backend=backend, mini=args.mini)
     _print_json(report)
     return 0
 
@@ -142,10 +137,11 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     """Offline end-to-end gate validation with a deterministic toy detector.
 
     The smoke experiment deliberately plants two FN failure cases in the
-    patrol pool and two FN cases in the gain set. The template proposer turns
-    the stable failure family into a text-boundary scanner intervention; the
-    mock backend overrides exactly the planted cases, so the candidate must
-    pass V1-V2-V3-M and be admitted. Both injected defects must be rejected.
+    patrol pool and two FN cases in the gain set. A scripted offline
+    proposer (same contract the LLM proposer must satisfy) turns the stable
+    failure family into a text-boundary scanner intervention; the mock
+    backend overrides exactly the planted cases, so the candidate must pass
+    V1-V2-V3-M and be admitted. Both injected defects must be rejected.
     No LLM call and no gold leakage beyond the mock oracle contract.
     """
     config = load_config(args.config)
@@ -188,9 +184,9 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     base: dict[str, bool | None] = {}
     for case in patrol_true + gain_true:
         base[case] = False  # planted false negatives for the bare base
-    # TemplateProposer names the first proposal IV-1-001.
+    smoke_id = "IV-SMOKE-001"
     overrides = {
-        "IV-1-001": {case: True for case in gain_true},
+        smoke_id: {case: True for case in gain_true},
     }
 
     from evolution_v3.backends import make_backend
@@ -203,6 +199,7 @@ def cmd_smoke(args: argparse.Namespace) -> int:
         backend=backend,
         split=split,
         mini=True,
+        proposer=_smoke_proposer(smoke_id, patrol_true),
     )
     report = engine.run_cycle(1)
     out = resolve_path(config["work_root"]) / "experiments" / "smoke_cycle.json"
@@ -210,6 +207,54 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     _print_json(report)
     print(f"\nsmoke report -> {out}")
     return 0
+
+
+def _smoke_proposer(intervention_id: str, failure_cases: list[str]):
+    """Scripted offline stand-in with the LLM proposer's contract."""
+    from evolution_v3.contracts import make_intervention
+    from evolution_v3.proposer import ProposalBatch
+
+    class _ScriptedProposer:
+        name = "scripted_smoke"
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            candidate = make_intervention(
+                intervention_id=intervention_id,
+                intervention_type="text_boundary",
+                hook="scanner.system",
+                packet_features=["has_tool_calls"],
+                body={
+                    "directive": (
+                        "Report every explicitly required action from the "
+                        "question that has no matching tool call."
+                    ),
+                    "not_when": (
+                        "Never apply when every required action has a "
+                        "matching tool call."
+                    ),
+                },
+                expected_behavior=(
+                    "recall scanner gains candidates for missing required "
+                    "actions"
+                ),
+                target_polarity="recall",
+                cycle=cycle,
+                failure_family=(
+                    str(families[0].get("failure_family") or "FAM-smoke")
+                    if families else "FAM-smoke"
+                ),
+                failure_cases=list(failure_cases),
+            )
+            return ProposalBatch(
+                candidates=[candidate],
+                joint_groups=[],
+                notes=[{
+                    "intervention_id": intervention_id,
+                    "generator": "scripted_smoke",
+                }],
+            )
+
+    return _ScriptedProposer()
 
 
 def _gold(config: dict[str, Any], case: str) -> bool | None:
@@ -245,7 +290,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_experiment)
 
     p = sub.add_parser("final", help="read-once final verification")
-    p.add_argument("--noise-reruns", type=int, default=None)
     p.add_argument("--config")
     p.set_defaults(func=cmd_final)
 
@@ -267,15 +311,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mini", action="store_true")
     p.add_argument("--config")
     p.set_defaults(func=cmd_preview)
-
-    p = sub.add_parser(
-        "calibrate-noise",
-        help="pre-register the empty-registry rerun noise floor on the gain set",
-    )
-    p.add_argument("--backend", choices=["detector_v2", "mock"], default=None)
-    p.add_argument("--mini", action="store_true")
-    p.add_argument("--config")
-    p.set_defaults(func=cmd_calibrate_noise)
 
     p = sub.add_parser("registry", help="show active registry")
     p.add_argument("--config")

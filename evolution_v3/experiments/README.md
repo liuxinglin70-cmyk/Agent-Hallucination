@@ -26,7 +26,7 @@ python evolution_v3/experiments/run_tuning100.py cycle \
   --cycle 1 --max-proposals 2 --m-min-marginal 1 --no-audit
 python evolution_v3/experiments/run_tuning100.py cycle \
   --cycle 2 --max-proposals 3 --m-min-marginal 2 --no-audit
-python evolution_v3/experiments/run_tuning100.py validate --no-noise
+python evolution_v3/experiments/run_tuning100.py validate
 ```
 
 摘要：100 例调优集基线 `runs_v2/v2_100_20w`；50 例验证基线
@@ -38,9 +38,8 @@ python evolution_v3/experiments/run_tuning100.py validate --no-noise
 ### E2：正式 393/300 协议（需要 AUTODL_API_KEY 或 detector_v2 配置）
 
 ```bash
-python -m evolution_v3 calibrate-noise --backend detector_v2
 python -m evolution_v3 experiment --cycles 3 --backend detector_v2
-python -m evolution_v3 final --noise-reruns 2
+python -m evolution_v3 final
 python -m evolution_v3 meta
 ```
 
@@ -48,7 +47,7 @@ python -m evolution_v3 meta
 文档 §7.2 对齐；`--backend detector_v2` 会在 `evolution_v3/work/cache/` 缓存
 每个 registry-hash × case 的结果，重复跑不会重复调用 LLM。
 
-配对噪声控制：非 `judge.system` 候选会复用同案例空库的 frozen judge；在
+配对执行控制：非 `judge.system` 候选会复用同案例空库的 frozen judge；在
 `CachedRunBackend` 下进一步 frozen recall / upgrade / tracer / defense 基线
 阶段，只有被干预 hook 覆盖的阶段重新执行。`judge.system` 候选自动走真实重跑
 并在报告中标记 `frozen_judge_replay_compatible=false`。
@@ -74,7 +73,7 @@ evolution_v3/registry/snapshots/     # 每次写入的不可变快照
 
 `final_report.json` 中的 `verdict.overall` 由以下规则机械生成：
 
-1. active vs 空库的 `marginal_cases >= noise_floor.positive_net`；
+1. active vs 空库的 `marginal_cases >= gates.m_min_marginal_cases`；
 2. 单侧 McNemar p < 0.05；
 3. `unresolved_added <= 0`；
 4. step localization 不下降。

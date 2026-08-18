@@ -44,7 +44,7 @@ A5. **每个干预必须证明相对 no-skill control 的边际增益；没有�
 
 数据：`runs_v2/v2_pilot20_10w_v21`（20 例）+ `runs_v2/v2_extra80_20w`
 （已完成的 77 例），2026-08-17。**本节数字只用于：(1) 排序 M0 修复项；
-(2) 给预算与噪声地板提供先验。任何个案不进入设计。**
+(2) 给预算提供先验。任何个案不进入设计。**
 
 | 聚合指标 | 值 |
 |---|---|
@@ -182,7 +182,8 @@ A5. **每个干预必须证明相对 no-skill control 的边际增益；没有�
   TP 10 例 + TN 10 例（source 分层，写入 manifest）。
 - 候选注册表 vs 空库在 S 上配对运行：
   要求 `新增 FN = 0 ∧ 新增 FP = 0 ∧ unresolved 不增加`。
-  容忍度不设默认值；噪声地板实测后写入 `gate_calibration.json`，预注册。
+  容忍度不设默认值；V2 采用绝对零容忍哨兵规则（`v2_new_fn_allowed=0` 等），
+  不做噪声地板预校准。
 
 ### 3.3 V3 语义一致性（claim vs 行为差分）
 
@@ -284,7 +285,7 @@ cycle、intervention_id、hook、marginal、tp_lost、fp_added、fired 率、
 - **终审**：`phase2_v1 final_verification` 300 例，read-once。
 
 报告：decisive / all-case accuracy、macro-F1、TP/FP/FN/TN 配对翻转表、
-stage 级噪声地板、step localization、authority 分布、fired 率。
+step localization、authority 分布、fired 率。
 
 ### 6.2 Meta-Evaluation（进化机制本身）
 
@@ -296,7 +297,6 @@ stage 级噪声地板、step localization、authority 分布、fired 率。
 | `library_drift` | empty vs active 在 G 上配对净贡献 | 连续 2 cycle <0 → 回滚 |
 | `process_quality` | evidence refs 可定位率、contract 覆盖率、upgrade 缺行率 | 用于 M0 验收与谓词效果读数 |
 | `cross_source_transfer` | 干预在各 source 子集上的配对增益符号 | 只在一个 source 正、其他 source 负 → benchmark-specialist 警告（SEVA 教训），不收入 |
-| `noise_floor` | 同案例空库双跑翻面分布 | 用于标定 V2/M 阈值 |
 | `ledger_integrity` | ledger 事件可重放、hash 链完整 | 断裂 → 冻结 |
 
 **Meta-Evaluation 只读不写**：它不改 registry、不改门参数、不重跑终审。
@@ -330,8 +330,8 @@ phase2_v1 final_verification (300)：read-once 终审
 
 ### 7.3 终审判据（预注册，read-once）
 
-- 主判据：`active registry vs 空库` 在 300 例上的配对净翻转 ≥ 同案例
-  噪声重跑翻转分布的 90 分位（按样本量线性标定）。
+- 主判据：`active registry vs 空库` 在 300 例上的配对边际增益 ≥
+  `gates.m_min_marginal_cases`，且 `unresolved` 不增加。
 - 次判据：分层 McNemar 单侧 p<0.05；step localization 不显著下降；
   unresolved 不增加。
 - 不通过 → 框架判负，清空候选，回 §8 的 M4 复盘；不调参续命。
@@ -349,8 +349,9 @@ phase2_v1 final_verification (300)：read-once 终审
 | **M4** ⏸ | 正式实验：3 个 cycle 后冻结 300 例 read-once 终审 | 尚未执行；`final_verification` 300 例仍未读取 |
 
 **框架有效定义**：存在非空 registry，在 300 例终审上相对空库的配对净
-翻转显著优于噪声分布，且终审后 1 个 cycle 巡逻中 fired 率 >0、无 TP
-损失。否则结论为“当前自进化框架无效”，回退检测器修复路线。
+翻转达到 `m_min_marginal_cases` 且不新增错误，且终审后 1 个 cycle 巡逻中
+fired 率 >0、无 TP 损失。否则结论为“当前自进化框架无效”，回退检测器
+修复路线。
 
 ---
 
@@ -363,7 +364,7 @@ phase2_v1 final_verification (300)：read-once 终审
 4. 不重开单向 census 探针；所有文本干预必须双边界。
 5. 不让已部署技能的输出进入后续候选的 reference（VaG 污染链）。
 6. 终审 300 例在 M4 前零读取，M4 恰读 1 次。
-7. 不用任何案例 id 设计规则；97 例读数只做机制统计与噪声先验。
+7. 不用任何案例 id 设计规则；97 例读数只做机制统计。
 
 ---
 

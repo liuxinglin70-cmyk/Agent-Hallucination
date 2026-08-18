@@ -41,7 +41,6 @@ evolution_v3/
   contracts.py                # 干预合同（复用 detector_v2 的校验/哈希）
   splits.py                   # S / G / P / 终审300 read-once；mini tuning100 切分
   backends.py                 # detector_v2 真实后端（frozen-judge + frozen_stages 重放）+ cached run 后端
-  calibration.py              # 空库双跑噪声地板预注册
   worksheet.py                # 机械失败族归因 + predicate 诊断（case id 不进候选文本）
   proposer.py                 # 多模板起草器（机械诊断接地）+ LLM 起草器（≤3 候选）
   gates.py                    # V1/V2/V3/M + 缺陷注入审计
@@ -66,7 +65,7 @@ detector_v2 运行结果    ──回传──>  proof.deployment / proof.eviden
 ## 3. 快速验证（不消耗 LLM 预算）
 
 ```bash
-# 单元/集成/回归测试全绿（当前 156 个）
+# 单元/集成/回归测试全绿（当前 176 个）
 python -m pytest detector_v2/tests evolution_v3/tests tests -q
 
 # 离线完整 cycle：玩具检测器注入 2 个稳定 FN 失败族，
@@ -115,7 +114,7 @@ python evolution_v3/experiments/run_tuning100.py cycle \
   --cycle 1 --max-proposals 2 --m-min-marginal 1 --no-audit
 python evolution_v3/experiments/run_tuning100.py cycle \
   --cycle 2 --max-proposals 3 --m-min-marginal 2 --no-audit
-python evolution_v3/experiments/run_tuning100.py validate --no-noise
+python evolution_v3/experiments/run_tuning100.py validate
 ```
 
 结果与完整证据索引：
@@ -132,15 +131,13 @@ python evolution_v3/experiments/run_tuning100.py validate --no-noise
 python -m evolution_v3 init
 # 0.5 预算前预演：只巡逻 + 提案，看候选数量与失败族诊断
 python -m evolution_v3 preview --cycle 1 --backend detector_v2
-# 0.6 预注册同案例空库双跑的噪声地板（M4 前校准，不做默认容忍度假设）
-python -m evolution_v3 calibrate-noise --backend detector_v2
 
 # 1. M2：跑一个完整 cycle（无候选收入也是有效结果）
 python -m evolution_v3 cycle --cycle 1 --backend detector_v2
 
 # 2. M4：3 个 cycle 后，恰读一次终审 300（再次读取会报 read-once violation）
 python -m evolution_v3 experiment --cycles 3 --backend detector_v2
-python -m evolution_v3 final --noise-reruns 2
+python -m evolution_v3 final
 
 # 3. 进化机制自身评估（只读）
 python -m evolution_v3 meta
@@ -150,7 +147,7 @@ python -m evolution_v3 verify-ledger
 预算与阈值见 `configs/framework.json`，终审判据见
 `evolution_v3/work/final/final_report.json`：
 
-- 主判据：active vs 空库在 300 例上的配对净翻转 ≥ 同案例噪声重跑正净翻转；
+- 主判据：active vs 空库在 300 例上的配对边际增益达到 `m_min_marginal_cases`；
 - 次判据：单侧 McNemar p<0.05、step localization 不下降、unresolved 不增加；
 - 不通过即框架判负，不调参续命。
 

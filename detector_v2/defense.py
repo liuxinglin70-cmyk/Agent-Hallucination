@@ -37,6 +37,8 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
         refs = []
     if not isinstance(refs, list) or any(not isinstance(x, str) for x in refs):
         return None, "evidence_refs must be a list of event ids"
+    if verdict == "refuted" and not refs:
+        return None, "refuted requires at least one evidence reference"
     reason = str(parsed.get("reason") or "").strip()
     if not reason:
         return None, "reason is required"
@@ -46,6 +48,35 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
         "evidence_refs": refs,
         "reason": reason,
     }, ""
+
+
+def _validate_defense_evidence(
+    parsed: Mapping[str, Any], packet: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str]:
+    """Require defense references to resolve to packet event/tool ids."""
+    valid_ids = {
+        str(event.get("event_id") or "")
+        for event in packet.get("events") or ()
+        if isinstance(event, Mapping)
+    }
+    for event in packet.get("events") or ():
+        if isinstance(event, Mapping):
+            valid_ids.update(
+                str(item.get("interaction_id") or "")
+                for item in event.get("tool_interactions") or ()
+                if isinstance(item, Mapping)
+            )
+    refs = [str(ref) for ref in parsed.get("evidence_refs") or ()]
+    if any(ref not in valid_ids for ref in refs):
+        return None, "evidence_refs contains an unknown packet event"
+    if parsed.get("verdict") == "substantiated":
+        step = parsed.get("confirmed_step")
+        event_count = len(list(packet.get("events") or ()))
+        if not isinstance(step, int) or isinstance(step, bool) or not 1 <= step <= event_count:
+            return None, "confirmed_step is outside the packet event range"
+        if not refs:
+            return None, "substantiated requires at least one evidence reference"
+    return dict(parsed), ""
 
 
 def _positive_facts(positive: Mapping[str, Any]) -> dict[str, Any]:
@@ -63,6 +94,7 @@ def _positive_facts(positive: Mapping[str, Any]) -> dict[str, Any]:
 
 def _call_defense(
     *,
+    packet: Mapping[str, Any],
     route: Mapping[str, Any],
     system: str,
     user: str,
@@ -78,6 +110,8 @@ def _call_defense(
             "attempts": exc.attempts, "view": "unknown", "warnings": [],
         }
     result, error = _parse_defense(parsed)
+    if result is not None:
+        result, error = _validate_defense_evidence(result, packet)
     warnings: list[dict[str, str]] = []
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
@@ -88,6 +122,8 @@ def _call_defense(
                 purpose="defense_repair",
             )
             result, error = _parse_defense(parsed)
+            if result is not None:
+                result, error = _validate_defense_evidence(result, packet)
         except ProviderError as exc:
             return {"ok": False, "parsed": None, "error": exc.message,
                     "error_type": exc.error_type}, {
@@ -182,7 +218,7 @@ def run_defense(
             packet, facts["step"], evidence_refs=facts["evidence_refs"],
         )
     result, status = _call_defense(
-        route=route, system=system, user=user_for(view_text),
+        packet=packet, route=route, system=system, user=user_for(view_text),
     )
     status["view"] = (
         "complete"
@@ -194,7 +230,7 @@ def run_defense(
         if verdict == "inconclusive" and view_meta.get("omitted_event_ids"):
             full_text, full_meta = render_judge_view(packet)
             result2, status2 = _call_defense(
-                route=route, system=system, user=user_for(full_text),
+                packet=packet, route=route, system=system, user=user_for(full_text),
             )
             status2["view"] = (
                 "complete" if not full_meta.get("degraded") else "degraded"

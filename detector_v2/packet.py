@@ -98,15 +98,17 @@ def _tool_arguments(call: Any) -> Any:
 
 def _forbidden_nested_keys(record: Mapping[str, Any]) -> set[str]:
     hits: set[str] = set()
-    for row in record.get("history") or ():
-        if not isinstance(row, Mapping):
-            continue
-        hits.update(str(key) for key in row if str(key) in FORBIDDEN_KEYS)
-        for call in row.get("tool_calls") or []:
-            if isinstance(call, Mapping):
-                hits.update(
-                    str(key) for key in call if str(key) in FORBIDDEN_KEYS
-                )
+
+    def visit(value: Any) -> None:
+        if isinstance(value, Mapping):
+            hits.update(str(key) for key in value if str(key) in FORBIDDEN_KEYS)
+            for nested in value.values():
+                visit(nested)
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                visit(nested)
+
+    visit(record)
     return hits
 
 
@@ -135,6 +137,9 @@ def build_packet(record: Mapping[str, Any]) -> dict[str, Any]:
     history = record.get("history")
     if not isinstance(history, list) or not history:
         raise PacketError("history must be a non-empty list")
+    question = record.get("question")
+    if not isinstance(question, str) or not question.strip():
+        raise PacketError("question must be a non-empty string")
 
     events: list[dict[str, Any]] = []
     for ordinal, raw in enumerate(history, start=1):
@@ -164,7 +169,7 @@ def build_packet(record: Mapping[str, Any]) -> dict[str, Any]:
 
     packet = {
         "schema_version": PACKET_SCHEMA,
-        "question": record.get("question"),
+        "question": question,
         "events": events,
     }
     validate_packet(packet)

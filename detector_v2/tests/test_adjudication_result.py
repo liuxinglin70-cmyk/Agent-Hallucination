@@ -188,3 +188,61 @@ def test_result_envelope_and_prediction(sample_packet):
     )
     assert output["schema_version"] == "detector_v2.detection_result.v1"
     assert prediction_state(output) is True
+
+
+def test_convict_mechanical_violation_promotes_clean_to_error(sample_packet):
+    """The recall-side execution surface: a guard may convict on mechanical
+    evidence even when no preliminary positive exists."""
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_FALSE, judge_status=JUDGE_OK,
+        recall_result={"ok": True, "candidates": []},
+        recall_status={"stage": "recall_scanner", "state": "ok"},
+        upgrade_result={"ok": True, "upgrades": [], "upgraded_candidate": None},
+        upgrade_status={"stage": "causal_upgrade", "state": "not_needed"},
+        tracer_result=None, tracer_status=None,
+        defense_result=None, defense_status=None,
+        guard_actions=["convict_mechanical_violation"],
+    )
+    assert proof["state"] == STATE_ERROR
+    assert proof["decision_authority"] == AUTHORITY_AUTHORITATIVE
+    assert proof["incident_occurred"] is True
+    assert proof["terminal_basis"]["decisive_facts"]["positive_source"] == (
+        "mechanical_violation"
+    )
+    assert proof["terminal_basis"]["decisive_facts"]["guard_action"] == (
+        "convict_mechanical_violation"
+    )
+
+
+def test_convict_guard_localizes_to_delivered_anchor(sample_packet):
+    """The conviction anchors on the delivered-answer event, not step 1."""
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_FALSE, judge_status=JUDGE_OK,
+        recall_result={"ok": True, "candidates": []},
+        recall_status={"stage": "recall_scanner", "state": "ok"},
+        upgrade_result={"ok": True, "upgrades": [], "upgraded_candidate": None},
+        upgrade_status={"stage": "causal_upgrade", "state": "not_needed"},
+        tracer_result=None, tracer_status=None,
+        defense_result=None, defense_status=None,
+        guard_actions=["convict_mechanical_violation"],
+    )
+    # sample_packet's last prose event is event_002 at position 2.
+    assert proof["responsible_event_id"] == "event_002"
+    assert proof["responsible_step"] == 2
+
+
+def test_without_convict_guard_judge_false_stays_clean(sample_packet):
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_FALSE, judge_status=JUDGE_OK,
+        recall_result={"ok": True, "candidates": []},
+        recall_status={"stage": "recall_scanner", "state": "ok"},
+        upgrade_result={"ok": True, "upgrades": [], "upgraded_candidate": None},
+        upgrade_status={"stage": "causal_upgrade", "state": "not_needed"},
+        tracer_result=None, tracer_status=None,
+        defense_result=None, defense_status=None,
+        guard_actions=["require_full_view_defense"],
+    )
+    assert proof["state"] == STATE_CLEAN

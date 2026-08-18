@@ -8,7 +8,16 @@
     "timeout_seconds": 240,
     "total_timeout_seconds": 480,
     "transport_retries": 2,
-    "timeout_growth_factor": 1.5
+    "timeout_growth_factor": 1.5,
+    "context_cache": {
+      "enabled": true,
+      "mode": "automatic"
+    },
+    "extra_body": {
+      "thinking": {
+        "type": "disabled"
+      }
+    }
   },
   "judge_route": {
     "model": "deepseek-v4-pro"

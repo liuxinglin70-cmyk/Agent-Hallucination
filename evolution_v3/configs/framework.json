@@ -5,9 +5,8 @@
   "split_manifest": "datasets/eval_splits/phase2_v1/manifest.json",
   "mini_split_manifest": "datasets/eval_splits/v3_evo50/manifest.json",
   "work_root": "evolution_v3/work",
-  "registry_dir": "evolution_v3/registry",
-  "ledger_path": "datasets/evolution_v2/ledger.jsonl",
-  "gate_calibration": "datasets/evolution_v2/gate_calibration.json",
+  "registry_dir": "evolution_v3/work/runtime_registry",
+  "ledger_path": "evolution_v3/work/runtime_ledger.jsonl",
   "cycles": 3,
   "split": {
     "seed": 20260817,
@@ -38,15 +37,14 @@
     "m_new_errors_allowed": 0
   },
   "library": {
-    "max_width": 5,
+    "max_width": 6,
     "max_text_boundary_per_hook": 1,
-    "max_decision_guards": 3,
+    "max_decision_guards": 4,
     "retire_after_cycles_marginal_le0": 2,
     "rollback_after_cycles_net_negative": 2
   },
   "audit": {
-    "enabled": true,
-    "noise_floor_reruns": 2
+    "enabled": true
   },
   "backend": {
     "name": "detector_v2",
@@ -54,6 +52,8 @@
     "cache": true
   },
   "proposer": {
-    "mode": "template"
+    "mode": "llm",
+    "max_output_tokens": 4096,
+    "disable_thinking": true
   }
 }

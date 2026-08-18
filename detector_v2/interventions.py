@@ -60,6 +60,7 @@ GUARD_ACTIONS = frozenset({
     "withhold_conviction",
     "restore_judge_conviction",
     "require_full_view_defense",
+    "convict_mechanical_violation",
 })
 
 TARGET_POLARITIES = frozenset({"recall", "precision", "boundary"})
@@ -171,7 +172,37 @@ def _validate_trigger(entry: Mapping[str, Any], intervention_type: str) -> dict[
     }
 
 
-def _validate_body(entry: Mapping[str, Any], intervention_type: str) -> dict[str, Any]:
+def _validate_fact_list(
+    entry: Mapping[str, Any], value: Any, field: str,
+) -> list[tuple[str, str]]:
+    facts = _clean_list(value, field)
+    parsed: list[tuple[str, str]] = []
+    for fact in facts:
+        if "=" not in fact:
+            raise ValueError(
+                f"{entry.get('intervention_id')}: {field} item {fact!r} "
+                "must be name=value"
+            )
+        name, fact_value = fact.split("=", 1)
+        if name not in FACT_NAMES:
+            raise ValueError(
+                f"{entry.get('intervention_id')}: unknown fact name {name!r}"
+            )
+        if fact_value not in FACT_NAMES[name]:
+            raise ValueError(
+                f"{entry.get('intervention_id')}: fact {name}={fact_value!r} "
+                f"outside {sorted(FACT_NAMES[name])}"
+            )
+        parsed.append((name, fact_value))
+    return parsed
+
+
+def _validate_body(
+    entry: Mapping[str, Any],
+    intervention_type: str,
+    *,
+    require_executable_bounds: bool = False,
+) -> dict[str, Any]:
     body = entry.get("body")
     body = body if isinstance(body, Mapping) else {}
     intervention_id = str(entry.get("intervention_id") or "?")
@@ -193,10 +224,10 @@ def _validate_body(entry: Mapping[str, Any], intervention_type: str) -> dict[str
                 "only deterministic is executable"
             )
         verdicts = set(body.get("output_verdicts") or ())
-        if not verdicts or not verdicts <= PREDICATE_VERDICTS[predicate]:
+        if verdicts != PREDICATE_VERDICTS[predicate]:
             raise ValueError(
-                f"{intervention_id}: output_verdicts must be a non-empty subset "
-                f"of {sorted(PREDICATE_VERDICTS[predicate])}"
+                f"{intervention_id}: output_verdicts must declare the full "
+                f"closed vocabulary {sorted(PREDICATE_VERDICTS[predicate])}"
             )
         return {
             "predicate": predicate,
@@ -211,10 +242,29 @@ def _validate_body(entry: Mapping[str, Any], intervention_type: str) -> dict[str
     action_not_when = _require_text(
         body.get("action_not_when"), f"{intervention_id}.body.action_not_when"
     )
-    return {"action": action, "action_not_when": action_not_when}
+    # ``action_not_when`` is retained as human-readable provenance for old
+    # persisted entries. New candidates must also provide executable facts;
+    # prose alone cannot constrain runtime behavior.
+    if require_executable_bounds and "action_not_when_facts" not in body:
+        raise ValueError(
+            f"{intervention_id}: body.action_not_when_facts is required; "
+            "prose-only exclusions are not executable"
+        )
+    not_when_facts = _validate_fact_list(
+        entry,
+        body.get("action_not_when_facts") or (),
+        f"{intervention_id}.body.action_not_when_facts",
+    )
+    return {
+        "action": action,
+        "action_not_when": action_not_when,
+        "action_not_when_facts": not_when_facts,
+    }
 
 
-def validate_intervention(entry: Mapping[str, Any]) -> None:
+def validate_intervention(
+    entry: Mapping[str, Any], *, require_executable_bounds: bool = False,
+) -> None:
     if not isinstance(entry, Mapping):
         raise ValueError("intervention entry must be an object")
     intervention_id = _require_text(
@@ -236,7 +286,11 @@ def validate_intervention(entry: Mapping[str, Any]) -> None:
             f"{intervention_id}: type {intervention_type} cannot bind to hook {hook}"
         )
     _validate_trigger(entry, intervention_type)
-    _validate_body(entry, intervention_type)
+    _validate_body(
+        entry,
+        intervention_type,
+        require_executable_bounds=require_executable_bounds,
+    )
     claim = entry.get("claim")
     claim = claim if isinstance(claim, Mapping) else {}
     _require_text(
@@ -275,7 +329,9 @@ def validate_intervention(entry: Mapping[str, Any]) -> None:
         raise ValueError(f"{intervention_id}: unsupported intervention schema {schema!r}")
 
 
-def validate_registry(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+def validate_registry(
+    payload: Mapping[str, Any], *, require_executable_bounds: bool = False,
+) -> list[dict[str, Any]]:
     if not isinstance(payload, Mapping):
         raise ValueError("intervention registry must be an object")
     if payload.get("schema_version") != INTERVENTION_REGISTRY_SCHEMA:
@@ -291,7 +347,9 @@ def validate_registry(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     for entry in entries:
-        validate_intervention(entry)
+        validate_intervention(
+            entry, require_executable_bounds=require_executable_bounds,
+        )
         entry_id = str(entry.get("intervention_id") or "")
         if entry_id in seen_ids:
             raise ValueError(f"duplicate intervention_id {entry_id}")
@@ -300,9 +358,15 @@ def validate_registry(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     return cleaned
 
 
-def load_intervention_registry(path: str | Path) -> dict[str, Any]:
+def load_intervention_registry(
+    path: str | Path, *, require_executable_bounds: bool = False,
+) -> dict[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    validate_registry(payload)
+    # Old persisted registries are readable, but legacy prose-only guards are
+    # disabled by InterventionPlan rather than silently interpreted.
+    validate_registry(
+        payload, require_executable_bounds=require_executable_bounds,
+    )
     return payload
 
 
@@ -313,7 +377,7 @@ def build_intervention_registry(
         "schema_version": INTERVENTION_REGISTRY_SCHEMA,
         "interventions": [dict(entry) for entry in entries],
     }
-    validate_registry(payload)
+    validate_registry(payload, require_executable_bounds=True)
     payload["content_hash"] = intervention_content_hash(payload)
     return payload
 
@@ -339,7 +403,7 @@ class InterventionPlan:
     def from_registry(cls, payload: Mapping[str, Any] | None) -> "InterventionPlan":
         if payload is None:
             return cls([])
-        entries = validate_registry(payload)
+        entries = validate_registry(payload, require_executable_bounds=True)
         plan = cls(entries)
         plan.registry_hash = str(payload.get("content_hash") or "")
         return plan
@@ -429,6 +493,12 @@ class InterventionPlan:
             result = run_predicate(
                 str(body.get("predicate") or ""), packet, context,
             )
+            allowed_verdicts = set(body.get("output_verdicts") or ())
+            if str(result.get("verdict") or "") not in allowed_verdicts:
+                raise ValueError(
+                    f"{entry.get('intervention_id')}: predicate returned "
+                    f"undeclared verdict {result.get('verdict')!r}"
+                )
             result["intervention_id"] = str(entry.get("intervention_id") or "")
             result["hook"] = hook
             self.evidence.append(dict(result))
@@ -456,6 +526,28 @@ class InterventionPlan:
         ]
         actions: list[str] = []
         for entry in entries:
+            body = entry.get("body") or {}
+            not_when = body.get("action_not_when_facts") or ()
+            if "action_not_when_facts" in body and not_when:
+                fact_map = self._facts_map(facts)
+                fact_map.update(self.facts)
+                excluded = self._facts_map(not_when)
+                if excluded and all(
+                    fact_map.get(name) == value
+                    for name, value in excluded.items()
+                ):
+                    self._record(
+                        entry, "guard_suppressed",
+                        "action_not_when_facts matched",
+                    )
+                    continue
+            elif "action_not_when_facts" not in body:
+                # This branch is defensive; validation rejects such entries.
+                self._record(
+                    entry, "guard_suppressed",
+                    "legacy guard has no executable action_not_when_facts",
+                )
+                continue
             action = str((entry.get("body") or {}).get("action") or "")
             self._record(entry, "guard_fired", f"action={action}")
             actions.append(action)

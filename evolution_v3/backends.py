@@ -10,6 +10,7 @@ budget; its results are marked ``backend=mock`` in every report.
 from __future__ import annotations
 
 import json
+import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -33,9 +34,25 @@ def prediction_from_state(state: Any) -> bool | None:
     return None
 
 
+def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
+    """Only authoritative terminal decisions enter evolution metrics."""
+    if str(result.get("decision_authority") or "") != "authoritative":
+        return None
+    return prediction_from_state(result.get("state"))
+
+
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
-CACHE_VERSION = "v5-evidence-guard"
+CACHE_VERSION = "v7-active-health-attribution"
+
+
+def _file_digest(path: str | Path | None) -> str:
+    if not path:
+        return "missing"
+    target = Path(path)
+    if not target.exists():
+        return "missing"
+    return hashlib.sha256(target.read_bytes()).hexdigest()[:16]
 
 
 def registry_key(registry: Mapping[str, Any] | None) -> str:
@@ -83,7 +100,7 @@ class DetectionBackend:
             return {
                 "case": case_id,
                 "gold": gold,
-                "prediction": prediction_from_state(result.get("state")),
+                "prediction": _prediction_from_result(result),
                 "state": result.get("state"),
                 "authority": result.get("decision_authority"),
                 "result": result,
@@ -98,6 +115,23 @@ class DetectionBackend:
                     rows.append(future.result())
             return sorted(rows, key=lambda row: str(row["case"]))
         return [one(case) for case in cases]
+
+    def evaluate_fresh(
+        self,
+        cases: Sequence[str],
+        *,
+        dataset_root: str | Path,
+        registry: Mapping[str, Any] | None = None,
+        gold_map: Mapping[str, bool | None] | None = None,
+        workers: int = 1,
+    ) -> list[dict[str, Any]]:
+        return self.evaluate(
+            cases,
+            dataset_root=dataset_root,
+            registry=registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
 
 
 class DetectorV2Backend(DetectionBackend):
@@ -131,13 +165,17 @@ class DetectorV2Backend(DetectionBackend):
             return []
         from detector_v2.interventions import validate_registry
 
-        return validate_registry(registry)
+        return validate_registry(registry, require_executable_bounds=True)
 
     def _baseline(self, record: Mapping[str, Any], *, case_id: str) -> dict[str, Any]:
         cached = self._base_results.get(str(case_id))
         if cached is not None:
             return cached
-        result = self.detector.detect(record, case_id=case_id)
+        result = self.detector.detect(
+            record,
+            case_id=case_id,
+            interventions=build_intervention_registry([]),
+        )
         self._base_results[str(case_id)] = dict(result)
         return result
 
@@ -233,6 +271,46 @@ class DetectorV2Backend(DetectionBackend):
             record, case_id=case_id, interventions=registry,
         )
 
+    def evaluate_fresh(
+        self,
+        cases: Sequence[str],
+        *,
+        dataset_root: str | Path,
+        registry: Mapping[str, Any] | None = None,
+        gold_map: Mapping[str, bool | None] | None = None,
+        workers: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Run every stage without cached/frozen baseline replay."""
+        direct = _DirectDetectorBackend(self.detector)
+        return direct.evaluate(
+            cases,
+            dataset_root=dataset_root,
+            registry=registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
+
+
+class _DirectDetectorBackend(DetectionBackend):
+    name = "detector_v2_fresh"
+
+    def __init__(self, detector: Detector) -> None:
+        self.detector = detector
+
+    def run_case(
+        self,
+        record: Mapping[str, Any],
+        *,
+        case_id: str,
+        registry: Mapping[str, Any] | None = None,
+        gold: bool | None = None,
+    ) -> dict[str, Any]:
+        return self.detector.detect(
+            record,
+            case_id=case_id,
+            interventions=(registry or build_intervention_registry([])),
+        )
+
 
 class MockDetectorBackend(DetectionBackend):
     """Offline detector with explicit failure injections and intervention effects.
@@ -266,7 +344,7 @@ class MockDetectorBackend(DetectionBackend):
             return []
         from detector_v2.interventions import validate_registry
 
-        return validate_registry(registry)
+        return validate_registry(registry, require_executable_bounds=True)
 
     def _deployment(self, registry: Mapping[str, Any] | None) -> dict[str, Any]:
         entries = self._active_ids(registry)
@@ -290,7 +368,9 @@ class MockDetectorBackend(DetectionBackend):
                 "detail": "mock backend fired record",
             })
         return {
-            "intervention_registry_hash": str(registry.get("content_hash") or ""),
+            "intervention_registry_hash": str(
+                (registry or {}).get("content_hash") or ""
+            ),
             "active_interventions": [
                 str(e.get("intervention_id") or "") for e in entries
             ],
@@ -392,7 +472,12 @@ class CachedRunBackend(DetectionBackend):
         )
         namespace = (
             "cached-" + CACHE_VERSION + "-"
-            + str(Path(run_root).name)
+            + _fingerprint({
+                "run_root": str(Path(run_root).resolve()),
+                "detector_config": _file_digest(config.get("detector_config")),
+                "cases": sorted(self.case_ids),
+                "baseline_results": self.results,
+            })
         )
         self.candidate_cache = CachingBackend(
             self.live, cache_path, namespace=namespace,
@@ -416,6 +501,9 @@ class CachedRunBackend(DetectionBackend):
             record, case_id=case_id, registry=registry, gold=gold,
         )
 
+    def evaluate_fresh(self, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
+        return self.live.evaluate_fresh(cases, **kwargs)
+
 
 class CachingBackend(DetectionBackend):
     def __init__(
@@ -430,9 +518,18 @@ class CachingBackend(DetectionBackend):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.name = backend.name
 
-    def _path(self, case_id: str, registry: Mapping[str, Any] | None) -> Path:
+    def _path(
+        self,
+        case_id: str,
+        registry: Mapping[str, Any] | None,
+        record: Mapping[str, Any],
+    ) -> Path:
         safe_case = str(case_id).replace("/", "__").replace("\\", "__")
-        return self.cache_dir / registry_key(registry) / f"{safe_case}.json"
+        record_hash = _fingerprint(record)
+        return (
+            self.cache_dir / registry_key(registry)
+            / f"{safe_case}.{record_hash}.json"
+        )
 
     def run_case(
         self,
@@ -442,7 +539,7 @@ class CachingBackend(DetectionBackend):
         registry: Mapping[str, Any] | None = None,
         gold: bool | None = None,
     ) -> dict[str, Any]:
-        path = self._path(case_id, registry)
+        path = self._path(case_id, registry, record)
         if path.exists():
             result = json.loads(path.read_text(encoding="utf-8-sig"))
             # Keep the real backend's frozen-judge baseline in sync with the
@@ -457,6 +554,9 @@ class CachingBackend(DetectionBackend):
         )
         save_json(path, result)
         return result
+
+    def evaluate_fresh(self, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
+        return self.backend.evaluate_fresh(cases, **kwargs)
 
 
 def make_backend(
@@ -479,7 +579,10 @@ def make_backend(
         })
     elif name == "detector_v2":
         backend = DetectorV2Backend(config)
-        namespace = "detector_v2-" + CACHE_VERSION
+        namespace = "detector_v2-" + CACHE_VERSION + "-" + _fingerprint({
+            "detector_config": _file_digest(config.get("detector_config")),
+            "dataset_root": str(resolve_path(config["dataset_root"])),
+        })
     else:
         raise ValueError(f"unknown evolution backend {name!r}")
     if bool(backend_cfg.get("cache", True)):
@@ -489,8 +592,6 @@ def make_backend(
 
 
 def _fingerprint(value: Any) -> str:
-    import hashlib
-
     canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 

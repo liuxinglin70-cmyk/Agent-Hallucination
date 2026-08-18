@@ -156,12 +156,26 @@ class FinalHoldout:
 def _mini_pool(manifest: Mapping[str, Any], size: int) -> list[str]:
     evolution_set = manifest.get("evolution_set") or {}
     cases = list(evolution_set.get("cases") or [])
+    declared_size = evolution_set.get("size")
+    if declared_size is not None and int(declared_size) != len(cases):
+        raise ValueError(
+            "mini manifest evolution_set.size does not match its case list"
+        )
+    if len(cases) != len(set(cases)):
+        raise ValueError("mini manifest contains duplicate case ids")
+    if size > len(cases):
+        raise ValueError(
+            f"mini_pool_size {size} exceeds manifest size {len(cases)}"
+        )
     return cases[:size]
 
 
 def _full_pool(manifest: Mapping[str, Any]) -> list[str]:
     pool = manifest.get("evolution_pool") or {}
-    return list(pool.get("cases") or [])
+    cases = list(pool.get("cases") or [])
+    if not cases or len(cases) != len(set(cases)):
+        raise ValueError("full manifest evolution_pool must be non-empty and unique")
+    return cases
 
 
 def _final_cases(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -186,6 +200,16 @@ def build_split(
     else:
         pool = _full_pool(manifest)
         final = _final_cases(manifest)
+        final_ids = [str(item.get("case_id") or "") for item in final]
+        if not final_ids or any(not case for case in final_ids):
+            raise ValueError("final_verification must contain valid case ids")
+        if len(final_ids) != len(set(final_ids)):
+            raise ValueError("final_verification contains duplicate case ids")
+        overlap = sorted(set(pool) & set(final_ids))
+        if overlap:
+            raise ValueError(
+                f"evolution pool overlaps final verification: {overlap[:5]}"
+            )
 
     gold = {
         case: load_gold(dataset_root, case)

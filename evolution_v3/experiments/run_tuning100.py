@@ -21,17 +21,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from detector_v2.interventions import build_intervention_registry  # noqa: E402
-from evolution_v3.backends import CachedRunBackend, DetectorV2Backend  # noqa: E402
+from evolution_v3.backends import CachedRunBackend  # noqa: E402
 from evolution_v3.config import load_config, resolve_path  # noqa: E402
-from evolution_v3.contracts import (  # noqa: E402
-    empty_registry,
-    make_intervention,
-    make_registry,
-    save_json,
-)
+from evolution_v3.contracts import empty_registry, save_json  # noqa: E402
 from evolution_v3.engine import EvolutionEngine  # noqa: E402
 from evolution_v3.metrics import paired_delta  # noqa: E402
-from evolution_v3.proposer import ProposalBatch  # noqa: E402
 from evolution_v3.splits import EvolutionSplit, load_gold  # noqa: E402
 from evolution_v3.worksheet import (  # noqa: E402
     diagnose_failure_families,
@@ -68,110 +62,6 @@ def _make_backend(config: dict[str, Any]) -> CachedRunBackend:
         config,
         RUN100,
         list(manifest["cases"]),
-    )
-
-
-def _cycle2_preset(cycle: int) -> ProposalBatch:
-    """Cycle-2 rare-family preset.
-
-    The default template proposer only sees >=2-case families inside the
-    40-case patrol slice. These candidates cover two single-slice mechanisms
-    that are nevertheless present in the full 100-case split and in the
-    cached validation baseline. They are pre-committed as one joint group so
-    M must show their combined marginal gain; V1/V2/V3 still run normally.
-    """
-    restore_judge = make_intervention(
-        intervention_id="IV-2-001",
-        intervention_type="decision_guard",
-        hook="adjudicate.guard",
-        packet_features=["has_tool_calls"],
-        facts=[
-            "judge_positive=true",
-            "defense_verdict=refuted",
-            "judge_confidence=high",
-        ],
-        body={
-            "action": "restore_judge_conviction",
-            "action_not_when": (
-                "Do not apply when the positive source is recall_upgrade and "
-                "required_action_present is satisfied or not_applicable."
-            ),
-        },
-        expected_behavior=(
-            "when defense refutes a high-confidence judge conviction, the "
-            "guard restores the judge conviction; symmetric with the "
-            "recall-upgrade restoration guard already admitted"
-        ),
-        target_polarity="recall",
-        cycle=cycle,
-        failure_family="FAM-fn-defense_refuted_judge",
-        failure_cases=["Camel/052.json", "BFCL/066.json"],
-    )
-    anchor_evidence = make_intervention(
-        intervention_id="IV-2-002",
-        intervention_type="evidence_check",
-        hook="judge.post",
-        packet_features=["has_tool_calls"],
-        body={
-            "predicate": "delivered_anchor_consistency",
-            "runner": "deterministic",
-            "output_verdicts": ["consistent", "inconsistent", "insufficient"],
-        },
-        expected_behavior=(
-            "when trigger fires, proof gains a delivered_anchor_consistency "
-            "mechanical evidence row after the judge"
-        ),
-        target_polarity="boundary",
-        cycle=cycle,
-        failure_family="FAM-fp-recall_upgrade_conviction",
-        failure_cases=["BFCL/033.json", "BFCL/113.json"],
-    )
-    withhold = make_intervention(
-        intervention_id="IV-2-003",
-        intervention_type="decision_guard",
-        hook="adjudicate.guard",
-        packet_features=["has_tool_calls"],
-        facts=[
-            "positive_source=recall_upgrade",
-            "defense_verdict=substantiated",
-            "delivered_anchor_consistency=consistent",
-        ],
-        body={
-            "action": "withhold_conviction",
-            "action_not_when": (
-                "Do not apply when the judge delivered result does not "
-                "mechanically match the final answer anchor."
-            ),
-        },
-        expected_behavior=(
-            "when a recall-upgrade positive is substantiated but the judge "
-            "delivered result mechanically matches the final answer anchor, "
-            "the guard withholds the conviction"
-        ),
-        target_polarity="precision",
-        cycle=cycle,
-        failure_family="FAM-fp-recall_upgrade_conviction",
-        failure_cases=["BFCL/033.json", "BFCL/113.json"],
-    )
-    return ProposalBatch(
-        candidates=[restore_judge, anchor_evidence, withhold],
-        joint_groups=[
-            ["IV-2-001", "IV-2-002", "IV-2-003"],
-        ],
-        notes=[
-            {
-                "template": "rare_family_symmetric_restore_judge",
-                "family": "FAM-fn-defense_refuted_judge",
-                "intervention_id": "IV-2-001",
-                "quality": 3,
-            },
-            {
-                "template": "recall_upgrade_anchor_consistency_withhold",
-                "family": "FAM-fp-recall_upgrade_conviction",
-                "intervention_id": "IV-2-003",
-                "quality": 2,
-            },
-        ],
     )
 
 
@@ -275,24 +165,25 @@ def cmd_cycle(args: argparse.Namespace) -> int:
     config["budget"]["patrol_cases"] = 40
     config["budget"]["stable_failure_rerun_cases"] = 0
     config["budget"]["max_proposals"] = args.max_proposals
+    if args.max_admits is not None:
+        config["budget"]["max_admits"] = args.max_admits
     config["gates"]["m_min_marginal_cases"] = args.m_min_marginal
-    if args.cycle == 2:
-        # Cycle 2 is the rare-family preset: one symmetric recall guard and
-        # one precision joint candidate, admitted only as a single unit.
-        config["budget"]["max_admits"] = 3
     if args.no_audit:
         config["audit"]["enabled"] = False
     backend = _make_backend(config)
     split = _load_tuning_split(config)
     engine = EvolutionEngine(config, backend=backend, split=split, mini=True)
-    preset = _cycle2_preset(args.cycle) if args.cycle == 2 else None
-    report = engine.run_cycle(args.cycle, proposal_batch=preset)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    report = engine.run_cycle(args.cycle)
     save_json(
         resolve_path(config["work_root"])
         / "experiments" / f"cycle{args.cycle:03d}_tuning100.json",
         report,
     )
+    # Windows consoles commonly default to GBK; persist the report before
+    # printing and make the human-readable output independent of that locale.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -368,16 +259,21 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("cycle")
     p.add_argument("--cycle", type=int, required=True)
     p.add_argument("--max-proposals", type=int, default=3)
+    p.add_argument(
+        "--max-admits", type=int, default=None,
+        help="maximum qualified interventions admitted in this cycle",
+    )
     p.add_argument("--m-min-marginal", type=int, default=2)
     p.add_argument("--no-audit", action="store_true")
     p.set_defaults(func=cmd_cycle)
     p = sub.add_parser("validate")
-    p.add_argument("--no-noise", action="store_true")
     p.set_defaults(func=cmd_validate)
     return parser
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     args = build_parser().parse_args()
     return int(args.func(args))
 

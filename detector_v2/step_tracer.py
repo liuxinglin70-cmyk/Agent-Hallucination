@@ -25,6 +25,20 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
     if not quote or not referent or not reason:
         return None, "quote, referent and reason are required"
     refs = [str(x) for x in parsed.get("evidence_refs") or () if str(x)]
+    valid_refs = {
+        str(event.get("event_id") or "")
+        for event in packet.get("events") or ()
+        if isinstance(event, Mapping)
+    }
+    for event in packet.get("events") or ():
+        if isinstance(event, Mapping):
+            valid_refs.update(
+                str(item.get("interaction_id") or "")
+                for item in event.get("tool_interactions") or ()
+                if isinstance(item, Mapping)
+            )
+    if not refs or any(ref not in valid_refs for ref in refs):
+        return None, "evidence_refs must resolve to packet events"
     return {
         "step": step,
         "quote": quote,

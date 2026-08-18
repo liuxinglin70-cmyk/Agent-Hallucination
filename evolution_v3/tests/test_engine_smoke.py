@@ -10,7 +10,50 @@ from evolution_v3.config import load_config
 from evolution_v3.contracts import empty_registry, make_intervention
 from evolution_v3.engine import EvolutionEngine
 from evolution_v3.gates import marginal_selection
+from evolution_v3.proposer import ProposalBatch
 from evolution_v3.splits import EvolutionSplit, FinalHoldout
+
+
+def _scripted_proposer(candidate):
+    class _Scripted:
+        name = "scripted"
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            bound = dict(candidate)
+            bound["provenance"] = {
+                "cycle": int(cycle),
+                "failure_family": str(families[0]["failure_family"]),
+                "failure_cases": list(families[0]["failure_cases"]),
+            }
+            bound.pop("content_hash", None)
+            return ProposalBatch(
+                candidates=[bound],
+                joint_groups=[],
+                notes=[{
+                    "intervention_id": bound["intervention_id"],
+                    "generator": "scripted",
+                }],
+            )
+
+    return _Scripted()
+
+
+def _scanner_candidate(cycle=1, family="FAM-fn"):
+    return make_intervention(
+        intervention_id=f"IV-{cycle}-001",
+        intervention_type="text_boundary",
+        hook="scanner.system",
+        packet_features=["has_tool_calls"],
+        body={
+            "directive": "Report missing required actions.",
+            "not_when": "Never when all required actions are present.",
+        },
+        expected_behavior="recall gain on planted FN",
+        target_polarity="recall",
+        cycle=cycle,
+        failure_family=family,
+        failure_cases=["A/000.json", "A/001.json"],
+    )
 
 
 def _make_dataset(root: Path, n: int = 20) -> list[str]:
@@ -74,6 +117,7 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
         backend=backend,
         split=split,
         mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
     )
     report = engine.run_cycle(1)
 
@@ -84,7 +128,7 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
     assert report["marginal_selection"]["selected"] == ["IV-1-001"]
     assert report["active_after_cycle"] == ["IV-1-001"]
     assert report["ledger_integrity"]["valid"] is True
-    assert report["empty_vs_active_on_g"]["marginal_cases"] >= 1
+    assert report["active_effect_on_g"]["marginal_cases"] >= 1
     assert engine.registry.entries[0]["type"] == "text_boundary"
     assert engine.registry.entries[0]["hook"] == "scanner.system"
 
@@ -110,7 +154,13 @@ def test_patrol_bootstrap_recovers_missed_failure_family(tmp_path, monkeypatch):
         base_predictions={case: False for case in planted + gain_true},
         overrides={"IV-1-001": {case: True for case in gain_true}},
     )
-    engine = EvolutionEngine(config, backend=backend, split=split, mini=True)
+    engine = EvolutionEngine(
+        config,
+        backend=backend,
+        split=split,
+        mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
     monkeypatch.setattr(
         engine.split, "patrol_sample", lambda cycle, n: cases[12:14]
     )
@@ -212,12 +262,12 @@ def test_final_verification_is_read_once_and_writes_report(tmp_path):
     )
     backend = MockDetectorBackend()
     engine = EvolutionEngine(config, backend=backend, split=split, mini=False)
-    report = engine.run_final(noise_reruns=2)
+    report = engine.run_final()
     assert report["final_cases"] == 6
     assert report["verdict"]["unresolved_not_increased"] is True
     assert engine.split.final_holdout.reads == 1
     with pytest.raises(RuntimeError):
-        engine.run_final(noise_reruns=2)
+        engine.run_final()
 
 
 def test_defect_injection_audit_freezes_on_leak_through(tmp_path):

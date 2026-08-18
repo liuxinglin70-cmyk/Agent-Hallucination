@@ -1,0 +1,46 @@
+{
+  "schema_version": "detector_v2.model_profiles.v1",
+  "pricing_currency": "CNY_per_million_tokens",
+  "cost_assumption": {
+    "input_tokens_per_case": 8000,
+    "output_tokens_per_case": 5500,
+    "note": "Planning estimate only; use result.json usage for actual cost."
+  },
+  "profiles": {
+    "balanced": {
+      "description": "Recommended default for judge/defense/upgrade.",
+      "model": "Qwen3.5-397B-A17B",
+      "input": 0.72,
+      "output": 4.32,
+      "roles": ["judge", "defense", "causal_upgrade"]
+    },
+    "cheap_mechanical": {
+      "description": "High-volume recall and tracing route.",
+      "model": "hy3",
+      "input": 1.0,
+      "output": 4.0,
+      "roles": ["recall", "step_tracer"]
+    },
+    "quality_first": {
+      "description": "Use only as an escalation route for conflicts or unresolved cases.",
+      "model": "GLM-5.3",
+      "input": 8.0,
+      "output": 28.0,
+      "roles": ["escalation"]
+    },
+    "openai_compatible_alternative": {
+      "description": "Low-cost alternative when the gateway has this model enabled.",
+      "model": "gpt-5.6-luna",
+      "input": 0.812,
+      "output": 4.872,
+      "roles": ["judge", "defense", "causal_upgrade"]
+    },
+    "minimax_candidate": {
+      "description": "Candidate only; price and endpoint were not supplied.",
+      "model": "MiniMax-H3",
+      "input": null,
+      "output": null,
+      "roles": ["benchmark_only"]
+    }
+  }
+}

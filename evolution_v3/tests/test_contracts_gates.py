@@ -5,11 +5,32 @@ import pytest
 from evolution_v3.config import load_config
 from evolution_v3.contracts import (
     candidate_contains_case_id,
+    empty_registry,
     make_intervention,
     make_registry,
 )
-from evolution_v3.gates import defect_candidates, v1_structural
+from evolution_v3.gates import defect_candidates, v1_structural, v2_harmlessness
 from detector_v2.interventions import validate_registry
+
+
+def _write_cases(root, cases):
+    import json as _json
+
+    for index, case in enumerate(cases):
+        path = root / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            _json.dumps({
+                "question": f"task {index}",
+                "history": [
+                    {"step": 1, "role": "assistant", "content": "answer"}
+                ],
+                "is_hallucination": True,
+                "hallucination_step": 1,
+                "true_answer": "gold",
+            }),
+            encoding="utf-8",
+        )
 
 
 def _candidate(intervention_id="IV-1-001"):
@@ -70,29 +91,204 @@ def test_v1_rejects_redundant_active_text():
     assert "redundant" in verdict["reason"]
 
 
-def test_template_proposer_diversifies_across_mixed_families():
-    from evolution_v3.proposer import TemplateProposer
+def test_llm_proposer_diversifies_across_mixed_families(monkeypatch):
+    """One drafting call covers both an L1 evidence row and an L2 guard."""
+    import evolution_v3.proposer as proposer
 
-    batch = TemplateProposer().propose(
+    monkeypatch.setattr(
+        proposer,
+        "load_detector_config",
+        lambda _path: {"judge_route": {"endpoint": "https://example.test/v1", "model": "m"}},
+    )
+
+    def fake_provider_call(**kwargs):
+        return {
+            "interventions": [
+                {
+                    "type": "evidence_check",
+                    "hook": "judge.post",
+                    "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+                    "body": {
+                        "predicate": "required_action_present",
+                        "runner": "deterministic",
+                        "output_verdicts": [
+                            "satisfied", "violated", "not_applicable"
+                        ],
+                    },
+                    "claim": {"expected_behavior": "append mechanical evidence", "target_polarity": "recall"},
+                    "provenance": {"failure_family": "FAM-fn-judge_false_no_recall_candidates"},
+                },
+                {
+                    "type": "decision_guard",
+                    "hook": "adjudicate.guard",
+                    "trigger": {
+                        "packet_features": ["has_tool_calls"],
+                        "facts": ["required_action_present=violated"],
+                    },
+                    "body": {
+                        "action": "convict_mechanical_violation",
+                        "action_not_when": "Never when the predicate is satisfied.",
+                        "action_not_when_facts": [
+                            "required_action_present=satisfied"
+                        ],
+                    },
+                    "claim": {"expected_behavior": "convict the mechanical violation", "target_polarity": "recall"},
+                    "provenance": {"failure_family": "FAM-fn-judge_false_no_recall_candidates"},
+                },
+                {
+                    "type": "decision_guard",
+                    "hook": "adjudicate.guard",
+                    "trigger": {
+                        "packet_features": ["has_tool_calls"],
+                        "facts": ["positive_source=judge"],
+                    },
+                    "body": {
+                        "action": "withhold_conviction",
+                        "action_not_when": "Never when defense is degraded.",
+                        "action_not_when_facts": [
+                            "defense_view_degraded=true"
+                        ],
+                    },
+                    "claim": {"expected_behavior": "withhold the unjustified positive", "target_polarity": "precision"},
+                    "provenance": {"failure_family": "FAM-fp-judge_conviction"},
+                },
+            ]
+        }, {"purpose": "evolution_proposer", "model": "m", "attempts": 1, "usage": {"total_tokens": 9}}
+
+    monkeypatch.setattr(proposer, "provider_call", fake_provider_call)
+    batch = proposer.make_proposer({
+        "detector_config": "ignored.json",
+        "budget": {"llm_calls": 1},
+    }).propose(
         [
             {
                 "failure_family": "FAM-fn-judge_false_no_recall_candidates",
                 "count": 2,
                 "failure_cases": ["A/001.json", "A/002.json"],
+                "sources": ["A"],
             },
             {
                 "failure_family": "FAM-fp-judge_conviction",
                 "count": 2,
                 "failure_cases": ["A/003.json", "A/004.json"],
+                "sources": ["A"],
             },
         ],
         cycle=1,
         max_proposals=3,
     )
-    assert batch.candidates
-    assert any(c["type"] == "decision_guard" for c in batch.candidates)
-    assert any(str(c.get("hook") or "").startswith("scanner.") for c in batch.candidates)
-    assert batch.joint_groups
+    assert [c["type"] for c in batch.candidates] == [
+        "evidence_check", "decision_guard", "decision_guard",
+    ]
+    assert any(
+        str(c.get("hook") or "").startswith("scanner.") is False
+        and c["type"] == "evidence_check"
+        for c in batch.candidates
+    )
+    # The guard consuming the evidence row's predicate is auto-paired with it.
+    assert batch.joint_groups == [["IV-1-001", "IV-1-002"]]
+
+
+def test_llm_proposer_binds_provenance_locally_and_records_usage(monkeypatch):
+    import evolution_v3.proposer as proposer
+
+    monkeypatch.setattr(
+        proposer,
+        "load_detector_config",
+        lambda _path: {"judge_route": {"endpoint": "https://example.test/v1", "model": "m"}},
+    )
+    calls = []
+
+    def fake_provider_call(**kwargs):
+        calls.append(kwargs)
+        return {
+            "interventions": [
+                {
+                    "type": "evidence_check",
+                    "hook": "judge.post",
+                    "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+                    "body": {
+                        "predicate": "required_action_present",
+                        "runner": "deterministic",
+                    "output_verdicts": [
+                        "satisfied", "violated", "not_applicable"
+                    ],
+                    },
+                    "claim": {"expected_behavior": "append mechanical evidence", "target_polarity": "boundary"},
+                    "provenance": {"failure_family": "FAM-fn-test"},
+                },
+                {
+                    "type": "text_boundary",
+                    "hook": "scanner.system",
+                    "provenance": {"failure_family": "FAM-fn-test"},
+                },
+                {
+                    "type": "evidence_check",
+                    "hook": "judge.post",
+                    "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+                    "body": {
+                        "predicate": "verbatim_fidelity",
+                        "runner": "deterministic",
+                    "output_verdicts": [
+                        "satisfied", "violated", "not_applicable"
+                    ],
+                    },
+                    "claim": {"expected_behavior": "another mechanical row", "target_polarity": "boundary"},
+                    "provenance": {"failure_family": "FAM-fn-test"},
+                },
+            ]
+        }, {"purpose": "evolution_proposer", "model": "m", "attempts": 1, "usage": {"total_tokens": 9}}
+
+    monkeypatch.setattr(proposer, "provider_call", fake_provider_call)
+    active = make_intervention(
+        intervention_id="IV-0-001",
+        intervention_type="evidence_check",
+        hook="judge.post",
+        packet_features=["has_tool_calls"],
+        body={
+            "predicate": "verbatim_fidelity",
+            "runner": "deterministic",
+            "output_verdicts": [
+                "satisfied", "violated", "not_applicable"
+            ],
+        },
+        expected_behavior="append another mechanical row",
+        target_polarity="boundary",
+        cycle=0,
+        failure_family="FAM-fn-test",
+        failure_cases=["A/001.json", "A/002.json"],
+    )
+    batch = proposer.make_proposer(
+        {
+            "detector_config": "ignored.json",
+            "budget": {"llm_calls": 1},
+        },
+        active_entries=[active],
+    ).propose(
+        [{
+            "failure_family": "FAM-fn-test",
+            "count": 2,
+            "failure_cases": ["A/001.json", "A/002.json"],
+            "sources": ["A"],
+        }],
+        cycle=3,
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["route"]["max_tokens"] == 4096
+    assert calls[0]["route"]["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert "A/001.json" not in calls[0]["user"]
+    assert "IV-0-001" in calls[0]["user"]  # active registry digest is in prompt
+    assert [candidate["type"] for candidate in batch.candidates] == ["evidence_check"]
+    assert batch.candidates[0]["provenance"] == {
+        "cycle": 3,
+        "failure_family": "FAM-fn-test",
+        "failure_cases": ["A/001.json", "A/002.json"],
+    }
+    assert batch.notes[0]["usage"]["total_tokens"] == 9
+    rejections = {note.get("intervention_id"): note for note in batch.notes[1:]}
+    assert rejections["IV-3-002"]["rejected"] == "invalid_contract"
+    assert rejections["IV-3-003"]["rejected"] == "echo_of_active"
 
 
 def test_defect_candidates_have_expected_shapes():
@@ -101,4 +297,197 @@ def test_defect_candidates_have_expected_shapes():
     leak, noise = candidates
     assert candidate_contains_case_id(leak) == "BFCL/001.json"
     assert candidate_contains_case_id(noise) is None
+    assert noise["type"] == "evidence_check"
+    assert noise["hook"] == "judge.post"
+    assert noise["body"]["predicate"] == "evidence_refs_resolve"
     validate_registry(make_registry(candidates))
+
+
+def test_v2_reroll_control_attributes_noise_correctly(tmp_path):
+    """Unfreezing-hook harm counts subtract the empty-reroll noise arm.
+
+    The candidate arm turns one gold-true sentinel case into a false
+    negative. The noise arm (empty registry, fresh roll) is fully correct,
+    so the reroll contributes no allowed slack: the harm is intervention-
+    attributable and the gate must reject. A second arm where the reroll
+    itself also flips that case shows the subtraction: the flip is noise,
+    not intervention, and the gate passes.
+    """
+    from evolution_v3.backends import MockDetectorBackend
+
+    config = load_config()
+    sentinel = ["A/001.json", "A/002.json", "A/003.json"]
+    _write_cases(tmp_path, sentinel)
+    gold_map = {"A/001.json": True, "A/002.json": True, "A/003.json": False}
+    baseline = MockDetectorBackend().evaluate(
+        sentinel, dataset_root=str(tmp_path), registry=empty_registry(),
+        gold_map=gold_map,
+    )
+    candidate = _candidate("IV-9-001")
+    candidate["hook"] = "scanner.system"
+    candidate["type"] = "text_boundary"
+
+    class _NoisyRoll(MockDetectorBackend):
+        """Every fresh roll flips A/002 to a false negative.
+
+        The cached baseline was captured on a lucky roll (A/002 correct), so
+        both the candidate arm and the empty-reroll arm flip it. The flip is
+        reroll noise, not intervention harm, and the gate must subtract it.
+        """
+
+        def __init__(self):
+            super().__init__()
+            self.rolls = 0
+
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            self.rolls += 1
+            gold = False if case_id == "A/002.json" else gold
+            return MockDetectorBackend.run_case(
+                self, record, case_id=case_id, registry=registry, gold=gold,
+            )
+
+    verdict = v2_harmlessness(
+        candidate,
+        baseline_rows=baseline,
+        backend=_NoisyRoll(),
+        dataset_root=str(tmp_path),
+        sentinel_cases=sentinel,
+        config=config,
+        gold_map=gold_map,
+    )
+    assert verdict["passed"] is True  # the flip is reroll-attributable
+    assert verdict["reroll_control"]["new_fn"] == 1
+
+    # And when the candidate adds real harm beyond noise, it must still fail:
+    # A/003 flips to a false positive only under the candidate registry.
+    class _NoisyRollPlusRealHarm(_NoisyRoll):
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            out = _NoisyRoll.run_case(
+                self, record, case_id=case_id, registry=registry, gold=gold,
+            )
+            if (
+                registry is not None
+                and case_id == "A/003.json"
+                and any(
+                    str(e.get("intervention_id") or "") == "IV-9-001"
+                    for e in (registry.get("interventions") or [])
+                )
+            ):
+                out = dict(out)
+                out["state"] = "verified_error"
+            return out
+
+    verdict_harm = v2_harmlessness(
+        candidate,
+        baseline_rows=baseline,
+        backend=_NoisyRollPlusRealHarm(),
+        dataset_root=str(tmp_path),
+        sentinel_cases=sentinel,
+        config=config,
+        gold_map=gold_map,
+    )
+    assert verdict_harm["passed"] is False
+    assert "new_fp=1" in verdict_harm["reason"]
+
+
+def test_v2_frozen_hook_skips_reroll_control(tmp_path):
+    """Frozen-replay hooks keep the pure paired-delta contract."""
+    from evolution_v3.backends import MockDetectorBackend
+
+    config = load_config()
+    sentinel = ["A/001.json", "A/002.json"]
+    _write_cases(tmp_path, sentinel)
+    gold_map = {"A/001.json": True, "A/002.json": False}
+    backend = MockDetectorBackend()
+    baseline = backend.evaluate(
+        sentinel, dataset_root=str(tmp_path), registry=empty_registry(),
+        gold_map=gold_map,
+    )
+    frozen_candidate = make_intervention(
+        intervention_id="IV-9-002",
+        intervention_type="evidence_check",
+        hook="judge.post",
+        packet_features=["has_tool_calls"],
+        body={
+            "predicate": "evidence_refs_resolve",
+            "runner": "deterministic",
+            "output_verdicts": ["resolved", "unresolved", "not_applicable"],
+        },
+        expected_behavior="gate audit frozen hook",
+        target_polarity="boundary",
+        cycle=9,
+        failure_family="FAM-test",
+        failure_cases=["A/001.json", "A/002.json"],
+    )
+    verdict = v2_harmlessness(
+        frozen_candidate,  # judge.post evidence hook stays frozen
+        baseline_rows=baseline,
+        backend=backend,
+        dataset_root=str(tmp_path),
+        sentinel_cases=sentinel,
+        config=config,
+        gold_map=gold_map,
+    )
+    assert verdict["passed"] is True
+    assert verdict["reroll_control"] is None
+
+
+def test_llm_proposer_rejects_duplicate_in_batch(monkeypatch):
+    import evolution_v3.proposer as proposer
+
+    monkeypatch.setattr(
+        proposer,
+        "load_detector_config",
+        lambda _path: {"judge_route": {"endpoint": "https://example.test/v1", "model": "m"}},
+    )
+
+    def fake_provider_call(**kwargs):
+        return {
+            "interventions": [
+                {
+                    "type": "evidence_check",
+                    "hook": "judge.post",
+                    "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+                    "body": {
+                        "predicate": "evidence_refs_resolve",
+                        "runner": "deterministic",
+                        "output_verdicts": [
+                            "resolved", "unresolved", "not_applicable"
+                        ],
+                    },
+                    "claim": {"expected_behavior": "first draft", "target_polarity": "boundary"},
+                    "provenance": {"failure_family": "FAM-fn-test"},
+                },
+                {
+                    "type": "evidence_check",
+                    "hook": "judge.post",
+                    "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+                    "body": {
+                        "predicate": "evidence_refs_resolve",
+                        "runner": "deterministic",
+                        "output_verdicts": [
+                            "resolved", "unresolved", "not_applicable"
+                        ],
+                    },
+                    "claim": {"expected_behavior": "same mechanism restated", "target_polarity": "boundary"},
+                    "provenance": {"failure_family": "FAM-fn-test"},
+                },
+            ]
+        }, {"purpose": "evolution_proposer", "model": "m", "attempts": 1, "usage": {}}
+
+    monkeypatch.setattr(proposer, "provider_call", fake_provider_call)
+    batch = proposer.make_proposer({
+        "detector_config": "ignored.json",
+        "budget": {"llm_calls": 1},
+    }).propose(
+        [{
+            "failure_family": "FAM-fn-test",
+            "count": 2,
+            "failure_cases": ["A/001.json", "A/002.json"],
+            "sources": ["A"],
+        }],
+        cycle=5,
+    )
+    assert len(batch.candidates) == 1
+    rejections = [note for note in batch.notes[1:]]
+    assert rejections[1]["rejected"] == "duplicate_in_batch"

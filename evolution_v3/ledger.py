@@ -40,18 +40,18 @@ class Ledger:
         return str(json.loads(last).get("entry_hash") or "0" * 64)
 
     def append(self, event: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-        record: dict[str, Any] = {
-            "event": str(event),
-            "payload": dict(payload),
-        }
-        prev_hash = self.last_hash()
-        record["prev_hash"] = prev_hash
-        canonical = json.dumps(
-            record, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-        )
-        record["entry_hash"] = _digest(canonical)
-        record["event_id"] = record["entry_hash"][:20]
         with self._lock:
+            record: dict[str, Any] = {
+                "event": str(event),
+                "payload": dict(payload),
+            }
+            prev_hash = self.last_hash()
+            record["prev_hash"] = prev_hash
+            canonical = json.dumps(
+                record, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            )
+            record["entry_hash"] = _digest(canonical)
+            record["event_id"] = record["entry_hash"][:20]
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(
                     json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"

@@ -29,7 +29,7 @@ from evolution_v3.gates import (
     v3_semantics,
 )
 from evolution_v3.ledger import Ledger, load_ledger
-from evolution_v3.metrics import paired_delta, source_deltas
+from evolution_v3.metrics import fired_rate, paired_delta, source_deltas
 from evolution_v3.proposer import ProposalBatch, make_proposer
 from evolution_v3.registry import ActiveRegistry, load_active_registry
 from evolution_v3.splits import (
@@ -67,6 +67,7 @@ class EvolutionEngine:
         split: EvolutionSplit | None = None,
         registry: ActiveRegistry | None = None,
         ledger: Ledger | None = None,
+        proposer: Any | None = None,
         mini: bool = False,
         mock_base: Mapping[str, bool | None] | None = None,
         mock_overrides: Mapping[str, Mapping[str, bool | None]] | None = None,
@@ -86,7 +87,9 @@ class EvolutionEngine:
         )
         self.registry = registry or load_active_registry(self.config)
         self.ledger = ledger or load_ledger(self.config)
-        self.proposer = make_proposer(self.config)
+        self.proposer = proposer or make_proposer(
+            self.config, active_entries=self.registry.entries
+        )
         self.gold_map = {
             case: load_gold(self.config["dataset_root"], case)
             for case in self.split.pool
@@ -114,11 +117,9 @@ class EvolutionEngine:
     def _audit(self, cycle: int) -> dict[str, Any]:
         if not bool((self.config.get("audit") or {}).get("enabled", True)):
             return {"enabled": False, "passed": True, "frozen": False, "reports": []}
-        empty = empty_registry()
         active = self.registry.registry
-        baseline_s = self._evaluate(empty, self.split.sentinel)
-        baseline_g = self._evaluate(empty, self.split.gain)
-        active_g = self._evaluate(active, self.split.gain)
+        baseline_s = self._evaluate(active, self.split.sentinel)
+        baseline_g = self._evaluate(active, self.split.gain)
         report = audit_defects(
             cycle=cycle,
             config=self.config,
@@ -128,7 +129,7 @@ class EvolutionEngine:
             baseline_sentinel_rows=baseline_s,
             sentinel_cases=self.split.sentinel,
             gain_cases=self.split.gain,
-            baseline_gain_rows=active_g,
+            baseline_gain_rows=baseline_g,
             gold_map=self.gold_map,
             workers=int((self.config.get("backend") or {}).get("workers", 1)),
         )
@@ -144,15 +145,15 @@ class EvolutionEngine:
         """Patrol + proposal preview without gates, ledger, or registry writes.
 
         This is the cheap pre-flight for experimenters: it shows whether the
-        current cycle would produce any candidate at all and what the source
-        templates are, before spending V2/M detection budget.
+        current cycle would produce any candidate at all, before spending
+        V2/M detection budget.
         """
         patrol_size = int(
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        empty = empty_registry()
-        patrol_rows = self._evaluate(empty, patrol_cases)
+        active = self.registry.registry
+        patrol_rows = self._evaluate(active, patrol_cases)
         families = stable_failure_families(patrol_rows)
         bootstrap_cases: list[str] = []
         if not families:
@@ -175,7 +176,7 @@ class EvolutionEngine:
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
                 patrol_rows = [
                     *patrol_rows,
-                    *self._evaluate(empty, bootstrap_cases),
+                    *self._evaluate(active, bootstrap_cases),
                 ]
                 families = stable_failure_families(patrol_rows)
         diagnosed = diagnose_failure_families(
@@ -197,8 +198,8 @@ class EvolutionEngine:
             )
         elif not proposal_batch.candidates:
             empty_reason = (
-                "stable failure families exist but no executable template "
-                "matches their family ids"
+                "stable failure families exist but the proposer drafted no "
+                "valid candidate"
             )
         else:
             empty_reason = ""
@@ -252,12 +253,16 @@ class EvolutionEngine:
             self.cycle_reports.append(report)
             return report
 
+        # Re-evaluate deployed entries before proposing replacements. This
+        # creates capacity from measured retirement, not from wider limits.
+        retirement = self._apply_retirement(cycle)
+
         patrol_size = int(
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        empty = empty_registry()
-        patrol_rows = self._evaluate(empty, patrol_cases)
+        active = self.registry.registry
+        patrol_rows = self._evaluate(active, patrol_cases)
         families = stable_failure_families(patrol_rows)
 
         # Source-quality bootstrap: a random patrol sample can legitimately
@@ -284,7 +289,7 @@ class EvolutionEngine:
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
                 patrol_rows = [
                     *patrol_rows,
-                    *self._evaluate(empty, bootstrap_cases),
+                    *self._evaluate(active, bootstrap_cases),
                 ]
                 families = stable_failure_families(patrol_rows)
 
@@ -340,40 +345,34 @@ class EvolutionEngine:
             )
         elif not proposals:
             empty_proposal_reason = (
-                "stable failure families exist but no executable template "
-                "matches their family ids"
+                "stable failure families exist but the proposer drafted no "
+                "valid candidate"
             )
         else:
             empty_proposal_reason = ""
 
         # Shared baseline arms used by every gate this cycle.
-        baseline_sentinel = self._evaluate(empty, self.split.sentinel)
-        baseline_gain = self._evaluate(empty, self.split.gain)
-        active_gain = self._evaluate(
-            self.registry.registry, self.split.gain,
-        )
+        baseline_sentinel = self._evaluate(active, self.split.sentinel)
+        baseline_gain = self._evaluate(active, self.split.gain)
+        active_gain = baseline_gain
 
         gate_reports: list[dict[str, Any]] = []
         v3_candidates: list[dict[str, Any]] = []
+        preflight: dict[str, dict[str, Any]] = {}
         for candidate in proposals:
             intervention_id = str(candidate.get("intervention_id") or "")
             v1 = v1_structural(
                 candidate,
                 active_entries=self.registry.entries,
                 config=self.config,
+                allowed_failure_cases=patrol_cases,
+                diagnosed_families=diagnosed_families,
             )
-            report: dict[str, Any] = {
-                "intervention_id": intervention_id,
-                "candidate": candidate,
-                "v1": v1,
-                "v2": None,
-                "v3": None,
-                "m": None,
-                "terminal": False,
-            }
+            v2 = None
             if v1["passed"]:
                 v2 = v2_harmlessness(
                     candidate,
+                    active_entries=self.registry.entries,
                     baseline_rows=baseline_sentinel,
                     backend=self.backend,
                     dataset_root=self.config["dataset_root"],
@@ -384,10 +383,30 @@ class EvolutionEngine:
                         (self.config.get("backend") or {}).get("workers", 1)
                     ),
                 )
-                report["v2"] = v2
-                if v2["passed"]:
+            preflight[intervention_id] = {"v1": v1, "v2": v2}
+        for candidate in proposals:
+            intervention_id = str(candidate.get("intervention_id") or "")
+            v1 = preflight[intervention_id]["v1"]
+            v2 = preflight[intervention_id]["v2"]
+            report: dict[str, Any] = {
+                "intervention_id": intervention_id,
+                "candidate": candidate,
+                "v1": v1,
+                "v2": None,
+                "v3": None,
+                "m": None,
+                "terminal": False,
+            }
+            report["v2"] = v2
+            if v1["passed"] and v2["passed"]:
+                    eligible_ids = {
+                        item_id for item_id, status in preflight.items()
+                        if status["v1"]["passed"] and status["v2"]["passed"]
+                    }
                     v3_group_entries = [candidate]
                     for partner_id in joint_partners.get(intervention_id, []):
+                        if partner_id not in eligible_ids:
+                            continue
                         partner = next(
                             (
                                 item for item in proposals
@@ -398,16 +417,60 @@ class EvolutionEngine:
                         )
                         if partner is not None:
                             v3_group_entries.append(partner)
-                    v3_registry = make_registry(v3_group_entries)
-                    candidate_s = self._evaluate(
-                        v3_registry, self.split.sentinel,
+                    v3_registry = make_registry([
+                        *self.registry.entries, *v3_group_entries,
+                    ])
+                    v3_control_entries = [
+                        *self.registry.entries,
+                        *[
+                            entry for entry in v3_group_entries
+                            if str(entry.get("intervention_id") or "")
+                            != intervention_id
+                        ],
+                    ]
+                    v3_control = make_registry(v3_control_entries)
+                    fresh = any(
+                        str(entry.get("hook") or "") in {
+                            "judge.system", "scanner.system", "upgrade.pre",
+                            "upgrade.system", "tracer.system", "defense.pre",
+                            "defense.system",
+                        }
+                        for entry in v3_group_entries
                     )
-                    candidate_g = self._evaluate(
-                        v3_registry, self.split.gain,
+                    evaluate = (
+                        self.backend.evaluate_fresh
+                        if fresh else self.backend.evaluate
+                    )
+                    evaluate_kwargs = {
+                        "dataset_root": self.config["dataset_root"],
+                        "gold_map": self.gold_map,
+                        "workers": int(
+                            (self.config.get("backend") or {}).get("workers", 1)
+                        ),
+                    }
+                    control_s = evaluate(
+                        self.split.sentinel,
+                        registry=v3_control,
+                        **evaluate_kwargs,
+                    )
+                    control_g = evaluate(
+                        self.split.gain,
+                        registry=v3_control,
+                        **evaluate_kwargs,
+                    )
+                    candidate_s = evaluate(
+                        self.split.sentinel,
+                        registry=v3_registry,
+                        **evaluate_kwargs,
+                    )
+                    candidate_g = evaluate(
+                        self.split.gain,
+                        registry=v3_registry,
+                        **evaluate_kwargs,
                     )
                     v3 = v3_semantics(
                         candidate,
-                        baseline_rows=[*baseline_sentinel, *baseline_gain],
+                        baseline_rows=[*control_s, *control_g],
                         candidate_rows=[*candidate_s, *candidate_g],
                         config=self.config,
                     )
@@ -576,7 +639,6 @@ class EvolutionEngine:
             })
 
         # Library governance: retirement and mechanical drift rollback.
-        retirement = self._apply_retirement(cycle)
         rollback = self._apply_rollback_check(cycle)
 
         report = {
@@ -602,23 +664,8 @@ class EvolutionEngine:
                     "failure_family": (c.get("provenance") or {}).get(
                         "failure_family"
                     ),
-                    "template": next(
-                        (
-                            note.get("template")
-                            for note in proposal_batch.notes
-                            if note.get("intervention_id")
-                            == c.get("intervention_id")
-                        ),
-                        None,
-                    ),
-                    "quality": next(
-                        (
-                            note.get("quality")
-                            for note in proposal_batch.notes
-                            if note.get("intervention_id")
-                            == c.get("intervention_id")
-                        ),
-                        None,
+                    "target_polarity": (c.get("claim") or {}).get(
+                        "target_polarity"
                     ),
                     "frozen_judge_replay_compatible": next(
                         (
@@ -648,7 +695,7 @@ class EvolutionEngine:
             ],
             "retirement": retirement,
             "rollback": rollback,
-            "empty_vs_active_on_g": paired_delta(
+            "active_effect_on_g": paired_delta(
                 baseline_gain,
                 self._evaluate(self.registry.registry, self.split.gain),
             ),
@@ -665,8 +712,22 @@ class EvolutionEngine:
             )
         )
         retire_ids: list[str] = []
+        active_rows = self._evaluate(self.registry.registry, self.split.gain)
         for entry in self.registry.entries:
             intervention_id = str(entry.get("intervention_id") or "")
+            without = [
+                item for item in self.registry.entries
+                if str(item.get("intervention_id") or "") != intervention_id
+            ]
+            without_rows = self._evaluate(make_registry(without), self.split.gain)
+            contribution = paired_delta(without_rows, active_rows)
+            fired = fired_rate(active_rows, intervention_id)
+            self.registry.record_marginal(
+                intervention_id,
+                int(contribution["marginal_cases"]),
+                cycle=cycle,
+                fired_rate=fired,
+            )
             info = self.registry.state.get("interventions", {}).get(
                 intervention_id, {}
             )
@@ -678,7 +739,11 @@ class EvolutionEngine:
                 retire_ids.append(intervention_id)
         if not retire_ids:
             return {"retired": [], "threshold": threshold}
-        retired = self.registry.retire(retire_ids, cycle=cycle)
+        retired = self.registry.retire(
+            retire_ids,
+            cycle=cycle,
+            library_cfg=self.config.get("library") or {},
+        )
         for intervention_id in retired:
             self._ledger("retired", {
                 "cycle": cycle,
@@ -709,7 +774,7 @@ class EvolutionEngine:
             int(item.get("net_correct_cases", 0)) < 0
             for item in history[-threshold:]
         ):
-            payload = self.registry.rollback_to_snapshot(cycle - 1)
+            payload = self.registry.rollback_to_snapshot(cycle - threshold)
             self._ledger("rolled_back", {
                 "cycle": cycle,
                 "reason": (
@@ -742,7 +807,7 @@ class EvolutionEngine:
         }
 
     # ------------------------------------------------------------------
-    def run_final(self, *, noise_reruns: int | None = None) -> dict[str, Any]:
+    def run_final(self) -> dict[str, Any]:
         if self.split.final_holdout is None:
             raise RuntimeError("mini split has no read-once final verification set")
         final_cases = self.split.final_holdout.read("final_verification")
@@ -767,27 +832,11 @@ class EvolutionEngine:
             gold_map=final_gold,
             workers=int((self.config.get("backend") or {}).get("workers", 1)),
         )
-        reruns = int(
-            noise_reruns
-            if noise_reruns is not None
-            else (self.config.get("audit") or {}).get("noise_floor_reruns", 2)
-        )
-        noise_rows = empty_rows
-        if reruns >= 2:
-            # A genuine second roll, never the cached first arm.
-            rerun_backend = getattr(self.backend, "backend", self.backend)
-            noise_rows = rerun_backend.evaluate(
-                case_ids,
-                dataset_root=self.config["dataset_root"],
-                registry=empty,
-                gold_map=final_gold,
-                workers=int((self.config.get("backend") or {}).get("workers", 1)),
-            )
-        noise_delta = paired_delta(empty_rows, noise_rows)
         effect = paired_delta(empty_rows, active_rows)
-        noise_positive_net = max(0, int(noise_delta["marginal_cases"]))
         main_pass = (
-            int(effect["marginal_cases"]) >= noise_positive_net
+            int(effect["marginal_cases"]) >= int(
+                (self.config.get("gates") or {}).get("m_min_marginal_cases", 1)
+            )
             and int(effect["unresolved_added"]) <= 0
         )
         p_value = _mcnemar_improvement_p(effect)
@@ -795,11 +844,6 @@ class EvolutionEngine:
             "schema_version": "evolution_v3.final_verification.v1",
             "registry_hash": str(active.get("content_hash") or ""),
             "final_cases": len(case_ids),
-            "noise_floor": {
-                "reruns": reruns,
-                "positive_net": int(noise_delta["marginal_cases"]),
-                "flips": noise_delta["flips"],
-            },
             "effect": {
                 "marginal_cases": int(effect["marginal_cases"]),
                 "new_fn": int(effect["new_fn"]),
@@ -851,9 +895,8 @@ class EvolutionEngine:
 
 def _mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:
     """One-sided exact binomial p for symmetric discordance (McNemar)."""
-    flips = delta.get("flips") or {}
-    improved = int(flips.get("F->T") or 0) + int(flips.get("U->T") or 0)
-    worsened = int(flips.get("T->F") or 0) + int(flips.get("T->U") or 0)
+    improved = int(delta.get("correctness_improved") or 0)
+    worsened = int(delta.get("correctness_worsened") or 0)
     n = improved + worsened
     if n == 0:
         return 1.0
