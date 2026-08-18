@@ -114,6 +114,7 @@ class LLMProposer:
             0,
             int((framework_config.get("budget") or {}).get("llm_calls", 1)),
         )
+        self.calls_used = 0
         self.active_entries = [dict(entry) for entry in active_entries]
 
     def _registry_digest(self) -> list[dict[str, Any]]:
@@ -148,7 +149,7 @@ class LLMProposer:
     ) -> ProposalBatch:
         if not families:
             return ProposalBatch()
-        if self.max_calls < 1:
+        if self.calls_used >= self.max_calls:
             return ProposalBatch(notes=[{
                 "generator": "llm",
                 "provider_called": False,
@@ -193,6 +194,7 @@ class LLMProposer:
             f"Draft at most {max_proposals} interventions."
         )
         try:
+            self.calls_used += 1
             parsed, meta = provider_call(
                 route=self.route,
                 system=_draft_system_prompt(),

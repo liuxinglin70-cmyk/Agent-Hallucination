@@ -85,7 +85,10 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
             return None, "evidence_refs is required when true"
         if not isinstance(root_cause, Mapping):
             return None, "root_cause object is required when true"
-        if int(root_cause.get("step") or 0) != step_value:
+        root_step = root_cause.get("step")
+        if not isinstance(root_step, int) or isinstance(root_step, bool):
+            return None, "root_cause.step must be an integer"
+        if root_step != step_value:
             return None, "root_cause.step must equal hallucination_step"
         if not str(root_cause.get("quote") or "").strip():
             return None, "root_cause.quote is required"

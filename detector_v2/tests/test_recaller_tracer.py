@@ -66,3 +66,19 @@ def test_step_tracer(sample_packet, monkeypatch):
     )
     assert result["parsed"]["step"] == 2
     assert status["state"] == "ok"
+
+
+def test_step_tracer_rejects_refs_for_another_step(sample_packet, monkeypatch):
+    def fake_call(*, route, system, user, purpose):
+        return {
+            "step": 2, "quote": "5", "referent": "4",
+            "evidence_refs": ["event_001"], "reason": "wrong step",
+        }, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.step_tracer.provider_call", fake_call)
+    result, status = run_step_tracer(
+        packet=sample_packet, delivered_result="5", correct_result="4",
+        config=CONFIG,
+    )
+    assert result["ok"] is False
+    assert status["state"] == "contract_error"

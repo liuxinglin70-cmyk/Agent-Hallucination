@@ -1,8 +1,12 @@
 # SEHD-RISE3：detector_v2 的干预式自进化框架（V3.1）
 
-状态：方案稿 v3.1（**取代本文件的早期草稿**）。
-实现与实验结果：`evolution_v3/` 已落地 M0/M1/M2/M3 核心，并完成 100 例
-自进化 + 50 例验证实验；当前结论真源见
+状态：方案稿 v3.1（**取代本文件的早期草稿**）。2026-08-19 实现审查、
+修复清单与真实实验准入条件见
+`SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`；若实验状态描述冲突，
+以后者为准。
+实现与历史实验结果：`evolution_v3/` 已落地 M0/M1/M2/M3 核心，并完成 100 例
+自进化 + 50 例探索性验证实验。当前实现审查结论与真实实验准入条件以
+`SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md` 为准；历史数字见
 `evolution_v3/experiments/tuning100_validation50_experiment_report.md`。
 输入：`detector_v2/` 当前实现、97 例最新实验读数（`runs_v2/`）、RSI /
 AI4AI 调研 PDF，以及网络检索到的近期研究（文献见 §10）。
@@ -117,8 +121,9 @@ A5. **每个干预必须证明相对 no-skill control 的边际增益；没有�
     "runner": "deterministic | llm_structured",
     "output_verdicts": ["equivalent", "not_equivalent", "insufficient"]
     // 或
-    "action": "withhold_conviction | restore_judge_conviction | require_full_view_defense",
-    "action_not_when": "..."
+    "action": "withhold_conviction | restore_judge_conviction | require_full_view_defense | convict_mechanical_violation",
+    "action_not_when": "...",
+    "action_not_when_facts": ["defense_view_degraded=true"]
   },
   "claim": {
     "expected_behavior": "在 trigger 命中时，hook X 的输出将增加 Y 类结构化证据",
@@ -139,7 +144,8 @@ A5. **每个干预必须证明相对 no-skill control 的边际增益；没有�
 - `evidence_check` 的输出只允许写 `proof.evidence[]`；
   `decision_guard` 只能改 authority / 终态，且动作闭词表；
   `text_boundary` 只能改 hook 的 system 文本。
-- `decision_guard` 动作保持双向：`withhold_conviction`（修 FP）与
+- `decision_guard` 的 executable exclusion facts 必须存在且非空；动作保持双向：
+  `withhold_conviction`（修 FP）与
   `restore_judge_conviction`（修 Defense 过度翻案造成的 FN）；冲突时
   全部失效并回退 baseline。
 

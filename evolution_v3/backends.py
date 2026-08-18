@@ -43,7 +43,7 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
-CACHE_VERSION = "v7-active-health-attribution"
+CACHE_VERSION = "v8-source-bound-cache"
 
 
 def _file_digest(path: str | Path | None) -> str:
@@ -53,6 +53,16 @@ def _file_digest(path: str | Path | None) -> str:
     if not target.exists():
         return "missing"
     return hashlib.sha256(target.read_bytes()).hexdigest()[:16]
+
+
+def _source_digest() -> str:
+    root = Path(__file__).resolve().parent.parent
+    digest = hashlib.sha256()
+    for package in (root / "detector_v2", root / "evolution_v3"):
+        for path in sorted(package.glob("*.py")):
+            digest.update(str(path.relative_to(root)).encode("utf-8"))
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:16]
 
 
 def registry_key(registry: Mapping[str, Any] | None) -> str:
@@ -86,17 +96,28 @@ class DetectionBackend:
         gold_map = dict(gold_map or {})
 
         def one(case_id: str) -> dict[str, Any]:
-            record = load_record(dataset_root, case_id)
-            gold = (
-                gold_map.get(case_id)
-                if case_id in gold_map
-                else gold_map.get(case_id.replace("/", "__"))
-            )
-            if gold is None and case_id not in gold_map and case_id.replace("/", "__") not in gold_map:
-                gold = None
-            result = self.run_case(
-                record, case_id=case_id, registry=registry, gold=gold,
-            )
+            gold = gold_map.get(case_id, gold_map.get(case_id.replace("/", "__")))
+            try:
+                record = load_record(dataset_root, case_id)
+                result = self.run_case(
+                    record, case_id=case_id, registry=registry, gold=gold,
+                )
+            except Exception as exc:
+                result = {
+                    "schema_version": "detector_v2.detection_result.v1",
+                    "case_id": case_id,
+                    "state": "unresolved",
+                    "decision_authority": "invalid",
+                    "runtime_valid": False,
+                    "authority_failure_reasons": [{
+                        "component": "backend",
+                        "code": "case_evaluation_exception",
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    }],
+                    "stage_status": {},
+                    "proof": {"deployment": {}, "state": "unresolved"},
+                }
             return {
                 "case": case_id,
                 "gold": gold,
@@ -475,6 +496,7 @@ class CachedRunBackend(DetectionBackend):
             + _fingerprint({
                 "run_root": str(Path(run_root).resolve()),
                 "detector_config": _file_digest(config.get("detector_config")),
+                "source": _source_digest(),
                 "cases": sorted(self.case_ids),
                 "baseline_results": self.results,
             })
@@ -541,14 +563,18 @@ class CachingBackend(DetectionBackend):
     ) -> dict[str, Any]:
         path = self._path(case_id, registry, record)
         if path.exists():
-            result = json.loads(path.read_text(encoding="utf-8-sig"))
-            # Keep the real backend's frozen-judge baseline in sync with the
-            # cached baseline arm, otherwise paired replay would compare the
-            # candidate against a different judge roll.
-            base_results = getattr(self.backend, "_base_results", None)
-            if isinstance(base_results, dict) and not registry:
-                base_results[str(case_id)] = dict(result)
-            return result
+            try:
+                result = json.loads(path.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError):
+                result = None
+            if result is not None:
+                # Keep the real backend's frozen-judge baseline in sync with the
+                # cached baseline arm, otherwise paired replay would compare the
+                # candidate against a different judge roll.
+                base_results = getattr(self.backend, "_base_results", None)
+                if isinstance(base_results, dict) and not registry:
+                    base_results[str(case_id)] = dict(result)
+                return result
         result = self.backend.run_case(
             record, case_id=case_id, registry=registry, gold=gold,
         )
@@ -582,6 +608,7 @@ def make_backend(
         namespace = "detector_v2-" + CACHE_VERSION + "-" + _fingerprint({
             "detector_config": _file_digest(config.get("detector_config")),
             "dataset_root": str(resolve_path(config["dataset_root"])),
+            "source": _source_digest(),
         })
     else:
         raise ValueError(f"unknown evolution backend {name!r}")

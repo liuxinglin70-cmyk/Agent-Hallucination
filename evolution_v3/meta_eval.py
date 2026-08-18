@@ -45,6 +45,12 @@ def _rows_from_reports(reports: Sequence[Mapping[str, Any]]) -> list[dict[str, A
             row["v2"] = (gate.get("v2") or {}).get("passed")
             row["v3"] = (gate.get("v3") or {}).get("passed")
         selection = report.get("marginal_selection") or {}
+        selected_marginals = {
+            str(item.get("intervention_id") or ""): (
+                item.get("delta") or {}
+            ).get("marginal_cases")
+            for item in selection.get("selected_attribution") or []
+        }
         for item in selection.get("reports") or []:
             candidate = item.get("candidate") or {}
             row = next(
@@ -78,6 +84,18 @@ def _rows_from_reports(reports: Sequence[Mapping[str, Any]]) -> list[dict[str, A
                 )
                 row["m_passed"] = item.get("passed")
                 row["joint_group"] = list(item.get("candidate_ids") or [])
+        for intervention_id, marginal in selected_marginals.items():
+            row = next(
+                (
+                    item for item in rows
+                    if item.get("cycle") == cycle
+                    and item.get("intervention_id") == intervention_id
+                ),
+                None,
+            )
+            if row is not None:
+                row["m_marginal_cases"] = marginal
+                row["m_attribution"] = "leave_one_out_final_configuration"
     return rows
 
 

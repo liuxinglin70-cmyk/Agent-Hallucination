@@ -54,11 +54,17 @@ def build_detection_output(
 def prediction_state(
     row: Mapping[str, Any], *, require_authoritative: bool = True,
 ) -> bool | None:
+    if str(row.get("schema_version") or "") != RESULT_SCHEMA:
+        return None
     if require_authoritative and str(
         row.get("decision_authority") or ""
     ) != "authoritative":
         return None
+    if row.get("runtime_valid") is not True:
+        return None
     state = str(row.get("state") or "")
+    if state not in VALID_STATES or row.get("occurrence_state") != state:
+        return None
     if state == "verified_error":
         return True
     if state == "verified_clean":

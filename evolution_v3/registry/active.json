@@ -52,7 +52,10 @@
       },
       "body": {
         "action": "restore_judge_conviction",
-        "action_not_when": "Do not apply when the required_action_present fact is satisfied or not_applicable."
+        "action_not_when": "Do not apply when the required_action_present fact is satisfied or not_applicable.",
+        "action_not_when_facts": [
+          "defense_verdict=substantiated"
+        ]
       },
       "claim": {
         "expected_behavior": "when a recall-upgrade positive is refuted while a required action is mechanically violated, the guard restores the conviction",
@@ -66,7 +69,7 @@
           "SmolAgents/028.json"
         ]
       },
-      "content_hash": "ded7e47fe090503401b80214ba5d50bc4d51fd8d91d00b32e5179a58f94d2e0e"
+      "content_hash": "9c328b3754b9ea972233bb44755044fe4428325f0a8fd754a4bf752967212f3c"
     },
     {
       "schema_version": "detector_v2.intervention.v1",
@@ -85,7 +88,10 @@
       },
       "body": {
         "action": "restore_judge_conviction",
-        "action_not_when": "Do not apply when the positive source is recall_upgrade and required_action_present is satisfied or not_applicable."
+        "action_not_when": "Do not apply when the positive source is recall_upgrade and required_action_present is satisfied or not_applicable.",
+        "action_not_when_facts": [
+          "defense_verdict=substantiated"
+        ]
       },
       "claim": {
         "expected_behavior": "when defense refutes a high-confidence judge conviction, the guard restores the judge conviction; symmetric with the recall-upgrade restoration guard already admitted",
@@ -99,7 +105,7 @@
           "BFCL/066.json"
         ]
       },
-      "content_hash": "b4143f9c5bed3105f00c240eff0438e8cf2ae1dfb3b68f565b5b04a3f8ab6c74"
+      "content_hash": "8b880a44fe7609156ca9206199aa998d057925a147acc94c03f3314e69096201"
     },
     {
       "schema_version": "detector_v2.intervention.v1",
@@ -152,7 +158,10 @@
       },
       "body": {
         "action": "withhold_conviction",
-        "action_not_when": "Do not apply when the judge delivered result does not mechanically match the final answer anchor."
+        "action_not_when": "Do not apply when the judge delivered result does not mechanically match the final answer anchor.",
+        "action_not_when_facts": [
+          "delivered_anchor_consistency=inconsistent"
+        ]
       },
       "claim": {
         "expected_behavior": "when a recall-upgrade positive is substantiated but the judge delivered result mechanically matches the final answer anchor, the guard withholds the conviction",
@@ -166,8 +175,8 @@
           "BFCL/113.json"
         ]
       },
-      "content_hash": "b9d825d480782bcd72587cb7fb7ff9fe7b00b6a49943b17405932bb90e8f8b84"
+      "content_hash": "44bb2532e943489e71b3d16e8ee7137d94be037931ab42cd416f1f248f09e427"
     }
   ],
-  "content_hash": "034c5338fd73d34699504f95cb0bc729f35930f44a16b271e3715f5a433a7d89"
+  "content_hash": "1be2a68cb00637ea1d706176d1f777b4b91c1fd890cb4578a8c6eeae40439639"
 }

@@ -41,6 +41,12 @@ class ActiveRegistry:
         self._entries = self._load_entries()
         self._state = self._load_state()
         self._lock = threading.RLock()
+        expected_hash = str(self._state.get("active_hash") or "")
+        if expected_hash and expected_hash != self.registry_hash:
+            raise RuntimeError(
+                "registry active/state mismatch: "
+                f"active={self.registry_hash}, state={expected_hash}"
+            )
         if not self.active_path.exists():
             self._atomic_write(self.active_path, empty_registry())
 
@@ -166,6 +172,7 @@ class ActiveRegistry:
             self._atomic_write(self.active_path, payload)
             self._entries = [dict(entry) for entry in entries]
             self._state["cycle"] = int(cycle)
+            self._state["active_hash"] = str(payload.get("content_hash") or "")
             self._state.setdefault("snapshots", []).append({
                 "cycle": int(cycle),
                 "file": snapshot_name,
@@ -271,11 +278,35 @@ class ActiveRegistry:
         self._entries = validate_registry(
             payload, require_executable_bounds=True,
         )
+        target_cycle = int(target.get("cycle") or 0)
+        target_ids = {
+            str(entry.get("intervention_id") or "") for entry in self._entries
+        }
+        interventions = self._state.setdefault("interventions", {})
+        for intervention_id in list(interventions):
+            info = interventions[intervention_id]
+            if intervention_id not in target_ids:
+                # Preserve audit history, but prevent retired/removed entries
+                # from influencing future governance after rollback.
+                info["rolled_back_out"] = True
+                continue
+            info["marginal_history"] = [
+                item for item in info.get("marginal_history") or []
+                if int(item.get("cycle") or 0) <= target_cycle
+            ]
+            info.pop("retired_cycle", None)
+            info.pop("rolled_back_out", None)
+        self._state["net_contribution_history"] = [
+            item for item in self._state.get("net_contribution_history") or []
+            if int(item.get("cycle") or 0) <= target_cycle
+        ]
+        self._state["cycle"] = target_cycle
         self._state["rolled_back_to"] = {
             "cycle": int(cycle),
             "snapshot": str(target.get("file") or ""),
             "hash": str(payload.get("content_hash") or ""),
         }
+        self._state["active_hash"] = str(payload.get("content_hash") or "")
         self._save_state()
         return payload
 
@@ -288,6 +319,7 @@ class ActiveRegistry:
         self._entries = []
         self._state = {
             "cycle": 0,
+            "active_hash": str(payload.get("content_hash") or ""),
             "net_contribution_history": [],
             "interventions": {},
             "snapshots": [],

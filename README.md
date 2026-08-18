@@ -9,25 +9,30 @@
   skill 贡献淘汰、evaluation / meta-evaluation、M0-M5 里程碑。
 - **[detector_v2/README.md](detector_v2/README.md)** —— 当前检测器（冻结基座）的使用与结构说明。
 - **[evolution_v3/README.md](evolution_v3/README.md)** —— 干预式自进化框架的实现与实验说明。
+- **[SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md](SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md)**
+  —— 2026-08-19 系统审查结论、修复清单、实验阻断条件和真实验证协议。
 - **[evolution_v3/experiments/tuning100_validation50_experiment_report.md](evolution_v3/experiments/tuning100_validation50_experiment_report.md)**
-  —— **100 例自进化集 + 50 例验证集完整实验记录（当前阶段结论的真源）**。
+  —— 历史 100+50 实验记录，仅作探索性机制证据，不是独立泛化结论。
 - **[Recursive 与 AI4AI 前沿进展调研.pdf](Recursive%20%E4%B8%8E%20AI4AI%20%E5%89%8D%E6%B2%BF%E8%BF%9B%E5%B1%95%E8%B0%83%E7%A0%94.pdf)** —— RSI / AI4AI 调研（V3 设计的理论输入）。
 
-## 当前状态（2026-08-17）
+## 当前状态（2026-08-19）
 
 - 检测器：`detector_v2`（Outcome Judge → Recall Scanner → Causal Upgrade →
   Step Tracer → Defense → 确定性裁决）。
 - 检测器基线：`runs_v2/v2_100_20w`（100 例，20 并发）已冻结；20 例 pilot 与
   80 例补充实验均已出结果。
 - 自进化框架：`evolution_v3` 已实现 V1→V2→V3→M 四门、defect-injection audit、
-  frozen-stage 配对重放、hash-chained ledger、pre-commit registry。
-- 当前部署 registry：`evolution_v3/registry/active.json`，共 5 条干预
-  （`IV-1-001/002` + `IV-2-001/002/003`），全部通过 V1/V2/V3/M 且无新增错误。
-- 100+50 实验结论：100 例 G 集 22→25 correct；50 例验证集 **78%→84%（+6pp）**、
-  FP 4→3、macro-F1 .7792→.8397、`new_fn=0/new_fp=0`。详见上面的完整实验记录。
+  frozen-stage 配对重放、hash-chained ledger、pre-commit registry、rollback 状态恢复、
+  source-bound cache 和 run manifest。
+- 历史 active registry：`evolution_v3/registry/active.json`，共 5 条干预，可按当前
+  executable contract 加载；默认 runtime registry 仍为空。
+- 历史 100+50 结果只能作为探索性机制证据：数据被用于开发/重复调优，active
+  验证臂主要是 frozen replay，不能证明独立外部泛化提升。
+- 全量测试当前为 `191 passed`；正式 393/300 split 因已知历史污染会被代码阻断。
 - LLM provider：默认已切换为 **AutoDL**（`https://www.autodl.art/api/v1`，
   `AUTODL_API_KEY`）；官方 DeepSeek 配置保留为显式回滚路径。
-- 冻结 300 例终审（`final_verification`）尚未读取，保持 read-once。
+- 原计划冻结 300 例终审尚未读取，但已发现与 tuning100 重叠 44 例，因此不能
+  继续作为干净确认集，必须重建 holdout。
 - 旧框架 `sehd_rise2/` 已冻结，不再作为进化方向；其历史设计与证据归档在
   `archive/legacy_docs/`，仅作追溯，不作为当前工作依据。
 

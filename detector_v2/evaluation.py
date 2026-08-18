@@ -85,8 +85,12 @@ def evaluate_run(
         label = gold.get("is_hallucination")
         if isinstance(label, bool):
             gold_bool = label
+        elif label is None:
+            raise ValueError(f"missing is_hallucination label for {case_id}")
+        elif isinstance(label, str) and label.strip().lower() in {"true", "false"}:
+            gold_bool = label.strip().lower() == "true"
         else:
-            gold_bool = str(label).strip().lower() == "true"
+            raise ValueError(f"invalid is_hallucination label for {case_id}: {label!r}")
         if not result_path.exists():
             missing_cases.append(case_id)
             rows.append({

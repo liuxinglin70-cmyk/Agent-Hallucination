@@ -24,7 +24,13 @@ def bool_gold(value: Any) -> bool | None:
         return value
     if value is None:
         return None
-    return str(value).strip().lower() == "true"
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+    raise ValueError(f"invalid is_hallucination label: {value!r}")
 
 
 def load_gold(dataset_root: str | Path, case_id: str) -> bool | None:
@@ -111,7 +117,12 @@ class FinalHoldout:
         self.reads = 0
         self.read_reasons: list[str] = []
 
-    def read(self, reason: str = "final_verification") -> list[dict[str, Any]]:
+    def read(
+        self,
+        reason: str = "final_verification",
+        *,
+        commit: bool = True,
+    ) -> list[dict[str, Any]]:
         if self.marker_path is not None and self.marker_path.exists():
             previous = {}
             try:
@@ -125,32 +136,41 @@ class FinalHoldout:
                 f"exists at {self.marker_path} "
                 f"(previous_read={previous.get('reason')})"
             )
-        self.reads += 1
-        self.read_reasons.append(reason)
-        if self.reads > 1:
+        if self.reads > 0:
             raise RuntimeError(
                 "final verification read-once violation: "
                 f"reads={self.reads}, reasons={self.read_reasons}"
             )
+        if commit:
+            self.commit(reason)
+        return [dict(item) for item in self.cases]
+
+    def commit(self, reason: str = "final_verification") -> None:
+        """Persist the read-once marker after a successful evaluation."""
+        if self.reads > 0:
+            raise RuntimeError("final verification has already been committed")
+        if self.marker_path is not None and self.marker_path.exists():
+            raise RuntimeError(
+                "final verification read-once violation: marker already exists "
+                f"at {self.marker_path}"
+            )
+        case_ids = sorted(str(item.get("case_id") or "") for item in self.cases)
+        marker_payload = {
+            "reason": reason,
+            "reads": 1,
+            "case_ids_hash": hashlib.sha256(
+                "\n".join(case_ids).encode("utf-8")
+            ).hexdigest(),
+            "n_cases": len(self.cases),
+        }
         if self.marker_path is not None:
             self.marker_path.parent.mkdir(parents=True, exist_ok=True)
-            case_ids = sorted(str(item.get("case_id") or "") for item in self.cases)
             self.marker_path.write_text(
-                json.dumps(
-                    {
-                        "reason": reason,
-                        "reads": self.reads,
-                        "case_ids_hash": hashlib.sha256(
-                            "\n".join(case_ids).encode("utf-8")
-                        ).hexdigest(),
-                        "n_cases": len(self.cases),
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ) + "\n",
+                json.dumps(marker_payload, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
-        return [dict(item) for item in self.cases]
+        self.reads = 1
+        self.read_reasons.append(reason)
 
 
 def _mini_pool(manifest: Mapping[str, Any], size: int) -> list[str]:
@@ -210,6 +230,25 @@ def build_split(
             raise ValueError(
                 f"evolution pool overlaps final verification: {overlap[:5]}"
             )
+        historical_overlap: dict[str, list[str]] = {}
+        for configured in config.get("historical_development_manifests") or ():
+            path = Path(str(configured))
+            if not path.exists():
+                continue
+            historical = load_json(path)
+            touched = sorted(
+                set(map(str, historical.get("cases") or ())) & set(final_ids)
+            )
+            if touched:
+                historical_overlap[str(path)] = touched
+        if historical_overlap:
+            preview = {
+                key: values[:5] for key, values in historical_overlap.items()
+            }
+            raise ValueError(
+                "final verification overlaps historical development cases: "
+                f"{preview}"
+            )
 
     gold = {
         case: load_gold(dataset_root, case)
@@ -218,6 +257,11 @@ def build_split(
     positives = [case for case in pool if gold.get(case) is True]
     negatives = [case for case in pool if gold.get(case) is False]
     unknown = [case for case in pool if gold.get(case) is None]
+    if unknown:
+        raise ValueError(
+            "evolution manifest contains missing/unknown gold labels: "
+            f"{unknown[:5]}"
+        )
     sentinel_pos = _quota_sample(
         positives,
         int(split_cfg.get("sentinel_positives", 10)),

@@ -19,14 +19,24 @@ def confusion_rows(
     *,
     case_key: str = "case",
 ) -> list[dict[str, Any]]:
-    base = {
-        str(row[case_key]): row
-        for row in baseline_rows
-        if row.get("gold") is not None
-    }
+    base: dict[str, Mapping[str, Any]] = {}
+    for row in baseline_rows:
+        case = str(row.get(case_key) or "")
+        if not case:
+            raise ValueError("paired metrics received a row without a case id")
+        if case in base:
+            raise ValueError(f"duplicate baseline case in paired metrics: {case}")
+        if row.get("gold") is not None:
+            base[case] = row
+    active_seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     for active in active_rows:
         case = str(active.get(case_key) or "")
+        if not case:
+            raise ValueError("paired metrics received a row without a case id")
+        if case in active_seen:
+            raise ValueError(f"duplicate active case in paired metrics: {case}")
+        active_seen.add(case)
         if case not in base:
             continue
         baseline = base[case]
@@ -40,6 +50,12 @@ def confusion_rows(
             "baseline_state": baseline.get("state"),
             "active_state": active.get("state"),
         })
+    missing = sorted(set(base) - active_seen)
+    if missing:
+        raise ValueError(
+            "paired metrics missing active rows for case(s): "
+            f"{missing[:5]}"
+        )
     return rows
 
 

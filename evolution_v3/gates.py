@@ -698,11 +698,49 @@ def marginal_selection(
                 f"{joint_report.get('reason') or 'joint M passed'}; "
                 f"not selected: remaining budget {budget} < {len(entries)}"
             )
+    # Attribute the committed combination from the same final configuration.
+    # The pre-selection report is relative to the old active registry and is
+    # not a valid per-member contribution when candidates interact.
+    selected_attribution: list[dict[str, Any]] = []
+    if selected_entries:
+        full_registry = make_registry([*active_entries, *selected_entries])
+        full_fresh = any(
+            str(entry.get("hook") or "") in UNFREEZING_HOOKS
+            for entry in selected_entries
+        )
+        full_evaluate = backend.evaluate_fresh if full_fresh else backend.evaluate
+        full_rows = full_evaluate(
+            list(gain_cases),
+            dataset_root=dataset_root,
+            registry=full_registry,
+            gold_map=gold_map,
+            workers=workers,
+        )
+        for candidate in selected_entries:
+            candidate_id = str(candidate.get("intervention_id") or "")
+            without_entries = [
+                entry for entry in selected_entries
+                if str(entry.get("intervention_id") or "") != candidate_id
+            ]
+            without_registry = make_registry([*active_entries, *without_entries])
+            without_rows = full_evaluate(
+                list(gain_cases),
+                dataset_root=dataset_root,
+                registry=without_registry,
+                gold_map=gold_map,
+                workers=workers,
+            )
+            selected_attribution.append({
+                "intervention_id": candidate_id,
+                "delta": paired_delta(without_rows, full_rows),
+                "attribution": "leave_one_out_final_configuration",
+            })
     return {
         "reports": reports,
         "joint_reports": joint_reports,
         "selected": selected_entries,
         "removed_redundant": removed,
+        "selected_attribution": selected_attribution,
     }
 
 

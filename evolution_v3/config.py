@@ -27,6 +27,10 @@ DEFAULTS: dict[str, Any] = {
     "work_root": "evolution_v3/work",
     "registry_dir": "evolution_v3/work/runtime_registry",
     "ledger_path": "evolution_v3/work/runtime_ledger.jsonl",
+    "historical_development_manifests": [
+        "datasets/eval_splits/evolution_v3_tuning100.json",
+        "datasets/eval_splits/evolution_v3_validation50.json",
+    ],
     "cycles": 3,
     "split": {
         "seed": 20260817,
@@ -120,6 +124,10 @@ def load_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
         "mini_split_manifest", "work_root", "registry_dir", "ledger_path",
     ):
         merged[key] = str(resolve_path(merged[key]))
+    merged["historical_development_manifests"] = [
+        str(resolve_path(item))
+        for item in merged.get("historical_development_manifests") or ()
+    ]
     merged["config_path"] = str(config_path)
     return merged
 

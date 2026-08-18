@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import os
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -28,10 +31,24 @@ def safe_case_id(case_id: str) -> str:
 
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    fd, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent),
     )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _fingerprint(value: Any) -> str:
+    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _is_transport_unresolved(result: Mapping[str, Any]) -> bool:
@@ -102,16 +119,51 @@ def run_batch(
     workers: int = 8,
 ) -> dict[str, Any]:
     """Run *cases* concurrently; skip cases whose result already exists."""
+    if len(cases) != len(set(map(str, cases))):
+        raise ValueError("batch cases must be unique")
+    normalized_paths = {}
+    for case_id in cases:
+        safe = safe_case_id(case_id)
+        previous = normalized_paths.setdefault(safe, str(case_id))
+        if previous != str(case_id):
+            raise ValueError(
+                f"case ids collide in result path {safe!r}: {previous!r} and {case_id!r}"
+            )
     config = config or load_config()
     detector = Detector(config)
     run_id = run_id or new_run_id()
     case_root = Path(runs_root) / run_id / "cases"
+    run_manifest = {
+        "schema_version": "detector_v2.run_manifest.v1",
+        "run_id": run_id,
+        "cases": list(cases),
+        "config_hash": _fingerprint(config),
+        "artifacts_hash": _fingerprint(artifacts) if artifacts is not None else None,
+        "interventions_hash": (
+            str(interventions.get("content_hash") or _fingerprint(interventions))
+            if interventions is not None else None
+        ),
+    }
+    manifest_path = Path(runs_root) / run_id / "run.json"
+    if manifest_path.exists():
+        previous = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        if previous != run_manifest:
+            raise ValueError(
+                f"run {run_id!r} already exists with a different manifest"
+            )
+    else:
+        _write_json(manifest_path, run_manifest)
     summaries: list[dict[str, Any]] = []
 
     def run(case_id: str) -> dict[str, Any]:
         out_path = case_root / safe_case_id(case_id) / "result.json"
         if out_path.exists():
             result = json.loads(out_path.read_text(encoding="utf-8-sig"))
+            if str(result.get("case_id") or "") != str(case_id):
+                raise ValueError(
+                    f"cached result at {out_path} belongs to "
+                    f"{result.get('case_id')!r}, not {case_id!r}"
+                )
             summaries.append(result)
             return result
         record, _gold = load_case(dataset_root, case_id)

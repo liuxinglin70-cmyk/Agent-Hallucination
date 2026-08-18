@@ -242,6 +242,63 @@ def test_joint_l1_l2_candidates_are_only_admitted_together(tmp_path):
     assert {c["intervention_id"] for c in selection["selected"]} == {
         "IV-L1", "IV-L2"
     }
+    attribution = {
+        item["intervention_id"]: item["delta"]["marginal_cases"]
+        for item in selection["selected_attribution"]
+    }
+    assert attribution == {"IV-L1": 1, "IV-L2": 1}
+
+
+def test_joint_attribution_does_not_copy_joint_gain_to_members(tmp_path):
+    cases = _make_dataset(tmp_path / "data", n=4)
+    config = _config(tmp_path)
+    gain_cases = cases[:2]
+    gold_map = {gain_cases[0]: True, gain_cases[1]: False}
+    l1 = make_intervention(
+        intervention_id="IV-A", intervention_type="text_boundary",
+        hook="scanner.system", packet_features=["has_tool_calls"],
+        body={"directive": "Find missing actions.", "not_when": "Never when complete."},
+        expected_behavior="first half", target_polarity="recall", cycle=1,
+        failure_family="FAM-fn", failure_cases=cases[:2],
+    )
+    l2 = make_intervention(
+        intervention_id="IV-B", intervention_type="text_boundary",
+        hook="judge.system", packet_features=["has_tool_calls"],
+        body={"directive": "Check the result.", "not_when": "Never when correct."},
+        expected_behavior="second half", target_polarity="recall", cycle=1,
+        failure_family="FAM-fn", failure_cases=cases[:2],
+    )
+
+    class _SynergyBackend(MockDetectorBackend):
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            active = {
+                str(item.get("intervention_id") or "")
+                for item in (registry or {}).get("interventions") or ()
+            }
+            effective_gold = gold
+            if case_id == gain_cases[0] and active != {"IV-A", "IV-B"}:
+                effective_gold = False
+            return super().run_case(
+                record, case_id=case_id, registry=registry, gold=effective_gold,
+            )
+
+    backend = _SynergyBackend()
+    active_rows = backend.evaluate(
+        gain_cases, dataset_root=config["dataset_root"],
+        registry=empty_registry(), gold_map=gold_map,
+    )
+    selection = marginal_selection(
+        [l1, l2], active_entries=[], backend=backend,
+        dataset_root=config["dataset_root"], gain_cases=gain_cases,
+        active_rows=active_rows, config=config, gold_map=gold_map,
+        max_admits=2, joint_groups=[["IV-A", "IV-B"]],
+    )
+    assert selection["joint_reports"][0]["delta"]["marginal_cases"] == 1
+    attribution = {
+        item["intervention_id"]: item["delta"]["marginal_cases"]
+        for item in selection["selected_attribution"]
+    }
+    assert attribution == {"IV-A": 1, "IV-B": 1}
 
 
 def test_final_verification_is_read_once_and_writes_report(tmp_path):
@@ -262,6 +319,9 @@ def test_final_verification_is_read_once_and_writes_report(tmp_path):
     )
     backend = MockDetectorBackend()
     engine = EvolutionEngine(config, backend=backend, split=split, mini=False)
+    engine.registry.write(
+        [_scanner_candidate()], cycle=1, reason="final test active registry",
+    )
     report = engine.run_final()
     assert report["final_cases"] == 6
     assert report["verdict"]["unresolved_not_increased"] is True

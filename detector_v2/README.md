@@ -161,8 +161,9 @@ DETECTOR_V2_TRANSPORT_RETRIES
   - `frozen_judge={"judge_result": ..., "judge_status": ...}`：冻结 Judge，
     供不触碰 `judge.system` 的候选做配对重放；
   - `frozen_stages`：进一步冻结 recall / upgrade / tracer / defense 的基线
-    阶段输出，只有被干预 hook 覆盖的阶段重新执行。registry 含
-    `judge.system` 时拒绝冻结 Judge（fail-closed）。
+    阶段输出，只有被干预 hook 覆盖的阶段重新执行。公共 API 会拒绝冻结与当前
+    intervention 冲突的阶段；registry 含 `judge.system` 时拒绝冻结 Judge
+    （fail-closed）。
 - 干预执行器、事实词表、guard 动作与落盘格式见
   `detector_v2/INTERVENTIONS.md`。
 
@@ -174,8 +175,9 @@ DETECTOR_V2_TRANSPORT_RETRIES
   `experiments/v2_100_report.md`。
 - 自进化 100+50 完整实验记录（cycle 1/2、五条准入干预、50 例验证结果）：
   `../evolution_v3/experiments/tuning100_validation50_experiment_report.md`。
-- 20 例 / 100 例是开发读数；冻结 300 例 `final_verification` 仍未读取，
-  正式终审保持 read-once。
+- 20 例 / 100 例是开发读数；原计划冻结 300 例 `final_verification` 虽未读取，
+  但与历史 tuning100 重叠 44 例，不能再作为干净确认集。正式实验必须重建
+  holdout，详见 `../SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`。
 
 ## 测试
 

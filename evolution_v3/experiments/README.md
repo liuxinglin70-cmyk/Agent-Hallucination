@@ -17,7 +17,7 @@ python -m evolution_v3 smoke
   - V1/V2/V3/M 全过，边际 +2 例，pre-commit 写入隔离 registry；
   - case-id 泄漏缺陷被 V1 拒，零边际噪声缺陷被 M 拒，audit passed。
 
-### E3：100 例自进化 + 50 例验证（已运行，当前结论真源）
+### E3：100 例自进化 + 50 例历史探索性验证（已运行）
 
 完整记录：**[tuning100_validation50_experiment_report.md](tuning100_validation50_experiment_report.md)**。
 
@@ -33,18 +33,20 @@ python evolution_v3/experiments/run_tuning100.py validate
 `evolution_v3/work/valruns/evo3_val_base`。两 cycle 准入 5 条干预；
 100 例 G 22→25 correct；50 例 78%→84%（+6pp），FP 4→3，
 `new_fn=0/new_fp=0`。调优与 active 验证臂均为缓存/frozen replay，
-0 新增 LLM token。
+0 新增 LLM token。该结果不是独立外部泛化证据：tuning100 与原计划
+final300 重叠 44 例，且历史参数被重复用于开发和选择。
 
-### E2：正式 393/300 协议（需要 AUTODL_API_KEY 或 detector_v2 配置）
+### E2：正式实验协议（旧 393/300 已阻断，必须先重建 holdout）
 
 ```bash
-python -m evolution_v3 experiment --cycles 3 --backend detector_v2
-python -m evolution_v3 final
-python -m evolution_v3 meta
+python -m evolution_v3 experiment --cycles 3 --backend detector_v2 --config path/to/real_eval_v2.json
+python -m evolution_v3 final --config path/to/real_eval_v2.json
+python -m evolution_v3 meta --config path/to/real_eval_v2.json
 ```
 
-预算（每个 cycle 上限）以 `evolution_v3/configs/framework.json` 为准，与设计
-文档 §7.2 对齐；`--backend detector_v2` 会在 `evolution_v3/work/cache/` 缓存
+预算（每个 cycle 上限）以新实验配置为准；旧 formal split 与历史 development
+资产重叠时会被 `build_split()` 主动拒绝。`--backend detector_v2` 会在
+`evolution_v3/work/cache/` 缓存
 每个 registry-hash × case 的结果，重复跑不会重复调用 LLM。
 
 配对执行控制：非 `judge.system` 候选会复用同案例空库的 frozen judge；在
@@ -79,3 +81,7 @@ evolution_v3/registry/snapshots/     # 每次写入的不可变快照
 4. step localization 不下降。
 
 不通过时结论为“当前自进化框架无效”，回退检测器修复路线。
+
+旧 393/300 终审不得直接运行。必须先完成新的 clean holdout、fresh baseline/active
+双臂、registry hash 冻结和完整产物归档。详见根目录
+`SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`。

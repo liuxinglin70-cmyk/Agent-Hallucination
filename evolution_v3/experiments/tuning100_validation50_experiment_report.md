@@ -4,7 +4,11 @@
 > 日期：2026-08-17
 > 范围：`runs_v2/v2_100_20w`（100 例冻结基线）与
 > `evolution_v3/work/valruns/evo3_val_base`（50 例冻结基线）
-> 结论位置：本文件是当前阶段实验结论的真源；`evolution_v3/work/` 内的
+> 历史记录说明：本文件保留 2026-08-17 的探索性实验结果，不再是当前实验
+> 结论真源。2026-08-19 系统审查确认 tuning100 与原 final300 重叠 44 例，
+> active 验证臂主要是 frozen-stage replay，因此不能作为独立外部泛化证据。
+> 当前结论与真实实验协议见
+> `SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`。`evolution_v3/work/` 内的
 > JSON 报告是本文件的机器可读证据。
 
 ---

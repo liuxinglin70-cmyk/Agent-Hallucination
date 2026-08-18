@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evolution_v3.backends import DetectorV2Backend
+from evolution_v3.backends import DetectionBackend, DetectorV2Backend
 from evolution_v3.contracts import make_intervention, make_registry
 
 
@@ -104,3 +104,25 @@ def test_detector_v2_backend_does_not_freeze_when_judge_hook_active():
         record, case_id="case", registry=make_registry([judge_candidate]),
     )
     assert backend.detector.calls[-1]["frozen_judge"] is None
+
+
+def test_backend_isolates_single_case_exception(tmp_path):
+    case = tmp_path / "A" / "001.json"
+    case.parent.mkdir(parents=True)
+    case.write_text(
+        '{"question":"q","history":[],"is_hallucination":true}',
+        encoding="utf-8",
+    )
+
+    class _Broken(DetectionBackend):
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            raise RuntimeError("boom")
+
+    rows = _Broken().evaluate(
+        ["A/001.json"], dataset_root=tmp_path,
+        gold_map={"A/001.json": True},
+    )
+    assert rows[0]["prediction"] is None
+    assert rows[0]["result"]["authority_failure_reasons"][0]["code"] == (
+        "case_evaluation_exception"
+    )

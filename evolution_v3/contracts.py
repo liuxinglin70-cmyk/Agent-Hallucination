@@ -8,7 +8,9 @@ it. The evolution package only adds V1-facing text/claim helpers.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -70,7 +72,10 @@ def make_intervention(
         },
     }
     if intervention_type == "decision_guard":
-        payload["body"].setdefault("action_not_when_facts", [])
+        if "action_not_when_facts" not in payload["body"]:
+            payload["body"]["action_not_when_facts"] = [
+                "defense_view_degraded=true"
+            ]
     validate_intervention(payload, require_executable_bounds=True)
     payload["content_hash"] = intervention_content_hash(payload)
     return payload
@@ -175,10 +180,19 @@ def load_json(path: str | Path) -> Any:
 def save_json(path: str | Path, payload: Any) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    fd, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent),
     )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 __all__ = [

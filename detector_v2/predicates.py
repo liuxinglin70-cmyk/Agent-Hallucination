@@ -289,6 +289,12 @@ def predicate_required_action_present(
             "verdict": "violated",
             "detail": f"required actions missing from tool calls: {missing}",
         }
+    if not required and contracts:
+        return {
+            "predicate": "required_action_present",
+            "verdict": "not_applicable",
+            "detail": "required_action contract is not covered by a mechanical parser",
+        }
     if not required and not contracts:
         return {
             "predicate": "required_action_present",
@@ -424,7 +430,8 @@ def predicate_delivered_anchor_consistency(
             "detail": "no mechanical delivery anchors in packet",
         }
     consistent = any(
-        delivered in anchor or (len(delivered) >= 6 and anchor in delivered)
+        delivered == anchor
+        or (len(delivered) >= 6 and anchor in delivered)
         for anchor in anchors
     )
     if consistent:

@@ -32,6 +32,9 @@ V1→V2→V3→M 四道 gold 评审。LLM 永远不做晋升评分。
 | M3 L1+L2 联合候选（各自过 V1-V3，只按联合配置过 M） | `evolution_v3/proposer.py`、`evolution_v3/gates.py::marginal_selection` |
 | Meta-Evaluation | `evolution_v3/meta_eval.py` |
 | 393/300 数据布局与 read-once 终审 | `evolution_v3/splits.py`、`evolution_v3/engine.py::run_final` |
+| 联合最终配置 leave-one-out 归因 | `evolution_v3/gates.py::marginal_selection` |
+| rollback 状态恢复、active/state hash 校验 | `evolution_v3/registry.py` |
+| formal split 历史污染阻断 | `evolution_v3/splits.py` |
 
 ## 2. 目录结构
 
@@ -65,7 +68,7 @@ detector_v2 运行结果    ──回传──>  proof.deployment / proof.eviden
 ## 3. 快速验证（不消耗 LLM 预算）
 
 ```bash
-# 单元/集成/回归测试全绿（当前 176 个）
+# 单元/集成/回归测试全绿（当前 191 个）
 python -m pytest detector_v2/tests evolution_v3/tests tests -q
 
 # 离线完整 cycle：玩具检测器注入 2 个稳定 FN 失败族，
@@ -104,7 +107,7 @@ python -m evolution_v3 smoke
    允许把 100 例中只出现一次的清晰机制族作为 pre-commit 联合单元提交，
    避免巡逻切分恰好吃掉第二例导致空进化。
 
-### 3.2 已执行的 100+50 mini 实验
+### 3.2 历史 100+50 探索性实验
 
 当前阶段实验用冻结的 `runs_v2/v2_100_20w`（100 例调优）与
 `evolution_v3/work/valruns/evo3_val_base`（50 例验证基线），不新增数据集：
@@ -117,17 +120,22 @@ python evolution_v3/experiments/run_tuning100.py cycle \
 python evolution_v3/experiments/run_tuning100.py validate
 ```
 
-结果与完整证据索引：
+结果与完整历史记录：
 **`experiments/tuning100_validation50_experiment_report.md`**。
 
-摘要：5 条干预通过 V1/V2/V3/M 并写入
+历史摘要：5 条干预通过当时的 V1/V2/V3/M 并写入
 `evolution_v3/registry/active.json`；100 例 G 集 22→25 correct；50 例验证集
 78%→84%（+6pp），FP 4→3，`new_fn=0/new_fp=0`。
 
-## 4. 正式实验协议（393/300，尚未执行）
+这些结果不能作为确认性泛化证据：tuning100 与原计划 final300 重叠 44 例，
+50 例 active 臂主要是 frozen-stage replay，且历史参数被重复用于开发和选择。
+当前审查结论与新实验协议见根目录
+`SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`。
+
+## 4. 正式实验协议（旧 393/300 已阻断，必须重建 holdout）
 
 ```bash
-# 0. 检查数据与门状态（终审 300 仍为 read-once）
+# 0. 检查数据与门状态；历史污染会被主动阻断
 python -m evolution_v3 init
 # 0.5 预算前预演：只巡逻 + 提案，看候选数量与失败族诊断
 python -m evolution_v3 preview --cycle 1 --backend detector_v2
@@ -135,7 +143,7 @@ python -m evolution_v3 preview --cycle 1 --backend detector_v2
 # 1. M2：跑一个完整 cycle（无候选收入也是有效结果）
 python -m evolution_v3 cycle --cycle 1 --backend detector_v2
 
-# 2. M4：3 个 cycle 后，恰读一次终审 300（再次读取会报 read-once violation）
+# 2. 只有新建干净 holdout、冻结 active registry 并完成 fresh 双臂后才允许 final
 python -m evolution_v3 experiment --cycles 3 --backend detector_v2
 python -m evolution_v3 final
 
@@ -166,7 +174,8 @@ python -m evolution_v3 verify-ledger
   `deterministic`，没有 executor 的 runner 在加载时 fail-closed。
 - `decision_guard` 动作闭词表：
   `withhold_conviction` / `restore_judge_conviction` /
-  `require_full_view_defense`；多 guard 动作冲突时全部失效并回退 baseline，
+  `require_full_view_defense` / `convict_mechanical_violation`；每条 guard
+  必须提供非空 `action_not_when_facts`；多 guard 动作冲突时全部失效并回退 baseline，
   `proof.deployment.policy_conflict=true`。
 - `text_boundary` 必须同时有 `directive` 和 `not_when` 双边界。
 
@@ -179,9 +188,9 @@ python -m evolution_v3 verify-ledger
   （pool 去重后 50 例，基线 `evolution_v3/work/valruns/evo3_val_base`）。
 - 正式协议：SENTINEL 20 例（gold 正负各 10，source 分层）→ V2；
   G 80 例 → M 边际增益；P 其余 293 例中每 cycle 随机抽 120 例巡逻。
-- 终审：300 例，`FinalHoldout` 强制 read-once；M4 前零读取（当前仍未读取）。
-- 已知污染：100 例 tuning 集与 `final_verification` 有 44 例重叠；正式终审
-  必须改用剩余 256 例或重建全新冻结终审集。
+- 原计划终审：300 例，`FinalHoldout` 强制 read-once；当前未读取但已污染。
+- 已知污染：100 例 tuning 集与 `final_verification` 有 44 例重叠；不能继续
+  宣称 final300 是干净确认集，建议重建全新冻结终审集。
 - Provider：默认 AutoDL（`detector_v2/configs/detector_v2_autodl.json`）。
 
 ## 7. 已知边界与明确不做

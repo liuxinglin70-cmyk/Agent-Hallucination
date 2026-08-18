@@ -491,3 +491,29 @@ def test_llm_proposer_rejects_duplicate_in_batch(monkeypatch):
     assert len(batch.candidates) == 1
     rejections = [note for note in batch.notes[1:]]
     assert rejections[1]["rejected"] == "duplicate_in_batch"
+
+
+def test_llm_proposer_consumes_call_budget(monkeypatch):
+    import evolution_v3.proposer as proposer
+    monkeypatch.setattr(
+        proposer,
+        "load_detector_config",
+        lambda _path: {"judge_route": {"endpoint": "https://example.test/v1", "model": "m"}},
+    )
+    calls = []
+    monkeypatch.setattr(
+        proposer,
+        "provider_call",
+        lambda **kwargs: (calls.append(kwargs) or ({"interventions": []}, {"purpose": "evolution_proposer"})),
+    )
+    instance = proposer.make_proposer({
+        "detector_config": "ignored.json", "budget": {"llm_calls": 1},
+    })
+    families = [{
+        "failure_family": "FAM-fn-test", "count": 2,
+        "failure_cases": ["A/001.json", "A/002.json"],
+    }]
+    instance.propose(families, cycle=1)
+    second = instance.propose(families, cycle=2)
+    assert len(calls) == 1
+    assert second.notes[0]["provider_called"] is False

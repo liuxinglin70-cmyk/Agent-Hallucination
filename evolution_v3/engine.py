@@ -35,6 +35,7 @@ from evolution_v3.registry import ActiveRegistry, load_active_registry
 from evolution_v3.splits import (
     EvolutionSplit,
     build_split,
+    bool_gold,
     load_gold,
     split_manifest_report,
 )
@@ -312,6 +313,8 @@ class EvolutionEngine:
         })
 
         if proposal_batch is None:
+            if hasattr(self.proposer, "active_entries"):
+                self.proposer.active_entries = self.registry.entries
             proposal_batch = self.proposer.propose(
                 diagnosed_families,
                 cycle=cycle,
@@ -319,6 +322,12 @@ class EvolutionEngine:
                     (self.config.get("budget") or {}).get("max_proposals", 3)
                 ),
             )
+        self._validate_proposal_batch(
+            proposal_batch,
+            cycle=cycle,
+            patrol_cases=patrol_cases,
+            diagnosed_families=diagnosed_families,
+        )
         proposals = list(proposal_batch.candidates)
         joint_groups = [
             [str(identifier) for identifier in group]
@@ -595,8 +604,14 @@ class EvolutionEngine:
                         None,
                     )
                 marginal = int(
-                    (row or joint_report or {}).get("delta", {}).get(
-                        "marginal_cases", 0
+                    {
+                        str(item.get("intervention_id") or ""): item
+                        for item in selection.get("selected_attribution", [])
+                    }.get(intervention_id, {}).get("delta", {}).get(
+                        "marginal_cases",
+                        (row or joint_report or {}).get("combined_delta", {}).get(
+                            "marginal_cases", 0
+                        ),
                     )
                 )
                 joint_with = (
@@ -687,6 +702,7 @@ class EvolutionEngine:
                     str(c.get("intervention_id") or "") for c in selected
                 ],
                 "removed_redundant": selection["removed_redundant"],
+                "selected_attribution": selection.get("selected_attribution", []),
                 "library_rejections": library_problems,
             },
             "active_after_cycle": [
@@ -792,9 +808,56 @@ class EvolutionEngine:
             }
         return {"triggered": False, "threshold": threshold, "history": history[-threshold:]}
 
+    def _validate_proposal_batch(
+        self,
+        batch: ProposalBatch,
+        *,
+        cycle: int,
+        patrol_cases: Sequence[str],
+        diagnosed_families: Sequence[Mapping[str, Any]],
+    ) -> None:
+        candidates = list(batch.candidates)
+        ids = [str(item.get("intervention_id") or "") for item in candidates]
+        if any(not item_id for item_id in ids) or len(ids) != len(set(ids)):
+            raise ValueError("proposal batch must contain unique non-empty ids")
+        family_cases = {
+            str(item.get("failure_family") or ""): {
+                str(case) for case in item.get("failure_cases") or ()
+            }
+            for item in diagnosed_families
+        }
+        patrol = {str(case) for case in patrol_cases}
+        for candidate in candidates:
+            provenance = candidate.get("provenance") or {}
+            if int(provenance.get("cycle", -1)) != int(cycle):
+                raise ValueError(
+                    f"proposal {candidate.get('intervention_id')} has stale cycle provenance"
+                )
+            family = str(provenance.get("failure_family") or "")
+            cases = {str(case) for case in provenance.get("failure_cases") or ()}
+            if family not in family_cases or len(cases) < 2 or not cases <= patrol:
+                raise ValueError(
+                    f"proposal {candidate.get('intervention_id')} has invalid patrol provenance"
+                )
+            if not cases <= family_cases[family]:
+                raise ValueError(
+                    f"proposal {candidate.get('intervention_id')} is outside its diagnosed family"
+                )
+        candidate_ids = set(ids)
+        grouped: set[str] = set()
+        for group in batch.joint_groups:
+            group_ids = [str(item) for item in group]
+            if len(group_ids) < 2 or len(group_ids) != len(set(group_ids)):
+                raise ValueError("joint groups need at least two unique candidates")
+            if not set(group_ids) <= candidate_ids or grouped.intersection(group_ids):
+                raise ValueError("joint groups must reference unique batch candidates")
+            grouped.update(group_ids)
+
     # ------------------------------------------------------------------
     def run_experiment(self, cycles: int | None = None) -> dict[str, Any]:
-        cycles = int(cycles or self.config.get("cycles", 3))
+        cycles = int(self.config.get("cycles", 3) if cycles is None else cycles)
+        if cycles < 0:
+            raise ValueError("cycles must be non-negative")
         for cycle in range(1, cycles + 1):
             self.run_cycle(cycle)
         return {
@@ -810,12 +873,20 @@ class EvolutionEngine:
     def run_final(self) -> dict[str, Any]:
         if self.split.final_holdout is None:
             raise RuntimeError("mini split has no read-once final verification set")
-        final_cases = self.split.final_holdout.read("final_verification")
+        if not self.registry.entries:
+            raise RuntimeError(
+                "final verification requires a non-empty active registry"
+            )
+        final_cases = self.split.final_holdout.read(
+            "final_verification", commit=False,
+        )
         case_ids = [str(item.get("case_id") or "") for item in final_cases]
         final_gold = {
-            str(item.get("case_id") or ""): bool(item.get("gold"))
+            str(item.get("case_id") or ""): bool_gold(item.get("gold"))
             for item in final_cases
         }
+        if any(value is None for value in final_gold.values()):
+            raise ValueError("final verification contains an unknown gold label")
         empty = empty_registry()
         active = self.registry.registry
         empty_rows = self.backend.evaluate(
@@ -840,6 +911,10 @@ class EvolutionEngine:
             and int(effect["unresolved_added"]) <= 0
         )
         p_value = _mcnemar_improvement_p(effect)
+        step_check = _step_localization_check(
+            self.config["dataset_root"], empty_rows, active_rows,
+        )
+        main_pass = main_pass and bool(step_check["not_regressed"])
         report = {
             "schema_version": "evolution_v3.final_verification.v1",
             "registry_hash": str(active.get("content_hash") or ""),
@@ -856,16 +931,17 @@ class EvolutionEngine:
             },
             "cross_source": source_deltas(empty_rows, active_rows),
             "verdict": {
+                "active_registry_nonempty": bool(self.registry.entries),
                 "main_criterion": "pass" if main_pass else "fail",
                 "mcnemar_one_sided_p": p_value,
-                "step_localization_not_regressed": _step_localization_check(
-                    self.config["dataset_root"], empty_rows, active_rows
-                ),
+                "step_localization_not_regressed": step_check,
                 "unresolved_not_increased": int(effect["unresolved_added"]) <= 0,
                 "overall": (
                     "pass"
                     if main_pass and p_value < 0.05
                     and int(effect["unresolved_added"]) <= 0
+                    and bool(step_check["not_regressed"])
+                    and bool(self.registry.entries)
                     else "fail"
                 ),
                 "statistical_power_note": (
@@ -881,6 +957,7 @@ class EvolutionEngine:
             ],
         }
         save_json(self.paths["final"] / "final_report.json", report)
+        self.split.final_holdout.commit("final_verification")
         self._ledger("final_verification", {
             "cycle": int(self.config.get("cycles", 3)),
             "verdict": report["verdict"],
@@ -914,7 +991,7 @@ def _step_localization_check(
     active_rows: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     base_map = {str(r.get("case") or ""): r for r in baseline_rows}
-    hit_base = hit_active = n = 0
+    hit_base = hit_active = n = errors = 0
     for row in active_rows:
         if not row.get("gold"):
             continue
@@ -944,12 +1021,13 @@ def _step_localization_check(
             ):
                 hit_base += 1
         except Exception:
-            continue
+            errors += 1
     return {
         "n": n,
+        "errors": errors,
         "baseline_hits": hit_base,
         "active_hits": hit_active,
-        "not_regressed": hit_active >= hit_base,
+        "not_regressed": bool(n > 0 and errors == 0 and hit_active >= hit_base),
     }
 
 

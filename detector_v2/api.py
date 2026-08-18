@@ -74,18 +74,60 @@ def _validate_frozen_stages(
                     "upgrades": upgrade_result.get("upgrades") or [],
                 },
                 recall_candidates,
+                packet,
             )
             if upgrades is None or missing:
                 raise ValueError(
                     f"frozen upgrade_result contract error: {error or missing}"
                 )
             upgraded = upgrade_result.get("upgraded_candidate")
-            valid_ids = {str(row.get("candidate_id") or "") for row in upgrades}
+            valid_ids = {
+                str(row.get("candidate_id") or "")
+                for row in upgrades
+                if row.get("coverage") == "answered"
+                and row.get("content_error") is True
+                and row.get("causal") is True
+            }
             if upgraded is not None:
                 if not isinstance(upgraded, Mapping) or str(
                     upgraded.get("candidate_id") or ""
                 ) not in valid_ids:
-                    raise ValueError("frozen upgraded_candidate is not a valid row")
+                    raise ValueError(
+                        "frozen upgraded_candidate is not a valid positive row"
+                    )
+                row = next(
+                    item for item in upgrades
+                    if str(item.get("candidate_id") or "")
+                    == str(upgraded.get("candidate_id") or "")
+                )
+                if int(upgraded.get("corrected_step") or 0) != int(
+                    row.get("corrected_step") or 0
+                ):
+                    raise ValueError(
+                        "frozen upgraded_candidate disagrees with upgrade row"
+                    )
+            positive_row = next(
+                (
+                    item for item in upgrades
+                    if str(item.get("candidate_id") or "") in valid_ids
+                ),
+                None,
+            )
+            if positive_row is not None:
+                candidate = next(
+                    item for item in recall_candidates
+                    if str(item.get("candidate_id") or "")
+                    == str(positive_row.get("candidate_id") or "")
+                )
+                upgrade_result["upgraded_candidate"] = {
+                    **positive_row,
+                    "locus_event_id": candidate["locus_event_id"],
+                    "evidence_refs": candidate["evidence_refs"],
+                    "claim": candidate["claim"],
+                    "quote": candidate["quote"],
+                }
+            else:
+                upgrade_result["upgraded_candidate"] = None
             upgrade_result["upgrades"] = upgrades
         normalized["upgrade_result"] = upgrade_result
         normalized["upgrade_status"] = upgrade_status
@@ -355,8 +397,9 @@ class Detector:
             )
         if frozen_judge is not None or frozen_stages is not None:
             provenance["frozen_judge_replay"] = True
+            replay_payload = frozen_stages if frozen_stages is not None else frozen_judge
             frozen_keys = [
-                key for key in (frozen_stages or frozen_judge or {})
+                key for key in (replay_payload or {})
                 if key.endswith("_result")
             ]
             provenance["frozen_stages"] = sorted(frozen_keys)

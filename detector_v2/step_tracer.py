@@ -24,7 +24,12 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
     reason = str(parsed.get("reason") or "").strip()
     if not quote or not referent or not reason:
         return None, "quote, referent and reason are required"
-    refs = [str(x) for x in parsed.get("evidence_refs") or () if str(x)]
+    refs_raw = parsed.get("evidence_refs")
+    if not isinstance(refs_raw, list) or any(
+        not isinstance(item, str) for item in refs_raw
+    ):
+        return None, "evidence_refs must be a list of strings"
+    refs = [str(x) for x in refs_raw if str(x)]
     valid_refs = {
         str(event.get("event_id") or "")
         for event in packet.get("events") or ()
@@ -39,6 +44,19 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
             )
     if not refs or any(ref not in valid_refs for ref in refs):
         return None, "evidence_refs must resolve to packet events"
+    step_event_id = next(
+        (
+            str(event.get("event_id") or "")
+            for event in packet.get("events") or ()
+            if isinstance(event, Mapping) and event.get("position") == step
+        ),
+        "",
+    )
+    if not step_event_id or not any(
+        ref == step_event_id or ref.startswith(step_event_id + "_tool_")
+        for ref in refs
+    ):
+        return None, "evidence_refs do not support the traced step"
     return {
         "step": step,
         "quote": quote,

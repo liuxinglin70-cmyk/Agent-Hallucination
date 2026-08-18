@@ -250,6 +250,10 @@ def _validate_body(
             f"{intervention_id}: body.action_not_when_facts is required; "
             "prose-only exclusions are not executable"
         )
+    if require_executable_bounds and not body.get("action_not_when_facts"):
+        raise ValueError(
+            f"{intervention_id}: body.action_not_when_facts must be non-empty"
+        )
     not_when_facts = _validate_fact_list(
         entry,
         body.get("action_not_when_facts") or (),

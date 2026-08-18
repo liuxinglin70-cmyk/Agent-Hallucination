@@ -7,7 +7,7 @@ import pytest
 from evolution_v3.ledger import Ledger
 from evolution_v3.metrics import binary_metrics, paired_delta
 from evolution_v3.registry import ActiveRegistry, LibraryLimitError
-from evolution_v3.splits import FinalHoldout
+from evolution_v3.splits import FinalHoldout, bool_gold
 
 from evolution_v3.tests.test_contracts_gates import _candidate
 
@@ -78,6 +78,23 @@ def test_paired_delta_counts_unresolved_to_wrong_as_new_error():
     assert delta["new_errors"] == 1
 
 
+def test_paired_delta_rejects_duplicate_or_missing_cases():
+    baseline = [{"case": "a", "gold": True, "prediction": False}]
+    with pytest.raises(ValueError, match="duplicate active"):
+        paired_delta(
+            baseline,
+            [
+                {"case": "a", "gold": True, "prediction": True},
+                {"case": "a", "gold": True, "prediction": True},
+            ],
+        )
+    with pytest.raises(ValueError, match="missing active"):
+        paired_delta(
+            baseline + [{"case": "b", "gold": False, "prediction": False}],
+            [{"case": "a", "gold": True, "prediction": True}],
+        )
+
+
 def test_final_holdout_is_read_once():
     holdout = FinalHoldout([
         {"case_id": "A/001.json", "gold": True},
@@ -103,6 +120,32 @@ def test_final_holdout_marker_survives_new_process(tmp_path):
         fresh_holdout.read("final")
 
 
+def test_final_holdout_preview_does_not_consume_until_commit(tmp_path):
+    marker = tmp_path / "marker.json"
+    holdout = FinalHoldout(
+        [{"case_id": "A/001.json", "gold": True}], marker_path=marker,
+    )
+    assert holdout.read("final", commit=False)
+    assert marker.exists() is False
+    assert holdout.reads == 0
+    holdout.commit("final")
+    assert marker.exists() is True
+    with pytest.raises(RuntimeError):
+        holdout.read("again", commit=False)
+
+
+@pytest.mark.parametrize("value, expected", [
+    (True, True), (False, False), ("true", True), ("FALSE", False), (None, None),
+])
+def test_bool_gold_accepts_only_explicit_labels(value, expected):
+    assert bool_gold(value) is expected
+
+
+def test_bool_gold_rejects_unknown_string():
+    with pytest.raises(ValueError, match="invalid is_hallucination"):
+        bool_gold("unknown")
+
+
 def test_net_contribution_is_idempotent_per_cycle(tmp_path):
     """A retried cycle overwrites its own record instead of appending."""
     registry = ActiveRegistry(tmp_path / "registry")
@@ -114,3 +157,28 @@ def test_net_contribution_is_idempotent_per_cycle(tmp_path):
         {"cycle": 1, "net_correct_cases": 3},
         {"cycle": 2, "net_correct_cases": 0},
     ]
+
+
+def test_registry_rollback_restores_governance_state(tmp_path):
+    registry = ActiveRegistry(tmp_path / "registry")
+    first = _candidate("IV-1-001")
+    registry.write([first], cycle=1, reason="first")
+    registry.record_marginal("IV-1-001", 2, cycle=1, fired_rate=1.0)
+    second = _candidate("IV-2-001")
+    registry.write(
+        [first, second], cycle=2, reason="second",
+        library_cfg={"max_text_boundary_per_hook": 2},
+    )
+    registry.record_marginal("IV-1-001", -3, cycle=2, fired_rate=1.0)
+    registry.record_marginal("IV-2-001", -3, cycle=2, fired_rate=1.0)
+    registry.record_net_contribution(-2, cycle=2)
+
+    registry.rollback_to_snapshot(1)
+    assert [item["intervention_id"] for item in registry.entries] == ["IV-1-001"]
+    state = registry.state
+    assert state["cycle"] == 1
+    assert state["net_contribution_history"] == []
+    assert state["interventions"]["IV-1-001"]["marginal_history"] == [{
+        "cycle": 1, "marginal_cases": 2, "fired_rate": 1.0,
+    }]
+    assert state["interventions"]["IV-2-001"]["rolled_back_out"] is True

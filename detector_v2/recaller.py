@@ -52,7 +52,14 @@ def _parse_candidates(parsed: Any, packet: Mapping[str, Any]):
         seen.add(candidate_id)
         claim = str(raw.get("claim") or "").strip()
         locus = str(raw.get("locus_event_id") or "").strip()
-        refs = [str(x) for x in raw.get("evidence_refs") or () if str(x)]
+        refs_raw = raw.get("evidence_refs")
+        if refs_raw is None:
+            refs_raw = []
+        if not isinstance(refs_raw, list) or any(
+            not isinstance(item, str) for item in refs_raw
+        ):
+            return None, f"candidate {candidate_id} evidence_refs must be a list"
+        refs = [str(x) for x in refs_raw if str(x)]
         if not claim or not locus:
             return None, f"candidate {candidate_id} needs claim and locus"
         if locus not in universe or any(ref not in universe for ref in refs):
@@ -140,7 +147,11 @@ def run_recall_scan(
     }
 
 
-def _parse_upgrades(parsed: Any, candidates: Sequence[Mapping[str, Any]]):
+def _parse_upgrades(
+    parsed: Any,
+    candidates: Sequence[Mapping[str, Any]],
+    packet: Mapping[str, Any] | None = None,
+):
     """Parse explicit upgrade rows and report silently-missing candidates.
 
     Missing rows are returned separately so the caller can re-ask or degrade.
@@ -151,6 +162,7 @@ def _parse_upgrades(parsed: Any, candidates: Sequence[Mapping[str, Any]]):
     ):
         return None, [], "upgrade output is not an upgrades object"
     valid_ids = {str(c.get("candidate_id")) for c in candidates}
+    event_count = len(list((packet or {}).get("events") or ()))
     rows_by_id: dict[str, dict[str, Any]] = {}
     for raw in parsed["upgrades"]:
         if not isinstance(raw, Mapping):
@@ -158,6 +170,8 @@ def _parse_upgrades(parsed: Any, candidates: Sequence[Mapping[str, Any]]):
         candidate_id = str(raw.get("candidate_id") or "")
         if candidate_id not in valid_ids:
             continue
+        if candidate_id in rows_by_id:
+            return None, [], f"duplicate upgrade row for candidate {candidate_id}"
         content_error = raw.get("content_error")
         causal = raw.get("causal")
         if not isinstance(content_error, bool) or not isinstance(causal, bool):
@@ -168,6 +182,10 @@ def _parse_upgrades(parsed: Any, candidates: Sequence[Mapping[str, Any]]):
                 corrected_step, bool
             ):
                 return None, [], "corrected_step must be an integer for upgrades"
+            if packet is not None and not 1 <= corrected_step <= event_count:
+                return None, [], "corrected_step is outside the packet event range"
+        elif corrected_step is not None:
+            return None, [], "corrected_step must be null for non-upgrades"
         rows_by_id[candidate_id] = {
             "candidate_id": candidate_id,
             "content_error": content_error,
@@ -258,7 +276,7 @@ def run_causal_upgrade(
             "view": "complete" if not view_meta.get("degraded") else "degraded",
             "warnings": [],
         }
-    upgrades, missing, error = _parse_upgrades(parsed, candidates)
+    upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
     warnings: list[dict[str, str]] = []
     if upgrades is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
@@ -268,7 +286,7 @@ def run_causal_upgrade(
                 user=user + UPGRADE_CONTRACT_REPAIR,
                 purpose="causal_upgrade_repair",
             )
-            upgrades, missing, error = _parse_upgrades(parsed, candidates)
+            upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
         except ProviderError as exc:
             return {
                 "ok": False, "upgrades": [], "error": exc.message,
@@ -304,7 +322,7 @@ def run_causal_upgrade(
                 route=route, system=system, user=repair_user,
                 purpose="causal_upgrade_coverage_repair",
             )
-            upgrades, missing, error = _parse_upgrades(parsed, candidates)
+            upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
         except ProviderError as exc:
             return {
                 "ok": False,
