@@ -16,6 +16,7 @@
   },
   "judge_route": {
     "model": "Qwen3.5-397B-A17B",
+    "json_mode": true,
     "extra_body": {
       "thinking": {
         "type": "disabled"

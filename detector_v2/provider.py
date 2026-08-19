@@ -110,7 +110,12 @@ class ProviderError(RuntimeError):
 
 
 def extract_json_object(text: str) -> Any | None:
-    """Return the first balanced JSON object in *text*, or ``None``."""
+    """Return the first complete JSON value (object or array) in *text*.
+
+    A reply that is entirely one JSON value — object or array — is returned
+    whole; otherwise the first balanced object/array embedded in prose is
+    extracted. Callers validate the shape they expect.
+    """
     if not text:
         return None
     stripped = text.strip()
@@ -121,15 +126,19 @@ def extract_json_object(text: str) -> Any | None:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         stripped = "\n".join(lines).strip()
-    if not stripped.startswith("{"):
-        start = stripped.find("{")
-        if start < 0:
-            return None
-        stripped = stripped[start:]
+    try:
+        return json.loads(stripped)
+    except ValueError:
+        pass
+    starts = [i for i in (stripped.find("{"), stripped.find("[")) if i >= 0]
+    if not starts:
+        return None
+    start = min(starts)
     depth = 0
     in_string = False
     escape = False
-    for index, char in enumerate(stripped):
+    for index in range(start, len(stripped)):
+        char = stripped[index]
         if in_string:
             if escape:
                 escape = False
@@ -140,13 +149,13 @@ def extract_json_object(text: str) -> Any | None:
             continue
         if char == '"':
             in_string = True
-        elif char == "{":
+        elif char in "{[":
             depth += 1
-        elif char == "}":
+        elif char in "}]":
             depth -= 1
             if depth == 0:
                 try:
-                    return json.loads(stripped[: index + 1])
+                    return json.loads(stripped[start : index + 1])
                 except ValueError:
                     return None
     return None
@@ -209,6 +218,11 @@ def provider_call(
                 payload["prompt_cache_retention"] = str(retention)
     if route.get("max_tokens") is not None:
         payload["max_tokens"] = int(route["max_tokens"])
+    if bool(route.get("json_mode", False)):
+        # Providers that accept OpenAI-style JSON mode constrain the reply
+        # to a single JSON value; opt-in per route so strict gateways that
+        # reject the field are unaffected.
+        payload["response_format"] = {"type": "json_object"}
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
@@ -289,6 +303,9 @@ def provider_call(
             continue
         message = (data.get("choices") or [{}])[0].get("message") or {}
         content = str(message.get("content") or "")
+        finish_reason = str(
+            (data.get("choices") or [{}])[0].get("finish_reason") or ""
+        )
         parsed = extract_json_object(content)
         usage = dict(data.get("usage") or {})
         meta: dict[str, Any] = {
@@ -313,9 +330,20 @@ def provider_call(
             ),
             "purpose": purpose,
             "model": str(data.get("model") or route.get("model") or ""),
+            "finish_reason": finish_reason or None,
             "raw_content_preview": content[:300],
         }
         if parsed is None:
+            if finish_reason == "length":
+                # Truncated output can never re-parse as JSON; retrying the
+                # same prompt with the same cap is wasted spend.
+                raise ProviderError(
+                    route_name,
+                    f"output truncated at max_tokens "
+                    f"({usage.get('completion_tokens')} tokens)",
+                    error_type="truncated_output",
+                    attempts=attempts,
+                )
             if not needs_recovery:
                 needs_recovery = True
                 last_error = "provider reply carried no usable JSON object"

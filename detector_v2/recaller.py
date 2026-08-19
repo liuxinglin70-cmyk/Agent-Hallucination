@@ -173,17 +173,29 @@ def _parse_upgrades(
         content_error = raw.get("content_error")
         causal = raw.get("causal")
         if not isinstance(content_error, bool) or not isinstance(causal, bool):
-            return None, [], "content_error and causal must be booleans"
+            return None, [], (
+                f"content_error and causal must be booleans "
+                f"(candidate {candidate_id})"
+            )
         corrected_step = raw.get("corrected_step")
         if content_error and causal:
             if not isinstance(corrected_step, int) or isinstance(
                 corrected_step, bool
             ):
-                return None, [], "corrected_step must be an integer for upgrades"
+                return None, [], (
+                    f"corrected_step must be an integer for upgrades "
+                    f"(candidate {candidate_id})"
+                )
             if packet is not None and not 1 <= corrected_step <= event_count:
-                return None, [], "corrected_step is outside the packet event range"
+                return None, [], (
+                    f"corrected_step is outside the packet event range "
+                    f"(candidate {candidate_id})"
+                )
         elif corrected_step is not None:
-            return None, [], "corrected_step must be null for non-upgrades"
+            return None, [], (
+                f"corrected_step must be null for non-upgrades "
+                f"(candidate {candidate_id})"
+            )
         rows_by_id[candidate_id] = {
             "candidate_id": candidate_id,
             "content_error": content_error,
@@ -297,6 +309,7 @@ def run_causal_upgrade(
         return {
             "ok": False, "upgrades": [], "error": error,
             "error_type": "contract_error",
+            "provider": meta,
         }, {
             "stage": "causal_upgrade", "state": "contract_error",
             "attempts": int(meta.get("attempts") or 0),

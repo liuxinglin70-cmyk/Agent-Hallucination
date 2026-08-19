@@ -132,7 +132,9 @@ A deviation that is real but irrelevant to the delivered result is NOT an \
 upgrade. A deviation that is only formatting/wording and is not fixed by \
 an explicit task contract is NOT an upgrade.
 
-Reply with ONLY a JSON object of the exact shape:
+Reply with ONLY a JSON object of the exact shape. The upgrades array must \
+contain EXACTLY ONE ROW FOR EVERY candidate, in the same order, with no \
+row skipped:
 {
   "upgrades": [
     {
@@ -141,16 +143,28 @@ Reply with ONLY a JSON object of the exact shape:
       "causal": true,
       "corrected_step": 3,
       "reason": "one sentence"
+    },
+    {
+      "candidate_id": "c2",
+      "content_error": false,
+      "causal": false,
+      "corrected_step": null,
+      "reason": "one sentence"
     }
   ]
 }
+A candidate that fails either test is reported as a row with the failing \
+flag(s) false and "corrected_step": null. Omitting a candidate is a \
+contract violation.
 No commentary.
 """
 
 UPGRADE_CONTRACT_REPAIR = """\
 
 CONTRACT_REPAIR: Your previous reply violated the upgrade contract. Return \
-the COMPLETE corrected JSON object now, starting with {. No commentary.
+the COMPLETE corrected JSON object now, starting with {. Every candidate \
+needs exactly one row; a non-upgrading row has the failing flag(s) false \
+and corrected_step null. No commentary.
 """
 
 UPGRADE_MISSING_REPAIR = """\
@@ -158,8 +172,9 @@ UPGRADE_MISSING_REPAIR = """\
 COVERAGE_REPAIR: Your previous upgrade response omitted one or more \
 candidates. An omitted candidate is NEVER a no-upgrade. Return the COMPLETE \
 corrected upgrades object containing an explicit row for EVERY candidate, \
-including these previously-missing candidate ids: {missing}. Use the exact \
-schema shown above. No commentary.
+including these previously-missing candidate ids: {missing}. A \
+non-upgrading row sets the failing flag(s) false and corrected_step to \
+null. No commentary.
 """
 
 TRACER_SYSTEM = """\
