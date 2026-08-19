@@ -54,6 +54,20 @@ def test_validate_record_recurses_through_tool_observations(sample_record):
         validate_record(bad)
 
 
+def test_validate_record_allows_source_in_tool_arguments(sample_record):
+    """File-tool arguments legitimately name source/destination paths."""
+    record = {**sample_record, "history": [
+        {
+            "role": "assistant",
+            "tool_calls": [{
+                "name": "move_file",
+                "arguments": {"source": "log.txt", "destination": "out.txt"},
+            }],
+        },
+    ]}
+    validate_record(record)
+
+
 def test_delivered_result(sample_packet):
     result = delivered_result(sample_packet)
     assert result["last_prose_event_id"] == "event_002"

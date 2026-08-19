@@ -26,11 +26,6 @@ EVALUATOR_ONLY_FIELDS = frozenset({
     "gold_explanation",
 })
 
-FORBIDDEN_KEYS = EVALUATOR_ONLY_FIELDS | {
-    "case_id", "source", "source_dir", "agent_type", "model_id",
-    "question_source", "question_domain", "agent_answer",
-}
-
 _ANSWER_TOOL_HINTS = (
     "final_answer", "answer", "finish", "terminate", "submit",
     "respond", "conclude",
@@ -131,11 +126,15 @@ def _tool_arguments(call: Any) -> Any:
 
 
 def _forbidden_nested_keys(record: Mapping[str, Any]) -> set[str]:
+    """Gold labels must not hide anywhere inside the trajectory; metadata
+    keys are a top-level concern (ALLOWED_RECORD_KEYS rejects them there)."""
     hits: set[str] = set()
 
     def visit(value: Any) -> None:
         if isinstance(value, Mapping):
-            hits.update(str(key) for key in value if str(key) in FORBIDDEN_KEYS)
+            hits.update(
+                str(key) for key in value if str(key) in EVALUATOR_ONLY_FIELDS
+            )
             for nested in value.values():
                 visit(nested)
         elif isinstance(value, (list, tuple)):
@@ -538,7 +537,6 @@ def packet_features(packet: Mapping[str, Any]) -> set[str]:
 __all__ = [
     "ALLOWED_RECORD_KEYS",
     "EVALUATOR_ONLY_FIELDS",
-    "FORBIDDEN_KEYS",
     "PACKET_FEATURE_NAMES",
     "PACKET_SCHEMA",
     "PacketError",
