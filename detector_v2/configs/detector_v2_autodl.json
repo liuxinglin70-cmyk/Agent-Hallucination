@@ -2,7 +2,7 @@
   "schema_version": "detector_v2.config.v1",
   "provider": {
     "endpoint": "https://www.autodl.art/api/v1",
-    "model": "deepseek-v4-pro",
+    "model": "Qwen3.5-397B-A17B",
     "api_key_env": "AUTODL_API_KEY",
     "temperature": 0.0,
     "timeout_seconds": 240,
@@ -12,20 +12,22 @@
     "context_cache": {
       "enabled": true,
       "mode": "automatic"
-    },
+    }
+  },
+  "judge_route": {
+    "model": "Qwen3.5-397B-A17B",
     "extra_body": {
       "thinking": {
         "type": "disabled"
       }
     }
   },
-  "judge_route": {
-    "model": "deepseek-v4-pro"
-  },
   "defense_route": {
-    "model": "deepseek-v4-pro"
+    "model": "gpt-5.6-luna",
+    "max_tokens": 8192
   },
   "recall_route": {
-    "model": "deepseek-v4-flash"
+    "model": "gpt-5.6-luna",
+    "max_tokens": 8192
   }
 }

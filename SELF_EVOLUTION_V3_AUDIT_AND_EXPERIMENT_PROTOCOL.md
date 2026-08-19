@@ -151,3 +151,58 @@ python -m evolution_v3 meta --config path/to/real_eval_v2.json
 > 在开发相关、provider 混合且 active 臂主要采用 frozen-stage replay 的配对实验中，active interventions 产生了局部正确翻转；该观察未构成独立外部泛化证据。
 
 只有完成新的 clean holdout、fresh baseline/active 双臂、预注册统计和完整产物归档后，才可以表述“确认性提升”或“真实泛化提升”。
+
+## 8. Round-4 模型切换验证序列（Qwen3.5 判决 + GPT-5.6 复核）
+
+2026-08-19 起部署模型切换为 AutoDL 网关：judge/step_tracer/causal_upgrade/evolution_proposer
+= Qwen3.5-397B-A17B（thinking disabled），recall_scanner/defense = gpt-5.6-luna（max_tokens
+8192）。配置指纹已随 `detector_v2/configs/detector_v2_autodl.json` 变化，历史基线不可比。
+切换前已修复：AgentHallu 多轮 question（list 形态）在 `build_packet` 统一拍平为带轮次编号
+的字符串（4d3d7d5 引入的字符串门曾使原始数据全部拒载）。
+
+全量实验前必须按下列顺序完成两级小规模验证；任一门失败即停止，不得进入下一级。
+
+### 8.1 阶段 A：检测器验证（pilot20 双跑）
+
+复用 `runs_v2/v2_pilot20_10w` 的 20 例清单（10 阳性/10 阴性），同配置连跑两次
+（run-id 仅后缀 `_a1`/`_a2`）：
+
+```bash
+python -m detector_v2 batch   --dataset-root datasets/raw/agenthallu/AgentHallu \
+  --cases-file <pilot20 清单> --run-id v4_qg_pilot20_a1 --workers 8
+python -m detector_v2 evaluate --dataset-root datasets/raw/agenthallu/AgentHallu \
+  --cases-file <pilot20 清单> --run-id v4_qg_pilot20_a1
+# a2 同理
+```
+
+预注册通过门（两级全部满足）：
+
+| 门 | 阈值 | 失败处置 |
+| --- | --- | --- |
+| unresolved（provider 侧） | ≤ 1/20 | 查超时/重试日志，必要时 judge 升级 qwen3.6-plus 重跑 |
+| accuracy（a1） | ≥ 0.60 | 按 FP/FN 构成定位；FP 高查 defense 路，FN 高查 recall 路 |
+| a1 vs a2 判决一致率 | ≥ 18/20 | 一致性不足禁止进入进化实验 |
+| provider 失败率 | < 10% | 网关不稳则切回 DeepSeek 直连配置 |
+
+### 8.2 阶段 B：自进化机制验证（mini，无验证集）
+
+v3_evo50 mini split 的 validation_set 为空，本阶段只验证机制闭环，不产生任何效果结论：
+
+```bash
+python -m evolution_v3 preview --cycle 1 --backend detector_v2 --mini
+python -m evolution_v3 experiment --cycles 3 --backend detector_v2 --mini
+python -m evolution_v3 verify-ledger
+```
+
+预注册通过门：
+
+- 每个 cycle 完整结束，ledger hash 链 `verify-ledger` 通过；
+- Qwen3.5 提案器在 `llm_calls ≤ 4/cycle` 预算内产出至少一个契约合法提案；
+- G1/G2/G3 门对每个提案给出明确 admit/reject，配对重放语义无 crash；
+- 巡逻/边际臂 unresolved 率不高于阶段 A 观测值的两倍。
+
+### 8.3 阶段 C：全量实验（100+50）
+
+A、B 全部门通过后，按第 6 节顺序对 tuning100 + validation50 跑 3 cycles + final +
+meta，统计判据沿用第 5 节预注册要求。预算参考：阶段 A 约 ¥5，阶段 B 约 ¥10-15，
+阶段 C 含重放与双臂在 ¥200 内（member 价，以 result.json usage 实算为准）。

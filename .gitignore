@@ -138,3 +138,6 @@ runs_v2/
 evolution_v3/work/
 evolution_v3/registry/state.json
 evolution_v3/registry/snapshots/
+
+# Detector V2 smoke outputs
+detector_v2_out/

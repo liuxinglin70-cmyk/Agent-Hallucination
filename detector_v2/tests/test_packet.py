@@ -74,3 +74,26 @@ def test_defense_view_cited(sample_packet):
     assert "[CITED]" in text
     assert "DELIVERED RESULT ANCHORS" in text
     assert meta["packet_truncated"] is False
+
+
+def test_build_packet_flattens_multi_turn_question(sample_record):
+    record = {**sample_record, "question": [["first turn"], ["second turn"]]}
+    packet = build_packet(record)
+    assert packet["question"] == (
+        "[turn 1] first turn\n[turn 2] second turn"
+    )
+    assert "multi_turn_question" in packet_features(packet)
+
+
+def test_build_packet_keeps_single_turn_list_question(sample_record):
+    record = {**sample_record, "question": [["only turn"]]}
+    packet = build_packet(record)
+    assert packet["question"] == "only turn"
+    assert "multi_turn_question" not in packet_features(packet)
+
+
+def test_build_packet_rejects_empty_question_turns(sample_record):
+    for question in (None, [], [[]], ["ok", " "]):
+        record = {**sample_record, "question": question}
+        with pytest.raises(PacketError):
+            build_packet(record)

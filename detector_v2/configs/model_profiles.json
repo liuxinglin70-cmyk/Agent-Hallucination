@@ -1,6 +1,7 @@
 {
   "schema_version": "detector_v2.model_profiles.v1",
   "pricing_currency": "CNY_per_million_tokens",
+  "pricing_basis": "AutoDL member prices (Qwen 6折 / GPT 5.8折 / qwen3.6-plus 8折)",
   "cost_assumption": {
     "input_tokens_per_case": 8000,
     "output_tokens_per_case": 5500,
@@ -8,32 +9,26 @@
   },
   "profiles": {
     "balanced": {
-      "description": "Recommended default for judge/defense/upgrade.",
+      "description": "Deployed judge route: judge, step tracer, causal upgrade, evolution proposer.",
       "model": "Qwen3.5-397B-A17B",
       "input": 0.72,
       "output": 4.32,
-      "roles": ["judge", "defense", "causal_upgrade"]
+      "roles": ["judge", "step_tracer", "causal_upgrade", "evolution_proposer"]
     },
-    "cheap_mechanical": {
-      "description": "High-volume recall and tracing route.",
-      "model": "hy3",
-      "input": 1.0,
-      "output": 4.0,
-      "roles": ["recall", "step_tracer"]
-    },
-    "quality_first": {
-      "description": "Use only as an escalation route for conflicts or unresolved cases.",
-      "model": "GLM-5.3",
-      "input": 8.0,
-      "output": 28.0,
-      "roles": ["escalation"]
-    },
-    "openai_compatible_alternative": {
-      "description": "Low-cost alternative when the gateway has this model enabled.",
+    "cross_family_review": {
+      "description": "Deployed cross-family review routes: defense re-checks positives, recall scans for deviations.",
       "model": "gpt-5.6-luna",
       "input": 0.812,
       "output": 4.872,
-      "roles": ["judge", "defense", "causal_upgrade"]
+      "cache_read": 0.081,
+      "roles": ["defense", "recall_scanner"]
+    },
+    "judge_upgrade_candidate": {
+      "description": "Escalation candidate if the Qwen3.5 judge quality is insufficient; ~2x cost, 1M context.",
+      "model": "qwen3.6-plus",
+      "input": 1.6,
+      "output": 9.6,
+      "roles": ["benchmark_only"]
     },
     "minimax_candidate": {
       "description": "Candidate only; price and endpoint were not supplied.",

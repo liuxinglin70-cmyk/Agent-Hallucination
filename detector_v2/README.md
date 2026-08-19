@@ -128,7 +128,6 @@ DETECTOR_V2_TRANSPORT_RETRIES
 |---|---|---:|---:|
 | Judge / Defense / Causal Upgrade | `Qwen3.5-397B-A17B` | 0.72 | 4.32 |
 | Recall / Step Tracer | `hy3` | 1.0 | 4.0 |
-| 冲突 / unresolved 升级 | `GLM-5.3` | 8.0 | 28.0 |
 | 主流程备选 | `gpt-5.6-luna` | 0.812 | 4.872 |
 | Benchmark candidate | `MiniMax-H3` | 待定 | 待定 |
 

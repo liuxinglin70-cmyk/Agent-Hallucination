@@ -80,6 +80,30 @@ def _text(row: Mapping[str, Any]) -> Any:
     return None
 
 
+def _question_text(value: Any) -> str:
+    """Flatten a benchmark question into prompt text.
+
+    AgentHallu stores single-turn questions as a string and multi-turn
+    ones as a list of turns, each turn a list of strings. Turn numbering
+    keeps the multi-turn structure visible to the judge.
+    """
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, list) or not value:
+        raise PacketError("question must be a non-empty string or turn list")
+    turns = [
+        " ".join(str(part).strip() for part in _as_list(turn))
+        for turn in value
+    ]
+    if any(not turn for turn in turns):
+        raise PacketError("question turns must be non-empty")
+    if len(turns) == 1:
+        return turns[0]
+    return "\n".join(
+        f"[turn {index}] {turn}" for index, turn in enumerate(turns, 1)
+    )
+
+
 def _tool_name(call: Any) -> str:
     if isinstance(call, str):
         return call
@@ -147,8 +171,8 @@ def build_packet(record: Mapping[str, Any]) -> dict[str, Any]:
     history = record.get("history")
     if not isinstance(history, list) or not history:
         raise PacketError("history must be a non-empty list")
-    question = record.get("question")
-    if not isinstance(question, str) or not question.strip():
+    question = _question_text(record.get("question"))
+    if not question.strip():
         raise PacketError("question must be a non-empty string")
 
     events: list[dict[str, Any]] = []
@@ -475,6 +499,7 @@ def packet_features(packet: Mapping[str, Any]) -> set[str]:
     """Closed vocabulary of observable features for intervention routing."""
     events = list(packet.get("events") or [])
     question = str(packet.get("question") or "")
+    multi_turn = "[turn 2]" in question
     tool_count = 0
     has_retrieval = False
     has_answer_tool = False
@@ -503,10 +528,7 @@ def packet_features(packet: Mapping[str, Any]) -> set[str]:
         features.add("has_numeric_content")
     if max_content_chars > 400:
         features.add("has_long_prose")
-    if (
-        isinstance(packet.get("question"), list)
-        and len(packet.get("question") or []) > 1
-    ):
+    if multi_turn:
         features.add("multi_turn_question")
     if any(char.isdigit() for char in question):
         features.add("question_has_numbers")
