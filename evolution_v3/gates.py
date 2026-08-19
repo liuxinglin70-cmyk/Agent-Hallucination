@@ -878,6 +878,9 @@ def audit_defects(
                     if m["passed"]:
                         report["audit_rejected"] = False
                         report["audit_passed"] = True
+        if not report["audit_passed"]:
+            # V1, V2, or V3/M failure is a successful audit rejection.
+            report["audit_rejected"] = True
         if report["audit_passed"]:
             passed_any = True
         reports.append(report)

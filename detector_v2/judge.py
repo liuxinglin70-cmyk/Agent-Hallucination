@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import (
+    evidence_refs_support_step,
     packet_features,
     render_judge_view,
 )
@@ -83,6 +84,8 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
             return None, "hallucination_reason is required when true"
         if not refs:
             return None, "evidence_refs is required when true"
+        if not evidence_refs_support_step(packet, refs, step_value):
+            return None, "evidence_refs do not support hallucination_step"
         if not isinstance(root_cause, Mapping):
             return None, "root_cause object is required when true"
         root_step = root_cause.get("step")

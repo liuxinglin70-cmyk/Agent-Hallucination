@@ -33,6 +33,9 @@ PREDICATE_VERDICTS: dict[str, frozenset[str]] = {
     "delivered_anchor_consistency": frozenset({
         "consistent", "inconsistent", "insufficient",
     }),
+    "final_delivery_present": frozenset({
+        "present", "missing", "not_applicable",
+    }),
 }
 
 PREDICATES = frozenset(PREDICATE_VERDICTS)
@@ -447,12 +450,50 @@ def predicate_delivered_anchor_consistency(
     }
 
 
+def predicate_final_delivery_present(
+    packet: Mapping[str, Any], context: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Detect a terminal success with no answer/prose delivery anchor."""
+    question = _question_text(packet).lower()
+    anchors = packet_delivered_result(packet)
+    has_prose = bool(anchors.get("last_prose_event_id"))
+    answer_tool = anchors.get("last_answer_tool_call") or {}
+    answer_tool_name = str(answer_tool.get("tool_name") or "").lower()
+    has_answer_tool = bool(answer_tool) and not any(
+        marker in answer_tool_name for marker in ("terminate", "finish", "success")
+    )
+    terminal_success = any(
+        "success" in str(interaction.get("arguments") or "").lower()
+        or "success" in str(interaction.get("observation") or "").lower()
+        for event in packet.get("events") or ()
+        for interaction in event.get("tool_interactions") or ()
+    )
+    if terminal_success and not has_prose and not has_answer_tool:
+        return {
+            "predicate": "final_delivery_present",
+            "verdict": "missing",
+            "detail": "trajectory reports success without a prose or answer-tool delivery anchor",
+        }
+    if not terminal_success:
+        return {
+            "predicate": "final_delivery_present",
+            "verdict": "not_applicable",
+            "detail": "no mechanical terminal success signal found",
+        }
+    return {
+        "predicate": "final_delivery_present",
+        "verdict": "present",
+        "detail": "terminal success has a prose or answer-tool delivery anchor",
+    }
+
+
 _RUNNERS: dict[str, Any] = {
     "required_action_present": predicate_required_action_present,
     "verbatim_fidelity": predicate_verbatim_fidelity,
     "evidence_refs_resolve": predicate_evidence_refs_resolve,
     "contract_coverage": predicate_contract_coverage,
     "delivered_anchor_consistency": predicate_delivered_anchor_consistency,
+    "final_delivery_present": predicate_final_delivery_present,
 }
 
 

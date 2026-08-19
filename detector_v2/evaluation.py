@@ -104,7 +104,10 @@ def evaluate_run(
             })
             continue
         result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-        prediction = prediction_state(result)
+        # A degraded terminal decision is still a detector outcome.  Keep
+        # authoritative-only filtering for evolution gates, but Stage A's
+        # provider-unresolved gate must only count an actual unresolved state.
+        prediction = prediction_state(result, require_authoritative=False)
         rows.append({
             "case": case_id,
             "gold": gold_bool,
@@ -129,6 +132,17 @@ def evaluate_run(
             })
 
     metrics = binary_metrics(rows)
+    metrics["authoritative"] = sum(
+        1 for row in rows if row["authority"] == "authoritative"
+    )
+    metrics["degraded"] = sum(
+        1 for row in rows
+        if row["authority"] not in {"authoritative", "invalid"}
+        and row["prediction"] is not None
+    )
+    metrics["provider_unresolved"] = sum(
+        1 for row in rows if row["state"] in {"unresolved", "missing_result"}
+    )
     metrics["requested_cases"] = len(cases)
     metrics["found_results"] = len(cases) - len(missing_cases)
     metrics["missing_cases"] = len(missing_cases)

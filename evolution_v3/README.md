@@ -68,7 +68,7 @@ detector_v2 运行结果    ──回传──>  proof.deployment / proof.eviden
 ## 3. 快速验证（不消耗 LLM 预算）
 
 ```bash
-# 单元/集成/回归测试全绿（当前 191 个）
+# 单元/集成/回归测试全绿
 python -m pytest detector_v2/tests evolution_v3/tests tests -q
 
 # 离线完整 cycle：玩具检测器注入 2 个稳定 FN 失败族，
@@ -107,7 +107,28 @@ python -m evolution_v3 smoke
    允许把 100 例中只出现一次的清晰机制族作为 pre-commit 联合单元提交，
    避免巡逻切分恰好吃掉第二例导致空进化。
 
-### 3.2 历史 100+50 探索性实验
+### 3.2 当前 Stage B mini50 并发验证
+
+使用独立配置 `configs/framework_stageB_mini50_workers20.json`：
+
+| 分区 | 数量 | 用途 |
+|---|---:|---|
+| mini pool | 50 | 来自 `v3_evo50/manifest.json` |
+| sentinel | 20 | V2 无害性与审计基线 |
+| gain | 16 | M 边际增益 |
+| patrol | 14 | 稳定失败族发现 |
+| validation/final | 0 | mini 协议不提供 |
+
+所有 case 级 backend evaluation 使用 `workers=20`；缓存使用原子写，cycle
+级 ledger、registry 和报告写入保持串行。Windows 长路径临时文件名问题已在
+`contracts.save_json` 修复，并由 `tests/test_concurrent_cache.py` 覆盖。
+
+本轮 3-cycle 运行的每轮状态为 `completed`，ledger 12 条记录 hash 校验通过。
+但 14 条 patrol 没有形成可提案的稳定失败族，三轮 proposal 均为空。因此当前
+结果只能说明机制编排、审计拒绝和账本闭环可运行，不能说明 proposer 已产生合法
+提案或任何干预已通过 V1/V2/V3/M。不得把该结果写成自进化效果提升。
+
+### 3.3 历史 100+50 探索性实验
 
 当前阶段实验用冻结的 `runs_v2/v2_100_20w`（100 例调优）与
 `evolution_v3/work/valruns/evo3_val_base`（50 例验证基线），不新增数据集：

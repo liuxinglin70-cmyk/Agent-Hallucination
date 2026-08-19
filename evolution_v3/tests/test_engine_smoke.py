@@ -362,6 +362,41 @@ def test_defect_injection_audit_freezes_on_leak_through(tmp_path):
     assert engine.registry.entries == []
 
 
+def test_defect_injection_audit_marks_v2_rejection(tmp_path, monkeypatch):
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(),
+        split=split,
+        mini=True,
+    )
+    def reject_noise(candidate, **_kwargs):
+        if str(candidate.get("intervention_id") or "").endswith("-002"):
+            return {"passed": False, "reason": "injected V2 rejection"}
+        raise AssertionError("only the noise defect should reach V2")
+
+    monkeypatch.setattr("evolution_v3.gates.v2_harmlessness", reject_noise)
+    report = engine.run_cycle(1)
+    noise = next(
+        item for item in report["audit"]["reports"]
+        if str(item["intervention_id"]).endswith("-002")
+    )
+    assert noise["v2"] == {
+        "passed": False, "reason": "injected V2 rejection",
+    }
+    assert noise["audit_rejected"] is True
+    assert noise["audit_passed"] is False
+
+
 def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)

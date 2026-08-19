@@ -22,7 +22,10 @@ AUTHORITY_INVALID = "invalid"
 CONVICTING_VERDICTS = frozenset({"substantiated", "substantiated_upgraded"})
 
 
-from detector_v2.packet import delivered_result as packet_delivered_result
+from detector_v2.packet import (
+    delivered_result as packet_delivered_result,
+    evidence_refs_support_step,
+)
 
 
 def _event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
@@ -96,17 +99,34 @@ def _clean_positive(positive: Mapping[str, Any], step: int | None) -> dict[str, 
     return clean
 
 
-def _hearing_verdict(hearing: Mapping[str, Any]) -> str:
+def _hearing_verdict(
+    hearing: Mapping[str, Any], packet: Mapping[str, Any] | None = None,
+) -> str:
     parsed = (hearing.get("defense_result") or {}).get("parsed")
     parsed = parsed if isinstance(parsed, Mapping) else {}
-    return str(parsed.get("verdict") or "none")
+    verdict = str(parsed.get("verdict") or "none")
+    if verdict not in CONVICTING_VERDICTS or packet is None:
+        return verdict
+    alleged_step = hearing.get("step")
+    confirmed_step = parsed.get("confirmed_step")
+    refs = parsed.get("evidence_refs") or []
+    if (
+        not isinstance(alleged_step, int)
+        or confirmed_step != alleged_step
+        or not evidence_refs_support_step(packet, refs, alleged_step)
+    ):
+        return "invalid"
+    return verdict
 
 
 def _convicted_hearing(
-    hearings: Sequence[Mapping[str, Any]],
+    hearings: Sequence[Mapping[str, Any]], packet: Mapping[str, Any],
 ) -> Mapping[str, Any] | None:
     return next(
-        (h for h in hearings if _hearing_verdict(h) in CONVICTING_VERDICTS),
+        (
+            h for h in hearings
+            if _hearing_verdict(h, packet) in CONVICTING_VERDICTS
+        ),
         None,
     )
 
@@ -179,6 +199,26 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
+    if "convict_mechanical_violation" in guards:
+        anchor_event, anchor_step = _mechanical_anchor(packet)
+        return {
+            "state": STATE_ERROR,
+            "decision_authority": AUTHORITY_AUTHORITATIVE,
+            "runtime_valid": True,
+            "responsible_event_id": anchor_event,
+            "responsible_step": anchor_step,
+            "incident_occurred": True,
+            "terminal_basis": {
+                "state": STATE_ERROR,
+                "decisive_facts": {
+                    "positive_source": "mechanical_violation",
+                    "guard_action": "convict_mechanical_violation",
+                },
+                "blocking_facts": [dict(reason) for reason in reasons],
+            },
+            "authority_failure_reasons": reasons,
+        }
+
     judge_parsed = judge_result.get("parsed") or {}
     judge_positive = _positive_from_judge(judge_result)
     recall_ok = (
@@ -188,6 +228,30 @@ def adjudicate(
     upgrade_positive = _positive_from_upgrade(upgrade_result) if recall_ok else None
 
     if not judge_positive and not upgrade_positive:
+        if "convict_mechanical_violation" in guards:
+            reasons.append({
+                "component": "adjudicate.guard",
+                "code": "convict_mechanical_violation",
+                "error_type": "deterministic predicate found a missing final delivery",
+            })
+            anchor_event, anchor_step = _mechanical_anchor(packet)
+            return {
+                "state": STATE_ERROR,
+                "decision_authority": AUTHORITY_AUTHORITATIVE,
+                "runtime_valid": True,
+                "responsible_event_id": anchor_event,
+                "responsible_step": anchor_step,
+                "incident_occurred": True,
+                "terminal_basis": {
+                    "state": STATE_ERROR,
+                    "decisive_facts": {
+                        "positive_source": "mechanical_violation",
+                        "guard_action": "convict_mechanical_violation",
+                    },
+                    "blocking_facts": [dict(reason) for reason in reasons],
+                },
+                "authority_failure_reasons": reasons,
+            }
         if "convict_mechanical_violation" in guards and recall_ok:
             # A decision_guard may promote a mechanical contract violation
             # into a conviction even with no preliminary positive. The guard
@@ -358,7 +422,7 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    convicted = _convicted_hearing(hearing_queue)
+    convicted = _convicted_hearing(hearing_queue, packet)
     if convicted is None:
         # No hearing substantiated and not all refuted: the defense failed
         # to settle, the preliminary verdict survives with degraded

@@ -232,6 +232,33 @@ def validate_packet(packet: Mapping[str, Any]) -> None:
         raise PacketError("packet ids must be unique")
 
 
+def event_id_for_step(packet: Mapping[str, Any], step: int) -> str | None:
+    """Return the canonical event id for a 1-based packet position."""
+    for event in packet.get("events") or []:
+        if int(event.get("position") or 0) == step:
+            return str(event.get("event_id") or "") or None
+    return None
+
+
+def evidence_refs_support_event(
+    evidence_refs: Sequence[str], event_id: str,
+) -> bool:
+    """Whether refs cite an event or one of that event's tool interactions."""
+    parent = str(event_id).rsplit("_tool_", 1)[0]
+    return any(
+        str(ref).rsplit("_tool_", 1)[0] == parent
+        for ref in evidence_refs
+        if str(ref)
+    )
+
+
+def evidence_refs_support_step(
+    packet: Mapping[str, Any], evidence_refs: Sequence[str], step: int,
+) -> bool:
+    event_id = event_id_for_step(packet, step)
+    return bool(event_id) and evidence_refs_support_event(evidence_refs, event_id)
+
+
 def delivered_result(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Mechanical extraction of the delivered-result anchors.
 
@@ -542,6 +569,9 @@ __all__ = [
     "PacketError",
     "build_packet",
     "delivered_result",
+    "event_id_for_step",
+    "evidence_refs_support_event",
+    "evidence_refs_support_step",
     "packet_features",
     "render_defense_view",
     "render_full_view",

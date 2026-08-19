@@ -52,6 +52,45 @@ def test_recall_scan_and_upgrade(sample_packet, monkeypatch):
     assert upgrade_result["upgraded_candidate"]["corrected_step"] == 2
 
 
+def test_recall_candidate_rejects_refs_for_another_locus(sample_packet, monkeypatch):
+    def fake_call(*, route, system, user, purpose):
+        return {"candidates": [{
+            "candidate_id": "c1",
+            "claim": "wrong value",
+            "locus_event_id": "event_002",
+            "evidence_refs": ["event_001"],
+            "quote": "5",
+        }]}, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.recaller.provider_call", fake_call)
+    result, status = run_recall_scan(packet=sample_packet, config=CONFIG)
+    assert result["ok"] is False
+    assert status["state"] == "contract_error"
+
+
+def test_upgrade_rejects_corrected_step_without_supporting_ref(sample_packet):
+    from detector_v2.recaller import _parse_upgrades
+
+    candidates = [{
+        "candidate_id": "c1",
+        "claim": "wrong value",
+        "locus_event_id": "event_001",
+        "evidence_refs": ["event_001"],
+        "quote": "wrong",
+    }]
+    rows, missing, error = _parse_upgrades(
+        {"upgrades": [{
+            "candidate_id": "c1", "content_error": True, "causal": True,
+            "corrected_step": 2, "reason": "wrong step",
+        }]},
+        candidates,
+        sample_packet,
+    )
+    assert rows is None
+    assert missing == []
+    assert "do not support corrected_step" in error
+
+
 def test_step_tracer(sample_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose):
         return {
@@ -66,6 +105,27 @@ def test_step_tracer(sample_packet, monkeypatch):
     )
     assert result["parsed"]["step"] == 2
     assert status["state"] == "ok"
+
+
+def test_step_tracer_does_not_inherit_judge_vote_count(sample_packet, monkeypatch):
+    calls = []
+
+    def fake_call(*, route, system, user, purpose):
+        calls.append(purpose)
+        return {
+            "step": 2, "quote": "5", "referent": "4",
+            "evidence_refs": ["event_002"], "reason": "earliest wrong step",
+        }, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.step_tracer.provider_call", fake_call)
+    config = {**CONFIG, "judge_route": {**CONFIG["judge_route"], "votes": 3}}
+    result, status = run_step_tracer(
+        packet=sample_packet, delivered_result="5", correct_result="4",
+        config=config,
+    )
+    assert result["parsed"]["step"] == 2
+    assert calls == ["step_tracer"]
+    assert "vote" not in result["provider"]
 
 
 def test_step_tracer_rejects_refs_for_another_step(sample_packet, monkeypatch):

@@ -63,6 +63,18 @@ def test_run_judge_contract_repair(sample_packet, monkeypatch):
     assert status["warnings"][0]["error"].startswith("contract:")
 
 
+def test_run_judge_rejects_evidence_for_another_step(sample_packet, monkeypatch):
+    def fake_call(*, route, system, user, purpose):
+        return {**JUDGE_TRUE, "evidence_refs": ["event_001"]}, {
+            "attempts": 1, "model": "m", "usage": {},
+        }
+
+    monkeypatch.setattr("detector_v2.judge.provider_call", fake_call)
+    result, status = run_judge(packet=sample_packet, config=CONFIG)
+    assert result["ok"] is False
+    assert status["state"] == "provider_error"
+
+
 def test_run_judge_provider_error(sample_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose):
         raise ProviderError("judge", "boom", attempts=1)
@@ -136,6 +148,25 @@ def test_run_defense_rejects_unknown_evidence_reference(
             "confirmed_step": None,
             "evidence_refs": ["event_999"],
             "reason": "the value is correct",
+        }, {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.defense.provider_call", fake_call)
+    result, status = run_defense(
+        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+    )
+    assert result["ok"] is False
+    assert status["state"] == "contract_error"
+
+
+def test_run_defense_rejects_confirmation_for_another_step(
+    sample_packet, monkeypatch,
+):
+    def fake_call(*, route, system, user, purpose):
+        return {
+            "verdict": "substantiated",
+            "confirmed_step": 1,
+            "evidence_refs": ["event_001"],
+            "reason": "wrong allegation",
         }, {"attempts": 1, "model": "m", "usage": {}}
 
     monkeypatch.setattr("detector_v2.defense.provider_call", fake_call)

@@ -181,7 +181,9 @@ def save_json(path: str | Path, payload: Any) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent),
+        # Repeating a long cache filename in the temporary prefix can cross
+        # Windows MAX_PATH even when the final path itself is valid.
+        prefix=".tmp-", suffix=".json", dir=str(path.parent),
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:

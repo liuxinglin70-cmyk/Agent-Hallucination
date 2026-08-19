@@ -268,10 +268,11 @@ UPGRADE_EMPTY = ({"ok": True, "upgrades": [], "upgraded_candidate": None,
 
 
 def _hearing(source, step, verdict, candidate_id=None):
+    event_id = f"event_{step:03d}"
     parsed = {
         "verdict": verdict,
         "confirmed_step": step if verdict.startswith("substantiated") else None,
-        "evidence_refs": ["event_002"],
+        "evidence_refs": [event_id],
         "reason": "r",
     }
     return {
@@ -281,11 +282,11 @@ def _hearing(source, step, verdict, candidate_id=None):
         "reason": "allegation",
         "delivered_result": "5",
         "correct_result": "4",
-        "evidence_refs": ["event_002"],
+        "evidence_refs": [event_id],
         "quote": "5",
         "tracer_result": {"ok": True, "parsed": {
             "step": step, "quote": "5", "referent": "4",
-            "evidence_refs": ["event_002"], "reason": "earliest",
+            "evidence_refs": [event_id], "reason": "earliest",
         }},
         "defense_result": {"ok": True, "parsed": parsed},
     }

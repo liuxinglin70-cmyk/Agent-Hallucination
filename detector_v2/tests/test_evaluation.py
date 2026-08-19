@@ -45,6 +45,19 @@ def test_degraded_result_is_not_authoritative():
     assert prediction_state(rows[0]) is None
 
 
+def test_degraded_terminal_result_is_predictable_for_stage_a():
+    from detector_v2.result import prediction_state
+
+    row = {
+        "schema_version": "detector_v2.detection_result.v1",
+        "state": "verified_error",
+        "occurrence_state": "verified_error",
+        "runtime_valid": True,
+        "decision_authority": "degraded_judge_only",
+    }
+    assert prediction_state(row, require_authoritative=False) is True
+
+
 def test_evaluate_run_counts_missing_results(tmp_path):
     dataset = tmp_path / "data"
     dataset.mkdir()

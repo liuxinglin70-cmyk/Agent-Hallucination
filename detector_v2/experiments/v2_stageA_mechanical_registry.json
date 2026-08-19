@@ -1,0 +1,53 @@
+{
+  "schema_version": "detector_v2.intervention_registry.v1",
+  "interventions": [
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-3-003",
+      "type": "evidence_check",
+      "hook": "upgrade.pre",
+      "trigger": {
+        "packet_features": ["has_tool_calls"],
+        "facts": []
+      },
+      "body": {
+        "predicate": "final_delivery_present",
+        "runner": "deterministic",
+        "output_verdicts": ["present", "missing", "not_applicable"]
+      },
+      "claim": {
+        "expected_behavior": "append a deterministic final_delivery_present fact before upgrade evaluation",
+        "target_polarity": "boundary"
+      },
+      "provenance": {
+        "cycle": 3,
+        "failure_family": "FAM-mechanical-missing-final-delivery",
+        "failure_cases": ["OpenManus/067.json", "OpenManus/035.json"]
+      }
+    },
+    {
+      "schema_version": "detector_v2.intervention.v1",
+      "intervention_id": "IV-3-004",
+      "type": "decision_guard",
+      "hook": "adjudicate.guard",
+      "trigger": {
+        "packet_features": ["has_tool_calls"],
+        "facts": ["final_delivery_present=missing"]
+      },
+      "body": {
+        "action": "convict_mechanical_violation",
+        "action_not_when": "Never apply when a final prose or answer-tool delivery anchor is present.",
+        "action_not_when_facts": ["final_delivery_present=present"]
+      },
+      "claim": {
+        "expected_behavior": "convict a terminal success that has no final delivery anchor",
+        "target_polarity": "recall"
+      },
+      "provenance": {
+        "cycle": 3,
+        "failure_family": "FAM-mechanical-missing-final-delivery",
+        "failure_cases": ["OpenManus/067.json", "OpenManus/035.json"]
+      }
+    }
+  ]
+}

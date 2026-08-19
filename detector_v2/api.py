@@ -30,6 +30,26 @@ _FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
 }
 
 
+def _judge_negative_needs_recall(
+    judge_result: Mapping[str, Any], config: Mapping[str, Any],
+) -> bool:
+    """Use the judge ensemble's uncertainty instead of rescanning 3/3 clean cases."""
+    requested = max(
+        1, int((config.get("judge_route") or {}).get("votes", 1) or 1),
+    )
+    if requested == 1:
+        return True
+    parsed = judge_result.get("parsed") or {}
+    if str(parsed.get("confidence") or "") != "high":
+        return True
+    vote = (judge_result.get("provider") or {}).get("vote") or {}
+    if not vote:
+        return True
+    cast = int(vote.get("cast") or 0)
+    positives = int(vote.get("positives") or 0)
+    return cast < requested or positives > 0 or bool(vote.get("tie"))
+
+
 def _frozen_masked_stages(
     frozen: Mapping[str, Any], targeted_hooks: set[str],
 ) -> list[str]:
@@ -173,7 +193,14 @@ def _validate_frozen_stages(
             parsed, error = _parse_defense(defense_result.get("parsed"))
             if parsed is None:
                 raise ValueError(f"frozen defense_result contract error: {error}")
-            parsed, error = _validate_defense_evidence(parsed, packet)
+            judge_parsed = (judge_result.get("parsed") or {})
+            positive = (
+                {"step": judge_parsed.get("hallucination_step")}
+                if judge_parsed.get("is_hallucination") is True else None
+            )
+            parsed, error = _validate_defense_evidence(
+                parsed, packet, positive,
+            )
             if parsed is None:
                 raise ValueError(f"frozen defense_result evidence error: {error}")
             defense_result["parsed"] = parsed
@@ -282,6 +309,11 @@ class Detector:
                 "quote": (judge_parsed.get("root_cause") or {}).get("quote") or "",
             },
         )
+        plan.evidence_for(
+            "upgrade.pre",
+            packet,
+            {"contracts": judge_parsed.get("contracts") or []},
+        )
 
         recall_result = None
         recall_status = None
@@ -325,10 +357,29 @@ class Detector:
                     "attempts": 0, "view": "not_rendered", "warnings": [],
                 }
 
-        if judge_status.get("state") == "ok" and not judge_positive:
-            # The recall net always runs before any clean verdict: the
-            # judge alone never has the last word on innocence.
+        negative_needs_recall = (
+            judge_status.get("state") == "ok"
+            and not judge_positive
+            and _judge_negative_needs_recall(judge_result, self.config)
+        )
+        if negative_needs_recall:
+            # Multi-vote consensus is already a recall signal. Scanner is
+            # reserved for dissent, abstention or low-confidence negatives.
             run_recall_net()
+        elif judge_status.get("state") == "ok" and not judge_positive:
+            recall_result = {"ok": True, "candidates": []}
+            recall_status = {
+                "stage": "recall_scanner", "state": "not_needed",
+                "attempts": 0, "view": "not_rendered", "warnings": [],
+            }
+            upgrade_result = {
+                "ok": True, "upgrades": [], "upgraded_candidate": None,
+                "upgraded_candidates": [],
+            }
+            upgrade_status = {
+                "stage": "causal_upgrade", "state": "not_needed",
+                "attempts": 0, "view": "not_rendered", "warnings": [],
+            }
 
         def positives_from_upgrade() -> list[dict[str, Any]]:
             candidates = list(
@@ -415,9 +466,7 @@ class Detector:
             if str(defense_parsed.get("verdict") or "") == "refuted":
                 judge_overturned = True
 
-        if (
-            judge_status.get("state") == "ok" and not judge_positive
-        ) or judge_overturned:
+        if negative_needs_recall or judge_overturned:
             # A judge-negative case, or a judge conviction the defense
             # overturned: the recall net hears the case next.
             run_recall_net()

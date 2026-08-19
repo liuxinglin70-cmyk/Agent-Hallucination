@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from detector_v2.api import Detector
+from detector_v2.api import Detector, _judge_negative_needs_recall
 
 CONFIG = {
     "judge_route": {
@@ -12,6 +12,39 @@ CONFIG = {
         "temperature": 0.0, "timeout_seconds": 5, "transport_retries": 0,
     },
 }
+
+
+def test_unanimous_high_confidence_negative_skips_recall():
+    result = {
+        "parsed": {"is_hallucination": False, "confidence": "high"},
+        "provider": {"vote": {
+            "votes": 3, "cast": 3, "positives": 0,
+            "winner": False, "tie": False,
+        }},
+    }
+    config = {"judge_route": {"votes": 3}}
+    assert _judge_negative_needs_recall(result, config) is False
+
+
+def test_dissenting_or_incomplete_negative_runs_recall():
+    config = {"judge_route": {"votes": 3}}
+    for cast, positives in ((3, 1), (2, 0)):
+        result = {
+            "parsed": {"is_hallucination": False, "confidence": "high"},
+            "provider": {"vote": {
+                "votes": 3, "cast": cast, "positives": positives,
+                "winner": False, "tie": False,
+            }},
+        }
+        assert _judge_negative_needs_recall(result, config) is True
+
+
+def test_single_vote_negative_keeps_recall_safety_net():
+    result = {
+        "parsed": {"is_hallucination": False, "confidence": "high"},
+        "provider": {"model": "m"},
+    }
+    assert _judge_negative_needs_recall(result, CONFIG) is True
 
 
 def test_detect_end_to_end_clean(sample_record, monkeypatch):

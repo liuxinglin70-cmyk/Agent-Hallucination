@@ -86,6 +86,9 @@ FACT_NAMES: dict[str, frozenset[str]] = {
     "delivered_anchor_consistency": frozenset({
         "consistent", "inconsistent", "insufficient",
     }),
+    "final_delivery_present": frozenset({
+        "present", "missing", "not_applicable",
+    }),
 }
 
 _EVIDENCE_HOOK_BY_TYPE: dict[str, frozenset[str]] = {

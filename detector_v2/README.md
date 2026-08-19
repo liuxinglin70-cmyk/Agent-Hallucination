@@ -16,7 +16,7 @@ packet（事件 + 工具交互 + 交付结果锚点）
       ▼
 [1] Outcome Judge        全轨迹端到端判断（3 票多数决）
       │ true ────────────────────────────────────────┐
-      │ false（一律运行召回安全网）                      │
+      │ uncertain false（分歧/弃权/低置信）              │
       ▼                                               │
 [2] Recall Scanner       只找候选偏差，永远不定罪        │
       │                                               │
@@ -51,9 +51,21 @@ deterministic adjudication（封闭词表，无阈值）
   不是幻觉；
 - Judge 阳性被 Defense 驳倒后转召回网再审，任何一个正候选听证
   `substantiated` 即定罪；
+- 多票 Judge 的一致高置信阴性直接结束；Recall Scanner 只处理阴性票分歧、
+  弃权或低置信度，避免单次高召回扫描推翻 3/3 clean 共识；
 - Defense 的 `inconclusive`、平票（`substantiated_upgraded`）和基础设施故障
   不翻案，只降 authority；
 - 只有 Judge 失败才 `unresolved`。
+
+### 并发与评估口径
+
+- `detector_v2 batch --workers N` 使用线程池并行 case；Stage A 验证使用
+  `--workers 20`。
+- `verified_error` / `verified_clean` 即使 authority 为
+  `degraded_judge_only` 仍是合法 terminal outcome；评估会把它们作为可预测
+  终态统计，同时单独报告 `degraded` 和 `provider_unresolved`。
+- evolution gate 仍只接受 authoritative prediction；Stage A 的 provider
+  unresolved 只统计真正 `state=unresolved` 或缺失结果。
 
 ### 方差层（多数决投票）
 
@@ -201,6 +213,11 @@ DETECTOR_V2_TRANSPORT_RETRIES
 - 20 例 / 100 例是开发读数；原计划冻结 300 例 `final_verification` 虽未读取，
   但与历史 tuning100 重叠 44 例，不能再作为干净确认集。正式实验必须重建
   holdout，详见 `../SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md`。
+
+本轮 Round-4 Stage A：`v4_qg_pilot20_fixed20_a1/a2`，20 路并发，两个 run
+均 accuracy `0.80`、0 unresolved，终态一致 `20/20`。B 阶段使用
+`evolution_v3/configs/framework_stageB_mini50_workers20.json` 的 mini50
+划分（S20/G16/P14）和 `workers=20`；B 结果及边界以根目录实验协议为准。
 
 ## 测试
 

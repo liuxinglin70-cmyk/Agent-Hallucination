@@ -169,7 +169,7 @@ python -m evolution_v3 meta --config path/to/real_eval_v2.json
 
 ```bash
 python -m detector_v2 batch   --dataset-root datasets/raw/agenthallu/AgentHallu \
-  --cases-file <pilot20 清单> --run-id v4_qg_pilot20_a1 --workers 8
+  --cases-file <pilot20 清单> --run-id v4_qg_pilot20_a1 --workers 20
 python -m detector_v2 evaluate --dataset-root datasets/raw/agenthallu/AgentHallu \
   --cases-file <pilot20 清单> --run-id v4_qg_pilot20_a1
 # a2 同理
@@ -184,14 +184,37 @@ python -m detector_v2 evaluate --dataset-root datasets/raw/agenthallu/AgentHallu
 | a1 vs a2 判决一致率 | ≥ 18/20 | 一致性不足禁止进入进化实验 |
 | provider 失败率 | < 10% | 网关不稳则切回 DeepSeek 直连配置 |
 
+本轮修复后的 frozen pilot20 实测结果：`v4_qg_pilot20_fixed20_a1/a2` 均为
+20/20 完成、accuracy `0.80`、真正 `state=unresolved` 为 `0/20`，provider
+stage failure 为 0；两次终态判决一致率为 `20/20`。A1 有 1 条
+`degraded_judge_only`，但它仍有合法的 `verified_error` 终态，不计入
+provider-unresolved；A2 为 0 条 degraded。该结果满足 A 阶段四道门。
+
+本轮同时修复了三个回归来源：多票 Judge 的 3/3 高置信阴性不再被单次
+Recall Scanner 推翻；Step Tracer 不再误继承 Judge 的 `votes=3`；评估器将
+合法 degraded terminal 与真正 unresolved 分开统计。
+
 ### 8.2 阶段 B：自进化机制验证（mini，无验证集）
 
-v3_evo50 mini split 的 validation_set 为空，本阶段只验证机制闭环，不产生任何效果结论：
+v3_evo50 的 validation_set 为空，本阶段只验证机制闭环，不产生任何效果结论。
+本轮使用独立配置 `evolution_v3/configs/framework_stageB_mini50_workers20.json`：
+
+```text
+mini pool: 50
+sentinel: 20（gold 正负各 10）
+gain: 16
+patrol: 14
+validation/final: 0
+backend workers: 20
+```
 
 ```bash
-python -m evolution_v3 preview --cycle 1 --backend detector_v2 --mini
-python -m evolution_v3 experiment --cycles 3 --backend detector_v2 --mini
-python -m evolution_v3 verify-ledger
+python -m evolution_v3 preview --cycle 1 --backend detector_v2 --mini \
+  --config evolution_v3/configs/framework_stageB_mini50_workers20.json
+python -m evolution_v3 experiment --cycles 3 --backend detector_v2 --mini \
+  --config evolution_v3/configs/framework_stageB_mini50_workers20.json
+python -m evolution_v3 verify-ledger \
+  --config evolution_v3/configs/framework_stageB_mini50_workers20.json
 ```
 
 预注册通过门：
@@ -200,6 +223,19 @@ python -m evolution_v3 verify-ledger
 - Qwen3.5 提案器在 `llm_calls ≤ 4/cycle` 预算内产出至少一个契约合法提案；
 - G1/G2/G3 门对每个提案给出明确 admit/reject，配对重放语义无 crash；
 - 巡逻/边际臂 unresolved 率不高于阶段 A 观测值的两倍。
+
+并发安全要求：case 评估通过 `ThreadPoolExecutor(max_workers=20)` 并行，缓存
+结果使用短临时文件名和原子替换；cycle、registry、ledger 写入保持主流程串行。
+曾发现 Windows 长路径下临时文件前缀重复完整 cache 文件名会造成并发落盘失败，
+现已修复并加入专项回归测试。
+
+本轮 B 运行结果：3 个 cycle 均完成，ledger 共 12 条记录且 hash 链有效；14 条
+patrol 没有形成至少两个同机制失败案例，因此三轮 proposal 均为空。这证明了
+cycle 编排、审计拒绝和 ledger 闭环，但没有触发 proposer 的合法提案和准入路径，
+所以不能宣称 B 的提案/干预有效性门已通过。故障注入审计中的 active arm 出现
+大量 unresolved 属于被测坏候选的拒绝信号，不计入正常 patrol/gain 健康度；审计
+代码和回归测试已修复为 V1/V2/V3/M 任一失败均明确记录
+`audit_rejected=true`；该修复从下一次 B 运行开始生效，历史 `v2` 产物不被改写。
 
 ### 8.3 阶段 C：全量实验（100+50）
 

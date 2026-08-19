@@ -132,6 +132,24 @@ def test_substantiated_is_error(sample_packet):
     assert proof["responsible_event_id"] == "event_002"
 
 
+def test_adjudication_rejects_hearing_evidence_for_another_step(sample_packet):
+    defense_result, defense_status = _defense("substantiated")
+    hearing = _hearings(JUDGE_TRUE, defense_result)[0]
+    hearing["defense_result"]["parsed"]["confirmed_step"] = 1
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_TRUE, judge_status=JUDGE_OK,
+        recall_result=None, recall_status=None,
+        upgrade_result=None, upgrade_status=None,
+        tracer_result=None, tracer_status=None,
+        defense_result=defense_result, defense_status=defense_status,
+        hearings=[hearing],
+    )
+    assert proof["state"] == STATE_ERROR
+    assert proof["decision_authority"] == AUTHORITY_DEGRADED_JUDGE_ONLY
+    assert proof["responsible_step"] == 2
+
+
 def test_refuted_overturns(sample_packet):
     defense_result, defense_status = _defense("refuted")
     proof = adjudicate(

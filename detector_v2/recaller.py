@@ -15,7 +15,12 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from detector_v2.interventions import InterventionPlan, empty_plan
-from detector_v2.packet import packet_features, render_judge_view
+from detector_v2.packet import (
+    evidence_refs_support_event,
+    evidence_refs_support_step,
+    packet_features,
+    render_judge_view,
+)
 from detector_v2.provider import ProviderError, majority_vote, provider_call
 from detector_v2.semantics import (
     RECALL_CONTRACT_REPAIR,
@@ -64,6 +69,10 @@ def _parse_candidates(parsed: Any, packet: Mapping[str, Any]):
             return None, f"candidate {candidate_id} needs claim and locus"
         if locus not in universe or any(ref not in universe for ref in refs):
             return None, f"candidate {candidate_id} references unknown event"
+        if not evidence_refs_support_event(refs, locus):
+            return None, (
+                f"candidate {candidate_id} evidence_refs do not support its locus"
+            )
         candidates.append({
             "candidate_id": candidate_id,
             "claim": claim,
@@ -191,6 +200,18 @@ def _parse_upgrades(
                     f"corrected_step is outside the packet event range "
                     f"(candidate {candidate_id})"
                 )
+            if packet is not None:
+                candidate = next(
+                    item for item in candidates
+                    if str(item.get("candidate_id") or "") == candidate_id
+                )
+                if not evidence_refs_support_step(
+                    packet, candidate.get("evidence_refs") or [], corrected_step,
+                ):
+                    return None, [], (
+                        "candidate evidence_refs do not support corrected_step "
+                        f"(candidate {candidate_id})"
+                    )
         elif corrected_step is not None:
             return None, [], (
                 f"corrected_step must be null for non-upgrades "
@@ -361,7 +382,6 @@ def run_causal_upgrade(
     total_attempts = 0
     warnings: list[dict[str, str]] = []
     failure: dict[str, Any] | None = None
-    still_missing: set[str] = set()
     for _ in range(votes):
         rows, meta, sample_warnings, sample_failure, sample_missing = _upgrade_sample(
             packet=packet, candidates=candidates, route=route,
@@ -375,7 +395,6 @@ def run_causal_upgrade(
         if rows is not None:
             samples.append(rows)
             sample_meta = dict(meta)
-            still_missing.update(sample_missing)
     if not samples:
         error = failure or {}
         return {
@@ -388,10 +407,14 @@ def run_causal_upgrade(
             "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }
+    still_missing: set[str] = set()
+    for rows in samples:
+        still_missing.update(
+            str(row.get("candidate_id") or "")
+            for row in rows
+            if row.get("coverage") == "missing"
+        )
     if still_missing:
-        # Never interpret an omitted row as a negative. A candidate no
-        # sample answered leaves the recall upgrade unavailable and the
-        # final authority degrades (still decisive clean).
         missing = sorted(still_missing)
         coverage = {
             "expected": len(candidates),
@@ -417,8 +440,6 @@ def run_causal_upgrade(
             "warnings": warnings,
         }
 
-    # Per-candidate strict majority over the cast samples; a candidate
-    # that fails the majority keeps its first negative row on record.
     cast = len(samples)
     by_id: dict[str, list[dict[str, Any]]] = {
         str(candidate.get("candidate_id") or ""): []

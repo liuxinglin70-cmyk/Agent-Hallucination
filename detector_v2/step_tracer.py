@@ -84,6 +84,7 @@ def run_step_tracer(
         f"DELIVERED RESULT: {delivered_result}\n"
         f"CORRECT RESULT: {correct_result}\n\nTRAJECTORY:\n" + view_text
     )
+    warnings: list[dict[str, str]] = []
     try:
         parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="step_tracer",
@@ -99,7 +100,6 @@ def run_step_tracer(
             "warnings": [],
         }
     result, error = _parse_tracer(parsed, packet)
-    warnings: list[dict[str, str]] = []
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:

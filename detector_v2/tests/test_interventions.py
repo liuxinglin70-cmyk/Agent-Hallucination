@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from detector_v2.api import Detector
 from detector_v2.interventions import (
     InterventionPlan,
     build_intervention_registry,
+    load_intervention_registry,
     validate_registry,
 )
 from detector_v2.predicates import (
@@ -63,6 +67,48 @@ def test_registry_validation_and_prompt_injection(sample_packet):
     assert "required action" in block
     assert plan.prompt_block(set(), hook="scanner.system") == ""
     assert plan.deployment_summary()["fired"][0]["event"] == "text_injected"
+
+
+def test_stage_a_repair_registry_is_zero_call_text_only():
+    root = Path(__file__).resolve().parents[2]
+    registry = load_intervention_registry(
+        root / "detector_v2" / "experiments" / "v2_stageA_repair_registry.json",
+        require_executable_bounds=True,
+    )
+    entries = registry["interventions"]
+    assert {entry["type"] for entry in entries} == {"text_boundary"}
+    assert {entry["hook"] for entry in entries} == {
+        "scanner.system", "upgrade.system",
+    }
+    plan = InterventionPlan.from_registry(registry)
+    assert "grounding" in plan.prompt_block(
+        {"has_tool_calls"}, hook="scanner.system",
+    ).lower()
+    assert "materiality" in plan.prompt_block(
+        {"has_tool_calls"}, hook="upgrade.system",
+    ).lower()
+
+    config = json.loads((
+        root / "detector_v2" / "configs"
+        / "detector_v2_autodl_stageA_repair.json"
+    ).read_text(encoding="utf-8"))
+    assert config["judge_route"]["votes"] == 3
+    assert config["defense_route"]["votes"] == 3
+    assert "votes" not in config["recall_route"]
+
+
+def test_mechanical_delivery_registry_is_deterministic_only():
+    root = Path(__file__).resolve().parents[2]
+    registry = load_intervention_registry(
+        root / "detector_v2" / "experiments" / "v2_stageA_mechanical_registry.json",
+        require_executable_bounds=True,
+    )
+    entries = registry["interventions"]
+    assert {entry["type"] for entry in entries} == {
+        "evidence_check", "decision_guard",
+    }
+    assert {entry["body"].get("runner") for entry in entries
+            if entry["type"] == "evidence_check"} == {"deterministic"}
 
 
 def test_evidence_check_only_append_evidence(sample_packet):

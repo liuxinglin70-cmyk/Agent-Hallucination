@@ -10,7 +10,12 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from detector_v2.interventions import InterventionPlan, empty_plan
-from detector_v2.packet import packet_features, render_defense_view, render_judge_view
+from detector_v2.packet import (
+    evidence_refs_support_step,
+    packet_features,
+    render_defense_view,
+    render_judge_view,
+)
 from detector_v2.provider import ProviderError, majority_vote, provider_call
 from detector_v2.semantics import (
     DEFENSE_CONTRACT_REPAIR,
@@ -52,6 +57,7 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
 
 def _validate_defense_evidence(
     parsed: Mapping[str, Any], packet: Mapping[str, Any],
+    positive: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Require defense references to resolve to packet event/tool ids."""
     valid_ids = {
@@ -76,6 +82,11 @@ def _validate_defense_evidence(
             return None, "confirmed_step is outside the packet event range"
         if not refs:
             return None, "substantiated requires at least one evidence reference"
+        if not evidence_refs_support_step(packet, refs, step):
+            return None, "evidence_refs do not support confirmed_step"
+        alleged_step = (positive or {}).get("step")
+        if isinstance(alleged_step, int) and step != alleged_step:
+            return None, "confirmed_step must equal the alleged step"
     return dict(parsed), ""
 
 
@@ -118,6 +129,7 @@ def _call_defense(
     route: Mapping[str, Any],
     system: str,
     user: str,
+    positive: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Sample one defense ballot; a ``None`` verdict abstains."""
     try:
@@ -132,7 +144,7 @@ def _call_defense(
         }
     result, error = _parse_defense(parsed)
     if result is not None:
-        result, error = _validate_defense_evidence(result, packet)
+        result, error = _validate_defense_evidence(result, packet, positive)
     warnings: list[dict[str, str]] = []
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
@@ -144,7 +156,9 @@ def _call_defense(
             )
             result, error = _parse_defense(parsed)
             if result is not None:
-                result, error = _validate_defense_evidence(result, packet)
+                result, error = _validate_defense_evidence(
+                    result, packet, positive,
+                )
         except ProviderError as exc:
             return {"ok": False, "parsed": None, "error": exc.message,
                     "error_type": exc.error_type}, {
@@ -172,6 +186,7 @@ def _vote_defense(
     route: Mapping[str, Any],
     system: str,
     user: str,
+    positive: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run the requested number of defense votes and collapse them.
 
@@ -192,6 +207,7 @@ def _vote_defense(
     for _ in range(votes):
         result, status = _call_defense(
             packet=packet, route=route, system=system, user=user,
+            positive=positive,
         )
         total_attempts += int(status.get("attempts") or 0)
         warnings.extend(status.get("warnings") or [])
@@ -313,6 +329,7 @@ def run_defense(
         )
     result, status = _vote_defense(
         packet=packet, route=route, system=system, user=user_for(view_text),
+        positive=positive,
     )
     status["view"] = (
         "complete"
@@ -325,7 +342,7 @@ def run_defense(
             full_text, full_meta = render_judge_view(packet)
             result2, status2 = _vote_defense(
                 packet=packet, route=route, system=system,
-                user=user_for(full_text),
+                user=user_for(full_text), positive=positive,
             )
             status2["view"] = (
                 "complete" if not full_meta.get("degraded") else "degraded"
