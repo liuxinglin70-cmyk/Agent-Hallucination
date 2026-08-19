@@ -14,23 +14,27 @@
 packet（事件 + 工具交互 + 交付结果锚点）
       │
       ▼
-[1] Outcome Judge        全轨迹端到端判断（主召回来源）
+[1] Outcome Judge        全轨迹端到端判断（3 票多数决）
       │ true ────────────────────────────────────────┐
       │ false（一律运行召回安全网）                      │
       ▼                                               │
-[2] Recall Scanner       只找候选偏差，永远不定罪       │
+[2] Recall Scanner       只找候选偏差，永远不定罪        │
       │                                               │
       ▼                                               │
 [3] Causal Upgrade       候选必须 content_error ∧ causal
-      │ 升级成功 ─────────────────────────────────────┤
+      │ （逐候选 3 票多数决；全部正候选按最早步排序）      │
       ▼                                               ▼
-[4] Step Tracer          最早因果步（只在阳性后运行）
+[4] 听证队列（hearings）  Judge 阳性先听证；被 Defense 驳倒
+      │                  或 Judge 阴性时，每个正候选依次听证
+      ▼
+[5] Step Tracer          最早因果步（每场听证各跑一次）
       │
       ▼
-[5] Defense Verifier     只审查定罪，只允许“有证据的翻案”
+[6] Defense Verifier     只审查定罪，只允许“有证据的翻案”（3 票多数决）
       │ substantiated ────────► verified_error
-      │ refuted ──────────────► verified_clean
-      │ inconclusive/故障 ────► verified_error（degraded_judge_only）
+      │ substantiated_upgraded（平票）─► verified_error（degraded）
+      │ 全部听证 refuted ────► verified_clean
+      │ 未决/故障 ──────────► verified_error（degraded_judge_only）
       ▼
 deterministic adjudication（封闭词表，无阈值）
 ```
@@ -38,10 +42,27 @@ deterministic adjudication（封闭词表，无阈值）
 关键语义：
 
 - 幻觉 = 轨迹交付的结果错误，且最早某一步的修正是因果充分的；
+- **MATERIALITY 法则**（`semantics.py`）是唯一的语义权威，Judge / Causal
+  Upgrade / Defense 三段共享同一文本：判定单位 = 任务要求的全部交付物；
+  物质性 = 结果错误 ∨ 交付物内容违约 ∨ 虚假完成；工具调用即动作、任务固定
+  常量自接地、人类消息是断言非环境事实、已纠正的中间错误不算错；
 - 工具观察是环境事实；公开事实错误可用世界知识定罪；
-- 格式差异、已纠正的中间错误、纯过程/风格偏差、无虚假完成声明的未完成，不是幻觉；
-- Defense 的 `inconclusive` 和基础设施故障不翻案，只降 authority；
+- 格式差异、已纠正的中间错误、纯过程/风格偏差、无虚假完成声明的未完成，
+  不是幻觉；
+- Judge 阳性被 Defense 驳倒后转召回网再审，任何一个正候选听证
+  `substantiated` 即定罪；
+- Defense 的 `inconclusive`、平票（`substantiated_upgraded`）和基础设施故障
+  不翻案，只降 authority；
 - 只有 Judge 失败才 `unresolved`。
+
+### 方差层（多数决投票）
+
+Judge、Causal Upgrade、Defense 三个决定位支持 `votes: N` 路由配置（当前
+部署 3）。每次投票是独立顺序采样；契约违反或传输失败的一票弃权，其余票
+继续裁决。平票处置写成法则而非调参：Judge 平票保持阴性（定罪是非常规
+主张）；Upgrade 逐候选平票保持不升级；Defense 平票将 `substantiated`
+升级为 `substantiated_upgraded`（维持定罪、降 authority，绝不翻案）。
+Scanner 和 Tracer 不投票。投票详情记录在各阶段 `provider.vote`。
 
 ## 运行
 
@@ -154,7 +175,8 @@ DETECTOR_V2_TRANSPORT_RETRIES
 - 结果中的结构化字段：
   `proof.judge.delivered_result / correct_result / basis / confidence /
   evidence_refs / root_cause / contracts`
-  `proof.recall_candidates / causal_upgrade_rows / step_tracer`
+  `proof.recall_candidates / causal_upgrade_rows / causal_upgrades /
+  step_tracer / hearings`
   `proof.defense.verdict / confirmed_step / evidence_refs`
   `proof.evidence / proof.deployment`
   `decision_authority`（三态）——供进化层读取。

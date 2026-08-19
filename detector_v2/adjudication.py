@@ -1,7 +1,9 @@
 """Deterministic terminal adjudication for detector_v2.1.
 
-Closed vocabulary only. The preliminary positive may come from the Judge or
-from Recall Scanner + Causal Upgrade; Defense can only overturn it with a
+Closed vocabulary only. Preliminary positives arrive as a hearing queue
+(the judge first, then every recall-upgrade candidate from earliest
+corrected step); defense substantiates or refutes each hearing, and the
+first substantiated hearing convicts. Defense can only overturn with a
 proven ``refuted`` verdict.
 """
 
@@ -16,6 +18,8 @@ STATE_UNRESOLVED = "unresolved"
 AUTHORITY_AUTHORITATIVE = "authoritative"
 AUTHORITY_DEGRADED_JUDGE_ONLY = "degraded_judge_only"
 AUTHORITY_INVALID = "invalid"
+
+CONVICTING_VERDICTS = frozenset({"substantiated", "substantiated_upgraded"})
 
 
 from detector_v2.packet import delivered_result as packet_delivered_result
@@ -61,9 +65,18 @@ def _positive_from_judge(judge_result: Mapping[str, Any]) -> dict[str, Any] | No
 
 
 def _positive_from_upgrade(upgrade_result: Mapping[str, Any]) -> dict[str, Any] | None:
-    candidate = (upgrade_result.get("upgraded_candidate") or {}) if isinstance(upgrade_result, Mapping) else {}
-    if not candidate:
+    candidates = (
+        upgrade_result.get("upgraded_candidates")
+        or (
+            [upgrade_result.get("upgraded_candidate")]
+            if upgrade_result.get("upgraded_candidate") else []
+        )
+    ) if isinstance(upgrade_result, Mapping) else []
+    candidates = [c for c in candidates if c]
+    candidates.sort(key=lambda c: int(c.get("corrected_step") or 0))
+    if not candidates:
         return None
+    candidate = candidates[0]
     return {
         "source": "recall_upgrade",
         "step": int(candidate.get("corrected_step") or 0),
@@ -83,20 +96,61 @@ def _clean_positive(positive: Mapping[str, Any], step: int | None) -> dict[str, 
     return clean
 
 
+def _hearing_verdict(hearing: Mapping[str, Any]) -> str:
+    parsed = (hearing.get("defense_result") or {}).get("parsed")
+    parsed = parsed if isinstance(parsed, Mapping) else {}
+    return str(parsed.get("verdict") or "none")
+
+
+def _convicted_hearing(
+    hearings: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    return next(
+        (h for h in hearings if _hearing_verdict(h) in CONVICTING_VERDICTS),
+        None,
+    )
+
+
+def _convicted_candidate_step(
+    upgrade_result: Mapping[str, Any] | None,
+    convicted: Mapping[str, Any],
+) -> int | None:
+    """The upgraded candidate the convicted hearing heard, by id."""
+    if not isinstance(upgrade_result, Mapping):
+        return None
+    candidates = list(upgrade_result.get("upgraded_candidates") or [])
+    if not candidates and upgrade_result.get("upgraded_candidate"):
+        candidates = [upgrade_result["upgraded_candidate"]]
+    candidate = next(
+        (
+            c for c in candidates
+            if c and str(c.get("candidate_id") or "")
+            == str(convicted.get("candidate_id") or "")
+        ),
+        None,
+    )
+    if candidate is None:
+        return None
+    step = candidate.get("corrected_step")
+    return int(step) if isinstance(step, int) else None
+
+
 def adjudicate(
     *,
     packet: Mapping[str, Any],
     judge_result: Mapping[str, Any],
     judge_status: Mapping[str, Any],
-    recall_result: Mapping[str, Any] | None,
-    recall_status: Mapping[str, Any] | None,
-    upgrade_result: Mapping[str, Any] | None,
-    upgrade_status: Mapping[str, Any] | None,
-    tracer_result: Mapping[str, Any] | None,
-    tracer_status: Mapping[str, Any] | None,
-    defense_result: Mapping[str, Any] | None,
-    defense_status: Mapping[str, Any] | None,
+    recall_result: Mapping[str, Any] | None = None,
+    recall_status: Mapping[str, Any] | None = None,
+    upgrade_result: Mapping[str, Any] | None = None,
+    upgrade_status: Mapping[str, Any] | None = None,
+    tracer_result: Mapping[str, Any] | None = None,
+    tracer_status: Mapping[str, Any] | None = None,
+    defense_result: Mapping[str, Any] | None = None,
+    defense_status: Mapping[str, Any] | None = None,
     guard_actions: Sequence[str] | None = None,
+    hearings: Sequence[Mapping[str, Any]] | None = None,
+    hearing_facts: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     guards = set(guard_actions or ())
     if len(guards) > 1:
@@ -229,24 +283,25 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    traced_step = None
-    traced_refs = list(positive.get("evidence_refs") or [])
-    if tracer_result and tracer_result.get("ok"):
-        traced = tracer_result.get("parsed") or {}
-        traced_step = int(traced.get("step") or 0)
-        traced_refs = list(traced.get("evidence_refs") or [])
-    working_positive = _clean_positive(positive, traced_step)
-    working_positive["evidence_refs"] = traced_refs or working_positive.get("evidence_refs", [])
-
+    # The hearing queue is the conviction flow: the judge first, then
+    # every recall-upgrade candidate from earliest corrected step.
+    hearing_queue: list[Mapping[str, Any]] = list(hearings or [])
     defense_parsed = (defense_result or {}).get("parsed")
     defense_parsed = defense_parsed if isinstance(defense_parsed, Mapping) else {}
 
-    if defense_state == "ok" and defense_parsed.get("verdict") == "refuted":
-        reasons.append({
-            "component": "defense",
-            "code": "refuted",
-            "error_type": str(defense_parsed.get("reason") or ""),
-        })
+    if hearing_queue and all(
+        _hearing_verdict(h) == "refuted" for h in hearing_queue
+    ):
+        for h in hearing_queue:
+            reasons.append({
+                "component": "defense",
+                "code": "refuted",
+                "error_type": str(
+                    ((h.get("defense_result") or {}).get("parsed") or {}).get(
+                        "reason"
+                    ) or ""
+                ),
+            })
         if "restore_judge_conviction" in guards and (
             judge_positive or positive.get("source") == "recall_upgrade"
         ):
@@ -275,6 +330,7 @@ def adjudicate(
                 },
                 "authority_failure_reasons": reasons,
             }
+        last_reason = reasons[-1] if reasons else {}
         return {
             "state": STATE_CLEAN,
             "decision_authority": AUTHORITY_AUTHORITATIVE,
@@ -287,37 +343,102 @@ def adjudicate(
                 "decisive_facts": {
                     "positive_source": positive["source"],
                     "defense": "refuted",
-                    "defense_reason": defense_parsed.get("reason") or "",
+                    "defense_reason": last_reason.get("error_type") or "",
+                    "hearings": [
+                        {
+                            "source": h.get("source"),
+                            "candidate_id": h.get("candidate_id"),
+                            "verdict": _hearing_verdict(h),
+                        }
+                        for h in hearing_queue
+                    ],
                 },
                 "blocking_facts": [dict(reason) for reason in reasons],
             },
             "authority_failure_reasons": reasons,
         }
 
-    degraded = False
-    if defense_state == "ok" and defense_parsed.get("verdict") == "substantiated":
-        confirmed = defense_parsed.get("confirmed_step")
+    convicted = _convicted_hearing(hearing_queue)
+    if convicted is None:
+        # No hearing substantiated and not all refuted: the defense failed
+        # to settle, the preliminary verdict survives with degraded
+        # authority.
+        degraded = True
+        if defense_state != "ok":
+            reasons.append({
+                "component": "defense",
+                "code": str(defense_state or "unknown"),
+                "error_type": str((defense_result or {}).get("error_type") or ""),
+                "error": str((defense_result or {}).get("error") or ""),
+            })
+        else:
+            reasons.append({
+                "component": "defense",
+                "code": "inconclusive",
+                "error_type": str(defense_parsed.get("reason") or ""),
+            })
+        step = positive.get("step")
+        responsible_event_id = _event_id_for_step(packet, step)
+        return {
+            "state": STATE_ERROR,
+            "decision_authority": AUTHORITY_DEGRADED_JUDGE_ONLY,
+            "runtime_valid": True,
+            "responsible_event_id": responsible_event_id,
+            "responsible_step": step if responsible_event_id else None,
+            "incident_occurred": True,
+            "terminal_basis": {
+                "state": STATE_ERROR,
+                "decisive_facts": {
+                    "positive_source": positive["source"],
+                    "defense": "unsettled",
+                    "judge_basis": judge_parsed.get("basis"),
+                    "hearings": [
+                        {
+                            "source": h.get("source"),
+                            "candidate_id": h.get("candidate_id"),
+                            "verdict": _hearing_verdict(h),
+                        }
+                        for h in hearing_queue
+                    ],
+                },
+                "blocking_facts": [dict(reason) for reason in reasons],
+            },
+            "authority_failure_reasons": reasons,
+        }
+
+    working_positive = dict(positive)
+    convicted_parsed = (
+        (convicted.get("defense_result") or {}).get("parsed") or {}
+    )
+    convicted_tracer = (
+        (convicted.get("tracer_result") or {}).get("parsed") or {}
+    )
+    working_positive["source"] = str(convicted.get("source") or positive["source"])
+    if convicted.get("source") == "recall_upgrade":
+        working_positive["step"] = _convicted_candidate_step(
+            upgrade_result, convicted,
+        ) or int(working_positive.get("step") or 0)
+    traced_step = None
+    traced_refs = list(
+        convicted_tracer.get("evidence_refs")
+        or working_positive.get("evidence_refs")
+        or []
+    )
+    if convicted_tracer.get("step") is not None:
+        traced_step = int(convicted_tracer.get("step"))
+        working_positive = _clean_positive(working_positive, traced_step)
+    working_positive["evidence_refs"] = traced_refs
+
+    verdict = str(convicted_parsed.get("verdict") or "")
+    degraded = verdict == "substantiated_upgraded"
+    if traced_step is None and not degraded:
+        confirmed = convicted_parsed.get("confirmed_step")
         # The step tracer is the dedicated localization authority; the
         # defense-confirmed step is only a fallback when tracing failed.
-        if traced_step is None and isinstance(confirmed, int):
+        if isinstance(confirmed, int):
             event_count = len(list(packet.get("events") or []))
             if 1 <= confirmed <= event_count:
                 working_positive = _clean_positive(working_positive, confirmed)
-    elif defense_state == "ok" and defense_parsed.get("verdict") == "inconclusive":
-        degraded = True
-        reasons.append({
-            "component": "defense",
-            "code": "inconclusive",
-            "error_type": str(defense_parsed.get("reason") or ""),
-        })
-    else:
-        degraded = True
-        reasons.append({
-            "component": "defense",
-            "code": str(defense_state or "unknown"),
-            "error_type": str((defense_result or {}).get("error_type") or ""),
-            "error": str((defense_result or {}).get("error") or ""),
-        })
 
     step = working_positive.get("step")
     responsible_event_id = _event_id_for_step(packet, step)
@@ -332,16 +453,24 @@ def adjudicate(
         "terminal_basis": {
             "state": STATE_ERROR,
             "decisive_facts": {
-                "positive_source": positive["source"],
+                "positive_source": working_positive["source"],
                 "judge_step": judge_positive.get("step") if judge_positive else None,
                 "traced_step": traced_step,
-                "defense": defense_parsed.get("verdict"),
-                "confirmed_step": defense_parsed.get("confirmed_step"),
-                "delivered_result": positive.get("delivered_result") or "",
-                "correct_result": positive.get("correct_result") or "",
+                "defense": verdict,
+                "confirmed_step": convicted_parsed.get("confirmed_step"),
+                "delivered_result": working_positive.get("delivered_result") or "",
+                "correct_result": working_positive.get("correct_result") or "",
                 "judge_basis": judge_parsed.get("basis"),
                 "authority": authority,
                 "guard_actions": sorted(guards),
+                "hearings": [
+                    {
+                        "source": h.get("source"),
+                        "candidate_id": h.get("candidate_id"),
+                        "verdict": _hearing_verdict(h),
+                    }
+                    for h in hearing_queue
+                ],
             },
             "blocking_facts": [dict(reason) for reason in reasons],
         },

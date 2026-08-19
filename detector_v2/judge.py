@@ -14,7 +14,7 @@ from detector_v2.packet import (
     packet_features,
     render_judge_view,
 )
-from detector_v2.provider import ProviderError, provider_call
+from detector_v2.provider import ProviderError, majority_vote, provider_call
 from detector_v2.semantics import (
     CONTRACT_KINDS,
     JUDGE_BASIS_VALUES,
@@ -126,6 +126,59 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
     }, ""
 
 
+def _cast_vote(
+    *,
+    packet: Mapping[str, Any],
+    route: Mapping[str, Any],
+    system: str,
+    user: str,
+    view_state: str,
+) -> tuple[dict | None, dict[str, Any] | None, bool, list[dict[str, str]]]:
+    """One judge ballot; a ``None`` verdict means this ballot abstains.
+
+    Returns ``(parsed_or_None, provider_meta_or_None, fatal, warnings)``
+    where ``fatal`` marks a failure that makes the whole judge stage fail
+    (a missing credential repeats for every vote). Ordinary contract
+    violations and transport failures are repaired once and otherwise
+    abstain — the remaining ballots still decide.
+    """
+    warnings: list[dict[str, str]] = []
+
+    def abstain(message: str) -> tuple:
+        warnings.append({"attempt": "vote", "error": message})
+        return None, None, False, list(warnings)
+
+    def fatal_error(message: str, attempts: int, error_type: str) -> tuple:
+        warnings.append({"attempt": "vote", "error": message})
+        return None, None, True, list(warnings)
+
+    try:
+        parsed, meta = provider_call(
+            route=route, system=system, user=user, purpose="judge",
+        )
+    except ProviderError as exc:
+        if exc.error_type == "missing_credential":
+            return fatal_error(exc.message, exc.attempts, "provider_error")
+        return abstain(exc.message)
+    result, error = _parse_judge(parsed, packet)
+    if result is None:
+        warnings.append({"attempt": "initial", "error": f"contract:{error}"})
+        try:
+            parsed, meta = provider_call(
+                route=route, system=system,
+                user=user + JUDGE_CONTRACT_REPAIR,
+                purpose="judge_repair",
+            )
+            result, error = _parse_judge(parsed, packet)
+        except ProviderError as exc:
+            if exc.error_type == "missing_credential":
+                return fatal_error(exc.message, exc.attempts, "provider_error")
+            return abstain(exc.message)
+    if result is None:
+        warnings.append({"attempt": "final", "error": f"contract:{error}"})
+    return result, meta, False, list(warnings)
+
+
 def run_judge(
     *,
     packet: Mapping[str, Any],
@@ -136,7 +189,11 @@ def run_judge(
 
     ``judge_result`` always carries ``ok`` and ``parsed``. A provider or
     contract failure is returned as status, never raised: only the judge
-    failure can make the whole case unresolved.
+    failure can make the whole case unresolved. When the route requests
+    more than one vote, independent samples decide ``is_hallucination``
+    by strict majority; a tie or no quorum keeps the negative verdict and
+    the stage degrades, because a positive verdict is the extraordinary
+    claim.
     """
     plan = plan or empty_plan()
     route = dict(config["judge_route"])
@@ -147,75 +204,87 @@ def run_judge(
         "Judge the trajectory below. Do not use any information that is not "
         "in the question or the trajectory.\n\n" + view_text
     )
+    view_state = "complete" if not view_meta.get("degraded") else "degraded"
+
+    votes = max(1, int(route.get("votes", 1) or 1))
+    ballots: list[dict[str, Any]] = []
+    sample_meta: dict[str, Any] = {}
+    total_attempts = 0
     warnings: list[dict[str, str]] = []
-    meta: dict[str, Any] = {}
-    try:
-        parsed, meta = provider_call(
-            route=route, system=system, user=user, purpose="judge",
+    fatal_error = ""
+    for _ in range(votes):
+        parsed, meta, fatal, vote_warnings = _cast_vote(
+            packet=packet, route=route, system=system, user=user,
+            view_state=view_state,
         )
-    except ProviderError as exc:
+        total_attempts += int((meta or {}).get("attempts") or 0)
+        warnings.extend(vote_warnings)
+        if fatal:
+            fatal_error = vote_warnings[-1]["error"] if vote_warnings else "judge vote failed"
+            break
+        if parsed is not None:
+            ballots.append(parsed)
+            sample_meta = dict(meta or {})
+    if fatal_error:
         return {
             "ok": False,
             "parsed": None,
-            "error": exc.message,
-            "error_type": exc.error_type,
+            "error": fatal_error,
+            "error_type": "provider_error",
         }, {
-            "stage": "judge",
-            "state": "provider_error",
-            "attempts": exc.attempts,
-            "view": "complete" if not view_meta.get("degraded") else "degraded",
+            "stage": "judge", "state": "provider_error",
+            "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }
-    result, error = _parse_judge(parsed, packet)
-    if result is None:
-        warnings.append({
-            "attempt": "initial", "error": f"contract:{error}",
-        })
-        try:
-            parsed, meta = provider_call(
-                route=route,
-                system=system,
-                user=user + JUDGE_CONTRACT_REPAIR,
-                purpose="judge_repair",
-            )
-            result, error = _parse_judge(parsed, packet)
-        except ProviderError as exc:
-            return {
-                "ok": False,
-                "parsed": None,
-                "error": exc.message,
-                "error_type": exc.error_type,
-            }, {
-                "stage": "judge",
-                "state": "provider_error",
-                "attempts": exc.attempts,
-                "view": "complete" if not view_meta.get("degraded") else "degraded",
-                "warnings": warnings,
-            }
-    if result is None:
+    if not ballots:
         return {
             "ok": False,
             "parsed": None,
-            "error": error,
-            "error_type": "contract_error",
+            "error": "every judge vote failed",
+            "error_type": "provider_error",
         }, {
-            "stage": "judge",
-            "state": "contract_error",
-            "attempts": int(meta.get("attempts") or 0),
-            "view": "complete" if not view_meta.get("degraded") else "degraded",
+            "stage": "judge", "state": "provider_error",
+            "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }
+
+    if votes == 1:
+        result = ballots[0]
+        vote_meta: dict[str, Any] = {"votes": 1}
+    else:
+        winner, cast = majority_vote(
+            [bool(ballot.get("is_hallucination")) for ballot in ballots],
+            on_tie=False,
+        )
+        positives = sum(
+            1 for ballot in ballots if ballot.get("is_hallucination")
+        )
+        # A positive verdict needs a strict majority; an undecided vote
+        # keeps the negative verdict, the less extraordinary claim.
+        vote_meta = {
+            "votes": votes, "cast": cast, "positives": positives,
+            "winner": winner,
+            "tie": not (winner or positives * 2 < cast),
+        }
+        result = next(
+            (
+                ballot for ballot in ballots
+                if bool(ballot.get("is_hallucination")) == winner
+            ),
+            ballots[0],
+        )
+    sample_meta["vote"] = vote_meta
     return {
         "ok": True,
         "parsed": result,
-        "raw": parsed,
-        "provider": meta,
+        "raw": ballots if votes > 1 else ballots[0],
+        "provider": sample_meta,
         "view_meta": view_meta,
     }, {
         "stage": "judge",
         "state": "ok",
-        "attempts": int(meta.get("attempts") or 0),
-        "view": "complete" if not view_meta.get("degraded") else "degraded",
+        "attempts": total_attempts,
+        "view": view_state,
         "warnings": warnings,
     }
 

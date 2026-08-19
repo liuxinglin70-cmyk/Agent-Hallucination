@@ -138,6 +138,136 @@ def test_detect_recall_upgrade_path(sample_record, monkeypatch):
     assert result["proof"]["terminal_basis"]["decisive_facts"]["positive_source"] == "recall_upgrade"
 
 
+def test_detect_judge_conviction_is_authoritative(sample_record, monkeypatch):
+    """A judge positive that defense substantiates convicts without degradation."""
+    judge_result = {
+        "ok": True,
+        "parsed": {
+            "is_hallucination": True,
+            "hallucination_step": 2,
+            "hallucination_reason": "said 5",
+            "delivered_result": "5",
+            "correct_result": "4",
+            "basis": "derivation",
+            "confidence": "high",
+            "evidence_refs": ["event_002"],
+            "root_cause": {"step": 2, "quote": "5", "referent": "4"},
+            "contracts": [{"kind": "exact_value", "requirement": "4"}],
+        },
+        "provider": {"model": "m"},
+    }
+    judge_status = {
+        "stage": "judge", "state": "ok", "attempts": 1,
+        "view": "complete", "warnings": [],
+    }
+
+    def fake_judge(*, packet, config, plan):
+        return judge_result, judge_status
+
+    def fake_recall(*, packet, config, plan):
+        raise AssertionError("recall net must not run for a conviction")
+
+    def fake_upgrade(*, packet, candidates, config, plan):
+        raise AssertionError("recall net must not run for a conviction")
+
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan):
+        return {"ok": True, "parsed": {
+            "step": 2, "quote": "5", "referent": "4",
+            "evidence_refs": ["event_002"], "reason": "earliest wrong step",
+        }}, {"stage": "step_tracer", "state": "ok", "attempts": 0,
+             "view": "complete", "warnings": []}
+
+    def fake_defense(*, packet, positive, config, plan):
+        return {"ok": True, "parsed": {
+            "verdict": "substantiated", "confirmed_step": 2,
+            "evidence_refs": ["event_002"], "reason": "real and causal",
+        }}, {"stage": "defense", "state": "ok", "attempts": 0,
+             "view": "complete", "warnings": []}
+
+    monkeypatch.setattr("detector_v2.api.run_judge", fake_judge)
+    monkeypatch.setattr("detector_v2.api.run_recall_scan", fake_recall)
+    monkeypatch.setattr("detector_v2.api.run_causal_upgrade", fake_upgrade)
+    monkeypatch.setattr("detector_v2.api.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector_v2.api.run_defense", fake_defense)
+    detector = Detector(CONFIG)
+    result = detector.detect(sample_record, case_id="x")
+    assert result["state"] == "verified_error"
+    assert result["decision_authority"] == "authoritative"
+    assert result["responsible_step"] == 2
+    facts = result["proof"]["terminal_basis"]["decisive_facts"]
+    assert facts["positive_source"] == "judge"
+    assert facts["defense"] == "substantiated"
+    hearing = result["proof"]["hearings"][0]
+    assert hearing["source"] == "judge"
+    assert hearing["defense"]["verdict"] == "substantiated"
+
+
+def test_detect_judge_refuted_and_recall_empty_is_clean(sample_record, monkeypatch):
+    """The refuted judge hearing plus an empty recall net acquits."""
+    judge_result = {
+        "ok": True,
+        "parsed": {
+            "is_hallucination": True,
+            "hallucination_step": 2,
+            "hallucination_reason": "said 5",
+            "delivered_result": "5",
+            "correct_result": "4",
+            "basis": "derivation",
+            "confidence": "high",
+            "evidence_refs": ["event_002"],
+            "root_cause": {"step": 2, "quote": "5", "referent": "4"},
+            "contracts": [{"kind": "exact_value", "requirement": "4"}],
+        },
+        "provider": {"model": "m"},
+    }
+    judge_status = {
+        "stage": "judge", "state": "ok", "attempts": 1,
+        "view": "complete", "warnings": [],
+    }
+
+    def fake_judge(*, packet, config, plan):
+        return judge_result, judge_status
+
+    def fake_recall(*, packet, config, plan):
+        return {"ok": True, "candidates": []}, {
+            "stage": "recall_scanner", "state": "ok", "attempts": 0,
+            "view": "complete", "warnings": [],
+        }
+
+    def fake_upgrade(*, packet, candidates, config, plan):
+        return {
+            "ok": True, "upgrades": [], "upgraded_candidate": None,
+            "upgraded_candidates": [],
+        }, {"stage": "causal_upgrade", "state": "not_needed", "attempts": 0,
+            "view": "not_rendered", "warnings": []}
+
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan):
+        return {"ok": True, "parsed": {
+            "step": 2, "quote": "5", "referent": "4",
+            "evidence_refs": ["event_002"], "reason": "earliest wrong step",
+        }}, {"stage": "step_tracer", "state": "ok", "attempts": 0,
+             "view": "complete", "warnings": []}
+
+    def fake_defense(*, packet, positive, config, plan):
+        return {"ok": True, "parsed": {
+            "verdict": "refuted", "confirmed_step": None,
+            "evidence_refs": ["event_002"], "reason": "not a real error",
+        }}, {"stage": "defense", "state": "ok", "attempts": 0,
+             "view": "complete", "warnings": []}
+
+    monkeypatch.setattr("detector_v2.api.run_judge", fake_judge)
+    monkeypatch.setattr("detector_v2.api.run_recall_scan", fake_recall)
+    monkeypatch.setattr("detector_v2.api.run_causal_upgrade", fake_upgrade)
+    monkeypatch.setattr("detector_v2.api.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector_v2.api.run_defense", fake_defense)
+    detector = Detector(CONFIG)
+    result = detector.detect(sample_record, case_id="x")
+    assert result["state"] == "verified_clean"
+    assert result["decision_authority"] == "authoritative"
+    hearing = result["proof"]["hearings"][0]
+    assert hearing["defense"]["verdict"] == "refuted"
+
+
 def test_detect_rejects_extra_fields(sample_record):
     detector = Detector(CONFIG, require_credentials=False)
     bad = {**sample_record, "true_answer": "4"}

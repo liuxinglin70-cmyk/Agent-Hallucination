@@ -161,6 +161,29 @@ def extract_json_object(text: str) -> Any | None:
     return None
 
 
+def majority_vote(values, *, on_tie):
+    """Strict-majority vote with a deterministic tie law.
+
+    ``None`` ballots are abstentions (a sample that produced no valid
+    verdict) and are not counted. A value wins only with more than half of
+    the cast ballots; any other outcome — a tie, no strict majority, or no
+    cast ballots — resolves to ``on_tie``. The winner never depends on
+    ballot order, so sequential sampling cannot bias the outcome.
+
+    Returns ``(winner, cast_ballots)``.
+    """
+    counts: dict[Any, int] = {}
+    for value in values:
+        if value is None:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    cast = sum(counts.values())
+    for value, count in counts.items():
+        if count * 2 > cast:
+            return value, cast
+    return on_tie, cast
+
+
 def _endpoint_url(endpoint: str) -> str:
     endpoint = endpoint.rstrip("/")
     if endpoint.endswith("/chat/completions"):

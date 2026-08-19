@@ -292,7 +292,11 @@ class Detector:
         defense_result = None
         defense_status = None
 
-        if judge_status.get("state") == "ok" and not judge_positive:
+        def run_recall_net() -> None:
+            """Run the recall net (scanner + causal upgrade) on demand."""
+            nonlocal recall_result, recall_status, upgrade_result, upgrade_status
+            if recall_result is not None:
+                return
             if frozen is not None and "recall_result" in frozen:
                 recall_result = dict(frozen.get("recall_result") or {})
                 recall_status = dict(frozen.get("recall_status") or {})
@@ -314,15 +318,28 @@ class Detector:
             elif recall_result.get("ok"):
                 upgrade_result = {
                     "ok": True, "upgrades": [], "upgraded_candidate": None,
+                    "upgraded_candidates": [],
                 }
                 upgrade_status = {
                     "stage": "causal_upgrade", "state": "not_needed",
                     "attempts": 0, "view": "not_rendered", "warnings": [],
                 }
 
-        positive = None
-        if judge_status.get("state") == "ok" and judge_positive:
-            positive = {
+        if judge_status.get("state") == "ok" and not judge_positive:
+            # The recall net always runs before any clean verdict: the
+            # judge alone never has the last word on innocence.
+            run_recall_net()
+
+        def positives_from_upgrade() -> list[dict[str, Any]]:
+            candidates = list(
+                (upgrade_result or {}).get("upgraded_candidates")
+                or ([(upgrade_result or {}).get("upgraded_candidate")]
+                    if (upgrade_result or {}).get("upgraded_candidate") else [])
+            )
+            return [dict(c) for c in candidates if c]
+
+        def positive_from_judge() -> dict[str, Any]:
+            return {
                 "source": "judge",
                 "step": judge_parsed.get("hallucination_step"),
                 "reason": judge_parsed.get("hallucination_reason"),
@@ -333,9 +350,9 @@ class Detector:
                 "confidence": judge_parsed.get("confidence") or "",
                 "quote": (judge_parsed.get("root_cause") or {}).get("quote") or "",
             }
-        elif upgrade_result and upgrade_result.get("upgraded_candidate"):
-            candidate = upgrade_result["upgraded_candidate"]
-            positive = {
+
+        def positive_from_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
+            return {
                 "source": "recall_upgrade",
                 "step": candidate.get("corrected_step"),
                 "reason": candidate.get("claim"),
@@ -351,12 +368,19 @@ class Detector:
                 "contracts": judge_parsed.get("contracts") or [],
             }
 
-        if positive:
+        hearings: list[dict[str, Any]] = []
+        if judge_status.get("state") == "ok" and judge_positive:
+            hearings.append(positive_from_judge())
+
+        def run_hearing(positive: Mapping[str, Any]) -> tuple[
+            dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
+        ]:
+            """Tracer + defense for one positive; defense is decisive."""
             if frozen is not None and "tracer_result" in frozen:
-                tracer_result = dict(frozen.get("tracer_result") or {})
-                tracer_status = dict(frozen.get("tracer_status") or {})
+                tracer_r = dict(frozen.get("tracer_result") or {})
+                tracer_s = dict(frozen.get("tracer_status") or {})
             else:
-                tracer_result, tracer_status = run_step_tracer(
+                tracer_r, tracer_s = run_step_tracer(
                     packet=packet,
                     delivered_result=str(positive.get("delivered_result") or ""),
                     correct_result=str(positive.get("correct_result") or ""),
@@ -364,23 +388,82 @@ class Detector:
                     plan=plan,
                 )
             if frozen is not None and "defense_result" in frozen:
-                defense_result = dict(frozen.get("defense_result") or {})
-                defense_status = dict(frozen.get("defense_status") or {})
+                defense_r = dict(frozen.get("defense_result") or {})
+                defense_s = dict(frozen.get("defense_status") or {})
             else:
-                defense_result, defense_status = run_defense(
+                defense_r, defense_s = run_defense(
                     packet=packet,
                     positive=positive,
                     config=self.config,
                     plan=plan,
                 )
+            return tracer_r, tracer_s, defense_r, defense_s
+
+        judge_overturned = False
+        if hearings:
+            tracer_result, tracer_status, defense_result, defense_status = (
+                run_hearing(hearings[0])
+            )
+            hearings[0]["tracer_result"] = tracer_result
+            hearings[0]["tracer_status"] = tracer_status
+            hearings[0]["defense_result"] = defense_result
+            hearings[0]["defense_status"] = defense_status
+            defense_parsed = (
+                defense_result.get("parsed")
+                if isinstance(defense_result.get("parsed"), Mapping) else {}
+            )
+            if str(defense_parsed.get("verdict") or "") == "refuted":
+                judge_overturned = True
+
+        if (
+            judge_status.get("state") == "ok" and not judge_positive
+        ) or judge_overturned:
+            # A judge-negative case, or a judge conviction the defense
+            # overturned: the recall net hears the case next.
+            run_recall_net()
+            for candidate in positives_from_upgrade():
+                hearing = positive_from_candidate(candidate)
+                (
+                    hearing["tracer_result"],
+                    hearing["tracer_status"],
+                    hearing["defense_result"],
+                    hearing["defense_status"],
+                ) = run_hearing(hearing)
+                hearing["candidate_id"] = candidate.get("candidate_id")
+                hearings.append(hearing)
 
         defense_parsed = (
             (defense_result or {}).get("parsed") or {}
         ) if isinstance((defense_result or {}).get("parsed"), Mapping) else {}
+        hearing_facts = [
+            {
+                "candidate_id": h.get("candidate_id"),
+                "source": h.get("source"),
+                "defense_verdict": str(
+                    ((h.get("defense_result") or {}).get("parsed") or {}).get(
+                        "verdict"
+                    ) or "none"
+                ),
+            }
+            for h in hearings
+        ]
+        first_convicted = next(
+            (
+                hearing for hearing in hearings
+                if str(
+                    ((hearing.get("defense_result") or {}).get("parsed") or {}
+                     ).get("verdict") or ""
+                ) in {"substantiated", "substantiated_upgraded"}
+            ),
+            None,
+        )
+        positive = first_convicted
         guard_facts = {
             "judge_positive": str(judge_positive).lower(),
             "judge_confidence": str(judge_parsed.get("confidence") or ""),
-            "positive_source": str((positive or {}).get("source") or "none"),
+            "positive_source": str(
+                (first_convicted or {}).get("source") or "none"
+            ),
             "defense_verdict": str(defense_parsed.get("verdict") or "none"),
             "defense_view_degraded": str(
                 bool(defense_status)
@@ -396,7 +479,9 @@ class Detector:
                     == "degraded_missing_rows"
                 )
             ).lower(),
-            "recall_upgrade": "present" if positive and positive.get("source") == "recall_upgrade" else "none",
+            "recall_upgrade": (
+                "present" if positive and positive.get("source") == "recall_upgrade" else "none"
+            ),
         }
         guard_actions = plan.guard_actions(packet, guard_facts)
         proof = adjudicate(
@@ -412,6 +497,8 @@ class Detector:
             defense_result=defense_result,
             defense_status=defense_status,
             guard_actions=guard_actions,
+            hearings=hearings,
+            hearing_facts=hearing_facts,
         )
         provenance: dict[str, Any] = {}
         if effective_interventions is not None:
@@ -447,6 +534,9 @@ class Detector:
         proof["causal_upgrade"] = (
             upgrade_result.get("upgraded_candidate") if upgrade_result else None
         )
+        proof["causal_upgrades"] = (
+            upgrade_result.get("upgraded_candidates") if upgrade_result else None
+        )
         proof["causal_upgrade_rows"] = (
             upgrade_result.get("upgrades") if upgrade_result else None
         )
@@ -459,6 +549,25 @@ class Detector:
         proof["causal_upgrade_coverage"] = (
             upgrade_result.get("coverage") if upgrade_result else None
         )
+        proof["hearings"] = [
+            {
+                "source": hearing.get("source"),
+                "candidate_id": hearing.get("candidate_id"),
+                "positive": {
+                    key: hearing.get(key) for key in (
+                        "source", "step", "reason", "evidence_refs", "quote",
+                        "delivered_result", "correct_result",
+                    )
+                },
+                "step_tracer": (
+                    (hearing.get("tracer_result") or {}).get("parsed")
+                ),
+                "defense": (
+                    (hearing.get("defense_result") or {}).get("parsed")
+                ),
+            }
+            for hearing in hearings
+        ]
         proof["evidence"] = list(plan.evidence)
         proof["deployment"] = plan.deployment_summary()
         return build_detection_output(

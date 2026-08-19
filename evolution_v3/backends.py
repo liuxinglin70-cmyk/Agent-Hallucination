@@ -232,6 +232,13 @@ class DetectorV2Backend(DetectionBackend):
                 "ok": upgrade_status.get("state") == "ok",
                 "upgrades": list(proof.get("causal_upgrade_rows") or []),
                 "upgraded_candidate": proof.get("causal_upgrade"),
+                "upgraded_candidates": list(
+                    proof.get("causal_upgrades")
+                    or (
+                        [proof.get("causal_upgrade")]
+                        if proof.get("causal_upgrade") else []
+                    )
+                ),
             })
         if (
             "tracer.system" not in hooks

@@ -1,45 +1,77 @@
-"""Universal laws for detector_v2.1 stages.
+"""Universal laws for detector_v2 stages.
 
 Dataset-independent by construction. Domain specialisation is only allowed
 through validated ``text_boundary`` interventions (see
-``detector_v2.interventions``).
+``detector_v2.interventions``). The MATERIALITY law below is the single
+semantic authority: the judge, the causal upgrade gate and the defense all
+decide through the same text, so no stage can narrow what another stage
+convicts on.
 """
 
 from __future__ import annotations
 
+MATERIALITY = """\
+MATERIALITY LAW — every stage below decides through this one law.
+The unit of judgement is EVERY deliverable the task requires: the final
+answer, every artifact, state and action the task text demands, and the
+claim of completion itself. A trajectory is clean only when every
+deliverable is correct. A deviation is material iff it is one of:
+- RESULT ERROR: the delivered answer or committed state is wrong.
+- DELIVERABLE BREACH: a required deliverable's content or a required
+  action deviates from the task contract — wrong tool arguments, a
+  missing or wrongly ordered action, a wrong channel, target or format
+  fixed by the task — even when the final answer text looks plausible.
+- FALSE COMPLETION: the trajectory claims a success or completion that
+  did not happen as claimed.
+GROUNDING RULES:
+1. A tool call is the action it performs. When the task fixes an
+   argument, target, order or channel, that fixed part belongs to the
+   deliverable; a deviation observed in the call is real regardless of
+   the final answer text.
+2. Constants the task text fixes (names, ids, values, formats, channels)
+   are grounded in the task itself; no observation and no later message
+   can override them.
+3. Tool observations are environment facts. Any other human or user
+   message inside the trajectory is an assertion, not an environment
+   fact: saying it does not establish it, and a delivered result that
+   repeats an unverified user claim is not thereby correct.
+4. Judge the state the trajectory actually delivers: an intermediate
+   error the trajectory later corrected is not a violation.
+"""
+
 JUDGE_SYSTEM = """\
 You are the outcome judge of a hallucination detector.
 
-UNIVERSAL DEFINITION
-A trajectory is hallucinated iff the RESULT IT DELIVERS — its final answer \
-or the task state it commits to — is wrong, and there exists an earliest \
-step whose correction is causally sufficient to make the delivered result \
-correct.
-
+""" + MATERIALITY + """
 WORK IN THIS ORDER
 1. CONTRACT EXTRACTION. State what the task requires as its result, and \
 list every explicit constraint the task text fixes: verbatim content, \
-exact output form, exact numeric value, required tool action, required \
-channel or required state. For each constraint decide its kind from: \
-verbatim_content, exact_form, exact_value, required_action, required_channel.
-2. Reconstruct the result the trajectory actually delivered.
-3. Independently determine the correct result required by the question.
+exact output form, exact numeric value, required tool action (with its \
+arguments, order and channel), or required state. For each constraint \
+decide its kind from: verbatim_content, exact_form, exact_value, \
+required_action, required_channel.
+2. Reconstruct everything the trajectory actually delivered: the final \
+answer, every required artifact or state, every required action as it \
+was actually performed, and any completion claim it makes.
+3. Independently determine the correct deliverables required by the task.
    - Tool observations are environment facts: do not override them with
      outside knowledge.
    - Public factual claims may be checked against real-world knowledge,
      even when a retrieved source asserts otherwise.
-4. COMPARE WITH THE CONTRACT. Semantic differences decide the verdict. \
+   - A user message inside the trajectory is an assertion, not an
+     environment fact: check it against the observations or the task
+     before treating its content as correct.
+4. COMPARE THE DELIVERED STATE WITH THE CONTRACT under the MATERIALITY \
+LAW above. Semantic differences in a deliverable decide the verdict. \
 Formatting, wording, unit/currency presentation, or harmless rounding are \
 NOT errors UNLESS an explicit contract above fixes that exact form or \
-value. A violation of an explicit contract is an error only when it \
-changes what the task required the trajectory to deliver.
-5. If the delivered result satisfies the task, answer false.
-6. If it does not, find the EARLIEST step whose correction would make the \
-delivered result correct. A later step that merely reveals an earlier \
-error is not the locus. An intermediate error already corrected does not \
-count.
+value.
+5. If every deliverable satisfies the task, answer false.
+6. Otherwise find the EARLIEST step whose correction would make every \
+deliverable correct. A later step that merely reveals an earlier error \
+is not the locus. An intermediate error already corrected does not count.
 7. These are NOT hallucinations: an error corrected later; tool/style \
-choices that do not change the delivered result; failure to answer without \
+choices that do not change any deliverable; failure to answer without \
 a false completion claim or fabricated content; a tool observation itself.
 
 When is_hallucination is true, provide evidence_refs: the event ids that \
@@ -84,13 +116,16 @@ hallucinated.
 
 A candidate is any specific point where the trajectory may deviate from:
 - the task contract in the question (required result, verbatim content, \
-exact form/value, required action or channel);
+exact form/value, required actions with their arguments, order and \
+channel);
 - its own tool observations (fabricated, misreported or reordered results);
-- real-world facts (wrong entity, value, date, public fact, derivation).
+- real-world facts (wrong entity, value, date, public fact, derivation);
+- verification: a claim the trajectory presents as established although \
+no observation, no task-fixed constant and no world fact establishes it.
 
 For every assistant message and every tool call, compare it against the \
 question, the tool observations, and real-world knowledge. Name the \
-deviation in contrast form: "the agent did X instead of the required Y".
+deviation in contrast form: "the agent did X instead of the required Y". \
 Include candidates even when you are uncertain — a later stage filters \
 them. Do not include formatting-only differences unless the task \
 explicitly fixed that form.
@@ -121,16 +156,20 @@ You are the causal upgrade gate of a hallucination detector. A recall \
 scanner found candidate deviations, but a candidate can only turn a clean \
 trajectory into a hallucinated one if BOTH tests pass.
 
+""" + MATERIALITY + """
 For each candidate:
-1. CONTENT TEST — is the claimed deviation factually real (wrong content, \
-fabricated/misreported observation, or violated explicit task contract)?
-2. CAUSAL TEST — if that exact point were corrected, would the trajectory's \
-delivered result become the correct result required by the task? Consider \
-later corrections and whether the deviation is merely presentational.
+1. CONTENT TEST — is the claimed deviation factually real under the \
+grounding rules (wrong content, fabricated or misreported observation, \
+or a violated explicit task contract)?
+2. CAUSAL TEST — if that exact point were corrected, would every \
+deliverable become correct under the MATERIALITY LAW? Consider later \
+corrections and whether the deviation is merely presentational.
 
-A deviation that is real but irrelevant to the delivered result is NOT an \
-upgrade. A deviation that is only formatting/wording and is not fixed by \
-an explicit task contract is NOT an upgrade.
+A deviation that is real but touches no deliverable is NOT an upgrade. \
+A deviation that is only formatting/wording and is not fixed by an \
+explicit task contract is NOT an upgrade. A required action performed \
+with wrong arguments, in the wrong order, or through the wrong channel \
+IS a deliverable breach even when the final answer text is unchanged.
 
 Reply with ONLY a JSON object of the exact shape. The upgrades array must \
 contain EXACTLY ONE ROW FOR EVERY candidate, in the same order, with no \
@@ -217,23 +256,34 @@ You are the defense stage of a hallucination detector. A positive verdict \
 claims the trajectory is hallucinated at the step below for the reason \
 below.
 
+""" + MATERIALITY + """
 Your ONLY power is to overturn a wrong conviction with positive evidence. \
-You may not convict anything yourself.
+You may not convict anything yourself. Judge THIS allegation on THIS \
+trajectory: quote the exact statement or action at the alleged step from \
+the shown evidence, and never evaluate the general theory of the \
+allegation in the abstract.
 
 Answer two questions independently:
 1. CONTENT TEST — quote the exact statement or action at the alleged step \
-and the correct or required referent. Is the claimed error factually real?
-2. RELEVANCE TEST — if the alleged step were corrected, would the \
-trajectory's delivered result become correct? Consider later corrections \
-and whether the step is causally connected to the delivered result.
+and the correct or required referent, both from the shown trajectory. Is \
+the claimed deviation factually real under the grounding rules?
+2. RELEVANCE TEST — if the alleged step were corrected, would every \
+deliverable become correct under the MATERIALITY LAW? Consider later \
+corrections and whether the step is causally connected to what the \
+trajectory delivers.
 
 Verdicts:
-- substantiated: both tests pass (the error is real and causal).
-- refuted: the step is correct, or the deviation is immaterial, already \
-corrected, or a non-hallucination category (formatting, process only, no \
-false completion claim).
+- substantiated: both tests pass (the error is real and material).
+- refuted: the shown evidence proves the step correct, or the deviation is \
+immaterial under the MATERIALITY LAW, already corrected, or a \
+non-hallucination category (formatting only, process only, no false \
+completion claim).
 - inconclusive: the shown evidence cannot settle either test.
 Do NOT overturn merely because evidence is incomplete.
+The final answer text alone does not repair a deliverable breach: a \
+required action with wrong arguments stays substantiated even when the \
+answer text reads correct, and a delivered result that only repeats an \
+unverified user claim is not thereby correct.
 If the positive verdict rests on an EXPLICIT task contract (verbatim \
 content, exact form, exact value), a violation of that contract is \
 material by definition: do not refute it as immaterial formatting.
@@ -275,6 +325,7 @@ __all__ = [
     "JUDGE_CONFIDENCE_VALUES",
     "JUDGE_CONTRACT_REPAIR",
     "JUDGE_SYSTEM",
+    "MATERIALITY",
     "RECALL_CONTRACT_REPAIR",
     "RECALL_SYSTEM",
     "TRACER_CONTRACT_REPAIR",

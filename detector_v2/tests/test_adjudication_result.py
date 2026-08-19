@@ -62,6 +62,22 @@ def _defense(verdict, state="ok"):
     )
 
 
+def _hearings(judge_result, defense_result, tracer_result=None):
+    """One hearing per preliminary positive, judge-shaped by default."""
+    parsed = judge_result.get("parsed") or {}
+    return [{
+        "source": "judge",
+        "step": parsed.get("hallucination_step"),
+        "reason": parsed.get("hallucination_reason"),
+        "delivered_result": parsed.get("delivered_result"),
+        "correct_result": parsed.get("correct_result"),
+        "evidence_refs": parsed.get("evidence_refs") or [],
+        "quote": (parsed.get("root_cause") or {}).get("quote") or "",
+        "tracer_result": tracer_result,
+        "defense_result": defense_result,
+    }]
+
+
 def _adjudicate(judge_result, judge_status, defense, recall_ok=True):
     defense_result, defense_status = defense
     recall_result, recall_status = NONE_RECALL
@@ -79,6 +95,7 @@ def _adjudicate(judge_result, judge_status, defense, recall_ok=True):
         upgrade_result=upgrade_result, upgrade_status=upgrade_status,
         tracer_result=tracer_result, tracer_status=tracer_status,
         defense_result=defense_result, defense_status=defense_status,
+        hearings=_hearings(judge_result, defense_result, tracer_result),
     )
 
 
@@ -107,6 +124,7 @@ def test_substantiated_is_error(sample_packet):
         upgrade_result=None, upgrade_status=None,
         tracer_result=None, tracer_status=None,
         defense_result=defense_result, defense_status=defense_status,
+        hearings=_hearings(JUDGE_TRUE, defense_result),
     )
     assert proof["state"] == STATE_ERROR
     assert proof["decision_authority"] == AUTHORITY_AUTHORITATIVE
@@ -123,6 +141,7 @@ def test_refuted_overturns(sample_packet):
         upgrade_result=None, upgrade_status=None,
         tracer_result=None, tracer_status=None,
         defense_result=defense_result, defense_status=defense_status,
+        hearings=_hearings(JUDGE_TRUE, defense_result),
     )
     assert proof["state"] == STATE_CLEAN
     assert proof["authority_failure_reasons"][0]["code"] == "refuted"
@@ -137,6 +156,7 @@ def test_inconclusive_keeps_error_but_degrades(sample_packet):
         upgrade_result=None, upgrade_status=None,
         tracer_result=None, tracer_status=None,
         defense_result=defense_result, defense_status=defense_status,
+        hearings=_hearings(JUDGE_TRUE, defense_result),
     )
     assert proof["state"] == STATE_ERROR
     assert proof["decision_authority"] == AUTHORITY_DEGRADED_JUDGE_ONLY
@@ -165,6 +185,7 @@ def test_result_envelope_and_prediction(sample_packet):
         upgrade_result=None, upgrade_status=None,
         tracer_result=None, tracer_status=None,
         defense_result=defense_result, defense_status=defense_status,
+        hearings=_hearings(JUDGE_TRUE, defense_result),
     )
     stage_status = {
         "judge": JUDGE_OK,

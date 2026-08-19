@@ -7,11 +7,11 @@ failures keep the positive verdict and degrade authority.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import packet_features, render_defense_view, render_judge_view
-from detector_v2.provider import ProviderError, provider_call
+from detector_v2.provider import ProviderError, majority_vote, provider_call
 from detector_v2.semantics import (
     DEFENSE_CONTRACT_REPAIR,
     DEFENSE_SYSTEM,
@@ -79,6 +79,26 @@ def _validate_defense_evidence(
     return dict(parsed), ""
 
 
+UPGRADED_SUBSTANTIATED = "substantiated_upgraded"
+
+
+def _vote_verdict(verdicts: Sequence[str], *, cast: int) -> tuple[str, bool]:
+    """Collapse the per-sample verdicts into one defense verdict.
+
+    A conviction stands when more than half of the samples uphold it. Any
+    other outcome — tie, no quorum — upgrades ``substantiated`` to
+    ``substantiated_upgraded``: the case stays convicted but the authority
+    degrades, because the defense could not decisively confirm it.
+    """
+    winner, _ = majority_vote(list(verdicts), on_tie="")
+    if winner == "substantiated":
+        return "substantiated", False
+    if winner:
+        return winner, False
+    upgraded = any(v == "substantiated" for v in verdicts)
+    return (UPGRADED_SUBSTANTIATED if upgraded else ""), True
+
+
 def _positive_facts(positive: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "step": int(positive.get("step") or 0),
@@ -99,6 +119,7 @@ def _call_defense(
     system: str,
     user: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Sample one defense ballot; a ``None`` verdict abstains."""
     try:
         parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="defense",
@@ -132,15 +153,90 @@ def _call_defense(
             }
     if result is None:
         return {"ok": False, "parsed": None, "error": error,
-                "error_type": "contract_error"}, {
+                "error_type": "contract_error", "warnings": warnings}, {
             "stage": "defense", "state": "contract_error",
             "attempts": int(meta.get("attempts") or 0), "view": "unknown",
             "warnings": warnings,
         }
     return {"ok": True, "parsed": result, "raw": parsed,
-            "provider": meta}, {
+            "provider": meta, "warnings": warnings}, {
         "stage": "defense", "state": "ok",
         "attempts": int(meta.get("attempts") or 0), "view": "unknown",
+        "warnings": warnings,
+    }
+
+
+def _vote_defense(
+    *,
+    packet: Mapping[str, Any],
+    route: Mapping[str, Any],
+    system: str,
+    user: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Run the requested number of defense votes and collapse them.
+
+    The verdict is decided by strict majority over the cast ballots; ties
+    and no-quorum outcomes keep the conviction but upgrade the verdict to
+    ``substantiated_upgraded`` (a degraded confirmation, never an
+    overturn). The returned ``parsed`` is the first ballot whose verdict
+    matches the collapsed verdict, or the first substantiated ballot when
+    upgraded.
+    """
+    votes = max(1, int(route.get("votes", 1) or 1))
+    ballots: list[dict[str, Any]] = []
+    sample_meta: dict[str, Any] = {}
+    total_attempts = 0
+    warnings: list[dict[str, str]] = []
+    last_error = {"error": "every defense vote failed",
+                  "error_type": "provider_error"}
+    for _ in range(votes):
+        result, status = _call_defense(
+            packet=packet, route=route, system=system, user=user,
+        )
+        total_attempts += int(status.get("attempts") or 0)
+        warnings.extend(status.get("warnings") or [])
+        if result.get("ok") and isinstance(result.get("parsed"), Mapping):
+            ballots.append(dict(result["parsed"]))
+            sample_meta = dict(result.get("provider") or {})
+        else:
+            last_error = {
+                "error": str(result.get("error") or "defense vote failed"),
+                "error_type": str(
+                    result.get("error_type") or "provider_error"
+                ),
+            }
+    if not ballots:
+        return {
+            "ok": False, "parsed": None,
+            "error": last_error["error"],
+            "error_type": last_error["error_type"],
+            "provider": sample_meta,
+        }, {
+            "stage": "defense", "state": last_error["error_type"],
+            "attempts": total_attempts, "view": "unknown",
+            "warnings": warnings,
+        }
+    verdicts = [str(ballot.get("verdict") or "") for ballot in ballots]
+    collapsed, tied = _vote_verdict(verdicts, cast=len(verdicts))
+    if collapsed == UPGRADED_SUBSTANTIATED:
+        anchor = next(
+            (b for b in ballots if b.get("verdict") == "substantiated"),
+            ballots[0],
+        )
+        parsed = {**anchor, "verdict": UPGRADED_SUBSTANTIATED}
+    else:
+        parsed = next(
+            (b for b in ballots if b.get("verdict") == collapsed),
+            ballots[0],
+        )
+    sample_meta["vote"] = {
+        "votes": votes, "cast": len(verdicts),
+        "verdicts": verdicts, "collapsed": collapsed, "tie": tied,
+    }
+    return {"ok": True, "parsed": parsed, "raw": ballots,
+            "provider": sample_meta}, {
+        "stage": "defense", "state": "ok",
+        "attempts": total_attempts, "view": "unknown",
         "warnings": warnings,
     }
 
@@ -215,7 +311,7 @@ def run_defense(
         view_text, view_meta = render_defense_view(
             packet, facts["step"], evidence_refs=facts["evidence_refs"],
         )
-    result, status = _call_defense(
+    result, status = _vote_defense(
         packet=packet, route=route, system=system, user=user_for(view_text),
     )
     status["view"] = (
@@ -227,8 +323,9 @@ def run_defense(
         verdict = (result.get("parsed") or {}).get("verdict")
         if verdict == "inconclusive" and view_meta.get("omitted_event_ids"):
             full_text, full_meta = render_judge_view(packet)
-            result2, status2 = _call_defense(
-                packet=packet, route=route, system=system, user=user_for(full_text),
+            result2, status2 = _vote_defense(
+                packet=packet, route=route, system=system,
+                user=user_for(full_text),
             )
             status2["view"] = (
                 "complete" if not full_meta.get("degraded") else "degraded"
