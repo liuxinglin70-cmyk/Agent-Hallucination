@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from detector_v2.artifacts import DeployPlan, empty_plan
+from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import (
     packet_features,
     render_judge_view,
@@ -130,7 +130,7 @@ def run_judge(
     *,
     packet: Mapping[str, Any],
     config: Mapping[str, Any],
-    plan: DeployPlan | None = None,
+    plan: InterventionPlan | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run the judge; returns ``(judge_result, stage_status)``.
 
@@ -142,9 +142,7 @@ def run_judge(
     route = dict(config["judge_route"])
     route["_route_name"] = "judge"
     view_text, view_meta = render_judge_view(packet)
-    system = JUDGE_SYSTEM + plan.prompt_block(
-        packet_features(packet), stage="judge", hook="judge.system",
-    )
+    system = JUDGE_SYSTEM + plan.prompt_block(packet_features(packet), hook="judge.system")
     user = (
         "Judge the trajectory below. Do not use any information that is not "
         "in the question or the trajectory.\n\n" + view_text

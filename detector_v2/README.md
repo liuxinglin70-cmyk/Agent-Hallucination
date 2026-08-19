@@ -148,8 +148,10 @@ DETECTOR_V2_TRANSPORT_RETRIES
 
 ## 自进化接口
 
-- `artifacts.py`：已验证的 `prompt_directive` registry，运行时按机械特征
-  路由注入阶段 prompt。
+- `interventions.py`：唯一部署通道。已验证的
+  `detector_v2.intervention_registry.v1` registry，三类干预
+  （evidence_check / text_boundary / decision_guard）只通过注册 hook 执行，
+  运行时按机械 trigger 接合并落盘 `proof.deployment`。
 - 结果中的结构化字段：
   `proof.judge.delivered_result / correct_result / basis / confidence /
   evidence_refs / root_cause / contracts`
@@ -161,8 +163,8 @@ DETECTOR_V2_TRANSPORT_RETRIES
   - `frozen_judge={"judge_result": ..., "judge_status": ...}`：冻结 Judge，
     供不触碰 `judge.system` 的候选做配对重放；
   - `frozen_stages`：进一步冻结 recall / upgrade / tracer / defense 的基线
-    阶段输出，只有被干预 hook 覆盖的阶段重新执行。公共 API 会拒绝冻结与当前
-    intervention 冲突的阶段；registry 含 `judge.system` 时拒绝冻结 Judge
+    阶段输出，只有被干预 hook 覆盖的阶段重新执行。公共 API 对任何被干预
+    hook 覆盖的阶段一律拒绝冻结（遮蔽即 fail-closed）
     （fail-closed）。
 - 干预执行器、事实词表、guard 动作与落盘格式见
   `detector_v2/INTERVENTIONS.md`。

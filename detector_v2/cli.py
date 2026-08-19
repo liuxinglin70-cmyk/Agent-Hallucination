@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from detector_v2.api import Detector
-from detector_v2.artifacts import load_artifact_registry
 from detector_v2.config import load_config
 from detector_v2.interventions import load_intervention_registry
 from detector_v2.dataset import project_record
@@ -25,12 +24,6 @@ from detector_v2.runner import DEFAULT_RUNS_ROOT, new_run_id, run_batch
 
 def _load_json(path: str) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
-
-
-def _load_artifacts(path: str | None) -> dict[str, Any] | None:
-    if not path:
-        return None
-    return load_artifact_registry(path)
 
 
 def _load_interventions(path: str | None) -> dict[str, Any] | None:
@@ -56,7 +49,6 @@ def cmd_detect(args: argparse.Namespace) -> int:
     result = detector.detect(
         record,
         case_id=args.case_id,
-        artifacts=_load_artifacts(args.artifacts),
         interventions=_load_interventions(args.interventions),
     )
     _write_output(args.output_dir, result)
@@ -75,7 +67,6 @@ def cmd_batch(args: argparse.Namespace) -> int:
     ):
         raise SystemExit("--cases-file must contain a JSON array of case ids")
     config = load_config(args.config)
-    artifacts = _load_artifacts(args.artifacts)
     interventions = _load_interventions(args.interventions)
     run_id = args.run_id or new_run_id()
     print(
@@ -88,7 +79,6 @@ def cmd_batch(args: argparse.Namespace) -> int:
         run_id=run_id,
         runs_root=args.runs_root,
         config=config,
-        artifacts=artifacts,
         interventions=interventions,
         workers=args.workers,
     )
@@ -126,7 +116,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_detect.add_argument("--output-dir", default="detector_v2_out")
     p_detect.add_argument("--case-id", default="case")
     p_detect.add_argument("--config")
-    p_detect.add_argument("--artifacts")
     p_detect.add_argument("--interventions")
     p_detect.set_defaults(func=cmd_detect)
 
@@ -136,7 +125,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--run-id")
     p_batch.add_argument("--runs-root", default=str(DEFAULT_RUNS_ROOT))
     p_batch.add_argument("--config")
-    p_batch.add_argument("--artifacts")
     p_batch.add_argument("--interventions")
     p_batch.add_argument("--workers", type=int, default=8)
     p_batch.set_defaults(func=cmd_batch)

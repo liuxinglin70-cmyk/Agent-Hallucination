@@ -13,6 +13,7 @@ One cycle:
 
 from __future__ import annotations
 
+import json
 import math
 import random
 from pathlib import Path
@@ -21,6 +22,7 @@ from typing import Any, Mapping, Sequence
 from evolution_v3.backends import DetectionBackend, make_backend
 from evolution_v3.config import ensure_dirs, load_config, resolve_path
 from evolution_v3.contracts import empty_registry, make_registry, save_json
+from detector_v2.dataset import gold_fields
 from evolution_v3.gates import (
     audit_defects,
     marginal_selection,
@@ -153,8 +155,9 @@ class EvolutionEngine:
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        active = self.registry.registry
-        patrol_rows = self._evaluate(active, patrol_cases)
+        # Patrol is always the bare base: candidates may only be distilled
+        # from failures of the empty registry, never from deployed skills.
+        patrol_rows = self._evaluate(empty_registry(), patrol_cases)
         families = stable_failure_families(patrol_rows)
         bootstrap_cases: list[str] = []
         if not families:
@@ -177,7 +180,7 @@ class EvolutionEngine:
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
                 patrol_rows = [
                     *patrol_rows,
-                    *self._evaluate(active, bootstrap_cases),
+                    *self._evaluate(empty_registry(), bootstrap_cases),
                 ]
                 families = stable_failure_families(patrol_rows)
         diagnosed = diagnose_failure_families(
@@ -262,8 +265,10 @@ class EvolutionEngine:
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        active = self.registry.registry
-        patrol_rows = self._evaluate(active, patrol_cases)
+        # Patrol always runs the bare base; only the gate baselines below use
+        # the active registry. Candidates are never distilled from deployed
+        # skills (VaG contamination guard).
+        patrol_rows = self._evaluate(empty_registry(), patrol_cases)
         families = stable_failure_families(patrol_rows)
 
         # Source-quality bootstrap: a random patrol sample can legitimately
@@ -290,7 +295,7 @@ class EvolutionEngine:
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
                 patrol_rows = [
                     *patrol_rows,
-                    *self._evaluate(active, bootstrap_cases),
+                    *self._evaluate(empty_registry(), bootstrap_cases),
                 ]
                 families = stable_failure_families(patrol_rows)
 
@@ -361,6 +366,7 @@ class EvolutionEngine:
             empty_proposal_reason = ""
 
         # Shared baseline arms used by every gate this cycle.
+        active = self.registry.registry
         baseline_sentinel = self._evaluate(active, self.split.sentinel)
         baseline_gain = self._evaluate(active, self.split.gain)
         active_gain = baseline_gain
@@ -408,87 +414,87 @@ class EvolutionEngine:
             }
             report["v2"] = v2
             if v1["passed"] and v2["passed"]:
-                    eligible_ids = {
-                        item_id for item_id, status in preflight.items()
-                        if status["v1"]["passed"] and status["v2"]["passed"]
-                    }
-                    v3_group_entries = [candidate]
-                    for partner_id in joint_partners.get(intervention_id, []):
-                        if partner_id not in eligible_ids:
-                            continue
-                        partner = next(
-                            (
-                                item for item in proposals
-                                if str(item.get("intervention_id") or "")
-                                == partner_id
-                            ),
-                            None,
-                        )
-                        if partner is not None:
-                            v3_group_entries.append(partner)
-                    v3_registry = make_registry([
-                        *self.registry.entries, *v3_group_entries,
-                    ])
-                    v3_control_entries = [
-                        *self.registry.entries,
-                        *[
-                            entry for entry in v3_group_entries
-                            if str(entry.get("intervention_id") or "")
-                            != intervention_id
-                        ],
-                    ]
-                    v3_control = make_registry(v3_control_entries)
-                    fresh = any(
-                        str(entry.get("hook") or "") in {
-                            "judge.system", "scanner.system", "upgrade.pre",
-                            "upgrade.system", "tracer.system", "defense.pre",
-                            "defense.system",
-                        }
-                        for entry in v3_group_entries
-                    )
-                    evaluate = (
-                        self.backend.evaluate_fresh
-                        if fresh else self.backend.evaluate
-                    )
-                    evaluate_kwargs = {
-                        "dataset_root": self.config["dataset_root"],
-                        "gold_map": self.gold_map,
-                        "workers": int(
-                            (self.config.get("backend") or {}).get("workers", 1)
+                eligible_ids = {
+                    item_id for item_id, status in preflight.items()
+                    if status["v1"]["passed"] and status["v2"]["passed"]
+                }
+                v3_group_entries = [candidate]
+                for partner_id in joint_partners.get(intervention_id, []):
+                    if partner_id not in eligible_ids:
+                        continue
+                    partner = next(
+                        (
+                            item for item in proposals
+                            if str(item.get("intervention_id") or "")
+                            == partner_id
                         ),
+                        None,
+                    )
+                    if partner is not None:
+                        v3_group_entries.append(partner)
+                v3_registry = make_registry([
+                    *self.registry.entries, *v3_group_entries,
+                ])
+                v3_control_entries = [
+                    *self.registry.entries,
+                    *[
+                        entry for entry in v3_group_entries
+                        if str(entry.get("intervention_id") or "")
+                        != intervention_id
+                    ],
+                ]
+                v3_control = make_registry(v3_control_entries)
+                fresh = any(
+                    str(entry.get("hook") or "") in {
+                        "judge.system", "scanner.system", "upgrade.pre",
+                        "upgrade.system", "tracer.system", "defense.pre",
+                        "defense.system",
                     }
-                    control_s = evaluate(
-                        self.split.sentinel,
-                        registry=v3_control,
-                        **evaluate_kwargs,
-                    )
-                    control_g = evaluate(
-                        self.split.gain,
-                        registry=v3_control,
-                        **evaluate_kwargs,
-                    )
-                    candidate_s = evaluate(
-                        self.split.sentinel,
-                        registry=v3_registry,
-                        **evaluate_kwargs,
-                    )
-                    candidate_g = evaluate(
-                        self.split.gain,
-                        registry=v3_registry,
-                        **evaluate_kwargs,
-                    )
-                    v3 = v3_semantics(
-                        candidate,
-                        baseline_rows=[*control_s, *control_g],
-                        candidate_rows=[*candidate_s, *candidate_g],
-                        config=self.config,
-                    )
-                    report["v3"] = v3
-                    report["candidate_rows"] = _summarise_rows(
-                        [*candidate_s, *candidate_g]
-                    )
-                    if v3["passed"]:
-                        v3_candidates.append(candidate)
+                    for entry in v3_group_entries
+                )
+                evaluate = (
+                    self.backend.evaluate_fresh
+                    if fresh else self.backend.evaluate
+                )
+                evaluate_kwargs = {
+                    "dataset_root": self.config["dataset_root"],
+                    "gold_map": self.gold_map,
+                    "workers": int(
+                        (self.config.get("backend") or {}).get("workers", 1)
+                    ),
+                }
+                control_s = evaluate(
+                    self.split.sentinel,
+                    registry=v3_control,
+                    **evaluate_kwargs,
+                )
+                control_g = evaluate(
+                    self.split.gain,
+                    registry=v3_control,
+                    **evaluate_kwargs,
+                )
+                candidate_s = evaluate(
+                    self.split.sentinel,
+                    registry=v3_registry,
+                    **evaluate_kwargs,
+                )
+                candidate_g = evaluate(
+                    self.split.gain,
+                    registry=v3_registry,
+                    **evaluate_kwargs,
+                )
+                v3 = v3_semantics(
+                    candidate,
+                    baseline_rows=[*control_s, *control_g],
+                    candidate_rows=[*candidate_s, *candidate_g],
+                    config=self.config,
+                )
+                report["v3"] = v3
+                report["candidate_rows"] = _summarise_rows(
+                    [*candidate_s, *candidate_g]
+                )
+                if v3["passed"]:
+                    v3_candidates.append(candidate)
             if not v1["passed"]:
                 self._ledger("rejected", {
                     "cycle": cycle,
@@ -996,12 +1002,9 @@ def _step_localization_check(
         if not row.get("gold"):
             continue
         try:
-            from detector_v2.dataset import gold_fields
-            import json as _json
-            from pathlib import Path as _Path
             case = str(row.get("case") or "")
-            raw = _json.loads(
-                (_Path(dataset_root) / case).read_text(encoding="utf-8-sig")
+            raw = json.loads(
+                (Path(dataset_root) / case).read_text(encoding="utf-8-sig")
             )
             gold_step = gold_fields(raw).get("hallucination_step")
             if not str(gold_step or "").isdigit():

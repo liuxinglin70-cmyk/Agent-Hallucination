@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from detector_v2.artifacts import DeployPlan, empty_plan
+from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import packet_features, render_judge_view
 from detector_v2.provider import ProviderError, provider_call
 from detector_v2.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
@@ -72,15 +72,13 @@ def run_step_tracer(
     delivered_result: str,
     correct_result: str,
     config: Mapping[str, Any],
-    plan: DeployPlan | None = None,
+    plan: InterventionPlan | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     route = dict(config["judge_route"])
     route["_route_name"] = "step_tracer"
     view_text, view_meta = render_judge_view(packet)
-    system = TRACER_SYSTEM + plan.prompt_block(
-        packet_features(packet), stage="judge", hook="tracer.system",
-    )
+    system = TRACER_SYSTEM + plan.prompt_block(packet_features(packet), hook="tracer.system")
     user = (
         "Find the earliest step that introduced the error.\n\n"
         f"DELIVERED RESULT: {delivered_result}\n"

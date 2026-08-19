@@ -134,7 +134,7 @@ def compute_meta(
     )
     admitted = [row for row in rows if row.get("admitted")]
     library_drift = [
-        report.get("empty_vs_active_on_g") or {}
+        report.get("active_effect_on_g") or {}
         for report in cycle_reports
     ]
     net_contributions = [

@@ -10,7 +10,7 @@ from evolution_v3.config import load_config
 from evolution_v3.contracts import empty_registry, make_intervention
 from evolution_v3.engine import EvolutionEngine
 from evolution_v3.gates import marginal_selection
-from evolution_v3.proposer import ProposalBatch
+from evolution_v3.proposer import OfflineProposer, ProposalBatch
 from evolution_v3.splits import EvolutionSplit, FinalHoldout
 
 
@@ -360,3 +360,69 @@ def test_defect_injection_audit_freezes_on_leak_through(tmp_path):
     assert report["state"] == "frozen_after_defect_injection_audit"
     assert report["audit"]["passed"] is False
     assert engine.registry.entries == []
+
+
+def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    backend = MockDetectorBackend()
+    engine = EvolutionEngine(
+        config,
+        backend=backend,
+        split=split,
+        mini=True,
+        proposer=OfflineProposer(),
+    )
+    engine.registry.write(
+        [_scanner_candidate()], cycle=0, reason="pre-seeded active entry",
+        library_cfg=config["library"],
+    )
+    seen = []
+    original = engine._evaluate
+
+    def spy(registry, cases_arg):
+        seen.append((list(cases_arg), registry))
+        return original(registry, cases_arg)
+
+    monkeypatch.setattr(engine, "_evaluate", spy)
+    engine.run_cycle(1)
+    expected_patrol = engine.split.patrol_sample(
+        1, int(config["budget"]["patrol_cases"])
+    )
+    patrol_registries = [
+        registry for case_list, registry in seen
+        if case_list == expected_patrol
+    ]
+    assert patrol_registries
+    empty_hash = empty_registry()["content_hash"]
+    assert all(
+        str((registry or {}).get("content_hash") or "") == empty_hash
+        for registry in patrol_registries
+    )
+
+
+def test_meta_library_drift_reads_cycle_report_key():
+    from evolution_v3.meta_eval import compute_meta
+
+    meta = compute_meta([
+        {
+            "cycle": 1,
+            "proposals": [],
+            "gates": [],
+            "marginal_selection": {},
+            "active_effect_on_g": {"marginal_cases": 3},
+            "audit": None,
+            "patrol": {},
+            "proposal_summary": {},
+            "active_after_cycle": [],
+        },
+    ])
+    assert meta["library_drift"]["net_contribution_history"] == [3]

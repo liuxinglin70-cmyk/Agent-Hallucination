@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from detector_v2.artifacts import DeployPlan, empty_plan
+from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import packet_features, render_defense_view, render_judge_view
 from detector_v2.provider import ProviderError, provider_call
 from detector_v2.semantics import (
@@ -150,7 +150,7 @@ def run_defense(
     packet: Mapping[str, Any],
     positive: Mapping[str, Any],
     config: Mapping[str, Any],
-    plan: DeployPlan | None = None,
+    plan: InterventionPlan | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Review one positive preliminary verdict. Never raises."""
     if not positive:
@@ -193,9 +193,7 @@ def run_defense(
         },
     )
     force_full_view = "require_full_view_defense" in pre_actions
-    system = DEFENSE_SYSTEM + plan.prompt_block(
-        packet_features(packet), stage="defense", hook="defense.system",
-    )
+    system = DEFENSE_SYSTEM + plan.prompt_block(packet_features(packet), hook="defense.system")
     allegation = (
         "POSITIVE VERDICT:\n"
         f"alleged_step={facts['step']}\n"

@@ -21,6 +21,31 @@ from detector_v2.result import build_detection_output
 from detector_v2.step_tracer import _parse_tracer, run_step_tracer
 
 
+_FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
+    "judge_result": frozenset({"judge.system"}),
+    "recall_result": frozenset({"scanner.system"}),
+    "upgrade_result": frozenset({"upgrade.pre", "upgrade.system"}),
+    "tracer_result": frozenset({"tracer.system"}),
+    "defense_result": frozenset({"defense.pre", "defense.system"}),
+}
+
+
+def _frozen_masked_stages(
+    frozen: Mapping[str, Any], targeted_hooks: set[str],
+) -> list[str]:
+    """Frozen stages whose live inputs an active intervention would change.
+
+    Replaying such a stage would mask the intervention under test, so the
+    replay must be refused fail-closed. ``judge.post`` is absent: it is a
+    post-hoc deterministic evidence hook that still runs during replay.
+    """
+    return sorted(
+        stage_key.removesuffix("_result")
+        for stage_key, hooks in _FROZEN_STAGE_HOOKS.items()
+        if stage_key in frozen and targeted_hooks & hooks
+    )
+
+
 def _frozen_stage(
     frozen: Mapping[str, Any], name: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -180,7 +205,6 @@ class Detector:
         record: Mapping[str, Any],
         *,
         case_id: str = "case",
-        artifacts: Mapping[str, Any] | None = None,
         interventions: Mapping[str, Any] | None = None,
         frozen_judge: Mapping[str, Any] | None = None,
         frozen_stages: Mapping[str, Any] | None = None,
@@ -193,9 +217,9 @@ class Detector:
 
         ``frozen_judge`` enables paired replay for self-evolution gates. It
         must be ``{"judge_result": {...}, "judge_status": {...}}`` captured
-        from a baseline run. If the intervention registry targets ``judge.*``
-        hooks, replay is refused (fail-closed): freezing the judge would mask
-        the intervention under test.
+        from a baseline run. If the intervention registry targets any hook
+        whose stage is frozen, replay is refused (fail-closed): freezing
+        that stage would mask the intervention under test.
         """
         validate_record(record)
         packet = build_packet(record)
@@ -219,7 +243,7 @@ class Detector:
                 "configured intervention registry does not exist: "
                 f"{self.default_interventions_path}"
             )
-        plan = compile_runtime_plan(artifacts, effective_interventions)
+        plan = compile_runtime_plan(effective_interventions)
 
         frozen = frozen_judge if frozen_judge is not None else frozen_stages
         if frozen is not None and any(
@@ -230,13 +254,16 @@ class Detector:
             frozen = _validate_frozen_stages(frozen, packet)
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
-            if any(
-                str((entry.get("hook") or "")) == "judge.system"
-                for entry in plan.interventions.entries
-            ):
+            targeted_hooks = {
+                str(entry.get("hook") or "")
+                for entry in plan.entries
+            }
+            masked = _frozen_masked_stages(frozen, targeted_hooks)
+            if masked:
                 raise ValueError(
-                    "frozen judge replay is refused while a judge.system "
-                    "intervention is active (it would mask the intervention)"
+                    "frozen stage replay is refused: active interventions "
+                    f"target the frozen stage(s) {masked} (it would mask "
+                    "the intervention under test)"
                 )
         else:
             judge_result, judge_status = run_judge(
@@ -387,10 +414,6 @@ class Detector:
             guard_actions=guard_actions,
         )
         provenance: dict[str, Any] = {}
-        if artifacts is not None:
-            provenance["artifacts_hash"] = str(
-                artifacts.get("content_hash") or ""
-            )
         if effective_interventions is not None:
             provenance["interventions_hash"] = str(
                 effective_interventions.get("content_hash") or ""
@@ -436,7 +459,7 @@ class Detector:
         proof["causal_upgrade_coverage"] = (
             upgrade_result.get("coverage") if upgrade_result else None
         )
-        proof["evidence"] = list(plan.interventions.evidence)
+        proof["evidence"] = list(plan.evidence)
         proof["deployment"] = plan.deployment_summary()
         return build_detection_output(
             case_id=case_id,
@@ -463,7 +486,6 @@ def detect(
     *,
     case_id: str = "case",
     config: Mapping[str, Any] | None = None,
-    artifacts: Mapping[str, Any] | None = None,
     interventions: Mapping[str, Any] | None = None,
     frozen_judge: Mapping[str, Any] | None = None,
     frozen_stages: Mapping[str, Any] | None = None,
@@ -471,7 +493,7 @@ def detect(
     """Convenience entry with optional paired-replay stage freezing."""
     detector = Detector(config) if config is not None else _default_detector()
     return detector.detect(
-        record, case_id=case_id, artifacts=artifacts,
+        record, case_id=case_id,
         interventions=interventions, frozen_judge=frozen_judge,
         frozen_stages=frozen_stages,
     )

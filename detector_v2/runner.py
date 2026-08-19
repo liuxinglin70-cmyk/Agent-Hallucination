@@ -67,22 +67,15 @@ def detect_with_transport_retry(
     record: Mapping[str, Any],
     *,
     case_id: str,
-    artifacts: Mapping[str, Any] | None,
     interventions: Mapping[str, Any] | None = None,
     attempts: int = 3,
 ) -> dict[str, Any]:
     """Whole-detection retry for transport-only unresolved results."""
     result: dict[str, Any] = {}
     for _ in range(max(1, attempts)):
-        if interventions is None:
-            result = detector.detect(
-                record, case_id=case_id, artifacts=artifacts,
-            )
-        else:
-            result = detector.detect(
-                record, case_id=case_id, artifacts=artifacts,
-                interventions=interventions,
-            )
+        result = detector.detect(
+            record, case_id=case_id, interventions=interventions,
+        )
         if not _is_transport_unresolved(result):
             return result
     return result
@@ -114,7 +107,6 @@ def run_batch(
     run_id: str | None = None,
     runs_root: str | Path = DEFAULT_RUNS_ROOT,
     config: Mapping[str, Any] | None = None,
-    artifacts: Mapping[str, Any] | None = None,
     interventions: Mapping[str, Any] | None = None,
     workers: int = 8,
 ) -> dict[str, Any]:
@@ -138,7 +130,6 @@ def run_batch(
         "run_id": run_id,
         "cases": list(cases),
         "config_hash": _fingerprint(config),
-        "artifacts_hash": _fingerprint(artifacts) if artifacts is not None else None,
         "interventions_hash": (
             str(interventions.get("content_hash") or _fingerprint(interventions))
             if interventions is not None else None
@@ -169,7 +160,7 @@ def run_batch(
         record, _gold = load_case(dataset_root, case_id)
         started = time.monotonic()
         result = detect_with_transport_retry(
-            detector, record, case_id=case_id, artifacts=artifacts,
+            detector, record, case_id=case_id,
             interventions=interventions,
         )
         record_case(

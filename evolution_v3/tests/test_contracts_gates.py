@@ -493,7 +493,7 @@ def test_llm_proposer_rejects_duplicate_in_batch(monkeypatch):
     assert rejections[1]["rejected"] == "duplicate_in_batch"
 
 
-def test_llm_proposer_consumes_call_budget(monkeypatch):
+def test_llm_proposer_budget_is_per_cycle(monkeypatch):
     import evolution_v3.proposer as proposer
     monkeypatch.setattr(
         proposer,
@@ -514,6 +514,8 @@ def test_llm_proposer_consumes_call_budget(monkeypatch):
         "failure_cases": ["A/001.json", "A/002.json"],
     }]
     instance.propose(families, cycle=1)
-    second = instance.propose(families, cycle=2)
-    assert len(calls) == 1
-    assert second.notes[0]["provider_called"] is False
+    same_cycle = instance.propose(families, cycle=1)
+    assert same_cycle.notes[0]["provider_called"] is False
+    next_cycle = instance.propose(families, cycle=2)
+    assert len(calls) == 2
+    assert next_cycle.notes[0]["provider_called"] is True

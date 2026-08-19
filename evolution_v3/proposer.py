@@ -114,7 +114,10 @@ class LLMProposer:
             0,
             int((framework_config.get("budget") or {}).get("llm_calls", 1)),
         )
-        self.calls_used = 0
+        # The LLM budget is per cycle: the protocol caps failure-family
+        # diagnosis plus candidate drafting at N calls per cycle, so a long
+        # experiment must never exhaust its drafting ability mid-run.
+        self.calls_by_cycle: dict[int, int] = {}
         self.active_entries = [dict(entry) for entry in active_entries]
 
     def _registry_digest(self) -> list[dict[str, Any]]:
@@ -149,11 +152,12 @@ class LLMProposer:
     ) -> ProposalBatch:
         if not families:
             return ProposalBatch()
-        if self.calls_used >= self.max_calls:
+        calls_used = self.calls_by_cycle.get(int(cycle), 0)
+        if calls_used >= self.max_calls:
             return ProposalBatch(notes=[{
                 "generator": "llm",
                 "provider_called": False,
-                "reason": "llm_calls budget is zero",
+                "reason": "llm_calls budget exhausted for this cycle",
             }])
         family_cases = {
             str(family.get("failure_family") or ""): [
@@ -194,7 +198,7 @@ class LLMProposer:
             f"Draft at most {max_proposals} interventions."
         )
         try:
-            self.calls_used += 1
+            self.calls_by_cycle[int(cycle)] = calls_used + 1
             parsed, meta = provider_call(
                 route=self.route,
                 system=_draft_system_prompt(),

@@ -5,7 +5,6 @@ import pytest
 from detector_v2.api import Detector
 from detector_v2.interventions import (
     InterventionPlan,
-    RuntimePlan,
     build_intervention_registry,
     validate_registry,
 )
@@ -300,6 +299,44 @@ def test_frozen_judge_refuses_judge_hook_intervention(sample_record):
         )
 
 
+def test_frozen_replay_refuses_masked_later_stage(sample_record):
+    frozen = {
+        "judge_result": {
+            "ok": True,
+            "parsed": {
+                "is_hallucination": False,
+                "hallucination_step": None,
+                "hallucination_reason": None,
+                "delivered_result": "4",
+                "correct_result": "4",
+                "basis": None,
+                "confidence": "high",
+                "evidence_refs": [],
+                "root_cause": None,
+                "contracts": [{"kind": "exact_value", "requirement": "4"}],
+            },
+        },
+        "judge_status": {
+            "stage": "judge", "state": "ok", "attempts": 1,
+            "view": "complete", "warnings": [],
+        },
+        "recall_result": {"ok": True, "candidates": []},
+        "recall_status": {
+            "stage": "recall_scanner", "state": "ok", "attempts": 0,
+            "view": "complete", "warnings": [],
+        },
+    }
+    registry = build_intervention_registry([_candidate(
+        intervention_id="IV-S",
+        hook="scanner.system",
+    )])
+    with pytest.raises(ValueError, match="mask"):
+        Detector(CONFIG).detect(
+            sample_record, case_id="x", interventions=registry,
+            frozen_stages=frozen,
+        )
+
+
 def test_frozen_judge_rejects_invalid_contract(sample_record):
     frozen = {
         "judge_result": {
@@ -312,33 +349,3 @@ def test_frozen_judge_rejects_invalid_contract(sample_record):
     }
     with pytest.raises(ValueError, match="frozen judge_result contract"):
         Detector(CONFIG).detect(sample_record, frozen_judge=frozen)
-
-
-def test_runtime_plan_keeps_legacy_artifacts(sample_packet):
-    from detector_v2.artifacts import ARTIFACT_REGISTRY_SCHEMA, registry_hash
-
-    artifacts = {
-        "schema_version": ARTIFACT_REGISTRY_SCHEMA,
-        "artifacts": [{
-            "artifact_id": "a1",
-            "kind": "prompt_directive",
-            "trigger": {
-                "packet_features": ["has_tool_calls"],
-                "stages": ["judge"],
-            },
-            "intervention": {
-                "directive": "check the final result",
-                "exclusion": "never for formatting",
-            },
-        }],
-    }
-    artifacts["content_hash"] = registry_hash(artifacts)
-    runtime = RuntimePlan(artifacts, build_intervention_registry([_candidate()]))
-    block = runtime.prompt_block(
-        {"has_tool_calls"}, stage="judge", hook="judge.system",
-    )
-    assert "check the final result" in block
-    scanner_block = runtime.prompt_block(
-        {"has_tool_calls"}, stage="judge", hook="scanner.system",
-    )
-    assert "DEPLOYED INTERVENTIONS" in scanner_block

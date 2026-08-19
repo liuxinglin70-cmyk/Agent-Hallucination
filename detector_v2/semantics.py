@@ -1,7 +1,8 @@
 """Universal laws for detector_v2.1 stages.
 
 Dataset-independent by construction. Domain specialisation is only allowed
-through validated ``prompt_directive`` artifacts.
+through validated ``text_boundary`` interventions (see
+``detector_v2.interventions``).
 """
 
 from __future__ import annotations

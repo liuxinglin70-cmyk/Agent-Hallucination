@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from detector_v2.artifacts import DeployPlan, empty_plan
+from detector_v2.interventions import InterventionPlan, empty_plan
 from detector_v2.packet import packet_features, render_judge_view
 from detector_v2.provider import ProviderError, provider_call
 from detector_v2.semantics import (
@@ -78,15 +78,13 @@ def run_recall_scan(
     *,
     packet: Mapping[str, Any],
     config: Mapping[str, Any],
-    plan: DeployPlan | None = None,
+    plan: InterventionPlan | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     route = dict(config["recall_route"])
     route["_route_name"] = "recall_scanner"
     view_text, view_meta = render_judge_view(packet)
-    system = RECALL_SYSTEM + plan.prompt_block(
-        packet_features(packet), stage="judge", hook="scanner.system",
-    )
+    system = RECALL_SYSTEM + plan.prompt_block(packet_features(packet), hook="scanner.system")
     user = (
         "Scan the trajectory below for candidate deviations. Do not judge "
         "whether the trajectory is hallucinated.\n\n" + view_text
@@ -218,7 +216,7 @@ def run_causal_upgrade(
     packet: Mapping[str, Any],
     candidates: Sequence[Mapping[str, Any]],
     config: Mapping[str, Any],
-    plan: DeployPlan | None = None,
+    plan: InterventionPlan | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     if not candidates:
@@ -246,9 +244,7 @@ def run_causal_upgrade(
                 f"- {item['predicate']}: {item['verdict']} ({item['detail']})"
             )
         evidence_block = "\n".join(lines)
-    system = UPGRADE_SYSTEM + plan.prompt_block(
-        packet_features(packet), stage="defense", hook="upgrade.system",
-    )
+    system = UPGRADE_SYSTEM + plan.prompt_block(packet_features(packet), hook="upgrade.system")
     view_text, view_meta = render_judge_view(packet)
     user = (
         "Decide whether any candidate below can upgrade this trajectory to "

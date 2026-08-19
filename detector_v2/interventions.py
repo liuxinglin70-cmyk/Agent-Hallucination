@@ -21,13 +21,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from detector_v2.artifacts import (
-    DeployPlan,
-    PACKET_FEATURE_NAMES,
-    compile_deploy_plan,
-    empty_plan,
-)
-from detector_v2.packet import packet_features
+from detector_v2.packet import PACKET_FEATURE_NAMES, packet_features
 from detector_v2.predicates import PREDICATES, PREDICATE_VERDICTS, run_predicate
 
 INTERVENTION_REGISTRY_SCHEMA = "detector_v2.intervention_registry.v1"
@@ -242,9 +236,9 @@ def _validate_body(
     action_not_when = _require_text(
         body.get("action_not_when"), f"{intervention_id}.body.action_not_when"
     )
-    # ``action_not_when`` is retained as human-readable provenance for old
-    # persisted entries. New candidates must also provide executable facts;
-    # prose alone cannot constrain runtime behavior.
+    # ``action_not_when`` is human-readable provenance; the executable
+    # boundary is ``action_not_when_facts`` because prose alone cannot
+    # constrain runtime behavior.
     if require_executable_bounds and "action_not_when_facts" not in body:
         raise ValueError(
             f"{intervention_id}: body.action_not_when_facts is required; "
@@ -366,8 +360,6 @@ def load_intervention_registry(
     path: str | Path, *, require_executable_bounds: bool = False,
 ) -> dict[str, Any]:
     payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    # Old persisted registries are readable, but legacy prose-only guards are
-    # disabled by InterventionPlan rather than silently interpreted.
     validate_registry(
         payload, require_executable_bounds=require_executable_bounds,
     )
@@ -531,25 +523,18 @@ class InterventionPlan:
         actions: list[str] = []
         for entry in entries:
             body = entry.get("body") or {}
-            not_when = body.get("action_not_when_facts") or ()
-            if "action_not_when_facts" in body and not_when:
-                fact_map = self._facts_map(facts)
-                fact_map.update(self.facts)
-                excluded = self._facts_map(not_when)
-                if excluded and all(
-                    fact_map.get(name) == value
-                    for name, value in excluded.items()
-                ):
-                    self._record(
-                        entry, "guard_suppressed",
-                        "action_not_when_facts matched",
-                    )
-                    continue
-            elif "action_not_when_facts" not in body:
-                # This branch is defensive; validation rejects such entries.
+            fact_map = self._facts_map(facts)
+            fact_map.update(self.facts)
+            excluded = self._facts_map(
+                body.get("action_not_when_facts") or ()
+            )
+            if excluded and all(
+                fact_map.get(name) == value
+                for name, value in excluded.items()
+            ):
                 self._record(
                     entry, "guard_suppressed",
-                    "legacy guard has no executable action_not_when_facts",
+                    "action_not_when_facts matched",
                 )
                 continue
             action = str((entry.get("body") or {}).get("action") or "")
@@ -584,55 +569,14 @@ class InterventionPlan:
         }
 
 
-class RuntimePlan:
-    """Combined legacy ``prompt_directive`` artifacts + V3 interventions."""
-
-    def __init__(
-        self,
-        artifact_registry: Mapping[str, Any] | None = None,
-        intervention_registry: Mapping[str, Any] | None = None,
-    ) -> None:
-        self.legacy: DeployPlan = (
-            compile_deploy_plan(artifact_registry)
-            if artifact_registry is not None else empty_plan()
-        )
-        self.interventions = InterventionPlan.from_registry(intervention_registry)
-
-    def prompt_block(
-        self,
-        features: Mapping[str, Any] | set[str],
-        stage: str,
-        hook: str | None = None,
-    ) -> str:
-        blocks = [self.legacy.prompt_block(features, stage)]
-        if hook:
-            blocks.append(self.interventions.prompt_block(features, hook))
-        return "".join(block for block in blocks if block)
-
-    def evidence_for(
-        self,
-        hook: str,
-        packet: Mapping[str, Any],
-        context: Mapping[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        return self.interventions.evidence_for(hook, packet, context)
-
-    def guard_actions(
-        self,
-        packet: Mapping[str, Any],
-        facts: Mapping[str, Any] | Sequence[str] | None = None,
-    ) -> list[str]:
-        return self.interventions.guard_actions(packet, facts)
-
-    def deployment_summary(self) -> dict[str, Any]:
-        return self.interventions.deployment_summary()
-
-
 def compile_runtime_plan(
-    artifact_registry: Mapping[str, Any] | None = None,
     intervention_registry: Mapping[str, Any] | None = None,
-) -> RuntimePlan:
-    return RuntimePlan(artifact_registry, intervention_registry)
+) -> InterventionPlan:
+    return InterventionPlan.from_registry(intervention_registry)
+
+
+def empty_plan() -> InterventionPlan:
+    return InterventionPlan([])
 
 
 __all__ = [
@@ -645,11 +589,11 @@ __all__ = [
     "INTERVENTION_SCHEMA",
     "INTERVENTION_TYPES",
     "InterventionPlan",
-    "RuntimePlan",
     "SYSTEM_HOOKS",
     "TARGET_POLARITIES",
     "build_intervention_registry",
     "compile_runtime_plan",
+    "empty_plan",
     "intervention_content_hash",
     "load_intervention_registry",
     "validate_intervention",

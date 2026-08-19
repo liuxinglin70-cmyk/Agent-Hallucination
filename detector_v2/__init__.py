@@ -8,8 +8,9 @@ Architecture (two stages):
 
 The package is deliberately small. Self-evolution extension points are:
 
-- ``artifacts``: validated ``prompt_directive`` registry with mechanical
-  triggers (the only deployable artifact kind for now);
+- ``interventions``: the single deployment plane — a validated
+  ``detector_v2.intervention_registry.v1`` payload whose three closed
+  intervention types execute only through registered hooks;
 - structured outputs ``judge.delivered_result / correct_result / basis``
   and ``defense.verdict / evidence_refs``;
 - three-valued authority ``authoritative / degraded_judge_only / invalid``

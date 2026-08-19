@@ -51,7 +51,7 @@
 python -m pytest -q
 ```
 
-当前结果：`191 passed`。
+当前结果：`189 passed`。
 
 ```powershell
 python -m evolution_v3 smoke

@@ -36,6 +36,16 @@ _ANSWER_TOOL_HINTS = (
     "respond", "conclude",
 )
 
+PACKET_FEATURE_NAMES = frozenset({
+    "has_tool_calls",
+    "has_retrieval_tool",
+    "has_answer_tool",
+    "has_numeric_content",
+    "has_long_prose",
+    "multi_turn_question",
+    "question_has_numbers",
+})
+
 _JUDGE_VIEW_CHARS = 400_000
 _JUDGE_EVENT_CHARS = 100_000
 _JUDGE_TOOL_CHARS = 100_000
@@ -462,7 +472,7 @@ def render_defense_view(
 
 
 def packet_features(packet: Mapping[str, Any]) -> set[str]:
-    """Closed vocabulary of observable features for future artifact routing."""
+    """Closed vocabulary of observable features for intervention routing."""
     events = list(packet.get("events") or [])
     question = str(packet.get("question") or "")
     tool_count = 0
@@ -507,6 +517,7 @@ __all__ = [
     "ALLOWED_RECORD_KEYS",
     "EVALUATOR_ONLY_FIELDS",
     "FORBIDDEN_KEYS",
+    "PACKET_FEATURE_NAMES",
     "PACKET_SCHEMA",
     "PacketError",
     "build_packet",

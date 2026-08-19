@@ -11,7 +11,7 @@ class _FakeDetector:
     def __init__(self, config):
         self.config = config
 
-    def detect(self, record, *, case_id, artifacts=None):
+    def detect(self, record, *, case_id, interventions=None):
         return {
             "schema_version": "detector_v2.detection_result.v1",
             "case_id": case_id,
