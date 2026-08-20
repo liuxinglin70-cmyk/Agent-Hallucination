@@ -527,7 +527,7 @@ def test_rejection_feedback_redacts_case_ids(monkeypatch):
     }], cycle=2)
 
 
-def test_failure_family_separates_stage_and_contract_mechanisms():
+def test_failure_family_keys_execution_path_not_contract_kinds():
     def row(*, recall_state, contracts):
         return {
             "gold": True,
@@ -565,8 +565,11 @@ def test_failure_family_separates_stage_and_contract_mechanisms():
     required_action = failure_family(
         row(recall_state="not_needed", contracts=["required_action"])
     )
+    # Different execution path (recall ran vs skipped) is a different family.
     assert skipped != scanned
-    assert skipped != required_action
+    # Contract kinds are instance-level detail: they must NOT split a family,
+    # or every heterogeneous patrol degenerates into singleton families.
+    assert skipped == required_action
     assert skipped.startswith("FAM-fn-judge_false_no_recall_candidates-")
 
 
@@ -600,3 +603,22 @@ def test_predicate_profiles_refine_execution_family():
     assert refined[0]["diagnostics"]["predicate_signals"][
         "required_action_present"
     ] == {"applicable": 2, "violations": 2}
+
+
+def test_refine_keeps_heterogeneous_family_instead_of_dropping():
+    family = {
+        "failure_family": "FAM-fn-x-signature",
+        "failure_cases": ["A/001.json", "A/002.json", "A/003.json"],
+        "count": 3,
+        "diagnostics": {
+            "member_summaries": [
+                {"predicates": {"required_action_present": "violated"}},
+                {"predicates": {"verbatim_fidelity": "violated"}},
+                {"predicates": {"final_delivery_present": "missing"}},
+            ],
+        },
+    }
+    refined = refine_failure_families([family])
+    assert len(refined) == 1
+    assert refined[0]["failure_cases"] == ["A/001.json", "A/002.json", "A/003.json"]
+    assert refined[0]["profile_homogeneous"] is False

@@ -95,3 +95,14 @@ predicate profiles; the proposer receives de-identified member summaries; and
 gate rejections persist in the ledger and block unchanged proposals across
 cycles and process restarts. These changes require a new clean B run and must
 not reuse the contaminated V2 cache.
+
+The fourth attempt re-ran clean (whole work root deleted, v10 cache namespace)
+and completed both cycles with the ledger valid, but the mechanism signature
+still over-split: contract kinds were part of the family key, so five
+patrol FN cases with different contract profiles degenerated into five
+singleton families and the proposer never ran. The family key was then
+restricted to the execution path (judge polarity, recall path, stage states,
+defense/positive source) while contract kinds stayed in per-member summaries;
+`refine_failure_families` now keeps a heterogeneous family instead of dropping
+it when no predicate subgroup reaches the stability threshold. A clean B must
+be re-run after that change.

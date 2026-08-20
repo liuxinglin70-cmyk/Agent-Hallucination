@@ -96,19 +96,19 @@ def _coarse_failure_family(row: Mapping[str, Any]) -> str:
 
 
 def _mechanism_signature(row: Mapping[str, Any]) -> dict[str, Any]:
-    """Label-free execution signature used to keep unlike failures apart."""
+    """Label-free execution signature used to keep unlike failures apart.
+
+    The signature keys the failure path (which stage produced the verdict),
+    never task-level contract kinds: the same mechanism can appear across
+    different task contracts, and contract heterogeneity belongs to member
+    summaries and the V1 unanimity rule, not to family identity.
+    """
     result = row.get("result") or {}
     proof = result.get("proof") or {}
     judge = _judge_parsed(result)
     statuses = result.get("stage_status") or {}
-    contracts = sorted({
-        str(item.get("kind") or "")
-        for item in judge.get("contracts") or ()
-        if isinstance(item, Mapping) and str(item.get("kind") or "")
-    })
     return {
         "judge_positive": bool(judge.get("is_hallucination")),
-        "contracts": contracts,
         "stages": {
             name: str((statuses.get(name) or {}).get("state") or "not_run")
             for name in (
@@ -129,6 +129,15 @@ def _mechanism_signature(row: Mapping[str, Any]) -> dict[str, Any]:
             ) or "none"
         ),
     }
+
+
+def _contract_kinds(row: Mapping[str, Any]) -> list[str]:
+    judge = _judge_parsed(row.get("result") or {})
+    return sorted({
+        str(item.get("kind") or "")
+        for item in judge.get("contracts") or ()
+        if isinstance(item, Mapping) and str(item.get("kind") or "")
+    })
 
 
 def failure_family(row: Mapping[str, Any]) -> str:
@@ -323,7 +332,7 @@ def diagnose_failure_families(
                 signature = _mechanism_signature(row)
                 signal["member_summaries"].append({
                     "member": f"member_{len(signal['member_summaries']) + 1:03d}",
-                    "contracts": signature["contracts"],
+                    "contracts": _contract_kinds(row),
                     "stages": signature["stages"],
                     "judge_positive": signature["judge_positive"],
                     "recall_path": signature["recall_path"],
@@ -380,6 +389,17 @@ def refine_failure_families(
                 separators=(",", ":"),
             )
             groups.setdefault(profile, []).append((str(case_id), member))
+        largest = max((len(group) for group in groups.values()), default=0)
+        if largest < min_cases:
+            # Heterogeneous profiles without a stable subgroup: keep the whole
+            # family instead of discarding it, or the loop silently produces
+            # nothing. Mechanical conviction stays blocked by the V1 unanimity
+            # gate; evidence-only candidates remain possible.
+            item = dict(family)
+            item["diagnostic_complete"] = True
+            item["profile_homogeneous"] = False
+            refined.append(item)
+            continue
         for profile, group in sorted(groups.items()):
             if len(group) < min_cases:
                 continue
