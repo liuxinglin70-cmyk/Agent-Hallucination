@@ -46,7 +46,7 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
-CACHE_VERSION = "v9-source-bound-cache"
+CACHE_VERSION = "v10-mechanism-bound-cache"
 
 
 def file_digest(path: str | Path | None) -> str:
@@ -271,9 +271,14 @@ class DetectorV2Backend(DetectionBackend):
         providers = baseline.get("providers") or {}
         frozen: dict[str, Any] = {}
 
-        def add(name: str, result: dict[str, Any]) -> None:
-            frozen[f"{name}_result"] = result
-            frozen[f"{name}_status"] = dict(status.get(name) or {})
+        def add(
+            frozen_name: str,
+            status_name: str,
+            result: dict[str, Any],
+        ) -> None:
+            """Store a replay stage with its canonical detector status name."""
+            frozen[f"{frozen_name}_result"] = result
+            frozen[f"{frozen_name}_status"] = dict(status.get(status_name) or {})
 
         def ok_state(name: str) -> bool:
             # Only a stage that actually ran successfully is safe to freeze.
@@ -294,13 +299,13 @@ class DetectorV2Backend(DetectionBackend):
                 # same consensus instead of forcing a recall net on every
                 # candidate arm (which would re-run provider stages).
                 judge_result["provider"] = {"vote": dict(judge_provider["vote"])}
-            add("judge", judge_result)
+            add("judge", "judge", judge_result)
         if (
             "scanner.system" not in hooks
             and "judge_result" in frozen
             and ok_state("recall_scanner")
         ):
-            add("recall", {
+            add("recall", "recall_scanner", {
                 "ok": True,
                 "candidates": list(proof.get("recall_candidates") or []),
             })
@@ -310,7 +315,7 @@ class DetectorV2Backend(DetectionBackend):
             and "recall_result" in frozen
             and ok_state("causal_upgrade")
         ):
-            add("upgrade", {
+            add("upgrade", "causal_upgrade", {
                 "ok": True,
                 "upgrades": list(proof.get("causal_upgrade_rows") or []),
                 "upgraded_candidate": proof.get("causal_upgrade"),
@@ -339,7 +344,7 @@ class DetectorV2Backend(DetectionBackend):
             and single_judge_hearing
             and ok_state("step_tracer")
         ):
-            add("tracer", {
+            add("tracer", "step_tracer", {
                 "ok": True,
                 "parsed": proof.get("step_tracer"),
             })
@@ -349,7 +354,7 @@ class DetectorV2Backend(DetectionBackend):
             and "tracer_result" in frozen
             and ok_state("defense")
         ):
-            add("defense", {
+            add("defense", "defense", {
                 "ok": True,
                 "parsed": proof.get("defense"),
             })

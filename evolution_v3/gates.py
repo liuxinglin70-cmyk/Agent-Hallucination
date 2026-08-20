@@ -39,6 +39,21 @@ UNFREEZING_HOOKS = frozenset({
 })
 
 
+def requires_fresh_evaluation(
+    entries: Sequence[Mapping[str, Any]],
+) -> bool:
+    """Whether an intervention changes an LLM stage that replay would mask."""
+    return any(
+        str(entry.get("hook") or "") in UNFREEZING_HOOKS
+        or (
+            entry.get("type") == "decision_guard"
+            and (entry.get("body") or {}).get("action")
+            == "require_full_view_defense"
+        )
+        for entry in entries
+    )
+
+
 def _semantics_text() -> str:
     from detector_v2 import semantics
 
@@ -127,6 +142,36 @@ def v1_structural(
         return _policy_fail(
             f"FP failure family requires precision polarity, got {polarity!r}"
         )
+    body = candidate.get("body") or {}
+    if (
+        candidate.get("type") == "decision_guard"
+        and body.get("action") == "convict_mechanical_violation"
+        and diagnosed_families is not None
+    ):
+        diagnosed = next(
+            (
+                item for item in diagnosed_families
+                if str(item.get("failure_family") or "") == family
+            ),
+            {},
+        )
+        predicate = str(body.get("evidence_predicate") or "")
+        signal = ((diagnosed.get("diagnostics") or {}).get(
+            "predicate_signals", {}
+        ) or {}).get(predicate) or {}
+        family_count = int(diagnosed.get("count") or 0)
+        if (
+            family_count < 2
+            or int(signal.get("applicable") or 0) != family_count
+            or int(signal.get("violations") or 0) != family_count
+        ):
+            return _policy_fail(
+                "mechanical conviction requires unanimous applicable violation "
+                f"evidence across its family: predicate={predicate!r}, "
+                f"applicable={int(signal.get('applicable') or 0)}, "
+                f"violations={int(signal.get('violations') or 0)}, "
+                f"family_count={family_count}"
+            )
 
     candidate_text = candidate_prose_text(candidate)
     base_text = _semantics_text()
@@ -397,4 +442,5 @@ __all__ = [
     "v1_structural",
     "v2_harmlessness",
     "v3_semantics",
+    "requires_fresh_evaluation",
 ]

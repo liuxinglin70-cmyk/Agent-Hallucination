@@ -127,6 +127,11 @@ def candidate_contains_case_id(entry: Mapping[str, Any]) -> str | None:
     return match.group(0) if match else None
 
 
+def redact_case_ids(value: Any) -> str:
+    """Remove case identifiers before text crosses the proposer boundary."""
+    return _CASE_ID_RE.sub("[case]", str(value or ""))
+
+
 def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
     """Executable identity for deterministic intervention types.
 
@@ -139,21 +144,30 @@ def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
     entry_type = str(entry.get("type") or "")
     hook = str(entry.get("hook") or "")
     body = entry.get("body") or {}
+    trigger = entry.get("trigger") or {}
+    features = tuple(sorted(
+        str(item) for item in trigger.get("packet_features") or ()
+    ))
     if entry_type == "evidence_check":
         return (
             "evidence_check",
             hook,
+            features,
             str(body.get("predicate") or ""),
             str(body.get("runner") or ""),
         )
     if entry_type == "decision_guard":
-        trigger = entry.get("trigger") or {}
         facts = [str(item) for item in (trigger.get("facts") or ())]
         return (
             "decision_guard",
             hook,
+            features,
             tuple(sorted(facts)),
             str(body.get("action") or ""),
+            str(body.get("evidence_predicate") or ""),
+            tuple(sorted(
+                str(item) for item in body.get("action_not_when_facts") or ()
+            )),
         )
     return None
 
@@ -206,6 +220,7 @@ __all__ = [
     "load_registry",
     "make_intervention",
     "make_registry",
+    "redact_case_ids",
     "save_json",
     "structured_key",
     "validate_candidate",

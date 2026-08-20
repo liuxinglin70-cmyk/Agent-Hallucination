@@ -9,6 +9,7 @@ from evolution_v3.backends import MockDetectorBackend
 from evolution_v3.config import load_config
 from evolution_v3.contracts import empty_registry, make_intervention
 from evolution_v3.engine import EvolutionEngine
+from evolution_v3.ledger import Ledger
 from evolution_v3.proposer import OfflineProposer, ProposalBatch
 from evolution_v3.splits import EvolutionSplit, FinalHoldout
 
@@ -192,6 +193,54 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
     assert report["active_effect_on_g"]["marginal_cases"] >= 1
     assert engine.registry.entries[0]["type"] == "text_boundary"
     assert engine.registry.entries[0]["hook"] == "scanner.system"
+
+
+def test_engine_restores_rejection_feedback_before_next_cycle(tmp_path):
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    candidate = _scanner_candidate()
+    ledger = Ledger(config["ledger_path"])
+    ledger.append("rejected", {
+        "cycle": 1,
+        "intervention_id": candidate["intervention_id"],
+        "candidate": candidate,
+        "gate": "V2",
+        "reason": "sentinel harmlessness violation",
+        "delta": {"new_fp": 1},
+    })
+
+    class _FeedbackProposer:
+        active_entries = []
+
+        def __init__(self):
+            self.feedback = None
+
+        def set_rejection_feedback(self, feedback):
+            self.feedback = list(feedback)
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            return ProposalBatch()
+
+    proposer = _FeedbackProposer()
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(),
+        split=split,
+        mini=True,
+        proposer=proposer,
+    )
+    engine.run_cycle(2)
+    assert proposer.feedback
+    assert proposer.feedback[0]["gate"] == "V2"
 
 
 def test_gate_arms_share_one_evaluation_per_unit(tmp_path):

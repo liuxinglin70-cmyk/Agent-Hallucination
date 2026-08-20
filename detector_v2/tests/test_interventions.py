@@ -169,6 +169,121 @@ def test_guard_conflict_disables_all_actions(sample_packet):
     assert summary["policy_conflict"] is True
 
 
+def test_mechanical_guard_requires_bound_violating_evidence(sample_packet):
+    guard = _candidate(
+        intervention_id="IV-G-M",
+        type="decision_guard",
+        hook="adjudicate.guard",
+        trigger={
+            "packet_features": ["has_tool_calls"],
+            "facts": [
+                "required_action_present=violated",
+                "judge_positive=false",
+                "positive_source=none",
+            ],
+        },
+        body={
+            "action": "convict_mechanical_violation",
+            "evidence_predicate": "required_action_present",
+            "action_not_when": "Never when the required action is satisfied.",
+            "action_not_when_facts": ["required_action_present=satisfied"],
+        },
+    )
+    plan = InterventionPlan.from_registry(build_intervention_registry([guard]))
+    assert plan.guard_actions(sample_packet, {
+        "required_action_present": "violated",
+        "judge_positive": "false",
+        "positive_source": "none",
+    }) == []
+    assert plan.deployment_summary()["fired"][0]["event"] == "guard_suppressed"
+
+    evidence = plan.evidence_for(
+        "judge.post", sample_packet,
+        {"contracts": [], "delivered_result": "The answer is 4."},
+    )
+    assert evidence == []
+
+
+def test_mechanical_guard_rejects_diagnostic_only_predicate():
+    guard = _candidate(
+        intervention_id="IV-G-DIAG",
+        type="decision_guard",
+        hook="adjudicate.guard",
+        trigger={
+            "packet_features": ["has_tool_calls"],
+            "facts": [
+                "delivered_anchor_consistency=inconsistent",
+                "judge_positive=false",
+                "positive_source=none",
+            ],
+        },
+        body={
+            "action": "convict_mechanical_violation",
+            "evidence_predicate": "delivered_anchor_consistency",
+            "action_not_when": "Never when the anchor is consistent.",
+            "action_not_when_facts": [
+                "delivered_anchor_consistency=consistent",
+            ],
+        },
+    )
+    with pytest.raises(ValueError, match="conviction-authorized verdict"):
+        build_intervention_registry([guard])
+
+
+def test_mechanical_guard_cannot_consume_other_family_evidence(sample_packet):
+    evidence = _candidate(
+        intervention_id="IV-E-OTHER",
+        type="evidence_check",
+        hook="judge.post",
+        body={
+            "predicate": "required_action_present",
+            "runner": "deterministic",
+            "output_verdicts": ["satisfied", "violated", "not_applicable"],
+        },
+        provenance={
+            "cycle": 1,
+            "failure_family": "FAM-other",
+            "failure_cases": ["A/001.json", "A/002.json"],
+        },
+    )
+    guard = _candidate(
+        intervention_id="IV-G-THIS",
+        type="decision_guard",
+        hook="adjudicate.guard",
+        trigger={
+            "packet_features": ["has_tool_calls"],
+            "facts": [
+                "required_action_present=violated",
+                "judge_positive=false",
+                "positive_source=none",
+            ],
+        },
+        body={
+            "action": "convict_mechanical_violation",
+            "evidence_predicate": "required_action_present",
+            "action_not_when": "Never when the action is satisfied.",
+            "action_not_when_facts": ["required_action_present=satisfied"],
+        },
+        provenance={
+            "cycle": 1,
+            "failure_family": "FAM-this",
+            "failure_cases": ["A/003.json", "A/004.json"],
+        },
+    )
+    plan = InterventionPlan.from_registry(
+        build_intervention_registry([evidence, guard])
+    )
+    packet = dict(sample_packet)
+    packet["question"] = "Use the search tool, then answer."
+    plan.evidence_for("judge.post", packet, {})
+    assert plan.facts["required_action_present"] == "violated"
+    assert plan.guard_actions(packet, {
+        "required_action_present": "violated",
+        "judge_positive": "false",
+        "positive_source": "none",
+    }) == []
+
+
 def test_required_action_predicate_vocabulary(sample_packet):
     packet_with_contract = dict(sample_packet)
     packet_with_contract["question"] = (

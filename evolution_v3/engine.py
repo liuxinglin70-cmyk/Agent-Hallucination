@@ -36,9 +36,9 @@ from evolution_v3.config import ensure_dirs, load_config, resolve_path
 from evolution_v3.contracts import empty_registry, make_registry, save_json
 from detector_v2.dataset import gold_fields
 from evolution_v3.gates import (
-    UNFREEZING_HOOKS,
     defect_candidates,
     meets_m,
+    requires_fresh_evaluation,
     v1_structural,
     v2_harmlessness,
     v3_semantics,
@@ -56,6 +56,7 @@ from evolution_v3.splits import (
 )
 from evolution_v3.worksheet import (
     diagnose_failure_families,
+    refine_failure_families,
     stable_failure_families,
     worksheet_report,
 )
@@ -150,6 +151,18 @@ class EvolutionEngine:
         self.proposer = proposer or make_proposer(
             self.config, active_entries=self.registry.entries
         )
+        self.rejection_feedback: list[dict[str, Any]] = []
+        for record in self.ledger.read():
+            payload = record.get("payload") or {}
+            if (
+                record.get("event") == "rejected"
+                and isinstance(payload, Mapping)
+                and (
+                    isinstance(payload.get("candidate"), Mapping)
+                    or isinstance(payload.get("candidates"), list)
+                )
+            ):
+                self.rejection_feedback.append(dict(payload))
         self.gold_map = {
             case: load_gold(self.config["dataset_root"], case)
             for case in [*self.split.pool, *self.split.validation]
@@ -218,8 +231,13 @@ class EvolutionEngine:
             }
 
         active = self.registry.registry
-        baseline_s = arms.run(self.split.sentinel, registry=active)
-        baseline_g = arms.run(self.split.gain, registry=active)
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        baseline_s = arms.run(
+            self.split.sentinel, registry=active, fresh=active_fresh,
+        )
+        baseline_g = arms.run(
+            self.split.gain, registry=active, fresh=active_fresh,
+        )
         reports = []
         passed_any = False
         for candidate in defect_candidates():
@@ -301,10 +319,7 @@ class EvolutionEngine:
         intervention_id = str(candidate.get("intervention_id") or "")
         unit_entries = [*partners, dict(candidate)]
         registry = make_registry([*active_entries, *unit_entries])
-        fresh = any(
-            str(entry.get("hook") or "") in UNFREEZING_HOOKS
-            for entry in unit_entries
-        )
+        fresh = requires_fresh_evaluation([*active_entries, *unit_entries])
         candidate_rows = arms.run(
             [*self.split.sentinel, *self.split.gain],
             registry=registry,
@@ -396,6 +411,7 @@ class EvolutionEngine:
             patrol_rows,
             dataset_root=self.config["dataset_root"],
         )
+        diagnosed = refine_failure_families(diagnosed)
         proposal_batch = self.proposer.propose(
             diagnosed,
             cycle=cycle,
@@ -514,6 +530,7 @@ class EvolutionEngine:
             patrol_rows,
             dataset_root=self.config["dataset_root"],
         )
+        diagnosed_families = refine_failure_families(diagnosed_families)
         worksheet = worksheet_report(patrol_rows, diagnosed_families)
         worksheet["bootstrap"] = {
             "initial_patrol_size": patrol_size,
@@ -530,6 +547,8 @@ class EvolutionEngine:
         if proposal_batch is None:
             if hasattr(self.proposer, "active_entries"):
                 self.proposer.active_entries = self.registry.entries
+            if hasattr(self.proposer, "set_rejection_feedback"):
+                self.proposer.set_rejection_feedback(self.rejection_feedback)
             proposal_batch = self.proposer.propose(
                 diagnosed_families,
                 cycle=cycle,
@@ -577,13 +596,17 @@ class EvolutionEngine:
 
         # One active reference arm on S+G shared by every unit this cycle.
         active = self.registry.registry
-        baseline_sentinel = arms.run(self.split.sentinel, registry=active)
-        baseline_gain = arms.run(self.split.gain, registry=active)
-        active_rows = [*baseline_sentinel, *baseline_gain]
-        has_provider_stage = any(
-            str(candidate.get("hook") or "") in UNFREEZING_HOOKS
-            for candidate in proposals
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        baseline_sentinel = arms.run(
+            self.split.sentinel, registry=active, fresh=active_fresh,
         )
+        baseline_gain = arms.run(
+            self.split.gain, registry=active, fresh=active_fresh,
+        )
+        active_rows = [*baseline_sentinel, *baseline_gain]
+        has_provider_stage = requires_fresh_evaluation([
+            *self.registry.entries, *proposals,
+        ])
         fresh_control_rows = None
         reroll_noise = None
         if proposals and has_provider_stage:
@@ -592,12 +615,15 @@ class EvolutionEngine:
             # roll is generated once and reused by every such unit; comparing
             # units against different control rolls would measure provider
             # variance, not the interventions.
-            fresh_control_rows = arms.run(
-                [*self.split.sentinel, *self.split.gain],
-                registry=active,
-                fresh=True,
-            )
-            reroll_noise = paired_delta(active_rows, fresh_control_rows)
+            if active_fresh:
+                fresh_control_rows = active_rows
+            else:
+                fresh_control_rows = arms.run(
+                    [*self.split.sentinel, *self.split.gain],
+                    registry=active,
+                    fresh=True,
+                )
+                reroll_noise = paired_delta(active_rows, fresh_control_rows)
 
         by_id = {
             str(candidate.get("intervention_id") or ""): dict(candidate)
@@ -680,6 +706,20 @@ class EvolutionEngine:
             active_rows=active_rows,
             arms=arms,
         )
+        failed_combination = list(combination.get("failed_entries") or ())
+        if len(failed_combination) >= 2:
+            payload = {
+                "cycle": cycle,
+                "intervention_id": "combination",
+                "candidates": [dict(entry) for entry in failed_combination],
+                "type": "combination",
+                "hook": "multiple",
+                "gate": "COMBINATION_M",
+                "reason": combination["reason"],
+                "delta": _feedback_delta(combination.get("delta")),
+            }
+            self._ledger("rejected", payload)
+            self.rejection_feedback.append(payload)
 
         for report in gate_reports:
             intervention_id = str(report.get("intervention_id") or "")
@@ -690,12 +730,24 @@ class EvolutionEngine:
                 if gate == "m" and combination.get("unit_ids") == [intervention_id]:
                     continue
                 if not verdict["passed"]:
-                    self._ledger("rejected", {
+                    candidate = dict(report.get("candidate") or {})
+                    payload = {
                         "cycle": cycle,
                         "intervention_id": intervention_id,
+                        "candidate": candidate,
+                        "type": candidate.get("type"),
+                        "hook": candidate.get("hook"),
+                        "predicate": (candidate.get("body") or {}).get("predicate"),
+                        "action": (candidate.get("body") or {}).get("action"),
+                        "facts": list(
+                            (candidate.get("trigger") or {}).get("facts") or ()
+                        ),
                         "gate": gate.upper(),
                         "reason": verdict["reason"],
-                    })
+                        "delta": _feedback_delta(verdict.get("delta")),
+                    }
+                    self._ledger("rejected", payload)
+                    self.rejection_feedback.append(payload)
 
         selected = list(combination["entries"])
         library_problems = self.registry.check_limits(
@@ -704,12 +756,18 @@ class EvolutionEngine:
         )
         if library_problems:
             for candidate in selected:
-                self._ledger("rejected", {
+                payload = {
                     "cycle": cycle,
                     "intervention_id": str(candidate.get("intervention_id") or ""),
+                    "candidate": dict(candidate),
+                    "type": candidate.get("type"),
+                    "hook": candidate.get("hook"),
                     "gate": "LIBRARY",
                     "reason": "; ".join(library_problems),
-                })
+                    "delta": None,
+                }
+                self._ledger("rejected", payload)
+                self.rejection_feedback.append(payload)
             selected = []
         if selected:
             previous_ids = [
@@ -829,7 +887,13 @@ class EvolutionEngine:
                 for c in self.registry.entries
             ],
             "active_effect_on_g": paired_delta(
-                baseline_gain,
+                (
+                    _subset_rows(fresh_control_rows, self.split.gain)
+                    if selected
+                    and fresh_control_rows is not None
+                    and requires_fresh_evaluation(self.registry.entries)
+                    else baseline_gain
+                ),
                 self._evaluate(self.registry.registry, self.split.gain),
             ),
             "ledger_integrity": self.ledger.verify(),
@@ -897,10 +961,7 @@ class EvolutionEngine:
         entries: list[dict[str, Any]] = []
         for unit in units:
             entries.extend([*unit["partners"], unit["candidate"]])
-        fresh = any(
-            str(entry.get("hook") or "") in UNFREEZING_HOOKS
-            for entry in entries
-        )
+        fresh = requires_fresh_evaluation([*active_entries, *entries])
         control = (
             fresh_control_rows if fresh and fresh_control_rows is not None
             else active_rows
@@ -921,12 +982,19 @@ class EvolutionEngine:
                 "entries": entries,
                 "delta": delta,
                 "reason": "combination arm met M",
+                "dropped_entries": [],
+                "failed_entries": [],
             }
         # The earliest units keep their earned admission; the tail units are
         # rejected because their interaction with the earlier ones breaks M.
         survivors = units[:1]
         kept_ids = {survivors[0]["intervention_id"]}
         dropped = [unit_id for unit_id in unit_ids if unit_id not in kept_ids]
+        dropped_entries = [
+            dict(entry)
+            for unit in units[1:]
+            for entry in [*unit["partners"], unit["candidate"]]
+        ]
         survivor_entries = []
         for unit in survivors:
             survivor_entries.extend(
@@ -941,6 +1009,8 @@ class EvolutionEngine:
                 + "; ".join(failures)
                 + f"); rejected later unit(s) {dropped}"
             ),
+            "dropped_entries": dropped_entries,
+            "failed_entries": [dict(entry) for entry in entries],
         }
 
     def _evaluate(
@@ -949,7 +1019,13 @@ class EvolutionEngine:
         cases: Sequence[str],
     ) -> list[dict[str, Any]]:
         workers = int((self.config.get("backend") or {}).get("workers", 1))
-        return self.backend.evaluate(
+        entries = list((registry or {}).get("interventions") or ())
+        evaluate = (
+            self.backend.evaluate_fresh
+            if requires_fresh_evaluation(entries)
+            else self.backend.evaluate
+        )
+        return evaluate(
             list(cases),
             dataset_root=self.config["dataset_root"],
             registry=registry,
@@ -1104,7 +1180,10 @@ class EvolutionEngine:
 
         attribution: list[dict[str, Any]] = []
         if self.registry.entries:
-            active_rows = arms.run(self.split.gain, registry=self.registry.registry)
+            fresh = requires_fresh_evaluation(self.registry.entries)
+            active_rows = arms.run(
+                self.split.gain, registry=self.registry.registry, fresh=fresh,
+            )
             for entry in self.registry.entries:
                 intervention_id = str(entry.get("intervention_id") or "")
                 without = [
@@ -1112,7 +1191,7 @@ class EvolutionEngine:
                     if str(item.get("intervention_id") or "") != intervention_id
                 ]
                 without_rows = arms.run(
-                    self.split.gain, registry=make_registry(without),
+                    self.split.gain, registry=make_registry(without), fresh=fresh,
                 )
                 delta = paired_delta(without_rows, active_rows)
                 attribution.append({
@@ -1201,8 +1280,13 @@ class EvolutionEngine:
                 "rollback_after_cycles_net_negative", 2
             )
         )
-        empty_rows = arms.run(self.split.gain, registry=empty_registry())
-        active_rows = arms.run(self.split.gain, registry=self.registry.registry)
+        fresh = requires_fresh_evaluation(self.registry.entries)
+        empty_rows = arms.run(
+            self.split.gain, registry=empty_registry(), fresh=fresh,
+        )
+        active_rows = arms.run(
+            self.split.gain, registry=self.registry.registry, fresh=fresh,
+        )
         net = paired_delta(empty_rows, active_rows)
         self.registry.record_net_contribution(
             int(net["marginal_cases"]), cycle=cycle,
@@ -1339,6 +1423,17 @@ def _time_monotonic() -> float:
     import time
 
     return time.monotonic()
+
+
+def _feedback_delta(value: Any) -> dict[str, int] | None:
+    if not isinstance(value, Mapping):
+        return None
+    keys = (
+        "marginal_cases", "new_fn", "new_fp", "new_errors",
+        "unresolved_added", "health_regressed", "correctness_improved",
+        "correctness_worsened",
+    )
+    return {key: int(value.get(key) or 0) for key in keys}
 
 
 def _mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:

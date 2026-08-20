@@ -40,6 +40,15 @@ PREDICATE_VERDICTS: dict[str, frozenset[str]] = {
 
 PREDICATES = frozenset(PREDICATE_VERDICTS)
 
+# Only these predicate outcomes prove a task-level mechanical violation. Other
+# negative-looking outcomes diagnose evidence quality or judge coverage and may
+# guide proposals, but they cannot authorize a terminal conviction.
+PREDICATE_CONVICTION_VERDICTS: dict[str, frozenset[str]] = {
+    "required_action_present": frozenset({"violated"}),
+    "verbatim_fidelity": frozenset({"violated"}),
+    "final_delivery_present": frozenset({"missing"}),
+}
+
 _ACTION_MARKERS = (
     "must use", "required to use", "must call", "must invoke",
     "required to call", "should use", "has to use", "shall use",
@@ -517,6 +526,7 @@ def run_predicate(
 
 
 __all__ = [
+    "PREDICATE_CONVICTION_VERDICTS",
     "PREDICATE_VERDICTS",
     "PREDICATES",
     "run_predicate",

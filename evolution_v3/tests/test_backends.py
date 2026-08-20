@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from evolution_v3.backends import DetectionBackend, DetectorV2Backend
 from evolution_v3.contracts import make_intervention, make_registry
+from detector_v2.api import _validate_frozen_stages
+from detector_v2.packet import build_packet
 
 
 class _FakeDetector:
@@ -181,6 +183,52 @@ def test_frozen_stages_freeze_single_judge_hearing_tracer_defense():
     assert "defense_result" in frozen
     assert frozen["tracer_result"]["ok"] is True
     assert frozen["defense_result"]["ok"] is True
+    assert frozen["tracer_status"]["state"] == "ok"
+    assert frozen["defense_status"]["state"] == "ok"
+
+
+def test_frozen_stage_envelope_validates_with_canonical_status_names():
+    sample_record = {
+        "question": "What is 2 + 2?",
+        "history": [
+            {"step": 1, "role": "assistant", "content": "The answer is 4."},
+        ],
+    }
+    packet = build_packet(sample_record)
+    baseline = {
+        "proof": {
+            "judge": {
+                "is_hallucination": True,
+                "hallucination_step": 1,
+                "hallucination_reason": "wrong answer",
+                "delivered_result": "The answer is 4.",
+                "correct_result": "The answer is 5.",
+                "basis": "observation",
+                "confidence": "high",
+                "evidence_refs": ["event_001"],
+                "root_cause": {"step": 1, "quote": "4", "referent": "5"},
+                "contracts": [{"kind": "exact_value", "requirement": "5"}],
+            },
+            "hearings": [{"source": "judge"}],
+            "step_tracer": {
+                "step": 1, "quote": "4", "referent": "5",
+                "evidence_refs": ["event_001"], "reason": "wrong answer",
+            },
+            "defense": {
+                "verdict": "substantiated", "confirmed_step": 1,
+                "evidence_refs": ["event_001"], "reason": "confirmed",
+            },
+        },
+        "stage_status": {
+            "judge": {"state": "ok"},
+            "step_tracer": {"state": "ok"},
+            "defense": {"state": "ok"},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    normalized = _validate_frozen_stages(frozen, packet)
+    assert normalized["tracer_status"]["state"] == "ok"
+    assert normalized["defense_status"]["state"] == "ok"
 
 
 def test_frozen_stages_do_not_freeze_multi_hearing_tracer_defense():

@@ -22,7 +22,12 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from detector_v2.packet import PACKET_FEATURE_NAMES, packet_features
-from detector_v2.predicates import PREDICATES, PREDICATE_VERDICTS, run_predicate
+from detector_v2.predicates import (
+    PREDICATES,
+    PREDICATE_CONVICTION_VERDICTS,
+    PREDICATE_VERDICTS,
+    run_predicate,
+)
 
 INTERVENTION_REGISTRY_SCHEMA = "detector_v2.intervention_registry.v1"
 INTERVENTION_SCHEMA = "detector_v2.intervention.v1"
@@ -256,10 +261,45 @@ def _validate_body(
         body.get("action_not_when_facts") or (),
         f"{intervention_id}.body.action_not_when_facts",
     )
+    evidence_predicate = str(body.get("evidence_predicate") or "").strip()
+    if action == "convict_mechanical_violation":
+        if evidence_predicate not in PREDICATES:
+            raise ValueError(
+                f"{intervention_id}: convict_mechanical_violation requires a "
+                "valid body.evidence_predicate"
+            )
+        trigger_facts = _validate_trigger(entry, intervention_type)["facts"]
+        bound_values = {
+            value for name, value in trigger_facts if name == evidence_predicate
+        }
+        if not bound_values:
+            raise ValueError(
+                f"{intervention_id}: trigger.facts must bind evidence_predicate "
+                f"{evidence_predicate!r}"
+            )
+        allowed_convictions = PREDICATE_CONVICTION_VERDICTS.get(
+            evidence_predicate, frozenset(),
+        )
+        if not bound_values <= allowed_convictions:
+            raise ValueError(
+                f"{intervention_id}: convict_mechanical_violation must bind "
+                f"a conviction-authorized verdict for {evidence_predicate!r}"
+            )
+        trigger_facts = set(trigger_facts)
+        required_context = {
+            ("judge_positive", "false"),
+            ("positive_source", "none"),
+        }
+        if not required_context <= trigger_facts:
+            raise ValueError(
+                f"{intervention_id}: convict_mechanical_violation requires "
+                "judge_positive=false and positive_source=none"
+            )
     return {
         "action": action,
         "action_not_when": action_not_when,
         "action_not_when_facts": not_when_facts,
+        "evidence_predicate": evidence_predicate,
     }
 
 
@@ -395,6 +435,7 @@ class InterventionPlan:
         self.evidence: list[dict[str, Any]] = []
         self.facts: dict[str, str] = {}
         self.guard_actions_applied: list[str] = []
+        self.mechanical_guard_evidence: list[dict[str, Any]] = []
         self.policy_conflict = False
         self.registry_hash = ""
 
@@ -500,6 +541,9 @@ class InterventionPlan:
                 )
             result["intervention_id"] = str(entry.get("intervention_id") or "")
             result["hook"] = hook
+            result["failure_family"] = str(
+                (entry.get("provenance") or {}).get("failure_family") or ""
+            )
             self.evidence.append(dict(result))
             self.facts[str(result.get("predicate") or "")] = str(
                 result.get("verdict") or ""
@@ -541,6 +585,48 @@ class InterventionPlan:
                 )
                 continue
             action = str((entry.get("body") or {}).get("action") or "")
+            if action == "convict_mechanical_violation":
+                predicate = str(
+                    (entry.get("body") or {}).get("evidence_predicate") or ""
+                )
+                evidence = next(
+                    (
+                        item for item in self.evidence
+                        if str(item.get("predicate") or "") == predicate
+                        and str(item.get("failure_family") or "") == str(
+                            (entry.get("provenance") or {}).get(
+                                "failure_family"
+                            ) or ""
+                        )
+                        and str(item.get("verdict") or "")
+                        in PREDICATE_CONVICTION_VERDICTS.get(
+                            predicate, frozenset(),
+                        )
+                    ),
+                    None,
+                )
+                if evidence is None:
+                    self._record(
+                        entry,
+                        "guard_suppressed",
+                        "mechanical evidence binding missing or non-violating",
+                    )
+                    continue
+                self.mechanical_guard_evidence.append({
+                    "intervention_id": str(entry.get("intervention_id") or ""),
+                    "action": action,
+                    "predicate": predicate,
+                    "evidence_intervention_id": str(
+                        evidence.get("intervention_id") or ""
+                    ),
+                    "failure_family": str(
+                        (entry.get("provenance") or {}).get(
+                            "failure_family"
+                        ) or ""
+                    ),
+                    "verdict": str(evidence.get("verdict") or ""),
+                    "detail": str(evidence.get("detail") or ""),
+                })
             self._record(entry, "guard_fired", f"action={action}")
             actions.append(action)
         unique = list(dict.fromkeys(actions))
@@ -568,6 +654,7 @@ class InterventionPlan:
             "evidence": list(self.evidence),
             "facts": dict(self.facts),
             "guard_actions": list(self.guard_actions_applied),
+            "mechanical_guard_evidence": list(self.mechanical_guard_evidence),
             "policy_conflict": conflict,
         }
 

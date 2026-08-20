@@ -28,21 +28,28 @@ holdout. B passes only when all conditions hold:
 If B fails, the full holdout must not be read. A timeout or incomplete cycle is
 also a failure, not a reason to retry with more calls.
 
-## Commands
+## Clean B Commands
+
+A repaired implementation must never continue from the invalid attempt's work
+root. Remove the whole B work root so cache, registry, ledger, reports and audit
+verdicts are reset together. The detector cache namespace is currently
+`v10-mechanism-bound-cache`; seeing a v9 namespace means the run is invalid.
 
 ```powershell
-python tools/build_real_eval_v1.py
+Remove-Item -Recurse -Force evolution_v3/work/real_eval_v2_b
+python tools/build_real_eval_v1.py --check --seed 20260821 --output-dir datasets/eval_splits/real_eval_v2
 python -m pytest detector_v2/tests evolution_v3/tests tests -q
-python -m evolution_v3 init --config evolution_v3/configs/framework_real_eval_v1_b.json --reset
-python -m evolution_v3 experiment --cycles 2 --backend detector_v2 --mini --config evolution_v3/configs/framework_real_eval_v1_b.json
-python -m evolution_v3 verify-ledger --config evolution_v3/configs/framework_real_eval_v1_b.json
+python -m evolution_v3 init --config evolution_v3/configs/framework_real_eval_v2_b.json --reset
+$env:EVO3_PROGRESS = "1"
+python -m evolution_v3 experiment --cycles 2 --backend detector_v2 --mini --config evolution_v3/configs/framework_real_eval_v2_b.json
+python -m evolution_v3 verify-ledger --config evolution_v3/configs/framework_real_eval_v2_b.json
 ```
 
 Only after the B report says `mini_effect.passed=true` and the registry is
 non-empty may the single full verification be started:
 
 ```powershell
-python -m evolution_v3 final --config evolution_v3/configs/framework_real_eval_v1_full.json
+python -m evolution_v3 final --config evolution_v3/configs/framework_real_eval_v2_full.json
 ```
 
 `run_final()` uses fresh evaluation for both empty and active arms. It does not
@@ -62,15 +69,29 @@ the gate completed. It is recorded as failed/incomplete and did not authorize
 the full holdout.
 
 The third attempt re-ran the refactored code on `real_eval_v2` (seed
-`20260821`). The replay fix held: both cycles completed to `state=completed`
-within budget and the ledger verified clean (10 records). Each cycle proposed
-two candidates from the same stable failure family
-`FAM-fn-judge_false_no_recall_candidates` — an `evidence_check` on `judge.post`
-and a `decision_guard` on `adjudicate.guard`. Every candidate was rejected at
-V2 with a genuine sentinel harmlessness violation: the `decision_guard` flipped
-clean cases to error and dropped ten cases to unresolved
-(`new_fn=4, new_fp=2, new_unresolved=10`, `health_regressed=10`), so no
-intervention was admitted and the active registry stayed empty.
-`mini_effect.passed=false` (its reported `marginal_cases=1` is noise between two
-fresh empty arms, `unresolved_added=1`). B did not pass and the full holdout was
-not read.
+`20260821`). Both cycles completed and the ledger verified clean (10 records),
+but a post-run architecture audit found that the V2 result was not a valid
+proposal-quality measurement. Frozen replay wrote short envelope names
+(`tracer`, `recall`, `upgrade`) back through canonical detector status names
+(`step_tracer`, `recall_scanner`, `causal_upgrade`) incorrectly. Successful
+frozen results therefore carried empty status objects, failed authority
+validation, and became artificial unresolved rows. The reported
+`new_fn=4, new_unresolved=10` is contaminated by that execution defect.
+
+The same audit also found independent proposal-mechanism defects: an outcome
+path label was treated as a causal failure family, the proposer received only
+aggregate counts, a diagnostic-only anchor mismatch could authorize a terminal
+conviction, and rejected mechanisms were not fed into the next cycle. The two
+observed new false positives remain evidence that the proposed guard was
+unsafe, but the run cannot rank the proposer or estimate its net effect. It is
+recorded as failed/invalid, the full holdout was not read, and no threshold was
+changed in response.
+
+The framework was subsequently repaired at the architecture boundary: replay
+uses canonical stage/status mappings; mechanical convictions require a
+conviction-authorized predicate and runtime evidence from the same failure
+family; families are refined by stage/contract and per-member deterministic
+predicate profiles; the proposer receives de-identified member summaries; and
+gate rejections persist in the ledger and block unchanged proposals across
+cycles and process restarts. These changes require a new clean B run and must
+not reuse the contaminated V2 cache.

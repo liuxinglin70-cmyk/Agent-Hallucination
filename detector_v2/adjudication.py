@@ -26,6 +26,7 @@ from detector_v2.packet import (
     delivered_result as packet_delivered_result,
     evidence_refs_support_step,
 )
+from detector_v2.predicates import PREDICATE_CONVICTION_VERDICTS
 
 
 def _event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
@@ -169,6 +170,7 @@ def adjudicate(
     defense_result: Mapping[str, Any] | None = None,
     defense_status: Mapping[str, Any] | None = None,
     guard_actions: Sequence[str] | None = None,
+    mechanical_evidence: Sequence[Mapping[str, Any]] | None = None,
     hearings: Sequence[Mapping[str, Any]] | None = None,
     hearing_facts: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -199,7 +201,18 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    if "convict_mechanical_violation" in guards:
+    valid_mechanical_evidence = any(
+        str(item.get("action") or "") == "convict_mechanical_violation"
+        and bool(str(item.get("intervention_id") or ""))
+        and bool(str(item.get("evidence_intervention_id") or ""))
+        and bool(str(item.get("failure_family") or ""))
+        and str(item.get("verdict") or "")
+        in PREDICATE_CONVICTION_VERDICTS.get(
+            str(item.get("predicate") or ""), frozenset(),
+        )
+        for item in mechanical_evidence or ()
+    )
+    if "convict_mechanical_violation" in guards and valid_mechanical_evidence:
         anchor_event, anchor_step = _mechanical_anchor(packet)
         return {
             "state": STATE_ERROR,
@@ -228,57 +241,6 @@ def adjudicate(
     upgrade_positive = _positive_from_upgrade(upgrade_result) if recall_ok else None
 
     if not judge_positive and not upgrade_positive:
-        if "convict_mechanical_violation" in guards:
-            reasons.append({
-                "component": "adjudicate.guard",
-                "code": "convict_mechanical_violation",
-                "error_type": "deterministic predicate found a missing final delivery",
-            })
-            anchor_event, anchor_step = _mechanical_anchor(packet)
-            return {
-                "state": STATE_ERROR,
-                "decision_authority": AUTHORITY_AUTHORITATIVE,
-                "runtime_valid": True,
-                "responsible_event_id": anchor_event,
-                "responsible_step": anchor_step,
-                "incident_occurred": True,
-                "terminal_basis": {
-                    "state": STATE_ERROR,
-                    "decisive_facts": {
-                        "positive_source": "mechanical_violation",
-                        "guard_action": "convict_mechanical_violation",
-                    },
-                    "blocking_facts": [dict(reason) for reason in reasons],
-                },
-                "authority_failure_reasons": reasons,
-            }
-        if "convict_mechanical_violation" in guards and recall_ok:
-            # A decision_guard may promote a mechanical contract violation
-            # into a conviction even with no preliminary positive. The guard
-            # trigger vocabulary (predicate verdicts written by evidence_check
-            # rows plus the stage facts) decides when this is safe; the
-            # localization is the delivered-answer anchor.
-            anchor_event, anchor_step = _mechanical_anchor(packet)
-            return {
-                "state": STATE_ERROR,
-                "decision_authority": AUTHORITY_AUTHORITATIVE,
-                "runtime_valid": True,
-                "responsible_event_id": anchor_event,
-                "responsible_step": anchor_step,
-                "incident_occurred": True,
-                "terminal_basis": {
-                    "state": STATE_ERROR,
-                    "decisive_facts": {
-                        "positive_source": "mechanical_violation",
-                        "guard_action": "convict_mechanical_violation",
-                        "mechanical_anchor_event": anchor_event,
-                        "judge": "false",
-                        "recall_upgrade": "none",
-                    },
-                    "blocking_facts": [dict(reason) for reason in reasons],
-                },
-                "authority_failure_reasons": reasons,
-            }
         degraded = not recall_ok
         if degraded:
             reasons.append({

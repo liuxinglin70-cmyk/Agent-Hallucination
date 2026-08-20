@@ -242,6 +242,14 @@ def test_convict_mechanical_violation_promotes_clean_to_error(sample_packet):
         tracer_result=None, tracer_status=None,
         defense_result=None, defense_status=None,
         guard_actions=["convict_mechanical_violation"],
+        mechanical_evidence=[{
+            "action": "convict_mechanical_violation",
+            "intervention_id": "IV-G",
+            "evidence_intervention_id": "IV-E",
+            "failure_family": "FAM-test",
+            "predicate": "required_action_present",
+            "verdict": "violated",
+        }],
     )
     assert proof["state"] == STATE_ERROR
     assert proof["decision_authority"] == AUTHORITY_AUTHORITATIVE
@@ -266,6 +274,14 @@ def test_convict_guard_localizes_to_delivered_anchor(sample_packet):
         tracer_result=None, tracer_status=None,
         defense_result=None, defense_status=None,
         guard_actions=["convict_mechanical_violation"],
+        mechanical_evidence=[{
+            "action": "convict_mechanical_violation",
+            "intervention_id": "IV-G",
+            "evidence_intervention_id": "IV-E",
+            "failure_family": "FAM-test",
+            "predicate": "required_action_present",
+            "verdict": "violated",
+        }],
     )
     # sample_packet's last prose event is event_002 at position 2.
     assert proof["responsible_event_id"] == "event_002"
@@ -283,5 +299,40 @@ def test_without_convict_guard_judge_false_stays_clean(sample_packet):
         tracer_result=None, tracer_status=None,
         defense_result=None, defense_status=None,
         guard_actions=["require_full_view_defense"],
+    )
+    assert proof["state"] == STATE_CLEAN
+
+
+def test_convict_guard_without_bound_evidence_stays_clean(sample_packet):
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_FALSE, judge_status=JUDGE_OK,
+        recall_result={"ok": True, "candidates": []},
+        recall_status={"stage": "recall_scanner", "state": "ok"},
+        upgrade_result={"ok": True, "upgrades": [], "upgraded_candidate": None},
+        upgrade_status={"stage": "causal_upgrade", "state": "not_needed"},
+        tracer_result=None, tracer_status=None,
+        defense_result=None, defense_status=None,
+        guard_actions=["convict_mechanical_violation"],
+        mechanical_evidence=[],
+    )
+    assert proof["state"] == STATE_CLEAN
+
+
+def test_convict_guard_rejects_incomplete_evidence_provenance(sample_packet):
+    proof = adjudicate(
+        packet=sample_packet,
+        judge_result=JUDGE_FALSE, judge_status=JUDGE_OK,
+        recall_result={"ok": True, "candidates": []},
+        recall_status={"stage": "recall_scanner", "state": "ok"},
+        upgrade_result={"ok": True, "upgrades": [], "upgraded_candidate": None},
+        upgrade_status={"stage": "causal_upgrade", "state": "not_needed"},
+        tracer_result=None, tracer_status=None,
+        defense_result=None, defense_status=None,
+        guard_actions=["convict_mechanical_violation"],
+        mechanical_evidence=[{
+            "predicate": "required_action_present",
+            "verdict": "violated",
+        }],
     )
     assert proof["state"] == STATE_CLEAN

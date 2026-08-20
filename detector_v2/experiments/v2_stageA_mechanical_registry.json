@@ -32,10 +32,15 @@
       "hook": "adjudicate.guard",
       "trigger": {
         "packet_features": ["has_tool_calls"],
-        "facts": ["final_delivery_present=missing"]
+        "facts": [
+          "final_delivery_present=missing",
+          "judge_positive=false",
+          "positive_source=none"
+        ]
       },
       "body": {
         "action": "convict_mechanical_violation",
+        "evidence_predicate": "final_delivery_present",
         "action_not_when": "Never apply when a final prose or answer-tool delivery anchor is present.",
         "action_not_when_facts": ["final_delivery_present=present"]
       },

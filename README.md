@@ -15,7 +15,7 @@
   —— 历史 100+50 实验记录，仅作探索性机制证据，不是独立泛化结论。
 - **[Recursive 与 AI4AI 前沿进展调研.pdf](Recursive%20%E4%B8%8E%20AI4AI%20%E5%89%8D%E6%B2%BF%E8%BF%9B%E5%B1%95%E8%B0%83%E7%A0%94.pdf)** —— RSI / AI4AI 调研（V3 设计的理论输入）。
 
-## 当前状态（2026-08-19）
+## 当前状态（2026-08-20）
 
 - 检测器：`detector_v2`（Outcome Judge → Recall Scanner → Causal Upgrade →
   Step Tracer → Defense → 确定性裁决）。
@@ -28,14 +28,17 @@
   executable contract 加载；默认 runtime registry 仍为空。
 - 历史 100+50 结果只能作为探索性机制证据：数据被用于开发/重复调优，active
   验证臂主要是 frozen replay，不能证明独立外部泛化提升。
-- 全量测试当前为 `232 passed`；正式 393/300 split 因已知历史污染会被代码阻断。
+- 全量测试当前为 `244 passed`；正式 393/300 split 因已知历史污染会被代码阻断。
 - 后续 clean 实验协议见 `evolution_v3/experiments/real_eval_v1_protocol.md`：
   B 阶段必须在独立 effect holdout 上 fresh 验证后才能读取一次性全量集，
   不再使用单独 C 阶段。
-- `real_eval_v2` B 阶段（重构后）完整跑通 2 cycle + fresh mini_effect，ledger
-  校验通过，但两轮提案均在 V2 被判 sentinel 无害性违规（decision_guard 致
-  new_fn=4 / new_fp=2 / new_unresolved=10），无干预准入，`mini_effect.passed=false`，
-  B 未通过，全量 holdout 未读取。
+- `real_eval_v2` B 阶段完整跑通 2 cycle + fresh mini_effect，ledger 校验通过，
+  但事后架构审查确认 frozen-stage status alias 缺陷制造了假性 unresolved，
+  因此该次 V2 数字属于失败/无效运行，不能用于评价 proposer。框架现已在机制层
+  修复 replay、failure-family 归纳、mechanical evidence binding 与跨 cycle
+  rejection feedback；门限未按实验结果调整，全量 holdout 未读取，后续必须使用
+  v10 cache 做 clean B 验证。clean run 必须整体删除
+  `evolution_v3/work/real_eval_v2_b`，不能只清单个 cache 子目录。
 - LLM provider：默认已切换为 **AutoDL**（`https://www.autodl.art/api/v1`，
   `AUTODL_API_KEY`）；官方 DeepSeek 配置保留为显式回滚路径。
 - 原计划冻结 300 例终审尚未读取，但已发现与 tuning100 重叠 44 例，因此不能

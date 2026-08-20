@@ -16,11 +16,14 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from detector_v2.config import load_config as load_detector_config
-from detector_v2.predicates import PREDICATE_VERDICTS
+from detector_v2.predicates import (
+    PREDICATE_CONVICTION_VERDICTS,
+    PREDICATE_VERDICTS,
+)
 from detector_v2.provider import ProviderError, provider_call
 
 from evolution_v3.config import resolve_path
-from evolution_v3.contracts import structured_key
+from evolution_v3.contracts import redact_case_ids, structured_key
 
 
 @dataclass
@@ -40,10 +43,13 @@ Evidence schema (writes one mechanical evidence row):
 {"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"<one predicate from the predicate list>","runner":"deterministic","output_verdicts":["<all verdicts listed for that predicate>"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
 
 Guard schema (emits one closed adjudication action):
-{"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","evidence_predicate":"<required only for convict_mechanical_violation>","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
 
 Predicates and their verdicts:
 {predicate_block}
+
+Conviction-authorized predicate verdicts:
+{conviction_block}
 
 Stage facts (guard triggers only):
 judge_confidence=high|medium|low; judge_positive=true|false;
@@ -55,10 +61,13 @@ A predicate name itself is also a fact once its evidence row ran, with the
 verdict that predicate produced (for example required_action_present=violated).
 
 Guidance:
-- For an FN family (detector said clean but gold says error): an evidence_check
-  that mechanically exposes the violated contract, paired with a
-  convict_mechanical_violation guard consuming that predicate verdict, is the
-  recall-side lever when no preliminary positive exists.
+- For an FN family (detector said clean but gold says error), first determine
+  that one mechanism is shared by the supplied member summaries. An
+  evidence_check may be paired with a convict_mechanical_violation guard only
+  when the evidence predicate is applicable and violating for every member;
+  its trigger must also require judge_positive=false and positive_source=none,
+  so it cannot override a positive hearing or defense; otherwise prefer an
+  evidence-only candidate or no candidate.
 - For an FN family where a positive existed but was lost: restore_judge_conviction
   with the facts that identify the over-refutation.
 - For an FP family: withhold_conviction with the facts that identify the
@@ -66,7 +75,8 @@ Guidance:
 - target_polarity must match the family kind: recall for FN, precision for FP.
 - Every guard needs action_not_when_facts. They are ANDed executable exclusions;
   use [] only when no exclusion is required.
-- Never re-propose a mechanism equivalent to an active intervention.
+ - Never re-propose a mechanism equivalent to an active intervention or a
+   rejected candidate listed in the feedback.
 """
 
 
@@ -75,8 +85,14 @@ def _draft_system_prompt() -> str:
         f"{name}: {'|'.join(sorted(verdicts))}"
         for name, verdicts in sorted(PREDICATE_VERDICTS.items())
     )
-    return _LLM_DRAFT_SYSTEM_TEMPLATE.replace(
-        "{predicate_block}", predicate_block
+    conviction_block = "\n".join(
+        f"{name}: {'|'.join(sorted(verdicts))}"
+        for name, verdicts in sorted(PREDICATE_CONVICTION_VERDICTS.items())
+    )
+    return (
+        _LLM_DRAFT_SYSTEM_TEMPLATE
+        .replace("{predicate_block}", predicate_block)
+        .replace("{conviction_block}", conviction_block)
     )
 
 
@@ -119,6 +135,33 @@ class LLMProposer:
         # experiment must never exhaust its drafting ability mid-run.
         self.calls_by_cycle: dict[int, int] = {}
         self.active_entries = [dict(entry) for entry in active_entries]
+        self.rejection_feedback: list[dict[str, Any]] = []
+        self.rejected_keys: set[tuple[Any, ...]] = set()
+        self.rejected_group_keys: set[frozenset[tuple[Any, ...]]] = set()
+
+    def set_rejection_feedback(
+        self, feedback: Sequence[Mapping[str, Any]],
+    ) -> None:
+        self.rejection_feedback = [dict(item) for item in feedback]
+        self.rejected_keys = {
+            key for key in (
+                _proposal_fingerprint(item.get("candidate") or {})
+                for item in self.rejection_feedback
+            ) if key is not None
+        }
+        self.rejected_group_keys = {
+            frozenset(keys)
+            for keys in (
+                [
+                    key for key in (
+                        _proposal_fingerprint(candidate)
+                        for candidate in item.get("candidates") or ()
+                    ) if key is not None
+                ]
+                for item in self.rejection_feedback
+            )
+            if len(keys) >= 2
+        }
 
     def _registry_digest(self) -> list[dict[str, Any]]:
         digest = []
@@ -181,8 +224,12 @@ class LLMProposer:
                     "count": f.get("count"),
                     "sources": f.get("sources"),
                     "mechanism_summary": f.get("mechanism_summary"),
+                    "mechanism_signature": f.get("mechanism_signature"),
                     "predicate_signals": (f.get("diagnostics") or {}).get(
                         "predicate_signals", {}
+                    ),
+                    "member_summaries": (f.get("diagnostics") or {}).get(
+                        "member_summaries", []
                     ),
                 }
                 for f in families[:5]
@@ -191,9 +238,38 @@ class LLMProposer:
             ensure_ascii=False,
         )
         active_block = json.dumps(self._registry_digest(), ensure_ascii=False)
+        feedback_block = json.dumps(
+            [
+                {
+                    "type": item.get("type"),
+                    "hook": item.get("hook"),
+                    "predicate": item.get("predicate"),
+                    "action": item.get("action"),
+                    "facts": item.get("facts"),
+                    "gate": item.get("gate"),
+                    "reason": redact_case_ids(item.get("reason")),
+                    "delta": item.get("delta"),
+                    "combination": [
+                        {
+                            "type": candidate.get("type"),
+                            "hook": candidate.get("hook"),
+                            "predicate": (candidate.get("body") or {}).get(
+                                "predicate"
+                            ),
+                            "action": (candidate.get("body") or {}).get("action"),
+                        }
+                        for candidate in item.get("candidates") or ()
+                    ],
+                }
+                for item in self.rejection_feedback[-8:]
+            ],
+            ensure_ascii=False,
+        )
         user = (
             f"Cycle {cycle}. Active interventions already deployed (do not "
             f"echo their mechanisms):\n{active_block}\n\n"
+            f"Previously rejected mechanisms (do not repeat unchanged):\n"
+            f"{feedback_block}\n\n"
             f"Stable bare-base failure families:\n{family_block}\n\n"
             f"Draft at most {max_proposals} interventions."
         )
@@ -280,6 +356,7 @@ class LLMProposer:
                 })
                 continue
             key = structured_key(candidate)
+            proposal_fingerprint = _proposal_fingerprint(candidate)
             if key is not None:
                 if key in active_keys:
                     notes.append({
@@ -298,6 +375,14 @@ class LLMProposer:
                     })
                     continue
                 batch_keys.add(key)
+            if proposal_fingerprint in self.rejected_keys:
+                notes.append({
+                    "intervention_id": candidate["intervention_id"],
+                    "generator": "llm",
+                    "rejected": "echo_of_rejected",
+                    "reason": "executable mechanism previously failed a gate",
+                })
+                continue
             proposals.append(candidate)
             notes.append({
                 "intervention_id": candidate["intervention_id"],
@@ -307,9 +392,47 @@ class LLMProposer:
                     candidate.get("hook") or ""
                 ) != "judge.system",
             })
+        joint_groups = _joint_groups(proposals)
+        grouped_ids = {item for group in joint_groups for item in group}
+        filtered: list[dict[str, Any]] = []
+        for candidate in proposals:
+            if (
+                candidate.get("type") == "decision_guard"
+                and (candidate.get("body") or {}).get("action")
+                == "convict_mechanical_violation"
+                and str(candidate.get("intervention_id") or "") not in grouped_ids
+            ):
+                notes.append({
+                    "intervention_id": candidate["intervention_id"],
+                    "generator": "llm",
+                    "rejected": "missing_evidence_partner",
+                    "reason": "mechanical conviction requires a paired evidence_check",
+                })
+                continue
+            filtered.append(candidate)
+        filtered_keys = {
+            key: candidate
+            for candidate in filtered
+            if (key := _proposal_fingerprint(candidate)) is not None
+        }
+        for group in self.rejected_group_keys:
+            if not group <= set(filtered_keys):
+                continue
+            rejected_key = next(
+                key for key in reversed(list(filtered_keys)) if key in group
+            )
+            rejected = filtered_keys[rejected_key]
+            filtered.remove(rejected)
+            notes.append({
+                "intervention_id": rejected["intervention_id"],
+                "generator": "llm",
+                "rejected": "echo_of_rejected_combination",
+                "reason": "candidate recreates a combination that failed M",
+            })
+            break
         return ProposalBatch(
-            candidates=proposals,
-            joint_groups=_joint_groups(proposals),
+            candidates=filtered,
+            joint_groups=_joint_groups(filtered),
             notes=notes,
         )
 
@@ -367,6 +490,26 @@ def _joint_groups(proposals: Sequence[Mapping[str, Any]]) -> list[list[str]]:
             ])
             break
     return groups
+
+
+def _proposal_fingerprint(candidate: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    key = structured_key(candidate)
+    if key is not None:
+        return key
+    if candidate.get("type") == "text_boundary":
+        body = candidate.get("body") or {}
+        return (
+            "text_boundary",
+            str(candidate.get("hook") or ""),
+            tuple(sorted(
+                str(item) for item in (candidate.get("trigger") or {}).get(
+                    "packet_features"
+                ) or ()
+            )),
+            str(body.get("directive") or "").strip(),
+            str(body.get("not_when") or "").strip(),
+        )
+    return None
 
 
 def make_proposer(

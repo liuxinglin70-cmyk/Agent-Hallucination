@@ -565,6 +565,7 @@ class Detector:
             defense_result=defense_result,
             defense_status=defense_status,
             guard_actions=guard_actions,
+            mechanical_evidence=plan.mechanical_guard_evidence,
             hearings=hearings,
             hearing_facts=hearing_facts,
         )

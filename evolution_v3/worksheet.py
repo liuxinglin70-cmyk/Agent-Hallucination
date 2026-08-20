@@ -8,6 +8,7 @@ appear in directive/body/claim prose (enforced by V1).
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any, Mapping, Sequence
 
 from detector_v2.dataset import load_case
@@ -48,8 +49,8 @@ def _coverage(result: Mapping[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def failure_family(row: Mapping[str, Any]) -> str:
-    """Mechanical failure-family id; never case-id conditioned."""
+def _coarse_failure_family(row: Mapping[str, Any]) -> str:
+    """Outcome-path family used as a readable mechanism-signature prefix."""
     gold = row.get("gold")
     prediction = row.get("prediction")
     result = row.get("result") or {}
@@ -94,6 +95,54 @@ def failure_family(row: Mapping[str, Any]) -> str:
     return "FAM-none"
 
 
+def _mechanism_signature(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Label-free execution signature used to keep unlike failures apart."""
+    result = row.get("result") or {}
+    proof = result.get("proof") or {}
+    judge = _judge_parsed(result)
+    statuses = result.get("stage_status") or {}
+    contracts = sorted({
+        str(item.get("kind") or "")
+        for item in judge.get("contracts") or ()
+        if isinstance(item, Mapping) and str(item.get("kind") or "")
+    })
+    return {
+        "judge_positive": bool(judge.get("is_hallucination")),
+        "contracts": contracts,
+        "stages": {
+            name: str((statuses.get(name) or {}).get("state") or "not_run")
+            for name in (
+                "judge", "recall_scanner", "causal_upgrade",
+                "step_tracer", "defense",
+            )
+        },
+        "recall_path": (
+            "positive" if proof.get("causal_upgrade")
+            else "candidates" if proof.get("recall_candidates")
+            else str((statuses.get("recall_scanner") or {}).get("state") or "not_run")
+        ),
+        "upgrade_positive": bool(proof.get("causal_upgrade")),
+        "defense_verdict": str((proof.get("defense") or {}).get("verdict") or "none"),
+        "positive_source": str(
+            ((proof.get("terminal_basis") or {}).get("decisive_facts") or {}).get(
+                "positive_source"
+            ) or "none"
+        ),
+    }
+
+
+def failure_family(row: Mapping[str, Any]) -> str:
+    """Mechanism family id; never case-id or source conditioned."""
+    coarse = _coarse_failure_family(row)
+    if coarse in {"FAM-none"} or coarse.startswith("FAM-unresolved-"):
+        return coarse
+    signature = json.dumps(
+        _mechanism_signature(row), ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"{coarse}-{_sha(signature)}"
+
+
 def stable_failure_families(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -133,6 +182,7 @@ def stable_failure_families(
                 source_of(str(row.get("case") or "")) for row in members
             }),
             "mechanism_summary": _mechanism_summary(family, members),
+            "mechanism_signature": _mechanism_signature(members[0]),
         })
     families.sort(key=lambda item: (-item["count"], item["failure_family"]))
     return families
@@ -143,7 +193,7 @@ def _mechanism_summary(
     members: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {"family": family, "n": len(members)}
-    if family == "FAM-fn-upgrade_missing_rows":
+    if family.startswith("FAM-fn-upgrade_missing_rows"):
         coverages = []
         for row in members:
             coverage = _coverage(row.get("result") or {})
@@ -180,7 +230,7 @@ def worksheet_report(
 
 
 _VIOLATION_VERDICTS = {
-    "violated", "unresolved", "uncovered", "inconsistent",
+    "violated", "unresolved", "uncovered", "inconsistent", "missing",
 }
 
 
@@ -212,6 +262,7 @@ def diagnose_failure_families(
         signal: dict[str, Any] = {
             "n": len(members),
             "predicate_signals": {},
+            "member_summaries": [],
         }
         if dataset_root:
             applicable: dict[str, int] = {}
@@ -235,7 +286,9 @@ def diagnose_failure_families(
                 if not refs and defense:
                     refs = list(defense.get("evidence_refs") or [])
                 contexts = {
-                    "required_action_present": {},
+                    "required_action_present": {
+                        "contracts": judge.get("contracts") or [],
+                    },
                     "verbatim_fidelity": {},
                     "evidence_refs_resolve": {
                         "evidence_refs": refs,
@@ -247,23 +300,37 @@ def diagnose_failure_families(
                     "delivered_anchor_consistency": {
                         "delivered_result": judge.get("delivered_result") or "",
                     },
+                    "final_delivery_present": {},
                 }
                 try:
                     record, _gold = load_case(dataset_root, case)
                     packet = build_packet(record)
                 except Exception:
                     continue
+                member_predicates: dict[str, str] = {}
                 for predicate, context in contexts.items():
                     try:
-                        verdict = run_predicate(
+                        verdict = str(run_predicate(
                             predicate, packet, context,
-                        ).get("verdict")
+                        ).get("verdict") or "")
                     except Exception:
                         continue
                     if verdict != "not_applicable":
                         applicable[predicate] = applicable.get(predicate, 0) + 1
                     if verdict in _VIOLATION_VERDICTS:
                         violations[predicate] = violations.get(predicate, 0) + 1
+                    member_predicates[predicate] = verdict
+                signature = _mechanism_signature(row)
+                signal["member_summaries"].append({
+                    "member": f"member_{len(signal['member_summaries']) + 1:03d}",
+                    "contracts": signature["contracts"],
+                    "stages": signature["stages"],
+                    "judge_positive": signature["judge_positive"],
+                    "recall_path": signature["recall_path"],
+                    "upgrade_positive": signature["upgrade_positive"],
+                    "defense_verdict": signature["defense_verdict"],
+                    "predicates": member_predicates,
+                })
             signal["predicate_signals"] = {
                 predicate: {
                     "applicable": applicable.get(predicate, 0),
@@ -275,6 +342,7 @@ def diagnose_failure_families(
                     "evidence_refs_resolve",
                     "contract_coverage",
                     "delivered_anchor_consistency",
+                    "final_delivery_present",
                 )
             }
         item["diagnostics"] = signal
@@ -282,9 +350,89 @@ def diagnose_failure_families(
     return diagnosed
 
 
+def refine_failure_families(
+    families: Sequence[Mapping[str, Any]],
+    *,
+    min_cases: int = 2,
+) -> list[dict[str, Any]]:
+    """Split execution families by deterministic predicate profiles.
+
+    Stage/contract signatures are available before packet diagnosis. This
+    second, still label-free pass prevents members with different mechanical
+    evidence from being presented as one repairable mechanism.
+    """
+    refined: list[dict[str, Any]] = []
+    for family in families:
+        diagnostics = family.get("diagnostics") or {}
+        members = list(diagnostics.get("member_summaries") or ())
+        case_ids = list(family.get("failure_cases") or ())
+        if len(members) != len(case_ids):
+            item = dict(family)
+            item["diagnostic_complete"] = False
+            refined.append(item)
+            continue
+        groups: dict[str, list[tuple[str, Mapping[str, Any]]]] = {}
+        for case_id, member in zip(case_ids, members):
+            profile = json.dumps(
+                member.get("predicates") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            groups.setdefault(profile, []).append((str(case_id), member))
+        for profile, group in sorted(groups.items()):
+            if len(group) < min_cases:
+                continue
+            item = dict(family)
+            item["failure_family"] = (
+                f"{family.get('failure_family')}-P{_sha(profile)}"
+            )
+            item["failure_cases"] = [case_id for case_id, _member in group]
+            item["count"] = len(group)
+            item["diagnostic_complete"] = True
+            item["diagnostics"] = {
+                "n": len(group),
+                "member_summaries": [dict(member) for _case, member in group],
+                "predicate_signals": _predicate_signal_counts(
+                    [member for _case, member in group]
+                ),
+            }
+            refined.append(item)
+    refined.sort(key=lambda item: (-int(item.get("count") or 0), str(
+        item.get("failure_family") or ""
+    )))
+    return refined
+
+
+def _predicate_signal_counts(
+    members: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, int]]:
+    predicates = sorted({
+        str(name)
+        for member in members
+        for name in (member.get("predicates") or {})
+    })
+    return {
+        predicate: {
+            "applicable": sum(
+                1 for member in members
+                if str((member.get("predicates") or {}).get(predicate) or "")
+                != "not_applicable"
+            ),
+            "violations": sum(
+                1 for member in members
+                if str((member.get("predicates") or {}).get(predicate) or "")
+                in _VIOLATION_VERDICTS
+            ),
+        }
+        for predicate in predicates
+    }
+
+
 __all__ = [
     "diagnose_failure_families",
     "failure_family",
+    "refine_failure_families",
     "stable_failure_families",
     "worksheet_report",
 ]
