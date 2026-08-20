@@ -88,6 +88,7 @@ class EvolutionSplit:
     sentinel: list[str] = field(default_factory=list)
     gain: list[str] = field(default_factory=list)
     patrol_pool: list[str] = field(default_factory=list)
+    validation: list[str] = field(default_factory=list)
     final: list[dict[str, Any]] = field(default_factory=list)
     final_holdout: "FinalHoldout | None" = None
     mini: bool = False
@@ -174,7 +175,9 @@ class FinalHoldout:
 
 
 def _mini_pool(manifest: Mapping[str, Any], size: int) -> list[str]:
-    evolution_set = manifest.get("evolution_set") or {}
+    evolution_set = manifest.get("evolution_set") or (
+        (manifest.get("b_stage") or {}).get("evolution_set") or {}
+    )
     cases = list(evolution_set.get("cases") or [])
     declared_size = evolution_set.get("size")
     if declared_size is not None and int(declared_size) != len(cases):
@@ -191,7 +194,9 @@ def _mini_pool(manifest: Mapping[str, Any], size: int) -> list[str]:
 
 
 def _full_pool(manifest: Mapping[str, Any]) -> list[str]:
-    pool = manifest.get("evolution_pool") or {}
+    pool = manifest.get("evolution_pool") or (
+        manifest.get("full_stage") or {}
+    )
     cases = list(pool.get("cases") or [])
     if not cases or len(cases) != len(set(cases)):
         raise ValueError("full manifest evolution_pool must be non-empty and unique")
@@ -200,7 +205,26 @@ def _full_pool(manifest: Mapping[str, Any]) -> list[str]:
 
 def _final_cases(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     final = manifest.get("final_verification") or {}
-    return [dict(item) for item in (final.get("cases") or [])]
+    if final.get("records"):
+        return [dict(item) for item in final["records"]]
+    full = manifest.get("full_stage") or {}
+    return [
+        {"case_id": item.get("case_id"), "gold": item.get("gold")}
+        for item in (full.get("records") or [])
+    ]
+
+
+def _validation_cases(manifest: Mapping[str, Any]) -> list[str]:
+    validation = manifest.get("validation_set") or (
+        (manifest.get("b_stage") or {}).get("validation_set") or {}
+    )
+    cases = [str(item) for item in validation.get("cases") or []]
+    declared_size = validation.get("size")
+    if declared_size is not None and int(declared_size) != len(cases):
+        raise ValueError("validation_set.size does not match its case list")
+    if len(cases) != len(set(cases)):
+        raise ValueError("validation_set contains duplicate case ids")
+    return cases
 
 
 def build_split(
@@ -214,18 +238,26 @@ def build_split(
     manifest = load_json(manifest_path)
     seed = int(split_cfg.get("seed", 20260817))
     rng = random.Random(seed)
+    final_only = bool(config.get("final_only", False))
     if mini:
         pool = _mini_pool(manifest, int(split_cfg.get("mini_pool_size", 32)))
         final: list[dict[str, Any]] = []
+        validation = _validation_cases(manifest)
+        if set(pool) & set(validation):
+            raise ValueError("mini evolution_set overlaps validation_set")
     else:
-        pool = _full_pool(manifest)
         final = _final_cases(manifest)
+        validation = []
+        pool = (
+            [str(item.get("case_id") or "") for item in final]
+            if final_only else _full_pool(manifest)
+        )
         final_ids = [str(item.get("case_id") or "") for item in final]
         if not final_ids or any(not case for case in final_ids):
             raise ValueError("final_verification must contain valid case ids")
         if len(final_ids) != len(set(final_ids)):
             raise ValueError("final_verification contains duplicate case ids")
-        overlap = sorted(set(pool) & set(final_ids))
+        overlap = [] if final_only else sorted(set(pool) & set(final_ids))
         if overlap:
             raise ValueError(
                 f"evolution pool overlaps final verification: {overlap[:5]}"
@@ -298,6 +330,7 @@ def build_split(
         sentinel=sentinel,
         gain=gain,
         patrol_pool=patrol_pool,
+        validation=validation,
         final=final,
         final_holdout=holdout,
         mini=mini,
@@ -316,6 +349,8 @@ def split_manifest_report(split: EvolutionSplit) -> dict[str, Any]:
         "gain": split.gain,
         "gain_size": len(split.gain),
         "patrol_pool_size": len(split.patrol_pool),
+        "validation": split.validation,
+        "validation_size": len(split.validation),
         "final_size": len(split.final),
         "final_reads": (
             split.final_holdout.reads if split.final_holdout else 0

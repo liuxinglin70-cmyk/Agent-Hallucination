@@ -292,7 +292,7 @@ def test_llm_proposer_binds_provenance_locally_and_records_usage(monkeypatch):
 
 
 def test_defect_candidates_have_expected_shapes():
-    candidates = defect_candidates(1)
+    candidates = defect_candidates()
     assert len(candidates) == 2
     leak, noise = candidates
     assert candidate_contains_case_id(leak) == "BFCL/001.json"
@@ -303,133 +303,52 @@ def test_defect_candidates_have_expected_shapes():
     validate_registry(make_registry(candidates))
 
 
-def test_v2_reroll_control_attributes_noise_correctly(tmp_path):
-    """Unfreezing-hook harm counts subtract the empty-reroll noise arm.
-
-    The candidate arm turns one gold-true sentinel case into a false
-    negative. The noise arm (empty registry, fresh roll) is fully correct,
-    so the reroll contributes no allowed slack: the harm is intervention-
-    attributable and the gate must reject. A second arm where the reroll
-    itself also flips that case shows the subtraction: the flip is noise,
-    not intervention, and the gate passes.
-    """
-    from evolution_v3.backends import MockDetectorBackend
-
-    config = load_config()
-    sentinel = ["A/001.json", "A/002.json", "A/003.json"]
-    _write_cases(tmp_path, sentinel)
-    gold_map = {"A/001.json": True, "A/002.json": True, "A/003.json": False}
-    baseline = MockDetectorBackend().evaluate(
-        sentinel, dataset_root=str(tmp_path), registry=empty_registry(),
-        gold_map=gold_map,
-    )
-    candidate = _candidate("IV-9-001")
-    candidate["hook"] = "scanner.system"
-    candidate["type"] = "text_boundary"
-
-    class _NoisyRoll(MockDetectorBackend):
-        """Every fresh roll flips A/002 to a false negative.
-
-        The cached baseline was captured on a lucky roll (A/002 correct), so
-        both the candidate arm and the empty-reroll arm flip it. The flip is
-        reroll noise, not intervention harm, and the gate must subtract it.
-        """
-
-        def __init__(self):
-            super().__init__()
-            self.rolls = 0
-
-        def run_case(self, record, *, case_id, registry=None, gold=None):
-            self.rolls += 1
-            gold = False if case_id == "A/002.json" else gold
-            return MockDetectorBackend.run_case(
-                self, record, case_id=case_id, registry=registry, gold=gold,
-            )
-
-    verdict = v2_harmlessness(
-        candidate,
-        baseline_rows=baseline,
-        backend=_NoisyRoll(),
-        dataset_root=str(tmp_path),
-        sentinel_cases=sentinel,
-        config=config,
-        gold_map=gold_map,
-    )
-    assert verdict["passed"] is True  # the flip is reroll-attributable
-    assert verdict["reroll_control"]["new_fn"] == 1
-
-    # And when the candidate adds real harm beyond noise, it must still fail:
-    # A/003 flips to a false positive only under the candidate registry.
-    class _NoisyRollPlusRealHarm(_NoisyRoll):
-        def run_case(self, record, *, case_id, registry=None, gold=None):
-            out = _NoisyRoll.run_case(
-                self, record, case_id=case_id, registry=registry, gold=gold,
-            )
-            if (
-                registry is not None
-                and case_id == "A/003.json"
-                and any(
-                    str(e.get("intervention_id") or "") == "IV-9-001"
-                    for e in (registry.get("interventions") or [])
-                )
-            ):
-                out = dict(out)
-                out["state"] = "verified_error"
-            return out
-
-    verdict_harm = v2_harmlessness(
-        candidate,
-        baseline_rows=baseline,
-        backend=_NoisyRollPlusRealHarm(),
-        dataset_root=str(tmp_path),
-        sentinel_cases=sentinel,
-        config=config,
-        gold_map=gold_map,
-    )
-    assert verdict_harm["passed"] is False
-    assert "new_fp=1" in verdict_harm["reason"]
-
-
-def test_v2_frozen_hook_skips_reroll_control(tmp_path):
-    """Frozen-replay hooks keep the pure paired-delta contract."""
-    from evolution_v3.backends import MockDetectorBackend
-
+def test_v2_harmlessness_is_pure_over_paired_rows(tmp_path):
+    """V2 scores precomputed rows; reroll accounting lives in the caller."""
     config = load_config()
     sentinel = ["A/001.json", "A/002.json"]
     _write_cases(tmp_path, sentinel)
     gold_map = {"A/001.json": True, "A/002.json": False}
-    backend = MockDetectorBackend()
-    baseline = backend.evaluate(
-        sentinel, dataset_root=str(tmp_path), registry=empty_registry(),
-        gold_map=gold_map,
-    )
-    frozen_candidate = make_intervention(
-        intervention_id="IV-9-002",
-        intervention_type="evidence_check",
-        hook="judge.post",
-        packet_features=["has_tool_calls"],
-        body={
-            "predicate": "evidence_refs_resolve",
-            "runner": "deterministic",
-            "output_verdicts": ["resolved", "unresolved", "not_applicable"],
-        },
-        expected_behavior="gate audit frozen hook",
-        target_polarity="boundary",
-        cycle=9,
-        failure_family="FAM-test",
-        failure_cases=["A/001.json", "A/002.json"],
-    )
+    baseline = [
+        {"case": "A/001.json", "gold": True, "prediction": True,
+         "state": "verified_error", "authority": "authoritative"},
+        {"case": "A/002.json", "gold": False, "prediction": False,
+         "state": "verified_clean", "authority": "authoritative"},
+    ]
+    candidate_rows = [
+        {"case": "A/001.json", "gold": True, "prediction": False,
+         "state": "verified_clean", "authority": "authoritative"},
+        {"case": "A/002.json", "gold": False, "prediction": False,
+         "state": "verified_clean", "authority": "authoritative"},
+    ]
     verdict = v2_harmlessness(
-        frozen_candidate,  # judge.post evidence hook stays frozen
         baseline_rows=baseline,
-        backend=backend,
-        dataset_root=str(tmp_path),
-        sentinel_cases=sentinel,
+        candidate_rows=candidate_rows,
         config=config,
-        gold_map=gold_map,
+    )
+    assert verdict["passed"] is False
+    assert "new_fn=1" in verdict["reason"]
+    assert verdict["reroll_control"] is None
+
+    reroll_note = {"new_fn": 1}
+    verdict = v2_harmlessness(
+        baseline_rows=baseline,
+        candidate_rows=candidate_rows,
+        config=config,
+        reroll_control=reroll_note,
+    )
+    # The gate itself never subtracts reroll noise; the engine decides which
+    # control arm the rows came from.
+    assert verdict["passed"] is False
+    assert verdict["reroll_control"] == reroll_note
+
+    identical = [dict(row) for row in baseline]
+    verdict = v2_harmlessness(
+        baseline_rows=baseline,
+        candidate_rows=identical,
+        config=config,
     )
     assert verdict["passed"] is True
-    assert verdict["reroll_control"] is None
 
 
 def test_llm_proposer_rejects_duplicate_in_batch(monkeypatch):

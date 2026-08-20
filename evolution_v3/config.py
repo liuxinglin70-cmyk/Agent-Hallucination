@@ -80,6 +80,11 @@ DEFAULTS: dict[str, Any] = {
         "max_output_tokens": 4096,
         "disable_thinking": True,
     },
+    "mini_effect": {
+        "min_marginal_cases": 1,
+        "max_new_errors": 0,
+        "max_unresolved_added": 0,
+    },
 }
 
 

@@ -115,6 +115,9 @@ def load_config(
     provider_block = raw.get("provider")
     provider_block = provider_block if isinstance(provider_block, dict) else {}
     resolved: dict[str, Any] = {"schema_version": CONFIG_SCHEMA}
+    case_timeout = raw.get("case_timeout_seconds")
+    if case_timeout is not None:
+        resolved["case_timeout_seconds"] = int(float(case_timeout))
     registry_path = raw.get("intervention_registry")
     if registry_path:
         path = Path(str(registry_path))

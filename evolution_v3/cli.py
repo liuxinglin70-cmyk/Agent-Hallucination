@@ -5,6 +5,7 @@ Examples:
     python -m evolution_v3 smoke
     python -m evolution_v3 cycle --cycle 1 --backend mock --mini
     python -m evolution_v3 experiment --cycles 3 --backend detector_v2
+    python -m evolution_v3 governance --cycle 3 --backend detector_v2
     python -m evolution_v3 final
     python -m evolution_v3 meta
 """
@@ -68,6 +69,19 @@ def cmd_experiment(args: argparse.Namespace) -> int:
     report = engine.run_experiment(int(args.cycles))
     out = resolve_path(config["work_root"]) / "reports" / "experiment.json"
     save_json(out, report)
+    _print_json(report)
+    if args.mini and report.get("mini_effect") and not report["mini_effect"].get("passed"):
+        return 2
+    return 0
+
+
+def cmd_governance(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
+    backend = _mock_backend(config) if args.backend == "mock" else None
+    engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
+    report = engine.run_governance(cycle=int(args.cycle))
     _print_json(report)
     return 0
 
@@ -288,6 +302,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mini", action="store_true")
     p.add_argument("--config")
     p.set_defaults(func=cmd_experiment)
+
+    p = sub.add_parser(
+        "governance",
+        help="post-cycle attribution, retirement and rollback accounting",
+    )
+    p.add_argument("--cycle", type=int, default=None)
+    p.add_argument("--backend", choices=["detector_v2", "mock"], default=None)
+    p.add_argument("--mini", action="store_true")
+    p.add_argument("--config")
+    p.set_defaults(func=cmd_governance)
 
     p = sub.add_parser("final", help="read-once final verification")
     p.add_argument("--config")

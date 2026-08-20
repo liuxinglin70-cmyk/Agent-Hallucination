@@ -11,6 +11,7 @@ from detector_v2.defense import _parse_defense, _validate_defense_evidence, run_
 from detector_v2.interventions import compile_runtime_plan, load_intervention_registry
 from detector_v2.judge import _parse_judge, run_judge
 from detector_v2.packet import build_packet, validate_record
+from detector_v2.provider import case_deadline_ctx
 from detector_v2.recaller import (
     _parse_candidates,
     _parse_upgrades,
@@ -248,6 +249,24 @@ class Detector:
         whose stage is frozen, replay is refused (fail-closed): freezing
         that stage would mask the intervention under test.
         """
+        with case_deadline_ctx(self.config.get("case_timeout_seconds")):
+            return self._detect(
+                record,
+                case_id=case_id,
+                interventions=interventions,
+                frozen_judge=frozen_judge,
+                frozen_stages=frozen_stages,
+            )
+
+    def _detect(
+        self,
+        record: Mapping[str, Any],
+        *,
+        case_id: str = "case",
+        interventions: Mapping[str, Any] | None = None,
+        frozen_judge: Mapping[str, Any] | None = None,
+        frozen_stages: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         validate_record(record)
         packet = build_packet(record)
         effective_interventions = (

@@ -13,6 +13,7 @@ Key behaviour (a deliberate fix over the old detector):
 from __future__ import annotations
 
 import base64
+import contextvars
 import json
 import os
 import subprocess
@@ -23,6 +24,14 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib import error as urlerror
 from urllib import request as urlrequest
+
+# A whole-detection wall-clock deadline, set by the detector around one
+# ``detect`` call and honoured by every provider call inside it. Each stage
+# still keeps its own per-call budget, but the shared deadline prevents one
+# case from stacking many serial stage budgets into unbounded runtime.
+_CASE_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "detector_v2_case_deadline", default=None,
+)
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
 
@@ -161,6 +170,27 @@ def extract_json_object(text: str) -> Any | None:
     return None
 
 
+def case_deadline_ctx(seconds: float | None) -> Any:
+    """Context manager that bounds all provider calls within the block.
+
+    ``None`` disables the deadline (unbounded, the historical behaviour).
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _ctx():
+        if seconds is None:
+            yield
+            return
+        token = _CASE_DEADLINE.set(time.monotonic() + float(seconds))
+        try:
+            yield
+        finally:
+            _CASE_DEADLINE.reset(token)
+
+    return _ctx()
+
+
 def majority_vote(values, *, on_tie):
     """Strict-majority vote with a deterministic tie law.
 
@@ -254,6 +284,15 @@ def provider_call(
     growth = max(1.0, float(route.get("timeout_growth_factor", 1.5)))
     per_attempt = int(route.get("timeout_seconds", 120))
     total_timeout = max(1.0, float(route.get("total_timeout_seconds", 360)))
+    case_deadline = _CASE_DEADLINE.get()
+    if case_deadline is not None:
+        remaining_case = case_deadline - time.monotonic()
+        if remaining_case <= 0:
+            raise ProviderError(
+                route_name, "case deadline exceeded",
+                error_type="case_deadline_exceeded",
+            )
+        total_timeout = min(total_timeout, remaining_case)
     deadline = time.monotonic() + total_timeout
     last_error = ""
     attempts = 0

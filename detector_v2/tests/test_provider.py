@@ -11,6 +11,7 @@ import detector_v2.provider as provider_module
 from detector_v2.provider import (
     ProviderError,
     _isolated_transport,
+    case_deadline_ctx,
     extract_json_object,
     provider_call,
 )
@@ -205,3 +206,57 @@ def test_provider_call_enables_context_cache(monkeypatch):
     assert meta["prompt_cache_hit_tokens"] == 7
     assert meta["prompt_cache_read_tokens"] == 3
     assert meta["prompt_cache_write_tokens"] == 2
+
+
+def test_case_deadline_bounds_provider_call(monkeypatch):
+    monkeypatch.setenv("V2_TEST_KEY", "secret")
+    clock = {"now": 0.0}
+
+    def _monotonic():
+        return clock["now"]
+
+    monkeypatch.setattr(provider_module.time, "monotonic", _monotonic)
+    monkeypatch.setattr(provider_module.time, "sleep", lambda _delay: None)
+    timeouts: list[float] = []
+
+    def _timed_out_transport(*, timeout, **_kwargs):
+        timeouts.append(timeout)
+        clock["now"] += 1.0
+        raise TimeoutError("simulated")
+
+    monkeypatch.setattr(provider_module, "_isolated_transport", _timed_out_transport)
+    with case_deadline_ctx(2.0):
+        with pytest.raises(ProviderError) as exc:
+            provider_call(
+                route={
+                    "endpoint": "http://127.0.0.1:1/v1",
+                    "model": "test-model",
+                    "api_key_env": "V2_TEST_KEY",
+                    "timeout_seconds": 100,
+                    "total_timeout_seconds": 100,
+                    "transport_retries": 2,
+                },
+                system="sys", user="user", purpose="test",
+            )
+    assert "total timeout exceeded" in str(exc.value)
+    assert all(t <= 2.0 for t in timeouts)
+    assert len(timeouts) > 1
+
+
+def test_case_deadline_raises_when_already_exceeded(monkeypatch):
+    monkeypatch.setenv("V2_TEST_KEY", "secret")
+    clock = {"now": 0.0}
+
+    monkeypatch.setattr(provider_module.time, "monotonic", lambda: clock["now"])
+    with case_deadline_ctx(1.0):
+        clock["now"] = 10.0
+        with pytest.raises(ProviderError) as exc:
+            provider_call(
+                route={
+                    "endpoint": "http://127.0.0.1:1/v1",
+                    "model": "test-model",
+                    "api_key_env": "V2_TEST_KEY",
+                },
+                system="s", user="u", purpose="p",
+            )
+    assert exc.value.error_type == "case_deadline_exceeded"

@@ -30,72 +30,41 @@ def _rows_from_reports(reports: Sequence[Mapping[str, Any]]) -> list[dict[str, A
                     report.get("active_after_cycle") or []
                 ),
             })
-        for gate in report.get("gates") or []:
-            row = next(
-                (
-                    r for r in rows
-                    if r.get("cycle") == cycle
-                    and r.get("intervention_id") == gate.get("intervention_id")
-                ),
-                None,
-            )
-            if row is None:
-                continue
-            row["v1"] = (gate.get("v1") or {}).get("passed")
-            row["v2"] = (gate.get("v2") or {}).get("passed")
-            row["v3"] = (gate.get("v3") or {}).get("passed")
-        selection = report.get("marginal_selection") or {}
-        selected_marginals = {
-            str(item.get("intervention_id") or ""): (
-                item.get("delta") or {}
-            ).get("marginal_cases")
-            for item in selection.get("selected_attribution") or []
+        gates_by_id = {
+            str(gate.get("intervention_id") or ""): gate
+            for gate in report.get("gates") or []
         }
-        for item in selection.get("reports") or []:
-            candidate = item.get("candidate") or {}
-            row = next(
-                (
-                    r for r in rows
-                    if r.get("cycle") == cycle
-                    and r.get("intervention_id") == candidate.get("intervention_id")
-                ),
-                None,
-            )
-            if row is None:
+        for row in rows:
+            if row.get("cycle") != cycle:
                 continue
-            row["m_marginal_cases"] = (item.get("delta") or {}).get(
-                "marginal_cases"
-            )
-            row["m_passed"] = item.get("passed")
-        for item in selection.get("joint_reports") or []:
-            for candidate_id in item.get("candidate_ids") or []:
-                row = next(
-                    (
-                        r for r in rows
-                        if r.get("cycle") == cycle
-                        and r.get("intervention_id") == candidate_id
-                    ),
-                    None,
+            gate = gates_by_id.get(str(row.get("intervention_id") or ""))
+            if gate is None:
+                continue
+            partner_ids = [str(p) for p in gate.get("partner_ids") or []]
+            if partner_ids:
+                row["joint_group"] = sorted(
+                    [str(row.get("intervention_id")), *partner_ids]
                 )
-                if row is None:
-                    continue
-                row["m_marginal_cases"] = (item.get("delta") or {}).get(
+            # A joint unit's arm lives on the member the engine loop reached
+            # with all partners V1-passed; every member shares that outcome.
+            scored = gate if (gate.get("v2") or gate.get("v3") or gate.get("m")) else next(
+                (
+                    gates_by_id.get(partner)
+                    for partner in partner_ids
+                    if gates_by_id.get(partner, {}).get("v2")
+                    or gates_by_id.get(partner, {}).get("m")
+                ),
+                gate,
+            )
+            row["v1"] = (gate.get("v1") or {}).get("passed")
+            row["v2"] = (scored.get("v2") or {}).get("passed")
+            row["v3"] = (scored.get("v3") or {}).get("passed")
+            m_verdict = scored.get("m")
+            if m_verdict is not None:
+                row["m_marginal_cases"] = (m_verdict.get("delta") or {}).get(
                     "marginal_cases"
                 )
-                row["m_passed"] = item.get("passed")
-                row["joint_group"] = list(item.get("candidate_ids") or [])
-        for intervention_id, marginal in selected_marginals.items():
-            row = next(
-                (
-                    item for item in rows
-                    if item.get("cycle") == cycle
-                    and item.get("intervention_id") == intervention_id
-                ),
-                None,
-            )
-            if row is not None:
-                row["m_marginal_cases"] = marginal
-                row["m_attribution"] = "leave_one_out_final_configuration"
+                row["m_passed"] = m_verdict.get("passed")
     return rows
 
 

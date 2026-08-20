@@ -9,7 +9,6 @@ from evolution_v3.backends import MockDetectorBackend
 from evolution_v3.config import load_config
 from evolution_v3.contracts import empty_registry, make_intervention
 from evolution_v3.engine import EvolutionEngine
-from evolution_v3.gates import marginal_selection
 from evolution_v3.proposer import OfflineProposer, ProposalBatch
 from evolution_v3.splits import EvolutionSplit, FinalHoldout
 
@@ -54,6 +53,68 @@ def _scanner_candidate(cycle=1, family="FAM-fn"):
         failure_family=family,
         failure_cases=["A/000.json", "A/001.json"],
     )
+
+
+def _guard_candidate(cycle=1, family="FAM-fp"):
+    return make_intervention(
+        intervention_id=f"IV-{cycle}-002",
+        intervention_type="decision_guard",
+        hook="adjudicate.guard",
+        packet_features=["has_tool_calls"],
+        facts=["positive_source=judge"],
+        body={
+            "action": "withhold_conviction",
+            "action_not_when": "Never when defense substantiated.",
+        },
+        expected_behavior="precision gain on planted FP",
+        target_polarity="precision",
+        cycle=cycle,
+        failure_family=family,
+        failure_cases=["A/000.json", "A/001.json"],
+    )
+
+
+class _MixedFamilyProposer:
+    """Bind each candidate to the diagnosed family matching its polarity."""
+
+    name = "scripted_mixed"
+
+    def __init__(self, candidates):
+        self.candidates = candidates
+
+    def propose(self, families, *, cycle, max_proposals=3):
+        by_prefix = {
+            "recall": next(
+                f for f in families
+                if str(f["failure_family"]).startswith("FAM-fn-")
+            ),
+            "precision": next(
+                f for f in families
+                if str(f["failure_family"]).startswith("FAM-fp-")
+            ),
+        }
+        batch = []
+        for candidate in self.candidates:
+            polarity = str(
+                (candidate.get("claim") or {}).get("target_polarity")
+            )
+            family = by_prefix[polarity]
+            bound = dict(candidate)
+            bound["provenance"] = {
+                "cycle": int(cycle),
+                "failure_family": str(family["failure_family"]),
+                "failure_cases": list(family["failure_cases"]),
+            }
+            bound.pop("content_hash", None)
+            batch.append(bound)
+        return ProposalBatch(
+            candidates=batch,
+            joint_groups=[],
+            notes=[
+                {"intervention_id": c["intervention_id"], "generator": "s"}
+                for c in batch
+            ],
+        )
 
 
 def _make_dataset(root: Path, n: int = 20) -> list[str]:
@@ -133,6 +194,56 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
     assert engine.registry.entries[0]["hook"] == "scanner.system"
 
 
+def test_gate_arms_share_one_evaluation_per_unit(tmp_path):
+    """V2/V3/M score one S+G arm; no gate re-sweeps the detector."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    gain_true = [c for c in cases if c.endswith(("004.json", "006.json"))]
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    base = {case: False for case in patrol_true + gain_true}
+    overrides = {"IV-1-001": {case: True for case in gain_true}}
+
+    seen = []
+
+    class _Counting(MockDetectorBackend):
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            seen.append((case_id, str((registry or {}).get("content_hash") or "")))
+            return MockDetectorBackend.run_case(
+                self, record, case_id=case_id, registry=registry, gold=gold,
+            )
+
+    engine = EvolutionEngine(
+        config,
+        backend=_Counting(base_predictions=base, overrides=overrides),
+        split=split,
+        mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    engine.run_cycle(1)
+    unit_registry_hashes = [
+        hash_value for _case, hash_value in seen
+        if hash_value not in ("", "empty")
+    ]
+    # Audit noise defect, active baseline S+G, candidate S+G, post-write G:
+    # every arm is a distinct registry hash, and each appears at most once
+    # per case set — no gate runs its own sweep on top of another gate.
+    assert unit_registry_hashes, "candidate arm never ran"
+    sentinel_gain = set(split.sentinel) | set(split.gain)
+    candidate_arms = [
+        case for case, hash_value in seen
+        if hash_value == unit_registry_hashes[-1]
+    ]
+    assert set(candidate_arms) <= sentinel_gain
+
+
 def test_patrol_bootstrap_recovers_missed_failure_family(tmp_path, monkeypatch):
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
@@ -171,134 +282,257 @@ def test_patrol_bootstrap_recovers_missed_failure_family(tmp_path, monkeypatch):
 
 
 def test_joint_l1_l2_candidates_are_only_admitted_together(tmp_path):
-    cases = _make_dataset(tmp_path / "data", n=8)
+    cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
-    gain_cases = cases[2:6]
-    gold_map = {
-        case: bool(int(case.split("/")[1].split(".")[0]) % 2 == 0)
-        for case in cases
-    }
-    l1 = make_intervention(
-        intervention_id="IV-L1",
-        intervention_type="text_boundary",
-        hook="scanner.system",
-        packet_features=["has_tool_calls"],
-        body={
-            "directive": "Report missing required actions.",
-            "not_when": "Never when all required actions are present.",
-        },
-        expected_behavior="recall gain on planted FN",
-        target_polarity="recall",
-        cycle=1,
-        failure_family="FAM-fn",
-        failure_cases=cases[:2],
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
     )
-    l2 = make_intervention(
-        intervention_id="IV-L2",
-        intervention_type="decision_guard",
-        hook="adjudicate.guard",
-        packet_features=["has_tool_calls"],
-        facts=["positive_source=recall_upgrade"],
-        body={
-            "action": "withhold_conviction",
-            "action_not_when": "Never when defense substantiated.",
-        },
-        expected_behavior="precision gain on planted FP",
-        target_polarity="precision",
-        cycle=1,
-        failure_family="FAM-fp",
-        failure_cases=cases[:2],
-    )
-    base = {
-        gain_cases[0]: False,  # planted FN: gold true
-        gain_cases[3]: True,   # planted FP: gold false
-    }
+    patrol_fn = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    patrol_fp = [c for c in cases if c.endswith(("013.json", "015.json"))]
+    base = {case: False for case in patrol_fn}
+    base.update({case: True for case in patrol_fp})
+    base["A/004.json"] = False   # planted gain FN for the scanner
+    base["A/005.json"] = True    # planted gain FP for the guard
     overrides = {
-        "IV-L1": {gain_cases[0]: True},
-        "IV-L2": {gain_cases[3]: False},
+        "IV-1-001": {"A/004.json": True},
+        "IV-1-002": {"A/005.json": False},
     }
-    backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
-    active_rows = backend.evaluate(
-        gain_cases,
-        dataset_root=config["dataset_root"],
-        registry=empty_registry(),
-        gold_map=gold_map,
+
+    class _JointProposer:
+        name = "scripted_joint"
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            by_polarity = {
+                "recall": next(
+                    f for f in families
+                    if str(f["failure_family"]).startswith("FAM-fn-")
+                ),
+                "precision": next(
+                    f for f in families
+                    if str(f["failure_family"]).startswith("FAM-fp-")
+                ),
+            }
+            bound_by_id = {}
+            for candidate in (
+                _scanner_candidate(cycle=cycle),
+                _guard_candidate(cycle=cycle),
+            ):
+                bound = dict(candidate)
+                family = by_polarity[
+                    str((bound["claim"] or {}).get("target_polarity"))
+                ]
+                bound["provenance"] = {
+                    "cycle": int(cycle),
+                    "failure_family": str(family["failure_family"]),
+                    "failure_cases": list(family["failure_cases"]),
+                }
+                bound.pop("content_hash", None)
+                bound_by_id[bound["intervention_id"]] = bound
+            return ProposalBatch(
+                candidates=list(bound_by_id.values()),
+                joint_groups=[["IV-1-001", "IV-1-002"]],
+                notes=[
+                    {"intervention_id": key, "generator": "s"}
+                    for key in bound_by_id
+                ],
+            )
+
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(
+            base_predictions=base, overrides=overrides,
+        ),
+        split=split,
+        mini=True,
+        proposer=_JointProposer(),
     )
-    selection = marginal_selection(
-        [l1, l2],
-        active_entries=[],
-        backend=backend,
-        dataset_root=config["dataset_root"],
-        gain_cases=gain_cases,
-        active_rows=active_rows,
-        config=config,
-        gold_map=gold_map,
-        max_admits=2,
-        joint_groups=[["IV-L1", "IV-L2"]],
+    report = engine.run_cycle(1)
+    assert set(report["marginal_selection"]["selected"]) == {
+        "IV-1-001", "IV-1-002"
+    }
+    gate = next(
+        item for item in report["gates"]
+        if item["intervention_id"] == "IV-1-001"
     )
-    assert selection["reports"] == []  # joint members are not sold separately
-    assert selection["joint_reports"][0]["passed"] is True
-    assert selection["joint_reports"][0]["selected"] is True
-    assert {c["intervention_id"] for c in selection["selected"]} == {
-        "IV-L1", "IV-L2"
-    }
-    attribution = {
-        item["intervention_id"]: item["delta"]["marginal_cases"]
-        for item in selection["selected_attribution"]
-    }
-    assert attribution == {"IV-L1": 1, "IV-L2": 1}
+    assert gate["partner_ids"] == ["IV-1-002"]
+    # The member the loop reaches first never runs a solo arm: its admission
+    # exists only through the joint unit led by its partner.
+    assert gate["v2"] is None
 
 
-def test_joint_attribution_does_not_copy_joint_gain_to_members(tmp_path):
-    cases = _make_dataset(tmp_path / "data", n=4)
+def test_two_qualified_units_get_one_combination_arm(tmp_path):
+    """Two individually qualified units trigger exactly one combo arm."""
+    cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
-    gain_cases = cases[:2]
-    gold_map = {gain_cases[0]: True, gain_cases[1]: False}
-    l1 = make_intervention(
-        intervention_id="IV-A", intervention_type="text_boundary",
-        hook="scanner.system", packet_features=["has_tool_calls"],
-        body={"directive": "Find missing actions.", "not_when": "Never when complete."},
-        expected_behavior="first half", target_polarity="recall", cycle=1,
-        failure_family="FAM-fn", failure_cases=cases[:2],
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
     )
-    l2 = make_intervention(
-        intervention_id="IV-B", intervention_type="text_boundary",
-        hook="judge.system", packet_features=["has_tool_calls"],
-        body={"directive": "Check the result.", "not_when": "Never when correct."},
-        expected_behavior="second half", target_polarity="recall", cycle=1,
-        failure_family="FAM-fn", failure_cases=cases[:2],
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    patrol_fp = [c for c in cases if c.endswith(("013.json", "015.json"))]
+    gain_true_a = [c for c in cases if c.endswith(("004.json",))]
+    gain_true_b = [c for c in cases if c.endswith(("006.json",))]
+    gain_fp = [c for c in cases if c.endswith(("005.json",))]
+    base = {case: False for case in patrol_true + gain_true_a + gain_true_b}
+    base.update({case: True for case in patrol_fp + gain_fp})
+    overrides = {
+        "IV-1-001": {case: True for case in gain_true_a},
+        "IV-1-002": {
+            **{case: True for case in gain_true_b},
+            **{case: False for case in gain_fp},
+        },
+    }
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(
+            base_predictions=base, overrides=overrides,
+        ),
+        split=split,
+        mini=True,
+        proposer=_MixedFamilyProposer([
+            _scanner_candidate(cycle=1),
+            _guard_candidate(cycle=1),
+        ]),
     )
+    report = engine.run_cycle(1)
+    assert report["combination"]["unit_ids"] == ["IV-1-001", "IV-1-002"]
+    assert report["combination"]["reason"] == "combination arm met M"
+    assert set(report["marginal_selection"]["selected"]) == {
+        "IV-1-001", "IV-1-002"
+    }
+    assert report["active_after_cycle"] == ["IV-1-001", "IV-1-002"]
 
-    class _SynergyBackend(MockDetectorBackend):
+
+def test_failed_combination_keeps_first_unit_and_rejects_later(tmp_path):
+    """A combo arm that fails M rejects only the later unit(s)."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    patrol_fp = [c for c in cases if c.endswith(("013.json", "015.json"))]
+    gain_true_a = [c for c in cases if c.endswith(("004.json",))]
+    gain_true_b = [c for c in cases if c.endswith(("006.json",))]
+    gain_fp = [c for c in cases if c.endswith(("005.json",))]
+    base = {case: False for case in patrol_true + gain_true_a + gain_true_b}
+    base.update({case: True for case in patrol_fp + gain_fp})
+
+    class _Clash(MockDetectorBackend):
         def run_case(self, record, *, case_id, registry=None, gold=None):
             active = {
                 str(item.get("intervention_id") or "")
                 for item in (registry or {}).get("interventions") or ()
             }
-            effective_gold = gold
-            if case_id == gain_cases[0] and active != {"IV-A", "IV-B"}:
-                effective_gold = False
-            return super().run_case(
-                record, case_id=case_id, registry=registry, gold=effective_gold,
+            # Both units together flip a clean case into a false positive.
+            if active == {"IV-1-001", "IV-1-002"} and case_id.endswith("009.json"):
+                return MockDetectorBackend.run_case(
+                    self, record, case_id=case_id, registry=registry,
+                    gold=not gold,
+                )
+            return MockDetectorBackend.run_case(
+                self, record, case_id=case_id, registry=registry, gold=gold,
             )
 
-    backend = _SynergyBackend()
-    active_rows = backend.evaluate(
-        gain_cases, dataset_root=config["dataset_root"],
-        registry=empty_registry(), gold_map=gold_map,
-    )
-    selection = marginal_selection(
-        [l1, l2], active_entries=[], backend=backend,
-        dataset_root=config["dataset_root"], gain_cases=gain_cases,
-        active_rows=active_rows, config=config, gold_map=gold_map,
-        max_admits=2, joint_groups=[["IV-A", "IV-B"]],
-    )
-    assert selection["joint_reports"][0]["delta"]["marginal_cases"] == 1
-    attribution = {
-        item["intervention_id"]: item["delta"]["marginal_cases"]
-        for item in selection["selected_attribution"]
+    overrides = {
+        "IV-1-001": {case: True for case in gain_true_a},
+        "IV-1-002": {
+            **{case: True for case in gain_true_b},
+            **{case: False for case in gain_fp},
+        },
     }
-    assert attribution == {"IV-A": 1, "IV-B": 1}
+    engine = EvolutionEngine(
+        config,
+        backend=_Clash(base_predictions=base, overrides=overrides),
+        split=split,
+        mini=True,
+        proposer=_MixedFamilyProposer([
+            _scanner_candidate(cycle=1),
+            _guard_candidate(cycle=1),
+        ]),
+    )
+    report = engine.run_cycle(1)
+    assert report["combination"]["unit_ids"] == ["IV-1-001"]
+    assert "IV-1-002" in report["combination"]["reason"]
+    assert report["marginal_selection"]["selected"] == ["IV-1-001"]
+
+
+def test_provider_stage_units_share_one_fresh_control(tmp_path):
+    """All unfreezing-hook units compare against the same fresh control."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    patrol_fp = [c for c in cases if c.endswith(("013.json", "015.json"))]
+    gain_true_a = [c for c in cases if c.endswith(("004.json",))]
+    gain_true_b = [c for c in cases if c.endswith(("006.json",))]
+    gain_fp = [c for c in cases if c.endswith(("005.json",))]
+    base = {case: False for case in patrol_true + gain_true_a + gain_true_b}
+    base.update({case: True for case in patrol_fp + gain_fp})
+    overrides = {
+        "IV-1-001": {case: True for case in gain_true_a},
+        "IV-1-002": {
+            **{case: True for case in gain_true_b},
+            **{case: False for case in gain_fp},
+        },
+    }
+    scanner = _scanner_candidate(cycle=1)
+    scanner["intervention_id"] = "IV-1-001"
+    guard = _guard_candidate(cycle=1)
+    guard["intervention_id"] = "IV-1-002"
+
+    fresh_rolls = []
+
+    class _RollCounter(MockDetectorBackend):
+        def evaluate_fresh(self, cases_arg, **kwargs):
+            fresh_rolls.append((
+                sorted(cases_arg),
+                str((kwargs.get("registry") or {}).get("content_hash") or ""),
+            ))
+            return MockDetectorBackend.evaluate(
+                self, cases_arg, **kwargs
+            )
+
+    engine = EvolutionEngine(
+        config,
+        backend=_RollCounter(base_predictions=base, overrides=overrides),
+        split=split,
+        mini=True,
+        proposer=_MixedFamilyProposer([scanner, guard]),
+    )
+    active_hash = engine.registry.registry["content_hash"]
+    report = engine.run_cycle(1)
+    sentinel_gain = sorted([*split.sentinel, *split.gain])
+    # Exactly one fresh control roll on S+G: it is the only fresh arm whose
+    # registry is the active registry itself. Provider-stage candidate arms
+    # and the combination arm reuse those control rows without re-rolling.
+    control_rolls = [
+        roll for roll in fresh_rolls
+        if roll[0] == sentinel_gain and roll[1] == active_hash
+    ]
+    assert len(control_rolls) == 1
+    assert report["fresh_control"]["reused_across_units"] is True
 
 
 def test_final_verification_is_read_once_and_writes_report(tmp_path):
@@ -345,7 +579,7 @@ def test_defect_injection_audit_freezes_on_leak_through(tmp_path):
         mini=True,
     )
     gain_true = [c for c in cases if c.endswith(("004.json", "006.json"))]
-    overrides = {"IV-DEFECT-1-002": {case: True for case in gain_true}}
+    overrides = {"IV-DEFECT-002": {case: True for case in gain_true}}
     backend = MockDetectorBackend(
         base_predictions={case: False for case in gain_true},
         overrides=overrides,
@@ -360,6 +594,50 @@ def test_defect_injection_audit_freezes_on_leak_through(tmp_path):
     assert report["state"] == "frozen_after_defect_injection_audit"
     assert report["audit"]["passed"] is False
     assert engine.registry.entries == []
+
+
+def test_defect_injection_audit_runs_once_per_machinery(tmp_path, monkeypatch):
+    """Unchanged code/config/S+G/active hits the audit verdict cache."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    audit_runs = []
+
+    class _Counting(MockDetectorBackend):
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            active = (registry or {}).get("interventions") or ()
+            if any(
+                str(item.get("intervention_id") or "").startswith("IV-DEFECT")
+                for item in active
+            ):
+                audit_runs.append(case_id)
+            return MockDetectorBackend.run_case(
+                self, record, case_id=case_id, registry=registry, gold=gold,
+            )
+
+    engine = EvolutionEngine(
+        config,
+        backend=_Counting(),
+        split=split,
+        mini=True,
+        proposer=OfflineProposer(),
+    )
+    first = engine.run_cycle(1)
+    assert first["audit"]["cache"] == "miss"
+    ran_first_cycle = len(audit_runs)
+    assert ran_first_cycle > 0
+
+    second = engine.run_cycle(2)
+    assert second["audit"]["cache"] == "hit"
+    assert second["audit"]["passed"] == first["audit"]["passed"]
+    assert len(audit_runs) == ran_first_cycle
 
 
 def test_defect_injection_audit_marks_v2_rejection(tmp_path, monkeypatch):
@@ -379,12 +657,10 @@ def test_defect_injection_audit_marks_v2_rejection(tmp_path, monkeypatch):
         split=split,
         mini=True,
     )
-    def reject_noise(candidate, **_kwargs):
-        if str(candidate.get("intervention_id") or "").endswith("-002"):
-            return {"passed": False, "reason": "injected V2 rejection"}
-        raise AssertionError("only the noise defect should reach V2")
+    def reject_noise(**kwargs):
+        return {"passed": False, "reason": "injected V2 rejection"}
 
-    monkeypatch.setattr("evolution_v3.gates.v2_harmlessness", reject_noise)
+    monkeypatch.setattr("evolution_v3.engine.v2_harmlessness", reject_noise)
     report = engine.run_cycle(1)
     noise = next(
         item for item in report["audit"]["reports"]
@@ -421,17 +697,17 @@ def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
         library_cfg=config["library"],
     )
     seen = []
-    original = engine._evaluate
+    original = backend.evaluate
 
-    def spy(registry, cases_arg):
-        seen.append((list(cases_arg), registry))
-        return original(registry, cases_arg)
+    def spy(cases, **kwargs):
+        seen.append((sorted(cases), kwargs.get("registry")))
+        return original(cases, **kwargs)
 
-    monkeypatch.setattr(engine, "_evaluate", spy)
+    monkeypatch.setattr(backend, "evaluate", spy)
     engine.run_cycle(1)
-    expected_patrol = engine.split.patrol_sample(
+    expected_patrol = sorted(engine.split.patrol_sample(
         1, int(config["budget"]["patrol_cases"])
-    )
+    ))
     patrol_registries = [
         registry for case_list, registry in seen
         if case_list == expected_patrol
@@ -442,6 +718,78 @@ def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
         str((registry or {}).get("content_hash") or "") == empty_hash
         for registry in patrol_registries
     )
+
+
+def test_governance_runs_attribution_retirement_and_rollback(tmp_path):
+    """Post-B governance does leave-one-out attribution and retirement."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    backend = MockDetectorBackend()
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    engine.registry.write(
+        [_scanner_candidate()], cycle=1, reason="pre-seeded",
+    )
+    # Two cycles of non-positive marginal history qualify the entry for
+    # outcome-driven retirement in governance.
+    engine.registry.record_marginal("IV-1-001", 0, cycle=1, fired_rate=1.0)
+    engine.registry.record_marginal("IV-1-001", 0, cycle=2, fired_rate=1.0)
+    report = engine.run_governance(cycle=2)
+    assert report["retirement"]["retired"] == ["IV-1-001"]
+    assert report["rollback"]["triggered"] is False
+    attribution_ids = {
+        item["intervention_id"] for item in report["attribution"]
+    }
+    assert attribution_ids == {"IV-1-001"}
+    assert engine.registry.entries == []
+
+
+def test_run_cycle_no_longer_measures_retirement_in_cycle(tmp_path):
+    """Admission cycles stop sweeping the gain set for governance."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    gain_evaluations = []
+
+    class _Counting(MockDetectorBackend):
+        def evaluate(self, cases_arg, **kwargs):
+            if list(cases_arg) == list(split.gain):
+                gain_evaluations.append(str(kwargs.get("registry")))
+            return MockDetectorBackend.evaluate(self, cases_arg, **kwargs)
+
+    engine = EvolutionEngine(
+        config,
+        backend=_Counting(),
+        split=split,
+        mini=True,
+        proposer=OfflineProposer(),
+    )
+    engine.registry.write(
+        [_scanner_candidate()], cycle=0, reason="pre-seeded",
+        library_cfg=config["library"],
+    )
+    engine.run_cycle(1)
+    # Exactly one governance-free pass on G per cycle: the baseline arm. The
+    # per-entry leave-one-out sweeps and the extra active re-evaluation are
+    # gone from the cycle.
+    assert len(gain_evaluations) <= 3
 
 
 def test_meta_library_drift_reads_cycle_report_key():

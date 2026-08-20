@@ -126,3 +126,90 @@ def test_backend_isolates_single_case_exception(tmp_path):
     assert rows[0]["result"]["authority_failure_reasons"][0]["code"] == (
         "case_evaluation_exception"
     )
+
+
+def test_frozen_stages_do_not_replay_failed_provider_stages():
+    baseline = {
+        "proof": {"judge": {"is_hallucination": False}},
+        "stage_status": {
+            "judge": {"state": "ok"},
+            "recall_scanner": {"state": "provider_error"},
+            "causal_upgrade": {"state": "provider_error"},
+            "step_tracer": {"state": "provider_error"},
+            "defense": {"state": "provider_error"},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    assert "judge_result" in frozen
+    assert "recall_result" not in frozen
+    assert "upgrade_result" not in frozen
+    assert "tracer_result" not in frozen
+    assert "defense_result" not in frozen
+
+
+def test_frozen_stages_do_not_freeze_not_needed_stages():
+    baseline = {
+        "proof": {"judge": {"is_hallucination": False}},
+        "stage_status": {
+            "judge": {"state": "ok"},
+            "recall_scanner": {"state": "not_needed"},
+            "causal_upgrade": {"state": "not_needed"},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    assert "judge_result" in frozen
+    assert "recall_result" not in frozen
+    assert "upgrade_result" not in frozen
+
+
+def test_frozen_stages_freeze_single_judge_hearing_tracer_defense():
+    baseline = {
+        "proof": {
+            "judge": {"is_hallucination": True},
+            "hearings": [{"source": "judge"}],
+            "step_tracer": {"step": 1},
+            "defense": {"verdict": "substantiated"},
+        },
+        "stage_status": {
+            "judge": {"state": "ok"},
+            "step_tracer": {"state": "ok"},
+            "defense": {"state": "ok"},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    assert "tracer_result" in frozen
+    assert "defense_result" in frozen
+    assert frozen["tracer_result"]["ok"] is True
+    assert frozen["defense_result"]["ok"] is True
+
+
+def test_frozen_stages_do_not_freeze_multi_hearing_tracer_defense():
+    baseline = {
+        "proof": {
+            "judge": {"is_hallucination": True},
+            "hearings": [{"source": "judge"}, {"source": "recall_upgrade"}],
+            "step_tracer": {"step": 1},
+            "defense": {"verdict": "substantiated"},
+        },
+        "stage_status": {
+            "judge": {"state": "ok"},
+            "step_tracer": {"state": "ok"},
+            "defense": {"state": "ok"},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    assert "tracer_result" not in frozen
+    assert "defense_result" not in frozen
+
+
+def test_frozen_stages_preserve_judge_vote():
+    baseline = {
+        "proof": {"judge": {"is_hallucination": False}},
+        "stage_status": {"judge": {"state": "ok"}},
+        "providers": {
+            "judge": {"vote": {"votes": 3, "cast": 3, "positives": 0, "tie": False}},
+        },
+    }
+    frozen = DetectorV2Backend._frozen_stages(baseline, {"judge.post"})
+    assert frozen["judge_result"]["provider"]["vote"]["cast"] == 3
+    assert frozen["judge_result"]["provider"]["vote"]["positives"] == 0

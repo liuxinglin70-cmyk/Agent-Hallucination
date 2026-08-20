@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -43,10 +46,10 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
-CACHE_VERSION = "v8-source-bound-cache"
+CACHE_VERSION = "v9-source-bound-cache"
 
 
-def _file_digest(path: str | Path | None) -> str:
+def file_digest(path: str | Path | None) -> str:
     if not path:
         return "missing"
     target = Path(path)
@@ -55,7 +58,12 @@ def _file_digest(path: str | Path | None) -> str:
     return hashlib.sha256(target.read_bytes()).hexdigest()[:16]
 
 
-def _source_digest() -> str:
+def source_digest() -> str:
+    """Digest of the detector_v2 + evolution_v3 source trees.
+
+    Execution-semantics fingerprint: any change to how arms are replayed or
+    gated must invalidate derived caches (audit verdicts, row caches).
+    """
     root = Path(__file__).resolve().parent.parent
     digest = hashlib.sha256()
     for package in (root / "detector_v2", root / "evolution_v3"):
@@ -65,10 +73,38 @@ def _source_digest() -> str:
     return digest.hexdigest()[:16]
 
 
+def fingerprint(value: Any) -> str:
+    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
 def registry_key(registry: Mapping[str, Any] | None) -> str:
     if not registry:
         return "empty"
     return str(registry.get("content_hash") or "unsigned")
+
+
+def _unresolved_backend_result(
+    case_id: str,
+    code: str,
+    message: str,
+    error_type: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "detector_v2.detection_result.v1",
+        "case_id": case_id,
+        "state": "unresolved",
+        "decision_authority": "invalid",
+        "runtime_valid": False,
+        "authority_failure_reasons": [{
+            "component": "backend",
+            "code": code,
+            "error_type": error_type,
+            "message": message,
+        }],
+        "stage_status": {},
+        "proof": {"deployment": {}, "state": "unresolved"},
+    }
 
 
 class DetectionBackend:
@@ -92,32 +128,38 @@ class DetectionBackend:
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
         workers: int = 1,
+        deadline: float | None = None,
     ) -> list[dict[str, Any]]:
+        """Evaluate cases paired by id.
+
+        ``deadline`` is a monotonic wall-clock timestamp for the whole batch.
+        A case that cannot start before it fail-closes to an unresolved row:
+        bounded runtime never silently drops or invents outcomes.
+        """
         gold_map = dict(gold_map or {})
 
         def one(case_id: str) -> dict[str, Any]:
             gold = gold_map.get(case_id, gold_map.get(case_id.replace("/", "__")))
-            try:
-                record = load_record(dataset_root, case_id)
-                result = self.run_case(
-                    record, case_id=case_id, registry=registry, gold=gold,
+            if deadline is not None and time.monotonic() >= deadline:
+                result = _unresolved_backend_result(
+                    case_id,
+                    "batch_deadline_exceeded",
+                    "batch deadline exceeded before this case started",
+                    "Timeout",
                 )
-            except Exception as exc:
-                result = {
-                    "schema_version": "detector_v2.detection_result.v1",
-                    "case_id": case_id,
-                    "state": "unresolved",
-                    "decision_authority": "invalid",
-                    "runtime_valid": False,
-                    "authority_failure_reasons": [{
-                        "component": "backend",
-                        "code": "case_evaluation_exception",
-                        "error_type": type(exc).__name__,
-                        "message": str(exc),
-                    }],
-                    "stage_status": {},
-                    "proof": {"deployment": {}, "state": "unresolved"},
-                }
+            else:
+                try:
+                    record = load_record(dataset_root, case_id)
+                    result = self.run_case(
+                        record, case_id=case_id, registry=registry, gold=gold,
+                    )
+                except Exception as exc:
+                    result = _unresolved_backend_result(
+                        case_id,
+                        "case_evaluation_exception",
+                        str(exc),
+                        type(exc).__name__,
+                    )
             return {
                 "case": case_id,
                 "gold": gold,
@@ -130,10 +172,27 @@ class DetectionBackend:
 
         if int(workers) > 1 and len(cases) > 1:
             rows: list[dict[str, Any]] = []
+            total = len(cases)
+            progress = bool(os.environ.get("EVO3_PROGRESS"))
+            if progress:
+                print(
+                    f"[evo3] batch start: {total} cases, workers={workers}, "
+                    f"registry={registry_key(registry)}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             with ThreadPoolExecutor(max_workers=int(workers)) as pool:
                 futures = [pool.submit(one, case) for case in cases]
                 for future in as_completed(futures):
-                    rows.append(future.result())
+                    row = future.result()
+                    rows.append(row)
+                    if progress:
+                        print(
+                            f"[evo3] {len(rows)}/{total} {row['case']} -> "
+                            f"{row['prediction']} ({row['state']})",
+                            file=sys.stderr,
+                            flush=True,
+                        )
             return sorted(rows, key=lambda row: str(row["case"]))
         return [one(case) for case in cases]
 
@@ -145,6 +204,7 @@ class DetectionBackend:
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
         workers: int = 1,
+        deadline: float | None = None,
     ) -> list[dict[str, Any]]:
         return self.evaluate(
             cases,
@@ -152,6 +212,7 @@ class DetectionBackend:
             registry=registry,
             gold_map=gold_map,
             workers=workers,
+            deadline=deadline,
         )
 
 
@@ -207,29 +268,50 @@ class DetectorV2Backend(DetectionBackend):
     ) -> dict[str, Any]:
         proof = baseline.get("proof") or {}
         status = baseline.get("stage_status") or {}
+        providers = baseline.get("providers") or {}
         frozen: dict[str, Any] = {}
 
         def add(name: str, result: dict[str, Any]) -> None:
             frozen[f"{name}_result"] = result
             frozen[f"{name}_status"] = dict(status.get(name) or {})
 
+        def ok_state(name: str) -> bool:
+            # Only a stage that actually ran successfully is safe to freeze.
+            # ``not_needed`` stages are NOT frozen: the live control flow
+            # reproduces them deterministically (zero provider calls), and
+            # freezing a ``not_needed`` stage as ``ok=False`` turns a valid
+            # no-call into a downstream ``recall_unavailable`` degradation.
+            return str((status.get(name) or {}).get("state") or "") == "ok"
+
         judge_status = status.get("judge") or {}
         if isinstance(proof.get("judge"), Mapping) and judge_status.get("state") == "ok":
-            add("judge", {"ok": True, "parsed": dict(proof["judge"])})
-        if "scanner.system" not in hooks and "judge_result" in frozen:
-            recall_status = status.get("recall_scanner") or {}
+            judge_result: dict[str, Any] = {"ok": True, "parsed": dict(proof["judge"])}
+            judge_provider = providers.get("judge")
+            if isinstance(judge_provider, Mapping) and isinstance(
+                judge_provider.get("vote"), Mapping
+            ):
+                # Preserve the vote record so the recall decision replays the
+                # same consensus instead of forcing a recall net on every
+                # candidate arm (which would re-run provider stages).
+                judge_result["provider"] = {"vote": dict(judge_provider["vote"])}
+            add("judge", judge_result)
+        if (
+            "scanner.system" not in hooks
+            and "judge_result" in frozen
+            and ok_state("recall_scanner")
+        ):
             add("recall", {
-                "ok": recall_status.get("state") == "ok",
+                "ok": True,
                 "candidates": list(proof.get("recall_candidates") or []),
             })
         if (
             "upgrade.pre" not in hooks
             and "upgrade.system" not in hooks
             and "recall_result" in frozen
+            and ok_state("causal_upgrade")
         ):
-            upgrade_status = status.get("causal_upgrade") or {}
             add("upgrade", {
-                "ok": upgrade_status.get("state") == "ok",
+                "ok": True,
                 "upgrades": list(proof.get("causal_upgrade_rows") or []),
                 "upgraded_candidate": proof.get("causal_upgrade"),
                 "upgraded_candidates": list(
@@ -240,25 +322,35 @@ class DetectorV2Backend(DetectionBackend):
                     )
                 ),
             })
+        # Tracer/defense may only be frozen for a single judge hearing. A
+        # judge-positive case that defense does not refute has exactly one
+        # hearing and its top-level tracer/defense belong to that hearing, so
+        # replay is safe. Multi-hearing cases (a refuted judge followed by
+        # recall candidates) carry per-hearing results that the frozen
+        # envelope cannot represent, so they must stay live.
+        hearings = list(proof.get("hearings") or [])
+        single_judge_hearing = (
+            len(hearings) == 1
+            and str((hearings[0] or {}).get("source") or "") == "judge"
+        )
         if (
             "tracer.system" not in hooks
             and "judge_result" in frozen
-            and "recall_result" in frozen
-            and "upgrade_result" in frozen
+            and single_judge_hearing
+            and ok_state("step_tracer")
         ):
-            tracer_status = status.get("step_tracer") or {}
             add("tracer", {
-                "ok": tracer_status.get("state") == "ok",
+                "ok": True,
                 "parsed": proof.get("step_tracer"),
             })
         if (
             "defense.pre" not in hooks
             and "defense.system" not in hooks
             and "tracer_result" in frozen
+            and ok_state("defense")
         ):
-            defense_status = status.get("defense") or {}
             add("defense", {
-                "ok": defense_status.get("state") == "ok",
+                "ok": True,
                 "parsed": proof.get("defense"),
             })
         return frozen
@@ -307,6 +399,7 @@ class DetectorV2Backend(DetectionBackend):
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
         workers: int = 1,
+        deadline: float | None = None,
     ) -> list[dict[str, Any]]:
         """Run every stage without cached/frozen baseline replay."""
         direct = _DirectDetectorBackend(self.detector)
@@ -316,6 +409,7 @@ class DetectorV2Backend(DetectionBackend):
             registry=registry,
             gold_map=gold_map,
             workers=workers,
+            deadline=deadline,
         )
 
 
@@ -500,10 +594,10 @@ class CachedRunBackend(DetectionBackend):
         )
         namespace = (
             "cached-" + CACHE_VERSION + "-"
-            + _fingerprint({
+            + fingerprint({
                 "run_root": str(Path(run_root).resolve()),
-                "detector_config": _file_digest(config.get("detector_config")),
-                "source": _source_digest(),
+                "detector_config": file_digest(config.get("detector_config")),
+                "source": source_digest(),
                 "cases": sorted(self.case_ids),
                 "baseline_results": self.results,
             })
@@ -554,7 +648,7 @@ class CachingBackend(DetectionBackend):
         record: Mapping[str, Any],
     ) -> Path:
         safe_case = str(case_id).replace("/", "__").replace("\\", "__")
-        record_hash = _fingerprint(record)
+        record_hash = fingerprint(record)
         return (
             self.cache_dir / registry_key(registry)
             / f"{safe_case}.{record_hash}.json"
@@ -606,16 +700,16 @@ def make_backend(
             base_predictions=mock_base,
             overrides=mock_overrides,
         )
-        namespace = "mock-" + CACHE_VERSION + "-" + _fingerprint({
+        namespace = "mock-" + CACHE_VERSION + "-" + fingerprint({
             "base": mock_base or {},
             "overrides": mock_overrides or {},
         })
     elif name == "detector_v2":
         backend = DetectorV2Backend(config)
-        namespace = "detector_v2-" + CACHE_VERSION + "-" + _fingerprint({
-            "detector_config": _file_digest(config.get("detector_config")),
+        namespace = "detector_v2-" + CACHE_VERSION + "-" + fingerprint({
+            "detector_config": file_digest(config.get("detector_config")),
             "dataset_root": str(resolve_path(config["dataset_root"])),
-            "source": _source_digest(),
+            "source": source_digest(),
         })
     else:
         raise ValueError(f"unknown evolution backend {name!r}")
@@ -625,11 +719,6 @@ def make_backend(
     return backend
 
 
-def _fingerprint(value: Any) -> str:
-    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
-
-
 __all__ = [
     "CACHE_VERSION",
     "CachedRunBackend",
@@ -637,7 +726,10 @@ __all__ = [
     "DetectionBackend",
     "DetectorV2Backend",
     "MockDetectorBackend",
+    "file_digest",
+    "fingerprint",
     "make_backend",
     "prediction_from_state",
     "registry_key",
+    "source_digest",
 ]
