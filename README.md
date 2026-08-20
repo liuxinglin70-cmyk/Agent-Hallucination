@@ -39,6 +39,10 @@
   rejection feedback；门限未按实验结果调整，全量 holdout 未读取，后续必须使用
   v10 cache 做 clean B 验证。clean run 必须整体删除
   `evolution_v3/work/real_eval_v2_b`，不能只清单个 cache 子目录。
+- 修复后首个有效 clean B（v10b）已跑通完整闭环：patrol 形成稳定失败族、
+  提案器产出的不安全 guard 被本地契约拦截、evidence_check 在 V2 被
+  `new_fn=1` 正确拒绝、cycle 2 原样重提被 `echo_of_rejected` 拦截。active
+  registry 为空，B 未通过，全量 holdout 未读取；该运行是有效的提案机制证据。
 - LLM provider：默认已切换为 **AutoDL**（`https://www.autodl.art/api/v1`，
   `AUTODL_API_KEY`）；官方 DeepSeek 配置保留为显式回滚路径。
 - 原计划冻结 300 例终审尚未读取，但已发现与 tuning100 重叠 44 例，因此不能

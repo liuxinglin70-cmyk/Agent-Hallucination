@@ -106,3 +106,26 @@ defense/positive source) while contract kinds stayed in per-member summaries;
 `refine_failure_families` now keeps a heterogeneous family instead of dropping
 it when no predicate subgroup reaches the stability threshold. A clean B must
 be re-run after that change.
+
+The fifth attempt re-ran clean on the repaired machinery and is the first
+valid proposal-measurement run. Both cycles completed, the ledger verified
+clean (9 records) and the full loop executed end to end:
+
+- patrol found the 5-case FN cluster; execution-path family keys kept it
+  together and predicate-profile refinement kept the 2-case unanimous
+  `delivered_anchor_consistency=inconsistent` subgroup as the stable family;
+- the proposer drafted an `evidence_check` on `judge.post` plus a
+  `convict_mechanical_violation` guard; the guard was rejected locally
+  (`invalid_contract`) because `delivered_anchor_consistency` is not a
+  conviction-authorized predicate — the unsafe mechanism never reached a gate;
+- the evidence_check passed V1 but failed V2 with
+  `sentinel harmlessness violation: new_fn=1` (the appended evidence changed a
+  downstream defense roll on one sentinel case);
+- cycle 2 re-proposed the same evidence mechanism and was blocked locally as
+  `echo_of_rejected`, proving rejection feedback persists across cycles.
+
+The active registry stayed empty, so B did not pass and the full holdout was
+not read. This run is valid evidence about the proposal loop: the framework now
+executes the complete cycle safely, but the first candidate family still needs
+a mechanism that measurably helps sentinel cases. No threshold or split was
+changed for this outcome.
