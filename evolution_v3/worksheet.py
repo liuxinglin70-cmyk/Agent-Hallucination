@@ -242,6 +242,105 @@ _VIOLATION_VERDICTS = {
     "violated", "unresolved", "uncovered", "inconsistent", "missing",
 }
 
+ACTIONABILITY = {
+    "actionable": (
+        "at least one closed action route exists for this family's mechanism"
+    ),
+    "capability_gap": (
+        "no closed action can treat this mechanism; the action space does "
+        "not intersect the diagnosis"
+    ),
+}
+
+# Closed treatment routes: route name -> the hook/action that implements it.
+TREATMENT_ROUTES = {
+    "recall_directive": "scanner.system text boundary widens recall",
+    "upgrade_directive": "upgrade.pre/system intervention reshapes upgrades",
+    "restore_guard": "adjudicate.guard restore_judge_conviction",
+    "withhold_guard": "adjudicate.guard withhold_conviction",
+    "mechanical_conviction": (
+        "evidence_check + convict_mechanical_violation on a unanimously "
+        "violating conviction-authorized predicate"
+    ),
+    "evidence_only": "evidence_check exposes facts without a verdict change",
+}
+
+
+def classify_family_actionability(
+    family: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Enumerate the closed action routes available for one family.
+
+    Routes are derived mechanically from the failure mechanism: which stage
+    produced the wrong outcome decides which hooks could legally change it.
+    ``mechanical_conviction`` additionally requires a conviction-authorized
+    predicate unanimously violated across the family (the V1 gate demand, so
+    an invalid conviction draft never reaches the provider budget). A family
+    with no route is a capability gap — a measured property of the action
+    space, reported instead of silently producing an empty proposal batch.
+    """
+    from detector_v2.predicates import PREDICATE_CONVICTION_VERDICTS
+
+    family_id = str(family.get("failure_family") or "")
+    signature = family.get("mechanism_signature") or {}
+    diagnostics = family.get("diagnostics") or {}
+    signals = diagnostics.get("predicate_signals") or {}
+    count = int(family.get("count") or 0)
+    routes: list[str] = []
+
+    if family_id.startswith("FAM-unresolved-"):
+        return {
+            "classification": "capability_gap",
+            "reason": (
+                "unresolved families need provider reliability, not an "
+                "intervention action"
+            ),
+            "routes": [],
+        }
+
+    if family_id.startswith("FAM-fn-"):
+        defense_verdict = str(signature.get("defense_verdict") or "none")
+        recall_path = str(signature.get("recall_path") or "")
+        if defense_verdict == "refuted":
+            routes.append("restore_guard")
+        if recall_path in {"not_run", "not_needed", "ok"} or not (
+            signature.get("upgrade_positive")
+        ):
+            routes.append("recall_directive")
+            routes.append("upgrade_directive")
+        for predicate, authorized in sorted(
+            PREDICATE_CONVICTION_VERDICTS.items()
+        ):
+            signal = signals.get(predicate) or {}
+            if (
+                count >= 2
+                and authorized
+                and int(signal.get("applicable") or 0) == count
+                and int(signal.get("violations") or 0) == count
+            ):
+                routes.append("mechanical_conviction")
+                break
+        routes.append("evidence_only")
+    elif family_id.startswith("FAM-fp-"):
+        positive_source = str(signature.get("positive_source") or "none")
+        if positive_source in {"judge", "recall_upgrade"}:
+            routes.append("withhold_guard")
+        routes.append("evidence_only")
+
+    if not routes:
+        return {
+            "classification": "capability_gap",
+            "reason": (
+                f"family kind outside the action vocabulary: {family_id!r}"
+            ),
+            "routes": [],
+        }
+    return {
+        "classification": "actionable",
+        "reason": ACTIONABILITY["actionable"],
+        "routes": routes,
+    }
+
 
 def diagnose_failure_families(
     families: Sequence[Mapping[str, Any]],

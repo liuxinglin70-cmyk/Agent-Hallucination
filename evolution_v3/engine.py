@@ -55,6 +55,7 @@ from evolution_v3.splits import (
     split_manifest_report,
 )
 from evolution_v3.worksheet import (
+    classify_family_actionability,
     diagnose_failure_families,
     refine_failure_families,
     stable_failure_families,
@@ -81,6 +82,35 @@ def _subset_rows(
 ) -> list[dict[str, Any]]:
     wanted = {str(case) for case in cases}
     return [row for row in rows if str(row.get("case") or "") in wanted]
+
+
+def split_actionable_families(
+    families: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Partition diagnosed families into actionable ones and capability gaps.
+
+    Gap families stay first-class in the cycle report (a gap is a measured
+    outcome about the action space, not a silent empty batch), but they never
+    reach the proposer: drafting against them can only produce contracts the
+    validators must reject.
+    """
+    actionable: list[dict[str, Any]] = []
+    gaps: list[dict[str, Any]] = []
+    for family in families:
+        verdict = classify_family_actionability(family)
+        item = dict(family)
+        item["actionability"] = verdict
+        if verdict["classification"] == "actionable":
+            actionable.append(item)
+        else:
+            gaps.append({
+                "failure_family": item.get("failure_family"),
+                "count": item.get("count"),
+                "sources": item.get("sources"),
+                "classification": verdict["classification"],
+                "reason": verdict["reason"],
+            })
+    return actionable, gaps
 
 
 class _ArmRunner:
@@ -412,6 +442,7 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
         )
         diagnosed = refine_failure_families(diagnosed)
+        diagnosed, capability_gaps = split_actionable_families(diagnosed)
         proposal_batch = self.proposer.propose(
             diagnosed,
             cycle=cycle,
@@ -423,6 +454,12 @@ class EvolutionEngine:
             empty_reason = (
                 "no stable bare-base failure family after initial patrol and "
                 "bootstrap reruns"
+            )
+        elif capability_gaps:
+            empty_reason = (
+                f"{len(capability_gaps)} stable family(ies) classified as "
+                "capability gap(s); proposer received only actionable "
+                "families"
             )
         elif not proposal_batch.candidates:
             empty_reason = (
@@ -444,6 +481,7 @@ class EvolutionEngine:
                 }
                 for item in diagnosed
             ],
+            "capability_gaps": capability_gaps,
             "candidates": proposal_batch.candidates,
             "joint_groups": proposal_batch.joint_groups,
             "notes": proposal_batch.notes,
@@ -531,6 +569,9 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
         )
         diagnosed_families = refine_failure_families(diagnosed_families)
+        (
+            diagnosed_families, capability_gaps,
+        ) = split_actionable_families(diagnosed_families)
         worksheet = worksheet_report(patrol_rows, diagnosed_families)
         worksheet["bootstrap"] = {
             "initial_patrol_size": patrol_size,
@@ -538,6 +579,7 @@ class EvolutionEngine:
             "bootstrap_count": len(bootstrap_cases),
             "family_found": bool(diagnosed_families),
         }
+        worksheet["capability_gaps"] = capability_gaps
         self._ledger("patrol", {
             "cycle": cycle,
             "cases": patrol_cases,
@@ -582,10 +624,17 @@ class EvolutionEngine:
             "notes": list(proposal_batch.notes),
         })
         if not diagnosed_families:
-            empty_proposal_reason = (
-                "no stable bare-base failure family (>=2 same-mechanism cases) "
-                "after initial patrol and bootstrap reruns"
-            )
+            if capability_gaps:
+                empty_proposal_reason = (
+                    f"{len(capability_gaps)} stable family(ies) classified "
+                    "as capability gap(s); no family is treatable by the "
+                    "closed action vocabulary"
+                )
+            else:
+                empty_proposal_reason = (
+                    "no stable bare-base failure family (>=2 same-mechanism "
+                    "cases) after initial patrol and bootstrap reruns"
+                )
         elif not proposals:
             empty_proposal_reason = (
                 "stable failure families exist but the proposer drafted no "
@@ -832,6 +881,7 @@ class EvolutionEngine:
                     str(item.get("failure_family") or "")
                     for item in diagnosed_families
                 ],
+                "capability_gaps": capability_gaps,
                 "candidate_count": len(proposals),
                 "joint_groups": joint_groups,
                 "empty_proposal_reason": empty_proposal_reason,
@@ -1102,29 +1152,41 @@ class EvolutionEngine:
     def _evaluate_mini_effect(self) -> dict[str, Any]:
         """Evaluate the committed registry on cases excluded from B gates.
 
-        This is deliberately fresh for both arms.  A gain-set improvement is
-        only an admission signal; this separate arm is the B-stage efficacy
-        check and cannot be used to generate proposals.
+        The empty arm is the single cached roll of the bare base; the active
+        arm replays that same roll through the frozen envelope, so the
+        comparison measures the interventions alone. This arm can never
+        generate proposals (VaG separation from the gain-set signal).
         """
         seconds = self._cycle_seconds()
         deadline = (_time_monotonic() + seconds) if seconds else None
-        empty_rows = self.backend.evaluate_fresh(
+        workers = int((self.config.get("backend") or {}).get("workers", 1))
+        empty_rows = self.backend.evaluate(
             self.split.validation,
             dataset_root=self.config["dataset_root"],
             registry=empty_registry(),
             gold_map=self.gold_map,
-            workers=int((self.config.get("backend") or {}).get("workers", 1)),
+            workers=workers,
             deadline=deadline,
         )
-        active_rows = self.backend.evaluate_fresh(
-            self.split.validation,
-            dataset_root=self.config["dataset_root"],
-            registry=self.registry.registry,
-            gold_map=self.gold_map,
-            workers=int((self.config.get("backend") or {}).get("workers", 1)),
-            deadline=deadline,
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        active_rows = self._evaluate_arm(
+            self.split.validation, self.registry.registry, active_fresh, deadline,
         )
-        effect = paired_delta(empty_rows, active_rows)
+        if not self.registry.entries:
+            # Empty-vs-empty is the same rows by construction; a delta here
+            # is machinery inconsistency, not a measured effect.
+            effect = paired_delta(empty_rows, [
+                dict(row) for row in empty_rows
+            ])
+            if any(int(effect[key]) != 0 for key in (
+                "marginal_cases", "new_errors", "unresolved_added",
+            )):
+                raise RuntimeError(
+                    "empty-registry mini effect is not zero: paired replay "
+                    "machinery is inconsistent"
+                )
+        else:
+            effect = paired_delta(empty_rows, active_rows)
         cfg = self.config.get("mini_effect") or {}
         passed = (
             bool(self.registry.entries)
@@ -1140,8 +1202,7 @@ class EvolutionEngine:
         )
         return {
             "cases": len(self.split.validation),
-            "fresh_baseline": True,
-            "fresh_active": True,
+            "paired_replay": not active_fresh,
             "effect": {
                 "marginal_cases": int(effect["marginal_cases"]),
                 "new_errors": int(effect["new_errors"]),
@@ -1158,6 +1219,26 @@ class EvolutionEngine:
             ],
             "passed": passed,
         }
+
+    def _evaluate_arm(
+        self,
+        cases: Sequence[str],
+        registry: Mapping[str, Any] | None,
+        fresh: bool,
+        deadline: float | None,
+    ) -> list[dict[str, Any]]:
+        workers = int((self.config.get("backend") or {}).get("workers", 1))
+        evaluate = (
+            self.backend.evaluate_fresh if fresh else self.backend.evaluate
+        )
+        return evaluate(
+            list(cases),
+            dataset_root=self.config["dataset_root"],
+            registry=registry,
+            gold_map=self.gold_map,
+            workers=workers,
+            deadline=deadline,
+        )
 
     # ------------------------------------------------------------------
     def run_governance(self, cycle: int | None = None) -> dict[str, Any]:
@@ -1338,20 +1419,36 @@ class EvolutionEngine:
             raise ValueError("final verification contains an unknown gold label")
         empty = empty_registry()
         active = self.registry.registry
-        empty_rows = self.backend.evaluate_fresh(
+        workers = int((self.config.get("backend") or {}).get("workers", 1))
+        # The empty arm is the single cached roll; the active arm replays it
+        # through the frozen envelope so the final effect measures the
+        # committed interventions alone. Provider-stage interventions cannot
+        # be replayed, so they compare against a fresh control roll (their
+        # only measurable contrast, same rule as the cycle gates).
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        empty_rows = self.backend.evaluate(
             case_ids,
             dataset_root=self.config["dataset_root"],
             registry=empty,
             gold_map=final_gold,
-            workers=int((self.config.get("backend") or {}).get("workers", 1)),
+            workers=workers,
         )
-        active_rows = self.backend.evaluate_fresh(
-            case_ids,
-            dataset_root=self.config["dataset_root"],
-            registry=active,
-            gold_map=final_gold,
-            workers=int((self.config.get("backend") or {}).get("workers", 1)),
-        )
+        if active_fresh:
+            active_rows = self.backend.evaluate_fresh(
+                case_ids,
+                dataset_root=self.config["dataset_root"],
+                registry=active,
+                gold_map=final_gold,
+                workers=workers,
+            )
+        else:
+            active_rows = self.backend.evaluate(
+                case_ids,
+                dataset_root=self.config["dataset_root"],
+                registry=active,
+                gold_map=final_gold,
+                workers=workers,
+            )
         effect = paired_delta(empty_rows, active_rows)
         main_pass = (
             int(effect["marginal_cases"]) >= int(

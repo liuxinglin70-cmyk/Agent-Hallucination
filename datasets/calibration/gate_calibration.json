@@ -1,9 +1,0 @@
-{
-    "schema_version": "sehd2.gate_calibration.v2",
-    "capability_proposal": {
-        "predicate_runners": ["deterministic"]
-    },
-    "composition": {
-        "max_interaction_loss": 0
-    }
-}

@@ -193,18 +193,23 @@ def _vote_defense(
     The verdict is decided by strict majority over the cast ballots; ties
     and no-quorum outcomes keep the conviction but upgrade the verdict to
     ``substantiated_upgraded`` (a degraded confirmation, never an
-    overturn). The returned ``parsed`` is the first ballot whose verdict
-    matches the collapsed verdict, or the first substantiated ballot when
-    upgraded.
+    overturn). ``vote_topup`` re-casts abstained ballots a bounded number
+    of times so transport jitter cannot shrink the quorum between runs.
+    The returned ``parsed`` is the first ballot whose verdict matches the
+    collapsed verdict, or the first substantiated ballot when upgraded.
     """
     votes = max(1, int(route.get("votes", 1) or 1))
+    topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
     ballots: list[dict[str, Any]] = []
     sample_meta: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
     last_error = {"error": "every defense vote failed",
                   "error_type": "provider_error"}
-    for _ in range(votes):
+    topups_used = 0
+
+    def cast_one() -> None:
+        nonlocal total_attempts, last_error, sample_meta
         result, status = _call_defense(
             packet=packet, route=route, system=system, user=user,
             positive=positive,
@@ -221,6 +226,13 @@ def _vote_defense(
                     result.get("error_type") or "provider_error"
                 ),
             }
+
+    for _ in range(votes):
+        cast_one()
+    while len(ballots) < votes and topup_budget > 0:
+        topup_budget -= 1
+        topups_used += 1
+        cast_one()
     if not ballots:
         return {
             "ok": False, "parsed": None,
@@ -248,6 +260,7 @@ def _vote_defense(
     sample_meta["vote"] = {
         "votes": votes, "cast": len(verdicts),
         "verdicts": verdicts, "collapsed": collapsed, "tie": tied,
+        "topups": topups_used,
     }
     return {"ok": True, "parsed": parsed, "raw": ballots,
             "provider": sample_meta}, {

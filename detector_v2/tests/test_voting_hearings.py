@@ -367,3 +367,70 @@ def test_upgraded_verdict_degrades_authority(sample_packet):
     )
     assert proof["state"] == "verified_error"
     assert proof["decision_authority"] == "degraded_judge_only"
+
+
+def test_judge_topup_refills_abstained_ballots(sample_packet, monkeypatch):
+    """vote_topup re-casts abstained ballots so quorum does not shrink."""
+    calls = []
+
+    def fake_call(*, route, system, user, purpose):
+        calls.append(purpose)
+        # First two ballots abstain, the topup succeeds twice.
+        if len(calls) <= 2:
+            return {"is_hallucination": "yes"}, {"attempts": 1}
+        return dict(JUDGE_FALSE), {"attempts": 1, "model": "m", "usage": {}}
+
+    monkeypatch.setattr("detector_v2.judge.provider_call", fake_call)
+    config = {
+        "judge_route": {**CONFIG["judge_route"], "votes": 2, "vote_topup": 2},
+    }
+    result, status = run_judge(packet=sample_packet, config=config)
+    assert result["ok"] is True
+    vote = result["provider"]["vote"]
+    assert vote["cast"] == 2
+    assert vote["topups"] == 1
+
+
+def test_judge_topup_absent_keeps_abstention_contract(sample_packet, monkeypatch):
+    calls = []
+
+    def fake_call(*, route, system, user, purpose):
+        calls.append(1)
+        return {"is_hallucination": "yes"}, {"attempts": 1}
+
+    monkeypatch.setattr("detector_v2.judge.provider_call", fake_call)
+    config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
+    result, status = run_judge(packet=sample_packet, config=config)
+    assert result["ok"] is False
+    assert result["error"] == "every judge vote failed"
+    # 3 ballots x (initial + contract repair) provider calls, no topup.
+    assert len(calls) == 6
+
+
+def test_defense_topup_refills_abstained_ballots(sample_packet, monkeypatch):
+    calls = []
+
+    def fake_call(*, route, system, user, purpose):
+        calls.append(1)
+        # Ballot 1 fails both its initial call and its contract repair.
+        if len(calls) <= 2:
+            return {"verdict": "nonsense"}, {"attempts": 1}
+        return _defense_output("substantiated")
+
+    monkeypatch.setattr("detector_v2.defense.provider_call", fake_call)
+    config = {
+        "defense_route": {**CONFIG["defense_route"], "votes": 2, "vote_topup": 1},
+    }
+    positive = {
+        "source": "judge", "step": 2, "reason": "wrong value",
+        "delivered_result": "5", "correct_result": "4",
+        "evidence_refs": ["event_002"],
+    }
+    result, status = run_defense(
+        packet=sample_packet, positive=positive, config=config,
+    )
+    assert result["ok"] is True
+    assert result["parsed"]["verdict"] == "substantiated"
+    vote = result["provider"]["vote"]
+    assert vote["cast"] == 2
+    assert vote["topups"] == 1

@@ -61,10 +61,14 @@ A predicate name itself is also a fact once its evidence row ran, with the
 verdict that predicate produced (for example required_action_present=violated).
 
 Guidance:
+- Each family lists its open treatment_routes; draft only within them. A
+  route absent from the list is structurally closed (its contract can never
+  validate), so drafting it wastes the cycle budget.
 - For an FN family (detector said clean but gold says error), first determine
   that one mechanism is shared by the supplied member summaries. An
   evidence_check may be paired with a convict_mechanical_violation guard only
-  when the evidence predicate is applicable and violating for every member;
+  when the mechanical_conviction route is open AND the evidence predicate is
+  applicable and violating for every member;
   its trigger must also require judge_positive=false and positive_source=none,
   so it cannot override a positive hearing or defense; otherwise prefer an
   evidence-only candidate or no candidate.
@@ -225,6 +229,9 @@ class LLMProposer:
                     "sources": f.get("sources"),
                     "mechanism_summary": f.get("mechanism_summary"),
                     "mechanism_signature": f.get("mechanism_signature"),
+                    "treatment_routes": (f.get("actionability") or {}).get(
+                        "routes", []
+                    ),
                     "predicate_signals": (f.get("diagnostics") or {}).get(
                         "predicate_signals", {}
                     ),

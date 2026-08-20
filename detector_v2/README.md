@@ -196,9 +196,11 @@ DETECTOR_V2_TRANSPORT_RETRIES
   - `frozen_judge={"judge_result": ..., "judge_status": ...}`：冻结 Judge，
     供不触碰 `judge.system` 的候选做配对重放；
   - `frozen_stages`：进一步冻结 recall / upgrade / tracer / defense 的基线
-    阶段输出，只有被干预 hook 覆盖的阶段重新执行。公共 API 对任何被干预
-    hook 覆盖的阶段一律拒绝冻结（遮蔽即 fail-closed）
-    （fail-closed）。
+    阶段输出。已结算（`ok` / provider_error / contract_error）阶段一律可
+    冻结；tracer/defense 按听证持久化在 `proof.hearings` 每行，多听证案例
+    按 `(source, candidate_id)` 匹配重放，冻结流中缺少某个听证的冻结条目
+    即 fail-closed。只有被干预 hook 覆盖的阶段重新执行，公共 API 对任何
+    被干预 hook 覆盖的阶段一律拒绝冻结（遮蔽即 fail-closed）。
 - 干预执行器、事实词表、guard 动作与落盘格式见
   `detector_v2/INTERVENTIONS.md`。
 

@@ -196,7 +196,8 @@ def run_judge(
     more than one vote, independent samples decide ``is_hallucination``
     by strict majority; a tie or no quorum keeps the negative verdict and
     the stage degrades, because a positive verdict is the extraordinary
-    claim.
+    claim. ``vote_topup`` re-casts abstained ballots a bounded number of
+    times so transport jitter cannot shrink the quorum between runs.
     """
     plan = plan or empty_plan()
     route = dict(config["judge_route"])
@@ -210,12 +211,17 @@ def run_judge(
     view_state = "complete" if not view_meta.get("degraded") else "degraded"
 
     votes = max(1, int(route.get("votes", 1) or 1))
+    topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
     ballots: list[dict[str, Any]] = []
     sample_meta: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
     fatal_error = ""
-    for _ in range(votes):
+    topups_used = 0
+
+    def cast_one() -> bool:
+        """One ballot; False marks a fatal failure that stops all voting."""
+        nonlocal fatal_error, total_attempts, sample_meta
         parsed, meta, fatal, vote_warnings = _cast_vote(
             packet=packet, route=route, system=system, user=user,
             view_state=view_state,
@@ -223,11 +229,26 @@ def run_judge(
         total_attempts += int((meta or {}).get("attempts") or 0)
         warnings.extend(vote_warnings)
         if fatal:
-            fatal_error = vote_warnings[-1]["error"] if vote_warnings else "judge vote failed"
-            break
+            fatal_error = (
+                vote_warnings[-1]["error"] if vote_warnings
+                else "judge vote failed"
+            )
+            return False
         if parsed is not None:
             ballots.append(parsed)
             sample_meta = dict(meta or {})
+        return True
+
+    for _ in range(votes):
+        if not cast_one():
+            break
+    while (
+        not fatal_error and len(ballots) < votes and topup_budget > 0
+    ):
+        topup_budget -= 1
+        topups_used += 1
+        if not cast_one():
+            break
     if fatal_error:
         return {
             "ok": False,
@@ -276,6 +297,8 @@ def run_judge(
             ),
             ballots[0],
         )
+    if topups_used:
+        vote_meta["topups"] = topups_used
     sample_meta["vote"] = vote_meta
     return {
         "ok": True,

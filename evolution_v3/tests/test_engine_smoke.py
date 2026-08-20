@@ -858,3 +858,77 @@ def test_meta_library_drift_reads_cycle_report_key():
         },
     ])
     assert meta["library_drift"]["net_contribution_history"] == [3]
+
+
+def _mini_engine(tmp_path, backend, split, proposer=None):
+    config = _config(tmp_path)
+    return EvolutionEngine(
+        config,
+        backend=backend,
+        split=split,
+        mini=True,
+        proposer=proposer or OfflineProposer(),
+    )
+
+
+def test_mini_effect_empty_registry_is_structural_zero(tmp_path):
+    """Empty-vs-empty compares one cached roll against itself: no fresh
+    provider calls, and the delta is zero by construction."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        validation=cases[:6],
+        mini=True,
+    )
+    fresh_calls = []
+
+    class _Counting(MockDetectorBackend):
+        def evaluate_fresh(self, cases_arg, **kwargs):
+            fresh_calls.append(list(cases_arg))
+            return MockDetectorBackend.evaluate_fresh(
+                self, cases_arg, **kwargs
+            )
+
+    engine = _mini_engine(tmp_path, _Counting(), split)
+    effect = engine._evaluate_mini_effect()
+    assert fresh_calls == []
+    assert effect["effect"]["marginal_cases"] == 0
+    assert effect["effect"]["new_errors"] == 0
+    assert effect["effect"]["unresolved_added"] == 0
+    assert effect["passed"] is False
+
+
+def test_mini_effect_deterministic_arm_replays_cached_roll(tmp_path):
+    """A decision-guard registry keeps every stage deterministic, so the
+    active arm must reuse the cached baseline rows instead of re-rolling."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        validation=cases[:6],
+        mini=True,
+    )
+    fresh_calls = []
+
+    class _Counting(MockDetectorBackend):
+        def evaluate_fresh(self, cases_arg, **kwargs):
+            fresh_calls.append(list(cases_arg))
+            return MockDetectorBackend.evaluate_fresh(
+                self, cases_arg, **kwargs
+            )
+
+    engine = _mini_engine(tmp_path, _Counting(), split)
+    engine.registry.write(
+        [_guard_candidate()], cycle=0, reason="pre-seeded",
+        library_cfg=engine.config["library"],
+    )
+    effect = engine._evaluate_mini_effect()
+    assert fresh_calls == []
+    assert effect["paired_replay"] is True

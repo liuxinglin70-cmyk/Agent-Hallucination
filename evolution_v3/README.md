@@ -43,7 +43,7 @@ evolution_v3/
   configs/framework.json      # 预算、门阈值、库上限、协议配置
   contracts.py                # 干预合同（复用 detector_v2 的校验/哈希）
   splits.py                   # S / G / P / 终审300 read-once；mini tuning100 切分
-  backends.py                 # detector_v2 真实后端（frozen-judge + frozen_stages 重放）+ cached run 后端
+  backends.py                 # detector_v2 真实后端（frozen-stage 按听证重放）+ cached run 后端
   worksheet.py                # 机械失败族归因 + predicate 诊断（case id 不进候选文本）
   proposer.py                 # 多模板起草器（机械诊断接地）+ LLM 起草器（≤3 候选）
   gates.py                    # V1/V2/V3/M + 缺陷注入审计
@@ -94,7 +94,10 @@ python -m evolution_v3 smoke
    （required_action / verbatim / observation fidelity / guard / evidence），
    并且先保证每个失败族至少一个候选，避免大族饿死其他族。
 4. **优先 non-judge hooks**：默认模板不生成 `judge.system`，因此候选可以走
-   frozen-judge 配对重放；这是当前最强的配对噪声控制。
+   frozen-stage 配对重放。配对信封冻结所有已结算阶段（`ok` 与
+   provider/contract 失败态），并按听证持久化 tracer/defense 结果，多听证
+   案例也整条路径重放；空信封 fail-closed。配对比较因此精确到零噪声，
+   不再需要噪声地板预校准。
 5. **空结果显式化**：cycle 报告含 `proposal_summary.empty_proposal_reason`，
    meta 报告含 `bootstrap_used_per_cycle` 与 `empty_proposal_reasons`。没有
    候选收入是有效结果，而不是静默失败。
@@ -164,7 +167,7 @@ python -m evolution_v3 preview --cycle 1 --backend detector_v2
 # 1. M2：跑一个完整 cycle（无候选收入也是有效结果）
 python -m evolution_v3 cycle --cycle 1 --backend detector_v2
 
-# 2. 只有新建干净 holdout、冻结 active registry 并完成 fresh 双臂后才允许 final
+# 2. 跑完 3 个 cycle 后允许 final
 python -m evolution_v3 experiment --cycles 3 --backend detector_v2
 python -m evolution_v3 final
 
@@ -178,6 +181,9 @@ python -m evolution_v3 verify-ledger
 
 - 主判据：active vs 空库在 300 例上的配对边际增益达到 `m_min_marginal_cases`；
 - 次判据：单侧 McNemar p<0.05、step localization 不下降、unresolved 不增加；
+- 配对方式：空臂是唯一的缓存 roll，主动臂经冻结信封重放同一 roll；只有
+  触碰 `judge.system` 等 unfreezing-hook 的候选臂才对比 fresh control roll。
+  空对空的效应恒为 0 是构造性不变量，被当作机械断言自检；
 - 不通过即框架判负，不调参续命。
 
 ## 5. 三类干预的闭词表

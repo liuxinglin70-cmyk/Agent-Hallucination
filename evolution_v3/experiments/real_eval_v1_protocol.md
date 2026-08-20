@@ -107,25 +107,40 @@ defense/positive source) while contract kinds stayed in per-member summaries;
 it when no predicate subgroup reaches the stability threshold. A clean B must
 be re-run after that change.
 
-The fifth attempt re-ran clean on the repaired machinery and is the first
-valid proposal-measurement run. Both cycles completed, the ledger verified
-clean (9 records) and the full loop executed end to end:
+The fifth attempt re-ran clean on the repaired machinery, but was later
+falsified as a measurement: an inert `judge.post` evidence probe (the kind of
+candidate that has no causal effect on the terminal verdict) reproduced the
+same `new_fn`/`marginal` signal, so the run measured provider noise rather than
+proposal quality. The instrumentation defect was in the paired-replay
+envelope: it froze only `ok` stages, so a baseline judge that errored re-rolled
+the whole downstream path in the candidate arm, and it froze tracer/defense
+only for single-judge-hearing cases, so every multi-hearing case (defense is a
+control-flow switch there) re-rolled and amplified its variance. Both the
+empty-vs-active `mini_effect` and the V2/M sentinel comparison compared a
+cached roll against partially re-rolled arms.
 
-- patrol found the 5-case FN cluster; execution-path family keys kept it
-  together and predicate-profile refinement kept the 2-case unanimous
-  `delivered_anchor_consistency=inconsistent` subgroup as the stable family;
-- the proposer drafted an `evidence_check` on `judge.post` plus a
-  `convict_mechanical_violation` guard; the guard was rejected locally
-  (`invalid_contract`) because `delivered_anchor_consistency` is not a
-  conviction-authorized predicate — the unsafe mechanism never reached a gate;
-- the evidence_check passed V1 but failed V2 with
-  `sentinel harmlessness violation: new_fn=1` (the appended evidence changed a
-  downstream defense roll on one sentinel case);
-- cycle 2 re-proposed the same evidence mechanism and was blocked locally as
-  `echo_of_rejected`, proving rejection feedback persists across cycles.
+The recorded signals were therefore noise:
+
+- `mini_effect` ran empty-registry against empty-registry and still reported
+  `marginal=-1, new_errors=4` (5 of 20 cases flipped) — a non-existent
+  intervention cannot change any outcome;
+- the `evidence_check` V2 failure (`sentinel harmlessness violation: new_fn=1`)
+  was the same inert probe flipping one sentinel's downstream defense roll,
+  not an intervention effect;
+- the local `invalid_contract` rejection of the `convict_mechanical_violation`
+  guard was correct (the predicate was not conviction-authorized), but the
+  guard was paired to a family that cannot manufacture conviction by any legal
+  route, so it was an action-space gap, not a proposer error.
 
 The active registry stayed empty, so B did not pass and the full holdout was
-not read. This run is valid evidence about the proposal loop: the framework now
-executes the complete cycle safely, but the first candidate family still needs
-a mechanism that measurably helps sentinel cases. No threshold or split was
-changed for this outcome.
+not read. This run carries no information about the proposer's ability and no
+threshold was derived from it.
+
+The instrumentation was then rebuilt so a paired comparison is exact rather
+than noise-calibrated: the frozen envelope now freezes settled stages (ok,
+provider_error, contract_error) and persists tracer/defense per hearing so
+multi-hearing cases replay too; the empty arm is the single cached roll and the
+candidate arm replays it (empty-vs-empty is zero by construction, enforced as
+an invariant); and families whose mechanism has no closed action route are
+classified as capability gaps and reported instead of reaching the proposer. A
+new clean B run must follow.

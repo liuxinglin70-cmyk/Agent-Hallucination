@@ -190,6 +190,11 @@ A5. **每个干预必须证明相对 no-skill control 的边际增益；没有�
   要求 `新增 FN = 0 ∧ 新增 FP = 0 ∧ unresolved 不增加`。
   容忍度不设默认值；V2 采用绝对零容忍哨兵规则（`v2_new_fn_allowed=0` 等），
   不做噪声地板预校准。
+- 配对必须是精确的：空库是唯一的缓存 roll，候选臂经冻结信封重放同一
+  roll——所有已结算阶段（`ok` 与 provider/contract 失败态）都冻结，
+  tracer/defense 按听证持久化、多听证也整条重放，空信封 fail-closed。
+  空对空的效应恒为 0 是构造性不变量并被断言。只有触碰 unfreezing-hook
+  （`judge.system` 等）的候选臂才对比 fresh control roll。
 
 ### 3.3 V3 语义一致性（claim vs 行为差分）
 
@@ -220,6 +225,21 @@ VaG 的实证：缺陷技能进入上下文后，后续技能会以它为 refere
 - registry 一旦写入，当 cycle 的运行时立即生效；后续 cycle 的候选
   生成只用裸基座 + 当前 registry 的贡献账本，不用已部署技能的输出
   文本做 reference。
+
+### 3.6 失败族动作空间覆盖（能力缺口显式化）
+
+诊断出的稳定失败族并不都能被闭词表动作治疗。`classify_family_actionability`
+从族的机制签名机械枚举开放治疗路由：
+
+- FN 族：`recall_directive`（scanner.system 文本边界）、`upgrade_directive`、
+  `restore_guard`（defense 过度反证）、`mechanical_conviction`（仅当某
+  conviction-authorized 谓词全族 applicable ∧ violated）、`evidence_only`；
+- FP 族：`withhold_guard`、`evidence_only`；
+- `FAM-unresolved`（provider 故障）无任何路由 → 真能力缺口。
+
+路由为空的族作为 `capability_gaps` 写入 cycle 报告（一等字段），不进入
+proposer——对这类族起草候选只能生成验证器必然拒绝的契约。conviction 路由
+只在 authorized 谓词全族一致违例时开放，绝不因“需要通门”而放宽授权。
 
 ---
 
@@ -348,7 +368,7 @@ phase2_v1 final_verification (300)：read-once 终审
 
 | 里程碑 | 内容 | 验收 |
 |---|---|---|
-| **M0** ✅ | detector_v2 hooks 注册与干预加载（fail-closed）；`proof.deployment` 落盘；**升级器输出契约修复**：逐候选覆盖校验 → 缺行补问 → 仍缺显式 degraded；信息不对称修复（升级/防御验证不接收 Judge 的 correct_result） | 已完成；frozen_judge/frozen_stages replay 已支持 |
+| **M0** ✅ | detector_v2 hooks 注册与干预加载（fail-closed）；`proof.deployment` 落盘；**升级器输出契约修复**：逐候选覆盖校验 → 缺行补问 → 仍缺显式 degraded；信息不对称修复（升级/防御验证不接收 Judge 的 correct_result） | 已完成；frozen-stage 按听证重放已支持（错误态+多听证，空信封 fail-closed） |
 | **M1** ✅ | 首批 5 个 deterministic predicates（§2.3）+ V1/V2/V3/M 最小实现 + append-only ledger | 已完成；defect-injection audit、结构化 V1、M 联合选择均可运行 |
 | **M2** ✅ | `text_boundary` 生成与语义一致性批评；每 cycle 提名巡逻 | 已完成；100 例 mini 调优集上 patrol/proposal 已跑通 |
 | **M3** ✅ | `decision_guard` 双向动作 + L1/L2 联合候选 | 已完成；cycle 1/2 共准入 5 条干预（evidence + guard 联合组） |

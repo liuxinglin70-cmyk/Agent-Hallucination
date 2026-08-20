@@ -232,7 +232,7 @@ def test_detect_judge_conviction_is_authoritative(sample_record, monkeypatch):
     assert facts["defense"] == "substantiated"
     hearing = result["proof"]["hearings"][0]
     assert hearing["source"] == "judge"
-    assert hearing["defense"]["verdict"] == "substantiated"
+    assert hearing["defense_result"]["parsed"]["verdict"] == "substantiated"
 
 
 def test_detect_judge_refuted_and_recall_empty_is_clean(sample_record, monkeypatch):
@@ -298,7 +298,7 @@ def test_detect_judge_refuted_and_recall_empty_is_clean(sample_record, monkeypat
     assert result["state"] == "verified_clean"
     assert result["decision_authority"] == "authoritative"
     hearing = result["proof"]["hearings"][0]
-    assert hearing["defense"]["verdict"] == "refuted"
+    assert hearing["defense_result"]["parsed"]["verdict"] == "refuted"
 
 
 def test_detect_rejects_extra_fields(sample_record):

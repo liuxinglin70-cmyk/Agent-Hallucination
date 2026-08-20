@@ -46,7 +46,17 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
-CACHE_VERSION = "v10-mechanism-bound-cache"
+CACHE_VERSION = "v11-per-hearing-frozen-envelope"
+
+
+def _valid_stage_entry(
+    result: Mapping[str, Any] | None,
+    status: Mapping[str, Any] | None,
+) -> bool:
+    """A persisted stage result/status pair usable as a freeze entry."""
+    if not isinstance(result, Mapping) or not isinstance(status, Mapping):
+        return False
+    return bool(result.get("ok")) == (str(status.get("state") or "") == "ok")
 
 
 def file_digest(path: str | Path | None) -> str:
@@ -266,6 +276,19 @@ class DetectorV2Backend(DetectionBackend):
         baseline: Mapping[str, Any],
         hooks: set[str],
     ) -> dict[str, Any]:
+        """Build the frozen replay envelope from one baseline result.
+
+        A stage is frozen once its outcome is settled: ``ok`` stages replay
+        their verdict, terminal failure states replay the failure (an
+        intervention that does not target the stage's hook cannot change a
+        transport or contract failure, and a re-roll only contributes
+        provider noise). ``not_needed`` / ``not_run`` stages are NOT frozen:
+        the live control flow reproduces them deterministically with zero
+        provider calls, and freezing a ``not_needed`` stage as ``ok=False``
+        would turn a valid no-call into a downstream degradation. Stages
+        whose hook an intervention targets are excluded so replay can never
+        mask the intervention under test.
+        """
         proof = baseline.get("proof") or {}
         status = baseline.get("stage_status") or {}
         providers = baseline.get("providers") or {}
@@ -280,16 +303,15 @@ class DetectorV2Backend(DetectionBackend):
             frozen[f"{frozen_name}_result"] = result
             frozen[f"{frozen_name}_status"] = dict(status.get(status_name) or {})
 
-        def ok_state(name: str) -> bool:
-            # Only a stage that actually ran successfully is safe to freeze.
-            # ``not_needed`` stages are NOT frozen: the live control flow
-            # reproduces them deterministically (zero provider calls), and
-            # freezing a ``not_needed`` stage as ``ok=False`` turns a valid
-            # no-call into a downstream ``recall_unavailable`` degradation.
-            return str((status.get(name) or {}).get("state") or "") == "ok"
+        def settled(name: str) -> bool:
+            state = str((status.get(name) or {}).get("state") or "")
+            return bool(state) and state not in {"not_run", "not_needed"}
 
-        judge_status = status.get("judge") or {}
-        if isinstance(proof.get("judge"), Mapping) and judge_status.get("state") == "ok":
+        def state_of(name: str) -> str:
+            return str((status.get(name) or {}).get("state") or "")
+
+        judge_state = state_of("judge")
+        if judge_state == "ok" and isinstance(proof.get("judge"), Mapping):
             judge_result: dict[str, Any] = {"ok": True, "parsed": dict(proof["judge"])}
             judge_provider = providers.get("judge")
             if isinstance(judge_provider, Mapping) and isinstance(
@@ -300,64 +322,116 @@ class DetectorV2Backend(DetectionBackend):
                 # candidate arm (which would re-run provider stages).
                 judge_result["provider"] = {"vote": dict(judge_provider["vote"])}
             add("judge", "judge", judge_result)
+        elif settled("judge"):
+            add("judge", "judge", {
+                "ok": False,
+                "parsed": None,
+                "error": f"judge stage failed in baseline ({judge_state})",
+                "error_type": judge_state,
+            })
         if (
             "scanner.system" not in hooks
             and "judge_result" in frozen
-            and ok_state("recall_scanner")
+            and settled("recall_scanner")
         ):
-            add("recall", "recall_scanner", {
-                "ok": True,
-                "candidates": list(proof.get("recall_candidates") or []),
-            })
+            if state_of("recall_scanner") == "ok":
+                add("recall", "recall_scanner", {
+                    "ok": True,
+                    "candidates": list(proof.get("recall_candidates") or []),
+                })
+            else:
+                add("recall", "recall_scanner", {
+                    "ok": False,
+                    "candidates": [],
+                    "error": (
+                        "recall stage failed in baseline "
+                        f"({state_of('recall_scanner')})"
+                    ),
+                    "error_type": state_of("recall_scanner"),
+                })
         if (
             "upgrade.pre" not in hooks
             and "upgrade.system" not in hooks
             and "recall_result" in frozen
-            and ok_state("causal_upgrade")
+            and settled("causal_upgrade")
         ):
-            add("upgrade", "causal_upgrade", {
-                "ok": True,
-                "upgrades": list(proof.get("causal_upgrade_rows") or []),
-                "upgraded_candidate": proof.get("causal_upgrade"),
-                "upgraded_candidates": list(
-                    proof.get("causal_upgrades")
-                    or (
-                        [proof.get("causal_upgrade")]
-                        if proof.get("causal_upgrade") else []
-                    )
-                ),
-            })
-        # Tracer/defense may only be frozen for a single judge hearing. A
-        # judge-positive case that defense does not refute has exactly one
-        # hearing and its top-level tracer/defense belong to that hearing, so
-        # replay is safe. Multi-hearing cases (a refuted judge followed by
-        # recall candidates) carry per-hearing results that the frozen
-        # envelope cannot represent, so they must stay live.
-        hearings = list(proof.get("hearings") or [])
-        single_judge_hearing = (
-            len(hearings) == 1
-            and str((hearings[0] or {}).get("source") or "") == "judge"
+            if state_of("causal_upgrade") == "ok":
+                add("upgrade", "causal_upgrade", {
+                    "ok": True,
+                    "upgrades": list(proof.get("causal_upgrade_rows") or []),
+                    "upgraded_candidate": proof.get("causal_upgrade"),
+                    "upgraded_candidates": list(
+                        proof.get("causal_upgrades")
+                        or (
+                            [proof.get("causal_upgrade")]
+                            if proof.get("causal_upgrade") else []
+                        )
+                    ),
+                })
+            else:
+                rows = proof.get("causal_upgrade_rows")
+                add("upgrade", "causal_upgrade", {
+                    "ok": False,
+                    "upgrades": list(rows) if isinstance(rows, list) else [],
+                    "error": (
+                        "causal_upgrade stage failed in baseline "
+                        f"({state_of('causal_upgrade')})"
+                    ),
+                    "error_type": state_of("causal_upgrade"),
+                    **(
+                        {"coverage": dict(proof["causal_upgrade_coverage"])}
+                        if isinstance(proof.get("causal_upgrade_coverage"), dict)
+                        else {}
+                    ),
+                })
+        freeze_tracer = "tracer.system" not in hooks
+        freeze_defense = (
+            "defense.pre" not in hooks and "defense.system" not in hooks
         )
-        if (
-            "tracer.system" not in hooks
-            and "judge_result" in frozen
-            and single_judge_hearing
-            and ok_state("step_tracer")
-        ):
-            add("tracer", "step_tracer", {
-                "ok": True,
-                "parsed": proof.get("step_tracer"),
-            })
-        if (
-            "defense.pre" not in hooks
-            and "defense.system" not in hooks
-            and "tracer_result" in frozen
-            and ok_state("defense")
-        ):
-            add("defense", "defense", {
-                "ok": True,
-                "parsed": proof.get("defense"),
-            })
+        if freeze_tracer or freeze_defense:
+            # Tracer/defense replay per hearing: freezing only the top-level
+            # results would paste one hearing's outcome into every other
+            # hearing of a multi-hearing case, so each hearing row carries
+            # its own freeze entry with exactly the stages this replay may
+            # use (a targeted hook keeps its stage live).
+            hearing_rows = [
+                row for row in proof.get("hearings") or []
+                if isinstance(row, Mapping)
+            ]
+            valid_rows = hearing_rows and all(
+                _valid_stage_entry(
+                    row.get("tracer_result"), row.get("tracer_status"),
+                )
+                and _valid_stage_entry(
+                    row.get("defense_result"), row.get("defense_status"),
+                )
+                for row in hearing_rows
+            )
+            if valid_rows:
+                frozen["hearings"] = [
+                    {
+                        "source": row.get("source"),
+                        "candidate_id": row.get("candidate_id"),
+                        "positive": dict(row.get("positive") or {}),
+                        **(
+                            {
+                                "tracer_result": dict(row["tracer_result"]),
+                                "tracer_status": dict(row["tracer_status"]),
+                            }
+                            if freeze_tracer
+                            else {}
+                        ),
+                        **(
+                            {
+                                "defense_result": dict(row["defense_result"]),
+                                "defense_status": dict(row["defense_status"]),
+                            }
+                            if freeze_defense
+                            else {}
+                        ),
+                    }
+                    for row in hearing_rows
+                ]
         return frozen
 
     def run_case(
@@ -385,15 +459,19 @@ class DetectorV2Backend(DetectionBackend):
         if baseline is None:
             baseline = self._baseline(record, case_id=case_id)
         frozen_stages = self._frozen_stages(baseline, hooks)
-        if frozen_stages:
-            return self.detector.detect(
-                record,
-                case_id=case_id,
-                interventions=registry,
-                frozen_stages=frozen_stages,
+        if not frozen_stages:
+            # With a settled baseline stage always freezable, an empty
+            # envelope means the paired-replay contract is broken; a silent
+            # live re-roll would attribute provider noise to the candidate.
+            raise ValueError(
+                f"frozen replay envelope is empty for {case_id}: the baseline "
+                "carries no settled stage to replay"
             )
         return self.detector.detect(
-            record, case_id=case_id, interventions=registry,
+            record,
+            case_id=case_id,
+            interventions=registry,
+            frozen_stages=frozen_stages,
         )
 
     def evaluate_fresh(

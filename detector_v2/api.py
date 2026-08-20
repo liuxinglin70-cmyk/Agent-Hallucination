@@ -59,11 +59,21 @@ def _frozen_masked_stages(
     Replaying such a stage would mask the intervention under test, so the
     replay must be refused fail-closed. ``judge.post`` is absent: it is a
     post-hoc deterministic evidence hook that still runs during replay.
+    Hearing rows count as frozen whenever any hearing carries them.
     """
+    def stage_frozen(stage_key: str) -> bool:
+        if stage_key in frozen:
+            return True
+        return any(
+            stage_key in entry for entry in frozen.get("hearings") or ()
+        )
+
     return sorted(
-        stage_key.removesuffix("_result")
-        for stage_key, hooks in _FROZEN_STAGE_HOOKS.items()
-        if stage_key in frozen and targeted_hooks & hooks
+        {
+            stage_key.removesuffix("_result")
+            for stage_key, hooks in _FROZEN_STAGE_HOOKS.items()
+            if targeted_hooks & hooks and stage_frozen(stage_key)
+        }
     )
 
 
@@ -178,35 +188,53 @@ def _validate_frozen_stages(
         normalized["upgrade_result"] = upgrade_result
         normalized["upgrade_status"] = upgrade_status
 
-    if "tracer_result" in frozen:
-        tracer_result, tracer_status = _frozen_stage(frozen, "tracer")
-        if tracer_result.get("ok"):
-            parsed, error = _parse_tracer(tracer_result.get("parsed"), packet)
-            if parsed is None:
-                raise ValueError(f"frozen tracer_result contract error: {error}")
-            tracer_result["parsed"] = parsed
-        normalized["tracer_result"] = tracer_result
-        normalized["tracer_status"] = tracer_status
-
-    if "defense_result" in frozen:
-        defense_result, defense_status = _frozen_stage(frozen, "defense")
-        if defense_result.get("ok"):
-            parsed, error = _parse_defense(defense_result.get("parsed"))
-            if parsed is None:
-                raise ValueError(f"frozen defense_result contract error: {error}")
-            judge_parsed = (judge_result.get("parsed") or {})
-            positive = (
-                {"step": judge_parsed.get("hallucination_step")}
-                if judge_parsed.get("is_hallucination") is True else None
-            )
-            parsed, error = _validate_defense_evidence(
-                parsed, packet, positive,
-            )
-            if parsed is None:
-                raise ValueError(f"frozen defense_result evidence error: {error}")
-            defense_result["parsed"] = parsed
-        normalized["defense_result"] = defense_result
-        normalized["defense_status"] = defense_status
+    if "hearings" in frozen:
+        entries = frozen.get("hearings")
+        if not isinstance(entries, list):
+            raise ValueError("frozen hearings must be a list")
+        normalized_hearings: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                raise ValueError("frozen hearing entry must be an object")
+            clean = {
+                "source": str(entry.get("source") or ""),
+                "candidate_id": entry.get("candidate_id"),
+                "positive": dict(entry.get("positive") or {}),
+            }
+            if "tracer_result" in entry or "tracer_status" in entry:
+                tracer_result, tracer_status = _frozen_stage(entry, "tracer")
+                if tracer_result.get("ok"):
+                    parsed, error = _parse_tracer(
+                        tracer_result.get("parsed"), packet,
+                    )
+                    if parsed is None:
+                        raise ValueError(
+                            f"frozen tracer_result contract error: {error}"
+                        )
+                    tracer_result["parsed"] = parsed
+                clean["tracer_result"] = tracer_result
+                clean["tracer_status"] = tracer_status
+            if "defense_result" in entry or "defense_status" in entry:
+                defense_result, defense_status = _frozen_stage(entry, "defense")
+                if defense_result.get("ok"):
+                    parsed, error = _parse_defense(defense_result.get("parsed"))
+                    if parsed is None:
+                        raise ValueError(
+                            f"frozen defense_result contract error: {error}"
+                        )
+                    positive = {"step": clean["positive"].get("step")}
+                    parsed, error = _validate_defense_evidence(
+                        parsed, packet, positive,
+                    )
+                    if parsed is None:
+                        raise ValueError(
+                            f"frozen defense_result evidence error: {error}"
+                        )
+                    defense_result["parsed"] = parsed
+                clean["defense_result"] = defense_result
+                clean["defense_status"] = defense_status
+            normalized_hearings.append(clean)
+        normalized["hearings"] = normalized_hearings
     return normalized
 
 
@@ -290,6 +318,9 @@ class Detector:
                 f"{self.default_interventions_path}"
             )
         plan = compile_runtime_plan(effective_interventions)
+        targeted_hooks = {
+            str(entry.get("hook") or "") for entry in plan.entries
+        }
 
         frozen = frozen_judge if frozen_judge is not None else frozen_stages
         if frozen is not None and any(
@@ -300,10 +331,6 @@ class Detector:
             frozen = _validate_frozen_stages(frozen, packet)
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
-            targeted_hooks = {
-                str(entry.get("hook") or "")
-                for entry in plan.entries
-            }
             masked = _frozen_masked_stages(frozen, targeted_hooks)
             if masked:
                 raise ValueError(
@@ -442,13 +469,42 @@ class Detector:
         if judge_status.get("state") == "ok" and judge_positive:
             hearings.append(positive_from_judge())
 
+        # In a frozen flow the baseline ran every hearing this flow can
+        # reach, so a missing freeze entry is machinery inconsistency, not
+        # a case where a live roll would be measuring the intervention.
+        flow_frozen = frozen is not None
+
+        def frozen_hearing(positive: Mapping[str, Any]) -> dict[str, Any] | None:
+            if not flow_frozen:
+                return None
+            return next(
+                (
+                    entry for entry in frozen.get("hearings") or ()
+                    if isinstance(entry, Mapping)
+                    and str(entry.get("source") or "")
+                    == str(positive.get("source") or "")
+                    and str(entry.get("candidate_id") or "")
+                    == str(positive.get("candidate_id") or "")
+                ),
+                None,
+            )
+
         def run_hearing(positive: Mapping[str, Any]) -> tuple[
             dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
         ]:
             """Tracer + defense for one positive; defense is decisive."""
-            if frozen is not None and "tracer_result" in frozen:
-                tracer_r = dict(frozen.get("tracer_result") or {})
-                tracer_s = dict(frozen.get("tracer_status") or {})
+            entry = frozen_hearing(positive)
+            if entry is not None:
+                tracer_r = dict(entry.get("tracer_result") or {})
+                tracer_s = dict(entry.get("tracer_status") or {})
+                defense_r = dict(entry.get("defense_result") or {})
+                defense_s = dict(entry.get("defense_status") or {})
+            elif flow_frozen:
+                raise ValueError(
+                    "frozen stage replay is missing a hearing freeze entry "
+                    f"for source={positive.get('source')!r} "
+                    f"candidate_id={positive.get('candidate_id')!r}"
+                )
             else:
                 tracer_r, tracer_s = run_step_tracer(
                     packet=packet,
@@ -457,10 +513,6 @@ class Detector:
                     config=self.config,
                     plan=plan,
                 )
-            if frozen is not None and "defense_result" in frozen:
-                defense_r = dict(frozen.get("defense_result") or {})
-                defense_s = dict(frozen.get("defense_status") or {})
-            else:
                 defense_r, defense_s = run_defense(
                     packet=packet,
                     positive=positive,
@@ -491,13 +543,13 @@ class Detector:
             run_recall_net()
             for candidate in positives_from_upgrade():
                 hearing = positive_from_candidate(candidate)
+                hearing["candidate_id"] = candidate.get("candidate_id")
                 (
                     hearing["tracer_result"],
                     hearing["tracer_status"],
                     hearing["defense_result"],
                     hearing["defense_status"],
                 ) = run_hearing(hearing)
-                hearing["candidate_id"] = candidate.get("candidate_id")
                 hearings.append(hearing)
 
         defense_parsed = (
@@ -628,12 +680,10 @@ class Detector:
                         "delivered_result", "correct_result",
                     )
                 },
-                "step_tracer": (
-                    (hearing.get("tracer_result") or {}).get("parsed")
-                ),
-                "defense": (
-                    (hearing.get("defense_result") or {}).get("parsed")
-                ),
+                "tracer_result": hearing.get("tracer_result"),
+                "tracer_status": hearing.get("tracer_status"),
+                "defense_result": hearing.get("defense_result"),
+                "defense_status": hearing.get("defense_status"),
             }
             for hearing in hearings
         ]
