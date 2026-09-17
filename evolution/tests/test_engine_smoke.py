@@ -1639,3 +1639,168 @@ def test_proposal_memory_context_is_bounded(tmp_path):
     assert len(context["open_capability_gaps"]) <= 8
     # Six families x up to two procedures each would be twelve uncapped.
     assert len(context["procedures"]) <= 6
+
+
+def _unmeasurable_recall_setup(tmp_path):
+    """A round with a recall family, a precision opportunity, no recall one.
+
+    Gain (004-011) holds one precision opportunity (005 is clean-gold but the
+    base calls it error) and no recall opportunity. The recall failures live in
+    the patrol pool, and 016/018 are base-wrong on error-gold, so they carry
+    recall coverage for a replacement set without touching the default gain.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    recall_failures = [
+        c for c in cases if c.endswith(
+            ("012.json", "014.json", "016.json", "018.json")
+        )
+    ]
+    base = {case: False for case in recall_failures}
+    base["A/005.json"] = True  # clean-gold called error: a precision chance
+    overrides = {"IV-1-001": {"A/016.json": True, "A/018.json": True}}
+    backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
+    return cases, config, split, backend
+
+
+def test_strict_coverage_policy_is_the_default_and_blocks_unchanged(tmp_path):
+    """The default must reproduce the previous behaviour exactly."""
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    assert config["coverage_response"]["mode"] == "strict"
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+    assert report["marginal_selection"]["selected"] == []
+    assert report["active_after_cycle"] == []
+    instrument = report["instrument"]
+    assert "recall" in instrument["unmeasurable_polarities"]
+    # No policy intervention was recorded: the reading is reported, and the
+    # claim is classified as unmeasured rather than falsified.
+    assert instrument["coverage_responses"] == {}
+    assert instrument["replacement_gain_cases"] == 0
+    assert instrument["terminal_counts"].get("not_evaluated") == 1
+
+
+def test_replacement_policy_re_measures_on_the_alternative_set(tmp_path):
+    """With a matching set installed, the claim is measured there instead."""
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    config["coverage_response"] = {"mode": "replacement", "policies": {}}
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    # A replacement set the base answers cleanly on error-gold cases, so recall
+    # is repairable there even though it is not on the default gain set.
+    replacement = [c for c in cases if c.endswith(("016.json", "018.json"))]
+    engine.set_replacement_gain_cases(replacement)
+
+    # The replacement set must really carry recall coverage, or the test would
+    # pass without measuring anything.
+    from evolution.engine import gain_opportunity
+    from evolution.contracts import empty_registry as _empty
+
+    control = engine.backend.evaluate(
+        replacement, dataset_root=engine.config["dataset_root"],
+        registry=_empty(), gold_map=engine.gold_map,
+    )
+    assert gain_opportunity(control)["recall"] > 0
+
+    report = engine.run_cycle(1)
+    instrument = report["instrument"]
+    assert instrument["replacement_gain_cases"] == len(replacement)
+    responses = instrument["coverage_responses"]
+    assert responses, report["gates"]
+    response = next(iter(responses.values()))
+    assert response["kind"] == "replacement"
+    assert response["policy"] == "replacement"
+    assert response["evaluated_on"] == "replacement"
+
+
+def test_replacement_or_skip_marks_unmeasured_when_no_set_matches(tmp_path):
+    """Without a matching set the claim is skipped, not silently rejected."""
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    config["coverage_response"] = {
+        "mode": "replacement_or_skip", "policies": {},
+    }
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+    instrument = report["instrument"]
+    assert instrument["replacement_gain_cases"] == 0
+    response = next(iter(instrument["coverage_responses"].values()))
+    assert response["kind"] == "skip"
+    assert response["evaluated_on"] == "default"
+    # Skipped claims stay blocked and read as unmeasured. The four-state
+    # vocabulary reports them as not_evaluated, with "skip" recorded as the
+    # response detail.
+    assert report["marginal_selection"]["selected"] == []
+    assert instrument["terminal_counts"].get("not_evaluated") == 1
+    assert instrument["instrument_limited"] is True
+    gate = next(g for g in report["gates"] if g.get("m"))
+    assert gate["m"]["status"] == "skipped_unmeasured"
+
+
+def test_per_direction_coverage_policy_overrides_the_default(tmp_path):
+    """The policy can be enabled for one direction only."""
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    config["coverage_response"] = {
+        "mode": "strict",
+        "policies": {"recall": "replacement_or_skip"},
+    }
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    # recall resolves to the override, precision stays strict.
+    assert engine._coverage_mode("recall") == "replacement_or_skip"
+    assert engine._coverage_mode("precision") == "strict"
+    report = engine.run_cycle(1)
+    response = next(iter(report["instrument"]["coverage_responses"].values()))
+    assert response["kind"] == "skip"
+
+
+def test_unknown_coverage_policy_is_rejected(tmp_path):
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    config["coverage_response"] = {"mode": "whatever", "policies": {}}
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    with pytest.raises(ValueError, match="coverage_response mode"):
+        engine._coverage_mode("recall")
+
+
+def test_proposer_is_told_which_directions_are_scoreable(tmp_path):
+    """Drafting input names the directions this round can actually measure."""
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    received: list[dict] = []
+
+    class RecordingProposer:
+        name = "recording"
+
+        def set_memory_context(self, context):
+            received.append(dict(context or {}))
+
+        def set_rejection_feedback(self, feedback):
+            pass
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            return ProposalBatch(candidates=[], joint_groups=[], notes=[])
+
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=RecordingProposer(),
+    )
+    engine.run_cycle(1)
+    assert received
+    context = received[0]
+    assert "precision" in context["scoreable_polarities"]
+    assert "recall" in context["unmeasurable_polarities"]

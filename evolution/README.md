@@ -40,6 +40,19 @@ python -m evolution verify-ledger
 
 下游干预现在回放原 judge，并重跑受到影响的阶段；新增听证可执行，已有听证仅在输入一致时复用。`judge.system` 仍需要新的配对控制。G 集没有相应 FN/FP 修复机会时，报告标记 `not_evaluable`，准入继续阻断；这不等于机制被否定，也不允许在原 G 集上无限搜索。真实复核后的具体修复与限制见 [修复说明](../reports/evolution_real/fixes.md)。
 
+### 覆盖响应
+
+`coverage_response` 决定「某方向在 gain 集上无机会可修」时怎么做，默认 `strict`（行为与改动前一致：记为未测量、准入阻断）。可显式改为 `replacement`（在已安装的替代评估集上重新测量整个判定单元）或 `replacement_or_skip`（无匹配评估集时记为 `skipped_unmeasured` 并跳过），并可按方向覆盖：
+
+```json
+"coverage_response": {
+  "mode": "strict",
+  "policies": {"recall": "replacement_or_skip"}
+}
+```
+
+替代评估集通过 `EvolutionEngine.set_replacement_gain_cases(cases)` 在内存中安装；持久化它需要与主 gain 集同等的 gold、协议与暴露保证，属单独决定。未安装时策略报告 `none_installed`。响应动作写入 `instrument.coverage_responses` 与 `instrument.coverage_response_counts`，因此「因不可测量而准入 0」与「重新测量后仍准入 0」可以区分。**该策略可以改变准入结果**，故默认关闭。
+
 自动化退出码：`smoke` 只有在目标干预准入、缺陷审计、账本完整性均通过且 cycle 完成时才返回 0；否则返回 2。`verify-ledger` 对有效账本返回 0、哈希链校验失败返回 2；无法解析的损坏文件也不会返回成功。
 
 当前已验证离线框架闭环和检测器真实服务连通性；尚未在整理后的代码上完成真实模型驱动的整轮进化效果验证。阶段目标见 [当前进展与计划](../docs/progress.md)。

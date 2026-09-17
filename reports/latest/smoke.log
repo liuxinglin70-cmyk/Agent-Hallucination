@@ -858,6 +858,9 @@
     "unmeasurable_polarities": [
       "precision"
     ],
+    "replacement_gain_cases": 0,
+    "coverage_responses": {},
+    "coverage_response_counts": {},
     "terminal_classification": {
       "IV-SMOKE-001": "admitted"
     },
@@ -1628,7 +1631,22 @@
       "gain_opportunities": {
         "recall": 2,
         "precision": 0
-      }
+      },
+      "measurement_gain_cases": [
+        "OpenDeepSearch/080.json",
+        "OpenDeepSearch/086.json",
+        "Magentic_One/050.json",
+        "OpenDeepSearch/095.json",
+        "Magentic_One/093.json",
+        "Camel/018.json",
+        "BFCL/017.json",
+        "Octotools/040.json",
+        "Octotools/030.json",
+        "OpenManus/064.json",
+        "SmolAgents/037.json",
+        "OpenDeepSearch/067.json"
+      ],
+      "coverage_response": null
     }
   ],
   "fresh_control": null,
@@ -1837,7 +1855,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "0e747603f77c",
+          "digest": "42bb5770338f",
           "payload": {
             "stages": [
               "validate",
@@ -1858,7 +1876,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "4c515932536c9466",
+            "source_digest": "ce98a761819db73f",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2024,11 +2042,11 @@
         }
       },
       "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
-      "digest": "d30180b68824"
+      "digest": "e08e325cac9a"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "d30180b68824",
+      "current_digest": "e08e325cac9a",
       "first_manifest": true,
       "changed": [
         "G",
@@ -2063,4 +2081,4 @@
   }
 }
 
-smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_d37et5is\work\smoke\experiments\smoke_cycle.json
+smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_8paes41p\work\smoke\experiments\smoke_cycle.json

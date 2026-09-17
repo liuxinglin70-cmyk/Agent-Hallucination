@@ -358,6 +358,9 @@
     "unmeasurable_polarities": [
       "precision"
     ],
+    "replacement_gain_cases": 0,
+    "coverage_responses": {},
+    "coverage_response_counts": {},
     "terminal_classification": {
       "IV-1-001": "admitted",
       "IV-1-002": "admitted"
@@ -1020,7 +1023,18 @@
       "gain_opportunities": {
         "recall": 2,
         "precision": 0
-      }
+      },
+      "measurement_gain_cases": [
+        "A/004.json",
+        "A/005.json",
+        "A/006.json",
+        "A/007.json",
+        "A/008.json",
+        "A/009.json",
+        "A/010.json",
+        "A/011.json"
+      ],
+      "coverage_response": null
     },
     {
       "intervention_id": "IV-1-002",
@@ -1615,7 +1629,18 @@
       "gain_opportunities": {
         "recall": 2,
         "precision": 0
-      }
+      },
+      "measurement_gain_cases": [
+        "A/004.json",
+        "A/005.json",
+        "A/006.json",
+        "A/007.json",
+        "A/008.json",
+        "A/009.json",
+        "A/010.json",
+        "A/011.json"
+      ],
+      "coverage_response": null
     }
   ],
   "fresh_control": null,
@@ -1794,7 +1819,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "0e747603f77c",
+          "digest": "42bb5770338f",
           "payload": {
             "stages": [
               "validate",
@@ -1815,7 +1840,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "4c515932536c9466",
+            "source_digest": "ce98a761819db73f",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2052,11 +2077,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "29a50f0b286a"
+      "digest": "6dd32eac9b69"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "29a50f0b286a",
+      "current_digest": "6dd32eac9b69",
       "first_manifest": true,
       "changed": [
         "G",

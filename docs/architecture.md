@@ -62,7 +62,24 @@ cycle 报告的 `instrument` 字段给出：`gain_opportunity`（每极性可修
 
 **`not_evaluated` 与 `rejected` 的含义不同，不能互相替代：** 前者表示声明方向在 gain 集上无案例可修，即「未曾被测量」，不得当作「已被证伪」；后者表示门控给出了实质理由（如造成新错误或健康回退）。只有 BEHAVIOR 与 M 可能因缺测量而不可评估——STRUCTURAL 与 HARMLESSNESS 依据合同与 sentinel 保护判定，与 gain 集极性无关。判别逻辑集中在 `gate_rejection_is_unevaluable` 与 `terminal_classification`，拒绝反馈、轮次报告与经验存储共用同一判据，避免三处各写一遍而彼此漂移。
 
-本轮仍按原规则阻断准入；区分「未评估」只改变结论如何被读出与被记忆，不放宽任何门限。
+本轮默认仍按原规则阻断准入；区分「未评估」只改变结论如何被读出与被记忆。
+
+## 覆盖响应：把「不可测量」变成决策
+
+读数本身不改变行为，因此新增 `coverage_response` 策略，在覆盖不足时给出动作。**默认 `strict`，与改动前行为完全一致**：claim 记为未测量、准入照旧阻断。另两种模式必须显式开启，且可按方向分别配置：
+
+| 模式 | 机会为 0 时的行为 |
+|---|---|
+| `strict`（默认） | 在默认 gain 集上测量，记为 `not_evaluated`，准入阻断。行为与改动前逐字一致 |
+| `replacement` | 若已安装替代评估集，则**整个判定单元在替代集上重新测量**；门限不放宽，只更换所运行的仪器 |
+| `replacement_or_skip` | 若没有匹配覆盖的评估集，记为 `skipped_unmeasured` 并跳过，而不是当作已被证伪 |
+
+两处实现细节值得记录：
+
+- **测量集在任何门运行之前决定。** 机会为 0 的召回类 claim 会先在 BEHAVIOR 的方向检查上失败，根本到不了 M；因此响应不能只在 M 处实现。单元先用默认 gain 计算机会，必要时改换整个测量集，再跑 HARMLESSNESS/BEHAVIOR/M。
+- **替代集只驻留内存**（`set_replacement_gain_cases`）。持久化它需要与主 gain 集同等的 gold、协议与暴露保证，那是一个需要单独决定的问题；未安装时策略如实报告 `none_installed`，而不是假装发生过替换。
+
+替代集可以改变准入结果——这正是它必须默认关闭、按方向开启、并把动作写进 `instrument.coverage_responses` 与账本的原因。
 
 ## H_t = (G, C, T, M, R)
 

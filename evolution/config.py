@@ -39,6 +39,13 @@ DEFAULTS: dict[str, Any] = {
     # residual failures of the deployed harness, "bare_base" restores the
     # older behaviour where proposals only ever came from the bare base.
     "patrol_registry": "active",
+    # How to respond when a claim's direction has no repairable case in the
+    # gain set. "strict" preserves the original behaviour: the claim is
+    # recorded as unmeasured and admission stays blocked. "replacement"
+    # re-measures on an alternative evaluation set when one is installed;
+    # "replacement_or_skip" additionally marks the claim skipped when no set
+    # matches. Per-direction overrides go under "policies".
+    "coverage_response": {"mode": "strict", "policies": {}},
     "split": {
         "seed": 20260817,
         "sentinel_size": 20,

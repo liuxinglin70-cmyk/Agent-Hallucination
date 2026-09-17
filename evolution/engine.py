@@ -206,6 +206,12 @@ def gate_rejection_is_unevaluable(
     """
     if gate not in {"behavior", "m"}:
         return False
+    # An M verdict that reports itself as unmeasured, or as skipped because no
+    # evaluation set had matching coverage, carries no substantive rejection.
+    status = str(verdict.get("status") or "")
+    if gate == "m" and status in {"not_evaluable", "skipped_unmeasured"}:
+        delta = verdict.get("delta") or {}
+        return not (delta.get("new_errors") or delta.get("health_regressed"))
     polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
     opportunities = report.get("gain_opportunities") or {}
     if opportunities.get(polarity) != 0:
@@ -244,6 +250,9 @@ def terminal_classification(
     ):
         return "not_evaluated"
     return "rejected"
+
+
+COVERAGE_POLICY_MODES = ("strict", "replacement", "replacement_or_skip")
 
 
 def split_actionable_families(
@@ -379,6 +388,9 @@ class EvolutionEngine:
         self.harness_dir = Path(self.config["harness_dir"])
         self.memory_root = Path(self.config["memory_root"])
         self.gap_store = self.harness_dir / GAP_STORE_NAME
+        # Optional replacement evaluation set for coverage response. Empty by
+        # default, which is what keeps the strict policy behaviour-identical.
+        self._replacement_gain_cases: list[str] = []
         self._previous_manifest = self._load_previous_manifest()
 
     # ------------------------------------------------------------------
@@ -481,6 +493,89 @@ class EvolutionEngine:
             ][:max_gaps],
         }
 
+    def set_replacement_gain_cases(
+        self, cases: Sequence[str] | None,
+    ) -> None:
+        """Install an alternative evaluation set for coverage response.
+
+        Held only in memory: persisting it would need the same gold, protocol
+        and exposure guarantees as the primary gain set, which is a separate
+        decision. Until it is set the replacement policy reports that no
+        matching set exists rather than inventing one.
+        """
+        self._replacement_gain_cases = [str(case) for case in (cases or ())]
+
+    def _coverage_mode(self, polarity: str) -> str:
+        """Resolve the coverage response mode for one claim direction.
+
+        ``strict`` (the default) keeps the original rule: a claim whose
+        direction has no repairable case in the gain set is measured there and
+        comes back ``not_evaluated``, with admission still blocked. The other
+        modes make coverage a decision instead of only a reading, and must be
+        turned on explicitly and per direction.
+        """
+        cfg = self.config.get("coverage_response") or {}
+        per_direction = cfg.get("policies") or {}
+        mode = str(per_direction.get(polarity) or cfg.get("mode") or "strict")
+        if mode not in COVERAGE_POLICY_MODES:
+            raise ValueError(
+                f"coverage_response mode for {polarity!r} must be one of "
+                f"{list(COVERAGE_POLICY_MODES)}, got {mode!r}"
+            )
+        return mode
+
+    def _coverage_response(
+        self, polarity: str, rows: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any] | None:
+        """What to do when a claim's direction is not repairable on ``rows``.
+
+        Returns ``None`` under the strict policy, which preserves the existing
+        behaviour exactly. Otherwise it reports whether a replacement
+        evaluation set with matching coverage exists, whether the claim was
+        therefore skipped as unmeasured, or that no set matched either.
+        """
+        mode = self._coverage_mode(polarity)
+        if mode == "strict":
+            return None
+        available = sorted(
+            direction
+            for direction, value in gain_opportunity(rows).items()
+            if value > 0
+        )
+        if bool(self._replacement_gain_cases):
+            return {
+                "kind": "replacement",
+                "policy": mode,
+                "available_polarities": available,
+                "replacement_cases": len(self._replacement_gain_cases),
+                "note": (
+                    "direction is not repairable on the default gain set; "
+                    "re-measured on the replacement evaluation set"
+                ),
+            }
+        if mode == "replacement_or_skip":
+            return {
+                "kind": "skip",
+                "policy": mode,
+                "available_polarities": available,
+                "note": (
+                    "no evaluation set with matching coverage; the claim was "
+                    "not measured (admission remains blocked)"
+                ),
+            }
+        return {
+            # No alternative set is installed, so nothing can be re-measured:
+            # report that rather than claiming a replacement happened.
+            "kind": "none_installed",
+            "policy": mode,
+            "available_polarities": available,
+            "replacement_cases": 0,
+            "note": (
+                "no replacement evaluation set configured; the claim was "
+                "measured on the default gain set"
+            ),
+        }
+
     def _instrument_report(
         self,
         *,
@@ -508,13 +603,41 @@ class EvolutionEngine:
         counts: dict[str, int] = {}
         for value in classifications.values():
             counts[value] = counts.get(value, 0) + 1
+        # How the engine responded to missing coverage, per candidate, so that
+        # "admission stayed 0 because nothing was measurable" is distinguishable
+        # from "admission stayed 0 although the claim was re-measured".
+        responses: dict[str, dict[str, Any]] = {}
+        for item in gate_reports:
+            response = (
+                item.get("coverage_response")
+                or (item.get("m") or {}).get("coverage_response")
+            )
+            if response:
+                responses[str(item.get("intervention_id") or "")] = {
+                    "kind": response.get("kind"),
+                    "policy": response.get("policy"),
+                    "passed": response.get("passed"),
+                    "evaluated_on": (
+                        "default" if response.get("kind") != "replacement"
+                        else "replacement"
+                    ),
+                }
+        response_counts: dict[str, int] = {}
+        for value in responses.values():
+            kind = str(value.get("kind") or "")
+            response_counts[kind] = response_counts.get(kind, 0) + 1
         return {
             "gain_opportunity": opportunity,
             "unmeasurable_polarities": sorted(
                 polarity for polarity, value in opportunity.items() if value == 0
             ),
+            "replacement_gain_cases": len(self._replacement_gain_cases),
+            "coverage_responses": responses,
+            "coverage_response_counts": response_counts,
             "terminal_classification": classifications,
             "terminal_counts": counts,
+            # A skip is reported as not_evaluated in the terminal vocabulary;
+            # both mean the claim was not measured, so one check covers them.
             "instrument_limited": bool(counts.get("not_evaluated")),
         }
 
@@ -710,6 +833,10 @@ class EvolutionEngine:
             },
             "active_registry_hash": self.registry.registry_hash,
             "active_registry": self.registry.registry,
+            # The coverage policy and replacement set change how a defect's M
+            # verdict is produced, so they belong in the audit's identity.
+            "coverage_response": dict(self.config.get("coverage_response") or {}),
+            "replacement_gain_cases": sorted(self._replacement_gain_cases),
             "records": {
                 case: file_digest(Path(self.config["dataset_root"]) / case)
                 for case in [*self.split.sentinel, *self.split.gain]
@@ -860,19 +987,78 @@ class EvolutionEngine:
         unit_entries = [*partners, dict(candidate)]
         registry = make_registry([*active_entries, *unit_entries])
         fresh = requires_fresh_evaluation([*active_entries, *unit_entries])
-        candidate_rows = arms.run(
-            [*self.split.sentinel, *self.split.gain],
-            registry=registry,
-            fresh=fresh,
+        polarity = str(
+            (candidate.get("claim") or {}).get("target_polarity") or ""
         )
+        sentinel = list(self.split.sentinel)
         control = (
             fresh_control_rows if fresh and fresh_control_rows is not None
             else list(active_rows)
         )
-        baseline_s = _subset_rows(control, self.split.sentinel)
         control_g = _subset_rows(control, self.split.gain)
         opportunity = gain_opportunity(control_g)
-        candidate_s = _subset_rows(candidate_rows, self.split.sentinel)
+
+        # Coverage is decided before any gate runs, because a claim whose
+        # direction is unrepairable on the default gain set fails the BEHAVIOR
+        # polarity check first and would never reach M. Under the strict policy
+        # (the default) this changes nothing.
+        response = (
+            self._coverage_response(polarity, control_g)
+            if polarity and opportunity.get(polarity) == 0
+            else None
+        )
+        measurement_gain = list(self.split.gain)
+        if (
+            response is not None
+            and response["kind"] == "replacement"
+            and self._replacement_gain_cases
+        ):
+            # Re-measure the whole unit on the replacement set: the gate is not
+            # relaxed, the instrument it runs on changes.
+            measurement_gain = list(self._replacement_gain_cases)
+            control = arms.run(
+                [*sentinel, *measurement_gain],
+                registry=make_registry(active_entries),
+                fresh=fresh,
+            )
+            control_g = _subset_rows(control, measurement_gain)
+            replacement_opportunity = gain_opportunity(control_g)
+            response["replacement_opportunity"] = replacement_opportunity
+            response["replacement_has_coverage"] = (
+                int(replacement_opportunity.get(polarity) or 0) > 0
+            )
+        candidate_rows = arms.run(
+            [*sentinel, *measurement_gain],
+            registry=registry,
+            fresh=fresh,
+        )
+        if response is not None and response["kind"] == "skip":
+            # No evaluation set carries the declared direction: the claim is
+            # marked unmeasured and skipped rather than rejected as false.
+            return {
+                "intervention_id": intervention_id,
+                "candidate": dict(candidate),
+                "partners": [dict(entry) for entry in partners],
+                "fresh": fresh,
+                "gain_opportunities": opportunity,
+                "measurement_gain_cases": measurement_gain,
+                "coverage_response": response,
+                "candidate_rows": _summarise_rows(candidate_rows),
+                "harmlessness": None,
+                "behavior": None,
+                "member_behavior": {},
+                "m": {
+                    "passed": False,
+                    "reason": response["note"],
+                    "delta": None,
+                    "evaluable": False,
+                    "status": "skipped_unmeasured",
+                    "coverage_response": response,
+                },
+            }
+
+        baseline_s = _subset_rows(control, sentinel)
+        candidate_s = _subset_rows(candidate_rows, sentinel)
         harmlessness = harmlessness_gate(
             baseline_rows=baseline_s,
             candidate_rows=candidate_s,
@@ -892,8 +1078,8 @@ class EvolutionEngine:
                 )
             behavior = member_behavior[intervention_id]
             if all(verdict["passed"] for verdict in member_behavior.values()):
-                control_g = _subset_rows(control, self.split.gain)
-                candidate_g = _subset_rows(candidate_rows, self.split.gain)
+                control_g = _subset_rows(control, measurement_gain)
+                candidate_g = _subset_rows(candidate_rows, measurement_gain)
                 delta = paired_delta(control_g, candidate_g)
                 passed, failures = meets_m(delta, config=self.config)
                 m = {
@@ -901,14 +1087,22 @@ class EvolutionEngine:
                     "reason": "; ".join(failures),
                     "delta": delta,
                 }
-                polarity = (candidate.get("claim") or {}).get("target_polarity")
-                if polarity in opportunity and opportunity[polarity] == 0 and not passed:
-                    # The claim was never measurable on this gain set: no case
-                    # exists there for the declared direction to repair. Record
-                    # it as unmeasured rather than as a failed claim.
+                if response is not None:
+                    response["passed"] = passed
+                    response["failure_reason"] = "; ".join(failures)
+                    m["coverage_response"] = response
+                    if not passed and response["kind"] == "replacement":
+                        m.update(
+                            evaluable=False,
+                            status="not_evaluable",
+                            reason=f"{response['note']}; {response['failure_reason']}",
+                        )
+                elif opportunity.get(polarity) == 0 and not passed:
+                    # Strict policy: record the rejection as unmeasured rather
+                    # than as a failed claim, admission blocked as before.
                     m.update(
                         evaluable=False,
-                        status="not_evaluable",
+                        status="not_evaluated",
                         reason=(
                             f"no {polarity} repair opportunities in gain; "
                             "claim was not measured (admission remains blocked)"
@@ -920,6 +1114,8 @@ class EvolutionEngine:
             "partners": [dict(entry) for entry in partners],
             "fresh": fresh,
             "gain_opportunities": opportunity,
+            "measurement_gain_cases": measurement_gain,
+            "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
             "harmlessness": harmlessness,
             "behavior": behavior,
@@ -1295,6 +1491,25 @@ class EvolutionEngine:
             "worksheet": worksheet,
         })
 
+        # One active reference arm on S+G shared by every unit this cycle.
+        # It is computed before drafting because the gain set's repairable
+        # directions are an input to drafting, not only a post-hoc read: a claim
+        # whose direction has no repairable case cannot be scored at all.
+        active = self.registry.registry
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        baseline_sentinel = arms.run(
+            self.split.sentinel, registry=active, fresh=active_fresh,
+        )
+        baseline_gain = arms.run(
+            self.split.gain, registry=active, fresh=active_fresh,
+        )
+        active_rows = [*baseline_sentinel, *baseline_gain]
+        instrument = self._instrument_report(
+            baseline_gain=baseline_gain,
+            gate_reports=(),
+            admitted_ids=set(),
+        )
+
         if proposal_batch is None:
             self._journal.save(proposing=True)
             if hasattr(self.proposer, "active_entries"):
@@ -1303,6 +1518,17 @@ class EvolutionEngine:
                 self.proposer.set_rejection_feedback(self.rejection_feedback)
             memory_context = self._proposal_memory_context(
                 diagnosed_families, capability_gaps,
+            )
+            # Telling the proposer which directions cannot be measured this
+            # round is the difference between drafting a scorable claim and
+            # drafting one that can only come back not_evaluated.
+            memory_context["scoreable_polarities"] = sorted(
+                polarity
+                for polarity, value in instrument["gain_opportunity"].items()
+                if value > 0
+            )
+            memory_context["unmeasurable_polarities"] = list(
+                instrument["unmeasurable_polarities"]
             )
             if hasattr(self.proposer, "set_memory_context"):
                 self.proposer.set_memory_context(memory_context)
@@ -1379,16 +1605,8 @@ class EvolutionEngine:
         else:
             empty_proposal_reason = ""
 
-        # One active reference arm on S+G shared by every unit this cycle.
-        active = self.registry.registry
-        active_fresh = requires_fresh_evaluation(self.registry.entries)
-        baseline_sentinel = arms.run(
-            self.split.sentinel, registry=active, fresh=active_fresh,
-        )
-        baseline_gain = arms.run(
-            self.split.gain, registry=active, fresh=active_fresh,
-        )
-        active_rows = [*baseline_sentinel, *baseline_gain]
+        # The reference arms were computed before drafting (see above); only
+        # the fresh control roll depends on the drafted candidates.
         has_provider_stage = requires_fresh_evaluation([
             *self.registry.entries, *proposals,
         ])
@@ -1474,6 +1692,8 @@ class EvolutionEngine:
                 "fresh": unit["fresh"],
                 "candidate_rows": unit["candidate_rows"],
                 "gain_opportunities": unit["gain_opportunities"],
+                "measurement_gain_cases": unit["measurement_gain_cases"],
+                "coverage_response": unit.get("coverage_response"),
             })
             # A joint unit's outcome belongs to every member; the member the
             # loop reaches first never runs a solo arm.
@@ -1483,10 +1703,10 @@ class EvolutionEngine:
                     str(partner.get("intervention_id") or ""), unit,
                 )
             if (
-                unit["harmlessness"]["passed"]
+                (unit.get("harmlessness") or {}).get("passed")
                 and all(
                     verdict["passed"]
-                    for verdict in unit["member_behavior"].values()
+                    for verdict in (unit.get("member_behavior") or {}).values()
                 )
                 and unit["m"] is not None
                 and unit["m"]["passed"]
@@ -1500,6 +1720,10 @@ class EvolutionEngine:
             unit = unit_outcomes.get(identifier)
             if not unit or report.get("harmlessness") is not None:
                 continue
+            # A skipped unit carries no harmlessness verdict; its M verdict is
+            # already on the report, so nothing needs backfilling.
+            if unit.get("harmlessness") is None:
+                continue
             report.update({
                 "harmlessness": unit["harmlessness"],
                 "behavior": (unit.get("member_behavior") or {}).get(identifier),
@@ -1507,6 +1731,8 @@ class EvolutionEngine:
                 "fresh": unit["fresh"],
                 "candidate_rows": unit["candidate_rows"],
                 "gain_opportunities": unit["gain_opportunities"],
+                "measurement_gain_cases": unit["measurement_gain_cases"],
+                "coverage_response": unit.get("coverage_response"),
             })
 
         # One combination arm when several units qualify on their own; this
