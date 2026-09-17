@@ -219,6 +219,8 @@ def build_capability_smoke_engine(work_root: str | Path, config: dict[str, Any] 
     cfg["work_root"] = str(root / "work")
     cfg["registry_dir"] = str(root / "registry")
     cfg["ledger_path"] = str(root / "ledger.jsonl")
+    cfg["harness_dir"] = str(root / "harness")
+    cfg["memory_root"] = str(root / "memory")
     cfg["backend"]["name"] = "mock"
     cfg["backend"]["cache"] = False
     cfg["audit"]["enabled"] = False

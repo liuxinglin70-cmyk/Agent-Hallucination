@@ -209,6 +209,8 @@ def _engine(tmp_path: Path):
     config["work_root"] = str(tmp_path / "work")
     config["registry_dir"] = str(tmp_path / "registry")
     config["ledger_path"] = str(tmp_path / "ledger.jsonl")
+    config["harness_dir"] = str(tmp_path / "harness")
+    config["memory_root"] = str(tmp_path / "memory")
     config["backend"]["name"] = "mock"
     config["backend"]["cache"] = False
     config["audit"]["enabled"] = False

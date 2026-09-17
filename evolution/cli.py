@@ -183,6 +183,9 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     config["work_root"] = str(smoke_root)
     config["registry_dir"] = str(smoke_root / "registry")
     config["ledger_path"] = str(smoke_root / "ledger.jsonl")
+    # The H_t stores are part of the run's writable state and must move with it.
+    config["harness_dir"] = str(smoke_root / "harness")
+    config["memory_root"] = str(smoke_root / "memory")
     split_cfg = config.setdefault("split", {})
     split_cfg.update({
         "sentinel_positives": 3,

@@ -297,7 +297,7 @@ Judge 有 topup 但**有上限**，放弃后仍用收缩后的 quorum；**Causal
 - **DSL `value=0/False` 不可表达**（`predicate_dsl.py:107` 用 `str(value or "")`）；`matches` 大小写敏感而其他操作符不敏感（`583-585` vs `561-562`）。
 - **L1/L2 层分离仅是文档**：`interventions.py:15-16` 声称层写权分离，但代码无 `layer` 字段/校验，
   一个"L1 text_boundary"可改写 L2 的 `defense.system` 提示词。
-- **`UNFREEZING_HOOKS` 死代码**（`gates.py:45-49`，仅出现在 `__all__`，无任何引用）。
+- **`UNFREEZING_HOOKS` 死代码**（`gates.py` 仅在 `__all__` 导出，无任何引用）——**已修复**：从 `__all__` 移除；同批删除两个无代码读取且误导的配置键 `budget.sentinel_cases` 与 `budget.marginal_cases`。
 - **`adjudicate` 存在未使用参数**（`recall_status`/`upgrade_status`/`tracer_result`/`tracer_status`/`hearing_facts`），`api.py:579-590` 构造 `hearing_facts` 后从未使用。
 - **`run_defense` 里 guard 检查有副作用**（`defense.py:312-320` 调 `plan.guard_actions`，会追加 `guard_fired` 与机械证据），
   与 `api.py:635` 的终态调用叠加 ⇒ `deployment.fired` 可能重复记录同一 guard。
@@ -403,5 +403,14 @@ A/B 阶段全部完成。**`python -m pytest -q` → 244 passed**（原 220）�
 - 大规模成本/方差评估、独立终审数据与正式协议冻结（原计划第 3–5 项）——属于实验设计问题，不是代码缺陷；
 - 定位一致性与命中率偏低——需单独度量，已记录在 progress.md。
 
+### 后续实施（2026-09-17，同日）
+
+本节最初列的「未在本次处理」中的两项结构缺口已落地，并新增 H_t 基座：
+
+- **评估读数**：边际集极性下限 + 巡检对准已部署版本（测试 244 → 251）；依据与边界见 [方向对照评估](directions-assessment.md) 第 4、5 节。
+- **H_t 基座**：`harness.py`（五组件清单与代际差异）、`gaps.py`（能力缺口后备清单）、`memory.py`（三类经验存储与有界检索），测试 251 → **292 passed**。三者均为记录与记忆设施，不参与门判定；经验尚未接入候选生成。
+- 新增持久化一度导致测试写入仓库默认 `artifacts/evolution/`，已在测试与 smoke 配置中补齐隔离路径。
+
 **方法论提醒**：以上修复让"测出来的东西是对的、且有统计意义"成为前提；但**它们本身不产生收益**。
-真正的收益问题见 [optimization-directions.md](optimization-directions.md)——当前自进化仍处在无效循环中。
+真正的收益问题见 [optimization-directions.md](optimization-directions.md)——当前自进化仍处在无效循环中；
+H_t 基座提供了描述、记忆与工单能力，但能力增长仍取决于后续把记忆接入改进过程。

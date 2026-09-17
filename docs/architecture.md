@@ -22,6 +22,9 @@
 | 持久状态 | `evolution/registry.py`、`ledger.py` | 预提交、快照、哈希链、淘汰与回滚 |
 | 数据与执行后端 | `evolution/splits.py`、`backends.py` | 开发/正式划分、live/mock/cached 执行 |
 | 元评估与能力面 | `evolution/meta_eval.py`、`capability_surface.py` | 门控行为、缺陷审计、可执行能力清单 |
+| H_t 清单与差异 | `evolution/harness.py` | 已部署版本 → 五组件清单、哈希、代际差异 |
+| 能力缺口工单箱 | `evolution/gaps.py` | 不可执行失败族 → 去重后备清单与处理历史 |
+| 三类经验存储 | `evolution/memory.py` | 情景/程序性/改进经验 → 有界检索结果 |
 
 ## 检测流程
 
@@ -43,8 +46,33 @@
 6. `behavior_gate` 验证干预实际触发且产生与声明一致的行为证据。
 7. 边际门 `meets_m` 和 engine 中的组合选择在 gain 集计算净收益及新错误，处理联合候选、贪心子集和 leave-one-out 归因。
 8. 合格组合经 registry 预提交与限额检查后写入活跃库；账本记录决策。后续治理按贡献淘汰与回滚，恢复一致的 registry/state。
+9. 准入写盘之后记录 H_t：写入五组件清单并与上一代做逐组件差异，把本轮不可执行的失败族写入能力缺口清单，把本轮尝试写入三类经验存储。这些只描述与记忆已发生的这一代，不参与任何门的判定。
 
 报告中的门字段为 `structural`、`harmlessness`、`behavior`、`m`；`m` 是 marginal 的数学简称，不是软件版本。
+
+## H_t = (G, C, T, M, R)
+
+每一代被表示为五个组件，`evolution/harness.py` 把它做成可装载、可核验的清单：
+
+| 组件 | 含义 | 清单来源 |
+|---|---|---|
+| G | 工作流与状态转移 | 阶段顺序常量 + 实际入口点（导入失败即构建失败） |
+| C | 上下文构造与压缩 | `detector.packet` 的视图预算与渲染器实测值 |
+| T | 工具与技能实现 | 当前活跃 registry 的干预集合与哈希 |
+| M | 可检索经验与技能记忆 | `evolution/memory.py` 三个存储的条目统计 |
+| R | 路由、预算与停止策略 | 配置中的 patrol、budget、gates、library、split、proposer |
+
+两条性质比完整性更重要：**组件是推导出来的，不是断言的**（阶段入口被重命名、上下文预算消失都会使构建失败，而不是记录一份过时描述）；**事后可核验**（每个组件对自己的载荷有摘要，清单对组件摘要再有摘要，装载时重新推导，被编辑过的清单会被发现而不是被信任）。
+
+清单参与的流程只是报告：`record_harness` 在准入提交后写入，并记录逐组件差异（`changed` 与 `changed_keys`），使后续结果可以归因到真正变动的组件，而不是笼统的「系统」。清单与差异写入 cycle 报告与账本事件 `harness`；历史以 `harness_history.jsonl` 追加。
+
+## 能力缺口清单与三类经验
+
+**能力缺口清单（`evolution/gaps.py`）。** 可稳定复现、但当前动作词表无法处理的失败族，此前只写进当轮报告就被丢弃；现在落为后备项，保留 `reason` 与可行路由。身份是 `(failure_family, classification)`，并剥掉 worksheet 在按谓词画像切分时追加的 `-P<hash>` 后缀，因此同一个缺口只有一条记录、带 `occurrences`，而不是每轮一条。重复出现不重复追加；原因或路由变化才算新信息。解决通过 `resolve_gap` 记为历史而非删除，因此已处理的缺口仍可解释。记录缺口不放行也不拒绝任何候选。
+
+**三类经验（`evolution/memory.py`）。** 情景经验（某轮具体尝试与各门结论）、程序性经验（只有**通过门控**的处理路线才写入，附预期行为与失败边界）、改进经验（哪类瓶颈对哪类补丁有反应）。两条规则防止退化为日志：没有真实内容就不写入；检索按机制过滤并设上限。检索结果显式区分 `falsified_intervention_ids` 与 `unevaluable_intervention_ids` —— 后者是「未曾被测量」，不允许当作「已被证伪」抑制同一机制。
+
+三个存储都是追加式 JSONL，带 schema 版本；`append_jsonl`/`read_jsonl` 由 `evolution/contracts.py` 共享，格式头部错误会显式报错而非被误读。重复写入按逻辑键去重，使被中断后 `--resume` 重放的轮次不会虚增计数或让存储描述一次并未发生的运行。
 
 ## 配对重放和 fresh 对照
 

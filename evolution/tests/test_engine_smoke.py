@@ -194,6 +194,8 @@ def _config(tmp_path: Path) -> dict:
     config["work_root"] = str(tmp_path / "work")
     config["registry_dir"] = str(tmp_path / "registry")
     config["ledger_path"] = str(tmp_path / "ledger.jsonl")
+    config["harness_dir"] = str(tmp_path / "harness")
+    config["memory_root"] = str(tmp_path / "memory")
     config["backend"]["name"] = "mock"
     config["backend"]["cache"] = False
     config["budget"]["patrol_cases"] = 8
@@ -1330,3 +1332,100 @@ def test_audit_freezes_when_defect_arm_cannot_be_scored(tmp_path, monkeypatch):
         item.get("audit_inconclusive") for item in report["audit"]["reports"]
     )
     assert engine.registry.entries == []
+
+
+def test_cycle_records_harness_gaps_and_experience(tmp_path):
+    """One cycle populates the H_t base: manifest chain, backlog, experience.
+
+    These three stores are how the next round can know what version ran, what
+    capability was missing, and which patch shapes were already tried. None of
+    them may influence this cycle's admission.
+    """
+    from evolution.gaps import open_gaps
+    from evolution.harness import load_manifest, HARNESS_FILENAME
+    from evolution.memory import episodic_attempts, load_procedures
+
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    gain_true = [c for c in cases if c.endswith(("004.json", "006.json"))]
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    base = {case: False for case in patrol_true + gain_true}
+    overrides = {"IV-1-001": {case: True for case in gain_true}}
+    backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+
+    # The manifest describes the committed generation and verifies on reload.
+    assert report["harness"]["diff"]["first_manifest"] is True
+    manifest = load_manifest(tmp_path / "harness" / HARNESS_FILENAME)
+    assert manifest["digest"] == report["harness"]["manifest"]["digest"]
+    assert manifest["registry_hash"] == engine.registry.registry_hash
+    assert set(manifest["components"]) == {"G", "C", "T", "M", "R"}
+
+    # The admitted candidate is remembered as procedural experience, and the
+    # attempt itself is episodic.
+    procedures = load_procedures(tmp_path / "memory")
+    assert [item["intervention_id"] for item in procedures] == ["IV-1-001"]
+    attempts = {item["intervention_id"]: item for item in episodic_attempts(
+        tmp_path / "memory"
+    )}
+    assert attempts["IV-1-001"]["outcome"] == "admitted"
+    assert attempts["IV-1-001"]["falsified"] is False
+
+    # The backlog is present (empty here: this family was treatable) and it
+    # never affected the admission decision above.
+    assert report["capability_backlog"]["open"] == []
+    assert open_gaps(engine.gap_store) == []
+
+
+def test_capability_gap_becomes_a_backlog_item_not_a_silent_round(tmp_path):
+    """An untreatable family is recorded so the next round can still see it."""
+    from evolution.gaps import open_gaps
+
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(),
+        split=split,
+        mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    # Two same-mechanism failures the closed action vocabulary cannot treat.
+    # This is the exact shape ``split_actionable_families`` produces for them.
+    gaps = [{
+        "failure_family": "FAM-fn-unreachable",
+        "count": 2,
+        "sources": ["A"],
+        "classification": "capability_gap",
+        "reason": "no treatment route reaches the responsible stage",
+    }]
+    payload = engine.record_capability_gaps(1, gaps)
+    assert len(payload["open"]) == 1
+    assert payload["open"][0]["failure_family"] == "FAM-fn-unreachable"
+    assert payload["open"][0]["reason"] == (
+        "no treatment route reaches the responsible stage"
+    )
+    # It survives independently of any cycle report.
+    assert [item["failure_family"] for item in open_gaps(engine.gap_store)] == [
+        "FAM-fn-unreachable"
+    ]

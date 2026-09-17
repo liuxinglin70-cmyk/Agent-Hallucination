@@ -19,7 +19,18 @@ python -m evolution verify-ledger
 
 前 3 条命令不调用真实模型服务。`smoke` 检查准入与缺陷拒绝；`capability-smoke` 使用独立合成数据检查“新 DSL 谓词 + guard”带来的机制增益。其运行状态与真实 registry 隔离。
 
-真实运行输出集中在 `artifacts/evolution/`：`cycles/`、`cache/`、`reports/`、`registry/` 和 `ledger.jsonl`。框架不加载历史活跃干预，首次运行从空库开始。
+真实运行输出集中在 `artifacts/evolution/`：`cycles/`、`cache/`、`reports/`、`registry/`、`harness/`、`memory/` 和 `ledger.jsonl`。框架不加载历史活跃干预，首次运行从空库开始。
+
+## H_t 基座
+
+每轮在准入写盘之后记录 H_t = (G, C, T, M, R) 的五组件清单：写出 `harness/harness.json`，把逐组件摘要追加到 `harness/harness_history.jsonl`，并在 cycle 报告中给出与上一代的逐组件差异。清单的组件由实际运行的代码与配置推导（阶段入口、上下文预算、活跃 registry、经验存储、策略配置），不是手写描述；装载时重新推导摘要，被编辑过的清单会被发现，阶段入口被重命名也会使构建失败而不是留下过时描述。
+
+落点由配置 `harness_dir`（默认 `artifacts/evolution/harness`）与 `memory_root`（默认 `artifacts/evolution/memory`）决定，相对路径按仓库根目录解析。同一目录下还有两个配套设施：
+
+- **能力缺口清单** `harness/gaps.jsonl`：可复现、但当前动作词表无法处理的失败族落为去重后备项，保留原因与可行路由，可用 `resolve_gap` 记为已解决。身份剥掉 worksheet 的 `-P<hash>` 画像后缀，因此同一缺口只有一条记录。重复出现不重复追加；原因或路由变化才算新信息。
+- **三类经验** `memory/`：情景 `episodic.jsonl`、程序性 `procedural.jsonl`、改进 `improvement.jsonl`。只有**通过门控**的处理路线才写入程序性经验。检索按机制过滤并设上限；结果显式区分 `falsified_intervention_ids`（确实被门控否定）与 `unevaluable_intervention_ids`（未曾被测量），后者不会被当作证伪来抑制同一机制。
+
+**边界：** 这三处当前是**记录与记忆**设施，不参与任何门的判定，因此不会移动准入结果。程序性记忆已可有界检索（`EvolutionEngine.recall_experience`），但尚无组件把检索结果用于生成候选——让改进真正用上这些记忆属于后续 improver 步骤，不在本轮范围。
 
 `final` 和 `full-self-evolution` 需要显式的正式协议；默认开发配置不提供 `split_manifest`，因此会拒绝正式终审。详见 [评估协议](../docs/evaluation.md)。
 

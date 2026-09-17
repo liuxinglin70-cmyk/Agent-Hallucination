@@ -7,6 +7,9 @@
 ```text
 detector/                  检测器底座、配置、单元测试与测试夹具
 evolution/                 自进化框架、开发配置、离线闭环、回归测试
+  harness.py               H_t = (G, C, T, M, R) 清单、哈希与代际差异
+  gaps.py                  能力缺口后备清单（不可执行失败族）
+  memory.py                三类经验存储与有界检索（情景/程序性/改进）
 datasets/raw/              原始完整数据集，保持原文件不变
 datasets/protocols/        开发划分与保守的数据使用边界
 datasets/integrity.json    原始目录逐文件 SHA-256
@@ -73,4 +76,6 @@ python -m evolution verify-ledger
 
 2026-09-17 完成代码 review 与修复：13 项会污染结论的缺陷全部修复并配回归测试，测试由 220 增至 244 passed，`scripts/verify.py` 七项校验全 PASS。同时确认真实自进化收益未成立的结构性原因（搜索空间冻结、评估无统计功效、准入终结式无存档、框架自身只由人手优化），并给出面向 RSI 的优化方向。详见 [代码 Review](docs/review.md) 与 [优化方向](docs/optimization-directions.md)。
 
-同日完成两项评估侧优化，测试由 244 增至 **251 passed**，离线验证九项全 PASS：边际集（G）加极性下限，使两种 claim 方向都可被计分；巡检改测已部署版本并保留裸底座对照，把新引入退化、常驻残余与已修复分离为可读字段。依据是真实第 1 轮出现的「做出了有效修改却读数为 0」——G 中没有被修改机制的案例。逐条对照与理由见 [方向对照评估](docs/directions-assessment.md)。
+同日完成两项评估侧优化，测试由 244 增至 **251 passed**：边际集（G）加极性下限，使两种 claim 方向都可被计分；巡检改测已部署版本并保留裸底座对照，把新引入退化、常驻残余与已修复分离为可读字段。依据是真实第 1 轮出现的「做出了有效修改却读数为 0」——G 中没有被修改机制的案例。逐条对照与理由见 [方向对照评估](docs/directions-assessment.md)。
+
+2026-09-17 完成实验框架的结构性重构，测试增至 **292 passed**，离线验证九项全 PASS：`evolution/harness.py` 把 H_t = (G, C, T, M, R) 做成可装载、双层哈希可核验的清单与代际差异；`evolution/gaps.py` 把不可执行的稳定失败族从「当轮丢弃」变为去重后备清单；`evolution/memory.py` 提供情景/程序性/改进三类经验存储与有界检索。这些是**记录与记忆**设施，不参与任何门判定，因此不改变准入结果；经验尚未接入候选生成。详见 [H_t 基座说明](evolution/README.md#h_t-基座) 与 [当前进展](docs/progress.md)。

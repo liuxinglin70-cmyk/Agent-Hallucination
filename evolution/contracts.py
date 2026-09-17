@@ -258,7 +258,46 @@ def save_json(path: str | Path, payload: Any) -> None:
             os.unlink(temporary)
 
 
+def append_jsonl(path: str | Path, payload: Mapping[str, Any]) -> None:
+    """Append one record to an append-only JSONL store.
+
+    The experience, gap and harness stores are append-only for the same reason
+    the ledger is: a later round must be able to see what an earlier round
+    believed, and rewriting a store would erase that. Each line carries its own
+    schema so a mixed-version store fails loudly instead of being misread.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(dict(payload), ensure_ascii=False, sort_keys=True)
+    with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(line + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
+    """Read an append-only JSONL store; a missing file is an empty store."""
+    path = Path(path)
+    if not path.is_file():
+        return []
+    records: list[dict[str, Any]] = []
+    for number, line in enumerate(
+        path.read_text(encoding="utf-8-sig").splitlines(), start=1,
+    ):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except ValueError as exc:
+            raise ValueError(f"{path}:{number} is not valid JSON: {exc}") from exc
+        if not isinstance(value, dict):
+            raise ValueError(f"{path}:{number} is not a JSON object")
+        records.append(value)
+    return records
+
+
 __all__ = [
+    "append_jsonl",
     "candidate_contains_case_id",
     "candidate_prose_text",
     "empty_registry",
@@ -267,6 +306,7 @@ __all__ = [
     "load_registry",
     "make_intervention",
     "make_registry",
+    "read_jsonl",
     "redact_case_ids",
     "save_json",
     "structured_key",

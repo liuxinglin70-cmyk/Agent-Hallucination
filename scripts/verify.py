@@ -87,7 +87,8 @@ def main() -> int:
         assert temp.is_relative_to(artifacts.resolve()) and temp != artifacts.resolve()
         config = json.loads((ROOT / "evolution/configs/development.json").read_text(encoding="utf-8"))
         config.update({"work_root": str(temp / "work"), "registry_dir": str(temp / "registry"),
-                       "ledger_path": str(temp / "ledger.jsonl")})
+                       "ledger_path": str(temp / "ledger.jsonl"),
+                       "harness_dir": str(temp / "harness"), "memory_root": str(temp / "memory")})
         config_path = temp / "config.json"
         config_path.write_text(json.dumps(config), encoding="utf-8")
         for command, source, target in (

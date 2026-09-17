@@ -26,6 +26,11 @@ DEFAULTS: dict[str, Any] = {
     "work_root": "artifacts/evolution",
     "registry_dir": "artifacts/evolution/registry",
     "ledger_path": "artifacts/evolution/ledger.jsonl",
+    # H_t = (G, C, T, M, R) base: the harness manifest chain and the three
+    # experience stores. These describe the generation that ran; they never
+    # participate in admission.
+    "harness_dir": "artifacts/evolution/harness",
+    "memory_root": "artifacts/evolution/memory",
     "historical_development_manifests": [
         "datasets/protocols/development_exposure.json",
     ],
@@ -133,7 +138,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
     for key in (
         "detector_config", "dataset_root", "split_manifest",
         "mini_split_manifest", "work_root", "registry_dir", "ledger_path",
-        "registry_source",
+        "harness_dir", "memory_root", "registry_source",
     ):
         if key not in merged or not merged[key]:
             continue

@@ -53,6 +53,28 @@ from evolution.metrics import fired_rate, paired_delta, source_deltas
 from evolution.proposer import ProposalBatch, infer_joint_groups, make_proposer
 from evolution.registry import ActiveRegistry, load_active_registry
 from evolution.checkpoint import CycleJournal
+from evolution.gaps import (
+    GAP_STORE_NAME,
+    GAP_SUMMARY_NAME,
+    open_gaps,
+    record_gaps,
+    write_gap_summary,
+)
+from evolution.harness import (
+    HARNESS_FILENAME,
+    HARNESS_HISTORY_NAME,
+    build_manifest,
+    harness_diff,
+    load_manifest,
+    write_manifest,
+)
+from evolution.memory import (
+    record_episode,
+    record_improvement,
+    record_procedure,
+    recall as recall_experience,
+    write_recall,
+)
 from evolution.splits import (
     EvolutionSplit,
     build_split,
@@ -274,6 +296,13 @@ class EvolutionEngine:
             for case in self.split.pool
         }
         self.cycle_reports: list[dict[str, Any]] = []
+        # H_t = (G, C, T, M, R) base. These describe and remember the
+        # generation that ran; they are read for reporting and for what the
+        # next round starts from, and they never score a candidate.
+        self.harness_dir = Path(self.config["harness_dir"])
+        self.memory_root = Path(self.config["memory_root"])
+        self.gap_store = self.harness_dir / GAP_STORE_NAME
+        self._previous_manifest = self._load_previous_manifest()
 
     # ------------------------------------------------------------------
     def _cycle_seconds(self) -> float | None:
@@ -286,6 +315,183 @@ class EvolutionEngine:
                 if record["event"] == event and record["payload"] == payload:
                     return record
         return self.ledger.append(event, payload)
+
+    # ------------------------------------------------------------------
+    # H_t = (G, C, T, M, R) base.
+    #
+    # These methods describe and remember the generation that ran. They are
+    # reporting and starting-point facilities: none of them scores, admits or
+    # rejects a candidate, so nothing here can move a gate outcome.
+    # ------------------------------------------------------------------
+    def _load_previous_manifest(self) -> dict[str, Any] | None:
+        """The generation the next round starts from, if one was recorded."""
+        path = self.harness_dir / HARNESS_FILENAME
+        if not path.is_file():
+            return None
+        return load_manifest(path)
+
+    def record_harness(self, cycle: int) -> dict[str, Any]:
+        """Write H_t for this cycle and diff it against the previous one.
+
+        Called after a committed registry write, so the manifest describes the
+        version the next round will actually load.
+        """
+        manifest = build_manifest(
+            config=self.config,
+            registry=self.registry.registry,
+            memory_root=self.memory_root,
+            cycle=cycle,
+            parent_digest=(
+                self._previous_manifest.get("digest")
+                if self._previous_manifest else None
+            ),
+        )
+        diff = harness_diff(self._previous_manifest, manifest)
+        write_manifest(
+            self.harness_dir / HARNESS_FILENAME,
+            manifest=manifest,
+            history_path=self.harness_dir / HARNESS_HISTORY_NAME,
+        )
+        self._previous_manifest = manifest
+        self._ledger("harness", {
+            "cycle": cycle,
+            "digest": manifest["digest"],
+            "parent_digest": manifest.get("parent_digest"),
+            "changed_components": diff["changed"],
+            "registry_hash": manifest.get("registry_hash"),
+        })
+        return {"manifest": manifest, "diff": diff}
+
+    def record_capability_gaps(
+        self,
+        cycle: int,
+        capability_gaps: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Keep unexecutable families as backlog items instead of dropping them.
+
+        A gap is a measured statement that the action vocabulary is missing
+        something. Recording it admits and rejects nothing; it is the only
+        reason a later round can see the capability is still absent rather than
+        rediscovering it.
+        """
+        if capability_gaps:
+            record_gaps(self.gap_store, cycle=cycle, gaps=capability_gaps)
+        backlog = open_gaps(self.gap_store)
+        summary = write_gap_summary(
+            self.gap_store,
+            summary_path=self.harness_dir / GAP_SUMMARY_NAME,
+        )
+        self._ledger("capability_gaps", {
+            "cycle": cycle,
+            "recorded": [
+                {
+                    "failure_family": item.get("failure_family"),
+                    "classification": item.get("classification"),
+                    "reason": item.get("reason"),
+                }
+                for item in capability_gaps
+            ],
+            "open": len(backlog),
+        })
+        return {"open": backlog, "summary": summary}
+
+    def recall_experience(
+        self,
+        *,
+        failure_family: str = "",
+        polarity: str = "",
+        treatment_routes: Sequence[str] = (),
+        bottleneck: str = "",
+    ) -> dict[str, Any]:
+        """Read a bounded slice of prior experience for the current mechanism."""
+        retrieved = recall_experience(
+            self.memory_root,
+            failure_family=failure_family,
+            polarity=polarity,
+            treatment_routes=treatment_routes,
+            bottleneck=bottleneck,
+        )
+        write_recall(self.memory_root, retrieved)
+        return retrieved
+
+    def _record_cycle_experience(
+        self,
+        *,
+        cycle: int,
+        diagnosed_families: Sequence[Mapping[str, Any]],
+        gate_reports: Sequence[Mapping[str, Any]],
+        rejected: Sequence[Mapping[str, Any]],
+        selected: Sequence[Mapping[str, Any]],
+    ) -> None:
+        """Persist this cycle's attempts and, for admitted ones, procedures.
+
+        Only admitted interventions become procedural memory: a procedure
+        claims how to do something, and that claim is only established once a
+        gate has accepted it. A rejection that was merely unevaluable is kept
+        distinguishable from a falsified mechanism.
+        """
+        family_by_name = {
+            str(item.get("failure_family") or ""): item
+            for item in diagnosed_families
+        }
+        rejected_by_id = {
+            str(item.get("intervention_id") or ""): item
+            for item in rejected
+        }
+        admitted_ids = {
+            str(item.get("intervention_id") or "") for item in selected
+        }
+        for report in gate_reports:
+            candidate = dict(report.get("candidate") or {})
+            intervention_id = str(candidate.get("intervention_id") or "")
+            provenance = candidate.get("provenance") or {}
+            family = str(provenance.get("failure_family") or "")
+            polarity = str(
+                (candidate.get("claim") or {}).get("target_polarity") or ""
+            )
+            routes = list(
+                ((family_by_name.get(family) or {}).get("actionability") or {})
+                .get("routes") or ()
+            )
+            if intervention_id in admitted_ids:
+                outcome, gate, reason, unevaluable = "admitted", None, "", False
+            else:
+                rejection = rejected_by_id.get(intervention_id) or {}
+                outcome = "rejected"
+                gate = str(rejection.get("gate") or "") or None
+                reason = str(rejection.get("reason") or "")
+                unevaluable = bool(rejection.get("not_evaluable"))
+            record_episode(
+                self.memory_root,
+                cycle=cycle,
+                failure_family=family,
+                polarity=polarity,
+                outcome=outcome,
+                gate=gate,
+                reason=reason,
+                intervention_id=intervention_id,
+                intervention_type=str(candidate.get("type") or ""),
+                hook=str(candidate.get("hook") or ""),
+                treatment_routes=routes,
+                unevaluable=unevaluable,
+            )
+            if intervention_id in admitted_ids:
+                record_procedure(
+                    self.memory_root,
+                    cycle=cycle,
+                    failure_family=family,
+                    polarity=polarity,
+                    treatment_route=(routes[0] if routes else ""),
+                    intervention_type=str(candidate.get("type") or ""),
+                    hook=str(candidate.get("hook") or ""),
+                    intervention_id=intervention_id,
+                    expected_behavior=str(
+                        (candidate.get("claim") or {}).get("expected_behavior") or ""
+                    ),
+                    failure_boundary=str(
+                        (report.get("behavior") or {}).get("behavior_note") or ""
+                    ),
+                )
 
     # ------------------------------------------------------------------
     def _audit(self, cycle: int, arms: _ArmRunner) -> dict[str, Any]:
@@ -1300,6 +1506,24 @@ class EvolutionEngine:
             ),
             "ledger_integrity": self.ledger.verify(),
         }
+        # H_t bookkeeping. The committed registry write above is what decides
+        # admission; the manifest, the gap backlog and the experience stores
+        # only describe and remember the generation that resulted.
+        cycle_rejections = [
+            item for item in self.rejection_feedback
+            if int(item.get("cycle") or -1) == int(cycle)
+        ]
+        report["capability_backlog"] = self.record_capability_gaps(
+            cycle, capability_gaps,
+        )
+        self._record_cycle_experience(
+            cycle=cycle,
+            diagnosed_families=diagnosed_families,
+            gate_reports=gate_reports,
+            rejected=cycle_rejections,
+            selected=selected,
+        )
+        report["harness"] = self.record_harness(cycle)
         self._save_cycle_report(cycle, report)
         self._ledger("cycle_completed", {"cycle": cycle, "state": "completed",
                                         "active_registry_hash": self.registry.registry_hash})

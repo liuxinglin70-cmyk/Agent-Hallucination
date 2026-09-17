@@ -1800,7 +1800,251 @@
     "records": 6,
     "broken_at": null,
     "reason": ""
+  },
+  "capability_backlog": {
+    "open": [],
+    "summary": {
+      "schema_version": "evolution.capability_gap.v1",
+      "recorded": 0,
+      "open": 0,
+      "resolved": 0,
+      "by_classification": {},
+      "by_reason": {},
+      "observations": 0
+    }
+  },
+  "harness": {
+    "manifest": {
+      "schema_version": "evolution.harness.v1",
+      "cycle": 1,
+      "parent_digest": null,
+      "components": {
+        "G": {
+          "version": "detector.workflow.v1",
+          "digest": "ff00451c43cd",
+          "payload": {
+            "stages": [
+              "validate",
+              "packet",
+              "judge",
+              "recall",
+              "upgrade",
+              "tracer",
+              "defense",
+              "adjudicate"
+            ],
+            "entrypoints": {
+              "packet": "detector.packet.build_packet",
+              "judge": "detector.judge.run_judge",
+              "recall": "detector.recaller.run_recall_scan",
+              "upgrade": "detector.recaller.run_causal_upgrade",
+              "tracer": "detector.step_tracer.run_step_tracer",
+              "defense": "detector.defense.run_defense",
+              "adjudicate": "detector.adjudication.adjudicate"
+            },
+            "source_digest": "205b2f4c5f7563a6",
+            "intervention_types": [
+              "decision_guard",
+              "evidence_check",
+              "recall_trigger",
+              "text_boundary"
+            ],
+            "hooks": [
+              "adjudicate.guard",
+              "defense.pre",
+              "defense.system",
+              "judge.post",
+              "judge.system",
+              "recall.trigger",
+              "scanner.system",
+              "tracer.system",
+              "upgrade.pre",
+              "upgrade.system"
+            ],
+            "execution_graph_rewrite": false
+          }
+        },
+        "C": {
+          "version": "detector.context.v1",
+          "digest": "1f5166fc2878",
+          "payload": {
+            "packet_schema": "detector.packet.v1",
+            "budgets": {
+              "_JUDGE_VIEW_CHARS": 400000,
+              "_JUDGE_EVENT_CHARS": 100000,
+              "_JUDGE_TOOL_CHARS": 100000,
+              "_DEFENSE_VIEW_CHARS": 200000,
+              "_DEFENSE_EVENT_CHARS": 100000,
+              "_INDEX_VIEW_CHARS": 48000
+            },
+            "renderers": [
+              "render_defense_view",
+              "render_full_view",
+              "render_index_tail_view",
+              "render_judge_view"
+            ]
+          }
+        },
+        "T": {
+          "version": "detector.tools.v1",
+          "digest": "1a21014f5d40",
+          "payload": {
+            "intervention_count": 1,
+            "intervention_ids": [
+              "IV-SMOKE-001"
+            ],
+            "interventions": [
+              {
+                "schema_version": "detector.intervention.v1",
+                "intervention_id": "IV-SMOKE-001",
+                "type": "text_boundary",
+                "hook": "scanner.system",
+                "trigger": {
+                  "packet_features": [
+                    "has_tool_calls"
+                  ],
+                  "facts": []
+                },
+                "body": {
+                  "directive": "Report every explicitly required action from the question that has no matching tool call.",
+                  "not_when": "Never apply when every required action has a matching tool call."
+                },
+                "claim": {
+                  "expected_behavior": "recall scanner gains candidates for missing required actions",
+                  "target_polarity": "recall"
+                },
+                "provenance": {
+                  "cycle": 1,
+                  "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+                  "failure_cases": [
+                    "BFCL/062.json",
+                    "Camel/054.json"
+                  ]
+                },
+                "content_hash": "8bc245ad765804b46af65d8e424cab6363d83ede12fe57e208b20fde8fa5c6c4"
+              }
+            ]
+          }
+        },
+        "M": {
+          "version": "evolution.memory.v1",
+          "digest": "1329bceca68d",
+          "payload": {
+            "configured": true,
+            "stores": {
+              "episodic": {
+                "records": 1,
+                "falsified": 0,
+                "unevaluable": 0,
+                "admitted": 1
+              },
+              "procedural": {
+                "records": 1
+              },
+              "improvement": {
+                "records": 0
+              }
+            }
+          }
+        },
+        "R": {
+          "version": "evolution.policy.v1",
+          "digest": "9c6946ec53d0",
+          "payload": {
+            "patrol_registry": "active",
+            "cycles": 2,
+            "budget": {
+              "patrol_cases": 12,
+              "stable_failure_rerun_cases": 20,
+              "llm_calls": 2,
+              "max_proposals": 3,
+              "max_admits": 2,
+              "cycle_timeout_seconds": 7200
+            },
+            "gates": {
+              "structural_jaccard_threshold": 0.72,
+              "harmlessness_new_fn_allowed": 0,
+              "harmlessness_new_fp_allowed": 0,
+              "harmlessness_new_unresolved_allowed": 0,
+              "harmlessness_min_protected_tp": 2,
+              "harmlessness_min_protected_tn": 2,
+              "behavior_require_fired": true,
+              "m_min_marginal_cases": 1,
+              "m_new_errors_allowed": 0
+            },
+            "library": {
+              "max_width": 6,
+              "max_text_boundary_per_hook": 1,
+              "max_decision_guards": 4,
+              "retire_after_cycles_marginal_le0": 2,
+              "rollback_after_cycles_net_negative": 2
+            },
+            "mini_effect": {
+              "min_marginal_cases": 1,
+              "max_new_errors": 0,
+              "max_unresolved_added": 0
+            },
+            "split": {
+              "seed": 20260824,
+              "sentinel_size": 20,
+              "sentinel_positives": 3,
+              "sentinel_negatives": 3,
+              "gain_set_size": 80,
+              "gain_set_min_positives": 20,
+              "gain_set_min_negatives": 20,
+              "patrol_size": 120,
+              "mini_pool_size": 30,
+              "mini_gain_size": 12,
+              "mini_gain_min_positives": 1,
+              "mini_gain_min_negatives": 1
+            },
+            "proposer": {
+              "mode": "hybrid",
+              "max_output_tokens": 32768,
+              "thinking_level": "",
+              "max_repair_calls": 1
+            }
+          }
+        }
+      },
+      "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
+      "digest": "a719c05855e5"
+    },
+    "diff": {
+      "previous_digest": null,
+      "current_digest": "a719c05855e5",
+      "first_manifest": true,
+      "changed": [
+        "G",
+        "C",
+        "T",
+        "M",
+        "R"
+      ],
+      "components": {
+        "G": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "C": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "T": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "M": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "R": {
+          "changed": true,
+          "reason": "no previous manifest"
+        }
+      }
+    }
   }
 }
 
-smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_pdm9gw2o\work\smoke\experiments\smoke_cycle.json
+smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_uw9c01o8\work\smoke\experiments\smoke_cycle.json

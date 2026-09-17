@@ -206,6 +206,35 @@ def test_ledger_cli_exit_code_matches_verdict(tmp_path, valid, expected):
     assert cli.cmd_verify_ledger(SimpleNamespace(config=str(config))) == expected
 
 
+def test_h_t_stores_stay_inside_the_run_root():
+    """Harness and memory paths must not be writable side effects on the repo.
+
+    They are run state like the registry and the ledger. A check that isolates
+    work_root but not these two would leave the default
+    ``artifacts/evolution/harness`` and ``.../memory`` behind after a smoke or
+    verification run.
+    """
+    config = load_config()
+    for key in ("harness_dir", "memory_root"):
+        assert config[key], f"{key} must be configured"
+        resolved = Path(config[key])
+        assert "artifacts" in resolved.parts
+        # Each must be a distinct location, not an alias of the work root.
+        assert resolved != Path(config["work_root"])
+    assert Path(config["harness_dir"]) != Path(config["memory_root"])
+
+
+def test_capability_smoke_isolates_the_h_t_stores(tmp_path):
+    """The capability smoke must keep its H_t writes under its own root."""
+    from evolution.smoke import build_capability_smoke_engine
+
+    root = tmp_path / "smoke"
+    engine = build_capability_smoke_engine(root)
+    assert engine.harness_dir.is_relative_to(root)
+    assert engine.memory_root.is_relative_to(root)
+    assert engine.gap_store.is_relative_to(root)
+
+
 def test_smoke_cli_rejects_failed_admission(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path), "dataset_root": "unused"})
     monkeypatch.setattr(cli, "build_split", lambda **_: SimpleNamespace(
