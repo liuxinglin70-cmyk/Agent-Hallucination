@@ -1,143 +1,28 @@
-# Project directories (not part of SEHD-RISE core)
-_server_latest/
-.workbuddy/
-.trae/
-tmp_external/
-tmp_pull_*/
-tmp_upload_*/
-*.txt
-
-# Pre-refactor SEHD-v6 baseline: removed from the repo 2026-08-15
-# (git history retains it; no local backup tree remains)
-src/
-
-# Experiment workspace (run artifacts are local-only; the README is tracked)
-experiments/*
-!experiments/README.md
-!experiments/run_p1d.py
-!experiments/p1d_analyze.py
-!experiments/run_phase2.py
-!experiments/phase2_final.py
-!experiments/fixval_resample.py
-!experiments/run_fixval_round.py
-
-# Raw datasets (large, local-only); learning-case projections and the
-# policy-candidate/binding/replay artifacts are tracked
-datasets/raw/
-datasets/**/*.json
-datasets/**/*.jsonl
-!datasets/learning_cases/v1/**
-!datasets/policy_candidates/v1/**
-!datasets/eval_splits/**
-!datasets/convention_library/**
-!datasets/router_memory.json
-!datasets/calibration/**
-!datasets/calibration/**
-
-# Python
-__pycache__/
-.pytest_cache/
-*.py[cod]
-*$py.class
-*.egg-info/
-dist/
-build/
-*.egg
-
-# Virtual environments
+# Local credentials and environments
+.env
+.env.*
+!.env.example
+.venv/
 venv/
 env/
-.venv/
-.env
 
-# IDE
+# Original dataset remains local and unchanged
+datasets/raw/
+
+# Runtime outputs and caches
+artifacts/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+*.egg-info/
+build/
+dist/
+
+# Editor and OS metadata
 .idea/
 .vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
+.zcode/
 Thumbs.db
 desktop.ini
-
-# Data files
-*.jsonl
-!examples/*.jsonl
-
-# Cache
-__pycache__/
-.cache/
-*.cache
-
-# Output artifacts
-outputs/
-runs/*
-!runs/README.md
-eval/
-fitness_batches/
-champion_snapshots/
-shared_cache/
-
-# Config with secrets
-configs/*.local.json
-configs/*local*
-
-# Large data
-data/raw/
-data/cache/
-construct_census_cache/
-focused_prosecution_cache/
-defense_cache/
-appeal_prosecutor_cache/
-appeal_defender_cache/
-counterfactual_cache/
-layered_v2/
-
-# Backup and legacy
-backup/
-_legacy/
-*.bak
-
-# Logs
-*.log
-logs/
-
-# Large binary archives
-*.tar.gz
-*.tar
-*.zip
-*.7z
-*.rar
-
-# Temp
-tmp/
-temp/
-*.tmp
-.tmp/
-
-# Development probes & local run artifacts (live outside the repo)
-probe_*.py
-probe_records*.json
-probe_evolution_output*/
-probe_evolution_fn/
-probe_*_out/
-.pytest_tmp_*/
-
-detector_output/
-
-# Review virtual environment
-.review_venv/
-.zcode/
-
-# Detector V2 run artifacts
-runs_v2/
-
-
-# evolution_v3 run artifacts (code/README tracked; run trees local-only)
-evolution_v3/work/
-evolution_v3/registry/state.json
-evolution_v3/registry/snapshots/
-
-# Detector V2 smoke outputs
-detector_v2_out/
+.DS_Store

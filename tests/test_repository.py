@@ -1,0 +1,138 @@
+"""Regression coverage for public entry points and repository boundaries."""
+from __future__ import annotations
+
+import ast
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from detector.config import load_config as detector_config
+from evolution import cli
+from evolution.config import load_config
+from evolution.splits import build_split
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_detector_has_no_dependency_on_evolution():
+    for path in (ROOT / "detector").glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            names = ([node.module or ""] if isinstance(node, ast.ImportFrom)
+                     else [a.name for a in node.names] if isinstance(node, ast.Import) else [])
+            assert all(name.split(".")[0] != "evolution" for name in names), path
+
+
+def test_current_configuration_resolves_real_development_partition():
+    config = load_config()
+    split = build_split(config=config, dataset_root=config["dataset_root"], mini=True)
+    assert len(split.pool) == 30
+    assert len(split.validation) == 10
+    assert not set(split.pool) & set(split.validation)
+    assert set(split.sentinel + split.gain + split.patrol_pool) == set(split.pool)
+    assert Path(config["detector_config"]).is_file()
+    assert all(Path(p).is_file() for p in config["historical_development_manifests"])
+
+
+def test_formal_protocol_is_not_silently_inferred():
+    config = load_config()
+    with pytest.raises(ValueError, match="No formal split"):
+        build_split(config=config, dataset_root=config["dataset_root"])
+
+
+def test_missing_explicit_configuration_fails_closed(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_config(tmp_path / "missing.json")
+
+
+def test_missing_exposure_record_cannot_disable_contamination_check(tmp_path):
+    manifest = tmp_path / "formal.json"
+    manifest.write_text(json.dumps({
+        "evolution_pool": {"cases": ["A/001.json"]},
+        "final_verification": {"records": [{"case_id": "A/002.json", "gold": True}]},
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="historical development manifest is missing"):
+        build_split(config={
+            "split_manifest": str(manifest),
+            "historical_development_manifests": [str(tmp_path / "missing.json")],
+        }, dataset_root=tmp_path)
+
+
+def test_detector_environment_uses_stable_prefix(monkeypatch):
+    monkeypatch.setenv("DETECTOR_JUDGE_MODEL", "test-stable-model")
+    config = detector_config(require_credentials=False)
+    assert config["judge_route"]["model"] == "test-stable-model"
+
+
+def test_shipped_routes_use_supported_thinking_levels():
+    # GLM-5.3-flash always reasons and rejects any explicit thinking value
+    # (including "low") with an intermittent 400, so a GLM route must not send
+    # the field at all. DeepSeek routes may still disable thinking.
+    for name in ("autodl.json", "deepseek.json"):
+        raw = json.loads(
+            (ROOT / "detector" / "configs" / name).read_text(encoding="utf-8")
+        )
+        blocks = [raw.get("provider") or {}]
+        blocks += [raw[key] for key in raw if key.endswith("_route")]
+        for block in blocks:
+            if "glm" not in str(block.get("model") or "").lower():
+                continue
+            assert "thinking" not in (block.get("extra_body") or {}), (
+                name, block
+            )
+
+
+def test_shipped_proposer_budget_cannot_truncate_on_glm():
+    # GLM-5.3-flash always reasons; measured proposer completions run
+    # 6.2k-12.5k tokens with reasoning at 85-92% of that. At the old 4096
+    # ceiling the reply was cut off before the JSON array, yielding
+    # truncated_output and zero candidates. Keep a ceiling with real headroom.
+    config = load_config()
+    assert config["proposer"]["max_output_tokens"] >= 32768
+
+
+def test_experiment_cli_preserves_optional_cycle_default(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path)})
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
+        run_experiment=lambda cycles: seen.append(cycles) or {"cycles": []}))
+    assert cli.cmd_experiment(SimpleNamespace(config=None, backend=None, mini=True, cycles=None)) == 0
+    assert seen == [None]
+
+
+def test_governance_cli_preserves_optional_cycle_default(monkeypatch):
+    seen = []
+    monkeypatch.setattr(cli, "load_config", lambda _: {})
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
+        run_governance=lambda cycle: seen.append(cycle) or {}))
+    assert cli.cmd_governance(SimpleNamespace(config=None, backend=None, mini=True, cycle=None)) == 0
+    assert seen == [None]
+
+
+@pytest.mark.parametrize("valid, expected", [(True, 0), (False, 2)])
+def test_ledger_cli_exit_code_matches_verdict(tmp_path, valid, expected):
+    from evolution.ledger import Ledger
+    path = tmp_path / "ledger.jsonl"
+    Ledger(path).append("probe", {"admitted": False})
+    if not valid:
+        entry = json.loads(path.read_text(encoding="utf-8"))
+        entry["payload"]["admitted"] = True
+        path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"ledger_path": str(path)}), encoding="utf-8")
+    assert cli.cmd_verify_ledger(SimpleNamespace(config=str(config))) == expected
+
+
+def test_smoke_cli_rejects_failed_admission(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path), "dataset_root": "unused"})
+    monkeypatch.setattr(cli, "build_split", lambda **_: SimpleNamespace(
+        patrol_pool=["A/patrol1", "A/patrol2"], gain=["A/gain1", "A/gain2"]))
+    monkeypatch.setattr(cli, "_gold", lambda *_: True)
+    monkeypatch.setattr("evolution.backends.make_backend", lambda *a, **k: object())
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(run_cycle=lambda _: {
+        "state": "completed", "marginal_selection": {"selected": []},
+        "audit": {"passed": True}, "ledger_integrity": {"valid": True},
+    }))
+    assert cli.cmd_smoke(SimpleNamespace(config=None)) == 2

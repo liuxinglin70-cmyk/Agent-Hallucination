@@ -1,0 +1,103 @@
+{
+  "run_id": "recall",
+  "metrics": {
+    "decisive": 3,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.6666666666666666,
+    "all_case_accuracy": 0.6666666666666666,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "tn": 2,
+    "positive_precision": 0.0,
+    "positive_recall": 0.0,
+    "positive_f1": 0.0,
+    "macro_precision": 0.5,
+    "macro_recall": 0.3333333333333333,
+    "macro_f1": 0.4,
+    "authoritative": 3,
+    "degraded": 0,
+    "provider_unresolved": 0,
+    "requested_cases": 3,
+    "found_results": 3,
+    "missing_cases": 0,
+    "step_localization": {
+      "n": 0,
+      "hits": 0,
+      "accuracy": null
+    }
+  },
+  "rows": [
+    {
+      "case": "BFCL/012.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 5,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/028.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "BFCL/012.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "File 'DataSet1.csv' created; content 'Student | Math | Computer Science\nAlice | 5 | 9\nBob | 10 | 7' written line-by-line; last line 'Bob | 10 | 7' shown; counts reported as 3 lines, 16 words, 60 characters per tool observations; average of 3, 16, 60 reported as 26.33",
+        "correct_result": "Create 'DataSet1.csv'; write the data copied as-is split by line into three rows; show last entries of the file; summarize lines/words/characters as returned by wc (3/16/60); compute mean of the three values = 79/3 ≈ 26.333",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Create a file named 'DataSet1.csv'"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Write the given data into 'DataSet1.csv' copied as-is, split by line per row: 'Student | Math | Computer Science', 'Alice | 5 | 9', 'Bob | 10 | 7'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Read the last entries of 'DataSet1.csv' (tail)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Summarize lines, words, and characters of the file using wc"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Average of the three numerical values (3, 16, 60) = 26.333..."
+          }
+        ]
+      },
+      "defense": {}
+    }
+  ],
+  "missing_cases": []
+}

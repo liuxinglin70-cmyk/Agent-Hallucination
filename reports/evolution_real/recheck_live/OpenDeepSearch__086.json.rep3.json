@@ -1,0 +1,274 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "OpenDeepSearch/086.json",
+  "state": "verified_clean",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "76 tons",
+        "correct_result": "76 tons"
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "76 tons",
+      "correct_result": "76 tons",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "The tonnage of the topsail schooner Lisette built in 1873"
+        }
+      ]
+    },
+    "recall_candidates": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent provided the final answer immediately after a single web search instead of executing its own stated plan step 2 to verify the tonnage by cross-referencing with other historical records or sources",
+        "locus_event_id": "event_003",
+        "evidence_refs": [
+          "event_001",
+          "event_002",
+          "event_003"
+        ],
+        "quote": "2. Verify the information found by cross-referencing with other historical records or sources. ... I will now provide the final answer using the `final_answer` tool."
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent treated the unsourced sentence returned inside the code execution logs as the established tonnage instead of the sourced observation the search step was required to produce (the web_search produced no direct output and the printed result was None)",
+        "locus_event_id": "event_003",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "quote": "It seems there was no direct output from the `web_search` function, but the execution logs indicate that the tonnage of the topsail schooner \"Lisette\" is 76 tons."
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent reported the tonnage of the historical topsail schooner Lisette as 76 tons instead of the value documented in maritime records, without any corroborating source for the figure",
+        "locus_event_id": "event_003",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "quote": "final_answer(\"76 tons\")"
+      }
+    ],
+    "causal_upgrade": null,
+    "causal_upgrades": [],
+    "causal_upgrade_rows": [
+      {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The agent did skip its self-stated verification step, but the task text fixes no required verification action or order (the plan was agent-generated), and the delivered final answer already matches the environment observation, so correcting the skip would change no deliverable.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c2",
+        "content_error": false,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "Execution logs are part of the tool observation and thus environment facts under the grounding rules, so the agent's reading of the 76-ton figure from the logs is grounded reporting, not a fabricated or misreported observation.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c3",
+        "content_error": false,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The trajectory contains no evidence of any different documented tonnage, and the only environment fact available (the execution log) states 76 tons, which the final answer matches, so the claimed result error is not established.",
+        "coverage": "answered"
+      }
+    ],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": {
+      "expected": 3,
+      "answered": 3,
+      "missing": []
+    },
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276",
+      "active_interventions": [
+        "IV-1-002"
+      ],
+      "fired": [
+        {
+          "intervention_id": "IV-1-002",
+          "hook": "recall.trigger",
+          "type": "recall_trigger",
+          "event": "recall_triggered",
+          "detail": "predicate=evo_no_tool_anchored_delivery verdict=violated"
+        }
+      ],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    },
+    "recall_scanner": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 854,
+        "completion_tokens": 3217,
+        "total_tokens": 4071,
+        "prompt_tokens_details": {
+          "cached_tokens": 832
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2840
+        },
+        "input_tokens_details": {
+          "cached_tokens": 832
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2840
+        },
+        "input_tokens": 854,
+        "output_tokens": 3217
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "recall_scanner",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent provided the final answer immediately after a single web search instead of executing its own stated plan step 2 to verify the tonnage by cross-referencing with other historical records or sources\",\n      \"locus_event_id\""
+    },
+    "causal_upgrade": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1595,
+        "completion_tokens": 7789,
+        "total_tokens": 9384,
+        "prompt_tokens_details": {
+          "cached_tokens": 1536
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7526
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1536
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 7526
+        },
+        "input_tokens": 1595,
+        "output_tokens": 7789
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "causal_upgrade",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"upgrades\":[{\"candidate_id\":\"c1\",\"content_error\":false,\"causal\":false,\"corrected_step\":null,\"reason\":\"The cross-referencing step was self-imposed in the agent's own plan rather than an action demanded by the task text, so skipping it breaches no task-fixed deliverable and the final answer remains g",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "per_candidate": {
+          "c1": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          },
+          "c2": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          },
+          "c3": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "complete",
+    "upgrade_view": "complete",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "interventions_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276",
+    "frozen_judge_replay": true,
+    "frozen_stages": [
+      "judge_result"
+    ]
+  },
+  "_packet_event_count": 3
+}

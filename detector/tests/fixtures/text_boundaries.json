@@ -1,0 +1,63 @@
+{
+  "schema_version": "detector.intervention_registry.v1",
+  "interventions": [
+    {
+      "schema_version": "detector.intervention.v1",
+      "intervention_id": "IV-3-001",
+      "type": "text_boundary",
+      "hook": "scanner.system",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": []
+      },
+      "body": {
+        "directive": "Separate grounding from causality: treat human or ask_human output as an assertion, not an environment fact. Treat every constraint in the question, including exact tool arguments, required fields, required tool classes, output form, and final delivery, as a material contract. A later observation corrects an intermediate error only when the agent uses independently grounded evidence to correct the final deliverable; a later clue does not repair a final answer that remains wrong, a human-sourced assertion that remains unverified, or a successful termination with no required answer.",
+        "not_when": "Never treat a human assertion as verified evidence; never call a required argument or required final deliverable ancillary; never discard a wrong final answer or false completion merely because a later observation contains a related or possibly correct fact."
+      },
+      "claim": {
+        "expected_behavior": "scanner emits material grounding, required-action, and false-completion candidates while excluding corrected intermediate errors",
+        "target_polarity": "boundary"
+      },
+      "provenance": {
+        "cycle": 3,
+        "failure_family": "FAM-boundary-grounding-required-deliverable",
+        "failure_cases": [
+          "Camel/037.json",
+          "OpenManus/067.json"
+        ]
+      }
+    },
+    {
+      "schema_version": "detector.intervention.v1",
+      "intervention_id": "IV-3-002",
+      "type": "text_boundary",
+      "hook": "upgrade.system",
+      "trigger": {
+        "packet_features": [
+          "has_tool_calls"
+        ],
+        "facts": []
+      },
+      "body": {
+        "directive": "Apply materiality to the task contract, not to every questionable sentence: do not upgrade optional ancillary commentary, subjective praise, or generic source-reliability wording solely because the trajectory does not independently establish it. Always upgrade a false required answer, wrong required tool argument or field, missing required final deliverable, or false completion when correcting it is necessary for the task deliverable. Treat exact-form and required-action contracts extracted from the question as binding even when the final prose looks plausible.",
+        "not_when": "Never convert an optional side statement into a hallucination when every required deliverable and required action is correct; never use this boundary to excuse a wrong required result, required argument, required tool class, or completion claim."
+      },
+      "claim": {
+        "expected_behavior": "upgrade distinguishes material task-contract failures from optional unsupported ancillary prose without changing required-result detection",
+        "target_polarity": "precision"
+      },
+      "provenance": {
+        "cycle": 3,
+        "failure_family": "FAM-boundary-materiality-ancillary-prose",
+        "failure_cases": [
+          "Camel/050.json",
+          "Magentic_One/039.json",
+          "OpenDeepSearch/053.json"
+        ]
+      }
+    }
+  ],
+  "content_hash": "4e8b0fbc6c71a8d68357edc5d20ae78a88a5e561b1edaab77be51ad6fa6a7676"
+}

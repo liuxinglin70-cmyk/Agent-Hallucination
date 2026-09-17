@@ -1,0 +1,1793 @@
+{
+  "cycle": 1,
+  "state": "completed",
+  "split": {
+    "name": "mini",
+    "mini": true,
+    "seed": 20260824,
+    "pool_size": 30,
+    "sentinel": [
+      "BFCL/041.json",
+      "Magentic_One/036.json",
+      "Octotools/023.json",
+      "OpenDeepSearch/077.json",
+      "OpenDeepSearch/088.json",
+      "SmolAgents/019.json"
+    ],
+    "sentinel_size": 6,
+    "gain": [
+      "Magentic_One/050.json",
+      "OpenDeepSearch/086.json",
+      "Octotools/030.json",
+      "OpenDeepSearch/084.json",
+      "OpenManus/064.json",
+      "BFCL/062.json",
+      "Octotools/040.json",
+      "SmolAgents/037.json",
+      "Camel/048.json",
+      "OpenDeepSearch/067.json",
+      "Magentic_One/049.json",
+      "OpenDeepSearch/095.json"
+    ],
+    "gain_size": 12,
+    "patrol_pool_size": 12,
+    "validation": [
+      "BFCL/012.json",
+      "BFCL/068.json",
+      "BFCL/106.json",
+      "Camel/028.json",
+      "Magentic_One/067.json",
+      "Magentic_One/074.json",
+      "OpenDeepSearch/076.json",
+      "OpenDeepSearch/078.json",
+      "SmolAgents/022.json",
+      "SmolAgents/036.json"
+    ],
+    "validation_size": 10,
+    "final_size": 0,
+    "final_reads": 0
+  },
+  "audit": {
+    "enabled": true,
+    "passed": true,
+    "frozen": false,
+    "reports": [
+      {
+        "intervention_id": "IV-DEFECT-001",
+        "structural": {
+          "passed": false,
+          "reason": "case id leak in directive/body/claim: BFCL/001.json"
+        },
+        "harmlessness": null,
+        "behavior": null,
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      },
+      {
+        "intervention_id": "IV-DEFECT-002",
+        "structural": {
+          "passed": true,
+          "reason": "",
+          "jaccard_base": 0.0118
+        },
+        "harmlessness": {
+          "passed": true,
+          "reason": "",
+          "delta": {
+            "paired_n": 6,
+            "base_all_case_correct": 6,
+            "active_all_case_correct": 6,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "T->T": 3,
+              "F->F": 3
+            },
+            "transitions_by_gold": {
+              "error": {
+                "T->T": 3
+              },
+              "clean": {
+                "F->F": 3
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 6,
+              "decisive": 6,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 3,
+              "fp": 0,
+              "fn": 0,
+              "tn": 3,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "active_metrics": {
+              "n": 6,
+              "decisive": 6,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 3,
+              "fp": 0,
+              "fn": 0,
+              "tn": 3,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "rows": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              }
+            ]
+          },
+          "reroll_control": null,
+          "sentinel_manifest": {
+            "nominated": 6,
+            "protected": 6,
+            "protected_tp": 3,
+            "protected_tn": 3,
+            "excluded": [],
+            "baseline_rows": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "prediction": false
+              }
+            ],
+            "candidate_rows": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "prediction": false
+              }
+            ]
+          }
+        },
+        "behavior": {
+          "passed": false,
+          "reason": "target polarity mismatch: boundary claim corrected no decisive decision (decisive_fixed=0, decisive_broken=0)",
+          "delta": {
+            "paired_n": 18,
+            "base_all_case_correct": 16,
+            "active_all_case_correct": 16,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "T->T": 8,
+              "F->F": 10
+            },
+            "transitions_by_gold": {
+              "error": {
+                "T->T": 8,
+                "F->F": 2
+              },
+              "clean": {
+                "F->F": 8
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 18,
+              "decisive": 18,
+              "unresolved": 0,
+              "decisive_accuracy": 0.8888888888888888,
+              "all_case_accuracy": 0.8888888888888888,
+              "tp": 8,
+              "fp": 0,
+              "fn": 2,
+              "tn": 8,
+              "positive_precision": 1.0,
+              "positive_recall": 0.8,
+              "positive_f1": 0.888888888888889,
+              "macro_precision": 0.9,
+              "macro_recall": 0.9,
+              "macro_f1": 0.888888888888889
+            },
+            "active_metrics": {
+              "n": 18,
+              "decisive": 18,
+              "unresolved": 0,
+              "decisive_accuracy": 0.8888888888888888,
+              "all_case_accuracy": 0.8888888888888888,
+              "tp": 8,
+              "fp": 0,
+              "fn": 2,
+              "tn": 8,
+              "positive_precision": 1.0,
+              "positive_recall": 0.8,
+              "positive_f1": 0.888888888888889,
+              "macro_precision": 0.9,
+              "macro_recall": 0.9,
+              "macro_f1": 0.888888888888889
+            },
+            "rows": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/050.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/086.json",
+                "gold": true,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/030.json",
+                "gold": true,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/084.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenManus/064.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "BFCL/062.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/040.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "SmolAgents/037.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Camel/048.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/067.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Magentic_One/049.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/095.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              }
+            ]
+          }
+        },
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      }
+    ],
+    "cache": "miss"
+  },
+  "patrol": {
+    "patrol_size": 12,
+    "errors": 2,
+    "fn": 2,
+    "fp": 0,
+    "tp": 7,
+    "tn": 3,
+    "unresolved": 0,
+    "metrics": {
+      "n": 12,
+      "decisive": 12,
+      "unresolved": 0,
+      "decisive_accuracy": 0.8333333333333334,
+      "all_case_accuracy": 0.8333333333333334,
+      "tp": 7,
+      "fp": 0,
+      "fn": 2,
+      "tn": 3,
+      "positive_precision": 1.0,
+      "positive_recall": 0.7777777777777778,
+      "positive_f1": 0.8750000000000001,
+      "macro_precision": 0.8,
+      "macro_recall": 0.8888888888888888,
+      "macro_f1": 0.8125
+    },
+    "family_evidence": "cross-case co-occurrence; repeated-run stability not measured",
+    "stable_failure_families": [
+      {
+        "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+        "count": 2,
+        "failure_cases": [
+          "BFCL/017.json",
+          "Camel/018.json"
+        ],
+        "sources": [
+          "BFCL",
+          "Camel"
+        ],
+        "mechanism_summary": {
+          "family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+          "n": 2,
+          "judge_false_fraction": 1.0
+        },
+        "mechanism_signature": {
+          "judge_positive": false,
+          "stages": {
+            "judge": "not_run",
+            "recall_scanner": "not_run",
+            "causal_upgrade": "not_run",
+            "step_tracer": "not_run",
+            "defense": "not_run"
+          },
+          "recall_path": "not_run",
+          "upgrade_positive": false,
+          "defense_verdict": "none",
+          "positive_source": "none"
+        },
+        "diagnostics": {
+          "n": 2,
+          "predicate_signals": {
+            "required_action_present": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "verbatim_fidelity": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "evidence_refs_resolve": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "contract_coverage": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "delivered_anchor_consistency": {
+              "applicable": 2,
+              "violations": 0
+            },
+            "final_delivery_present": {
+              "applicable": 1,
+              "violations": 0
+            }
+          },
+          "member_summaries": [
+            {
+              "member": "member_001",
+              "contracts": [],
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "judge_positive": false,
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "predicates": {
+                "required_action_present": "not_applicable",
+                "verbatim_fidelity": "not_applicable",
+                "evidence_refs_resolve": "not_applicable",
+                "contract_coverage": "not_applicable",
+                "delivered_anchor_consistency": "insufficient",
+                "final_delivery_present": "not_applicable"
+              },
+              "typed_samples": {
+                "question_text": "[turn 1] I've just put together a file named 'ProjectOverview.txt' into my working directory where I've laid out an initial summary of the project. But as I foresee possible modifications down the line, I'd like to modify the file content b ...",
+                "last_prose_text": "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone in the loop about your documentation progress. If you need to share more update ...",
+                "last_answer_tool_name": "",
+                "last_answer_tool_arguments": "",
+                "last_answer_tool_observation": "",
+                "answer_anchor_status": "absent",
+                "event_texts": [
+                  "\necho\n{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}\nNone",
+                  "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!",
+                  "\ncp\n{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}\n{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
+                  "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identica ...",
+                  "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further change ...",
+                  "\nauthenticate_twitter\n{'username': 'tech_guru', 'password': 'securePass123'}\n{\"authentication_status\": true}"
+                ],
+                "prose_texts": [
+                  "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!",
+                  "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identica ...",
+                  "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further change ...",
+                  "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone ..."
+                ],
+                "tool_names": [
+                  "echo",
+                  "cp",
+                  "echo",
+                  "authenticate_twitter",
+                  "post_tweet"
+                ],
+                "tool_arguments": [
+                  "{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}",
+                  "{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}",
+                  "{'content': 'To be discussed', 'file_name': 'Draft.txt'}",
+                  "{'username': 'tech_guru', 'password': 'securePass123'}",
+                  "{'content': 'Initial summary of the project. To be discussed.', 'tags': ['#ProjectUpdate'], 'mentions': ['@manager', '@team_lead']}"
+                ],
+                "tool_observations": [
+                  "None",
+                  "{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
+                  "None",
+                  "{\"authentication_status\": true}",
+                  "{\"id\": 0, \"username\": \"tech_guru\", \"content\": \"Initial summary of the project. To be discussed.\", \"tags\": [\"#ProjectUpdate\"], \"mentions\": [\"@manager\", \"@team_le ..."
+                ],
+                "interaction_texts": [
+                  "echo\n{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}\nNone",
+                  "cp\n{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}\n{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
+                  "echo\n{'content': 'To be discussed', 'file_name': 'Draft.txt'}\nNone",
+                  "authenticate_twitter\n{'username': 'tech_guru', 'password': 'securePass123'}\n{\"authentication_status\": true}",
+                  "post_tweet\n{'content': 'Initial summary of the project. To be discussed.', 'tags': ['#ProjectUpdate'], 'mentions': ['@manager', '@team_lead']}\n{\"id\": 0, \"userna ..."
+                ],
+                "event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "interaction_ids": [
+                  "event_001_tool_01",
+                  "event_003_tool_01",
+                  "event_004_tool_01",
+                  "event_006_tool_01",
+                  "event_007_tool_01"
+                ],
+                "packet_features": [
+                  "has_tool_calls",
+                  "multi_turn_question",
+                  "question_has_numbers"
+                ],
+                "context_evidence_refs": [],
+                "context_contract_kinds": [],
+                "context_contract_requirements": [],
+                "context_quote": "",
+                "context_judge_delivered_result": "",
+                "context_judge_positive": "",
+                "context_judge_confidence": "",
+                "context_judge_hallucination_reason": "",
+                "event_count": 8,
+                "tool_call_count": 5,
+                "interaction_count": 5,
+                "prose_event_count": 4
+              }
+            },
+            {
+              "member": "member_002",
+              "contracts": [],
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "judge_positive": false,
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "predicates": {
+                "required_action_present": "not_applicable",
+                "verbatim_fidelity": "not_applicable",
+                "evidence_refs_resolve": "not_applicable",
+                "contract_coverage": "not_applicable",
+                "delivered_anchor_consistency": "insufficient",
+                "final_delivery_present": "present"
+              },
+              "typed_samples": {
+                "question_text": "Gases A and B are binary compounds consisting of three elements, two of which are in adjacent groups of the Periodic Table of Elements. Both gases can be burned in the air. The density of each of the gases relative to the density of argon a ...",
+                "last_prose_text": "{\"content\": \"To solve the task, the molecular masses of all products of combustion of each gas are summed, each multiplied by the stoichiometric coefficient (as per the balanced chemical equation with all coefficients as whole numbers).\\n\\n ...",
+                "last_answer_tool_name": "",
+                "last_answer_tool_arguments": "",
+                "last_answer_tool_observation": "",
+                "answer_anchor_status": "absent",
+                "event_texts": [
+                  "<tasks>\n<task>Identify all possible binary gases consisting of three elements, where two of the elements are from adjacent groups in the Periodic Table, and who ...",
+                  "{\"assignments\":[{\"assignee_id\":\"376bae1b-a41a-48f7-9324-e2d36a2da5fc (Search Agent)\",\"dependencies\":[],\"task_id\":\"66.1\"},{\"assignee_id\":\"dd005e3f-7f29-468c-b803 ...",
+                  "\nsearch_google\n{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}\n[{'result_id': 1, 'title': 'Thermodyn ...",
+                  "\nsearch_exa\n{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas phy ...",
+                  "\nappend_note\n{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50  ...",
+                  "\nappend_note\n{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F ..."
+                ],
+                "prose_texts": [
+                  "<tasks>\n<task>Identify all possible binary gases consisting of three elements, where two of the elements are from adjacent groups in the Periodic Table, and who ...",
+                  "{\"assignments\":[{\"assignee_id\":\"376bae1b-a41a-48f7-9324-e2d36a2da5fc (Search Agent)\",\"dependencies\":[],\"task_id\":\"66.1\"},{\"assignee_id\":\"dd005e3f-7f29-468c-b803 ...",
+                  "{\"content\":\"Based on a thorough review of recent journal literature, the following are the most plausible binary gases consisting of three elements, with two of ...",
+                  "{\"content\":\"For the identified gases with three elements and the given properties, here are the balanced chemical equations for their complete combustion in air ...",
+                  "{\"content\": \"To solve the task, the molecular masses of all products of combustion of each gas are summed, each multiplied by the stoichiometric coefficient (as ..."
+                ],
+                "tool_names": [
+                  "search_google",
+                  "search_exa",
+                  "append_note",
+                  "append_note",
+                  "read_note"
+                ],
+                "tool_arguments": [
+                  "{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}",
+                  "{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas physical proper ...",
+                  "{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 relative to a ...",
+                  "{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F are not adja ...",
+                  "{'note_name': 'binary_gas_candidates'}"
+                ],
+                "tool_observations": [
+                  "[{'result_id': 1, 'title': 'Thermodynamic characterization of the (H2 + C3H8) system ...', 'description': 'Mar 15, 2023 ... Experimental (p, ρexp, T) measuremen ...",
+                  "{'results': [{'url': 'https://www.chemtronlabs.com/products/gas/process-gas-mixtures/binary-gas-process-mixtures.html', 'id': 'https://www.chemtronlabs.com/prod ...",
+                  "Note 'binary_gas_candidates' created with content added.",
+                  "Content successfully appended to 'binary_gas_candidates.md'.",
+                  "Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 relative to argon:\n\n1. Ref ..."
+                ],
+                "interaction_texts": [
+                  "search_google\n{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}\n[{'result_id': 1, 'title': 'Thermodyna ...",
+                  "search_exa\n{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas phys ...",
+                  "append_note\n{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 r ...",
+                  "append_note\n{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F  ...",
+                  "read_note\n{'note_name': 'binary_gas_candidates'}\nTracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, ..."
+                ],
+                "event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "interaction_ids": [
+                  "event_003_tool_01",
+                  "event_004_tool_01",
+                  "event_005_tool_01",
+                  "event_006_tool_01",
+                  "event_007_tool_01"
+                ],
+                "packet_features": [
+                  "has_long_prose",
+                  "has_numeric_content",
+                  "has_retrieval_tool",
+                  "has_tool_calls",
+                  "question_has_numbers"
+                ],
+                "context_evidence_refs": [],
+                "context_contract_kinds": [],
+                "context_contract_requirements": [],
+                "context_quote": "",
+                "context_judge_delivered_result": "",
+                "context_judge_positive": "",
+                "context_judge_confidence": "",
+                "context_judge_hallucination_reason": "",
+                "event_count": 10,
+                "tool_call_count": 5,
+                "interaction_count": 5,
+                "prose_event_count": 5
+              }
+            }
+          ],
+          "shared_literals": {
+            "scalar_token_intersection": {
+              "question_text": [
+                "of",
+                "the",
+                "to"
+              ],
+              "last_prose_text": [
+                "as",
+                "of",
+                "the",
+                "to"
+              ],
+              "context_judge_hallucination_reason": [],
+              "context_judge_delivered_result": []
+            },
+            "question_bigram_intersection": [
+              "of the"
+            ],
+            "list_item_intersection": {
+              "tool_names": [],
+              "tool_arguments": [],
+              "tool_observations": [],
+              "context_contract_kinds": [],
+              "context_contract_requirements": [],
+              "packet_features": [
+                "has_tool_calls",
+                "question_has_numbers"
+              ]
+            }
+          }
+        },
+        "diagnostic_complete": true,
+        "profile_homogeneous": false,
+        "actionability": {
+          "classification": "actionable",
+          "reason": "at least one action or capability-creation route exists for this family's mechanism",
+          "routes": [
+            "recall_trigger",
+            "recall_directive",
+            "upgrade_directive",
+            "evolved_predicate"
+          ]
+        }
+      }
+    ],
+    "bootstrap": {
+      "initial_patrol_size": 12,
+      "bootstrap_cases": [],
+      "bootstrap_count": 0,
+      "family_found": true
+    },
+    "capability_gaps": []
+  },
+  "proposal_summary": {
+    "stable_families": [
+      "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f"
+    ],
+    "capability_gaps": [],
+    "candidate_count": 1,
+    "joint_groups": [],
+    "empty_proposal_reason": ""
+  },
+  "proposals": [
+    {
+      "intervention_id": "IV-SMOKE-001",
+      "type": "text_boundary",
+      "hook": "scanner.system",
+      "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+      "target_polarity": "recall",
+      "frozen_judge_replay_compatible": null
+    }
+  ],
+  "gates": [
+    {
+      "intervention_id": "IV-SMOKE-001",
+      "candidate": {
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-SMOKE-001",
+        "type": "text_boundary",
+        "hook": "scanner.system",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": []
+        },
+        "body": {
+          "directive": "Report every explicitly required action from the question that has no matching tool call.",
+          "not_when": "Never apply when every required action has a matching tool call."
+        },
+        "claim": {
+          "expected_behavior": "recall scanner gains candidates for missing required actions",
+          "target_polarity": "recall"
+        },
+        "provenance": {
+          "cycle": 1,
+          "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+          "failure_cases": [
+            "BFCL/017.json",
+            "Camel/018.json"
+          ]
+        },
+        "content_hash": "b64719b1700636726ec54c7f3c0b8eaaa7f58704949b47e39bd22f126b676363"
+      },
+      "structural": {
+        "passed": true,
+        "reason": "",
+        "jaccard_base": 0.0506
+      },
+      "harmlessness": {
+        "passed": true,
+        "reason": "",
+        "delta": {
+          "paired_n": 6,
+          "base_all_case_correct": 6,
+          "active_all_case_correct": 6,
+          "marginal_cases": 0,
+          "tp_lost": 0,
+          "fp_added": 0,
+          "new_fn": 0,
+          "new_fp": 0,
+          "new_errors": 0,
+          "unresolved_added": 0,
+          "unresolved_removed": 0,
+          "health_regressed": 0,
+          "health_improved": 0,
+          "flips": {
+            "T->T": 3,
+            "F->F": 3
+          },
+          "transitions_by_gold": {
+            "error": {
+              "T->T": 3
+            },
+            "clean": {
+              "F->F": 3
+            }
+          },
+          "correctness_improved": 0,
+          "correctness_worsened": 0,
+          "baseline_metrics": {
+            "n": 6,
+            "decisive": 6,
+            "unresolved": 0,
+            "decisive_accuracy": 1.0,
+            "all_case_accuracy": 1.0,
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "positive_precision": 1.0,
+            "positive_recall": 1.0,
+            "positive_f1": 1.0,
+            "macro_precision": 1.0,
+            "macro_recall": 1.0,
+            "macro_f1": 1.0
+          },
+          "active_metrics": {
+            "n": 6,
+            "decisive": 6,
+            "unresolved": 0,
+            "decisive_accuracy": 1.0,
+            "all_case_accuracy": 1.0,
+            "tp": 3,
+            "fp": 0,
+            "fn": 0,
+            "tn": 3,
+            "positive_precision": 1.0,
+            "positive_recall": 1.0,
+            "positive_f1": 1.0,
+            "macro_precision": 1.0,
+            "macro_recall": 1.0,
+            "macro_f1": 1.0
+          },
+          "rows": [
+            {
+              "case": "BFCL/041.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Magentic_One/036.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "Octotools/023.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            }
+          ]
+        },
+        "reroll_control": null,
+        "sentinel_manifest": {
+          "nominated": 6,
+          "protected": 6,
+          "protected_tp": 3,
+          "protected_tn": 3,
+          "excluded": [],
+          "baseline_rows": [
+            {
+              "case": "BFCL/041.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "Magentic_One/036.json",
+              "gold": false,
+              "prediction": false
+            },
+            {
+              "case": "Octotools/023.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "prediction": false
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "gold": false,
+              "prediction": false
+            }
+          ],
+          "candidate_rows": [
+            {
+              "case": "BFCL/041.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "Magentic_One/036.json",
+              "gold": false,
+              "prediction": false
+            },
+            {
+              "case": "Octotools/023.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "prediction": false
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "gold": true,
+              "prediction": true
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "gold": false,
+              "prediction": false
+            }
+          ]
+        }
+      },
+      "behavior": {
+        "passed": true,
+        "reason": "",
+        "delta": {
+          "paired_n": 18,
+          "base_all_case_correct": 16,
+          "active_all_case_correct": 18,
+          "marginal_cases": 2,
+          "tp_lost": 0,
+          "fp_added": 0,
+          "new_fn": 0,
+          "new_fp": 0,
+          "new_errors": 0,
+          "unresolved_added": 0,
+          "unresolved_removed": 0,
+          "health_regressed": 0,
+          "health_improved": 0,
+          "flips": {
+            "T->T": 8,
+            "F->F": 8,
+            "F->T": 2
+          },
+          "transitions_by_gold": {
+            "error": {
+              "T->T": 8,
+              "F->T": 2
+            },
+            "clean": {
+              "F->F": 8
+            }
+          },
+          "correctness_improved": 2,
+          "correctness_worsened": 0,
+          "baseline_metrics": {
+            "n": 18,
+            "decisive": 18,
+            "unresolved": 0,
+            "decisive_accuracy": 0.8888888888888888,
+            "all_case_accuracy": 0.8888888888888888,
+            "tp": 8,
+            "fp": 0,
+            "fn": 2,
+            "tn": 8,
+            "positive_precision": 1.0,
+            "positive_recall": 0.8,
+            "positive_f1": 0.888888888888889,
+            "macro_precision": 0.9,
+            "macro_recall": 0.9,
+            "macro_f1": 0.888888888888889
+          },
+          "active_metrics": {
+            "n": 18,
+            "decisive": 18,
+            "unresolved": 0,
+            "decisive_accuracy": 1.0,
+            "all_case_accuracy": 1.0,
+            "tp": 10,
+            "fp": 0,
+            "fn": 0,
+            "tn": 8,
+            "positive_precision": 1.0,
+            "positive_recall": 1.0,
+            "positive_f1": 1.0,
+            "macro_precision": 1.0,
+            "macro_recall": 1.0,
+            "macro_f1": 1.0
+          },
+          "rows": [
+            {
+              "case": "BFCL/041.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Magentic_One/036.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "Octotools/023.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/086.json",
+              "gold": true,
+              "baseline_prediction": false,
+              "active_prediction": true,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Octotools/030.json",
+              "gold": true,
+              "baseline_prediction": false,
+              "active_prediction": true,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenDeepSearch/084.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenManus/064.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "BFCL/062.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Octotools/040.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "SmolAgents/037.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Camel/048.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/067.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Magentic_One/049.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/095.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            }
+          ]
+        },
+        "fired_rate": 1.0,
+        "behavior_note": "text_injected_cases=18"
+      },
+      "m": {
+        "passed": true,
+        "reason": "",
+        "delta": {
+          "paired_n": 12,
+          "base_all_case_correct": 10,
+          "active_all_case_correct": 12,
+          "marginal_cases": 2,
+          "tp_lost": 0,
+          "fp_added": 0,
+          "new_fn": 0,
+          "new_fp": 0,
+          "new_errors": 0,
+          "unresolved_added": 0,
+          "unresolved_removed": 0,
+          "health_regressed": 0,
+          "health_improved": 0,
+          "flips": {
+            "F->F": 5,
+            "F->T": 2,
+            "T->T": 5
+          },
+          "transitions_by_gold": {
+            "error": {
+              "F->T": 2,
+              "T->T": 5
+            },
+            "clean": {
+              "F->F": 5
+            }
+          },
+          "correctness_improved": 2,
+          "correctness_worsened": 0,
+          "baseline_metrics": {
+            "n": 12,
+            "decisive": 12,
+            "unresolved": 0,
+            "decisive_accuracy": 0.8333333333333334,
+            "all_case_accuracy": 0.8333333333333334,
+            "tp": 5,
+            "fp": 0,
+            "fn": 2,
+            "tn": 5,
+            "positive_precision": 1.0,
+            "positive_recall": 0.7142857142857143,
+            "positive_f1": 0.8333333333333333,
+            "macro_precision": 0.8571428571428572,
+            "macro_recall": 0.8571428571428572,
+            "macro_f1": 0.8333333333333333
+          },
+          "active_metrics": {
+            "n": 12,
+            "decisive": 12,
+            "unresolved": 0,
+            "decisive_accuracy": 1.0,
+            "all_case_accuracy": 1.0,
+            "tp": 7,
+            "fp": 0,
+            "fn": 0,
+            "tn": 5,
+            "positive_precision": 1.0,
+            "positive_recall": 1.0,
+            "positive_f1": 1.0,
+            "macro_precision": 1.0,
+            "macro_recall": 1.0,
+            "macro_f1": 1.0
+          },
+          "rows": [
+            {
+              "case": "Magentic_One/050.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/086.json",
+              "gold": true,
+              "baseline_prediction": false,
+              "active_prediction": true,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Octotools/030.json",
+              "gold": true,
+              "baseline_prediction": false,
+              "active_prediction": true,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenDeepSearch/084.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenManus/064.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "BFCL/062.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Octotools/040.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "SmolAgents/037.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Camel/048.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/067.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Magentic_One/049.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": false,
+              "baseline_state": "verified_clean",
+              "active_state": "verified_clean"
+            },
+            {
+              "case": "OpenDeepSearch/095.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            }
+          ]
+        }
+      },
+      "partner_ids": [],
+      "fresh": false,
+      "candidate_rows": [
+        {
+          "case": "BFCL/041.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Magentic_One/036.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Octotools/023.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/077.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/088.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "SmolAgents/019.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Magentic_One/050.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/086.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Octotools/030.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/084.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenManus/064.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "BFCL/062.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Octotools/040.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "SmolAgents/037.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Camel/048.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/067.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Magentic_One/049.json",
+          "gold": false,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenDeepSearch/095.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        }
+      ],
+      "gain_opportunities": {
+        "recall": 2,
+        "precision": 0
+      }
+    }
+  ],
+  "fresh_control": null,
+  "combination": {
+    "unit_ids": [
+      "IV-SMOKE-001"
+    ],
+    "delta": null,
+    "reason": "single qualified unit; no combination arm needed"
+  },
+  "marginal_selection": {
+    "selected": [
+      "IV-SMOKE-001"
+    ],
+    "library_rejections": []
+  },
+  "active_after_cycle": [
+    "IV-SMOKE-001"
+  ],
+  "active_effect_on_g": {
+    "paired_n": 12,
+    "base_all_case_correct": 10,
+    "active_all_case_correct": 12,
+    "marginal_cases": 2,
+    "tp_lost": 0,
+    "fp_added": 0,
+    "new_fn": 0,
+    "new_fp": 0,
+    "new_errors": 0,
+    "unresolved_added": 0,
+    "unresolved_removed": 0,
+    "health_regressed": 0,
+    "health_improved": 0,
+    "flips": {
+      "F->F": 5,
+      "F->T": 2,
+      "T->T": 5
+    },
+    "transitions_by_gold": {
+      "error": {
+        "F->T": 2,
+        "T->T": 5
+      },
+      "clean": {
+        "F->F": 5
+      }
+    },
+    "correctness_improved": 2,
+    "correctness_worsened": 0,
+    "baseline_metrics": {
+      "n": 12,
+      "decisive": 12,
+      "unresolved": 0,
+      "decisive_accuracy": 0.8333333333333334,
+      "all_case_accuracy": 0.8333333333333334,
+      "tp": 5,
+      "fp": 0,
+      "fn": 2,
+      "tn": 5,
+      "positive_precision": 1.0,
+      "positive_recall": 0.7142857142857143,
+      "positive_f1": 0.8333333333333333,
+      "macro_precision": 0.8571428571428572,
+      "macro_recall": 0.8571428571428572,
+      "macro_f1": 0.8333333333333333
+    },
+    "active_metrics": {
+      "n": 12,
+      "decisive": 12,
+      "unresolved": 0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "tn": 5,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0
+    },
+    "rows": [
+      {
+        "case": "Magentic_One/050.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "OpenDeepSearch/086.json",
+        "gold": true,
+        "baseline_prediction": false,
+        "active_prediction": true,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Octotools/030.json",
+        "gold": true,
+        "baseline_prediction": false,
+        "active_prediction": true,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "OpenDeepSearch/084.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "OpenManus/064.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "BFCL/062.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Octotools/040.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "SmolAgents/037.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Camel/048.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "OpenDeepSearch/067.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Magentic_One/049.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "OpenDeepSearch/095.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      }
+    ]
+  },
+  "ledger_integrity": {
+    "valid": true,
+    "records": 6,
+    "broken_at": null,
+    "reason": ""
+  }
+}

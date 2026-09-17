@@ -1,0 +1,274 @@
+"""Evolution-side intervention contracts.
+
+All schema validation and hashing are delegated to ``detector.interventions``
+so a deployable payload can never drift from the executor that actually runs
+it. The evolution package only adds STRUCTURAL-facing text/claim helpers.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import tempfile
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+from detector.interventions import (
+    build_intervention_registry,
+    intervention_content_hash,
+    load_intervention_registry,
+    validate_intervention,
+)
+from detector.predicate_dsl import PROGRAM_RUNNER, predicate_program_hash
+
+_CASE_ID_RE = re.compile(
+    r"\b[A-Za-z_][A-Za-z0-9_-]{0,40}(?:/|__)\d{3}\.json\b",
+    re.IGNORECASE,
+)
+
+
+def empty_registry() -> dict[str, Any]:
+    return build_intervention_registry([])
+
+
+def make_registry(
+    entries: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return build_intervention_registry(entries)
+
+
+def make_intervention(
+    *,
+    intervention_id: str,
+    intervention_type: str,
+    hook: str,
+    packet_features: Sequence[str],
+    body: Mapping[str, Any],
+    expected_behavior: str,
+    target_polarity: str,
+    cycle: int,
+    failure_family: str,
+    failure_cases: Sequence[str],
+    facts: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": intervention_id,
+        "type": intervention_type,
+        "hook": hook,
+        "trigger": {
+            "packet_features": [str(x) for x in packet_features],
+            "facts": [str(x) for x in (facts or ())],
+        },
+        "body": dict(body),
+        "claim": {
+            "expected_behavior": str(expected_behavior),
+            "target_polarity": str(target_polarity),
+        },
+        "provenance": {
+            "cycle": int(cycle),
+            "failure_family": str(failure_family),
+            "failure_cases": [str(x) for x in failure_cases],
+        },
+    }
+    if intervention_type == "decision_guard":
+        if "action_not_when_facts" not in payload["body"]:
+            payload["body"]["action_not_when_facts"] = [
+                "defense_view_degraded=true"
+            ]
+    validate_intervention(payload, require_executable_bounds=True)
+    payload["content_hash"] = intervention_content_hash(payload)
+    return payload
+
+
+def validate_candidate(entry: Mapping[str, Any]) -> dict[str, Any]:
+    validate_intervention(entry)
+    return dict(entry)
+
+
+def load_registry(path: str | Path) -> dict[str, Any]:
+    return load_intervention_registry(path)
+
+
+def iter_strings(value: Any, *, keys: Iterable[str] | None = None) -> list[str]:
+    """Depth-first strings, optionally restricted to selected dict keys."""
+    rows: list[str] = []
+    if isinstance(value, str):
+        rows.append(value)
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            if keys is None or key in keys:
+                rows.extend(iter_strings(item, keys=keys))
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            rows.extend(iter_strings(item, keys=keys))
+    return rows
+
+
+def candidate_prose_text(entry: Mapping[str, Any]) -> str:
+    body = entry.get("body") or {}
+    claim = entry.get("claim") or {}
+    strings = [
+        str(body.get("directive") or ""),
+        str(body.get("not_when") or ""),
+        str(body.get("action_not_when") or ""),
+        str(body.get("predicate") or ""),
+        str(body.get("runner") or ""),
+        str(body.get("action") or ""),
+        str(claim.get("expected_behavior") or ""),
+        str(claim.get("target_polarity") or ""),
+    ]
+    program = body.get("predicate_definition")
+    if isinstance(program, Mapping):
+        # Evolved predicate programs are executable literals too. A case id
+        # hidden in a DSL literal is the same leakage as one in prose and
+        # must be rejected by the same STRUCTURAL check.
+        strings.append(json.dumps(program, ensure_ascii=False, sort_keys=True))
+    return "\n".join(strings)
+
+
+def candidate_contains_case_id(entry: Mapping[str, Any]) -> str | None:
+    text = candidate_prose_text(entry)
+    match = _CASE_ID_RE.search(text)
+    return match.group(0) if match else None
+
+
+def redact_case_ids(value: Any) -> str:
+    """Remove case identifiers before text crosses the proposer boundary."""
+    return _CASE_ID_RE.sub("[case]", str(value or ""))
+
+
+def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
+    """Executable identity for deterministic intervention types.
+
+    Prose similarity is the wrong redundancy test for deterministic hooks:
+    two evidence_check entries that share ``judge.post`` but execute
+    different predicates are distinct and must not be rejected just because
+    their natural-language claims overlap. ``text_boundary`` remains prose
+    compared because its body is natural language by definition.
+    """
+    entry_type = str(entry.get("type") or "")
+    hook = str(entry.get("hook") or "")
+    body = entry.get("body") or {}
+    trigger = entry.get("trigger") or {}
+    features = tuple(sorted(
+        str(item) for item in trigger.get("packet_features") or ()
+    ))
+    if entry_type == "evidence_check":
+        program_hash = ""
+        if str(body.get("runner") or "") == PROGRAM_RUNNER:
+            raw = body.get("predicate_definition") or {}
+            if isinstance(raw, Mapping):
+                try:
+                    from detector.predicate_dsl import validate_predicate_program
+
+                    program_hash = predicate_program_hash(
+                        validate_predicate_program(raw)
+                    )
+                except ValueError:
+                    program_hash = ""
+        return (
+            "evidence_check",
+            hook,
+            features,
+            str(body.get("predicate") or ""),
+            str(body.get("runner") or ""),
+            program_hash,
+        )
+    if entry_type == "decision_guard":
+        facts = [str(item) for item in (trigger.get("facts") or ())]
+        return (
+            "decision_guard",
+            hook,
+            features,
+            tuple(sorted(facts)),
+            str(body.get("action") or ""),
+            str(body.get("evidence_predicate") or ""),
+            tuple(sorted(
+                str(item) for item in body.get("action_not_when_facts") or ()
+            )),
+        )
+    if entry_type == "recall_trigger":
+        program_hash = ""
+        if str(body.get("runner") or "") == PROGRAM_RUNNER:
+            raw = body.get("predicate_definition") or {}
+            if isinstance(raw, Mapping):
+                try:
+                    from detector.predicate_dsl import validate_predicate_program
+
+                    program_hash = predicate_program_hash(
+                        validate_predicate_program(raw)
+                    )
+                except ValueError:
+                    program_hash = ""
+        return (
+            "recall_trigger",
+            hook,
+            features,
+            tuple(sorted(
+                str(item) for item in (trigger.get("facts") or ())
+            )),
+            str(body.get("predicate") or ""),
+            str(body.get("runner") or ""),
+            program_hash,
+            tuple(sorted(
+                str(item) for item in body.get("trigger_verdicts") or ()
+            )),
+        )
+    return None
+
+
+def tokenize(text: str) -> set[str]:
+    return {
+        token.lower()
+        for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text)
+    }
+
+
+def jaccard(left: str, right: str) -> float:
+    a = tokenize(left)
+    b = tokenize(right)
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def load_json(path: str | Path) -> Any:
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+
+
+def save_json(path: str | Path, payload: Any) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(
+        # Repeating a long cache filename in the temporary prefix can cross
+        # Windows MAX_PATH even when the final path itself is valid.
+        prefix=".tmp-", suffix=".json", dir=str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+__all__ = [
+    "candidate_contains_case_id",
+    "candidate_prose_text",
+    "empty_registry",
+    "jaccard",
+    "load_json",
+    "load_registry",
+    "make_intervention",
+    "make_registry",
+    "redact_case_ids",
+    "save_json",
+    "structured_key",
+    "validate_candidate",
+]

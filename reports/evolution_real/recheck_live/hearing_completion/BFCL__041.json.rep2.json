@@ -1,0 +1,170 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/041.json",
+  "state": "verified_clean",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "30 gallons converted to ~113.56 liters; engine start attempted in START mode but blocked by environment error (doors unlocked), honestly reported with an offer to lock doors; tire pressures checked (32/32/30/30 psi, healthy) and reported as optimal; tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru, confirmed by observation.",
+        "correct_result": "30 gallons ≈ 113.56 liters; attempt engine start in START mode; confirm tires optimal; post tweet 'Tire pressures are optimal!' with hashtag #CarMaintenance and mention @VehicleGuru."
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "30 gallons converted to ~113.56 liters; engine start attempted in START mode but blocked by environment error (doors unlocked), honestly reported with an offer to lock doors; tire pressures checked (32/32/30/30 psi, healthy) and reported as optimal; tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru, confirmed by observation.",
+      "correct_result": "30 gallons ≈ 113.56 liters; attempt engine start in START mode; confirm tires optimal; post tweet 'Tire pressures are optimal!' with hashtag #CarMaintenance and mention @VehicleGuru.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "30 gallons expressed in liters (≈113.56 L)"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Start the engine using start mode (ignitionMode START)"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Inspect each tire's condition and confirm optimal shape"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Post tweet with exact content 'Tire pressures are optimal!', hashtag #CarMaintenance, and mention @VehicleGuru"
+        }
+      ]
+    },
+    "recall_candidates": [],
+    "causal_upgrade": null,
+    "causal_upgrades": [],
+    "causal_upgrade_rows": [],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": null,
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276",
+      "active_interventions": [
+        "IV-1-002"
+      ],
+      "fired": [
+        {
+          "intervention_id": "IV-1-002",
+          "hook": "recall.trigger",
+          "type": "recall_trigger",
+          "event": "recall_triggered",
+          "detail": "predicate=evo_no_tool_anchored_delivery verdict=violated"
+        }
+      ],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    },
+    "recall_scanner": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1019,
+        "completion_tokens": 661,
+        "total_tokens": 1680,
+        "prompt_tokens_details": {
+          "cached_tokens": 960
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 654
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 654
+        },
+        "input_tokens_details": {
+          "cached_tokens": 960
+        },
+        "input_tokens": 1019,
+        "output_tokens": 661
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "recall_scanner",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"candidates\": []}"
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "complete",
+    "upgrade_view": "not_rendered",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "interventions_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276"
+  },
+  "_packet_event_count": 8,
+  "diagnostic_judge_replay": {
+    "source": "original empty-registry result",
+    "method": "run_judge boundary replay"
+  }
+}

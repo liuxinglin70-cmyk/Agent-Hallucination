@@ -1,0 +1,369 @@
+{
+  "original_attempts": [
+    {
+      "case": "BFCL/017.json",
+      "rep": 3,
+      "elapsed": 188.78,
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/017.json",
+      "rep": 2,
+      "elapsed": 201.15,
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/017.json",
+      "rep": 1,
+      "error": "ValueError: frozen stage replay is missing a hearing freeze entry for source='recall_upgrade' candidate_id='c4'"
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "rep": 2,
+      "elapsed": 108.98,
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "rep": 1,
+      "elapsed": 170.19,
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "rep": 3,
+      "elapsed": 209.98,
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/041.json",
+      "rep": 3,
+      "error": "ValueError: frozen stage replay is missing a hearing freeze entry for source='recall_upgrade' candidate_id='c1'"
+    },
+    {
+      "case": "BFCL/041.json",
+      "rep": 2,
+      "error": "ValueError: frozen stage replay is missing a hearing freeze entry for source='recall_upgrade' candidate_id='c1'"
+    },
+    {
+      "case": "BFCL/041.json",
+      "rep": 1,
+      "error": "ValueError: frozen stage replay is missing a hearing freeze entry for source='recall_upgrade' candidate_id='c2'"
+    }
+  ],
+  "technical_completions": [
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "rep": 2,
+      "elapsed": 11.41
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "rep": 3,
+      "elapsed": 113.48
+    },
+    {
+      "case": "BFCL/017.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "rep": 1,
+      "elapsed": 161.96
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error",
+      "authority": "authoritative",
+      "rep": 1,
+      "elapsed": 406.33
+    }
+  ],
+  "warning": "Conditional mechanism diagnostic; technical completions are not independent extra replicates.",
+  "cases": {
+    "BFCL/017.json": {
+      "gold_step": "4",
+      "runs": [
+        {
+          "case": "BFCL/017.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 1,
+          "technical_completion": true,
+          "path": "reports\\evolution_real\\recheck_live\\hearing_completion\\BFCL__017.json.rep1.json",
+          "responsible_step": null,
+          "recall_candidates": 3,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The echo write returned no error (None being the normal no-output success return for a file write), so the assertion that ProjectOverview.txt was updated is consistent with the environment facts and no deliverable is wrong.",
+            "The agent acknowledged the observed copy failure and only offered a hedged ('likely') diagnosis without misreporting the error, and correcting that speculation would change no deliverable since the corrective echo write and final file state were already appropriate.",
+            "The echo write to Draft.txt returned no error, so both files containing 'To be discussed' makes the identity claim consistent with the environment facts, and the absence of an explicit diff is not a contract violation affecting any deliverable."
+          ],
+          "hearing_reasons": []
+        },
+        {
+          "case": "BFCL/017.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 2,
+          "technical_completion": false,
+          "path": "reports\\evolution_real\\recheck_live\\BFCL__017.json.rep2.json",
+          "responsible_step": null,
+          "recall_candidates": 3,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The echo tool performed the requested write and returning None is a normal no-output observation, so asserting the update succeeded is grounded in the action actually taken, not a fabricated result.",
+            "The misattribution of the cp error cause is real but merely presentational reasoning; the agent immediately corrected the state by writing Draft.txt, so no deliverable depends on the wrong explanation.",
+            "Both files were written with the identical content 'To be discussed' via echo calls in the trajectory, so the identity claim follows from the actions performed rather than an unverified assertion."
+          ],
+          "hearing_reasons": []
+        },
+        {
+          "case": "BFCL/017.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 3,
+          "technical_completion": false,
+          "path": "reports\\evolution_real\\recheck_live\\BFCL__017.json.rep3.json",
+          "responsible_step": null,
+          "recall_candidates": 4,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The echo tool's None observation is the environment's silent-success signature (the failing cp returned an explicit error object), so the claim that ProjectOverview.txt was updated is grounded and no deliverable is wrong.",
+            "The hedged attribution to 'Draft.txt already exists as a file' is ungrounded speculation contradicting the observed 'Not a directory' error, but it touches no deliverable since the corrective echo made both files identical regardless of the cp failure's cause.",
+            "The None observation indicates the echo write to Draft.txt succeeded (this environment reports failures explicitly, as the cp error shows), so the identity claim matches the delivered state and no deliverable deviates.",
+            "The hardcoded string 'To be discussed' is exactly the content written to ProjectOverview.txt in event_001 and the task fixed no copying method, so the required identical-files state is achieved and the deviation is merely presentational."
+          ],
+          "hearing_reasons": []
+        }
+      ],
+      "completed": 3,
+      "correct": 0,
+      "clean": 3,
+      "unresolved_or_missing": 0
+    },
+    "OpenDeepSearch/086.json": {
+      "gold_step": "2",
+      "runs": [
+        {
+          "case": "OpenDeepSearch/086.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 1,
+          "technical_completion": false,
+          "path": "reports\\evolution_real\\recheck_live\\OpenDeepSearch__086.json.rep1.json",
+          "responsible_step": null,
+          "recall_candidates": 2,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The agent did skip the cross-referencing step it declared in event_001, but that step was self-imposed rather than fixed by the task text, and the final answer '76 tons' is grounded in the tool observation and correctly delivered, so correcting the skipped step would change no deliverable.",
+            "The search observation is an environment fact that supplies the value 76 tons absent from the query wording, so the agent's reliance on it is properly grounded rather than a misreported or fabricated observation, and the task imposes no independent-confirmation requirement."
+          ],
+          "hearing_reasons": []
+        },
+        {
+          "case": "OpenDeepSearch/086.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 2,
+          "technical_completion": false,
+          "path": "reports\\evolution_real\\recheck_live\\OpenDeepSearch__086.json.rep2.json",
+          "responsible_step": null,
+          "recall_candidates": 2,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The execution logs are part of the tool observation and thus environment facts explicitly stating the tonnage is 76 tons, so the agent did obtain a grounded search result and its final answer is correct despite the print yielding None.",
+            "Skipping the cross-referencing step is factually real, but that step was the agent's self-imposed plan rather than an action fixed by the task contract, and the only deliverable (the tonnage answer) is already correct and grounded, so no deliverable is breached."
+          ],
+          "hearing_reasons": []
+        },
+        {
+          "case": "OpenDeepSearch/086.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 3,
+          "technical_completion": false,
+          "path": "reports\\evolution_real\\recheck_live\\OpenDeepSearch__086.json.rep3.json",
+          "responsible_step": null,
+          "recall_candidates": 3,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The agent did skip its self-stated verification step, but the task text fixes no required verification action or order (the plan was agent-generated), and the delivered final answer already matches the environment observation, so correcting the skip would change no deliverable.",
+            "Execution logs are part of the tool observation and thus environment facts under the grounding rules, so the agent's reading of the 76-ton figure from the logs is grounded reporting, not a fabricated or misreported observation.",
+            "The trajectory contains no evidence of any different documented tonnage, and the only environment fact available (the execution log) states 76 tons, which the final answer matches, so the claimed result error is not established."
+          ],
+          "hearing_reasons": []
+        }
+      ],
+      "completed": 3,
+      "correct": 0,
+      "clean": 3,
+      "unresolved_or_missing": 0
+    },
+    "BFCL/041.json": {
+      "gold_step": "3",
+      "runs": [
+        {
+          "case": "BFCL/041.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative",
+          "rep": 1,
+          "technical_completion": true,
+          "path": "reports\\evolution_real\\recheck_live\\hearing_completion\\BFCL__041.json.rep1.json",
+          "responsible_step": 3,
+          "recall_candidates": 2,
+          "upgrade_positive": 2,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [
+            "substantiated",
+            "refuted"
+          ],
+          "upgrade_reasons": [
+            "The task demanded starting the engine in START mode on its own initiative, but the agent never locked the doors or retried startEngine, leaving the required engine-start state unachieved and merely asking permission, so correcting step 4 (locking doors and starting the engine) would complete every deliverable.",
+            "The task required inspecting each tire's overall condition, but the agent only read pressures and asserted optimal condition, breaching the required deliverable."
+          ],
+          "hearing_reasons": [
+            "event_003 shows the required startEngine(ignitionMode='START') call failed with 'All doors must be locked before starting the engine', and event_004 shows the agent merely reported the error and asked 'Would you like me to lock all the doors for you now?' instead of locking the doors and retrying. The task (turn 2) required starting the engine in START mode; no later event shows the doors being locked or the engine being started (events 5-6 move to tire checks), so the required deliverable was never achieved and the step is causally connected to the unmet completion.",
+            "CONTENT TEST: The statement at event_006 ('All tires are in optimal condition. The front tires have a pressure of 32.0 psi each, and the rear tires have a pressure of 30.0 psi each. These values are within the healthy range for your vehicle.') is directly grounded in the environment observation at event_005, which returns per-tire pressures plus the environment's own health verdict 'healthy_tire_pressure': true. Under grounding rule 3, tool observations are environment facts, so the confirmation of optimal condition is not fabricated — it reports the environment's health flag from the available tire-inspection tool. The task itself operationalizes the tire check as a pressure check: turn 4 says 'Upon verifying the tire pressure, we should share our findings' and fixes the tweet as 'Tire pressures are optimal!' (posted exactly so at event_007). No broader inspection tool or contrary evidence about tire condition appears in the shown trajectory, so the alleged gap between 'pressure reading' and 'overall condition' is not demonstrable from the evidence. RELEVANCE TEST: The claim at event_006 is the grounded confirmation turn 3 requires and feeds the tweet deliverable at event_007, which matches the task-fixed content verbatim; correcting a non-existent deviation would change nothing, and no false completion occurred since the environment itself confirmed healthy tire pressure."
+          ]
+        },
+        {
+          "case": "BFCL/041.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 2,
+          "technical_completion": true,
+          "path": "reports\\evolution_real\\recheck_live\\hearing_completion\\BFCL__041.json.rep2.json",
+          "responsible_step": null,
+          "recall_candidates": 0,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "not_needed"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [],
+          "hearing_reasons": []
+        },
+        {
+          "case": "BFCL/041.json",
+          "gold": true,
+          "prediction": false,
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "rep": 3,
+          "technical_completion": true,
+          "path": "reports\\evolution_real\\recheck_live\\hearing_completion\\BFCL__041.json.rep3.json",
+          "responsible_step": null,
+          "recall_candidates": 1,
+          "upgrade_positive": 0,
+          "forced_recall": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "ok",
+            "causal_upgrade": "ok"
+          },
+          "hearing_verdicts": [],
+          "upgrade_reasons": [
+            "The check_tire_pressure observation covering all four tires with healthy_tire_pressure=true is the environment's own condition data, so the agent's 'optimal condition' summary is grounded in the tool observation and the task itself frames optimality as pressure health ('Tire pressures are optimal!'), making the claimed tread/wear gap a merely interpretive wording difference; moreover, correcting it would not make every deliverable correct since the engine was never started (doors left unlocked), so the causal test also fails."
+          ],
+          "hearing_reasons": []
+        }
+      ],
+      "completed": 3,
+      "correct": 1,
+      "clean": 2,
+      "unresolved_or_missing": 0
+    }
+  }
+}

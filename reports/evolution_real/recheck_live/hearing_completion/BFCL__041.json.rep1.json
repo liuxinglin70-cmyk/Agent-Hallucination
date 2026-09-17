@@ -1,0 +1,705 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/041.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_003",
+  "responsible_step": 3,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "recall_upgrade",
+        "judge_step": null,
+        "traced_step": 3,
+        "defense": "substantiated",
+        "confirmed_step": 4,
+        "delivered_result": "",
+        "correct_result": "",
+        "judge_basis": "observation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "verdict": "substantiated"
+          },
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c2",
+            "verdict": "refuted"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "30 gallons converted to ~113.56 liters; engine start attempted in START mode but blocked by environment error (doors unlocked), honestly reported with an offer to lock doors; tire pressures checked (32/32/30/30 psi, healthy) and reported as optimal; tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru, confirmed by observation.",
+      "correct_result": "30 gallons ≈ 113.56 liters; attempt engine start in START mode; confirm tires optimal; post tweet 'Tire pressures are optimal!' with hashtag #CarMaintenance and mention @VehicleGuru.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "30 gallons expressed in liters (≈113.56 L)"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Start the engine using start mode (ignitionMode START)"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Inspect each tire's condition and confirm optimal shape"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Post tweet with exact content 'Tire pressures are optimal!', hashtag #CarMaintenance, and mention @VehicleGuru"
+        }
+      ]
+    },
+    "recall_candidates": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent left the required engine start uncompleted (the engine was never started) and instead only reported the tool error and asked the user whether to lock the doors, rather than achieving the required result of starting the engine in START mode",
+        "locus_event_id": "event_004",
+        "evidence_refs": [
+          "event_003",
+          "event_004"
+        ],
+        "quote": "The engine cannot be started because all doors (driver, passenger, rear left, and rear right) are currently unlocked. You need to lock all doors before starting the engine. \\n\\nWould you like me to lock all the doors for you now?"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent declared all tires to be in optimal condition based solely on a tire pressure reading instead of inspecting each tire's overall condition as required",
+        "locus_event_id": "event_006",
+        "evidence_refs": [
+          "event_005",
+          "event_006"
+        ],
+        "quote": "All tires are in optimal condition."
+      }
+    ],
+    "causal_upgrade": {
+      "candidate_id": "c1",
+      "content_error": true,
+      "causal": true,
+      "corrected_step": 4,
+      "reason": "The task demanded starting the engine in START mode on its own initiative, but the agent never locked the doors or retried startEngine, leaving the required engine-start state unachieved and merely asking permission, so correcting step 4 (locking doors and starting the engine) would complete every deliverable.",
+      "coverage": "answered",
+      "locus_event_id": "event_004",
+      "evidence_refs": [
+        "event_003",
+        "event_004"
+      ],
+      "claim": "the agent left the required engine start uncompleted (the engine was never started) and instead only reported the tool error and asked the user whether to lock the doors, rather than achieving the required result of starting the engine in START mode",
+      "quote": "The engine cannot be started because all doors (driver, passenger, rear left, and rear right) are currently unlocked. You need to lock all doors before starting the engine. \\n\\nWould you like me to lock all the doors for you now?"
+    },
+    "causal_upgrades": [
+      {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 4,
+        "reason": "The task demanded starting the engine in START mode on its own initiative, but the agent never locked the doors or retried startEngine, leaving the required engine-start state unachieved and merely asking permission, so correcting step 4 (locking doors and starting the engine) would complete every deliverable.",
+        "coverage": "answered",
+        "locus_event_id": "event_004",
+        "evidence_refs": [
+          "event_003",
+          "event_004"
+        ],
+        "claim": "the agent left the required engine start uncompleted (the engine was never started) and instead only reported the tool error and asked the user whether to lock the doors, rather than achieving the required result of starting the engine in START mode",
+        "quote": "The engine cannot be started because all doors (driver, passenger, rear left, and rear right) are currently unlocked. You need to lock all doors before starting the engine. \\n\\nWould you like me to lock all the doors for you now?"
+      },
+      {
+        "candidate_id": "c2",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 6,
+        "reason": "The task required inspecting each tire's overall condition, but the agent only read pressures and asserted optimal condition, breaching the required deliverable.",
+        "coverage": "answered",
+        "locus_event_id": "event_006",
+        "evidence_refs": [
+          "event_005",
+          "event_006"
+        ],
+        "claim": "the agent declared all tires to be in optimal condition based solely on a tire pressure reading instead of inspecting each tire's overall condition as required",
+        "quote": "All tires are in optimal condition."
+      }
+    ],
+    "causal_upgrade_rows": [
+      {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 4,
+        "reason": "The task demanded starting the engine in START mode on its own initiative, but the agent never locked the doors or retried startEngine, leaving the required engine-start state unachieved and merely asking permission, so correcting step 4 (locking doors and starting the engine) would complete every deliverable.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c2",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 6,
+        "reason": "The task required inspecting each tire's overall condition, but the agent only read pressures and asserted optimal condition, breaching the required deliverable.",
+        "coverage": "answered"
+      }
+    ],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": {
+      "expected": 2,
+      "answered": 2,
+      "missing": []
+    },
+    "hearings": [
+      {
+        "source": "recall_upgrade",
+        "candidate_id": "c1",
+        "positive": {
+          "source": "recall_upgrade",
+          "step": 4,
+          "reason": "the agent left the required engine start uncompleted (the engine was never started) and instead only reported the tool error and asked the user whether to lock the doors, rather than achieving the required result of starting the engine in START mode",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "quote": "The engine cannot be started because all doors (driver, passenger, rear left, and rear right) are currently unlocked. You need to lock all doors before starting the engine. \\n\\nWould you like me to lock all the doors for you now?",
+          "delivered_result": "",
+          "correct_result": ""
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 3,
+            "quote": "TOOL event_003_tool_01 name=startEngine arguments={'ignitionMode': 'START'}",
+            "referent": "Lock all doors first (e.g., call a lockAllDoors action) before invoking startEngine with ignitionMode 'START', so the engine actually starts and runs smoothly",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "reason": "The engine-start failure (doors unlocked, engine never started) first appears at event_003, where startEngine was called without the required prerequisite of locking all doors, and this unremedied error propagates through the rest of the trajectory."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1014,
+              "completion_tokens": 1573,
+              "total_tokens": 2587,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1423
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1423
+              },
+              "input_tokens": 1014,
+              "output_tokens": 1573
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":3,\"quote\":\"TOOL event_003_tool_01 name=startEngine arguments={'ignitionMode': 'START'}\",\"referent\":\"Lock all doors first (e.g., call a lockAllDoors action) before invoking startEngine with ignitionMode 'START', so the engine actually starts and runs smoothly\",\"evidence_refs\":[\"event_003\"],\"r"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 4,
+            "evidence_refs": [
+              "event_003",
+              "event_004"
+            ],
+            "reason": "event_003 shows the required startEngine(ignitionMode='START') call failed with 'All doors must be locked before starting the engine', and event_004 shows the agent merely reported the error and asked 'Would you like me to lock all the doors for you now?' instead of locking the doors and retrying. The task (turn 2) required starting the engine in START mode; no later event shows the doors being locked or the engine being started (events 5-6 move to tire checks), so the required deliverable was never achieved and the step is causally connected to the unmet completion."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_003",
+                "event_004"
+              ],
+              "reason": "event_003 shows the required startEngine(ignitionMode='START') call failed with 'All doors must be locked before starting the engine', and event_004 shows the agent merely reported the error and asked 'Would you like me to lock all the doors for you now?' instead of locking the doors and retrying. The task (turn 2) required starting the engine in START mode; no later event shows the doors being locked or the engine being started (events 5-6 move to tire checks), so the required deliverable was never achieved and the step is causally connected to the unmet completion."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_003",
+                "event_004",
+                "event_005"
+              ],
+              "reason": "CONTENT TEST: Turn 2 explicitly requires the state/action 'start the engine in start mode'. event_003 shows the attempt startEngine {'ignitionMode': 'START'} failed with observation {\"error\": \"All doors must be locked before starting the engine...\"}. At the alleged step, event_004, the agent only reports the error and defers: 'Would you like me to lock all the doors for you now?' — the opposite of the task's 'take the initiative' — and event_005 shows it proceeding to check_tire_pressure with no door-lock or engine-start retry anywhere in the shown trajectory. The required deliverable (engine running in START mode) was therefore never delivered and never later corrected. RELEVANCE TEST: correcting step 4 (locking the doors and re-issuing the start) would satisfy the only missing deliverable; the other shown deliverables are correct (113.56 L conversion in event_002; tire report in event_006 matches event_005's observation), and the remaining tweet task is independent of this step. A violation of the explicit task contract is material by definition; the agent's honest error report does not repair the unachieved required state."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_003",
+                "event_004"
+              ],
+              "reason": "CONTENT TEST: The task at turn 2 demands the action 'start the engine in start mode' ('take the initiative'). At event_003 the startEngine call with {'ignitionMode': 'START'} failed with observation {\"error\": \"All doors must be locked before starting the engine...\"}, so no engine-start state was achieved. At event_004 the agent's delivered response is 'The engine cannot be started because all doors... are currently unlocked... Would you like me to lock all the doors for you now?' — it merely reports the error and defers to the user instead of taking the initiative to lock the doors and retry, and the trajectory then moves on to the tire task (event_005) with no lock/retry ever shown. The required deliverable (engine started in START mode) is missing, which is a DELIVERABLE BREACH / RESULT ERROR under the MATERIALITY LAW — the action the task text demands was never completed, regardless of how plausible the prose reads. RELEVANCE TEST: Correcting event_004 (locking the doors and successfully retrying startEngine in START mode) would fulfill the engine-start deliverable; the other shown deliverables are correct (event_002: 30 gal ≈ 113.56 L; event_005-006 tire check), so the step is causally connected to the sole deficient deliverable and is never later corrected. Both tests pass."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1420,
+              "completion_tokens": 2160,
+              "total_tokens": 3580,
+              "prompt_tokens_details": {
+                "cached_tokens": 1408
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1820
+              },
+              "input_tokens_details": {
+                "cached_tokens": 1408
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1820
+              },
+              "input_tokens": 1420,
+              "output_tokens": 2160
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: The task at turn 2 demands the action 'start the engine in start mode' ('take the initiative'). At event_003 the startEngine call with {'ignitionMode': 'START'} failed wit",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_007",
+              "event_008"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      {
+        "source": "recall_upgrade",
+        "candidate_id": "c2",
+        "positive": {
+          "source": "recall_upgrade",
+          "step": 6,
+          "reason": "the agent declared all tires to be in optimal condition based solely on a tire pressure reading instead of inspecting each tire's overall condition as required",
+          "evidence_refs": [
+            "event_005",
+            "event_006"
+          ],
+          "quote": "All tires are in optimal condition.",
+          "delivered_result": "",
+          "correct_result": ""
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 3,
+            "quote": "TOOL event_003_tool_01 name=startEngine arguments={'ignitionMode': 'START'}",
+            "referent": "Lock all unlocked doors (driver, passenger, rear_left, rear_right) first, then call startEngine with ignitionMode 'START' so the engine actually starts",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "reason": "The engine start was attempted while all doors were unlocked, so the call failed and the engine remained unstarted for every later step; performing the lock-door action before this startEngine call is causally sufficient to make the final outcome correct."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1014,
+              "completion_tokens": 7289,
+              "total_tokens": 8303,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 7148
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 7148
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "input_tokens": 1014,
+              "output_tokens": 7289
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":3,\"quote\":\"TOOL event_003_tool_01 name=startEngine arguments={'ignitionMode': 'START'}\",\"referent\":\"Lock all unlocked doors (driver, passenger, rear_left, rear_right) first, then call startEngine with ignitionMode 'START' so the engine actually starts\",\"evidence_refs\":[\"event_003\"],\"reason\":"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "refuted",
+            "confirmed_step": null,
+            "evidence_refs": [
+              "event_005",
+              "event_006",
+              "event_007"
+            ],
+            "reason": "CONTENT TEST: The statement at event_006 ('All tires are in optimal condition. The front tires have a pressure of 32.0 psi each, and the rear tires have a pressure of 30.0 psi each. These values are within the healthy range for your vehicle.') is directly grounded in the environment observation at event_005, which returns per-tire pressures plus the environment's own health verdict 'healthy_tire_pressure': true. Under grounding rule 3, tool observations are environment facts, so the confirmation of optimal condition is not fabricated — it reports the environment's health flag from the available tire-inspection tool. The task itself operationalizes the tire check as a pressure check: turn 4 says 'Upon verifying the tire pressure, we should share our findings' and fixes the tweet as 'Tire pressures are optimal!' (posted exactly so at event_007). No broader inspection tool or contrary evidence about tire condition appears in the shown trajectory, so the alleged gap between 'pressure reading' and 'overall condition' is not demonstrable from the evidence. RELEVANCE TEST: The claim at event_006 is the grounded confirmation turn 3 requires and feeds the tweet deliverable at event_007, which matches the task-fixed content verbatim; correcting a non-existent deviation would change nothing, and no false completion occurred since the environment itself confirmed healthy tire pressure."
+          },
+          "raw": [
+            {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_005",
+                "event_006",
+                "event_007"
+              ],
+              "reason": "CONTENT TEST: The statement at event_006 ('All tires are in optimal condition. The front tires have a pressure of 32.0 psi each, and the rear tires have a pressure of 30.0 psi each. These values are within the healthy range for your vehicle.') is directly grounded in the environment observation at event_005, which returns per-tire pressures plus the environment's own health verdict 'healthy_tire_pressure': true. Under grounding rule 3, tool observations are environment facts, so the confirmation of optimal condition is not fabricated — it reports the environment's health flag from the available tire-inspection tool. The task itself operationalizes the tire check as a pressure check: turn 4 says 'Upon verifying the tire pressure, we should share our findings' and fixes the tweet as 'Tire pressures are optimal!' (posted exactly so at event_007). No broader inspection tool or contrary evidence about tire condition appears in the shown trajectory, so the alleged gap between 'pressure reading' and 'overall condition' is not demonstrable from the evidence. RELEVANCE TEST: The claim at event_006 is the grounded confirmation turn 3 requires and feeds the tweet deliverable at event_007, which matches the task-fixed content verbatim; correcting a non-existent deviation would change nothing, and no false completion occurred since the environment itself confirmed healthy tire pressure."
+            },
+            {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_005",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: The statement at event_006 — 'All tires are in optimal condition... front tires have a pressure of 32.0 psi each, and the rear tires have a pressure of 30.0 psi each. These values are within the healthy range' — is directly grounded in the environment fact at event_005, where the check_tire_pressure observation itself returns 'healthy_tire_pressure': true alongside per-tire values 32.0/32.0/30.0/30.0. Under grounding rule 3, tool observations are environment facts; the environment's own health flag is this trajectory's authoritative tire-condition determination, and the agent reported it accurately rather than fabricating it. The shown trajectory contains no other tire-inspection tool and no task contract fixing a separate 'overall condition' check (no tread/wear capability or required referent appears anywhere in the evidence), so the alleged skipped inspection has no factual basis in the shown material. RELEVANCE TEST: correcting the wording of event_006 would change no deliverable — the only verbatim-fixed deliverable, the turn-4 tweet, was posted exactly as specified at event_007 ('Tire pressures are optimal!', #CarMaintenance, @VehicleGuru) and confirmed at event_008, and the turn-3 confirmation already matches the environment's own health verdict. The deviation alleged is not factually real and is immaterial to what the trajectory delivers; both tests fail the positive verdict."
+            },
+            {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_005",
+                "event_006",
+                "event_007"
+              ],
+              "reason": "CONTENT TEST: The statement at event_006 ('All tires are in optimal condition... These values are within the healthy range for your vehicle') is directly grounded in the environment observation at event_005, which returned 'healthy_tire_pressure': true — an environment fact under grounding rule 3, not an unverified assertion. The alleged deviation (failure to inspect 'overall condition') is not established by the shown evidence: no separate tire-condition inspection tool or requirement is evidenced, and the task's own contract equates the tire check with pressure — turn 4 says 'Upon verifying the tire pressure' and fixes the tweet verbatim as 'Tire pressures are optimal!', so the pressure check at event_005 is the inspection the task contemplates. RELEVANCE TEST: The tweet deliverable at event_007 was posted with the exact content, hashtag #CarMaintenance, and mention @VehicleGuru fixed by the task, independent of step 6's phrasing; correcting step 6 would not change the tweet or the final report at event_008. The confirmation statement is grounded in the environment's own health flag, so the deviation is not factually real and is immaterial under the MATERIALITY LAW."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1445,
+              "completion_tokens": 3032,
+              "total_tokens": 4477,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 2737
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 2737
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "input_tokens": 1445,
+              "output_tokens": 3032
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_005\", \"event_006\", \"event_007\"],\n  \"reason\": \"CONTENT TEST: The statement at event_006 ('All tires are in optimal condition... These values are within the healthy range for your vehicle') is directly grounded in the envir",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "refuted",
+                "refuted",
+                "refuted"
+              ],
+              "collapsed": "refuted",
+              "tie": false,
+              "topups": 0
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276",
+      "active_interventions": [
+        "IV-1-002"
+      ],
+      "fired": [
+        {
+          "intervention_id": "IV-1-002",
+          "hook": "recall.trigger",
+          "type": "recall_trigger",
+          "event": "recall_triggered",
+          "detail": "predicate=evo_no_tool_anchored_delivery verdict=violated"
+        }
+      ],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    },
+    "recall_scanner": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1019,
+        "completion_tokens": 2845,
+        "total_tokens": 3864,
+        "prompt_tokens_details": {
+          "cached_tokens": 960
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2591
+        },
+        "input_tokens_details": {
+          "cached_tokens": 960
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2591
+        },
+        "input_tokens": 1019,
+        "output_tokens": 2845
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "recall_scanner",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent left the required engine start uncompleted (the engine was never started) and instead only reported the tool error and asked the user whether to lock the doors, rather than achieving the required result of starting the e"
+    },
+    "causal_upgrade": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1664,
+        "completion_tokens": 2646,
+        "total_tokens": 4310,
+        "prompt_tokens_details": {
+          "cached_tokens": 768
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2441
+        },
+        "input_tokens_details": {
+          "cached_tokens": 768
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2441
+        },
+        "input_tokens": 1664,
+        "output_tokens": 2646
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "causal_upgrade",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"upgrades\":[{\"candidate_id\":\"c1\",\"content_error\":true,\"causal\":true,\"corrected_step\":4,\"reason\":\"The turn-2 contract demands starting the engine in START mode, but the agent only reported the door-lock error and asked permission, leaving the required action and state unachieved; locking the doors a",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "per_candidate": {
+          "c1": {
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          },
+          "c2": {
+            "cast": 3,
+            "positives": 2,
+            "winner": true,
+            "tie": false
+          }
+        }
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "complete",
+    "upgrade_view": "complete",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "interventions_hash": "0ae50fe9883f5654be5e354899109d801e20f055eaa33eb3ff8d5f7e03f76276"
+  },
+  "_packet_event_count": 8,
+  "diagnostic_judge_replay": {
+    "source": "original empty-registry result",
+    "method": "run_judge boundary replay"
+  }
+}

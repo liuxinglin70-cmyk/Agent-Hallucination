@@ -1,69 +1,73 @@
-# agent-hallucination 工作区（当前入口）
+# Agent Hallucination：检测器底座与自进化框架
 
-本仓库当前只有一个活跃方向：**基于 `detector_v2` 的自进化幻觉检测器**。
+本仓库维护两条相互连接的主线：`detector` 独立判断 Agent 轨迹中的结果性幻觉；`evolution` 从稳定失效中提出干预，经程序化评审后部署到底座。模块、命令和配置按职责命名，不按研究迭代版本命名。
 
-## 从这里开始（活跃设计文档）
+## 项目结构
 
-- **[SELF_EVOLUTION_V3_DESIGN_FOR_DETECTOR_V2.md](SELF_EVOLUTION_V3_DESIGN_FOR_DETECTOR_V2.md)** —— V3 自进化框架设计真源：
-  机制级失效面、L1/L2 双向机制与防 hack、artifact 合同、G1/G2a/G2b/G3 门、
-  skill 贡献淘汰、evaluation / meta-evaluation、M0-M5 里程碑。
-- **[detector_v2/README.md](detector_v2/README.md)** —— 当前检测器（冻结基座）的使用与结构说明。
-- **[evolution_v3/README.md](evolution_v3/README.md)** —— 干预式自进化框架的实现与实验说明。
-- **[SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md](SELF_EVOLUTION_V3_AUDIT_AND_EXPERIMENT_PROTOCOL.md)**
-  —— 2026-08-19 系统审查结论、修复清单、实验阻断条件和真实验证协议。
-- **[evolution_v3/experiments/tuning100_validation50_experiment_report.md](evolution_v3/experiments/tuning100_validation50_experiment_report.md)**
-  —— 历史 100+50 实验记录，仅作探索性机制证据，不是独立泛化结论。
-- **[Recursive 与 AI4AI 前沿进展调研.pdf](Recursive%20%E4%B8%8E%20AI4AI%20%E5%89%8D%E6%B2%BF%E8%BF%9B%E5%B1%95%E8%B0%83%E7%A0%94.pdf)** —— RSI / AI4AI 调研（V3 设计的理论输入）。
+```text
+detector/                  检测器底座、配置、单元测试与测试夹具
+evolution/                 自进化框架、开发配置、离线闭环、回归测试
+datasets/raw/              原始完整数据集，保持原文件不变
+datasets/protocols/        开发划分与保守的数据使用边界
+datasets/integrity.json    原始目录逐文件 SHA-256
+docs/                      架构、干预契约、数据评估协议、维护说明、代码 review 与优化方向
+tests/                     跨模块和仓库入口回归测试
+scripts/verify.py           可复现的离线验证入口
+scripts/live_smoke.py       两个合成案例的真实服务联调入口
+scripts/real_path_check.py  真实数据集上的小规模路径与重复运行检查
+reports/latest/            最新源码对应的验证报告
+reports/live/              独立记录的真实服务联调结果
+reports/real/              真实数据集路径与重复运行结果
+reports/evolution_real/    真实两轮自进化实验结果
+reports/maintenance/       精简的整理记录与历史背景
+artifacts/                 运行时输出（自动生成，不入 Git）
+pyproject.toml             Python 项目元数据与统一测试配置
+```
 
-## 当前状态（2026-08-20）
+## 使用入口
 
-- 检测器：`detector_v2`（Outcome Judge → Recall Scanner → Causal Upgrade →
-  Step Tracer → Defense → 确定性裁决）。
-- 检测器基线：`runs_v2/v2_100_20w`（100 例，20 并发）已冻结；20 例 pilot 与
-  80 例补充实验均已出结果。
-- 自进化框架：`evolution_v3` 已实现 V1→V2→V3→M 四门、defect-injection audit、
-  frozen-stage 配对重放、hash-chained ledger、pre-commit registry、rollback 状态恢复、
-  source-bound cache 和 run manifest。
-- 历史 active registry：`evolution_v3/registry/active.json`，共 5 条干预，可按当前
-  executable contract 加载；默认 runtime registry 仍为空。
-- 历史 100+50 结果只能作为探索性机制证据：数据被用于开发/重复调优，active
-  验证臂主要是 frozen replay，不能证明独立外部泛化提升。
-- 全量测试当前为 `244 passed`；正式 393/300 split 因已知历史污染会被代码阻断。
-- 后续 clean 实验协议见 `evolution_v3/experiments/real_eval_v1_protocol.md`：
-  B 阶段必须在独立 effect holdout 上 fresh 验证后才能读取一次性全量集，
-  不再使用单独 C 阶段。
-- `real_eval_v2` B 阶段完整跑通 2 cycle + fresh mini_effect，ledger 校验通过，
-  但事后架构审查确认 frozen-stage status alias 缺陷制造了假性 unresolved，
-  因此该次 V2 数字属于失败/无效运行，不能用于评价 proposer。框架现已在机制层
-  修复 replay、failure-family 归纳、mechanical evidence binding 与跨 cycle
-  rejection feedback；门限未按实验结果调整，全量 holdout 未读取，后续必须使用
-  v10 cache 做 clean B 验证。clean run 必须整体删除
-  `evolution_v3/work/real_eval_v2_b`，不能只清单个 cache 子目录。
-- 修复后首个有效 clean B（v10b）已跑通完整闭环：patrol 形成稳定失败族、
-  提案器产出的不安全 guard 被本地契约拦截、evidence_check 在 V2 被
-  `new_fn=1` 正确拒绝、cycle 2 原样重提被 `echo_of_rejected` 拦截。active
-  registry 为空，B 未通过，全量 holdout 未读取；该运行是有效的提案机制证据。
-- LLM provider：默认已切换为 **AutoDL**（`https://www.autodl.art/api/v1`，
-  `AUTODL_API_KEY`）；官方 DeepSeek 配置保留为显式回滚路径。
-- 原计划冻结 300 例终审尚未读取，但已发现与 tuning100 重叠 44 例，因此不能
-  继续作为干净确认集，必须重建 holdout。
-- 旧框架 `sehd_rise2/` 已冻结，不再作为进化方向；其历史设计与证据归档在
-  `archive/legacy_docs/`，仅作追溯，不作为当前工作依据。
+Python 3.10 及以上；运行时使用标准库，测试依赖 pytest。建议在仓库根目录使用虚拟环境：
 
-## 旧文档去向
+```bash
+python -m pip install -e ".[test]"
+python -m detector --help
+python -m evolution --help
+python scripts/verify.py
+```
 
-根目录不再保留过时设计文档。历史文档（含旧 EvoGuard / fix-val / SEHD-RISE2
-诊断与重构方案）统一归档在：
+检测单个原始案例（会调用模型服务）：
 
-- `archive/legacy_docs/`
-  - `README_SEHD_RISE2_LEGACY.md`
-  - `DETECTOR_OUTCOME_V2_PROPOSAL.md`
-  - `EvoGuard_experiment_plan_and_iteration_roadmap.md`
-  - `EvoGuard_self_evolving_hallucination_detection_project_design.md`
-  - `FIX_VALIDATE_ITERATION_PLAN.md`
-  - `SEHD_RISE2_ARCHITECTURE_DIAGNOSIS.md`
-  - `SEHD_RISE2_V2_REFACTOR_PLAN.md`
-  - `SELF_EVOLUTION_REDESIGN_PROPOSAL.md`
-  - `V2_1_IMPROVEMENT_PLAN.md`
+```bash
+python -m detector detect --record datasets/raw/agenthallu/AgentHallu/BFCL/001.json --case-id BFCL/001.json --output-dir artifacts/detector/single
+```
 
-这些文件不再出现在工作区入口，需要追溯历史时再查阅。
+开发协议上的进化（会调用模型服务，数据已用于开发）：
+
+```bash
+python -m evolution preview --cycle 1 --mini
+python -m evolution experiment --mini
+python -m evolution registry
+python -m evolution verify-ledger
+```
+
+默认检测配置为 `detector/configs/autodl.json`，路由模型为 `GLM-5.3-flash`，通过 `AUTODL_API_KEY` 获取凭据，直连 `https://www.autodl.art/api/v1`。`detector/configs/deepseek.json` 是显式可选配置。模型、票数与思考档位只由配置文件决定；仓库 `.env` 保留且不入 Git，只存放凭据，进程环境可覆盖配置中的同名变量。`GLM-5.3-flash` 始终思考，且对任何显式 `thinking` 字段会间歇性返回 400，因此 GLM 路由不发送该字段。
+
+## 阅读顺序
+
+1. [代码架构与执行逻辑](docs/architecture.md)
+2. [干预、DSL 与部署契约](docs/interventions.md)
+3. [数据与评估协议](docs/evaluation.md)
+4. [命名与维护约定](docs/maintenance.md)
+5. [代码 Review：机制梳理与缺陷清单](docs/review.md)
+6. [跳出无效优化循环：面向 RSI 的优化方向](docs/optimization-directions.md)
+7. [最新验证结果](reports/latest/README.md)
+8. [当前进展与下一步计划](docs/progress.md)
+9. [真实服务联调结果](reports/live/README.md)
+10. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
+11. [真实两轮自进化实验结果](reports/evolution_real/README.md)
+
+原始数据共 693 个案例、7 个来源。原始目录 695 个文件的摘要保存在 `datasets/integrity.json`。当前默认协议为开发复测；没有预先配置可宣称独立泛化的终审集。离线 smoke 使用 mock 后端，证明机制闭环，不代表真实模型准确率。
+
+2026-09-16 已完成离线回归、真实服务联调、真实数据集小规模路径检查，以及首次真实两轮自进化实验。真实服务使用当前配置的 `GLM-5.3-flash`：两个合成算术案例跑通 `batch → evaluate`；真实数据集上冻结底座后两次运行 6 例，判定 6/6 一致、0 unresolved、12/12 authoritative，并另以单票强制触发验证了召回升级分支。自进化第 1 轮完整跑通真实 `proposer → detector 配对评估 → 四门准入`：产出 3 个合法候选但**全部被门限拒绝，准入 0，真实收益未成立**；第 2 轮被环境中断未完成。这些结果都不是准确率或泛化结论，具体证据边界见相应报告。
+
+2026-09-17 完成代码 review 与修复：13 项会污染结论的缺陷全部修复并配回归测试，测试由 220 增至 244 passed，`scripts/verify.py` 七项校验全 PASS。同时确认真实自进化收益未成立的结构性原因（搜索空间冻结、评估无统计功效、准入终结式无存档、框架自身只由人手优化），并给出面向 RSI 的优化方向。详见 [代码 Review](docs/review.md) 与 [优化方向](docs/optimization-directions.md)。

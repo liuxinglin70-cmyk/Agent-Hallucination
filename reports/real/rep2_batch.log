@@ -1,0 +1,25 @@
+batch run rep2: 6 cases, workers=2
+  [OpenDeepSearch/076.json] state=verified_error authority=authoritative
+  [SmolAgents/022.json] state=verified_error authority=authoritative
+  [BFCL/012.json] state=verified_clean authority=authoritative
+  [Camel/028.json] state=verified_clean authority=authoritative
+  [OpenDeepSearch/078.json] state=verified_error authority=authoritative
+  [Magentic_One/067.json] state=verified_clean authority=authoritative
+{
+  "schema_version": "detector.run_summary.v1",
+  "run_id": "rep2",
+  "cases": [
+    "OpenDeepSearch/076.json",
+    "OpenDeepSearch/078.json",
+    "SmolAgents/022.json",
+    "BFCL/012.json",
+    "Camel/028.json",
+    "Magentic_One/067.json"
+  ],
+  "completed": 6,
+  "state_counts": {
+    "verified_error": 3,
+    "verified_clean": 3,
+    "unresolved": 0
+  }
+}

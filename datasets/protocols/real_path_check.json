@@ -1,0 +1,24 @@
+{
+  "schema_version": "detector.real_path_check.v1",
+  "purpose": "Small-scale real-provider path and repeatability check on the real dataset. Freezes source, model, votes, prompt route and case list; not an accuracy benchmark and not an independent generalization set.",
+  "detector_config": "detector/configs/autodl.json",
+  "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+  "cases": [
+    "OpenDeepSearch/076.json",
+    "OpenDeepSearch/078.json",
+    "SmolAgents/022.json",
+    "BFCL/012.json",
+    "Camel/028.json",
+    "Magentic_One/067.json"
+  ],
+  "recall_cases": [
+    "BFCL/012.json",
+    "Camel/028.json",
+    "Magentic_One/067.json"
+  ],
+  "budget": {
+    "repetitions": 2,
+    "workers": 2,
+    "case_timeout_seconds": 900
+  }
+}

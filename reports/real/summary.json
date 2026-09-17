@@ -1,0 +1,517 @@
+{
+  "status": "completed",
+  "passed": true,
+  "started_at_utc": "2026-09-16T08:35:19.896451+00:00",
+  "scope": "Small-scale real-provider path and repeatability check on the real dataset. Freezes source, model, votes, prompt route and case list; not an accuracy benchmark and not an independent generalization set.",
+  "run_dir": "artifacts/real/real_path_20260916T083519896451Z",
+  "limits": {
+    "repetitions": 2,
+    "cases": 6,
+    "workers": 2,
+    "case_timeout_seconds": 900
+  },
+  "freeze": {
+    "resolved_config_sha256": "cace907899f43976d596027b9fcbb134c90660be8a3f096268b02fc6d4f2d0f1",
+    "protocol_sha256": "c9f0e1d0a3dfd70de5380af0b3894f55e7a51e351790e1b06844eb25015747bd",
+    "source_sha256": "452cd7ef94fa22a8c9ce8f8de51060086b1ed8421b500370d6a7379928661f8f",
+    "case_list": [
+      "OpenDeepSearch/076.json",
+      "OpenDeepSearch/078.json",
+      "SmolAgents/022.json",
+      "BFCL/012.json",
+      "Camel/028.json",
+      "Magentic_One/067.json"
+    ],
+    "routes": {
+      "judge_route": {
+        "model": "GLM-5.3-flash",
+        "endpoint": "https://www.autodl.art/api/v1",
+        "votes": 3,
+        "vote_topup": 2,
+        "max_tokens": null,
+        "json_mode": true,
+        "extra_body": null
+      },
+      "defense_route": {
+        "model": "GLM-5.3-flash",
+        "endpoint": "https://www.autodl.art/api/v1",
+        "votes": 3,
+        "vote_topup": 2,
+        "max_tokens": 8192,
+        "json_mode": null,
+        "extra_body": null
+      },
+      "recall_route": {
+        "model": "GLM-5.3-flash",
+        "endpoint": "https://www.autodl.art/api/v1",
+        "votes": null,
+        "vote_topup": null,
+        "max_tokens": 8192,
+        "json_mode": null,
+        "extra_body": null
+      }
+    }
+  },
+  "commands": [
+    {
+      "name": "rep1_batch",
+      "exit_code": 0
+    },
+    {
+      "name": "rep1_evaluate",
+      "exit_code": 0
+    },
+    {
+      "name": "rep2_batch",
+      "exit_code": 0
+    },
+    {
+      "name": "rep2_evaluate",
+      "exit_code": 0
+    },
+    {
+      "name": "recall_batch",
+      "exit_code": 0
+    },
+    {
+      "name": "recall_evaluate",
+      "exit_code": 0
+    }
+  ],
+  "recall_phase": {
+    "cases": [
+      "BFCL/012.json",
+      "Camel/028.json",
+      "Magentic_One/067.json"
+    ],
+    "ran": true,
+    "config_sha256": "f4ff36c475833be06322c3e2d0f228c7a38e839575e7408904cb6dfbb81f505b",
+    "stages_observed": [
+      "causal_upgrade",
+      "recall_scanner"
+    ],
+    "rows": [
+      {
+        "case": "BFCL/012.json",
+        "state": "verified_error",
+        "authority": "authoritative",
+        "responsible_step": 5,
+        "elapsed_seconds": 226.2,
+        "tokens": 9677,
+        "stages": {
+          "judge": "ok",
+          "recall_scanner": "ok",
+          "causal_upgrade": "ok"
+        },
+        "model": "glm-5.3-flash",
+        "runtime_valid": true
+      },
+      {
+        "case": "Camel/028.json",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "elapsed_seconds": 36.0,
+        "tokens": 52150,
+        "stages": {
+          "judge": "ok",
+          "recall_scanner": "ok",
+          "causal_upgrade": "not_needed"
+        },
+        "model": "glm-5.3-flash",
+        "runtime_valid": true
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "elapsed_seconds": 101.6,
+        "tokens": 31145,
+        "stages": {
+          "judge": "ok",
+          "recall_scanner": "ok",
+          "causal_upgrade": "ok"
+        },
+        "model": "glm-5.3-flash",
+        "runtime_valid": true
+      }
+    ]
+  },
+  "repetitions": [
+    {
+      "repetition": 1,
+      "metrics": {
+        "decisive": 6,
+        "unresolved": 0,
+        "completion": 1.0,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 1.0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 1.0,
+        "macro_recall": 1.0,
+        "macro_f1": 1.0,
+        "authoritative": 6,
+        "degraded": 0,
+        "provider_unresolved": 0,
+        "requested_cases": 6,
+        "found_results": 6,
+        "missing_cases": 0,
+        "step_localization": {
+          "n": 3,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "cases": [
+        {
+          "case": "OpenDeepSearch/076.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 3,
+          "elapsed_seconds": 56.1,
+          "tokens": 6582,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "OpenDeepSearch/078.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 4,
+          "elapsed_seconds": 184.3,
+          "tokens": 10996,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "SmolAgents/022.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 4,
+          "elapsed_seconds": 191.8,
+          "tokens": 40227,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "BFCL/012.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 39.3,
+          "tokens": 3234,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "Camel/028.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 32.3,
+          "tokens": 25603,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "Magentic_One/067.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 40.8,
+          "tokens": 8918,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "metrics": {
+        "decisive": 6,
+        "unresolved": 0,
+        "completion": 1.0,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 1.0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 1.0,
+        "macro_recall": 1.0,
+        "macro_f1": 1.0,
+        "authoritative": 6,
+        "degraded": 0,
+        "provider_unresolved": 0,
+        "requested_cases": 6,
+        "found_results": 6,
+        "missing_cases": 0,
+        "step_localization": {
+          "n": 3,
+          "hits": 1,
+          "accuracy": 0.3333333333333333
+        }
+      },
+      "cases": [
+        {
+          "case": "OpenDeepSearch/076.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 3,
+          "elapsed_seconds": 53.2,
+          "tokens": 6867,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "OpenDeepSearch/078.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 1,
+          "elapsed_seconds": 379.6,
+          "tokens": 21186,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "SmolAgents/022.json",
+          "state": "verified_error",
+          "authority": "authoritative",
+          "responsible_step": 4,
+          "elapsed_seconds": 218.5,
+          "tokens": 41174,
+          "stages": {
+            "judge": "ok",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "BFCL/012.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 43.2,
+          "tokens": 3401,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "Camel/028.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 42.0,
+          "tokens": 25547,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        },
+        {
+          "case": "Magentic_One/067.json",
+          "state": "verified_clean",
+          "authority": "authoritative",
+          "responsible_step": null,
+          "elapsed_seconds": 34.2,
+          "tokens": 8691,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed"
+          },
+          "model": "glm-5.3-flash",
+          "runtime_valid": true
+        }
+      ]
+    }
+  ],
+  "consistency": [
+    {
+      "case": "OpenDeepSearch/076.json",
+      "consistent": true,
+      "states": [
+        "verified_error",
+        "verified_error"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        3,
+        3
+      ]
+    },
+    {
+      "case": "OpenDeepSearch/078.json",
+      "consistent": false,
+      "states": [
+        "verified_error",
+        "verified_error"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        4,
+        1
+      ]
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "consistent": true,
+      "states": [
+        "verified_error",
+        "verified_error"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        4,
+        4
+      ]
+    },
+    {
+      "case": "BFCL/012.json",
+      "consistent": true,
+      "states": [
+        "verified_clean",
+        "verified_clean"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        null,
+        null
+      ]
+    },
+    {
+      "case": "Camel/028.json",
+      "consistent": true,
+      "states": [
+        "verified_clean",
+        "verified_clean"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        null,
+        null
+      ]
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "consistent": true,
+      "states": [
+        "verified_clean",
+        "verified_clean"
+      ],
+      "authorities": [
+        "authoritative",
+        "authoritative"
+      ],
+      "responsible_steps": [
+        null,
+        null
+      ]
+    }
+  ],
+  "summary": {
+    "consistent_cases": 5,
+    "total_cases": 6,
+    "agreement_rate": 0.8333333333333334,
+    "unresolved": 0,
+    "missing_results": 0,
+    "authoritative": 12,
+    "stages_fired": [
+      "defense:ok",
+      "judge:ok",
+      "step_tracer:ok"
+    ],
+    "elapsed_seconds": {
+      "min": 32.3,
+      "max": 379.6,
+      "mean": 109.6
+    },
+    "tokens": {
+      "total": 202426,
+      "mean_per_case": 16868.8
+    },
+    "recall_phase": {
+      "cases": 3,
+      "unresolved": 0,
+      "scanner_ran": 3,
+      "upgrade_ran": 2
+    }
+  },
+  "source_unchanged": true,
+  "finished_at_utc": "2026-09-16T08:50:29.547915+00:00"
+}

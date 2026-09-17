@@ -1,42 +1,7 @@
-# 原始数据集
+# 数据目录
 
-把原始数据集文件放在本目录。它们从不被 git 跟踪。
+`raw/` 是原始完整数据，保持原文件与原目录结构；不进入 Git。`integrity.json` 保存全部 695 个文件的 SHA-256，包含 693 个 AgentHallu 案例。
 
-预期布局：
+`protocols/development.json` 保存当前开发与复测案例 ID；`protocols/development_exposure.json` 保存保守的数据使用边界。旧派生学习案例、策略候选和重复 split 已移出活动仓库。
 
-```text
-datasets/
-├── README.md            # 本文件
-└── raw/                 # 实际数据集文件（被 git 忽略）
-    └── <dataset>/
-        ├── cases/       # 原始轨迹记录
-        └── manifest.jsonl
-```
-
-## 记录格式
-
-每条原始轨迹是供检测器消费的一个 JSON 对象：
-
-```json
-{
-  "case_id": "optional-external-id",
-  "question": "optional task text",
-  "history": [
-    {
-      "step": 1,
-      "role": "assistant",
-      "content": "agent message",
-      "tool_calls": [],
-      "tool_responses": []
-    }
-  ]
-}
-```
-
-- `history` 必须是非空列表。
-- 仅求值器使用的字段（`gold_label`、`is_hallucination`、`hallucination_step`，……）
-  可以存在；检测器在每次 provider 调用前剥离它们，进化框架只可在显式启用
-  gold 增强时使用它们。
-
-进化 CLI 接受本目录的记录，可以是 JSON 映射，也可以是 JSONL 序列；见
-`sehd_rise/detection/detector.py` 与 `sehd_rise/api/evolution.py` 中的记录加载入口。
+检测器输入严格只有 `question/history`，原始标签通过 `detector.dataset.project_record` 隔离。完整协议见 [数据与评估](../docs/evaluation.md)。

@@ -1,0 +1,125 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/017.json",
+  "state": "verified_clean",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "ProjectOverview.txt was written with 'To be discussed'; after the cp failure, Draft.txt was written with the same content 'To be discussed' so both files are identical; Twitter authentication with tech_guru/securePass123 succeeded, and the tweet 'Initial summary of the project. To be discussed.' with tag '#ProjectUpdate' and mentions @manager and @team_lead was successfully posted (tweet id 0).",
+        "correct_result": "ProjectOverview.txt contains 'To be discussed'; ProjectOverview.txt and Draft.txt are identical (both 'To be discussed'); a tweet with content 'Initial summary of the project. To be discussed.', tagged ProjectUpdate, mentioning @manager and @team_lead, posted via authenticated account tech_guru."
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "ProjectOverview.txt was written with 'To be discussed'; after the cp failure, Draft.txt was written with the same content 'To be discussed' so both files are identical; Twitter authentication with tech_guru/securePass123 succeeded, and the tweet 'Initial summary of the project. To be discussed.' with tag '#ProjectUpdate' and mentions @manager and @team_lead was successfully posted (tweet id 0).",
+      "correct_result": "ProjectOverview.txt contains 'To be discussed'; ProjectOverview.txt and Draft.txt are identical (both 'To be discussed'); a tweet with content 'Initial summary of the project. To be discussed.', tagged ProjectUpdate, mentioning @manager and @team_lead, posted via authenticated account tech_guru.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "required_action",
+          "requirement": "Write 'To be discussed' into ProjectOverview.txt"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Make ProjectOverview.txt and Draft.txt identical"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Authenticate to Twitter as tech_guru with securePass123 and post the tweet 'Initial summary of the project. To be discussed.' tagged ProjectUpdate, mentioning @manager and @team_lead"
+        }
+      ]
+    },
+    "recall_candidates": [],
+    "causal_upgrade": null,
+    "causal_upgrades": [],
+    "causal_upgrade_rows": [],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": null,
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "not_rendered",
+    "upgrade_view": "not_rendered",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+    "frozen_judge_replay": true,
+    "frozen_stages": [
+      "judge_result"
+    ]
+  },
+  "_packet_event_count": 8
+}

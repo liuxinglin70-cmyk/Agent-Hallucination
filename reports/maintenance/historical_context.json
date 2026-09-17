@@ -1,0 +1,121 @@
+{
+  "scope": "Historical context only; not a test of the reorganized source.",
+  "latest_experiment_summary": {
+    "active": [],
+    "ledger_integrity": {
+      "valid": true,
+      "records": 14,
+      "broken_at": null,
+      "reason": ""
+    },
+    "registry_state": {
+      "cycle": 0,
+      "net_contribution_history": [],
+      "interventions": {},
+      "snapshots": []
+    },
+    "mini_effect": {
+      "cases": 10,
+      "paired_replay": true,
+      "effect": {
+        "marginal_cases": 0,
+        "new_errors": 0,
+        "unresolved_added": 0,
+        "correctness_improved": 0,
+        "correctness_worsened": 0,
+        "baseline_metrics": {
+          "n": 10,
+          "decisive": 9,
+          "unresolved": 1,
+          "decisive_accuracy": 0.8888888888888888,
+          "all_case_accuracy": 0.8,
+          "tp": 3,
+          "fp": 0,
+          "fn": 1,
+          "tn": 5,
+          "positive_precision": 1.0,
+          "positive_recall": 0.75,
+          "positive_f1": 0.8571428571428571,
+          "macro_precision": 0.9166666666666667,
+          "macro_recall": 0.875,
+          "macro_f1": 0.8831168831168831
+        },
+        "active_metrics": {
+          "n": 10,
+          "decisive": 9,
+          "unresolved": 1,
+          "decisive_accuracy": 0.8888888888888888,
+          "all_case_accuracy": 0.8,
+          "tp": 3,
+          "fp": 0,
+          "fn": 1,
+          "tn": 5,
+          "positive_precision": 1.0,
+          "positive_recall": 0.75,
+          "positive_f1": 0.8571428571428571,
+          "macro_precision": 0.9166666666666667,
+          "macro_recall": 0.875,
+          "macro_f1": 0.8831168831168831
+        },
+        "flips": {
+          "F->F": 6,
+          "T->T": 3,
+          "U->U": 1
+        }
+      },
+      "active_interventions": [],
+      "passed": false
+    }
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "state": "completed",
+      "proposal_summary": {
+        "stable_families": [
+          "FAM-fn-judge_false_no_recall_candidates-a4f141369d93",
+          "FAM-fp-judge_conviction-117fce1c070d"
+        ],
+        "capability_gaps": [],
+        "candidate_count": 2,
+        "joint_groups": [
+          [
+            "IV-1-002",
+            "IV-1-003"
+          ]
+        ],
+        "empty_proposal_reason": ""
+      },
+      "active_after": null,
+      "admitted": null,
+      "rejected": null
+    },
+    {
+      "cycle": 2,
+      "state": "completed",
+      "proposal_summary": {
+        "stable_families": [
+          "FAM-fn-judge_false_no_recall_candidates-a4f141369d93",
+          "FAM-fp-judge_conviction-117fce1c070d"
+        ],
+        "capability_gaps": [],
+        "candidate_count": 2,
+        "joint_groups": [
+          [
+            "IV-2-002",
+            "IV-2-003"
+          ]
+        ],
+        "empty_proposal_reason": ""
+      },
+      "active_after": null,
+      "admitted": null,
+      "rejected": null
+    }
+  ],
+  "pre_cleanup_tests": {
+    "command": "python -m pytest detector_v2/tests evolution_v3/tests -q",
+    "passed": 188,
+    "seconds": 6.98
+  }
+}

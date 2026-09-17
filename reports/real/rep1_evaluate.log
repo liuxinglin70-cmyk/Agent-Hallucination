@@ -1,0 +1,30 @@
+{
+  "decisive": 6,
+  "unresolved": 0,
+  "completion": 1.0,
+  "decisive_accuracy": 1.0,
+  "all_case_accuracy": 1.0,
+  "tp": 3,
+  "fp": 0,
+  "fn": 0,
+  "tn": 3,
+  "positive_precision": 1.0,
+  "positive_recall": 1.0,
+  "positive_f1": 1.0,
+  "macro_precision": 1.0,
+  "macro_recall": 1.0,
+  "macro_f1": 1.0,
+  "authoritative": 6,
+  "degraded": 0,
+  "provider_unresolved": 0,
+  "requested_cases": 6,
+  "found_results": 6,
+  "missing_cases": 0,
+  "step_localization": {
+    "n": 3,
+    "hits": 0,
+    "accuracy": 0.0
+  }
+}
+
+evaluation -> E:\agent hallucination\agent hallucination\artifacts\real\real_path_20260916T083519896451Z\runs\rep1\evaluation.json

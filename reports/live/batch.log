@@ -1,0 +1,17 @@
+batch run probe: 2 cases, workers=2
+  [synthetic/clean.json] state=verified_clean authority=authoritative
+  [synthetic/error.json] state=verified_error authority=authoritative
+{
+  "schema_version": "detector.run_summary.v1",
+  "run_id": "probe",
+  "cases": [
+    "synthetic/clean.json",
+    "synthetic/error.json"
+  ],
+  "completed": 2,
+  "state_counts": {
+    "verified_error": 1,
+    "verified_clean": 1,
+    "unresolved": 0
+  }
+}

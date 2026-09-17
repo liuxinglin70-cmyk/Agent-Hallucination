@@ -1,0 +1,30 @@
+{
+  "decisive": 2,
+  "unresolved": 0,
+  "completion": 1.0,
+  "decisive_accuracy": 1.0,
+  "all_case_accuracy": 1.0,
+  "tp": 1,
+  "fp": 0,
+  "fn": 0,
+  "tn": 1,
+  "positive_precision": 1.0,
+  "positive_recall": 1.0,
+  "positive_f1": 1.0,
+  "macro_precision": 1.0,
+  "macro_recall": 1.0,
+  "macro_f1": 1.0,
+  "authoritative": 2,
+  "degraded": 0,
+  "provider_unresolved": 0,
+  "requested_cases": 2,
+  "found_results": 2,
+  "missing_cases": 0,
+  "step_localization": {
+    "n": 1,
+    "hits": 1,
+    "accuracy": 1.0
+  }
+}
+
+evaluation -> E:\agent hallucination\agent hallucination\artifacts\integration\live_smoke_20260916T073714949352Z\runs\probe\evaluation.json
