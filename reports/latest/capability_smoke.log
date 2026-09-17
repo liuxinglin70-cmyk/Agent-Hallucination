@@ -350,6 +350,23 @@
     },
     "capability_gaps": []
   },
+  "instrument": {
+    "gain_opportunity": {
+      "recall": 2,
+      "precision": 0
+    },
+    "unmeasurable_polarities": [
+      "precision"
+    ],
+    "terminal_classification": {
+      "IV-1-001": "admitted",
+      "IV-1-002": "admitted"
+    },
+    "terminal_counts": {
+      "admitted": 2
+    },
+    "instrument_limited": false
+  },
   "proposal_summary": {
     "stable_families": [
       "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f-P70fe7f80fd90"
@@ -1753,7 +1770,7 @@
   },
   "ledger_integrity": {
     "valid": true,
-    "records": 6,
+    "records": 8,
     "broken_at": null,
     "reason": ""
   },
@@ -1777,7 +1794,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "ff00451c43cd",
+          "digest": "0e747603f77c",
           "payload": {
             "stages": [
               "validate",
@@ -1798,7 +1815,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "205b2f4c5f7563a6",
+            "source_digest": "4c515932536c9466",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2035,11 +2052,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "0e336d51e741"
+      "digest": "29a50f0b286a"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "0e336d51e741",
+      "current_digest": "29a50f0b286a",
       "first_manifest": true,
       "changed": [
         "G",
@@ -2136,4 +2153,4 @@
   }
 }
 
-capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_uw9c01o8\work\capability_smoke\capability_smoke_report.json
+capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_d37et5is\work\capability_smoke\capability_smoke_report.json

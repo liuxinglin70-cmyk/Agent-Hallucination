@@ -169,6 +169,83 @@ def _failure_contrast(
     }
 
 
+def gain_opportunity(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """How many cases the marginal set can actually reward, per polarity.
+
+    ``marginal_cases`` counts all-case correct predictions gained, so a claim
+    can only be scored where the control arm is *wrong in that direction*. This
+    is a property of the instrument (the gain set together with the baseline's
+    behaviour), not of any candidate, which is why it is reported per round
+    rather than inferred from a rejection.
+    """
+    return {
+        "recall": sum(
+            1 for row in rows
+            if row.get("gold") is True and row.get("prediction") is False
+        ),
+        "precision": sum(
+            1 for row in rows
+            if row.get("gold") is False and row.get("prediction") is True
+        ),
+    }
+
+
+def gate_rejection_is_unevaluable(
+    *,
+    gate: str,
+    verdict: Mapping[str, Any],
+    report: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> bool:
+    """Whether a failing gate failed for want of a measurement.
+
+    Only BEHAVIOR and M can be unevaluable: STRUCTURAL and HARMLESSNESS decide
+    from contract and sentinel protection, which do not depend on the marginal
+    set's polarity mix. A rejection caused by an actual new error or a health
+    regression is substantive and never counts as unevaluable.
+    """
+    if gate not in {"behavior", "m"}:
+        return False
+    polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
+    opportunities = report.get("gain_opportunities") or {}
+    if opportunities.get(polarity) != 0:
+        return False
+    delta = verdict.get("delta") or {}
+    return not (delta.get("new_errors") or delta.get("health_regressed"))
+
+
+def terminal_classification(
+    report: Mapping[str, Any],
+    *,
+    admitted: bool,
+) -> str:
+    """Classify a candidate's outcome as admitted, falsified or unmeasured.
+
+    The distinction matters because "rejected" and "not evaluated" license
+    different follow-up: a falsified mechanism should not be re-proposed, while
+    an unmeasured one has simply not been judged yet and must not be treated as
+    refuted.
+    """
+    if admitted:
+        return "admitted"
+    candidate = report.get("candidate") or {}
+    failing = [
+        gate for gate in ("structural", "harmlessness", "behavior", "m")
+        if (report.get(gate) or {}).get("passed") is False
+    ]
+    if not failing:
+        return "unresolved"
+    if all(
+        gate_rejection_is_unevaluable(
+            gate=gate, verdict=report.get(gate) or {},
+            report=report, candidate=candidate,
+        )
+        for gate in failing
+    ):
+        return "not_evaluated"
+    return "rejected"
+
+
 def split_actionable_families(
     families: Sequence[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -329,6 +406,117 @@ class EvolutionEngine:
         if not path.is_file():
             return None
         return load_manifest(path)
+
+    def _proposal_memory_context(
+        self,
+        diagnosed_families: Sequence[Mapping[str, Any]],
+        capability_gaps: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Assemble the H_t memory handed to the proposer.
+
+        Two things are retrieved, both already stored by earlier rounds:
+
+        * admitted procedures for the mechanisms currently failing, so a route
+          that already worked is reused rather than re-derived;
+        * the open capability backlog, so a family that keeps failing because no
+          route can treat it is legible instead of looking like a drafting
+          failure.
+
+        Retrieval is bounded per family, so the drafting prompt does not grow
+        with the size of the memory stores.
+        """
+        procedures: list[dict[str, Any]] = []
+        for family in diagnosed_families:
+            name = str(family.get("failure_family") or "")
+            if not name:
+                continue
+            retrieved = recall_experience(
+                self.memory_root,
+                failure_family=name,
+                polarity=str(
+                    (family.get("actionability") or {}).get("polarity") or ""
+                ),
+                treatment_routes=list(
+                    (family.get("actionability") or {}).get("routes") or ()
+                ),
+                limit=2,
+            )
+            procedures.extend(retrieved.get("entries") or [])
+        # Both lists are capped. The prompt must not grow with the size of the
+        # stores, or a long run turns memory retrieval into an unbounded prompt.
+        max_procedures = 6
+        max_gaps = 8
+        backlog = open_gaps(self.gap_store)
+        current = {
+            str(family.get("failure_family") or "") for family in diagnosed_families
+        }
+        current_gaps = [
+            item for item in backlog
+            if str(item.get("failure_family") or "") in current
+        ]
+        return {
+            "procedures": procedures[:max_procedures],
+            # Open gaps are ranked by occurrence in ``open_gaps``, so the cap
+            # keeps the most persistent ones.
+            "open_capability_gaps": [
+                {
+                    "failure_family": item.get("failure_family"),
+                    "reason": item.get("reason"),
+                    "routes": item.get("routes"),
+                    "occurrences": item.get("occurrences"),
+                }
+                for item in backlog[:max_gaps]
+            ],
+            # A gap that keeps reappearing in this round's own patrol and has
+            # been seen more than once is the strongest signal that the missing
+            # capability, not the drafting, is the bottleneck.
+            "recurring_capability_gaps": [
+                {
+                    "failure_family": item.get("failure_family"),
+                    "reason": item.get("reason"),
+                    "occurrences": item.get("occurrences"),
+                }
+                for item in current_gaps
+                if int(item.get("occurrences") or 0) >= 2
+            ][:max_gaps],
+        }
+
+    def _instrument_report(
+        self,
+        *,
+        baseline_gain: Sequence[Mapping[str, Any]],
+        gate_reports: Sequence[Mapping[str, Any]],
+        admitted_ids: set[str],
+    ) -> dict[str, Any]:
+        """What this round's measurement could and could not decide.
+
+        Reported per round because it is a property of the instrument rather
+        than of a candidate: which claim directions the gain set can actually
+        score, and how each candidate's outcome should be read. A direction
+        with zero opportunities is unmeasurable, not failed, and the report
+        states that instead of leaving it to be inferred from a rejection
+        reason.
+        """
+        opportunity = gain_opportunity(baseline_gain)
+        classifications = {
+            str(item.get("intervention_id") or ""): terminal_classification(
+                item,
+                admitted=str(item.get("intervention_id") or "") in admitted_ids,
+            )
+            for item in gate_reports
+        }
+        counts: dict[str, int] = {}
+        for value in classifications.values():
+            counts[value] = counts.get(value, 0) + 1
+        return {
+            "gain_opportunity": opportunity,
+            "unmeasurable_polarities": sorted(
+                polarity for polarity, value in opportunity.items() if value == 0
+            ),
+            "terminal_classification": classifications,
+            "terminal_counts": counts,
+            "instrument_limited": bool(counts.get("not_evaluated")),
+        }
 
     def record_harness(self, cycle: int) -> dict[str, Any]:
         """Write H_t for this cycle and diff it against the previous one.
@@ -683,10 +871,7 @@ class EvolutionEngine:
         )
         baseline_s = _subset_rows(control, self.split.sentinel)
         control_g = _subset_rows(control, self.split.gain)
-        opportunity = {
-            "recall": sum(r.get("gold") is True and r.get("prediction") is False for r in control_g),
-            "precision": sum(r.get("gold") is False and r.get("prediction") is True for r in control_g),
-        }
+        opportunity = gain_opportunity(control_g)
         candidate_s = _subset_rows(candidate_rows, self.split.sentinel)
         harmlessness = harmlessness_gate(
             baseline_rows=baseline_s,
@@ -718,8 +903,17 @@ class EvolutionEngine:
                 }
                 polarity = (candidate.get("claim") or {}).get("target_polarity")
                 if polarity in opportunity and opportunity[polarity] == 0 and not passed:
-                    m.update(evaluable=False, status="not_evaluable",
-                             reason=f"no {polarity} repair opportunities in gain; admission remains blocked")
+                    # The claim was never measurable on this gain set: no case
+                    # exists there for the declared direction to repair. Record
+                    # it as unmeasured rather than as a failed claim.
+                    m.update(
+                        evaluable=False,
+                        status="not_evaluable",
+                        reason=(
+                            f"no {polarity} repair opportunities in gain; "
+                            "claim was not measured (admission remains blocked)"
+                        ),
+                    )
         return {
             "intervention_id": intervention_id,
             "candidate": dict(candidate),
@@ -1107,6 +1301,17 @@ class EvolutionEngine:
                 self.proposer.active_entries = self.registry.entries
             if hasattr(self.proposer, "set_rejection_feedback"):
                 self.proposer.set_rejection_feedback(self.rejection_feedback)
+            memory_context = self._proposal_memory_context(
+                diagnosed_families, capability_gaps,
+            )
+            if hasattr(self.proposer, "set_memory_context"):
+                self.proposer.set_memory_context(memory_context)
+            self._ledger("proposal_memory", {
+                "cycle": cycle,
+                "procedures": len(memory_context["procedures"]),
+                "open_gaps": len(memory_context["open_capability_gaps"]),
+                "recurring_gaps": len(memory_context["recurring_capability_gaps"]),
+            })
             proposal_batch = self.proposer.propose(
                 diagnosed_families,
                 cycle=cycle,
@@ -1114,6 +1319,17 @@ class EvolutionEngine:
                     (self.config.get("budget") or {}).get("max_proposals", 3)
                 ),
             )
+            # Only a batch drawn without memory can establish what memory
+            # changed. This records the counterfactual, not an assertion that
+            # memory improved the drafting.
+            self._ledger("proposal_memory_used", {
+                "cycle": cycle,
+                "supplied": bool(
+                    memory_context["procedures"]
+                    or memory_context["open_capability_gaps"]
+                ),
+                "candidates": len(proposal_batch.candidates),
+            })
         self._journal.save(proposing=False, proposal={
             "candidates": proposal_batch.candidates, "joint_groups": proposal_batch.joint_groups,
             "notes": proposal_batch.notes})
@@ -1346,11 +1562,12 @@ class EvolutionEngine:
                         "gain_opportunities": report.get("gain_opportunities"),
                         "behavior_delta": _feedback_delta((report.get("behavior") or {}).get("delta")),
                         "behavior_note": (report.get("behavior") or {}).get("behavior_note"),
-                        "not_evaluable": bool(gate in {"behavior", "m"}
-                            and (report.get("gain_opportunities") or {}).get(
-                                (candidate.get("claim") or {}).get("target_polarity")) == 0
-                            and not ((verdict.get("delta") or {}).get("new_errors")
-                                     or (verdict.get("delta") or {}).get("health_regressed"))),
+                        "not_evaluable": gate_rejection_is_unevaluable(
+                            gate=gate,
+                            verdict=verdict,
+                            report=report,
+                            candidate=candidate,
+                        ),
                     }
                     self._ledger("rejected", payload)
                     self.rejection_feedback.append(payload)
@@ -1433,6 +1650,13 @@ class EvolutionEngine:
             "split": split_manifest_report(self.split),
             "audit": audit,
             "patrol": worksheet,
+            "instrument": self._instrument_report(
+                baseline_gain=baseline_gain,
+                gate_reports=gate_reports,
+                admitted_ids={
+                    str(c.get("intervention_id") or "") for c in selected
+                },
+            ),
             "proposal_summary": {
                 "stable_families": [
                     str(item.get("failure_family") or "")

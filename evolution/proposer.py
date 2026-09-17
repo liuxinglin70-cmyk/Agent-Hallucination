@@ -227,6 +227,19 @@ class LLMProposer:
         self.rejection_feedback: list[dict[str, Any]] = []
         self.rejected_keys: set[tuple[Any, ...]] = set()
         self.rejected_group_keys: set[frozenset[tuple[Any, ...]]] = set()
+        self.memory_context: dict[str, Any] = {}
+
+    def set_memory_context(
+        self, context: Mapping[str, Any] | None,
+    ) -> None:
+        """Attach retrieved H_t memory as drafting input.
+
+        This is prior experience, not a constraint: an admitted procedure is a
+        known-good route for a mechanism, and an open capability gap explains
+        why some families are absent from the actionable list. Neither is
+        scored, and supplying them changes no gate.
+        """
+        self.memory_context = dict(context or {})
 
     def set_rejection_feedback(
         self, feedback: Sequence[Mapping[str, Any]],
@@ -370,6 +383,7 @@ class LLMProposer:
             ensure_ascii=False,
         )
         active_block = json.dumps(self._registry_digest(), ensure_ascii=False)
+        memory_block = json.dumps(self.memory_context, ensure_ascii=False)
         feedback_block = json.dumps(
             [
                 {
@@ -407,6 +421,11 @@ class LLMProposer:
             f"Prior gate feedback: do not repeat falsified mechanisms unchanged. "
             f"not_evaluable means missing evaluation coverage, not a falsified mechanism:\n"
             f"{feedback_block}\n\n"
+            f"Retrieved prior experience: admitted procedures describe routes "
+            f"that already worked on a mechanism, and open capability gaps "
+            f"explain families no current route can treat. Reuse a procedure "
+            f"when the mechanism matches; do not re-derive it from scratch:\n"
+            f"{memory_block}\n\n"
             f"Stable bare-base failure families:\n{family_block}\n\n"
             f"Draft at most {max_proposals} interventions."
         )
@@ -823,6 +842,12 @@ class HybridProposer:
         self.llm = LLMProposer(
             framework_config, active_entries=active_entries,
         )
+
+    def set_memory_context(
+        self, context: Mapping[str, Any] | None,
+    ) -> None:
+        """Forward retrieved H_t memory to the LLM drafting stage."""
+        self.llm.set_memory_context(context)
 
     def propose(
         self,

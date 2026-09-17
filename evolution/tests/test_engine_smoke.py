@@ -1429,3 +1429,213 @@ def test_capability_gap_becomes_a_backlog_item_not_a_silent_round(tmp_path):
     assert [item["failure_family"] for item in open_gaps(engine.gap_store)] == [
         "FAM-fn-unreachable"
     ]
+
+
+def test_gain_opportunity_counts_repairable_directions_only():
+    """Opportunity is a property of the instrument: where the control is wrong."""
+    from evolution.engine import gain_opportunity
+
+    rows = [
+        {"case": "A/1", "gold": True, "prediction": False},   # recall chance
+        {"case": "A/2", "gold": True, "prediction": False},   # recall chance
+        {"case": "A/3", "gold": False, "prediction": True},   # precision chance
+        {"case": "A/4", "gold": True, "prediction": True},    # already right
+        {"case": "A/5", "gold": False, "prediction": False},  # already right
+        {"case": "A/6", "gold": True, "prediction": None},    # undecided
+    ]
+    assert gain_opportunity(rows) == {"recall": 2, "precision": 1}
+    assert gain_opportunity([]) == {"recall": 0, "precision": 0}
+
+
+def test_cycle_report_reports_what_the_instrument_could_measure(tmp_path):
+    """A direction with no repairable case is reported as unmeasurable."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    # Patrol keeps a genuine FN family (012/014 are error-gold, answered clean)
+    # while every error-gold case in the gain set is answered correctly. A
+    # recall claim therefore has a family to target but nothing in gain to be
+    # scored on, which is exactly the unmeasurable case.
+    patrol_fn = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    backend = MockDetectorBackend(
+        base_predictions={case: False for case in patrol_fn},
+    )
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+    assert report["patrol"]["stable_failure_families"], report["patrol"]
+    instrument = report["instrument"]
+    assert instrument["gain_opportunity"]["recall"] == 0
+    assert "recall" in instrument["unmeasurable_polarities"]
+    counts = instrument["terminal_counts"]
+    assert sum(counts.values()) == len(report["proposals"])
+    assert instrument["terminal_classification"]
+    for verdict in instrument["terminal_classification"].values():
+        assert verdict in {"admitted", "rejected", "not_evaluated", "unresolved"}
+        if verdict == "not_evaluated":
+            assert instrument["instrument_limited"] is True
+
+
+def test_not_evaluable_rejection_is_classified_as_not_evaluated(tmp_path):
+    """A zero-opportunity rejection must not read as a falsified mechanism."""
+    from evolution.engine import terminal_classification
+
+    report = {
+        "candidate": {"intervention_id": "IV-1-002",
+                      "claim": {"target_polarity": "recall"}},
+        "structural": {"passed": True},
+        "harmlessness": {"passed": True},
+        "behavior": {"passed": True},
+        "m": {"passed": False, "reason": "marginal_cases=0 < 1",
+              "delta": {"marginal_cases": 0, "new_errors": 0,
+                        "health_regressed": 0}},
+        "gain_opportunities": {"recall": 0, "precision": 3},
+    }
+    assert terminal_classification(report, admitted=False) == "not_evaluated"
+    # A rejection that caused a real new error is substantive, not unmeasured.
+    report["m"]["delta"]["new_errors"] = 1
+    assert terminal_classification(report, admitted=False) == "rejected"
+    # A direction with opportunities available was measured normally.
+    report["m"]["delta"]["new_errors"] = 0
+    report["gain_opportunities"]["recall"] = 4
+    assert terminal_classification(report, admitted=False) == "rejected"
+    # STRUCTURAL and HARMLESSNESS never count as unevaluable.
+    structural = {
+        "candidate": {"intervention_id": "IV-1-003",
+                      "claim": {"target_polarity": "recall"}},
+        "structural": {"passed": False, "reason": "schema rejection"},
+        "harmlessness": {"passed": True},
+        "behavior": {"passed": True},
+        "m": {"passed": True},
+        "gain_opportunities": {"recall": 0, "precision": 0},
+    }
+    assert terminal_classification(structural, admitted=False) == "rejected"
+    assert terminal_classification(report, admitted=True) == "admitted"
+
+
+def test_engine_supplies_retrieved_memory_to_the_proposer(tmp_path):
+    """Memory reaches the proposer as input, and the retrieval is auditable.
+
+    Cycle 1 admits a route, so cycle 2 has procedural experience to offer. The
+    proposer records what it received, which is what makes "the system used its
+    own experience" a checkable claim rather than a description of the store.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    gain_true = [c for c in cases if c.endswith(("004.json", "006.json"))]
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    base = {case: False for case in patrol_true + gain_true}
+    overrides = {"IV-1-001": {case: True for case in gain_true}}
+
+    received: list[dict] = []
+
+    class RecordingProposer:
+        name = "recording"
+        memory_context: dict = {}
+
+        def set_memory_context(self, context):
+            self.memory_context = dict(context or {})
+
+        def set_rejection_feedback(self, feedback):
+            pass
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            received.append(dict(self.memory_context))
+            if int(cycle) != 1 or not families:
+                return ProposalBatch(candidates=[], joint_groups=[], notes=[])
+            candidate = dict(_scanner_candidate())
+            candidate["provenance"] = {
+                "cycle": int(cycle),
+                "failure_family": str(families[0]["failure_family"]),
+                "failure_cases": list(families[0]["failure_cases"]),
+            }
+            candidate.pop("content_hash", None)
+            return ProposalBatch(
+                candidates=[candidate], joint_groups=[], notes=[],
+            )
+
+    backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=RecordingProposer(),
+    )
+    first = engine.run_cycle(1)
+    assert first["marginal_selection"]["selected"] == ["IV-1-001"]
+    # Cycle 1 had no prior experience to offer.
+    assert received[0]["procedures"] == []
+
+    engine.run_cycle(2)
+    second_context = received[1]
+    # Cycle 2 is offered the procedure admitted in cycle 1.
+    assert second_context["procedures"], second_context
+    assert any(
+        item.get("intervention_id") == "IV-1-001"
+        for item in second_context["procedures"]
+    )
+    # Retrieval is auditable from the ledger, not only from the store.
+    memory_events = [
+        record["payload"] for record in engine.ledger.read()
+        if record["event"] == "proposal_memory"
+    ]
+    assert [item["cycle"] for item in memory_events] == [1, 2]
+    assert memory_events[1]["procedures"] >= 1
+
+
+def test_proposal_memory_context_is_bounded(tmp_path):
+    """Retrieval is capped so the drafting prompt cannot grow without limit."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    engine = EvolutionEngine(
+        config, backend=MockDetectorBackend(), split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    # Stuff both stores well beyond their caps.
+    from evolution.gaps import record_gaps
+    from evolution.memory import record_procedure
+
+    for index in range(20):
+        record_procedure(
+            tmp_path / "memory", cycle=index + 1,
+            failure_family=f"FAM-fn-{index}", polarity="recall",
+            treatment_route="recall_trigger",
+            intervention_type="recall_trigger", hook="recall.trigger",
+            intervention_id=f"IV-{index + 1}-001",
+        )
+    record_gaps(
+        tmp_path / "harness" / "gaps.jsonl",
+        cycle=1,
+        gaps=[
+            {
+                "failure_family": f"FAM-gap-{index}",
+                "classification": "capability_gap",
+                "reason": f"reason {index}",
+                "routes": [],
+            }
+            for index in range(20)
+        ],
+    )
+    families = [
+        {
+            "failure_family": f"FAM-fn-{index}",
+            "count": 2,
+            "actionability": {"routes": ["recall_trigger"]},
+        }
+        for index in range(6)
+    ]
+    context = engine._proposal_memory_context(families, [])
+    assert len(context["open_capability_gaps"]) <= 8
+    # Six families x up to two procedures each would be twelve uncapped.
+    assert len(context["procedures"]) <= 6

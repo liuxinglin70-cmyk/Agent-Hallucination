@@ -87,3 +87,66 @@ def test_hybrid_proposer_uses_llm_candidates_when_present():
         candidate.get("type") == "recall_trigger"
         for candidate in batch.candidates
     )
+
+
+def _llm_config():
+    config = _config()
+    config["budget"] = {"llm_calls": 2}
+    return config
+
+
+def _capture_prompt(monkeypatch):
+    """Stub the provider and capture the drafting prompt it receives."""
+    captured = {}
+
+    def fake_provider_call(*, route, system, user, purpose):
+        captured["system"] = system
+        captured["user"] = user
+        return {"interventions": []}, {"purpose": purpose, "model": "stub"}
+
+    monkeypatch.setattr("evolution.proposer.provider_call", fake_provider_call)
+    return captured
+
+
+def test_retrieved_memory_is_supplied_to_the_drafting_prompt(monkeypatch):
+    """Admitted procedures and open gaps must reach the prompt, not just a store."""
+    captured = _capture_prompt(monkeypatch)
+    proposer = HybridProposer(_llm_config())
+    proposer.set_memory_context({
+        "procedures": [{
+            "failure_family": "FAM-fn-judge_false_no_recall_candidates-test",
+            "treatment_route": "recall_trigger",
+            "intervention_id": "IV-1-001",
+        }],
+        "open_capability_gaps": [{
+            "failure_family": "FAM-fn-unreachable",
+            "reason": "no treatment route reaches the responsible stage",
+            "occurrences": 3,
+        }],
+        "recurring_capability_gaps": [],
+    })
+    proposer.propose([_fn_family()], cycle=9, max_proposals=2)
+    user = captured["user"]
+    assert "IV-1-001" in user
+    assert "recall_trigger" in user
+    assert "no treatment route reaches the responsible stage" in user
+    assert "Retrieved prior experience" in user
+
+
+def test_empty_memory_context_does_not_block_drafting(monkeypatch):
+    """With no experience yet, the prompt still carries an empty block."""
+    captured = _capture_prompt(monkeypatch)
+    proposer = HybridProposer(_llm_config())
+    proposer.set_memory_context(None)
+    proposer.propose([_fn_family()], cycle=10, max_proposals=2)
+    assert "Retrieved prior experience" in captured["user"]
+
+
+def test_offline_fallback_ignores_memory_context():
+    """A proposer without the setter must keep working unchanged."""
+    proposer = HybridProposer(_config())
+    assert not hasattr(proposer.llm, "memory_context") or (
+        proposer.llm.memory_context == {}
+    )
+    batch = proposer.propose([_fn_family()], cycle=11, max_proposals=2)
+    assert batch.candidates

@@ -30,7 +30,7 @@ python -m evolution verify-ledger
 - **能力缺口清单** `harness/gaps.jsonl`：可复现、但当前动作词表无法处理的失败族落为去重后备项，保留原因与可行路由，可用 `resolve_gap` 记为已解决。身份剥掉 worksheet 的 `-P<hash>` 画像后缀，因此同一缺口只有一条记录。重复出现不重复追加；原因或路由变化才算新信息。
 - **三类经验** `memory/`：情景 `episodic.jsonl`、程序性 `procedural.jsonl`、改进 `improvement.jsonl`。只有**通过门控**的处理路线才写入程序性经验。检索按机制过滤并设上限；结果显式区分 `falsified_intervention_ids`（确实被门控否定）与 `unevaluable_intervention_ids`（未曾被测量），后者不会被当作证伪来抑制同一机制。
 
-**边界：** 这三处当前是**记录与记忆**设施，不参与任何门的判定，因此不会移动准入结果。程序性记忆已可有界检索（`EvolutionEngine.recall_experience`），但尚无组件把检索结果用于生成候选——让改进真正用上这些记忆属于后续 improver 步骤，不在本轮范围。
+**边界：** 清单与缺口是**记录**设施，不参与任何门的判定，因此不会移动准入结果。经验存储已接入草拟：`_proposal_memory_context` 为当前失败族检索已准入程序性经验并附开放缺口，经 `set_memory_context` 进入 proposer 提示；供给情况记入账本 `proposal_memory` / `proposal_memory_used`。记忆是草拟先验，不是约束，也不参与门判定——是否真正改善了草拟质量，需要在后续实验中用带/不带记忆的对照来判定，不能由「已接入」直接推出。
 
 `final` 和 `full-self-evolution` 需要显式的正式协议；默认开发配置不提供 `split_manifest`，因此会拒绝正式终审。详见 [评估协议](../docs/evaluation.md)。
 
