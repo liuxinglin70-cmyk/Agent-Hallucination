@@ -13,6 +13,10 @@
       "A/003.json"
     ],
     "sentinel_size": 4,
+    "sentinel_polarity": {
+      "error": 0,
+      "clean": 0
+    },
     "gain": [
       "A/004.json",
       "A/005.json",
@@ -24,6 +28,10 @@
       "A/011.json"
     ],
     "gain_size": 8,
+    "gain_polarity": {
+      "error": 0,
+      "clean": 0
+    },
     "patrol_pool_size": 5,
     "validation": [
       "A/017.json",
@@ -315,6 +323,25 @@
         }
       }
     ],
+    "patrol_registry": "active",
+    "failure_contrast": {
+      "active_registry_size": 0,
+      "new_failures": {
+        "count": 0,
+        "cases": []
+      },
+      "persisting_failures": {
+        "count": 2,
+        "cases": [
+          "A/012.json",
+          "A/013.json"
+        ]
+      },
+      "resolved_by_active": {
+        "count": 0,
+        "cases": []
+      }
+    },
     "bootstrap": {
       "initial_patrol_size": 5,
       "bootstrap_cases": [],

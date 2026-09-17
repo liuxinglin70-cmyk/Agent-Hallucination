@@ -133,7 +133,9 @@ validate_record → build_packet   ── 输入防火墙：拒绝 gold 字段�
         ├─ 缺陷注入审计 _audit：把已知缺陷候选灌进四门，必须被拒 → 否则冻结
         │     （缓存在 reports/defect_audit_verdict.json，按 代码/config/gold/registry 指纹）
         │
-        ├─ Patrol：裸底座（空 registry，防 VaG 污染）在 patrol 集上跑，找重复的机制性失效
+        ├─ Patrol：已部署版本（H_t）在 patrol 集上跑，同时保留裸底座为参照臂
+        │     （两臂对比分出 new_failures / persisting_failures / resolved_by_active；
+        │      registry 为空时两臂是同一次评估。见 directions-assessment.md 第 5 节）
         │
         ├─ 失败族诊断 worksheet：机制签名聚类 + typed 谓词命中 + 共同字面量 → 可执行路由
         │
@@ -160,7 +162,7 @@ validate_record → build_packet   ── 输入防火墙：拒绝 gold 字段�
 |---|---|---|
 | S sentinel | 无害性保护集 | harmlessness_gate |
 | G gain | 边际收益集 | meets_m（**同时是准入依据**） |
-| P patrol | 裸底座失效发现 | 失败族诊断 |
+| P patrol | 巡检已部署版本，裸底座为对照 | 失败族诊断 |
 | validation (mini) | 准留出效果检查 | `_evaluate_mini_effect` → **当前崩溃** |
 | final holdout | 正式 read-once 终审 | `run_final`（默认关闭） |
 

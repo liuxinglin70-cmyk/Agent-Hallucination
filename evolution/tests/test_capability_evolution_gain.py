@@ -292,3 +292,45 @@ def test_evolved_predicate_produces_observable_detector_gain(tmp_path):
     assert mini["effect"]["marginal_cases"] >= 1
     assert mini["effect"]["new_errors"] == 0
     assert mini["passed"] is True
+
+
+class _CycleOneOnlyProposer(_EvolvedPredicateProposer):
+    """Propose the capability once, then stay silent so cycle 2 is a pure measurement."""
+
+    def propose(self, families, *, cycle, max_proposals=3):
+        if int(cycle) != 1:
+            return ProposalBatch(candidates=[], joint_groups=[], notes=[])
+        return super().propose(families, cycle=cycle, max_proposals=max_proposals)
+
+
+def test_next_cycle_patrols_the_deployed_version_and_sees_the_capability(tmp_path):
+    """The round after an admission must target H_t, not the bare base again.
+
+    Cycle 1 patrols the empty registry, so the planted patrol failures are the
+    standing residual. Cycle 2 patrols the now-deployed version: the same
+    cases come back repaired, the bare-base reference still reports them
+    broken, and the contrast records them as resolved rather than leaving the
+    system to re-propose a fix it already holds.
+    """
+    engine = _engine(tmp_path)
+    engine.proposer = _CycleOneOnlyProposer()
+    first = engine.run_cycle(1)
+    assert set(first["marginal_selection"]["selected"]) == {
+        "IV-1-001", "IV-1-002",
+    }
+    patrol_failures = {"A/012.json", "A/013.json"}
+    first_contrast = first["patrol"]["failure_contrast"]
+    assert first_contrast["active_registry_size"] == 0
+    assert patrol_failures <= set(first_contrast["persisting_failures"]["cases"])
+    assert first_contrast["resolved_by_active"]["count"] == 0
+
+    # The deployed version now patrols itself.
+    second = engine.run_cycle(2)
+    second_contrast = second["patrol"]["failure_contrast"]
+    assert second["patrol"]["patrol_registry"] == "active"
+    assert second_contrast["active_registry_size"] == 2
+    resolved = set(second_contrast["resolved_by_active"]["cases"])
+    assert patrol_failures <= resolved, second_contrast
+    # Without the bare-base arm, "resolved" would be invisible: those cases
+    # are only knowable as repairs against the reference.
+    assert not (patrol_failures & set(second_contrast["persisting_failures"]["cases"]))

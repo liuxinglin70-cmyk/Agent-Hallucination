@@ -3,7 +3,8 @@
 One cycle (B stage):
 
 1. defect-injection audit of the gate, once per machinery fingerprint;
-2. bare-base patrol on a fresh sample P (never from deployed skills);
+2. patrol of the deployed version on a fresh sample P, with the bare base kept
+   as the reference arm so new failures and the standing residual separate;
 3. mechanical stable failure families (worksheet);
 4. at most three candidate proposals;
 5. STRUCTURAL structural screening, then one detection arm per admission unit on
@@ -87,6 +88,63 @@ def _subset_rows(
 ) -> list[dict[str, Any]]:
     wanted = {str(case) for case in cases}
     return [row for row in rows if str(row.get("case") or "") in wanted]
+
+
+def _row_is_failure(row: Mapping[str, Any]) -> bool:
+    """A row fails when it cannot deliver the gold decision.
+
+    Unresolved and non-authoritative rows count as failures: from the base
+    version's point of view an undecided case is an unsolved case. This is a
+    diagnostic label for patrol only, never an admission score.
+    """
+    gold = row.get("gold")
+    if gold is not True and gold is not False:
+        return True
+    prediction = row.get("prediction")
+    return prediction is None or prediction != gold
+
+
+def _failure_contrast(
+    bare_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]],
+    *,
+    active_registry_size: int,
+) -> dict[str, Any]:
+    """Split the active patrol's failures into new versus persisting ones.
+
+    The patrol runs the deployed version so the next round is aimed at the
+    failures the system actually still has. The bare-base arm is kept as the
+    long-term reference, which makes the two classes separable:
+
+    * ``new_failures``: wrong on the active version, right on the bare base —
+      a regression introduced by admitted interventions;
+    * ``persisting_failures``: wrong on both — the standing residual.
+    """
+    bare_by_case = {str(row.get("case") or ""): row for row in bare_rows}
+    new_cases: list[str] = []
+    persisting_cases: list[str] = []
+    resolved_cases: list[str] = []
+    for row in active_rows:
+        case = str(row.get("case") or "")
+        active_failed = _row_is_failure(row)
+        bare_row = bare_by_case.get(case)
+        bare_failed = _row_is_failure(bare_row) if bare_row else True
+        if active_failed and bare_failed:
+            persisting_cases.append(case)
+        elif active_failed:
+            new_cases.append(case)
+        elif bare_failed:
+            resolved_cases.append(case)
+    return {
+        "active_registry_size": int(active_registry_size),
+        "new_failures": {"count": len(new_cases), "cases": sorted(new_cases)},
+        "persisting_failures": {
+            "count": len(persisting_cases), "cases": sorted(persisting_cases),
+        },
+        "resolved_by_active": {
+            "count": len(resolved_cases), "cases": sorted(resolved_cases),
+        },
+    }
 
 
 def split_actionable_families(
@@ -470,6 +528,98 @@ class EvolutionEngine:
         }
 
     # ------------------------------------------------------------------
+    def _patrol_registry_mode(self) -> str:
+        """Which version the patrol measures: ``active`` or ``bare_base``.
+
+        ``active`` (default) patrols the version that is actually deployed, so
+        a round is aimed at the residual failures of the current harness
+        instead of re-deriving proposals from the bare base forever. The bare
+        base still runs every cycle as the reference arm, which is what keeps
+        the contamination guarantee observable rather than assumed.
+        """
+        mode = str(self.config.get("patrol_registry") or "active").strip().lower()
+        if mode not in {"active", "bare_base"}:
+            raise ValueError(
+                "patrol_registry must be 'active' or 'bare_base', got "
+                f"{mode!r}"
+            )
+        return mode
+
+    def _patrol_uses_single_arm(self) -> bool:
+        """True when the patrol arm and its reference are the same evaluation.
+
+        That is the case for an explicitly bare-base patrol and for any cold
+        start with an empty registry; the second sweep is only needed once an
+        intervention is actually deployed.
+        """
+        return self._patrol_registry_mode() == "bare_base" or not self.registry.entries
+
+    def _patrol_arms(
+        self,
+        arms: "_ArmRunner",
+        cases: Sequence[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+        """Evaluate the patrol arm plus its bare-base reference.
+
+        Returns ``(patrol_rows, bare_rows, contrast)``. While the registry is
+        empty the two arms are the same evaluation, so a cold start costs the
+        same one sweep as before; once interventions are deployed the second
+        arm is the explicit price of keeping the reference.
+        """
+        active_entries = self.registry.entries
+        if self._patrol_uses_single_arm():
+            bare_rows = arms.run(cases, registry=empty_registry())
+            return bare_rows, bare_rows, _failure_contrast(
+                bare_rows, bare_rows, active_registry_size=len(active_entries),
+            )
+        patrol_rows = arms.run(
+            cases,
+            registry=self.registry.registry,
+            fresh=requires_fresh_evaluation(active_entries),
+        )
+        bare_rows = arms.run(cases, registry=empty_registry())
+        return patrol_rows, bare_rows, _failure_contrast(
+            bare_rows, patrol_rows, active_registry_size=len(active_entries),
+        )
+
+    def _extend_patrol(
+        self,
+        arms: "_ArmRunner",
+        *,
+        patrol_rows: Sequence[Mapping[str, Any]],
+        bare_rows: Sequence[Mapping[str, Any]],
+        bootstrap_cases: Sequence[str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+        """Append bootstrap cases to both patrol arms, keeping them in step.
+
+        The stable-failure rerun only exists because a random patrol sample can
+        miss the second member of a mechanism. Both arms must extend over the
+        same cases or the new-versus-persisting contrast silently compares two
+        different case sets.
+        """
+        active_entries = self.registry.entries
+        bare_extension = arms.run(bootstrap_cases, registry=empty_registry())
+        if self._patrol_uses_single_arm():
+            # A cold start or an explicit bare-base patrol: one shared arm.
+            extended_bare = [*bare_rows, *bare_extension]
+            extended_patrol = list(extended_bare)
+        else:
+            extended_patrol = [
+                *patrol_rows,
+                *arms.run(
+                    bootstrap_cases,
+                    registry=self.registry.registry,
+                    fresh=requires_fresh_evaluation(active_entries),
+                ),
+            ]
+            extended_bare = [*bare_rows, *bare_extension]
+        contrast = _failure_contrast(
+            extended_bare,
+            extended_patrol,
+            active_registry_size=len(active_entries),
+        )
+        return extended_patrol, extended_bare, contrast
+
     def preview_cycle(self, cycle: int) -> dict[str, Any]:
         """Patrol + proposal preview without gates, ledger, or registry writes.
 
@@ -477,13 +627,18 @@ class EvolutionEngine:
         current cycle would produce any candidate at all, before spending
         gate detection budget.
         """
+        # Preview runs without a journal, so the runner evaluates directly.
+        arms = _ArmRunner(self, None)
         patrol_size = int(
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        # Patrol is always the bare base: candidates may only be distilled
-        # from failures of the empty registry, never from deployed skills.
-        patrol_rows = self._evaluate(empty_registry(), patrol_cases)
+        # Preview measures the same version as the real cycle, so a preview
+        # that finds no family means the deployed version has no family left
+        # on that sample rather than the bare base having none.
+        patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
+            arms, patrol_cases,
+        )
         families = stable_failure_families(patrol_rows)
         bootstrap_cases: list[str] = []
         if not families:
@@ -504,10 +659,14 @@ class EvolutionEngine:
                     remaining, min(rerun_budget, len(remaining)),
                 )
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
-                patrol_rows = [
-                    *patrol_rows,
-                    *self._evaluate(empty_registry(), bootstrap_cases),
-                ]
+                patrol_rows, bare_patrol_rows, patrol_contrast = (
+                    self._extend_patrol(
+                        arms,
+                        patrol_cases=patrol_rows,
+                        bare_rows=bare_patrol_rows,
+                        bootstrap_cases=bootstrap_cases,
+                    )
+                )
                 families = stable_failure_families(patrol_rows)
         diagnosed = diagnose_failure_families(
             families,
@@ -671,10 +830,12 @@ class EvolutionEngine:
             (self.config.get("budget") or {}).get("patrol_cases", 120)
         )
         patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        # Patrol always runs the bare base; only the gate baselines below use
-        # the active registry. Candidates are never distilled from deployed
-        # skills (VaG contamination guard).
-        patrol_rows = arms.run(patrol_cases, registry=empty_registry())
+        # Patrol measures the deployed version (see ``_patrol_registry_mode``),
+        # with the bare base kept as the reference arm so newly introduced
+        # failures and the standing residual stay distinguishable.
+        patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
+            arms, patrol_cases,
+        )
         families = stable_failure_families(patrol_rows)
 
         # Source-quality bootstrap: a random patrol sample can legitimately
@@ -699,10 +860,14 @@ class EvolutionEngine:
                     remaining, min(rerun_budget, len(remaining)),
                 )
                 patrol_cases = [*patrol_cases, *bootstrap_cases]
-                patrol_rows = [
-                    *patrol_rows,
-                    *arms.run(bootstrap_cases, registry=empty_registry()),
-                ]
+                patrol_rows, bare_patrol_rows, patrol_contrast = (
+                    self._extend_patrol(
+                        arms,
+                        patrol_rows=patrol_rows,
+                        bare_rows=bare_patrol_rows,
+                        bootstrap_cases=bootstrap_cases,
+                    )
+                )
                 families = stable_failure_families(patrol_rows)
 
         diagnosed_families = diagnose_failure_families(
@@ -715,6 +880,8 @@ class EvolutionEngine:
             diagnosed_families, capability_gaps,
         ) = split_actionable_families(diagnosed_families)
         worksheet = worksheet_report(patrol_rows, diagnosed_families)
+        worksheet["patrol_registry"] = self._patrol_registry_mode()
+        worksheet["failure_contrast"] = patrol_contrast
         worksheet["bootstrap"] = {
             "initial_patrol_size": patrol_size,
             "bootstrap_cases": bootstrap_cases,

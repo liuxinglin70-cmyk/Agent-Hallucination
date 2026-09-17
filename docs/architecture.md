@@ -36,7 +36,7 @@
 ## 一轮进化
 
 1. `EvolutionEngine` 加载配置、分区、活跃库、账本与后端，检查来源和缓存身份。
-2. 在 patrol 上运行裸底座，必要时复测与补采，寻找重复的机制性失效。`worksheet` 区分可修复的检测失效与基础设施问题。
+2. 在 patrol 上运行已部署版本（H_t），并同时运行裸底座作为参照臂，必要时复测与补采，寻找重复的机制性失效。`worksheet` 区分可修复的检测失效与基础设施问题。参照臂使失败分为 `new_failures`（准入引入的退化）、`persisting_failures`（常驻残余）与 `resolved_by_active`（已修复），写入 `patrol.failure_contrast`；registry 为空时两臂是同一次评估。`patrol_registry: bare_base` 可恢复旧的单臂行为。
 3. 失败族诊断提供内置谓词命中情况、typed views、共同字面量、可行干预路由。`HybridProposer` 结合 LLM 草拟与受约束模板；历史拒绝反馈用于抑制原样重提。
 4. `structural_gate` 校验合同、去重、禁止案例 ID 泄漏；新 DSL 必须在失败族成员上实际执行并一致命中所声明的能力。
 5. `harmlessness_gate` 在 sentinel 配对比较，不允许超出配置的新 FN、FP 或 unresolved；只用程序化结果与标签评审。

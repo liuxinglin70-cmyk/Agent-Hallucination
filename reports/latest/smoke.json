@@ -15,21 +15,29 @@
       "SmolAgents/019.json"
     ],
     "sentinel_size": 6,
+    "sentinel_polarity": {
+      "error": 3,
+      "clean": 3
+    },
     "gain": [
-      "Magentic_One/050.json",
+      "OpenDeepSearch/080.json",
       "OpenDeepSearch/086.json",
-      "Octotools/030.json",
-      "OpenDeepSearch/084.json",
-      "OpenManus/064.json",
-      "BFCL/062.json",
+      "Magentic_One/050.json",
+      "OpenDeepSearch/095.json",
+      "Magentic_One/093.json",
+      "Camel/018.json",
+      "BFCL/017.json",
       "Octotools/040.json",
+      "Octotools/030.json",
+      "OpenManus/064.json",
       "SmolAgents/037.json",
-      "Camel/048.json",
-      "OpenDeepSearch/067.json",
-      "Magentic_One/049.json",
-      "OpenDeepSearch/095.json"
+      "OpenDeepSearch/067.json"
     ],
     "gain_size": 12,
+    "gain_polarity": {
+      "error": 10,
+      "clean": 2
+    },
     "patrol_pool_size": 12,
     "validation": [
       "BFCL/012.json",
@@ -280,16 +288,16 @@
             "health_regressed": 0,
             "health_improved": 0,
             "flips": {
-              "T->T": 8,
-              "F->F": 10
+              "T->T": 11,
+              "F->F": 7
             },
             "transitions_by_gold": {
               "error": {
-                "T->T": 8,
+                "T->T": 11,
                 "F->F": 2
               },
               "clean": {
-                "F->F": 8
+                "F->F": 5
               }
             },
             "correctness_improved": 0,
@@ -300,16 +308,16 @@
               "unresolved": 0,
               "decisive_accuracy": 0.8888888888888888,
               "all_case_accuracy": 0.8888888888888888,
-              "tp": 8,
+              "tp": 11,
               "fp": 0,
               "fn": 2,
-              "tn": 8,
+              "tn": 5,
               "positive_precision": 1.0,
-              "positive_recall": 0.8,
-              "positive_f1": 0.888888888888889,
-              "macro_precision": 0.9,
-              "macro_recall": 0.9,
-              "macro_f1": 0.888888888888889
+              "positive_recall": 0.8461538461538461,
+              "positive_f1": 0.9166666666666666,
+              "macro_precision": 0.8571428571428572,
+              "macro_recall": 0.9230769230769231,
+              "macro_f1": 0.875
             },
             "active_metrics": {
               "n": 18,
@@ -317,16 +325,16 @@
               "unresolved": 0,
               "decisive_accuracy": 0.8888888888888888,
               "all_case_accuracy": 0.8888888888888888,
-              "tp": 8,
+              "tp": 11,
               "fp": 0,
               "fn": 2,
-              "tn": 8,
+              "tn": 5,
               "positive_precision": 1.0,
-              "positive_recall": 0.8,
-              "positive_f1": 0.888888888888889,
-              "macro_precision": 0.9,
-              "macro_recall": 0.9,
-              "macro_f1": 0.888888888888889
+              "positive_recall": 0.8461538461538461,
+              "positive_f1": 0.9166666666666666,
+              "macro_precision": 0.8571428571428572,
+              "macro_recall": 0.9230769230769231,
+              "macro_f1": 0.875
             },
             "rows": [
               {
@@ -378,8 +386,8 @@
                 "active_state": "verified_clean"
               },
               {
-                "case": "Magentic_One/050.json",
-                "gold": false,
+                "case": "OpenDeepSearch/080.json",
+                "gold": true,
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
@@ -394,15 +402,7 @@
                 "active_state": "verified_clean"
               },
               {
-                "case": "Octotools/030.json",
-                "gold": true,
-                "baseline_prediction": false,
-                "active_prediction": false,
-                "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
-              },
-              {
-                "case": "OpenDeepSearch/084.json",
+                "case": "Magentic_One/050.json",
                 "gold": false,
                 "baseline_prediction": false,
                 "active_prediction": false,
@@ -410,7 +410,7 @@
                 "active_state": "verified_clean"
               },
               {
-                "case": "OpenManus/064.json",
+                "case": "OpenDeepSearch/095.json",
                 "gold": true,
                 "baseline_prediction": true,
                 "active_prediction": true,
@@ -418,7 +418,23 @@
                 "active_state": "verified_error"
               },
               {
-                "case": "BFCL/062.json",
+                "case": "Magentic_One/093.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Camel/018.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "BFCL/017.json",
                 "gold": true,
                 "baseline_prediction": true,
                 "active_prediction": true,
@@ -434,6 +450,22 @@
                 "active_state": "verified_clean"
               },
               {
+                "case": "Octotools/030.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenManus/064.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
                 "case": "SmolAgents/037.json",
                 "gold": true,
                 "baseline_prediction": true,
@@ -442,31 +474,7 @@
                 "active_state": "verified_error"
               },
               {
-                "case": "Camel/048.json",
-                "gold": false,
-                "baseline_prediction": false,
-                "active_prediction": false,
-                "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
-              },
-              {
                 "case": "OpenDeepSearch/067.json",
-                "gold": true,
-                "baseline_prediction": true,
-                "active_prediction": true,
-                "baseline_state": "verified_error",
-                "active_state": "verified_error"
-              },
-              {
-                "case": "Magentic_One/049.json",
-                "gold": false,
-                "baseline_prediction": false,
-                "active_prediction": false,
-                "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
-              },
-              {
-                "case": "OpenDeepSearch/095.json",
                 "gold": true,
                 "baseline_prediction": true,
                 "active_prediction": true,
@@ -490,8 +498,8 @@
     "errors": 2,
     "fn": 2,
     "fp": 0,
-    "tp": 7,
-    "tn": 3,
+    "tp": 4,
+    "tn": 6,
     "unresolved": 0,
     "metrics": {
       "n": 12,
@@ -499,16 +507,16 @@
       "unresolved": 0,
       "decisive_accuracy": 0.8333333333333334,
       "all_case_accuracy": 0.8333333333333334,
-      "tp": 7,
+      "tp": 4,
       "fp": 0,
       "fn": 2,
-      "tn": 3,
+      "tn": 6,
       "positive_precision": 1.0,
-      "positive_recall": 0.7777777777777778,
-      "positive_f1": 0.8750000000000001,
-      "macro_precision": 0.8,
-      "macro_recall": 0.8888888888888888,
-      "macro_f1": 0.8125
+      "positive_recall": 0.6666666666666666,
+      "positive_f1": 0.8,
+      "macro_precision": 0.875,
+      "macro_recall": 0.8333333333333333,
+      "macro_f1": 0.8285714285714285
     },
     "family_evidence": "cross-case co-occurrence; repeated-run stability not measured",
     "stable_failure_families": [
@@ -516,8 +524,8 @@
         "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
         "count": 2,
         "failure_cases": [
-          "BFCL/017.json",
-          "Camel/018.json"
+          "BFCL/062.json",
+          "Camel/054.json"
         ],
         "sources": [
           "BFCL",
@@ -546,8 +554,8 @@
           "n": 2,
           "predicate_signals": {
             "required_action_present": {
-              "applicable": 0,
-              "violations": 0
+              "applicable": 1,
+              "violations": 1
             },
             "verbatim_fidelity": {
               "applicable": 0,
@@ -566,7 +574,7 @@
               "violations": 0
             },
             "final_delivery_present": {
-              "applicable": 1,
+              "applicable": 0,
               "violations": 0
             }
           },
@@ -586,7 +594,7 @@
               "upgrade_positive": false,
               "defense_verdict": "none",
               "predicates": {
-                "required_action_present": "not_applicable",
+                "required_action_present": "violated",
                 "verbatim_fidelity": "not_applicable",
                 "evidence_refs_resolve": "not_applicable",
                 "contract_coverage": "not_applicable",
@@ -594,70 +602,73 @@
                 "final_delivery_present": "not_applicable"
               },
               "typed_samples": {
-                "question_text": "[turn 1] I've just put together a file named 'ProjectOverview.txt' into my working directory where I've laid out an initial summary of the project. But as I foresee possible modifications down the line, I'd like to modify the file content b ...",
-                "last_prose_text": "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone in the loop about your documentation progress. If you need to share more update ...",
+                "question_text": "[turn 1] I require assistance with my car. Can you kindly ensure that the fuel tank is refilled with precisely 38 liters of petrol? Make sure using 2 decimal digit for gallon amount.\n[turn 2] Wonderful, with the fuel tank now adequately rep ...",
+                "last_prose_text": "The engine could not be started because all doors must be locked first. Currently, the following doors are unlocked: driver, passenger, rear_left, and rear_right.\\n\\nHere are the requested statuses:\\n- Engine operational status: Stopped (en ...",
                 "last_answer_tool_name": "",
                 "last_answer_tool_arguments": "",
                 "last_answer_tool_observation": "",
                 "answer_anchor_status": "absent",
                 "event_texts": [
-                  "\necho\n{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}\nNone",
-                  "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!",
-                  "\ncp\n{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}\n{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
-                  "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identica ...",
-                  "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further change ...",
-                  "\nauthenticate_twitter\n{'username': 'tech_guru', 'password': 'securePass123'}\n{\"authentication_status\": true}"
+                  "\nliter_to_gallon\n{'liter': 38}\n{\"gallon\": 10.038536}",
+                  "\nfillFuelTank\n{'fuelAmount': 10.04}\n{\"fuelLevel\": 20.04}",
+                  "The fuel tank will be refilled with exactly 38 liters of petrol, which is approximately 10.04 gallons (rounded to two decimal places). The process is now underw ...",
+                  "\nstartEngine\n{'ignitionMode': 'START'}\n{\"error\": \"All doors must be locked before starting the engine. Here are the unlocked doors: driver, passenger, rear_left ...",
+                  "The engine could not be started because all doors must be locked first. Currently, the following doors are unlocked: driver, passenger, rear_left, and rear_righ ..."
                 ],
                 "prose_texts": [
-                  "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!",
-                  "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identica ...",
-                  "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further change ...",
-                  "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone ..."
+                  "The fuel tank will be refilled with exactly 38 liters of petrol, which is approximately 10.04 gallons (rounded to two decimal places). The process is now underw ...",
+                  "The engine could not be started because all doors must be locked first. Currently, the following doors are unlocked: driver, passenger, rear_left, and rear_righ ..."
                 ],
                 "tool_names": [
-                  "echo",
-                  "cp",
-                  "echo",
-                  "authenticate_twitter",
-                  "post_tweet"
+                  "liter_to_gallon",
+                  "fillFuelTank",
+                  "startEngine",
+                  "displayCarStatus",
+                  "displayCarStatus",
+                  "displayCarStatus"
                 ],
                 "tool_arguments": [
-                  "{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}",
-                  "{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}",
-                  "{'content': 'To be discussed', 'file_name': 'Draft.txt'}",
-                  "{'username': 'tech_guru', 'password': 'securePass123'}",
-                  "{'content': 'Initial summary of the project. To be discussed.', 'tags': ['#ProjectUpdate'], 'mentions': ['@manager', '@team_lead']}"
+                  "{'liter': 38}",
+                  "{'fuelAmount': 10.04}",
+                  "{'ignitionMode': 'START'}",
+                  "{'option': 'engine'}",
+                  "{'option': 'battery'}",
+                  "{'option': 'climate'}"
                 ],
                 "tool_observations": [
-                  "None",
-                  "{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
-                  "None",
-                  "{\"authentication_status\": true}",
-                  "{\"id\": 0, \"username\": \"tech_guru\", \"content\": \"Initial summary of the project. To be discussed.\", \"tags\": [\"#ProjectUpdate\"], \"mentions\": [\"@manager\", \"@team_le ..."
+                  "{\"gallon\": 10.038536}",
+                  "{\"fuelLevel\": 20.04}",
+                  "{\"error\": \"All doors must be locked before starting the engine. Here are the unlocked doors: driver, passenger, rear_left, rear_right\"}",
+                  "{\"engineState\": \"stopped\"}",
+                  "{\"batteryVoltage\": 12.6}",
+                  "{\"currentACTemperature\": 25.0, \"fanSpeed\": 50, \"climateMode\": \"auto\", \"humidityLevel\": 50.0}"
                 ],
                 "interaction_texts": [
-                  "echo\n{'content': 'To be discussed', 'file_name': 'ProjectOverview.txt'}\nNone",
-                  "cp\n{'source': 'ProjectOverview.txt', 'destination': 'Draft.txt'}\n{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}",
-                  "echo\n{'content': 'To be discussed', 'file_name': 'Draft.txt'}\nNone",
-                  "authenticate_twitter\n{'username': 'tech_guru', 'password': 'securePass123'}\n{\"authentication_status\": true}",
-                  "post_tweet\n{'content': 'Initial summary of the project. To be discussed.', 'tags': ['#ProjectUpdate'], 'mentions': ['@manager', '@team_lead']}\n{\"id\": 0, \"userna ..."
+                  "liter_to_gallon\n{'liter': 38}\n{\"gallon\": 10.038536}",
+                  "fillFuelTank\n{'fuelAmount': 10.04}\n{\"fuelLevel\": 20.04}",
+                  "startEngine\n{'ignitionMode': 'START'}\n{\"error\": \"All doors must be locked before starting the engine. Here are the unlocked doors: driver, passenger, rear_left, ...",
+                  "displayCarStatus\n{'option': 'engine'}\n{\"engineState\": \"stopped\"}",
+                  "displayCarStatus\n{'option': 'battery'}\n{\"batteryVoltage\": 12.6}",
+                  "displayCarStatus\n{'option': 'climate'}\n{\"currentACTemperature\": 25.0, \"fanSpeed\": 50, \"climateMode\": \"auto\", \"humidityLevel\": 50.0}"
                 ],
                 "event_ids": [
                   "event_001",
                   "event_002",
                   "event_003",
                   "event_004",
-                  "event_005",
-                  "event_006"
+                  "event_005"
                 ],
                 "interaction_ids": [
                   "event_001_tool_01",
-                  "event_003_tool_01",
+                  "event_002_tool_01",
                   "event_004_tool_01",
-                  "event_006_tool_01",
-                  "event_007_tool_01"
+                  "event_004_tool_02",
+                  "event_004_tool_03",
+                  "event_004_tool_04"
                 ],
                 "packet_features": [
+                  "has_long_prose",
+                  "has_numeric_content",
                   "has_tool_calls",
                   "multi_turn_question",
                   "question_has_numbers"
@@ -670,10 +681,10 @@
                 "context_judge_positive": "",
                 "context_judge_confidence": "",
                 "context_judge_hallucination_reason": "",
-                "event_count": 8,
-                "tool_call_count": 5,
-                "interaction_count": 5,
-                "prose_event_count": 4
+                "event_count": 5,
+                "tool_call_count": 6,
+                "interaction_count": 6,
+                "prose_event_count": 2
               }
             },
             {
@@ -696,57 +707,44 @@
                 "evidence_refs_resolve": "not_applicable",
                 "contract_coverage": "not_applicable",
                 "delivered_anchor_consistency": "insufficient",
-                "final_delivery_present": "present"
+                "final_delivery_present": "not_applicable"
               },
               "typed_samples": {
-                "question_text": "Gases A and B are binary compounds consisting of three elements, two of which are in adjacent groups of the Periodic Table of Elements. Both gases can be burned in the air. The density of each of the gases relative to the density of argon a ...",
-                "last_prose_text": "{\"content\": \"To solve the task, the molecular masses of all products of combustion of each gas are summed, each multiplied by the stoichiometric coefficient (as per the balanced chemical equation with all coefficients as whole numbers).\\n\\n ...",
+                "question_text": "methyl isoamyl ketone is treated with hydrogen peroxide and boron trifluoride in diethyl ether, forming a new product. what are the splitting patterns of the most deshielded, and second most deshielded hydrogen nucleus in the 1H NMR spectru ...",
+                "last_prose_text": "{\"content\": \"Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (ap ...",
                 "last_answer_tool_name": "",
                 "last_answer_tool_arguments": "",
                 "last_answer_tool_observation": "",
                 "answer_anchor_status": "absent",
                 "event_texts": [
-                  "<tasks>\n<task>Identify all possible binary gases consisting of three elements, where two of the elements are from adjacent groups in the Periodic Table, and who ...",
-                  "{\"assignments\":[{\"assignee_id\":\"376bae1b-a41a-48f7-9324-e2d36a2da5fc (Search Agent)\",\"dependencies\":[],\"task_id\":\"66.1\"},{\"assignee_id\":\"dd005e3f-7f29-468c-b803 ...",
-                  "\nsearch_google\n{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}\n[{'result_id': 1, 'title': 'Thermodyn ...",
-                  "\nsearch_exa\n{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas phy ...",
-                  "\nappend_note\n{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50  ...",
-                  "\nappend_note\n{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F ..."
+                  "<tasks>\n<task>Consult the human user via ask_human_via_console to gather any insights, clarifications, or preferences relevant to determining the 1H NMR splitti ...",
+                  "{\"assignments\":[{\"assignee_id\":\"42e2e0a1-cdee-4618-a0e1-cb717d681f04 (Search Agent)\",\"dependencies\":[],\"task_id\":\"4276.1\"},{\"assignee_id\":\"f142c8c5-94f6-49e6-80 ...",
+                  "\nask_human_via_console\n{'question': \"Before analyzing the 1H NMR splitting patterns, could you share any insights, clarifications, or preferences? For example,  ...",
+                  "\nappend_note\n{'content': 'User input: You may assume the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement, so the m ...",
+                  "{\"content\":\"User input documented: The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Th ...",
+                  "{\"content\": \"Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: me ..."
                 ],
                 "prose_texts": [
-                  "<tasks>\n<task>Identify all possible binary gases consisting of three elements, where two of the elements are from adjacent groups in the Periodic Table, and who ...",
-                  "{\"assignments\":[{\"assignee_id\":\"376bae1b-a41a-48f7-9324-e2d36a2da5fc (Search Agent)\",\"dependencies\":[],\"task_id\":\"66.1\"},{\"assignee_id\":\"dd005e3f-7f29-468c-b803 ...",
-                  "{\"content\":\"Based on a thorough review of recent journal literature, the following are the most plausible binary gases consisting of three elements, with two of ...",
-                  "{\"content\":\"For the identified gases with three elements and the given properties, here are the balanced chemical equations for their complete combustion in air ...",
-                  "{\"content\": \"To solve the task, the molecular masses of all products of combustion of each gas are summed, each multiplied by the stoichiometric coefficient (as ..."
+                  "<tasks>\n<task>Consult the human user via ask_human_via_console to gather any insights, clarifications, or preferences relevant to determining the 1H NMR splitti ...",
+                  "{\"assignments\":[{\"assignee_id\":\"42e2e0a1-cdee-4618-a0e1-cb717d681f04 (Search Agent)\",\"dependencies\":[],\"task_id\":\"4276.1\"},{\"assignee_id\":\"f142c8c5-94f6-49e6-80 ...",
+                  "{\"content\":\"User input documented: The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Th ...",
+                  "{\"content\": \"Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: me ..."
                 ],
                 "tool_names": [
-                  "search_google",
-                  "search_exa",
-                  "append_note",
-                  "append_note",
-                  "read_note"
+                  "ask_human_via_console",
+                  "append_note"
                 ],
                 "tool_arguments": [
-                  "{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}",
-                  "{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas physical proper ...",
-                  "{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 relative to a ...",
-                  "{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F are not adja ...",
-                  "{'note_name': 'binary_gas_candidates'}"
+                  "{'question': \"Before analyzing the 1H NMR splitting patterns, could you share any insights, clarifications, or preferences? For example, do you have a proposed  ...",
+                  "{'content': 'User input: You may assume the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement, so the most deshielde ..."
                 ],
                 "tool_observations": [
-                  "[{'result_id': 1, 'title': 'Thermodynamic characterization of the (H2 + C3H8) system ...', 'description': 'Mar 15, 2023 ... Experimental (p, ρexp, T) measuremen ...",
-                  "{'results': [{'url': 'https://www.chemtronlabs.com/products/gas/process-gas-mixtures/binary-gas-process-mixtures.html', 'id': 'https://www.chemtronlabs.com/prod ...",
-                  "Note 'binary_gas_candidates' created with content added.",
-                  "Content successfully appended to 'binary_gas_candidates.md'.",
-                  "Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 relative to argon:\n\n1. Ref ..."
+                  "You may assume the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement, so the most deshielded hydrogens can be assign ...",
+                  "Note 'nmr_insights_user' created with content added."
                 ],
                 "interaction_texts": [
-                  "search_google\n{'query': 'binary gases with three elements from adjacent groups and density about 0.50 relative to argon'}\n[{'result_id': 1, 'title': 'Thermodyna ...",
-                  "search_exa\n{'query': 'binary gases of three elements from adjacent groups with density about 0.50 relative to argon under same conditions chemical formulas phys ...",
-                  "append_note\n{'content': 'Tracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, and density near 0.50 r ...",
-                  "append_note\n{'content': 'KEY CANDIDATES (from notes):\\n\\n1. Difluoromethane (CH2F2)\\n- Formula: CH2F2\\n- Elements: C (group 14), H (group 1), F (group 17); C/F  ...",
-                  "read_note\n{'note_name': 'binary_gas_candidates'}\nTracing candidate binary gases consisting of three elements, mainly from adjacent groups in the Periodic Table, ..."
+                  "ask_human_via_console\n{'question': \"Before analyzing the 1H NMR splitting patterns, could you share any insights, clarifications, or preferences? For example, d ...",
+                  "append_note\n{'content': 'User input: You may assume the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement, so the mo ..."
                 ],
                 "event_ids": [
                   "event_001",
@@ -758,15 +756,11 @@
                 ],
                 "interaction_ids": [
                   "event_003_tool_01",
-                  "event_004_tool_01",
-                  "event_005_tool_01",
-                  "event_006_tool_01",
-                  "event_007_tool_01"
+                  "event_004_tool_01"
                 ],
                 "packet_features": [
                   "has_long_prose",
                   "has_numeric_content",
-                  "has_retrieval_tool",
                   "has_tool_calls",
                   "question_has_numbers"
                 ],
@@ -778,32 +772,28 @@
                 "context_judge_positive": "",
                 "context_judge_confidence": "",
                 "context_judge_hallucination_reason": "",
-                "event_count": 10,
-                "tool_call_count": 5,
-                "interaction_count": 5,
-                "prose_event_count": 5
+                "event_count": 6,
+                "tool_call_count": 2,
+                "interaction_count": 2,
+                "prose_event_count": 4
               }
             }
           ],
           "shared_literals": {
             "scalar_token_intersection": {
               "question_text": [
+                "is",
                 "of",
                 "the",
-                "to"
+                "with"
               ],
               "last_prose_text": [
-                "as",
-                "of",
-                "the",
-                "to"
+                "the"
               ],
               "context_judge_hallucination_reason": [],
               "context_judge_delivered_result": []
             },
-            "question_bigram_intersection": [
-              "of the"
-            ],
+            "question_bigram_intersection": [],
             "list_item_intersection": {
               "tool_names": [],
               "tool_arguments": [],
@@ -811,6 +801,8 @@
               "context_contract_kinds": [],
               "context_contract_requirements": [],
               "packet_features": [
+                "has_long_prose",
+                "has_numeric_content",
                 "has_tool_calls",
                 "question_has_numbers"
               ]
@@ -831,6 +823,25 @@
         }
       }
     ],
+    "patrol_registry": "active",
+    "failure_contrast": {
+      "active_registry_size": 0,
+      "new_failures": {
+        "count": 0,
+        "cases": []
+      },
+      "persisting_failures": {
+        "count": 2,
+        "cases": [
+          "BFCL/062.json",
+          "Camel/054.json"
+        ]
+      },
+      "resolved_by_active": {
+        "count": 0,
+        "cases": []
+      }
+    },
     "bootstrap": {
       "initial_patrol_size": 12,
       "bootstrap_cases": [],
@@ -884,11 +895,11 @@
           "cycle": 1,
           "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
           "failure_cases": [
-            "BFCL/017.json",
-            "Camel/018.json"
+            "BFCL/062.json",
+            "Camel/054.json"
           ]
         },
-        "content_hash": "b64719b1700636726ec54c7f3c0b8eaaa7f58704949b47e39bd22f126b676363"
+        "content_hash": "8bc245ad765804b46af65d8e424cab6363d83ede12fe57e208b20fde8fa5c6c4"
       },
       "structural": {
         "passed": true,
@@ -1102,17 +1113,17 @@
           "health_regressed": 0,
           "health_improved": 0,
           "flips": {
-            "T->T": 8,
-            "F->F": 8,
+            "T->T": 11,
+            "F->F": 5,
             "F->T": 2
           },
           "transitions_by_gold": {
             "error": {
-              "T->T": 8,
+              "T->T": 11,
               "F->T": 2
             },
             "clean": {
-              "F->F": 8
+              "F->F": 5
             }
           },
           "correctness_improved": 2,
@@ -1123,16 +1134,16 @@
             "unresolved": 0,
             "decisive_accuracy": 0.8888888888888888,
             "all_case_accuracy": 0.8888888888888888,
-            "tp": 8,
+            "tp": 11,
             "fp": 0,
             "fn": 2,
-            "tn": 8,
+            "tn": 5,
             "positive_precision": 1.0,
-            "positive_recall": 0.8,
-            "positive_f1": 0.888888888888889,
-            "macro_precision": 0.9,
-            "macro_recall": 0.9,
-            "macro_f1": 0.888888888888889
+            "positive_recall": 0.8461538461538461,
+            "positive_f1": 0.9166666666666666,
+            "macro_precision": 0.8571428571428572,
+            "macro_recall": 0.9230769230769231,
+            "macro_f1": 0.875
           },
           "active_metrics": {
             "n": 18,
@@ -1140,10 +1151,10 @@
             "unresolved": 0,
             "decisive_accuracy": 1.0,
             "all_case_accuracy": 1.0,
-            "tp": 10,
+            "tp": 13,
             "fp": 0,
             "fn": 0,
-            "tn": 8,
+            "tn": 5,
             "positive_precision": 1.0,
             "positive_recall": 1.0,
             "positive_f1": 1.0,
@@ -1201,12 +1212,12 @@
               "active_state": "verified_clean"
             },
             {
-              "case": "Magentic_One/050.json",
-              "gold": false,
+              "case": "OpenDeepSearch/080.json",
+              "gold": true,
               "baseline_prediction": false,
-              "active_prediction": false,
+              "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_error"
             },
             {
               "case": "OpenDeepSearch/086.json",
@@ -1217,15 +1228,7 @@
               "active_state": "verified_error"
             },
             {
-              "case": "Octotools/030.json",
-              "gold": true,
-              "baseline_prediction": false,
-              "active_prediction": true,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_error"
-            },
-            {
-              "case": "OpenDeepSearch/084.json",
+              "case": "Magentic_One/050.json",
               "gold": false,
               "baseline_prediction": false,
               "active_prediction": false,
@@ -1233,7 +1236,7 @@
               "active_state": "verified_clean"
             },
             {
-              "case": "OpenManus/064.json",
+              "case": "OpenDeepSearch/095.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1241,7 +1244,23 @@
               "active_state": "verified_error"
             },
             {
-              "case": "BFCL/062.json",
+              "case": "Magentic_One/093.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Camel/018.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "BFCL/017.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1257,6 +1276,22 @@
               "active_state": "verified_clean"
             },
             {
+              "case": "Octotools/030.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenManus/064.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
               "case": "SmolAgents/037.json",
               "gold": true,
               "baseline_prediction": true,
@@ -1265,31 +1300,7 @@
               "active_state": "verified_error"
             },
             {
-              "case": "Camel/048.json",
-              "gold": false,
-              "baseline_prediction": false,
-              "active_prediction": false,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
-            },
-            {
               "case": "OpenDeepSearch/067.json",
-              "gold": true,
-              "baseline_prediction": true,
-              "active_prediction": true,
-              "baseline_state": "verified_error",
-              "active_state": "verified_error"
-            },
-            {
-              "case": "Magentic_One/049.json",
-              "gold": false,
-              "baseline_prediction": false,
-              "active_prediction": false,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
-            },
-            {
-              "case": "OpenDeepSearch/095.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1319,17 +1330,17 @@
           "health_regressed": 0,
           "health_improved": 0,
           "flips": {
-            "F->F": 5,
             "F->T": 2,
-            "T->T": 5
+            "F->F": 2,
+            "T->T": 8
           },
           "transitions_by_gold": {
             "error": {
               "F->T": 2,
-              "T->T": 5
+              "T->T": 8
             },
             "clean": {
-              "F->F": 5
+              "F->F": 2
             }
           },
           "correctness_improved": 2,
@@ -1340,16 +1351,16 @@
             "unresolved": 0,
             "decisive_accuracy": 0.8333333333333334,
             "all_case_accuracy": 0.8333333333333334,
-            "tp": 5,
+            "tp": 8,
             "fp": 0,
             "fn": 2,
-            "tn": 5,
+            "tn": 2,
             "positive_precision": 1.0,
-            "positive_recall": 0.7142857142857143,
-            "positive_f1": 0.8333333333333333,
-            "macro_precision": 0.8571428571428572,
-            "macro_recall": 0.8571428571428572,
-            "macro_f1": 0.8333333333333333
+            "positive_recall": 0.8,
+            "positive_f1": 0.888888888888889,
+            "macro_precision": 0.75,
+            "macro_recall": 0.9,
+            "macro_f1": 0.7777777777777778
           },
           "active_metrics": {
             "n": 12,
@@ -1357,10 +1368,10 @@
             "unresolved": 0,
             "decisive_accuracy": 1.0,
             "all_case_accuracy": 1.0,
-            "tp": 7,
+            "tp": 10,
             "fp": 0,
             "fn": 0,
-            "tn": 5,
+            "tn": 2,
             "positive_precision": 1.0,
             "positive_recall": 1.0,
             "positive_f1": 1.0,
@@ -1370,12 +1381,12 @@
           },
           "rows": [
             {
-              "case": "Magentic_One/050.json",
-              "gold": false,
+              "case": "OpenDeepSearch/080.json",
+              "gold": true,
               "baseline_prediction": false,
-              "active_prediction": false,
+              "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_error"
             },
             {
               "case": "OpenDeepSearch/086.json",
@@ -1386,15 +1397,7 @@
               "active_state": "verified_error"
             },
             {
-              "case": "Octotools/030.json",
-              "gold": true,
-              "baseline_prediction": false,
-              "active_prediction": true,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_error"
-            },
-            {
-              "case": "OpenDeepSearch/084.json",
+              "case": "Magentic_One/050.json",
               "gold": false,
               "baseline_prediction": false,
               "active_prediction": false,
@@ -1402,7 +1405,7 @@
               "active_state": "verified_clean"
             },
             {
-              "case": "OpenManus/064.json",
+              "case": "OpenDeepSearch/095.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1410,7 +1413,23 @@
               "active_state": "verified_error"
             },
             {
-              "case": "BFCL/062.json",
+              "case": "Magentic_One/093.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "Camel/018.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "BFCL/017.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1426,6 +1445,22 @@
               "active_state": "verified_clean"
             },
             {
+              "case": "Octotools/030.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
+              "case": "OpenManus/064.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": true,
+              "baseline_state": "verified_error",
+              "active_state": "verified_error"
+            },
+            {
               "case": "SmolAgents/037.json",
               "gold": true,
               "baseline_prediction": true,
@@ -1434,31 +1469,7 @@
               "active_state": "verified_error"
             },
             {
-              "case": "Camel/048.json",
-              "gold": false,
-              "baseline_prediction": false,
-              "active_prediction": false,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
-            },
-            {
               "case": "OpenDeepSearch/067.json",
-              "gold": true,
-              "baseline_prediction": true,
-              "active_prediction": true,
-              "baseline_state": "verified_error",
-              "active_state": "verified_error"
-            },
-            {
-              "case": "Magentic_One/049.json",
-              "gold": false,
-              "baseline_prediction": false,
-              "active_prediction": false,
-              "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
-            },
-            {
-              "case": "OpenDeepSearch/095.json",
               "gold": true,
               "baseline_prediction": true,
               "active_prediction": true,
@@ -1514,10 +1525,10 @@
           "authority": "authoritative"
         },
         {
-          "case": "Magentic_One/050.json",
-          "gold": false,
-          "prediction": false,
-          "state": "verified_clean",
+          "case": "OpenDeepSearch/080.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
           "authority": "authoritative"
         },
         {
@@ -1528,28 +1539,35 @@
           "authority": "authoritative"
         },
         {
-          "case": "Octotools/030.json",
-          "gold": true,
-          "prediction": true,
-          "state": "verified_error",
-          "authority": "authoritative"
-        },
-        {
-          "case": "OpenDeepSearch/084.json",
+          "case": "Magentic_One/050.json",
           "gold": false,
           "prediction": false,
           "state": "verified_clean",
           "authority": "authoritative"
         },
         {
-          "case": "OpenManus/064.json",
+          "case": "OpenDeepSearch/095.json",
           "gold": true,
           "prediction": true,
           "state": "verified_error",
           "authority": "authoritative"
         },
         {
-          "case": "BFCL/062.json",
+          "case": "Magentic_One/093.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "Camel/018.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "BFCL/017.json",
           "gold": true,
           "prediction": true,
           "state": "verified_error",
@@ -1563,6 +1581,20 @@
           "authority": "authoritative"
         },
         {
+          "case": "Octotools/030.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
+          "case": "OpenManus/064.json",
+          "gold": true,
+          "prediction": true,
+          "state": "verified_error",
+          "authority": "authoritative"
+        },
+        {
           "case": "SmolAgents/037.json",
           "gold": true,
           "prediction": true,
@@ -1570,28 +1602,7 @@
           "authority": "authoritative"
         },
         {
-          "case": "Camel/048.json",
-          "gold": false,
-          "prediction": false,
-          "state": "verified_clean",
-          "authority": "authoritative"
-        },
-        {
           "case": "OpenDeepSearch/067.json",
-          "gold": true,
-          "prediction": true,
-          "state": "verified_error",
-          "authority": "authoritative"
-        },
-        {
-          "case": "Magentic_One/049.json",
-          "gold": false,
-          "prediction": false,
-          "state": "verified_clean",
-          "authority": "authoritative"
-        },
-        {
-          "case": "OpenDeepSearch/095.json",
           "gold": true,
           "prediction": true,
           "state": "verified_error",
@@ -1636,17 +1647,17 @@
     "health_regressed": 0,
     "health_improved": 0,
     "flips": {
-      "F->F": 5,
       "F->T": 2,
-      "T->T": 5
+      "F->F": 2,
+      "T->T": 8
     },
     "transitions_by_gold": {
       "error": {
         "F->T": 2,
-        "T->T": 5
+        "T->T": 8
       },
       "clean": {
-        "F->F": 5
+        "F->F": 2
       }
     },
     "correctness_improved": 2,
@@ -1657,16 +1668,16 @@
       "unresolved": 0,
       "decisive_accuracy": 0.8333333333333334,
       "all_case_accuracy": 0.8333333333333334,
-      "tp": 5,
+      "tp": 8,
       "fp": 0,
       "fn": 2,
-      "tn": 5,
+      "tn": 2,
       "positive_precision": 1.0,
-      "positive_recall": 0.7142857142857143,
-      "positive_f1": 0.8333333333333333,
-      "macro_precision": 0.8571428571428572,
-      "macro_recall": 0.8571428571428572,
-      "macro_f1": 0.8333333333333333
+      "positive_recall": 0.8,
+      "positive_f1": 0.888888888888889,
+      "macro_precision": 0.75,
+      "macro_recall": 0.9,
+      "macro_f1": 0.7777777777777778
     },
     "active_metrics": {
       "n": 12,
@@ -1674,10 +1685,10 @@
       "unresolved": 0,
       "decisive_accuracy": 1.0,
       "all_case_accuracy": 1.0,
-      "tp": 7,
+      "tp": 10,
       "fp": 0,
       "fn": 0,
-      "tn": 5,
+      "tn": 2,
       "positive_precision": 1.0,
       "positive_recall": 1.0,
       "positive_f1": 1.0,
@@ -1687,12 +1698,12 @@
     },
     "rows": [
       {
-        "case": "Magentic_One/050.json",
-        "gold": false,
+        "case": "OpenDeepSearch/080.json",
+        "gold": true,
         "baseline_prediction": false,
-        "active_prediction": false,
+        "active_prediction": true,
         "baseline_state": "verified_clean",
-        "active_state": "verified_clean"
+        "active_state": "verified_error"
       },
       {
         "case": "OpenDeepSearch/086.json",
@@ -1703,15 +1714,7 @@
         "active_state": "verified_error"
       },
       {
-        "case": "Octotools/030.json",
-        "gold": true,
-        "baseline_prediction": false,
-        "active_prediction": true,
-        "baseline_state": "verified_clean",
-        "active_state": "verified_error"
-      },
-      {
-        "case": "OpenDeepSearch/084.json",
+        "case": "Magentic_One/050.json",
         "gold": false,
         "baseline_prediction": false,
         "active_prediction": false,
@@ -1719,7 +1722,7 @@
         "active_state": "verified_clean"
       },
       {
-        "case": "OpenManus/064.json",
+        "case": "OpenDeepSearch/095.json",
         "gold": true,
         "baseline_prediction": true,
         "active_prediction": true,
@@ -1727,7 +1730,23 @@
         "active_state": "verified_error"
       },
       {
-        "case": "BFCL/062.json",
+        "case": "Magentic_One/093.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Camel/018.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "BFCL/017.json",
         "gold": true,
         "baseline_prediction": true,
         "active_prediction": true,
@@ -1743,6 +1762,22 @@
         "active_state": "verified_clean"
       },
       {
+        "case": "Octotools/030.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "OpenManus/064.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
         "case": "SmolAgents/037.json",
         "gold": true,
         "baseline_prediction": true,
@@ -1751,31 +1786,7 @@
         "active_state": "verified_error"
       },
       {
-        "case": "Camel/048.json",
-        "gold": false,
-        "baseline_prediction": false,
-        "active_prediction": false,
-        "baseline_state": "verified_clean",
-        "active_state": "verified_clean"
-      },
-      {
         "case": "OpenDeepSearch/067.json",
-        "gold": true,
-        "baseline_prediction": true,
-        "active_prediction": true,
-        "baseline_state": "verified_error",
-        "active_state": "verified_error"
-      },
-      {
-        "case": "Magentic_One/049.json",
-        "gold": false,
-        "baseline_prediction": false,
-        "active_prediction": false,
-        "baseline_state": "verified_clean",
-        "active_state": "verified_clean"
-      },
-      {
-        "case": "OpenDeepSearch/095.json",
         "gold": true,
         "baseline_prediction": true,
         "active_prediction": true,

@@ -30,21 +30,27 @@ DEFAULTS: dict[str, Any] = {
         "datasets/protocols/development_exposure.json",
     ],
     "cycles": 3,
+    # Which version the patrol measures: "active" aims each round at the
+    # residual failures of the deployed harness, "bare_base" restores the
+    # older behaviour where proposals only ever came from the bare base.
+    "patrol_registry": "active",
     "split": {
         "seed": 20260817,
         "sentinel_size": 20,
         "sentinel_positives": 10,
         "sentinel_negatives": 10,
         "gain_set_size": 80,
+        "gain_set_min_positives": 20,
+        "gain_set_min_negatives": 20,
         "patrol_size": 120,
         "mini_pool_size": 32,
         "mini_gain_size": 16,
+        "mini_gain_min_positives": 1,
+        "mini_gain_min_negatives": 1,
     },
     "budget": {
         "patrol_cases": 120,
         "stable_failure_rerun_cases": 40,
-        "sentinel_cases": 40,
-        "marginal_cases": 160,
         "llm_calls": 4,
         "max_proposals": 3,
         "max_admits": 2,

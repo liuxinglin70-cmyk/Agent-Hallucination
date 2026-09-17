@@ -11,7 +11,7 @@ import pytest
 from detector.config import load_config as detector_config
 from evolution import cli
 from evolution.config import load_config
-from evolution.splits import build_split
+from evolution.splits import build_split, split_manifest_report
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,6 +34,87 @@ def test_current_configuration_resolves_real_development_partition():
     assert set(split.sentinel + split.gain + split.patrol_pool) == set(split.pool)
     assert Path(config["detector_config"]).is_file()
     assert all(Path(p).is_file() for p in config["historical_development_manifests"])
+
+
+def test_marginal_set_carries_both_polarities(tmp_path):
+    """The instrument must be able to score either claim direction.
+
+    ``marginal_cases`` counts all-case correct predictions gained, so a claim
+    can only be scored if the marginal set contains the gold polarity it
+    repairs. Source-quota sampling alone left that to chance; the polarity
+    floor makes it a property of the split.
+    """
+    dataset_root = tmp_path / "data"
+    dataset_root.mkdir()
+    cases = []
+    for index in range(12):
+        gold = "true" if index < 8 else "false"
+        source = "A" if index % 2 == 0 else "B"
+        case_id = f"{source}/{index:03d}.json"
+        cases.append(case_id)
+        (dataset_root / source).mkdir(exist_ok=True)
+        (dataset_root / case_id).write_text(json.dumps({
+            "question": "q", "history": [],
+            "is_hallucination": gold,
+        }), encoding="utf-8")
+    manifest = {
+        "evolution_set": {"size": len(cases), "cases": cases},
+        "validation_set": {"size": 0, "cases": []},
+    }
+    manifest_path = tmp_path / "development.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    split = build_split(config={
+        "mini_split_manifest": str(manifest_path),
+        "split": {
+            "seed": 7,
+            "sentinel_positives": 1,
+            "sentinel_negatives": 1,
+            "mini_pool_size": len(cases),
+            "mini_gain_size": 4,
+            "mini_gain_min_positives": 2,
+            "mini_gain_min_negatives": 2,
+        },
+    }, dataset_root=dataset_root, mini=True)
+    report = split_manifest_report(split)
+    assert report["gain_size"] == 4
+    assert report["gain_polarity"]["error"] >= 2
+    assert report["gain_polarity"]["clean"] >= 2
+    assert report["sentinel_polarity"]["error"] == 1
+    assert report["sentinel_polarity"]["clean"] == 1
+
+
+def test_marginal_set_polarity_floor_fails_closed(tmp_path):
+    """An unsatisfiable floor is an error, not a silently weaker split."""
+    dataset_root = tmp_path / "data"
+    dataset_root.mkdir()
+    cases = []
+    for index in range(6):
+        source = "A"
+        case_id = f"{source}/{index:03d}.json"
+        cases.append(case_id)
+        (dataset_root / source).mkdir(exist_ok=True)
+        # Every case is an error-gold case: a clean floor cannot be met.
+        (dataset_root / case_id).write_text(json.dumps({
+            "question": "q", "history": [], "is_hallucination": "true",
+        }), encoding="utf-8")
+    manifest_path = tmp_path / "development.json"
+    manifest_path.write_text(json.dumps({
+        "evolution_set": {"size": len(cases), "cases": cases},
+        "validation_set": {"size": 0, "cases": []},
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="gain_min_negatives"):
+        build_split(config={
+            "mini_split_manifest": str(manifest_path),
+            "split": {
+                "seed": 7,
+                "sentinel_positives": 1,
+                "sentinel_negatives": 0,
+                "mini_pool_size": len(cases),
+                "mini_gain_size": 4,
+                "mini_gain_min_positives": 1,
+                "mini_gain_min_negatives": 1,
+            },
+        }, dataset_root=dataset_root, mini=True)
 
 
 def test_formal_protocol_is_not_silently_inferred():

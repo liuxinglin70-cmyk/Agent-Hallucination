@@ -756,7 +756,6 @@ def defect_candidates() -> list[dict[str, Any]]:
 
 __all__ = [
     "INFRASTRUCTURE_STATE_PREFIXES",
-    "UNFREEZING_HOOKS",
     "arm_has_infrastructure_failure",
     "defect_candidates",
     "meets_m",

@@ -10,7 +10,7 @@ evolution/                 自进化框架、开发配置、离线闭环、回�
 datasets/raw/              原始完整数据集，保持原文件不变
 datasets/protocols/        开发划分与保守的数据使用边界
 datasets/integrity.json    原始目录逐文件 SHA-256
-docs/                      架构、干预契约、数据评估协议、维护说明、代码 review 与优化方向
+docs/                      架构、干预契约、数据评估协议、维护说明、代码 review、优化方向与方向对照评估
 tests/                     跨模块和仓库入口回归测试
 scripts/verify.py           可复现的离线验证入口
 scripts/live_smoke.py       两个合成案例的真实服务联调入口
@@ -60,14 +60,17 @@ python -m evolution verify-ledger
 4. [命名与维护约定](docs/maintenance.md)
 5. [代码 Review：机制梳理与缺陷清单](docs/review.md)
 6. [跳出无效优化循环：面向 RSI 的优化方向](docs/optimization-directions.md)
-7. [最新验证结果](reports/latest/README.md)
-8. [当前进展与下一步计划](docs/progress.md)
-9. [真实服务联调结果](reports/live/README.md)
-10. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
-11. [真实两轮自进化实验结果](reports/evolution_real/README.md)
+7. [方向对照评估：文档主张与代码现状](docs/directions-assessment.md)
+8. [最新验证结果](reports/latest/README.md)
+9. [当前进展与下一步计划](docs/progress.md)
+10. [真实服务联调结果](reports/live/README.md)
+11. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
+12. [真实两轮自进化实验结果](reports/evolution_real/README.md)
 
 原始数据共 693 个案例、7 个来源。原始目录 695 个文件的摘要保存在 `datasets/integrity.json`。当前默认协议为开发复测；没有预先配置可宣称独立泛化的终审集。离线 smoke 使用 mock 后端，证明机制闭环，不代表真实模型准确率。
 
 2026-09-16 已完成离线回归、真实服务联调、真实数据集小规模路径检查，以及首次真实两轮自进化实验。真实服务使用当前配置的 `GLM-5.3-flash`：两个合成算术案例跑通 `batch → evaluate`；真实数据集上冻结底座后两次运行 6 例，判定 6/6 一致、0 unresolved、12/12 authoritative，并另以单票强制触发验证了召回升级分支。自进化第 1 轮完整跑通真实 `proposer → detector 配对评估 → 四门准入`：产出 3 个合法候选但**全部被门限拒绝，准入 0，真实收益未成立**；第 2 轮被环境中断未完成。这些结果都不是准确率或泛化结论，具体证据边界见相应报告。
 
 2026-09-17 完成代码 review 与修复：13 项会污染结论的缺陷全部修复并配回归测试，测试由 220 增至 244 passed，`scripts/verify.py` 七项校验全 PASS。同时确认真实自进化收益未成立的结构性原因（搜索空间冻结、评估无统计功效、准入终结式无存档、框架自身只由人手优化），并给出面向 RSI 的优化方向。详见 [代码 Review](docs/review.md) 与 [优化方向](docs/optimization-directions.md)。
+
+同日完成两项评估侧优化，测试由 244 增至 **251 passed**，离线验证九项全 PASS：边际集（G）加极性下限，使两种 claim 方向都可被计分；巡检改测已部署版本并保留裸底座对照，把新引入退化、常驻残余与已修复分离为可读字段。依据是真实第 1 轮出现的「做出了有效修改却读数为 0」——G 中没有被修改机制的案例。逐条对照与理由见 [方向对照评估](docs/directions-assessment.md)。

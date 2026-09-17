@@ -761,9 +761,79 @@ def test_defect_injection_audit_marks_harmlessness_rejection(tmp_path, monkeypat
     assert noise["audit_passed"] is False
 
 
-def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
+def test_patrol_runs_the_deployed_version_with_a_bare_base_reference(
+    tmp_path, monkeypatch,
+):
+    """The patrol measures H_t and still sweeps the bare base as its reference."""
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    backend = MockDetectorBackend()
+    engine = EvolutionEngine(
+        config,
+        backend=backend,
+        split=split,
+        mini=True,
+        proposer=OfflineProposer(),
+    )
+    active_entry = _scanner_candidate()
+    engine.registry.write(
+        [active_entry], cycle=0, reason="pre-seeded active entry",
+        library_cfg=config["library"],
+    )
+    seen = []
+    original = backend.evaluate
+
+    def spy(cases, **kwargs):
+        seen.append((sorted(cases), kwargs.get("registry")))
+        return original(cases, **kwargs)
+
+    monkeypatch.setattr(backend, "evaluate", spy)
+    report = engine.run_cycle(1)
+    expected_patrol = sorted(engine.split.patrol_sample(
+        1, int(config["budget"]["patrol_cases"])
+    ))
+    patrol_registries = [
+        registry for case_list, registry in seen
+        if case_list and set(case_list) <= set(expected_patrol)
+    ]
+    assert patrol_registries, "the patrol must be evaluated"
+    hashes = {
+        str((registry or {}).get("content_hash") or "")
+        for registry in patrol_registries
+    }
+    # Both arms must run: the deployed version (candidate targeting H_t) and
+    # the bare base (the long-term reference).
+    assert engine.registry.registry_hash in hashes
+    assert empty_registry()["content_hash"] in hashes
+    assert report["patrol"]["patrol_registry"] == "active"
+    contrast = report["patrol"]["failure_contrast"]
+    assert contrast["active_registry_size"] == 1
+    assert set(contrast) >= {
+        "new_failures", "persisting_failures", "resolved_by_active",
+    }
+    # The contrast partitions the active patrol's failures exactly.
+    assert (
+        contrast["new_failures"]["count"]
+        + contrast["persisting_failures"]["count"]
+        <= len(expected_patrol)
+    )
+
+
+def test_patrol_registry_bare_base_escape_hatch_skips_the_second_arm(
+    tmp_path, monkeypatch,
+):
+    """``patrol_registry: bare_base`` restores the single-arm patrol."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["patrol_registry"] = "bare_base"
     split = EvolutionSplit(
         name="synthetic",
         pool=cases,
@@ -792,21 +862,90 @@ def test_patrol_always_runs_the_bare_base(tmp_path, monkeypatch):
         return original(cases, **kwargs)
 
     monkeypatch.setattr(backend, "evaluate", spy)
-    engine.run_cycle(1)
-    expected_patrol = sorted(engine.split.patrol_sample(
+    report = engine.run_cycle(1)
+    expected_patrol = set(engine.split.patrol_sample(
         1, int(config["budget"]["patrol_cases"])
     ))
     patrol_registries = [
         registry for case_list, registry in seen
-        if case_list and set(case_list) <= set(expected_patrol)
+        if case_list and set(case_list) <= expected_patrol
     ]
     assert patrol_registries
-    assert {case for case_list, _ in seen for case in case_list if case in expected_patrol} == set(expected_patrol)
-    empty_hash = empty_registry()["content_hash"]
-    assert all(
-        str((registry or {}).get("content_hash") or "") == empty_hash
+    assert {
+        str((registry or {}).get("content_hash") or "")
         for registry in patrol_registries
+    } == {empty_registry()["content_hash"]}
+    assert report["patrol"]["patrol_registry"] == "bare_base"
+
+
+def test_patrol_registry_rejects_unknown_mode(tmp_path):
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["patrol_registry"] = "whatever"
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
     )
+    engine = EvolutionEngine(
+        config, backend=MockDetectorBackend(), split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    with pytest.raises(ValueError, match="patrol_registry must be"):
+        engine.run_cycle(1)
+
+
+def test_failure_contrast_separates_new_from_persisting_failures():
+    """The bare-base reference makes regressions and residual separable."""
+    from evolution.engine import _failure_contrast
+
+    def row(case, gold, prediction):
+        return {"case": case, "gold": gold, "prediction": prediction}
+
+    # A: wrong on both -> persisting residual.
+    # B: wrong on active, right on bare base -> a regression from the update.
+    # C: right on active, wrong on bare base -> repaired by the update.
+    # D: right on both -> untouched.
+    # E: unresolved on active while bare base is right -> counts as a failure.
+    bare = [
+        row("A/001.json", True, False),
+        row("B/002.json", True, True),
+        row("C/003.json", True, False),
+        row("D/004.json", False, False),
+        row("E/005.json", True, True),
+    ]
+    active = [
+        row("A/001.json", True, False),
+        row("B/002.json", True, False),
+        row("C/003.json", True, True),
+        row("D/004.json", False, False),
+        row("E/005.json", True, None),
+    ]
+    contrast = _failure_contrast(bare, active, active_registry_size=2)
+    assert contrast["active_registry_size"] == 2
+    assert contrast["persisting_failures"]["cases"] == ["A/001.json"]
+    assert contrast["new_failures"]["cases"] == ["B/002.json", "E/005.json"]
+    assert contrast["resolved_by_active"]["cases"] == ["C/003.json"]
+    assert contrast["persisting_failures"]["count"] == 1
+    assert contrast["new_failures"]["count"] == 2
+    assert contrast["resolved_by_active"]["count"] == 1
+
+
+def test_failure_contrast_is_empty_when_active_equals_bare():
+    """A cold start has no regressions and no repairs by construction."""
+    from evolution.engine import _failure_contrast
+
+    rows = [
+        {"case": "A/001.json", "gold": True, "prediction": False},
+        {"case": "B/002.json", "gold": False, "prediction": False},
+    ]
+    contrast = _failure_contrast(rows, rows, active_registry_size=0)
+    assert contrast["persisting_failures"]["cases"] == ["A/001.json"]
+    assert contrast["new_failures"] == {"count": 0, "cases": []}
+    assert contrast["resolved_by_active"] == {"count": 0, "cases": []}
 
 
 def test_governance_runs_attribution_retirement_and_rollback(tmp_path):

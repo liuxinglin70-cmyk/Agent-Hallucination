@@ -30,6 +30,16 @@
 
 原始语料不能因换 case ID 而被视为独立数据。自定义正式协议必须同时保留准确的数据使用边界；配置引用的历史记录缺失会报错，而不会静默绕过。
 
+## 巡检版本与边际集构成
+
+两个评估侧可配置项决定「一轮能读到什么」，改动它们会改变读数口径：
+
+**`patrol_registry`（顶层，取值 `active` / `bare_base`，默认 `active`）。** 决定巡检测量哪个版本。`active` 让每轮面向已部署版本（H_t）的残余错误，同时把裸底座作为参照臂保留；`bare_base` 恢复旧的单臂行为。参照臂使失败可分成三类并写入 `patrol.failure_contrast`：`new_failures`（巡检判错、裸底座判对，即被准入干预引入的退化）、`persisting_failures`（两臂都判错，即常驻残余）、`resolved_by_active`（巡检判对、裸底座判错）。registry 为空时两臂是同一次评估，冷启动成本不变；只有真正部署了干预才会多出第二次 sweep。
+
+**`split.mini_gain_min_positives` / `mini_gain_min_negatives`（正式协议为 `gain_set_min_positives` / `gain_set_min_negatives`）。** 边际集（G）的每极性最少案例数，开发默认各 1，正式默认 `max(1, gain_size // 4)`。`marginal_cases` 只统计全对案例净增，因此 G 缺少某极性时，对应方向的 claim 无法被计分——真实第 1 轮的 recall 候选就是这样被读成 0 收益。下限不可满足时构建直接报错，不静默弱化。`split_manifest_report` 的 `gain_polarity` / `sentinel_polarity` 记录实际构成。
+
+该下限是**必要不充分**条件：G 含有某极性案例，不等于该案例是该方向的修复机会——机会取决于底座在该案例上是否判错。机会覆盖（`gain_opportunities`：`recall` 与 `precision` 两个计数）目前每轮由引擎计算并写入拒绝反馈（`not_evaluable`），但尚未作用于本轮结论，详见 [方向对照评估](directions-assessment.md) 第 3、8 节。
+
 ## 证据等级
 
 | 结果 | 能说明什么 |

@@ -17,8 +17,6 @@
   "budget": {
     "patrol_cases": 20,
     "stable_failure_rerun_cases": 20,
-    "sentinel_cases": 6,
-    "marginal_cases": 4,
     "llm_calls": 2,
     "max_proposals": 4,
     "max_admits": 2,

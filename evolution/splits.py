@@ -82,6 +82,63 @@ def _quota_sample(
     return picked
 
 
+def _stratified_gain_sample(
+    cases: Sequence[str],
+    n: int,
+    gold: Mapping[str, bool | None],
+    *,
+    min_positives: int,
+    min_negatives: int,
+    rng: random.Random,
+) -> list[str]:
+    """Draw the marginal set with a guaranteed number of each gold polarity.
+
+    Source-quota sampling alone decides the polarity mix by chance, and the
+    marginal set is the only place a claim is scored. Without a floor on each
+    polarity the set can be unable to score one claim direction at all, which
+    makes the instrument look like a rejection instead of a missing measurement.
+    This floor is necessary but not sufficient: whether a case is a *repair
+    opportunity* still depends on the base's behavior, which is reported per
+    cycle as coverage rather than assumed here.
+    """
+    if n <= 0 or not cases:
+        return []
+    if n >= len(cases):
+        return list(cases)
+    positives = [case for case in cases if gold.get(case) is True]
+    negatives = [case for case in cases if gold.get(case) is False]
+    if min_positives + min_negatives > n:
+        raise ValueError(
+            "gain polarity floors exceed the marginal set size: "
+            f"{min_positives}+{min_negatives} > {n}"
+        )
+    if min_positives > len(positives):
+        raise ValueError(
+            f"gain_min_positives={min_positives} exceeds the {len(positives)} "
+            "error-gold case(s) available for the marginal set"
+        )
+    if min_negatives > len(negatives):
+        raise ValueError(
+            f"gain_min_negatives={min_negatives} exceeds the {len(negatives)} "
+            "clean-gold case(s) available for the marginal set"
+        )
+    picked: list[str] = []
+    if min_positives:
+        picked.extend(_quota_sample(positives, min_positives, rng))
+    if min_negatives:
+        picked.extend(_quota_sample(negatives, min_negatives, rng))
+    leftover = n - len(picked)
+    if leftover > 0:
+        chosen = set(picked)
+        picked.extend(
+            _quota_sample(
+                [case for case in cases if case not in chosen], leftover, rng,
+            )
+        )
+    rng.shuffle(picked)
+    return picked
+
+
 @dataclass
 class EvolutionSplit:
     name: str
@@ -94,6 +151,7 @@ class EvolutionSplit:
     final_holdout: "FinalHoldout | None" = None
     mini: bool = False
     seed: int = 20260817
+    gold: dict[str, bool | None] = field(default_factory=dict)
 
     def patrol_sample(self, cycle: int, n: int) -> list[str]:
         if n >= len(self.patrol_pool):
@@ -365,7 +423,17 @@ def build_split(
         int(split_cfg.get("mini_gain_size", 16)) if mini
         else int(split_cfg.get("gain_set_size", 80))
     )
-    gain = _quota_sample(remaining, gain_size, rng)
+    default_floor = 1 if mini else max(1, gain_size // 4)
+    gain = _stratified_gain_sample(
+        remaining,
+        gain_size,
+        gold,
+        min_positives=int(split_cfg.get("mini_gain_min_positives", default_floor))
+        if mini else int(split_cfg.get("gain_set_min_positives", default_floor)),
+        min_negatives=int(split_cfg.get("mini_gain_min_negatives", default_floor))
+        if mini else int(split_cfg.get("gain_set_min_negatives", default_floor)),
+        rng=rng,
+    )
     patrol_pool = [
         case for case in remaining if case not in set(gain)
     ]
@@ -387,10 +455,19 @@ def build_split(
         final_holdout=holdout,
         mini=mini,
         seed=seed,
+        gold=gold,
     )
 
 
 def split_manifest_report(split: EvolutionSplit) -> dict[str, Any]:
+    gold = getattr(split, "gold", None) or {}
+
+    def polarity(cases: Sequence[str]) -> dict[str, int]:
+        return {
+            "error": sum(1 for case in cases if gold.get(case) is True),
+            "clean": sum(1 for case in cases if gold.get(case) is False),
+        }
+
     return {
         "name": split.name,
         "mini": split.mini,
@@ -398,8 +475,10 @@ def split_manifest_report(split: EvolutionSplit) -> dict[str, Any]:
         "pool_size": len(split.pool),
         "sentinel": split.sentinel,
         "sentinel_size": len(split.sentinel),
+        "sentinel_polarity": polarity(split.sentinel),
         "gain": split.gain,
         "gain_size": len(split.gain),
+        "gain_polarity": polarity(split.gain),
         "patrol_pool_size": len(split.patrol_pool),
         "validation": split.validation,
         "validation_size": len(split.validation),
