@@ -647,15 +647,17 @@ class EvolutionEngine:
         Called after a committed registry write, so the manifest describes the
         version the next round will actually load.
         """
+        journal = getattr(self, "_journal", None)
+        parent = (
+            self._previous_manifest.get("digest")
+            if self._previous_manifest else None
+        )
         manifest = build_manifest(
             config=self.config,
             registry=self.registry.registry,
             memory_root=self.memory_root,
             cycle=cycle,
-            parent_digest=(
-                self._previous_manifest.get("digest")
-                if self._previous_manifest else None
-            ),
+            parent_digest=parent,
         )
         diff = harness_diff(self._previous_manifest, manifest)
         write_manifest(
@@ -663,6 +665,11 @@ class EvolutionEngine:
             manifest=manifest,
             history_path=self.harness_dir / HARNESS_HISTORY_NAME,
         )
+        if journal is not None:
+            # Persist the parent this cycle built on, so a resumed attempt
+            # reconstructs the same manifest instead of recording a second,
+            # differently-parented version of the same generation.
+            journal.save(harness_parent_digest=parent)
         self._previous_manifest = manifest
         self._ledger("harness", {
             "cycle": cycle,
@@ -1340,11 +1347,21 @@ class EvolutionEngine:
                 return report
         contract = {"cycle": cycle, "config": fingerprint(self.config), "source": source_digest(),
                     "detector_config": file_digest(self.config.get("detector_config")),
-                    "split": split_manifest_report(self.split), "registry": self.registry.registry_hash,
+                    "split": split_manifest_report(self.split),
                     "data": {case: file_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
-        self._journal = CycleJournal(self.paths["root"] / "checkpoints" / f"cycle{cycle:03d}",
-                                     contract, resume=resume)
+        # The contract deliberately excludes the registry hash: a cycle that
+        # committed its own admission and then died must still be resumable.
+        # The registry it started from is recorded separately and re-applied
+        # below, so a resumed run is evaluated against its true starting point.
+        self._journal = CycleJournal(
+            self.paths["root"] / "checkpoints" / f"cycle{cycle:03d}",
+            contract,
+            resume=resume,
+            registry_before=self.registry.registry,
+        )
         self._resuming = resume
+        if resume:
+            self._restore_resume_registry(cycle)
         backend = self.backend
         while hasattr(backend, "backend"):
             backend = backend.backend
@@ -1371,6 +1388,61 @@ class EvolutionEngine:
         finally:
             self._journal = None
             self._resuming = False
+
+    def _restore_resume_registry(self, cycle: int) -> None:
+        """Re-establish the state a resumed cycle started from.
+
+        Two things can be stale after an interruption: the registry may already
+        contain this cycle's own admission, and the harness parent may have
+        been advanced by this cycle's provisional manifest. Both are reverted
+        so the resumed run reproduces the interrupted attempt rather than
+        measuring against its own partial output.
+        """
+        journal = self._journal
+        if journal is None:
+            return
+        recorded = journal.state.get("registry_before") or {}
+        expected = str(recorded.get("content_hash") or "")
+        current = self.registry.registry_hash
+        if expected and expected != current:
+            completed = any(
+                record.get("event") == "cycle_completed"
+                and int((record.get("payload") or {}).get("cycle") or -1)
+                == int(cycle)
+                for record in self.ledger.read()
+            )
+            if completed:
+                raise RuntimeError(
+                    f"cycle {cycle} is already recorded complete, but the live "
+                    "registry does not match the checkpoint; refusing to resume "
+                    "on inconsistent state"
+                )
+            self.registry.restore(
+                recorded,
+                reason=(
+                    f"resume cycle {cycle}: revert this cycle's uncommitted "
+                    "admission"
+                ),
+            )
+            self._ledger("resume_registry_restored", {
+                "cycle": cycle,
+                "restored_hash": expected,
+                "previous_hash": current,
+            })
+        # The parent recorded when this cycle first wrote its manifest.
+        if "harness_parent_digest" in journal.state:
+            recorded_parent = journal.state.get("harness_parent_digest")
+            current_manifest = self._previous_manifest
+            if recorded_parent is None:
+                self._previous_manifest = None
+            elif (
+                current_manifest is None
+                or str(current_manifest.get("digest") or "") != str(recorded_parent)
+            ):
+                # The manifest this cycle was going to build on is no longer on
+                # disk; report an honest first-manifest diff instead of a wrong
+                # parent.
+                self._previous_manifest = None
 
     def _run_cycle(
         self,

@@ -274,6 +274,8 @@ Judge 有 topup 但**有上限**，放弃后仍用收缩后的 quorum；**Causal
 `checkpoint.py:34-35` 又对无 checkpoint 的历史中断直接拒绝重建。
 ⇒ 这正是 `docs/progress.md` 所说"第 2 轮被中断就要整轮重来"的根因。检查点机制已具备，只是正式路径没接线。
 
+> **2026-09-17 已修复（超出原 B4 范围）。** B4 只接上了正式路径的 `resume=True`，但真正的拦路是个更隐蔽的设计缺陷：检查点契约**包含 registry 哈希**，而一轮在提交自己的准入之后中断时，该哈希已经改变，于是续跑永久拒绝——正是真实第 2 轮整轮作废的机制（`resume fingerprint mismatch`）。现在契约不再含 registry 哈希，改为记录本轮**起始**的 registry；续跑发现 live registry 已含本轮准入时先回退到起始状态再评估（否则门控会拿候选与自己比较），回退写入账本 `resume_registry_restored`，快照链保留。观察按 `(arm, case)` 复用，因此候选臂与基线臂各自独立命中。仅剩「提案未落盘就中断」仍拒绝重抽——那等于在同一批已固定的巡检案例上追加搜索，但错误信息现在指向可行做法（换 `work_root` 重开）。见 `test_resume_after_committed_admission_reverts_its_own_write` 等回归测试。
+
 **5.10 默认配置下"无害性"与"收益"的保护都很薄。**
 - `harmlessness_min_protected_tp/tn` 默认 **1**（`gates.py:455-456`），开发 sentinel 仅 6 例 ⇒ 1 TP + 1 TN 即通过，其余 sentinel 案例即使回退也不受保护。
 - G 集仅 `mini_gain_size=4`，而 `m_min_marginal_cases` 默认 1 ⇒ 4 例上 +1 即准入。

@@ -17,7 +17,14 @@ from evolution.contracts import save_json
 
 
 class CycleJournal:
-    def __init__(self, directory: Path, contract: dict, *, resume: bool):
+    def __init__(
+        self,
+        directory: Path,
+        contract: dict,
+        *,
+        resume: bool,
+        registry_before: dict | None = None,
+    ):
         self.directory = directory
         self.path = directory / "checkpoint.json"
         self.lock = threading.Lock()
@@ -29,11 +36,24 @@ class CycleJournal:
             if self.state["contract"] != contract:
                 raise RuntimeError("resume fingerprint mismatch (code/config/data/split/registry changed)")
             if self.state.get("proposing") and "proposal" not in self.state:
-                raise RuntimeError("proposal call interrupted before persistence; refusing a new proposal draw")
+                raise RuntimeError(
+                    "proposal call interrupted before persistence; refusing a "
+                    "new proposal draw for the same cycle. This refusal is "
+                    "deliberate: re-drawing would be additional proposal search "
+                    "on an already-fixed patrol. Recover by starting a new "
+                    "work_root/registry_dir/ledger_path for a fresh cycle."
+                )
         else:
             if resume:
                 raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
-            self.state = {"contract": contract, "status": "started", "used_seconds": 0.0}
+            self.state = {
+                "contract": contract, "status": "started", "used_seconds": 0.0,
+            }
+        if registry_before is not None and "registry_before" not in self.state:
+            # The registry the cycle started from. Resuming needs it to
+            # re-establish that starting point if the interrupted run already
+            # committed its own admission.
+            self.state["registry_before"] = registry_before
         self.previous_seconds = float(self.state.get("used_seconds", 0))
         self.save()
 

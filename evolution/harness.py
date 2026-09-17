@@ -297,9 +297,9 @@ def write_manifest(
     verified = verify_manifest(manifest)
     save_json(path, verified)
     if history_path is not None:
-        from evolution.contracts import append_jsonl
+        from evolution.contracts import append_jsonl, read_jsonl
 
-        append_jsonl(history_path, {
+        entry = {
             "schema_version": HARNESS_SCHEMA,
             "cycle": int(verified.get("cycle") or 0),
             "digest": verified.get("digest"),
@@ -309,7 +309,17 @@ def write_manifest(
                 key: (verified["components"][key] or {}).get("digest")
                 for key in COMPONENT_KEYS
             },
-        })
+        }
+        # A resumed cycle re-runs this write. Recording the same generation
+        # twice would make the history describe a transition that never
+        # happened, so an identical (cycle, digest) entry is not repeated.
+        already = any(
+            int(existing.get("cycle") or -1) == entry["cycle"]
+            and str(existing.get("digest") or "") == str(entry["digest"] or "")
+            for existing in read_jsonl(history_path)
+        )
+        if not already:
+            append_jsonl(history_path, entry)
     return verified
 
 

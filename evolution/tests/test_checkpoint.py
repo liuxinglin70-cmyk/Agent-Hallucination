@@ -78,3 +78,198 @@ def test_cycle_resume_keeps_proposals_and_completed_arms(tmp_path, monkeypatch):
     assert proposals == [1]
     assert all(Path(p).read_bytes() == value for p, value in original_observations.items())
     assert engine.ledger.verify()["valid"]
+
+
+def _resume_engine(tmp, config, split, backend, proposer, **kwargs):
+    from evolution.engine import EvolutionEngine
+
+    return EvolutionEngine(
+        config, backend=backend, split=split, mini=True, proposer=proposer,
+        **kwargs,
+    )
+
+
+def _resume_config(tmp, monkeypatch):
+    from evolution.tests.test_engine_smoke import _config, _make_dataset
+    from evolution.splits import EvolutionSplit
+
+    cases = _make_dataset(tmp / "data", n=20)
+    config = _config(tmp)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    gain_true = [c for c in cases if c.endswith(("004.json", "006.json"))]
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    base = {case: False for case in patrol_true + gain_true}
+    overrides = {"IV-1-001": {case: True for case in gain_true}}
+    return cases, config, split, base, overrides
+
+
+def test_resume_after_committed_admission_reverts_its_own_write(tmp_path):
+    """A cycle that admitted and then died must be resumable, not wedged.
+
+    This is the gap the real interrupted run hit: the admission changed the
+    registry hash, and the resume contract included that hash, so the cycle
+    could never be resumed on the same ledger. The resumed run must evaluate
+    against the registry the cycle started from, and must not admit twice.
+    """
+    from evolution.backends import MockDetectorBackend
+    from evolution.harness import HARNESS_FILENAME, HARNESS_HISTORY_NAME
+    from evolution.tests.test_engine_smoke import _scanner_candidate, _scripted_proposer
+
+    cases, config, split, base, overrides = _resume_config(tmp_path, None)
+    proposer = _scripted_proposer(_scanner_candidate())
+    backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
+    engine = _resume_engine(tmp_path, config, split, backend, proposer)
+    engine._save_cycle_report = lambda *a, **k: (_ for _ in ()).throw(
+        RuntimeError("interrupted after registry write")
+    )
+    with pytest.raises(RuntimeError, match="interrupted after registry write"):
+        engine.run_cycle(1)
+    # The interrupted run really did commit its admission.
+    assert [e["intervention_id"] for e in engine.registry.entries] == ["IV-1-001"]
+
+    resumed = _resume_engine(
+        tmp_path, config, split,
+        MockDetectorBackend(base_predictions=base, overrides=overrides),
+        _scripted_proposer(_scanner_candidate()),
+    )
+    report = resumed.run_cycle(1, resume=True)
+    assert report["state"] == "completed"
+    assert report["marginal_selection"]["selected"] == ["IV-1-001"]
+    assert report["active_after_cycle"] == ["IV-1-001"]
+    assert resumed.ledger.verify()["valid"] is True
+    events = [record["event"] for record in resumed.ledger.read()]
+    # Exactly one admission and one registry write, despite two attempts.
+    assert events.count("admitted") == 1
+    assert events.count("registry_written") == 1
+    assert "resume_registry_restored" in events
+    # The same generation is not recorded twice in the manifest history.
+    history = [
+        json.loads(line)
+        for line in (tmp_path / "harness" / HARNESS_HISTORY_NAME)
+        .read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+    assert len(history) == 1
+    assert (tmp_path / "harness" / HARNESS_FILENAME).is_file()
+
+
+def test_resume_after_measurement_reuses_journaled_observations(tmp_path):
+    """Interrupting after the baselines must not re-evaluate them.
+
+    Reuse is per (arm, case): the same case under a *different* registry is a
+    genuinely different observation and must still be taken. So the check is
+    that no bare-base observation is retaken, while the candidate arms (which
+    the interrupted attempt never reached) still run.
+    """
+    from evolution.backends import MockDetectorBackend
+    from evolution.tests.test_engine_smoke import _scanner_candidate, _scripted_proposer
+
+    cases, config, split, base, overrides = _resume_config(tmp_path, None)
+    # The defect-injection audit also calls _run_unit; disabling it makes the
+    # interruption land where this test claims, after the patrol and baselines
+    # have been observed and journaled.
+    config["audit"]["enabled"] = False
+    resume_calls: list[tuple[bool, str]] = []
+
+    def counting_backend(sink):
+        backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
+        original = backend.run_case
+
+        def spy(record, **kwargs):
+            registry = kwargs.get("registry") or {}
+            sink.append((
+                not bool(registry.get("interventions")),
+                str(kwargs.get("case_id") or ""),
+            ))
+            return original(record, **kwargs)
+
+        backend.run_case = spy
+        return backend
+
+    engine = _resume_engine(
+        tmp_path, config, split, counting_backend([]),
+        _scripted_proposer(_scanner_candidate()),
+    )
+    engine._run_unit = lambda *a, **k: (_ for _ in ()).throw(
+        RuntimeError("interrupted during gates")
+    )
+    with pytest.raises(RuntimeError, match="interrupted during gates"):
+        engine.run_cycle(1)
+
+    journal = tmp_path / "work" / "checkpoints"
+    journaled_cases = {
+        json.loads(path.read_text(encoding="utf-8"))["row"]["case"]
+        for path in journal.rglob("arms/*/*.json")
+    }
+    assert journaled_cases, "the first attempt must have journaled observations"
+
+    resumed = _resume_engine(
+        tmp_path, config, split, counting_backend(resume_calls),
+        _scripted_proposer(_scanner_candidate()),
+    )
+    report = resumed.run_cycle(1, resume=True)
+    assert report["state"] == "completed"
+    assert resume_calls, "the resume must still do the remaining work"
+    # The candidate arms, which the first attempt never reached, still run.
+    assert any(not empty for empty, _case in resume_calls)
+    # No bare-base observation is retaken: those were replayed from the journal.
+    retaken = sorted(
+        case for empty, case in resume_calls
+        if empty and case in journaled_cases
+    )
+    assert retaken == [], retaken
+
+
+def test_resume_before_proposal_persistence_still_refuses(tmp_path):
+    """A lost proposal cannot be re-drawn: that would be a new search."""
+    from evolution.checkpoint import CycleJournal
+
+    journal = CycleJournal(tmp_path, {"c": 1}, resume=False)
+    journal.save(proposing=True)
+    with pytest.raises(RuntimeError, match="refusing a new proposal draw"):
+        CycleJournal(tmp_path, {"c": 1}, resume=True)
+
+
+def test_resume_refuses_when_cycle_is_complete_but_registry_differs(tmp_path):
+    """Inconsistent state must fail closed rather than silently re-run."""
+    from evolution.backends import MockDetectorBackend
+    from evolution.contracts import make_intervention, make_registry
+    from evolution.tests.test_engine_smoke import _scanner_candidate, _scripted_proposer
+
+    cases, config, split, base, overrides = _resume_config(tmp_path, None)
+    engine = _resume_engine(
+        tmp_path, config, split,
+        MockDetectorBackend(base_predictions=base, overrides=overrides),
+        _scripted_proposer(_scanner_candidate()),
+    )
+    engine._save_cycle_report = lambda *a, **k: (_ for _ in ()).throw(
+        RuntimeError("stop")
+    )
+    with pytest.raises(RuntimeError, match="stop"):
+        engine.run_cycle(1)
+    # Claim the cycle completed in the ledger, then diverge the registry.
+    engine._ledger("cycle_completed", {"cycle": 1, "state": "completed"})
+    extra = make_intervention(
+        intervention_id="IV-9-009",
+        intervention_type="text_boundary",
+        hook="scanner.system",
+        packet_features=["has_tool_calls"],
+        body={"directive": "unrelated", "not_when": "never"},
+        expected_behavior="unrelated",
+        target_polarity="recall",
+        cycle=9,
+        failure_family="FAM-fn-x",
+        failure_cases=["A/001.json", "A/002.json"],
+    )
+    engine.registry.restore(
+        make_registry([extra]), reason="test divergence",
+    )
+    resumed = _resume_engine(
+        tmp_path, config, split,
+        MockDetectorBackend(base_predictions=base, overrides=overrides),
+        _scripted_proposer(_scanner_candidate()),
+    )
+    with pytest.raises(RuntimeError, match="already recorded complete"):
+        resumed.run_cycle(1, resume=True)

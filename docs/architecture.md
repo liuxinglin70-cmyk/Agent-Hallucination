@@ -111,6 +111,19 @@ cycle 报告的 `instrument` 字段给出：`gain_opportunity`（每极性可修
 
 `LiveDetectorBackend` 对可机械重放的候选冻结未受影响的阶段，听证按 `(source, candidate_id)` 匹配。缺失或被干预遮蔽的冻结条目会被拒绝。对改变模型调用或召回控制流的干预，`requires_fresh_evaluation` 选择 fresh 对照与 fresh 候选臂，避免把缓存结果和重新采样结果直接当成因果收益。
 
+## 断点续跑
+
+`CycleJournal` 以 `(arm, case)` 为键持久化逐例观察，`arm` 由 registry 与 fresh 模式指纹决定。续跑不重抽已完成的观察，但**候选臂与基线臂是不同 arm**，各自独立复用——同一个案例在不同 registry 下本来就是不同的观察。
+
+契约（`contract`）刻意**不含 registry 哈希**：真实中断场景正是「本轮已提交准入、随后在写报告前中断」，若把哈希纳入契约，该轮将永远无法续跑（本轮修复前即如此，真实第 2 轮因此整轮作废）。替代做法是让检查点记录本轮**起始**的 registry：
+
+- 续跑时若 live registry 与本轮起始哈希不符，且账本显示该轮未完成，则先 `ActiveRegistry.restore` 回退到起始状态——否则门控会拿候选与自己比较。回退写入账本 `resume_registry_restored`，快照链保留，那次准入仍可恢复。
+- 续跑完成后同一轮只产生一次 `admitted` 与一次 `registry_written`；`record_harness` 重建同一父代，因此 `harness_history.jsonl` 对同一代只留一条。
+- 若账本已记该轮完成而 registry 不符，直接报错而非在可疑状态上继续。
+- 提案未持久化就中断仍拒绝重抽（那会是同一批巡检案例上的追加搜索），错误信息指向换 `work_root` 重开一轮。
+
+## 运行与验证分层
+
 缓存身份包括代码摘要、配置摘要、输入与 registry 身份。mock 后端仅用于机械回归；真实模型能力应来自真实后端的独立测量。
 
 ## 运行与验证分层

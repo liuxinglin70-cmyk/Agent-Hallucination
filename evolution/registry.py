@@ -258,6 +258,47 @@ class ActiveRegistry:
                 str(entry.get("intervention_id") or "") for entry in retired
             ]
 
+    def restore(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Reinstate a previously recorded registry payload.
+
+        Used when resuming a cycle whose own admission was already committed:
+        the resumed run must be evaluated against the state the cycle started
+        from, or its gates would treat the candidate as already deployed. The
+        snapshot history is retained, so the admission committed by the
+        interrupted run stays recoverable rather than being discarded.
+        """
+        # ``validate_registry`` returns the entry list; rebuild the envelope so
+        # the content hash is recomputed rather than trusted from the file.
+        entries = validate_registry(dict(payload), require_executable_bounds=True)
+        validated = make_registry(entries)
+        restored_hash = str(validated.get("content_hash") or "")
+        previous_hash = self.registry_hash
+        with self._lock:
+            self._atomic_write(self.active_path, validated)
+            self._entries = [
+                dict(entry) for entry in validated.get("interventions") or ()
+            ]
+            self._state["active_hash"] = restored_hash
+            if previous_hash != restored_hash:
+                self._state.setdefault("snapshots", []).append({
+                    "cycle": int(self._state.get("cycle") or 0),
+                    "file": "",
+                    "hash": restored_hash,
+                    "previous_hash": previous_hash,
+                    "reason": str(reason),
+                    "entries": [
+                        str(entry.get("intervention_id") or "")
+                        for entry in self._entries
+                    ],
+                })
+            self._save_state()
+        return validated
+
     def rollback_to_snapshot(self, cycle: int) -> dict[str, Any] | None:
         snapshots = list(self._state.get("snapshots") or [])
         if not snapshots:

@@ -53,6 +53,18 @@ python -m evolution verify-ledger
 
 替代评估集通过 `EvolutionEngine.set_replacement_gain_cases(cases)` 在内存中安装；持久化它需要与主 gain 集同等的 gold、协议与暴露保证，属单独决定。未安装时策略报告 `none_installed`。响应动作写入 `instrument.coverage_responses` 与 `instrument.coverage_response_counts`，因此「因不可测量而准入 0」与「重新测量后仍准入 0」可以区分。**该策略可以改变准入结果**，故默认关闭。
 
+### 断点续跑
+
+中断后用同一 `--config` 与 `--cycle N --resume` 继续。续跑以 `(arm, case)` 为单位复用已记录的观察（arm 由 registry 与 fresh 模式决定），因此：
+
+- **已完成的观察不重跑**，包括未决与失败结果；候选臂与基线臂是不同 arm，各自独立复用。
+- **已提交本轮准入后中断也可续跑。** 检查点记录本轮起始的 registry；续跑时若发现 live registry 已含本轮自己的准入，会先回退到该起始状态再评估（否则门控会拿候选与自己比较），回退动作记入账本 `resume_registry_restored`，快照链保留，因此那次准入仍可恢复。恢复完成后同一轮只产生一次 `admitted` 与一次 `registry_written`。
+- **提案未持久化就中断的轮次仍拒绝重抽**：那等于在同一批巡检案例上追加提案搜索。错误信息会指向正确做法——换新的 `work_root`/`registry_dir`/`ledger_path` 重开一轮。但这不再是唯一出路：只要提案已落盘，后续任何阶段中断都能续跑。
+- **一致性优先于便利。** 若账本已记该轮完成、而 live registry 与检查点不符，续跑直接报错，不会在可疑状态上继续。
+- **H_t 清单不重复记录**：续跑重建同一父代，因此 `harness_history.jsonl` 对同一代只留一条。
+
+本轮之前的检查点契约含 registry 哈希，导致「已准入后中断」永远无法续跑——这是真实第 2 轮遇到的缺口，现已修复。
+
 自动化退出码：`smoke` 只有在目标干预准入、缺陷审计、账本完整性均通过且 cycle 完成时才返回 0；否则返回 2。`verify-ledger` 对有效账本返回 0、哈希链校验失败返回 2；无法解析的损坏文件也不会返回成功。
 
 当前已验证离线框架闭环和检测器真实服务连通性；尚未在整理后的代码上完成真实模型驱动的整轮进化效果验证。阶段目标见 [当前进展与计划](../docs/progress.md)。
