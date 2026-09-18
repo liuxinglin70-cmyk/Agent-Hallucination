@@ -1,0 +1,35 @@
+{
+  "schema_version": "detector.corpus.v1",
+  "documents": [
+    {
+      "doc_id": "q-ships-1922",
+      "path": "documents/q-ships-1922.txt",
+      "url": "https://www.gutenberg.org/cache/epub/54338/pg54338.txt",
+      "title": "Q-Ships and Their Story (E. Keble Chatterton, 1922)",
+      "publisher": "gutenberg.org",
+      "retrieved_at": "2026-09-18T16:40:00+08:00",
+      "source_kind": "book",
+      "derivation": "primary account of the decoy-ship service; fetched for the Lisette tonnage question"
+    },
+    {
+      "doc_id": "heritage-lisette",
+      "path": "documents/heritage-lisette.txt",
+      "url": "https://www.heritage-images.com/preview/the-76-ton-schooner-lisette-under-sail-creator-kirk-sons-of-cowes-2696189",
+      "title": "The 76 ton schooner 'Lisette' under sail (Heritage Images)",
+      "publisher": "heritage-images.com",
+      "retrieved_at": "2026-09-18T16:42:00+08:00",
+      "source_kind": "catalogue",
+      "derivation": "photograph catalogue caption surfaced by the same search"
+    },
+    {
+      "doc_id": "musicbrainz-jsr",
+      "path": "documents/musicbrainz-jsr.txt",
+      "url": "https://musicbrainz.org/ws/2/release/be5b825d-5bb7-38b2-8fd7-dc0eef9501a9?inc=recordings+artist-credits&fmt=json",
+      "title": "MusicBrainz release be5b825d: Jet Set Radio Original Sound Tracks (2000-12-20, JP)",
+      "publisher": "musicbrainz.org",
+      "retrieved_at": "2026-09-18T16:45:00+08:00",
+      "source_kind": "database",
+      "derivation": "release tracklist for the 2000 soundtrack question"
+    }
+  ]
+}

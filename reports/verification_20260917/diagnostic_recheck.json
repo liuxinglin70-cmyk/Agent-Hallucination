@@ -1,0 +1,372 @@
+{
+  "method": "offline saved-arm comparison and predicate replay",
+  "cycles": [
+    {
+      "cycle": 1,
+      "instrument": {
+        "gain_opportunity": {
+          "recall": 0,
+          "precision": 1
+        },
+        "unmeasurable_polarities": [
+          "recall"
+        ],
+        "replacement_gain_cases": 0,
+        "coverage_responses": {},
+        "coverage_response_counts": {},
+        "terminal_classification": {
+          "IV-1-001": "rejected",
+          "IV-1-002": "rejected",
+          "IV-1-003": "rejected",
+          "IV-1-004": "rejected"
+        },
+        "terminal_counts": {
+          "rejected": 4
+        },
+        "instrument_limited": false
+      },
+      "structural_replay": [
+        {
+          "id": "IV-1-001",
+          "cases": [
+            "BFCL/017.json",
+            "OpenDeepSearch/086.json"
+          ],
+          "original": [
+            "not_applicable",
+            "no rule matched; default verdict not_applicable; no rule matched; default verdict not_applicable"
+          ],
+          "with_saved_judge_context": [
+            "violated",
+            "The judge recorded judge_positive=false at high confidence with an empty hallucination reason, leaving the negative conviction without any stated failure mechanism.; The judge recorded judge_positive=false at high confidence with an empty hallucination reason, leaving the negative conviction without any stated failure mechanism."
+          ],
+          "interpretation": "predicate applicability only; not admission or measured benefit"
+        }
+      ],
+      "units": [
+        {
+          "ids": [
+            "IV-1-002"
+          ],
+          "n": 10,
+          "changes": [],
+          "events": [
+            {
+              "case": "OpenDeepSearch/002.json",
+              "event": "recall_triggered",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Magentic_One/036.json",
+              "event": "recall_trigger_not_matched",
+              "recall_candidates": 0
+            },
+            {
+              "case": "BFCL/041.json",
+              "event": "recall_trigger_not_matched",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "recall_trigger_not_matched",
+              "recall_candidates": 3
+            }
+          ]
+        },
+        {
+          "ids": [
+            "IV-1-003",
+            "IV-1-004"
+          ],
+          "n": 10,
+          "changes": [
+            {
+              "case": "Octotools/023.json",
+              "gold": true,
+              "baseline": true,
+              "candidate": false,
+              "kind": "regression",
+              "partition": "S"
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "baseline": true,
+              "candidate": false,
+              "kind": "correction",
+              "partition": "S"
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "gold": true,
+              "baseline": true,
+              "candidate": false,
+              "kind": "regression",
+              "partition": "S"
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "gold": false,
+              "baseline": true,
+              "candidate": false,
+              "kind": "correction",
+              "partition": "S"
+            },
+            {
+              "case": "OpenDeepSearch/080.json",
+              "gold": true,
+              "baseline": true,
+              "candidate": false,
+              "kind": "regression",
+              "partition": "G"
+            },
+            {
+              "case": "Octotools/005.json",
+              "gold": true,
+              "baseline": true,
+              "candidate": false,
+              "kind": "regression",
+              "partition": "G"
+            }
+          ],
+          "events": [
+            {
+              "case": "OpenDeepSearch/088.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "OpenDeepSearch/088.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/023.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/023.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/005.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/005.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "OpenDeepSearch/080.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "OpenDeepSearch/080.json",
+              "event": "guard_fired",
+              "recall_candidates": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cycle": 2,
+      "instrument": {
+        "gain_opportunity": {
+          "recall": 0,
+          "precision": 1
+        },
+        "unmeasurable_polarities": [
+          "recall"
+        ],
+        "replacement_gain_cases": 0,
+        "coverage_responses": {},
+        "coverage_response_counts": {},
+        "terminal_classification": {
+          "IV-2-001": "rejected",
+          "IV-2-002": "rejected",
+          "IV-2-003": "rejected",
+          "IV-2-004": "rejected"
+        },
+        "terminal_counts": {
+          "rejected": 4
+        },
+        "instrument_limited": false
+      },
+      "structural_replay": [
+        {
+          "id": "IV-2-003",
+          "cases": [
+            "OpenDeepSearch/035.json",
+            "OpenDeepSearch/063.json"
+          ],
+          "original": [
+            "not_applicable",
+            "no rule matched; default verdict not_applicable; no rule matched; default verdict not_applicable"
+          ],
+          "with_saved_judge_context": [
+            "violated",
+            "final answer was delivered via final_answer and a delivered result is reported, yet the negative verdict carries no hallucination reason; final answer was delivered via final_answer and a delivered result is reported, yet the negative verdict carries no hallucination reason"
+          ],
+          "interpretation": "predicate applicability only; not admission or measured benefit"
+        },
+        {
+          "id": "IV-2-004",
+          "cases": [
+            "BFCL/017.json",
+            "OpenDeepSearch/086.json"
+          ],
+          "original": [
+            "not_applicable",
+            "no rule matched; default verdict not_applicable; no rule matched; default verdict not_applicable"
+          ],
+          "with_saved_judge_context": [
+            "violated",
+            "high-confidence negative with a reported delivered result but no hallucination reason explaining the rejection; high-confidence negative with a reported delivered result but no hallucination reason explaining the rejection"
+          ],
+          "interpretation": "predicate applicability only; not admission or measured benefit"
+        }
+      ],
+      "units": [
+        {
+          "ids": [
+            "IV-2-001",
+            "IV-2-002"
+          ],
+          "n": 10,
+          "changes": [],
+          "events": [
+            {
+              "case": "OpenDeepSearch/088.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "SmolAgents/019.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/023.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Octotools/005.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "Magentic_One/050.json",
+              "event": "evidence_appended",
+              "recall_candidates": 4
+            },
+            {
+              "case": "OpenDeepSearch/080.json",
+              "event": "evidence_appended",
+              "recall_candidates": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "detector": {
+    "metrics": {
+      "decisive": 40,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.725,
+      "all_case_accuracy": 0.725,
+      "tp": 17,
+      "fp": 4,
+      "fn": 7,
+      "tn": 12,
+      "positive_precision": 0.8095238095238095,
+      "positive_recall": 0.7083333333333334,
+      "positive_f1": 0.7555555555555556,
+      "macro_precision": 0.7205513784461153,
+      "macro_recall": 0.7291666666666667,
+      "macro_f1": 0.7206349206349207,
+      "authoritative": 38,
+      "degraded": 2,
+      "provider_unresolved": 0,
+      "requested_cases": 40,
+      "found_results": 40,
+      "missing_cases": 0,
+      "step_localization": {
+        "n": 24,
+        "hits": 10,
+        "accuracy": 0.4166666666666667
+      }
+    },
+    "localization_hits": 10,
+    "all_gold_positive_n": 24,
+    "detected_positive_n": 17,
+    "conditional_localization": 0.5882352941176471,
+    "fn_cases": [
+      "BFCL/017.json",
+      "BFCL/041.json",
+      "BFCL/062.json",
+      "OpenDeepSearch/035.json",
+      "OpenDeepSearch/063.json",
+      "OpenDeepSearch/086.json",
+      "Magentic_One/074.json"
+    ]
+  }
+}

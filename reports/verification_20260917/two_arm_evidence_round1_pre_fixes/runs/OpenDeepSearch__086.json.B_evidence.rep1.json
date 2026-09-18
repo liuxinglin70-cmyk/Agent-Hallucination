@@ -1,0 +1,674 @@
+{
+  "case": "OpenDeepSearch/086.json",
+  "arm": "B_evidence",
+  "rep": 1,
+  "gold": true,
+  "baseline_prediction": false,
+  "snapshot_digest": "e4b32079e2707f944b2baa76c203c6b1a9c80548c656b3ff4e613315b3a847a4",
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "OpenDeepSearch/086.json",
+    "state": "verified_error",
+    "decision_authority": "degraded_judge_only",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "defense": "unsettled",
+          "judge_basis": "observation",
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c1",
+              "verdict": "inconclusive"
+            }
+          ]
+        },
+        "blocking_facts": [
+          {
+            "component": "defense",
+            "candidate_id": "c1",
+            "code": "inconclusive",
+            "error_type": "",
+            "error": ""
+          }
+        ]
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "c1",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": ""
+        }
+      ],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "76 tons",
+        "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The tonnage of the topsail schooner 'Lisette', built in 1873, formerly owned by the Duke of Sutherland before serving as a decoy craft from 1917"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that names neither the Duke of Sutherland nor decoy service and gives no register source [E2], and the snapshot lists 116 vs 76 tons as an unresolved conflict, so the trajectory's value is not externally established",
+          "locus_event_id": "event_003",
+          "evidence_refs": [
+            "event_002",
+            "event_003"
+          ],
+          "evidence_citations": [
+            "E1",
+            "E2"
+          ],
+          "quote": "final_answer(\"76 tons\")"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent provided the final answer immediately after a single web search instead of performing its own planned verification step of cross-referencing with other historical records or sources",
+          "locus_event_id": "event_003",
+          "evidence_refs": [
+            "event_001",
+            "event_002",
+            "event_003"
+          ],
+          "evidence_citations": [],
+          "quote": "I will now provide the final answer using the `final_answer` tool."
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 3,
+        "reason": "The delivered answer 76 tons is a result error because the only source matching the task's full vessel description gives 116 tons [E1], and correcting the final_answer call at event_003 to 116 tons would make the sole required deliverable correct.",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "conflict_note": "Conflict resolved by entity-attribute matching: E1 matches every attribute the task fixes (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service through April 1917), so its 116-ton figure is the tonnage of the task's vessel; E2's photograph caption matches only the name and build year, names neither the Duke of Sutherland nor decoy service, and cites no register source, so its 76-ton figure does not establish the tonnage of the task's vessel.",
+        "coverage": "answered",
+        "locus_event_id": "event_003",
+        "evidence_citations": [
+          "E1",
+          "E2"
+        ],
+        "claim": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that names neither the Duke of Sutherland nor decoy service and gives no register source [E2], and the snapshot lists 116 vs 76 tons as an unresolved conflict, so the trajectory's value is not externally established",
+        "quote": "final_answer(\"76 tons\")"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 3,
+          "reason": "The delivered answer 76 tons is a result error because the only source matching the task's full vessel description gives 116 tons [E1], and correcting the final_answer call at event_003 to 116 tons would make the sole required deliverable correct.",
+          "evidence_refs": [
+            "event_002",
+            "event_003"
+          ],
+          "conflict_note": "Conflict resolved by entity-attribute matching: E1 matches every attribute the task fixes (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service through April 1917), so its 116-ton figure is the tonnage of the task's vessel; E2's photograph caption matches only the name and build year, names neither the Duke of Sutherland nor decoy service, and cites no register source, so its 76-ton figure does not establish the tonnage of the task's vessel.",
+          "coverage": "answered",
+          "locus_event_id": "event_003",
+          "evidence_citations": [
+            "E1",
+            "E2"
+          ],
+          "claim": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that names neither the Duke of Sutherland nor decoy service and gives no register source [E2], and the snapshot lists 116 vs 76 tons as an unresolved conflict, so the trajectory's value is not externally established",
+          "quote": "final_answer(\"76 tons\")"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 3,
+          "reason": "The delivered answer 76 tons is a result error because the only source matching the task's full vessel description gives 116 tons [E1], and correcting the final_answer call at event_003 to 116 tons would make the sole required deliverable correct.",
+          "evidence_refs": [
+            "E1",
+            "E2"
+          ],
+          "conflict_note": "Conflict resolved by entity-attribute matching: E1 matches every attribute the task fixes (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service through April 1917), so its 116-ton figure is the tonnage of the task's vessel; E2's photograph caption matches only the name and build year, names neither the Duke of Sutherland nor decoy service, and cites no register source, so its 76-ton figure does not establish the tonnage of the task's vessel.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The cross-referencing step was self-imposed in the agent's own plan and is not demanded by the task text, so skipping it breaches no deliverable and correcting it would not change any required output.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 2,
+        "answered": 2,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c1",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 3,
+            "reason": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that names neither the Duke of Sutherland nor decoy service and gives no register source [E2], and the snapshot lists 116 vs 76 tons as an unresolved conflict, so the trajectory's value is not externally established",
+            "evidence_refs": [
+              "event_002",
+              "event_003"
+            ],
+            "quote": "final_answer(\"76 tons\")",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [
+            "E1",
+            "E2"
+          ],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 2,
+              "quote": "lisette_tonnage = web_search(query=\"Tonnage of the topsail schooner Lisette built in 1873\") ... The tonnage of the topsail schooner Lisette, built in 1873, is 76 tons.",
+              "referent": "116 tons — the tonnage reported by the source matching the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service); the 76-ton figure comes only from a photograph catalogue caption naming neither the Duke of Sutherland nor decoy service",
+              "evidence_refs": [
+                "event_002",
+                "event_003"
+              ],
+              "reason": "The wrong 76-ton value first enters the trajectory at event_002, where the search (lacking the Duke of Sutherland/decoy-craft identifiers) returned the non-matching catalogue-caption figure, which event_003 then relayed unchanged as the final answer."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1060,
+                "completion_tokens": 1744,
+                "total_tokens": 2804,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1522
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1522
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "input_tokens": 1060,
+                "output_tokens": 1744
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 2,\n  \"quote\": \"lisette_tonnage = web_search(query=\\\"Tonnage of the topsail schooner Lisette built in 1873\\\") ... The tonnage of the topsail schooner Lisette, built in 1873, is 76 tons.\",\n  \"referent\": \"116 tons — the tonnage reported by the source matching the task's full vessel descrip"
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 3,
+              "reason": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that names neither the Duke of Sutherland nor decoy service and gives no register source [E2], and the snapshot lists 116 vs 76 tons as an unresolved conflict, so the trajectory's value is not externally established",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_002",
+                "event_003"
+              ],
+              "evidence_citations": [
+                "E1",
+                "E2"
+              ],
+              "quote": "final_answer(\"76 tons\")",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "exact_value",
+                  "requirement": "The tonnage of the topsail schooner 'Lisette', built in 1873, formerly owned by the Duke of Sutherland before serving as a decoy craft from 1917"
+                }
+              ],
+              "candidate_id": "c1"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "inconclusive",
+              "confirmed_step": null,
+              "evidence_refs": [],
+              "reason": "defense quorum not reached: 1 valid ballot(s) of 3 (need 2)"
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [
+                  "E1",
+                  "E2"
+                ],
+                "conflict_note": "The 116 vs 76 ton conflict is resolved by context: E1 (Chatterton, Q-Ships and Their Story, 1922) describes the exact vessel the task names — 'the 116-ton topsail schooner Lisette, which had formerly belonged to the Duke of Sutherland... built as far back as 1873', taken up for decoy service and paid off in the following spring (1917) — matching every task attribute; E2 is a photograph catalogue caption identifying its subject only by name and 1873 Cowes build, naming neither the Duke of Sutherland nor decoy service and giving no register source, so 76 tons is not established for the task's vessel and E1's 116 tons is the applicable value.",
+                "reason": "CONTENT TEST: at event_003 the agent committed 'final_answer(\"76 tons\")' (observation: 'Last output from code snippet: 76 tons'), stating 'the execution logs indicate that the tonnage of the topsail schooner \"Lisette\" is 76 tons. I will now provide the final answer' — merely repeating the single unverified search log of event_002. The correct referent for the vessel the task names is 116 tons per [E1], the one source matching the full task description (topsail schooner, built 1873, formerly the Duke of Sutherland's, decoy service into 1917), while the only 76-ton source [E2] is a photo caption lacking those identifiers and any register source. The delivered value is therefore wrong — a RESULT ERROR on the task's core deliverable, not formatting or process. RELEVANCE TEST: step 3 is itself the delivered final answer and the trajectory's last event; there is no later correction, and replacing '76 tons' with '116 tons' makes every required deliverable correct, so the step is causally identical to the defect."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2794,
+                "completion_tokens": 7878,
+                "total_tokens": 10672,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 7421
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 7421
+                },
+                "input_tokens": 2794,
+                "output_tokens": 7878
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_003\"],\n  \"evidence_citations\": [\"E1\", \"E2\"],\n  \"conflict_note\": \"The 116 vs 76 ton conflict is resolved by context: E1 (Chatterton, Q-Ships and Their Story, 1922) describes the exact vessel the task names — 'the 116-to",
+              "vote": {
+                "votes": 3,
+                "cast": 1,
+                "verdicts": [
+                  "substantiated"
+                ],
+                "collapsed": "inconclusive",
+                "tie": true,
+                "topups": 2,
+                "quorum": 2,
+                "quorum_met": false
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": []
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 5,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": {
+        "schema_version": "detector.evidence.v1",
+        "query": {
+          "text": "Lisette tonnage 1873 topsail schooner Duke of Sutherland decoy 1917",
+          "derivation": "task+claim",
+          "task_excerpt": "How many tons was the topsail schooner \"Lisette,\" built in 1873, which the Duke of Sutherland had formerly owned before she began working as a decoy craft in 1917?",
+          "claim": "The trajectory's search result reported the tonnage of the Lisette as 76 tons and the final answer repeated 76 tons."
+        },
+        "sources": [
+          {
+            "evidence_id": "E1",
+            "url": "https://www.gutenberg.org/cache/epub/54338/pg54338.txt",
+            "title": "Q-Ships and Their Story (E. Keble Chatterton, 1922), ch. VII \"More Sailing Ships\"",
+            "publisher": "gutenberg.org",
+            "retrieved_at": "2026-09-18T15:20:00+08:00",
+            "excerpt": "Even a private yacht was taken up for this work in June. This was the 116-ton topsail schooner Lisette, which had formerly belonged to the Duke of Sutherland. She had been built as far back as 1873 with a standing bowsprit and jibboom. She was taken from Cowes to Falmouth, where she was commissioned in August, and armed with three 6-pounders. But this old yacht was found to leak so much through her seams, and her construction was so light, that she was never a success, and was paid off in the following spring.",
+            "content_sha256": "2a72f4d16aa7c2f62eac1eaad4a0bd72ca989fcebf56509390740da77205d60e",
+            "verifies": {
+              "entity": "Lisette",
+              "attribute": "tonnage",
+              "value": "116 tons"
+            },
+            "applicable_context": "Describes the private yacht taken up in June 1916 and the vessel the task names: 116-ton topsail schooner Lisette, formerly the Duke of Sutherland's, built 1873, taken from Cowes to Falmouth, decoy service through April 1917."
+          },
+          {
+            "evidence_id": "E2",
+            "url": "https://www.heritage-images.com/preview/the-76-ton-schooner-lisette-under-sail-creator-kirk-sons-of-cowes-2696189",
+            "title": "The 76 ton schooner 'Lisette' under sail. Creator: Kirk & Sons of Cowes.",
+            "publisher": "heritage-images.com",
+            "retrieved_at": "2026-09-18T15:22:00+08:00",
+            "excerpt": "The 76 ton schooner 'Lisette' under sail. Creator: Kirk & Sons of Cowes. 'Lisette' was built at Cowes in 1873.",
+            "content_sha256": "d759e8f3ed96b103e40884b488b5352c2b8ef4a7253a3ebcfb91a6b72f038836",
+            "verifies": {
+              "entity": "Lisette",
+              "attribute": "tonnage",
+              "value": "76 tons"
+            },
+            "applicable_context": "A photograph catalogue caption. It states 76 tons and Cowes 1873, but names neither the Duke of Sutherland nor decoy service, and gives no tonnage measure or register source."
+          }
+        ]
+      }
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1982,
+          "completion_tokens": 1947,
+          "total_tokens": 3929,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1633
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1633
+          },
+          "input_tokens": 1982,
+          "output_tokens": 1947
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the "
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2558,
+          "completion_tokens": 7678,
+          "total_tokens": 10236,
+          "prompt_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 7308
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 7308
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "input_tokens": 2558,
+          "output_tokens": 7678
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": true,\n      \"corrected_step\": 3,\n      \"evidence_refs\": [\"E1\", \"E2\"],\n      \"conflict_note\": \"Conflict resolved by entity matching: E1 attests every identifying attribute fixed by the task (topsail scho",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 2,
+              "winner": true,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "defense",
+        "candidate_id": "c1",
+        "code": "inconclusive",
+        "error_type": "",
+        "error": ""
+      }
+    ],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+      "evidence_snapshot_digest": "e4b32079e2707f944b2baa76c203c6b1a9c80548c656b3ff4e613315b3a847a4",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 3
+  },
+  "prediction": null,
+  "summary": {
+    "state": "verified_error",
+    "authority": "degraded_judge_only",
+    "responsible_step": 3,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "recall_upgrade",
+        "defense": "unsettled",
+        "judge_basis": "observation",
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "verdict": "inconclusive"
+          }
+        ]
+      },
+      "blocking_facts": [
+        {
+          "component": "defense",
+          "candidate_id": "c1",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": ""
+        }
+      ]
+    },
+    "candidates": [
+      {
+        "candidate_id": "c1",
+        "claim": "the agent answered 76 tons instead of 116 tons, the tonnage reported by the source that matches the task's full vessel description (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service) [E1]; the 76-ton figure appears only in a photograph catalogue caption that name",
+        "locus_event_id": "event_003",
+        "citations": [
+          "E1",
+          "E2"
+        ]
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the agent provided the final answer immediately after a single web search instead of performing its own planned verification step of cross-referencing with other historical records or sources",
+        "locus_event_id": "event_003",
+        "citations": []
+      }
+    ],
+    "upgrade_rows": [
+      {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 3,
+        "citations": [
+          "E1",
+          "E2"
+        ],
+        "conflict_note": "Conflict resolved by entity-attribute matching: E1 matches every attribute the task fixes (topsail schooner Lisette, built 1873, formerly the Duke of Sutherland's, decoy service through April 1917), so its 116-ton figure is the tonnage of the task's vessel; E2's photograph caption matches only the name and build year, names neither the Duke of Sutherland nor decoy service, and cites no register so",
+        "reason": "The delivered answer 76 tons is a result error because the only source matching the task's full vessel description gives 116 tons [E1], and correcting the final_answer call at event_003 to 116 tons would make the sole required deliverable correct."
+      },
+      {
+        "candidate_id": "c2",
+        "content_error": false,
+        "causal": false,
+        "corrected_step": null,
+        "citations": [],
+        "conflict_note": "",
+        "reason": "The cross-referencing step was self-imposed in the agent's own plan and is not demanded by the task text, so skipping it breaches no deliverable and correcting it would not change any required output."
+      }
+    ],
+    "positive_candidates": [
+      "c1"
+    ],
+    "hearings": [
+      {
+        "source": "recall_upgrade",
+        "candidate_id": "c1",
+        "verdict": "inconclusive",
+        "confirmed_step": null,
+        "evidence_citations": null,
+        "reason": "defense quorum not reached: 1 valid ballot(s) of 3 (need 2)"
+      }
+    ],
+    "stages": {
+      "judge": {
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "provenance": {
+      "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+      "evidence_snapshot_digest": "e4b32079e2707f944b2baa76c203c6b1a9c80548c656b3ff4e613315b3a847a4",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    }
+  },
+  "elapsed_seconds": 749.81
+}

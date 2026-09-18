@@ -1,0 +1,184 @@
+{
+  "case": "OpenDeepSearch/002.json",
+  "arm": "B_evidence",
+  "rep": 1,
+  "gold": false,
+  "baseline_prediction": false,
+  "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "OpenDeepSearch/002.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "b, e",
+          "correct_result": "b, e"
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "b, e",
+        "correct_result": "b, e",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_form",
+            "requirement": "Answer must be a comma-separated list of the elements in the counter-example subset, in alphabetical order"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "The subset of S = {a, b, c, d, e} consisting of all elements appearing in at least one pair (x, y) with x*y != y*x per the given table"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "8c28a1d1cd9db4156d614337a44c0ec83e082bbaf8fb7d278769a10b810eedda",
+      "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "evidence_applied": false,
+      "evidence_application_reason": "no snapshot entity or value appears in the question or trajectory (entities: ['Lisette']); the snapshot does not bear on this case",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 3
+  },
+  "prediction": false,
+  "summary": {
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "b, e",
+        "correct_result": "b, e"
+      },
+      "blocking_facts": []
+    },
+    "candidates": [],
+    "upgrade_rows": [],
+    "positive_candidates": [],
+    "hearings": [],
+    "stages": {
+      "judge": {
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "provenance": {
+      "packet_hash": "8c28a1d1cd9db4156d614337a44c0ec83e082bbaf8fb7d278769a10b810eedda",
+      "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "evidence_applied": false,
+      "evidence_application_reason": "no snapshot entity or value appears in the question or trajectory (entities: ['Lisette']); the snapshot does not bear on this case",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    }
+  },
+  "elapsed_seconds": 0.0
+}

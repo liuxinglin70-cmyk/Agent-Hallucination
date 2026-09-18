@@ -1,0 +1,121 @@
+{
+  "scope": "offline evaluator acceptance; no admission or model rerun",
+  "cycles": [
+    {
+      "cycle": 1,
+      "structural_replay": [
+        {
+          "id": "IV-1-001",
+          "previous_passed": false,
+          "fixed_passed": true,
+          "interpretation": "old rejection invalidated; efficacy remains unmeasured"
+        }
+      ],
+      "harmlessness_reclassification": [
+        {
+          "id": "IV-1-002",
+          "partner_ids": [],
+          "outcome": "not_evaluated",
+          "reason": "sentinel has insufficient baseline-correct coverage: protected_tp=2 (minimum 2), protected_tn=1 (minimum 2)",
+          "new_fn": 0
+        },
+        {
+          "id": "IV-1-003",
+          "partner_ids": [
+            "IV-1-004"
+          ],
+          "outcome": "rejected",
+          "reason": "sentinel harmlessness violation: new_fn=2",
+          "new_fn": 2
+        },
+        {
+          "id": "IV-1-004",
+          "partner_ids": [
+            "IV-1-003"
+          ],
+          "outcome": "rejected",
+          "reason": "sentinel harmlessness violation: new_fn=2",
+          "new_fn": 2
+        }
+      ]
+    },
+    {
+      "cycle": 2,
+      "structural_replay": [
+        {
+          "id": "IV-2-003",
+          "previous_passed": false,
+          "fixed_passed": true,
+          "interpretation": "old rejection invalidated; efficacy remains unmeasured"
+        },
+        {
+          "id": "IV-2-004",
+          "previous_passed": false,
+          "fixed_passed": true,
+          "interpretation": "old rejection invalidated; efficacy remains unmeasured"
+        }
+      ],
+      "harmlessness_reclassification": [
+        {
+          "id": "IV-2-001",
+          "partner_ids": [
+            "IV-2-002"
+          ],
+          "outcome": "not_evaluated",
+          "reason": "sentinel has insufficient baseline-correct coverage: protected_tp=2 (minimum 2), protected_tn=1 (minimum 2)",
+          "new_fn": 0
+        },
+        {
+          "id": "IV-2-002",
+          "partner_ids": [
+            "IV-2-001"
+          ],
+          "outcome": "not_evaluated",
+          "reason": "sentinel has insufficient baseline-correct coverage: protected_tp=2 (minimum 2), protected_tn=1 (minimum 2)",
+          "new_fn": 0
+        }
+      ]
+    }
+  ],
+  "hook_contract": "predicate context fields unavailable at defense.pre: ['context_judge_hallucination_reason', 'context_judge_positive']",
+  "saved_run_preflight": {
+    "state": "blocked_evaluation_preflight",
+    "preflight": {
+      "reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2",
+      "sentinel": {
+        "protected_tp": 2,
+        "protected_tn": 1,
+        "minimum": {
+          "protected_tp": 2,
+          "protected_tn": 2
+        },
+        "evaluable": false,
+        "reason": "protected_tn=1 < 2"
+      }
+    },
+    "observations_read": 6,
+    "proposer_calls": 0,
+    "candidate_arms": 0,
+    "cycles_started": 1,
+    "requested_cycles": 2
+  },
+  "historical_files_verified_unchanged": 189,
+  "memory_corrections": {
+    "records": 8,
+    "summary": {
+      "episodic": {
+        "records": 8,
+        "falsified": 2,
+        "unevaluable": 6,
+        "admitted": 0
+      },
+      "procedural": {
+        "records": 0
+      },
+      "improvement": {
+        "records": 0
+      }
+    },
+    "original_files_unchanged": true
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "case": "OpenDeepSearch/063.json",
+  "arm": "A_no_evidence",
+  "rep": 2,
+  "gold": true,
+  "baseline_prediction": false,
+  "snapshot_digest": null,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "OpenDeepSearch/063.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\", which has a duration of 3:20.",
+          "correct_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\"."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\", which has a duration of 3:20.",
+        "correct_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\".",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The name of track 12 on the Jet Set Radio original soundtrack released in 2000"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "c4c36577d16251f09e28a9dd30678c612b3eac4f9dbfed0b124ada1e42297abd",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 3
+  },
+  "prediction": false,
+  "summary": {
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "decisive_facts": {
+      "judge": "false",
+      "recall_upgrade": "none",
+      "delivered_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\", which has a duration of 3:20.",
+      "correct_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\"."
+    },
+    "candidates": [],
+    "upgrade_rows": [],
+    "positive_candidates": [],
+    "hearings": [],
+    "stages": {
+      "judge": {
+        "state": "ok",
+        "attempts": 3
+      },
+      "recall_scanner": {
+        "state": "not_needed",
+        "attempts": 0
+      },
+      "causal_upgrade": {
+        "state": "not_needed",
+        "attempts": 0
+      }
+    },
+    "provenance": {
+      "packet_hash": "c4c36577d16251f09e28a9dd30678c612b3eac4f9dbfed0b124ada1e42297abd",
+      "evidence_snapshot_digest": null,
+      "evidence_applied": null,
+      "evidence_application_reason": null,
+      "frozen_judge_replay": true
+    }
+  },
+  "elapsed_seconds": 0.0
+}

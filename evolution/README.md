@@ -19,6 +19,12 @@ python -m evolution verify-ledger
 
 前 3 条命令不调用真实模型服务。`smoke` 检查准入与缺陷拒绝；`capability-smoke` 使用独立合成数据检查“新 DSL 谓词 + guard”带来的机制增益。其运行状态与真实 registry 隔离。
 
+实验先检查基线实际保护覆盖，再检查失败族对应的收益方向。保护覆盖不足或所有目标方向均不可测时，cycle 返回 `blocked_evaluation_preflight`，不调用 proposer；`run_experiment` 停止后续轮次及开发复测。部分方向可测时只向 proposer 提供对应失败族。显式传入的候选也会在候选臂执行前检查覆盖。门限不随样本量自动降低。
+
+DSL 上下文字段按 hook 校验：`judge.post` 与 `recall.trigger` 共用 judge 上下文；`defense.pre` 仅能读取听证证据、合约和引文，不能读取 judge 判定；`upgrade.pre` 不提供 `context_*` 字段。字段不属于 hook 是合同错误，历史回放缺少所需 judge 输入是不可评估，两者不会再静默表现成谓词不匹配。
+
+覆盖不足不能使缺陷审计通过，也不会记作机制已证伪；已有候选臂中实际观察到的退化仍作为实质拒绝。历史经验的人工复核更正追加到 `memory/episode_corrections.jsonl`，绑定原记录内容哈希，读取时应用到经验检索和匹配的旧账本拒绝反馈，原 `episodic.jsonl` 和账本不被重写。
+
 真实运行输出集中在 `artifacts/evolution/`：`cycles/`、`cache/`、`reports/`、`registry/`、`harness/`、`memory/` 和 `ledger.jsonl`。框架不加载历史活跃干预，首次运行从空库开始。
 
 ## H_t 基座

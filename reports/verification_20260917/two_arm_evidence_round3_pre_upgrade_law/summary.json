@@ -1,0 +1,614 @@
+{
+  "protocol": "protocol.json",
+  "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+  "target": "OpenDeepSearch/086.json",
+  "controls": [
+    "Magentic_One/036.json",
+    "OpenDeepSearch/002.json"
+  ],
+  "outcomes": [
+    {
+      "case": "Magentic_One/036.json",
+      "arm": "A_no_evidence",
+      "rep": 1,
+      "gold": false,
+      "baseline_prediction": false,
+      "snapshot_digest": null,
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "The first cardiologist in Kashmir was Dr. Upendra Kaul, as confirmed by the Kashmir Life article which explicitly describes him as 'Kashmir's first cardiologist'.",
+            "correct_result": "Dr. Upendra Kaul, identified as Kashmir's first cardiologist per the retrieved Kashmir Life source."
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "f6d2d5ac05eb1c7e4963a0101301cbf560a867ae8f658774cdd620f03963e729",
+          "evidence_snapshot_digest": null,
+          "evidence_applied": null,
+          "evidence_application_reason": null,
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "arm": "B_evidence",
+      "rep": 1,
+      "gold": false,
+      "baseline_prediction": false,
+      "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "The first cardiologist in Kashmir was Dr. Upendra Kaul, as confirmed by the Kashmir Life article which explicitly describes him as 'Kashmir's first cardiologist'.",
+            "correct_result": "Dr. Upendra Kaul, identified as Kashmir's first cardiologist per the retrieved Kashmir Life source."
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "f6d2d5ac05eb1c7e4963a0101301cbf560a867ae8f658774cdd620f03963e729",
+          "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+          "evidence_applied": false,
+          "evidence_application_reason": "no snapshot entity or value appears in the question or trajectory (entities: ['Lisette']); the snapshot does not bear on this case",
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "arm": "A_no_evidence",
+      "rep": 1,
+      "gold": false,
+      "baseline_prediction": false,
+      "snapshot_digest": null,
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "b, e",
+            "correct_result": "b, e"
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "8c28a1d1cd9db4156d614337a44c0ec83e082bbaf8fb7d278769a10b810eedda",
+          "evidence_snapshot_digest": null,
+          "evidence_applied": null,
+          "evidence_application_reason": null,
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "arm": "B_evidence",
+      "rep": 1,
+      "gold": false,
+      "baseline_prediction": false,
+      "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "b, e",
+            "correct_result": "b, e"
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "8c28a1d1cd9db4156d614337a44c0ec83e082bbaf8fb7d278769a10b810eedda",
+          "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+          "evidence_applied": false,
+          "evidence_application_reason": "no snapshot entity or value appears in the question or trajectory (entities: ['Lisette']); the snapshot does not bear on this case",
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "arm": "A_no_evidence",
+      "rep": 1,
+      "gold": true,
+      "baseline_prediction": false,
+      "snapshot_digest": null,
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "76 tons",
+            "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873"
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+          "evidence_snapshot_digest": null,
+          "evidence_applied": null,
+          "evidence_application_reason": null,
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "arm": "A_no_evidence",
+      "rep": 2,
+      "gold": true,
+      "baseline_prediction": false,
+      "snapshot_digest": null,
+      "prediction": false,
+      "summary": {
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "responsible_step": null,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "76 tons",
+            "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873"
+          },
+          "blocking_facts": []
+        },
+        "candidates": [],
+        "upgrade_rows": [],
+        "positive_candidates": [],
+        "hearings": [],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "not_needed",
+            "attempts": 0,
+            "view": "not_rendered",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+          "evidence_snapshot_digest": null,
+          "evidence_applied": null,
+          "evidence_application_reason": null,
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.0
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "arm": "B_evidence",
+      "rep": 1,
+      "gold": true,
+      "baseline_prediction": false,
+      "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "prediction": true,
+      "summary": {
+        "state": "verified_error",
+        "authority": "authoritative",
+        "responsible_step": 2,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "recall_upgrade",
+            "judge_step": null,
+            "traced_step": 2,
+            "defense": "substantiated",
+            "confirmed_step": 3,
+            "delivered_result": "",
+            "correct_result": "",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c1",
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "candidates": [
+          {
+            "candidate_id": "c1",
+            "claim": "the agent answered that the topsail schooner 'Lisette' was 76 tons instead of the required 116 tons, which the applicable source establishes for the task's vessel (topsail schooner, built 1873, formerly the Duke of Sutherland's, decoy service)",
+            "locus_event_id": "event_003",
+            "citations": [
+              "E1",
+              "E2"
+            ]
+          },
+          {
+            "candidate_id": "c2",
+            "claim": "the agent presented the single search result as established and submitted the final answer, instead of performing its declared verification step of cross-referencing with other historical records or sources before answering",
+            "locus_event_id": "event_003",
+            "citations": [
+              "E1",
+              "E2"
+            ]
+          }
+        ],
+        "upgrade_rows": [
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 3,
+            "citations": [
+              "E1",
+              "E2"
+            ],
+            "conflict_note": "E1 and E2 conflict on tonnage (116 vs 76); the snapshot resolves it in favor of E1 because E1 matches all four task descriptors (topsail schooner, built 1873, formerly the Duke of Sutherland's, decoy service 1917) while E2 is a photo caption matching only name and build year with no register source, so E1's 116 tons is the value the task asks for.",
+            "reason": "The delivered answer '76 tons' is a result error against E1's 116 tons for the task's vessel, and correcting the final answer at event_003 to 116 tons would make the sole deliverable correct."
+          },
+          {
+            "candidate_id": "c2",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "citations": [],
+            "conflict_note": "",
+            "reason": "Skipping the agent's self-declared verification step violates no action the task text demands and misreports no observation, and performing cross-referencing would not deterministically have produced the correct tonnage, so neither test passes."
+          }
+        ],
+        "positive_candidates": [
+          "c1"
+        ],
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "verdict": "substantiated",
+            "confirmed_step": 3,
+            "evidence_citations": [
+              "E1"
+            ],
+            "reason": "CONTENT TEST: at the alleged step the agent committed the deliverable 'TOOL event_003_tool_01 name=final_answer arguments=final_answer(\"76 tons\")' with observation 'Last output from code snippet: 76 tons', echoing the event_002 search log 'The tonnage of the topsail schooner Lisette, built in 1873, is 76 tons.' The correct referent per the applicable source E1 is 116 tons: 'This was the 116-ton to"
+          }
+        ],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+          "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+          "evidence_applied": true,
+          "evidence_application_reason": "source E1 entity 'lisette' appears in the question or trajectory",
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 323.61
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "arm": "B_evidence",
+      "rep": 2,
+      "gold": true,
+      "baseline_prediction": false,
+      "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+      "prediction": true,
+      "summary": {
+        "state": "verified_error",
+        "authority": "authoritative",
+        "responsible_step": 2,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "recall_upgrade",
+            "judge_step": null,
+            "traced_step": 2,
+            "defense": "substantiated",
+            "confirmed_step": 3,
+            "delivered_result": "",
+            "correct_result": "",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c1",
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "candidates": [
+          {
+            "candidate_id": "c1",
+            "claim": "the agent answered '76 tons' instead of the required '116 tons' for the topsail schooner Lisette built in 1873, formerly the Duke of Sutherland's and in decoy service in 1917; the applicable source E1 states she was the '116-ton topsail schooner Lisette' matching all four task descriptors, while the",
+            "locus_event_id": "event_003",
+            "citations": [
+              "E1"
+            ]
+          },
+          {
+            "candidate_id": "c2",
+            "claim": "the agent submitted the final answer immediately instead of cross-referencing the search result with other historical records as its own plan step 2 required ('Verify the information found by cross-referencing with other historical records or sources')",
+            "locus_event_id": "event_003",
+            "citations": []
+          }
+        ],
+        "upgrade_rows": [
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 3,
+            "citations": [
+              "E1"
+            ],
+            "conflict_note": "E1 vs E2 conflict on tonnage is resolved per the snapshot's recorded resolution: E1 states all four task descriptors (topsail schooner, built 1873, formerly Duke of Sutherland's, decoy service 1917) and is the applicable source with 116 tons; E2 names only the vessel and build year and cites no register, so it cannot ground the answer.",
+            "reason": "The delivered final answer '76 tons' is a result error: the source matching all four task descriptors, E1, gives 116 tons for the Lisette, so correcting event_003 to '116 tons' makes the sole deliverable correct."
+          },
+          {
+            "candidate_id": "c2",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "citations": [],
+            "conflict_note": "",
+            "reason": "Skipping the cross-referencing step violates only the agent's self-generated plan, not any action, order, or channel fixed by the task text, so no deliverable is breached and correcting it would not by itself change any deliverable's correctness."
+          }
+        ],
+        "positive_candidates": [
+          "c1"
+        ],
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "verdict": "substantiated",
+            "confirmed_step": 3,
+            "evidence_citations": [
+              "E1",
+              "E2"
+            ],
+            "reason": "CONTENT TEST: at event_003 the agent delivered final_answer(\"76 tons\") (observation: 'Last output from code snippet: 76 tons'), repeating the unverified search text at event_002 ('the tonnage of the topsail schooner Lisette, built in 1873, is 76 tons'). The applicable source E1 states: 'This was the 116-ton topsail schooner Lisette, which had formerly belonged to the Duke of Sutherland. She had be"
+          }
+        ],
+        "stages": {
+          "judge": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          },
+          "recall_scanner": {
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "causal_upgrade": {
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        },
+        "provenance": {
+          "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+          "evidence_snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37",
+          "evidence_applied": true,
+          "evidence_application_reason": "source E1 entity 'lisette' appears in the question or trajectory",
+          "frozen_judge_replay": true,
+          "frozen_stages": [
+            "judge_result"
+          ]
+        }
+      },
+      "elapsed_seconds": 274.76
+    }
+  ],
+  "complete": true
+}

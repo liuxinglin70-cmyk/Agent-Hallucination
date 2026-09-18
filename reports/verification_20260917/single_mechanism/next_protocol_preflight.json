@@ -1,0 +1,79 @@
+{
+  "status": "historical_coverage_only_not_live_ready",
+  "development_only": true,
+  "selection": "Original seed; one expansion to S=5 positive+5 negative, G=10, no seed search or outcome-driven replacement. Thresholds unchanged.",
+  "config": "evolution\\configs\\development_diagnostic_20260918.json",
+  "sentinel": [
+    "BFCL/041.json",
+    "Magentic_One/049.json",
+    "Magentic_One/085.json",
+    "Octotools/023.json",
+    "Octotools/040.json",
+    "OpenDeepSearch/002.json",
+    "OpenDeepSearch/035.json",
+    "OpenDeepSearch/088.json",
+    "OpenManus/073.json",
+    "SmolAgents/019.json"
+  ],
+  "gain": [
+    "OpenManus/064.json",
+    "OpenDeepSearch/086.json",
+    "BFCL/107.json",
+    "OpenDeepSearch/095.json",
+    "Camel/048.json",
+    "OpenDeepSearch/077.json",
+    "Octotools/005.json",
+    "OpenDeepSearch/063.json",
+    "SmolAgents/037.json",
+    "Magentic_One/050.json"
+  ],
+  "patrol": [
+    "BFCL/017.json",
+    "BFCL/062.json",
+    "Camel/018.json",
+    "Camel/054.json",
+    "Magentic_One/036.json",
+    "Magentic_One/093.json",
+    "Octotools/030.json",
+    "OpenDeepSearch/067.json",
+    "OpenDeepSearch/080.json",
+    "OpenDeepSearch/084.json"
+  ],
+  "validation": [
+    "BFCL/012.json",
+    "BFCL/068.json",
+    "BFCL/106.json",
+    "Camel/028.json",
+    "Magentic_One/067.json",
+    "Magentic_One/074.json",
+    "OpenDeepSearch/076.json",
+    "OpenDeepSearch/078.json",
+    "SmolAgents/022.json",
+    "SmolAgents/036.json"
+  ],
+  "sentinel_coverage": {
+    "protected_tp": 3,
+    "protected_tn": 3,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": true,
+    "reason": ""
+  },
+  "gain_fn": [
+    "OpenDeepSearch/086.json",
+    "OpenDeepSearch/063.json"
+  ],
+  "gain_fp": [
+    "BFCL/107.json",
+    "Camel/048.json",
+    "OpenDeepSearch/077.json",
+    "Magentic_One/050.json"
+  ],
+  "non_authoritative": [
+    "Magentic_One/049.json",
+    "OpenManus/064.json"
+  ],
+  "next": "Require a fresh authoritative baseline before proposals. Do not retry failed coverage with new seeds. All validation examples previously exposed."
+}

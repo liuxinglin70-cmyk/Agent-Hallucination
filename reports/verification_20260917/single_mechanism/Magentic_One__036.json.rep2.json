@@ -1,0 +1,235 @@
+{
+  "case": "Magentic_One/036.json",
+  "rep": 2,
+  "gold": false,
+  "baseline_prediction": false,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "Magentic_One/036.json",
+    "state": "verified_clean",
+    "decision_authority": "degraded_judge_only",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "The first cardiologist in Kashmir was Dr. Upendra Kaul, as confirmed by the Kashmir Life article which explicitly describes him as 'Kashmir's first cardiologist'.",
+          "correct_result": "Dr. Upendra Kaul, identified as Kashmir's first cardiologist per the retrieved Kashmir Life source."
+        },
+        "blocking_facts": [
+          {
+            "component": "recall",
+            "code": "recall_unavailable",
+            "error_type": "",
+            "error": ""
+          }
+        ]
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "recall",
+          "code": "recall_unavailable",
+          "error_type": "",
+          "error": ""
+        }
+      ],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The first cardiologist in Kashmir was Dr. Upendra Kaul, as confirmed by the Kashmir Life article which explicitly describes him as 'Kashmir's first cardiologist'.",
+        "correct_result": "Dr. Upendra Kaul, identified as Kashmir's first cardiologist per the retrieved Kashmir Life source.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Search the web for authoritative sources identifying the first cardiologist in Kashmir and verify the claim against a retrieved source before answering."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Deliver a final answer naming the first cardiologist in Kashmir with supporting context."
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the WebSurfer claimed the Kashmir Life article explicitly refers to Dr. Upendra Kaul as 'Kashmir's first cardiologist' instead of the article's actual visible wording, which calls him 'Kashmir's leading cardiologist'",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_005",
+            "event_007"
+          ],
+          "quote": "The article explicitly refers to Dr. Kaul as “Kashmir’s first cardiologist,” confirming this notable distinction"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the WebSurfer presented a passage about tearing up study-abroad forms and his mother's reaction as supporting evidence for the first-cardiologist claim instead of quoting article text that actually establishes that claim",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_007"
+          ],
+          "quote": "I told her the truth. She remained silent for a while with moist eyes. She told me after all their hard work in making me a doctor; I too had some responsibility towards them. I got the point and immediately tore away those forms, which brought a smile to her face."
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the orchestrator presented the answer as confirmed by 'reputable sources' (plural) instead of verifying with multiple additional independent sources as its own plan required, relying on a single Kashmir Life article plus a Bing search snippet",
+          "locus_event_id": "event_008",
+          "evidence_refs": [
+            "event_001",
+            "event_005",
+            "event_008"
+          ],
+          "quote": "He is widely recognized for pioneering cardiology in the region, as confirmed by reputable sources such as Kashmir Life."
+        },
+        {
+          "candidate_id": "c4",
+          "claim": "the orchestrator asserted Dr. Upendra Kaul was the first cardiologist practicing 'in Kashmir' instead of addressing the distinction it itself flagged in its fact sheet between the first cardiologist from Kashmir (whose career per the sources was built in Delhi at AIIMS) and the first cardiologist offering services in Kashmir",
+          "locus_event_id": "event_008",
+          "evidence_refs": [
+            "event_001",
+            "event_007",
+            "event_008"
+          ],
+          "quote": "The first cardiologist in Kashmir was Dr. Upendra Kaul."
+        }
+      ],
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c12b0e7be040d6279e4be2bd5d859019803a83c20f63bbb2607e0a97fbf92a90",
+        "active_interventions": [
+          "IV-1-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-1-001",
+            "hook": "recall.trigger",
+            "type": "recall_trigger",
+            "event": "recall_triggered",
+            "detail": "predicate=evo_unreasoned_negative verdict=violated"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      }
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "case_deadline_exceeded",
+        "attempts": 0,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 4536,
+          "completion_tokens": 5302,
+          "total_tokens": 9838,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4762
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4762
+          },
+          "input_tokens": 4536,
+          "output_tokens": 5302
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the WebSurfer claimed the Kashmir Life article explicitly refers to Dr. Upendra Kaul as 'Kashmir's first cardiologist' instead of the article's actual visible wording, which calls him 'Kashmir's leading cardiologist'\",\n      \"locu"
+      },
+      "causal_upgrade": {}
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "recall",
+        "code": "recall_unavailable",
+        "error_type": "",
+        "error": ""
+      }
+    ],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "f6d2d5ac05eb1c7e4963a0101301cbf560a867ae8f658774cdd620f03963e729",
+      "interventions_hash": "c12b0e7be040d6279e4be2bd5d859019803a83c20f63bbb2607e0a97fbf92a90",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 8
+  },
+  "prediction": null,
+  "elapsed_seconds": 900.02
+}

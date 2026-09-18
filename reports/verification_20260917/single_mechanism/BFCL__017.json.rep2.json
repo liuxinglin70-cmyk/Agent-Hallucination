@@ -1,0 +1,595 @@
+{
+  "case": "BFCL/017.json",
+  "rep": 2,
+  "gold": true,
+  "baseline_prediction": false,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/017.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_007",
+    "responsible_step": 7,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_007",
+      "responsible_step": 7,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "judge_step": null,
+          "traced_step": 7,
+          "defense": "substantiated",
+          "confirmed_step": 7,
+          "delivered_result": "",
+          "correct_result": "",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c4",
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "ProjectOverview.txt was written with 'To be discussed' (echo, no error); after a failed cp attempt (corrected in the next step), Draft.txt was written with the same content 'To be discussed', making both files identical; the assistant authenticated as tech_guru with securePass123 and posted the tweet with content 'Initial summary of the project. To be discussed.', tag '#ProjectUpdate', and mentions '@manager' and '@team_lead', confirmed by the environment observation (id 0).",
+        "correct_result": "ProjectOverview.txt containing 'To be discussed'; ProjectOverview.txt and Draft.txt identical; tweet 'Initial summary of the project. To be discussed.' posted, tagged with ProjectUpdate and mentioning @manager and @team_lead, using the provided credentials.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "ProjectOverview.txt modified to contain 'To be discussed'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Ensure ProjectOverview.txt and Draft.txt are identical"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet text 'Initial summary of the project. To be discussed.'"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet tagged with 'ProjectUpdate'"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet mentions @manager and @team_lead"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Authenticate as tech_guru with securePass123 and post the tweet"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent claimed the content of 'ProjectOverview.txt' has been updated to 'To be discussed' although the echo tool observation returned None and no observation establishes the file content",
+          "locus_event_id": "event_002",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "quote": "The content of 'ProjectOverview.txt' has been updated to \"To be discussed.\""
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent claimed the cp failure was 'likely because Draft.txt already exists as a file' instead of the actual error reported ('Not a directory'), presenting an unestablished diagnosis as the cause",
+          "locus_event_id": "event_004",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "quote": "likely because 'Draft.txt' already exists as a file"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent claimed both 'ProjectOverview.txt' and 'Draft.txt' are identical although no observation (all echo observations were None) verifies the content of either file",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "quote": "Both 'ProjectOverview.txt' and 'Draft.txt' now contain the same content: \"To be discussed.\" They are identical."
+        },
+        {
+          "candidate_id": "c4",
+          "claim": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_007"
+          ],
+          "quote": "'tags': ['#ProjectUpdate']"
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c4",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 7,
+        "reason": "The task fixes the tag as exactly 'ProjectUpdate', but the post_tweet call delivered '#ProjectUpdate', a wrong argument breaching the tweet deliverable, and correcting it at event_007 makes every deliverable correct.",
+        "coverage": "answered",
+        "locus_event_id": "event_007",
+        "evidence_refs": [
+          "event_007"
+        ],
+        "claim": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+        "quote": "'tags': ['#ProjectUpdate']"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c4",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 7,
+          "reason": "The task fixes the tag as exactly 'ProjectUpdate', but the post_tweet call delivered '#ProjectUpdate', a wrong argument breaching the tweet deliverable, and correcting it at event_007 makes every deliverable correct.",
+          "coverage": "answered",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_007"
+          ],
+          "claim": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+          "quote": "'tags': ['#ProjectUpdate']"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The echo write to 'ProjectOverview.txt' completed without any error (None being the tool's silent success output), so the completion claim matches the action actually performed and no deliverable is wrong.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The hedged diagnosis ('likely because') is interpretive commentary plausibly consistent with the 'Not a directory' failure and touches no required deliverable, since the agent immediately corrected via the echo overwrite that succeeded.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "Both echo writes completed without error with identical content, so the claim that the files are identical reflects the state the trajectory actually delivered rather than a fabricated observation.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c4",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 7,
+          "reason": "The task fixes the tag as exactly 'ProjectUpdate', but the post_tweet call delivered '#ProjectUpdate', a wrong argument breaching the tweet deliverable, and correcting it at event_007 makes every deliverable correct.",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 4,
+        "answered": 4,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c4",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 7,
+            "reason": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+            "evidence_refs": [
+              "event_007"
+            ],
+            "quote": "'tags': ['#ProjectUpdate']",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 7,
+              "quote": "'tags': ['#ProjectUpdate']",
+              "referent": "'tags': ['ProjectUpdate']",
+              "evidence_refs": [
+                "event_007"
+              ],
+              "reason": "Step 7 is the first step where the tag error appears: the post_tweet call used '#ProjectUpdate' whereas the user explicitly requested tagging with the exact tag 'ProjectUpdate', and no earlier step contains this wrong content."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1173,
+                "completion_tokens": 478,
+                "total_tokens": 1651,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 377
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 377
+                },
+                "input_tokens": 1173,
+                "output_tokens": 478
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 7,\n  \"quote\": \"'tags': ['#ProjectUpdate']\",\n  \"referent\": \"'tags': ['ProjectUpdate']\",\n  \"evidence_refs\": [\"event_007\"],\n  \"reason\": \"Step 7 is the first step where the tag error appears: the post_tweet call used '#ProjectUpdate' whereas the user explicitly requested tagging with the ex"
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 7,
+              "reason": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_007"
+              ],
+              "quote": "'tags': ['#ProjectUpdate']",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "ProjectOverview.txt modified to contain 'To be discussed'"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Ensure ProjectOverview.txt and Draft.txt are identical"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Tweet text 'Initial summary of the project. To be discussed.'"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Tweet tagged with 'ProjectUpdate'"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Tweet mentions @manager and @team_lead"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Authenticate as tech_guru with securePass123 and post the tweet"
+                }
+              ],
+              "candidate_id": "c4"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 7,
+              "evidence_refs": [
+                "event_007",
+                "event_008"
+              ],
+              "reason": "CONTENT TEST: turn 3 fixes the tag in exact form as 'tagging it with 'ProjectUpdate''; event_007 shows post_tweet called with tags=['#ProjectUpdate'], and the observation confirms the delivered state: tags: ['#ProjectUpdate']. The deviation from the task-fixed constant is factually real. RELEVANCE TEST: event_008 repeats the posted tweet with '#ProjectUpdate' and no later event corrects the tag; the tweet's content and mentions otherwise match the contract, so correcting the tags argument would make the deliverable correct. Since the positive verdict rests on an explicit exact-form contract (the quoted tag 'ProjectUpdate'), the violation is a material deliverable breach (wrong tool argument), not immaterial formatting."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 7,
+                "evidence_refs": [
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "CONTENT TEST: turn 3 fixes the tag in exact form as 'tagging it with 'ProjectUpdate''; event_007 shows post_tweet called with tags=['#ProjectUpdate'], and the observation confirms the delivered state: tags: ['#ProjectUpdate']. The deviation from the task-fixed constant is factually real. RELEVANCE TEST: event_008 repeats the posted tweet with '#ProjectUpdate' and no later event corrects the tag; the tweet's content and mentions otherwise match the contract, so correcting the tags argument would make the deliverable correct. Since the positive verdict rests on an explicit exact-form contract (the quoted tag 'ProjectUpdate'), the violation is a material deliverable breach (wrong tool argument), not immaterial formatting."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 7,
+                "evidence_refs": [
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "CONTENT TEST: In event_007 the agent called post_tweet with {'tags': ['#ProjectUpdate'], ...} and the observation confirms the delivered state: tags: [\"#ProjectUpdate\"]. The task contract (turn 3) fixes the exact value: \"tagging it with 'ProjectUpdate'\" — quoted without the '#'. The agent's argument deviates from that fixed constant, and the deviation was actually delivered to the environment (tweet id 0 posted with the '#'-prefixed tag), not just written in prose. This is an explicit exact-form contract on a tool argument, which is material by definition, not immaterial formatting. RELEVANCE TEST: The tag value in event_007 is causally identical to the posted tweet's tag in the observation; there is no later correction (event_008 merely confirms the posted tweet with '#ProjectUpdate' as done). Had the agent passed 'ProjectUpdate' exactly, the content ('Initial summary of the project. To be discussed.'), mentions (@manager, @team_lead), and authentication all already match the contract, so correcting this single argument would make every deliverable correct. Both tests pass."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 7,
+                "evidence_refs": [
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "CONTENT TEST: The user explicitly fixed the tag value with 'tagging it with 'ProjectUpdate'' (exact value in quotes), but event_007 shows post_tweet called with arguments={'content': 'Initial summary of the project. To be discussed.', 'tags': ['#ProjectUpdate'], 'mentions': ['@manager', '@team_lead']}, and the observation confirms the committed posted state carries tags: [\"#ProjectUpdate\"]. The delivered tag '#ProjectUpdate' deviates from the task-fixed exact value 'ProjectUpdate' — under grounding rules 1 and 2 the fixed argument belongs to the deliverable, and per the explicit-contract rule a violation of an exact fixed value is material, not dismissible as formatting. RELEVANCE TEST: This step is causally connected to the delivered result — the tweet is the committed state, and event_008 does not correct it but re-affirms the deviation ('posted as follows: ... #ProjectUpdate ...'). Correcting the tag to 'ProjectUpdate' would make every tweet-related deliverable (content, mentions, tag) match the contract, so the step is material and uncorrected."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1380,
+                "completion_tokens": 2982,
+                "total_tokens": 4362,
+                "prompt_tokens_details": {
+                  "cached_tokens": 1344
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 2705
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 2705
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 1344
+                },
+                "input_tokens": 1380,
+                "output_tokens": 2982
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 7,\n  \"evidence_refs\": [\"event_007\", \"event_008\"],\n  \"reason\": \"CONTENT TEST: The user explicitly fixed the tag value with 'tagging it with 'ProjectUpdate'' (exact value in quotes), but event_007 shows post_tweet called with arguments={'content': 'I",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c12b0e7be040d6279e4be2bd5d859019803a83c20f63bbb2607e0a97fbf92a90",
+        "active_interventions": [
+          "IV-1-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-1-001",
+            "hook": "recall.trigger",
+            "type": "recall_trigger",
+            "event": "recall_triggered",
+            "detail": "predicate=evo_unreasoned_negative verdict=violated"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      }
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1065,
+          "completion_tokens": 2142,
+          "total_tokens": 3207,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1732
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1732
+          },
+          "input_tokens": 1065,
+          "output_tokens": 2142
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent claimed the content of 'ProjectOverview.txt' has been updated to 'To be discussed' although the echo tool observation returned None and no observation establishes the file content\",\n      \"locus_event_id\": \"event_002\",\n "
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1808,
+          "completion_tokens": 4891,
+          "total_tokens": 6699,
+          "prompt_tokens_details": {
+            "cached_tokens": 1792
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4527
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1792
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4527
+          },
+          "input_tokens": 1808,
+          "output_tokens": 4891
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": false,\n      \"causal\": false,\n      \"corrected_step\": null,\n      \"reason\": \"The echo write returned None, which in this environment is the success signal (failures are returned as explicit error objects, as the cp call show",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c4": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "f4f07272aaec7f32469890d5df39e0b3303e9562ccc1988a69a2df8dc9158efb",
+      "interventions_hash": "c12b0e7be040d6279e4be2bd5d859019803a83c20f63bbb2607e0a97fbf92a90",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 8
+  },
+  "prediction": true,
+  "elapsed_seconds": 414.73
+}

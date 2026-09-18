@@ -1,0 +1,6 @@
+{
+  "archived_round": 3,
+  "why_archived": "Superseded by round 4 (the current protocol) after the upgrade-stage prompt gained the evidence law. Round 3 is kept because it is the first round whose two target runs agreed, demonstrating that the recorded resolutions removed the conflict-interpretation flip seen in rounds 1-2. Conclusions are reported in ../two_arm_evidence/README.md.",
+  "recorded_source_digest": "fa50a04aeff4b9ce",
+  "snapshot_digest": "8131b0ff9e164ec719641b5cb0cced13770d2b2cb597ab01e9bdb561ef0bcf37"
+}

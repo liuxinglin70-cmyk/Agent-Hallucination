@@ -1,0 +1,61 @@
+{
+  "complete": true,
+  "outcomes": [
+    {
+      "name": "original_rep1",
+      "expected_target_upgrade": false,
+      "status": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "target_upgraded": false,
+      "passed": true,
+      "elapsed_seconds": 344.4
+    },
+    {
+      "name": "original_rep2",
+      "expected_target_upgrade": false,
+      "status": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "target_upgraded": false,
+      "passed": true,
+      "elapsed_seconds": 300.57
+    },
+    {
+      "name": "literal_control",
+      "expected_target_upgrade": true,
+      "status": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "target_upgraded": true,
+      "passed": true,
+      "elapsed_seconds": 23.55
+    },
+    {
+      "name": "different_name_control",
+      "expected_target_upgrade": true,
+      "status": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "target_upgraded": true,
+      "passed": true,
+      "elapsed_seconds": 34.77
+    }
+  ]
+}

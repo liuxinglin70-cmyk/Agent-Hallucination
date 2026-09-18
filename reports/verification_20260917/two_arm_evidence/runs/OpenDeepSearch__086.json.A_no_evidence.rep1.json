@@ -1,0 +1,177 @@
+{
+  "case": "OpenDeepSearch/086.json",
+  "arm": "A_no_evidence",
+  "rep": 1,
+  "gold": true,
+  "baseline_prediction": false,
+  "snapshot_digest": null,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "OpenDeepSearch/086.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "76 tons",
+          "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873"
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "76 tons",
+        "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The tonnage of the topsail schooner 'Lisette', built in 1873, formerly owned by the Duke of Sutherland before serving as a decoy craft from 1917"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    },
+    "_packet_event_count": 3
+  },
+  "prediction": false,
+  "summary": {
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "76 tons",
+        "correct_result": "76 tons, as stated in the tool observation for the tonnage of the topsail schooner Lisette built in 1873"
+      },
+      "blocking_facts": []
+    },
+    "candidates": [],
+    "upgrade_rows": [],
+    "positive_candidates": [],
+    "hearings": [],
+    "stages": {
+      "judge": {
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "provenance": {
+      "packet_hash": "80f70add9f27193a6b600dece6f063db21b8b0ccdf3f0ebc27017a34fdd2e8a2",
+      "evidence_snapshot_digest": null,
+      "evidence_applied": null,
+      "evidence_application_reason": null,
+      "frozen_judge_replay": true,
+      "frozen_stages": [
+        "judge_result"
+      ]
+    }
+  },
+  "elapsed_seconds": 0.0
+}

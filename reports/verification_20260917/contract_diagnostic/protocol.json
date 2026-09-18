@@ -1,0 +1,480 @@
+{
+  "source_digest": "4f1ffb4d6bfcd5a7",
+  "config": {
+    "schema_version": "detector.config.v1",
+    "case_timeout_seconds": 900,
+    "judge_route": {
+      "endpoint": "https://www.autodl.art/api/v1",
+      "model": "GLM-5.3-flash",
+      "api_key_env": "AUTODL_API_KEY",
+      "temperature": 0.0,
+      "timeout_seconds": 240,
+      "total_timeout_seconds": 480,
+      "transport_retries": 2,
+      "timeout_growth_factor": 1.5,
+      "context_cache": {
+        "enabled": true,
+        "mode": "automatic"
+      },
+      "json_mode": true,
+      "votes": 3,
+      "vote_topup": 2
+    },
+    "defense_route": {
+      "endpoint": "https://www.autodl.art/api/v1",
+      "model": "GLM-5.3-flash",
+      "api_key_env": "AUTODL_API_KEY",
+      "temperature": 0.0,
+      "timeout_seconds": 240,
+      "total_timeout_seconds": 480,
+      "transport_retries": 2,
+      "timeout_growth_factor": 1.5,
+      "context_cache": {
+        "enabled": true,
+        "mode": "automatic"
+      },
+      "max_tokens": 8192,
+      "votes": 3,
+      "vote_topup": 2
+    },
+    "recall_route": {
+      "endpoint": "https://www.autodl.art/api/v1",
+      "model": "GLM-5.3-flash",
+      "api_key_env": "AUTODL_API_KEY",
+      "temperature": 0.0,
+      "timeout_seconds": 240,
+      "total_timeout_seconds": 480,
+      "transport_retries": 2,
+      "timeout_growth_factor": 1.5,
+      "context_cache": {
+        "enabled": true,
+        "mode": "automatic"
+      },
+      "max_tokens": 8192
+    }
+  },
+  "jobs": [
+    {
+      "name": "original_rep1",
+      "record": {
+        "history": [
+          {
+            "step": 1,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "echo",
+                "arguments": {
+                  "content": "To be discussed",
+                  "file_name": "ProjectOverview.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "None"
+            ]
+          },
+          {
+            "step": 2,
+            "role": "assistant",
+            "content": "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!"
+          },
+          {
+            "step": 3,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "cp",
+                "arguments": {
+                  "source": "ProjectOverview.txt",
+                  "destination": "Draft.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}"
+            ]
+          },
+          {
+            "step": 4,
+            "role": "assistant",
+            "content": "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identical, I will overwrite the content of 'Draft.txt' with the content from 'ProjectOverview.txt'.\"",
+            "tool_calls": [
+              {
+                "name": "echo",
+                "arguments": {
+                  "content": "To be discussed",
+                  "file_name": "Draft.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "None"
+            ]
+          },
+          {
+            "step": 5,
+            "role": "assistant",
+            "content": "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further changes, just let me know!"
+          },
+          {
+            "step": 6,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "authenticate_twitter",
+                "arguments": {
+                  "username": "tech_guru",
+                  "password": "securePass123"
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"authentication_status\": true}"
+            ]
+          },
+          {
+            "step": 7,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "post_tweet",
+                "arguments": {
+                  "content": "Initial summary of the project. To be discussed.",
+                  "tags": [
+                    "#ProjectUpdate"
+                  ],
+                  "mentions": [
+                    "@manager",
+                    "@team_lead"
+                  ]
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"id\": 0, \"username\": \"tech_guru\", \"content\": \"Initial summary of the project. To be discussed.\", \"tags\": [\"#ProjectUpdate\"], \"mentions\": [\"@manager\", \"@team_lead\"]}"
+            ]
+          },
+          {
+            "step": 8,
+            "role": "assistant",
+            "content": "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone in the loop about your documentation progress. If you need to share more updates or interact with your team on Twitter, just let me know!"
+          }
+        ],
+        "question": [
+          [
+            "I've just put together a file named 'ProjectOverview.txt' into my working directory where I've laid out an initial summary of the project. But as I foresee possible modifications down the line, I'd like to modify the file content by putting 'To be discussed' in it."
+          ],
+          [
+            "For peace of mind, let's ensure both 'ProjectOverview.txt' and 'Draft.txt' are identical."
+          ],
+          [
+            "Lastly, I'd like to broadcast my recent documentation progress on Twitter. Please draft a tweet announcing a brief project update, as 'Initial summary of the project. To be discussed.', tagging it with 'ProjectUpdate' and mentioning @manager and @team_lead to keep everyone in the loop. My user name is tech_guru and password is securePass123."
+          ]
+        ]
+      },
+      "candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent claimed the content of 'ProjectOverview.txt' has been updated to 'To be discussed' although the echo tool observation returned None and no observation establishes the file content",
+          "locus_event_id": "event_002",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "quote": "The content of 'ProjectOverview.txt' has been updated to \"To be discussed.\""
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent claimed the cp failure was 'likely because Draft.txt already exists as a file' instead of the actual error reported ('Not a directory'), presenting an unestablished diagnosis as the cause",
+          "locus_event_id": "event_004",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "quote": "likely because 'Draft.txt' already exists as a file"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent claimed both 'ProjectOverview.txt' and 'Draft.txt' are identical although no observation (all echo observations were None) verifies the content of either file",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "quote": "Both 'ProjectOverview.txt' and 'Draft.txt' now contain the same content: \"To be discussed.\" They are identical."
+        },
+        {
+          "candidate_id": "c4",
+          "claim": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_007"
+          ],
+          "quote": "'tags': ['#ProjectUpdate']"
+        }
+      ],
+      "target_candidate": "c4",
+      "expected_target_upgrade": false,
+      "kind": "saved real packet and scanner replay; not a new benchmark case"
+    },
+    {
+      "name": "original_rep2",
+      "record": {
+        "history": [
+          {
+            "step": 1,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "echo",
+                "arguments": {
+                  "content": "To be discussed",
+                  "file_name": "ProjectOverview.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "None"
+            ]
+          },
+          {
+            "step": 2,
+            "role": "assistant",
+            "content": "The content of \\'ProjectOverview.txt\\' has been updated to \"To be discussed.\" If you need further modifications or want to review the file, let me know!"
+          },
+          {
+            "step": 3,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "cp",
+                "arguments": {
+                  "source": "ProjectOverview.txt",
+                  "destination": "Draft.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"error\": \"cp: cannot copy 'ProjectOverview.txt' to 'Draft.txt': Not a directory\"}"
+            ]
+          },
+          {
+            "step": 4,
+            "role": "assistant",
+            "content": "\"It seems there was an issue copying 'ProjectOverview.txt' to 'Draft.txt'—likely because 'Draft.txt' already exists as a file. To ensure both files are identical, I will overwrite the content of 'Draft.txt' with the content from 'ProjectOverview.txt'.\"",
+            "tool_calls": [
+              {
+                "name": "echo",
+                "arguments": {
+                  "content": "To be discussed",
+                  "file_name": "Draft.txt"
+                }
+              }
+            ],
+            "tool_responses": [
+              "None"
+            ]
+          },
+          {
+            "step": 5,
+            "role": "assistant",
+            "content": "Both \\'ProjectOverview.txt\\' and \\'Draft.txt\\' now contain the same content: \"To be discussed.\" They are identical. If you need to verify or make further changes, just let me know!"
+          },
+          {
+            "step": 6,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "authenticate_twitter",
+                "arguments": {
+                  "username": "tech_guru",
+                  "password": "securePass123"
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"authentication_status\": true}"
+            ]
+          },
+          {
+            "step": 7,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "post_tweet",
+                "arguments": {
+                  "content": "Initial summary of the project. To be discussed.",
+                  "tags": [
+                    "#ProjectUpdate"
+                  ],
+                  "mentions": [
+                    "@manager",
+                    "@team_lead"
+                  ]
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"id\": 0, \"username\": \"tech_guru\", \"content\": \"Initial summary of the project. To be discussed.\", \"tags\": [\"#ProjectUpdate\"], \"mentions\": [\"@manager\", \"@team_lead\"]}"
+            ]
+          },
+          {
+            "step": 8,
+            "role": "assistant",
+            "content": "Your tweet has been drafted and posted as follows:\\n\\nInitial summary of the project. To be discussed. #ProjectUpdate @manager @team_lead\\n\\nThis keeps everyone in the loop about your documentation progress. If you need to share more updates or interact with your team on Twitter, just let me know!"
+          }
+        ],
+        "question": [
+          [
+            "I've just put together a file named 'ProjectOverview.txt' into my working directory where I've laid out an initial summary of the project. But as I foresee possible modifications down the line, I'd like to modify the file content by putting 'To be discussed' in it."
+          ],
+          [
+            "For peace of mind, let's ensure both 'ProjectOverview.txt' and 'Draft.txt' are identical."
+          ],
+          [
+            "Lastly, I'd like to broadcast my recent documentation progress on Twitter. Please draft a tweet announcing a brief project update, as 'Initial summary of the project. To be discussed.', tagging it with 'ProjectUpdate' and mentioning @manager and @team_lead to keep everyone in the loop. My user name is tech_guru and password is securePass123."
+          ]
+        ]
+      },
+      "candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent claimed the content of 'ProjectOverview.txt' has been updated to 'To be discussed' although the echo tool observation returned None and no observation establishes the file content",
+          "locus_event_id": "event_002",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "quote": "The content of 'ProjectOverview.txt' has been updated to \"To be discussed.\""
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent claimed the cp failure was 'likely because Draft.txt already exists as a file' instead of the actual error reported ('Not a directory'), presenting an unestablished diagnosis as the cause",
+          "locus_event_id": "event_004",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "quote": "likely because 'Draft.txt' already exists as a file"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent claimed both 'ProjectOverview.txt' and 'Draft.txt' are identical although no observation (all echo observations were None) verifies the content of either file",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "quote": "Both 'ProjectOverview.txt' and 'Draft.txt' now contain the same content: \"To be discussed.\" They are identical."
+        },
+        {
+          "candidate_id": "c4",
+          "claim": "the agent tagged the tweet with '#ProjectUpdate' instead of the exact tag 'ProjectUpdate' specified by the user",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_007"
+          ],
+          "quote": "'tags': ['#ProjectUpdate']"
+        }
+      ],
+      "target_candidate": "c4",
+      "expected_target_upgrade": false,
+      "kind": "saved real packet and scanner replay; not a new benchmark case"
+    },
+    {
+      "name": "literal_control",
+      "record": {
+        "question": "Post a tweet with text Hello. The tags tool argument must contain exactly the string ProjectUpdate without a leading #.",
+        "history": [
+          {
+            "step": 1,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "post_tweet",
+                "arguments": {
+                  "content": "Hello",
+                  "tags": [
+                    "#ProjectUpdate"
+                  ]
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"posted\": true, \"content\": \"Hello\", \"tags\": [\"#ProjectUpdate\"]}"
+            ]
+          }
+        ]
+      },
+      "kind": "synthetic contract unit probe",
+      "target_candidate": "c1",
+      "expected_target_upgrade": true,
+      "candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "The tags argument contains #ProjectUpdate rather than the explicitly required literal ProjectUpdate without a leading #.",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001"
+          ],
+          "quote": "'#ProjectUpdate'"
+        }
+      ]
+    },
+    {
+      "name": "different_name_control",
+      "record": {
+        "question": "Post a tweet with text Hello and tag it with 'ProjectUpdates'.",
+        "history": [
+          {
+            "step": 1,
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "name": "post_tweet",
+                "arguments": {
+                  "content": "Hello",
+                  "tags": [
+                    "#ProjectUpdate"
+                  ]
+                }
+              }
+            ],
+            "tool_responses": [
+              "{\"posted\": true, \"content\": \"Hello\", \"tags\": [\"#ProjectUpdate\"]}"
+            ]
+          }
+        ]
+      },
+      "kind": "synthetic contract unit probe",
+      "target_candidate": "c1",
+      "expected_target_upgrade": true,
+      "candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "The tweet uses the tag ProjectUpdate, while the requested tag name is ProjectUpdates, a different name.",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001"
+          ],
+          "quote": "'#ProjectUpdate'"
+        }
+      ]
+    }
+  ],
+  "old_result_sha256": "8313b4d15117c680f69ed3c7af572f0447b43a7cf9a4128256b64241a44ca297",
+  "stage": "causal_upgrade only, original votes/timeouts; no gold supplied",
+  "limit": "4 calls to the stage, workers=1; no result-dependent extra attempts",
+  "scope": "Tests contract semantics, not full detector accuracy or independent generalization"
+}

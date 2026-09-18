@@ -64,11 +64,12 @@ python -m evolution verify-ledger
 5. [代码 Review：机制梳理与缺陷清单](docs/review.md)
 6. [跳出无效优化循环：面向 RSI 的优化方向](docs/optimization-directions.md)
 7. [方向对照评估：文档主张与代码现状](docs/directions-assessment.md)
-8. [最新验证结果](reports/latest/README.md)
-9. [当前进展与下一步计划](docs/progress.md)
-10. [真实服务联调结果](reports/live/README.md)
-11. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
-12. [真实两轮自进化实验结果](reports/evolution_real/README.md)
+8. [真实验证可行性评估](docs/real-verification-feasibility.md)
+9. [最新验证结果](reports/latest/README.md)
+10. [当前进展与下一步计划](docs/progress.md)
+11. [真实服务联调结果](reports/live/README.md)
+12. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
+13. [真实两轮自进化实验结果](reports/evolution_real/README.md)
 
 原始数据共 693 个案例、7 个来源。原始目录 695 个文件的摘要保存在 `datasets/integrity.json`。当前默认协议为开发复测；没有预先配置可宣称独立泛化的终审集。离线 smoke 使用 mock 后端，证明机制闭环，不代表真实模型准确率。
 

@@ -1,6 +1,6 @@
 {
-  "started_at_utc": "2026-09-17T09:06:14.892053+00:00",
-  "finished_at_utc": "2026-09-17T09:06:54.356405+00:00",
+  "started_at_utc": "2026-09-17T09:12:14.183928+00:00",
+  "finished_at_utc": "2026-09-17T09:12:49.259202+00:00",
   "python": "3.13.7",
   "platform": "Windows-10-10.0.19045-SP0",
   "scope": "Offline regression and mock mechanism validation; no live provider accuracy measurement.",
@@ -29,7 +29,7 @@
         "--junitxml=reports/latest/pytest.xml"
       ],
       "exit_code": 0,
-      "seconds": 32.107
+      "seconds": 28.267
     },
     {
       "name": "detector_cli",
@@ -39,7 +39,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.235
+      "seconds": 0.249
     },
     {
       "name": "evolution_cli",
@@ -49,7 +49,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.307
+      "seconds": 0.254
     },
     {
       "name": "capability_audit",
@@ -59,7 +59,7 @@
         "capability-audit"
       ],
       "exit_code": 0,
-      "seconds": 0.269
+      "seconds": 0.241
     },
     {
       "name": "smoke",
@@ -68,10 +68,10 @@
         "evolution",
         "smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_4ygoz9vc\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_o91endis\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 3.943
+      "seconds": 3.507
     },
     {
       "name": "smoke_admission_and_audit",
@@ -84,10 +84,10 @@
         "evolution",
         "capability-smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_4ygoz9vc\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_o91endis\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 2.201
+      "seconds": 2.177
     },
     {
       "name": "source_unchanged_during_checks",
