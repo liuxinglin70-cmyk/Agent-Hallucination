@@ -14,6 +14,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from detector.evidence import (
+    citation_error,
+    render_evidence_block,
+    snapshot_digest,
+)
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_event,
@@ -36,6 +41,24 @@ from detector.semantics import (
 )
 
 
+def _provider_call(
+    *, route: Mapping[str, Any], system: str, user: str, purpose: str,
+    cache_tag: str = "",
+) -> tuple[Any, dict[str, Any]]:
+    """``provider_call`` forwarding the snapshot cache tag when one exists.
+
+    Keeping the no-snapshot call shape unchanged preserves every existing
+    replay/caching contract; the tag exists solely to key prompt caches on
+    the evidence digest that rides outside the prompt text.
+    """
+    if cache_tag:
+        return provider_call(
+            route=route, system=system, user=user, purpose=purpose,
+            cache_tag=cache_tag,
+        )
+    return provider_call(route=route, system=system, user=user, purpose=purpose)
+
+
 def _valid_event_ids(packet: Mapping[str, Any]) -> set[str]:
     ids: set[str] = set()
     for event in packet.get("events") or []:
@@ -45,7 +68,10 @@ def _valid_event_ids(packet: Mapping[str, Any]) -> set[str]:
     return ids
 
 
-def _parse_candidates(parsed: Any, packet: Mapping[str, Any]):
+def _parse_candidates(
+    parsed: Any, packet: Mapping[str, Any],
+    snapshot: Mapping[str, Any] | None = None,
+):
     if not isinstance(parsed, Mapping) or not isinstance(
         parsed.get("candidates"), list
     ):
@@ -78,11 +104,26 @@ def _parse_candidates(parsed: Any, packet: Mapping[str, Any]):
             return None, (
                 f"candidate {candidate_id} evidence_refs do not support its locus"
             )
+        cited_raw = raw.get("evidence_citations")
+        cited_raw = [] if cited_raw is None else cited_raw
+        if not isinstance(cited_raw, list) or any(
+            not isinstance(item, str) for item in cited_raw
+        ):
+            return None, (
+                f"candidate {candidate_id} evidence_citations must be a list"
+            )
+        cited = [str(x) for x in cited_raw if str(x)]
+        error = citation_error(
+            snapshot, cited, where=f"candidate {candidate_id}",
+        )
+        if error:
+            return None, error
         candidates.append({
             "candidate_id": candidate_id,
             "claim": claim,
             "locus_event_id": locus,
             "evidence_refs": refs,
+            "evidence_citations": cited,
             "quote": str(raw.get("quote") or "").strip(),
         })
     return candidates, ""
@@ -93,19 +134,28 @@ def run_recall_scan(
     packet: Mapping[str, Any],
     config: Mapping[str, Any],
     plan: InterventionPlan | None = None,
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     route = dict(config["recall_route"])
     route["_route_name"] = "recall_scanner"
     view_text, view_meta = render_judge_view(packet)
     system = RECALL_SYSTEM + plan.prompt_block(packet_features(packet), hook="scanner.system")
+    evidence_block = (
+        "\n\n" + render_evidence_block(snapshot) if snapshot is not None else ""
+    )
+    cache_tag = (
+        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+    )
     user = (
         "Scan the trajectory below for candidate deviations. Do not judge "
         "whether the trajectory is hallucinated.\n\n" + view_text
+        + evidence_block
     )
     try:
-        parsed, meta = provider_call(
+        parsed, meta = _provider_call(
             route=route, system=system, user=user, purpose="recall_scanner",
+            cache_tag=cache_tag,
         )
     except ProviderError as exc:
         return {
@@ -117,17 +167,18 @@ def run_recall_scan(
             "view": "complete" if not view_meta.get("degraded") else "degraded",
             "warnings": [],
         }
-    candidates, error = _parse_candidates(parsed, packet)
+    candidates, error = _parse_candidates(parsed, packet, snapshot)
     warnings: list[dict[str, str]] = []
     if candidates is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = provider_call(
+            parsed, meta = _provider_call(
                 route=route, system=system,
                 user=user + RECALL_CONTRACT_REPAIR,
                 purpose="recall_scanner_repair",
+                cache_tag=cache_tag,
             )
-            candidates, error = _parse_candidates(parsed, packet)
+            candidates, error = _parse_candidates(parsed, packet, snapshot)
         except ProviderError as exc:
             return {
                 "ok": False, "candidates": [], "error": exc.message,
@@ -163,6 +214,7 @@ def _parse_upgrades(
     parsed: Any,
     candidates: Sequence[Mapping[str, Any]],
     packet: Mapping[str, Any] | None = None,
+    snapshot: Mapping[str, Any] | None = None,
 ):
     """Parse explicit upgrade rows and report silently-missing candidates.
 
@@ -191,6 +243,25 @@ def _parse_upgrades(
                 f"content_error and causal must be booleans "
                 f"(candidate {candidate_id})"
             )
+        cited_raw = raw.get("evidence_refs")
+        cited_raw = [] if cited_raw is None else cited_raw
+        if not isinstance(cited_raw, list) or any(
+            not isinstance(item, str) for item in cited_raw
+        ):
+            return None, [], (
+                f"evidence_refs must be a list of snapshot ids "
+                f"(candidate {candidate_id})"
+            )
+        cited = [str(item) for item in cited_raw if str(item)]
+        conflict_note = str(raw.get("conflict_note") or "").strip()
+        error = citation_error(
+            snapshot, cited,
+            where=f"candidate {candidate_id}",
+            require_settled=bool(content_error and causal),
+            conflict_note=conflict_note,
+        )
+        if error:
+            return None, [], error
         corrected_step = raw.get("corrected_step")
         if content_error and causal:
             if not isinstance(corrected_step, int) or isinstance(
@@ -228,6 +299,8 @@ def _parse_upgrades(
             "causal": causal,
             "corrected_step": corrected_step,
             "reason": str(raw.get("reason") or "").strip(),
+            "evidence_refs": cited,
+            "conflict_note": conflict_note,
         }
     rows: list[dict[str, Any]] = []
     missing: list[str] = []
@@ -243,6 +316,8 @@ def _parse_upgrades(
                 "corrected_step": None,
                 "reason": "missing from upgrade response (degraded, not a no-upgrade)",
                 "coverage": "missing",
+                "evidence_refs": [],
+                "conflict_note": "",
             })
         else:
             rows.append({**row, "coverage": "answered"})
@@ -257,6 +332,7 @@ def _upgrade_sample(
     system: str,
     user: str,
     view_state: str,
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict | None, dict[str, Any], list[dict[str, str]], dict[str, Any] | None, list[str]]:
     """One upgrade ballot.
 
@@ -267,25 +343,34 @@ def _upgrade_sample(
     silently-missing rows is part of the sample.
     """
     warnings: list[dict[str, str]] = []
+    cache_tag = (
+        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+    )
     try:
-        parsed, meta = provider_call(
+        parsed, meta = _provider_call(
             route=route, system=system, user=user, purpose="causal_upgrade",
+            cache_tag=cache_tag,
         )
     except ProviderError as exc:
         return None, {}, warnings, {
             "state": "provider_error", "error": exc.message,
             "error_type": exc.error_type, "attempts": exc.attempts,
         }, []
-    upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
+    upgrades, missing, error = _parse_upgrades(
+        parsed, candidates, packet, snapshot,
+    )
     if upgrades is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = provider_call(
+            parsed, meta = _provider_call(
                 route=route, system=system,
                 user=user + UPGRADE_CONTRACT_REPAIR,
                 purpose="causal_upgrade_repair",
+                cache_tag=cache_tag,
             )
-            upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
+            upgrades, missing, error = _parse_upgrades(
+                parsed, candidates, packet, snapshot,
+            )
         except ProviderError as exc:
             return None, {}, warnings, {
                 "state": "provider_error", "error": exc.message,
@@ -305,11 +390,14 @@ def _upgrade_sample(
             missing=", ".join(missing)
         )
         try:
-            parsed, meta = provider_call(
+            parsed, meta = _provider_call(
                 route=route, system=system, user=repair_user,
                 purpose="causal_upgrade_coverage_repair",
+                cache_tag=cache_tag,
             )
-            upgrades, missing, error = _parse_upgrades(parsed, candidates, packet)
+            upgrades, missing, error = _parse_upgrades(
+                parsed, candidates, packet, snapshot,
+            )
         except ProviderError as exc:
             return None, dict(meta or {}), warnings, {
                 "state": "provider_error", "error": exc.message,
@@ -329,6 +417,7 @@ def run_causal_upgrade(
     candidates: Sequence[Mapping[str, Any]],
     config: Mapping[str, Any],
     plan: InterventionPlan | None = None,
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Decide every candidate; a candidate upgrades only on strict majority.
 
@@ -368,17 +457,22 @@ def run_causal_upgrade(
     system = UPGRADE_SYSTEM + plan.prompt_block(packet_features(packet), hook="upgrade.system")
     view_text, view_meta = render_judge_view(packet)
     view_state = "complete" if not view_meta.get("degraded") else "degraded"
+    snapshot_block = (
+        "\n\n" + render_evidence_block(snapshot) if snapshot is not None else ""
+    )
     user = (
         "Decide whether any candidate below can upgrade this trajectory to "
         "hallucinated. Apply both tests to every candidate.\n\nCANDIDATES:\n"
         + "\n".join(
             f"- {c['candidate_id']}: {c['claim']} "
             f"(locus {c['locus_event_id']}, refs {c['evidence_refs']}, "
+            f"evidence {c.get('evidence_citations') or []}, "
             f"quote {c['quote'] or '?'})"
             for c in candidates
         )
         + evidence_block
         + "\n\nTRAJECTORY:\n" + view_text
+        + snapshot_block
     )
 
     votes = max(1, int(route.get("votes", 1) or 1))
@@ -391,6 +485,7 @@ def run_causal_upgrade(
         rows, meta, sample_warnings, sample_failure, sample_missing = _upgrade_sample(
             packet=packet, candidates=candidates, route=route,
             system=system, user=user, view_state=view_state,
+            snapshot=snapshot,
         )
         total_attempts += int(meta.get("attempts") or 0)
         warnings.extend(sample_warnings)
@@ -538,7 +633,12 @@ def run_causal_upgrade(
         upgraded_candidates.append({
             **row,
             "locus_event_id": candidate["locus_event_id"],
+            # ``evidence_refs`` stays the trajectory refs the candidate
+            # deviates on; snapshot citations travel under their own key so
+            # the two id spaces are never confused.
             "evidence_refs": candidate["evidence_refs"],
+            "evidence_citations": list(row.get("evidence_refs") or []),
+            "conflict_note": str(row.get("conflict_note") or ""),
             "claim": candidate["claim"],
             "quote": candidate["quote"],
         })
@@ -547,6 +647,9 @@ def run_causal_upgrade(
         "upgraded_candidate": upgraded_candidates[0] if upgraded_candidates else None,
         "upgraded_candidates": upgraded_candidates,
         "provider": sample_meta, "view_meta": view_meta, "coverage": coverage,
+        "snapshot_digest": (
+            snapshot_digest(snapshot) if snapshot is not None else None
+        ),
     }, {
         "stage": "causal_upgrade", "state": "ok",
         "attempts": total_attempts, "view": view_state,

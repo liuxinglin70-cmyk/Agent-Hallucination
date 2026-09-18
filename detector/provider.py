@@ -242,8 +242,14 @@ def provider_call(
     system: str,
     user: str,
     purpose: str,
+    cache_tag: str = "",
 ) -> tuple[Any, dict[str, Any]]:
-    """One counted provider call; raises :class:`ProviderError` on failure."""
+    """One counted provider call; raises :class:`ProviderError` on failure.
+
+    ``cache_tag`` extends the prompt-cache key with the identity of inputs
+    that ride outside the prompt text (an evidence snapshot digest), so a
+    cached prefix can never be replayed across different evidence.
+    """
     route_name = str(route.get("_route_name") or purpose)
     url = _endpoint_url(str(route.get("endpoint") or ""))
     api_key = os.environ.get(str(route.get("api_key_env") or ""), "")
@@ -280,7 +286,10 @@ def provider_call(
         mode = str(context_cache.get("mode") or "automatic")
         if mode == "prompt_cache_key":
             prefix = str(context_cache.get("key_prefix") or "detector")
-            payload["prompt_cache_key"] = f"{prefix}:{purpose}"
+            key = f"{prefix}:{purpose}"
+            if cache_tag:
+                key = f"{key}:{cache_tag}"
+            payload["prompt_cache_key"] = key
             retention = context_cache.get("retention")
             if retention:
                 payload["prompt_cache_retention"] = str(retention)

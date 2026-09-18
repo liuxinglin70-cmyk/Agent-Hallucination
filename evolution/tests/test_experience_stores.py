@@ -40,6 +40,29 @@ def test_episodic_records_the_attempt(tmp_path):
     assert records[0]["gate"] == "M"
 
 
+def test_reviewed_correction_preserves_original_and_changes_retrieval(tmp_path):
+    from evolution.memory import record_episode_correction, CORRECTION_NAME
+    original = record_episode(tmp_path, cycle=1, failure_family="FAM-fn-x",
+        polarity="recall", outcome="rejected", gate="HARMLESSNESS",
+        reason="coverage too small", intervention_id="IV-1-001")
+    path = tmp_path / "episodic.jsonl"
+    before = path.read_bytes()
+    kwargs = dict(unevaluable=True, reason="review: not enough protected negatives",
+                  evidence="saved cycle report, offline paired replay")
+    record_episode_correction(tmp_path, original, **kwargs)
+    record_episode_correction(tmp_path, original, **kwargs)
+    assert path.read_bytes() == before
+    assert len((tmp_path / CORRECTION_NAME).read_text(encoding="utf-8").splitlines()) == 1
+    attempt = episodic_attempts(tmp_path)[0]
+    assert attempt["falsified"] is False
+    assert attempt["original_reason"] == "coverage too small"
+    retrieved = recall(tmp_path, failure_family="FAM-fn-x")
+    assert retrieved["unevaluable_intervention_ids"] == ["IV-1-001"]
+    assert retrieved["falsified_intervention_ids"] == []
+    with pytest.raises(ValueError, match="not an original episode"):
+        record_episode_correction(tmp_path, {**original, "reason": "different run"}, **kwargs)
+
+
 def test_unevaluable_rejection_is_not_treated_as_falsified(tmp_path):
     """A rejection from missing coverage must not suppress the mechanism."""
     record_episode(

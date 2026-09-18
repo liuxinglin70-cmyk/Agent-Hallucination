@@ -229,6 +229,12 @@ class DetectionBackend:
 
 
 class LiveDetectorBackend(DetectionBackend):
+    # Class-level defaults: tests and tools build this backend with
+    # ``__new__`` to inject a fake detector, and evidence must read as off
+    # rather than raising for them.
+    _evidence_provider: Any = None
+    _evidence_cache: dict[str, Any] = {}
+
     """Real detector backend with frozen-judge paired replay.
 
     The baseline (empty registry) judge output for a case is captured once.
@@ -245,6 +251,7 @@ class LiveDetectorBackend(DetectionBackend):
         config: Mapping[str, Any],
         *,
         baseline_results: Mapping[str, Mapping[str, Any]] | None = None,
+        evidence_provider: Any | None = None,
     ) -> None:
         detector_config_path = resolve_path(config.get("detector_config"))
         detector_config = load_detector_config(detector_config_path)
@@ -253,6 +260,33 @@ class LiveDetectorBackend(DetectionBackend):
             str(key).replace("__", "/"): dict(value)
             for key, value in (baseline_results or {}).items()
         }
+        # An optional callable ``case_id -> snapshot|None``. The snapshot is
+        # a harness input: it reaches the detector beside the record, and
+        # every cached or frozen artefact must be able to tell which
+        # evidence it was produced under.
+        self._evidence_provider = evidence_provider
+        self._evidence_cache: dict[str, Any] = {}
+        # Public alias: reporting code asks whether evidence is attached
+        # without reaching into a private attribute.
+        self.evidence_provider = evidence_provider
+
+    def evidence_for(self, case_id: str) -> Any | None:
+        """The snapshot for one case, memoized (providers may do I/O)."""
+        if self._evidence_provider is None:
+            return None
+        key = str(case_id)
+        if key not in self._evidence_cache:
+            self._evidence_cache[key] = self._evidence_provider(key)
+        return self._evidence_cache[key]
+
+    def evidence_tag(self, case_id: str) -> str:
+        """A short, stable cache tag for the evidence a case runs under."""
+        snapshot = self.evidence_for(case_id)
+        if snapshot is None:
+            return "noevidence"
+        from detector.evidence import snapshot_digest
+
+        return "ev-" + snapshot_digest(snapshot)[:16]
 
     def _active_entries(self, registry: Mapping[str, Any] | None) -> list[dict[str, Any]]:
         if not registry:
@@ -264,11 +298,30 @@ class LiveDetectorBackend(DetectionBackend):
     def _baseline(self, record: Mapping[str, Any], *, case_id: str) -> dict[str, Any]:
         cached = self._base_results.get(str(case_id))
         if cached is not None:
-            return cached
+            recorded = str(
+                (cached.get("provenance") or {}).get(
+                    "evidence_snapshot_digest"
+                ) or ""
+            )
+            active = self.evidence_for(case_id)
+            active_digest = ""
+            if active is not None:
+                from detector.evidence import snapshot_digest
+
+                active_digest = snapshot_digest(active)
+            if recorded == active_digest:
+                return cached
+            # A baseline recorded under different evidence is not a control
+            # for this run: drop it and measure a fresh one instead of
+            # silently comparing against another input.
+        snapshot = self.evidence_for(case_id)
         result = self.detector.detect(
             record,
             case_id=case_id,
             interventions=build_intervention_registry([]),
+            **(dict(stage_kwargs) if (stage_kwargs := (
+                {"evidence": snapshot} if snapshot is not None else {}
+            )) else {}),
         )
         self._base_results[str(case_id)] = dict(result)
         return result
@@ -295,9 +348,16 @@ class LiveDetectorBackend(DetectionBackend):
         status = baseline.get("stage_status") or {}
         providers = baseline.get("providers") or {}
         frozen: dict[str, Any] = {}
-        packet_hash = (baseline.get("provenance") or {}).get("packet_hash")
+        provenance = baseline.get("provenance") or {}
+        packet_hash = provenance.get("packet_hash")
         if packet_hash:
             frozen["packet_hash"] = packet_hash
+        if provenance.get("evidence_snapshot_digest"):
+            # Replay may reuse these stages only for the same evidence; the
+            # detector compares this digest with its own active snapshot.
+            frozen["evidence_snapshot_digest"] = str(
+                provenance["evidence_snapshot_digest"]
+            )
 
         def add(
             frozen_name: str,
@@ -456,10 +516,13 @@ class LiveDetectorBackend(DetectionBackend):
         hooks = {
             str(entry.get("hook") or "") for entry in entries
         }
+        snapshot = self.evidence_for(case_id)
+        evidence_kwargs = {"evidence": snapshot} if snapshot is not None else {}
         if "judge.system" in hooks:
             # The intervention changes the judge itself; replay would mask it.
             return self.detector.detect(
                 record, case_id=case_id, interventions=registry,
+                **evidence_kwargs,
             )
         baseline = self._base_results.get(str(case_id))
         if baseline is None:
@@ -478,6 +541,7 @@ class LiveDetectorBackend(DetectionBackend):
             case_id=case_id,
             interventions=registry,
             frozen_stages=frozen_stages,
+            **evidence_kwargs,
         )
 
     def evaluate_fresh(
@@ -756,6 +820,7 @@ class CachedRunBackend(DetectionBackend):
             )
         self.live = LiveDetectorBackend(
             config, baseline_results=self.results,
+            evidence_provider=build_evidence_provider(config),
         )
         cache_path = (
             Path(cache_dir)
@@ -774,6 +839,9 @@ class CachedRunBackend(DetectionBackend):
         )
         self.candidate_cache = CachingBackend(
             self.live, cache_path, namespace=namespace,
+            extra_key=(
+                self.live.evidence_tag if self.live._evidence_provider else None
+            ),
         )
 
     def run_case(
@@ -805,11 +873,17 @@ class CachingBackend(DetectionBackend):
         cache_dir: str | Path,
         *,
         namespace: str = "default",
+        extra_key: Any | None = None,
     ) -> None:
         self.backend = backend
         self.cache_dir = Path(cache_dir) / namespace
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.name = backend.name
+        # An optional ``case_id -> str`` tag for inputs that ride outside
+        # the record (an evidence snapshot). Without it in the key, a cached
+        # result produced under one snapshot would be served for another.
+        self._extra_key = extra_key
+        self.evidence_provider = getattr(backend, "evidence_provider", None)
 
     def _path(
         self,
@@ -819,9 +893,12 @@ class CachingBackend(DetectionBackend):
     ) -> Path:
         safe_case = str(case_id).replace("/", "__").replace("\\", "__")
         record_hash = fingerprint(record)
+        tag = ""
+        if self._extra_key is not None:
+            tag = "." + str(self._extra_key(case_id))
         return (
             self.cache_dir / registry_key(registry)
-            / f"{safe_case}.{record_hash}.json"
+            / f"{safe_case}.{record_hash}{tag}.json"
         )
 
     def run_case(
@@ -875,12 +952,86 @@ class CachingBackend(DetectionBackend):
         return self.backend.evaluate_fresh(cases, **kwargs)
 
 
+def build_evidence_provider(
+    config: Mapping[str, Any],
+) -> Any | None:
+    """A per-case snapshot provider, or ``None`` when evidence is off.
+
+    Configuration shape (all optional)::
+
+        "evidence": {
+          "corpus": "reports/.../corpus",   # corpus directory
+          "cases": {"Case/Id.json": "path/to/snapshot.json"}  # explicit pins
+        }
+
+    Explicit pins win, and a pinned file is validated like any other
+    snapshot. Cases without a pin get a mechanically retrieved snapshot from
+    the corpus, or no snapshot at all when nothing in it bears on the case.
+    """
+    from detector.retrieval import build_case_snapshot, load_corpus
+
+    block = config.get("evidence")
+    if not isinstance(block, Mapping) or not block:
+        return None
+    pinned: dict[str, str] = {}
+    raw_pins = block.get("cases")
+    if isinstance(raw_pins, Mapping):
+        pinned = {str(key): str(value) for key, value in raw_pins.items()}
+    corpus = None
+    if block.get("corpus"):
+        corpus = load_corpus(
+            resolve_path(str(block["corpus"]))
+        )
+    cache: dict[str, Any] = {}
+
+    def provider(case_id: str) -> Any | None:
+        key = str(case_id)
+        if key in cache:
+            return cache[key]
+        snapshot = None
+        pin = pinned.get(key) or pinned.get(key.replace("/", "__"))
+        if pin:
+            from detector.evidence import load_snapshot
+
+            snapshot = load_snapshot(resolve_path(pin))
+        elif corpus is not None:
+            question = str(block.get("questions", {}).get(key) or "") if isinstance(
+                block.get("questions"), Mapping
+            ) else ""
+            if not question:
+                cache[key] = None
+                return None
+            snapshot, _report = build_case_snapshot(corpus, question)
+        cache[key] = snapshot
+        return snapshot
+
+    return provider
+
+
+def evidence_namespace(
+    config: Mapping[str, Any],
+    provider: Any | None,
+) -> dict[str, Any]:
+    """A cache-namespace fingerprint of the evidence configuration."""
+    block = config.get("evidence")
+    if not isinstance(block, Mapping) or not block or provider is None:
+        return {"enabled": False}
+    return {
+        "enabled": True,
+        "corpus": file_digest(
+            resolve_path(str(block["corpus"])) / "corpus.json"
+        ) if block.get("corpus") else "none",
+        "cases": sorted(str(key) for key in (block.get("cases") or {})),
+    }
+
+
 def make_backend(
     config: Mapping[str, Any],
     mode: str | None = None,
     *,
     mock_base: Mapping[str, bool | None] | None = None,
     mock_overrides: Mapping[str, Mapping[str, bool | None]] | None = None,
+    evidence_provider: Any | None = None,
 ) -> DetectionBackend:
     backend_cfg = config.get("backend") or {}
     name = mode or str(backend_cfg.get("name") or "detector")
@@ -894,18 +1045,25 @@ def make_backend(
             "overrides": mock_overrides or {},
         })
     elif name == "detector":
-        backend = LiveDetectorBackend(config)
+        provider = evidence_provider or build_evidence_provider(config)
+        backend = LiveDetectorBackend(config, evidence_provider=provider)
         namespace = "detector-" + CACHE_FORMAT + "-" + fingerprint({
             "detector_config": file_digest(config.get("detector_config")),
             "dataset_root": str(resolve_path(config["dataset_root"])),
             "source": source_digest(),
             "cache_scope": config.get("diagnostic_cache_scope"),
+            "evidence": evidence_namespace(config, provider),
         })
     else:
         raise ValueError(f"unknown evolution backend {name!r}")
     if bool(backend_cfg.get("cache", True)):
         cache_dir = resolve_path(config["work_root"]) / "cache"
-        backend = CachingBackend(backend, cache_dir, namespace=namespace)
+        tag = None
+        if isinstance(backend, LiveDetectorBackend) and backend._evidence_provider:
+            tag = backend.evidence_tag
+        backend = CachingBackend(
+            backend, cache_dir, namespace=namespace, extra_key=tag,
+        )
     return backend
 
 

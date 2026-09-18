@@ -22,6 +22,7 @@ from detector.interventions import (
     validate_intervention,
 )
 from detector.packet import build_packet
+from detector.predicate_context import judge_predicate_context, missing_judge_inputs
 from detector.predicate_dsl import run_predicate_program
 
 from evolution.contracts import (
@@ -202,14 +203,19 @@ def _family_contexts(
             ((row.get("result") or {}).get("proof") or {}).get("judge")
             or {}
         )
-        root = judge.get("root_cause") or {}
-        contexts[str(case)] = {
-            "contracts": judge.get("contracts") or [],
-            "evidence_refs": judge.get("evidence_refs") or [],
-            "delivered_result": judge.get("delivered_result") or "",
-            "quote": root.get("quote") or "",
-        }
+        contexts[str(case)] = judge_predicate_context(judge)
     return contexts
+
+
+def _missing_family_inputs(program, contexts):
+    missing = {case: fields for case, context in contexts.items()
+               if (fields := missing_judge_inputs(program, context))}
+    if missing:
+        return _policy_fail(
+            f"family replay is missing recorded judge inputs: {missing}",
+            evaluable=False, status="not_evaluated",
+        )
+    return None
 
 
 def structural_gate(
@@ -318,6 +324,9 @@ def structural_gate(
                 )
             program = programs[predicate]
             contexts = _family_contexts(failure_cases, patrol_rows or ())
+            unavailable = _missing_family_inputs(program, contexts)
+            if unavailable:
+                return unavailable
             verdict, detail = _run_program_on_family(
                 program, failure_cases, dataset_root, contexts,
             )
@@ -361,6 +370,9 @@ def structural_gate(
                 )
             program = trigger_programs[predicate]
             contexts = _family_contexts(failure_cases, patrol_rows or ())
+            unavailable = _missing_family_inputs(program, contexts)
+            if unavailable:
+                return unavailable
             verdict, detail = _run_program_on_family(
                 program, failure_cases, dataset_root, contexts,
             )
@@ -432,6 +444,26 @@ def structural_gate(
         )
 
     return _policy_pass(jaccard_base=round(base_score, 4))
+
+
+def sentinel_coverage(
+    rows: Sequence[Mapping[str, Any]], config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Check measurement capacity using the control arm, before any proposal."""
+    gate_cfg = config.get("gates") or {}
+    counts = {
+        key: sum(row.get("gold") is gold and row.get("prediction") is gold
+                 and row.get("authority") == "authoritative" for row in rows)
+        for key, gold in (("protected_tp", True), ("protected_tn", False))
+    }
+    minima = {
+        "protected_tp": int(gate_cfg.get("harmlessness_min_protected_tp", 2)),
+        "protected_tn": int(gate_cfg.get("harmlessness_min_protected_tn", 2)),
+    }
+    missing = [f"{key}={counts[key]} < {minimum}" for key, minimum in minima.items()
+               if counts[key] < minimum]
+    return {**counts, "minimum": minima, "evaluable": not missing,
+            "reason": "; ".join(missing)}
 
 
 def harmlessness_gate(
@@ -513,15 +545,7 @@ def harmlessness_gate(
     }
     minimum_tp = int(gate_cfg.get("harmlessness_min_protected_tp", 2))
     minimum_tn = int(gate_cfg.get("harmlessness_min_protected_tn", 2))
-    if protected_tp < minimum_tp or protected_tn < minimum_tn:
-        return _policy_fail(
-            "sentinel has insufficient baseline-correct coverage: "
-            f"protected_tp={protected_tp} < {minimum_tp}, "
-            f"protected_tn={protected_tn} < {minimum_tn}",
-            delta=None,
-            reroll_control=reroll_control,
-            sentinel_manifest=sentinel_manifest,
-        )
+    coverage_sufficient = protected_tp >= minimum_tp and protected_tn >= minimum_tn
     delta = paired_delta(protected_baseline, protected_candidate)
     tolerance = {
         "new_fn": int(gate_cfg.get("harmlessness_new_fn_allowed", 0)),
@@ -546,6 +570,20 @@ def harmlessness_gate(
             delta=delta,
             reroll_control=reroll_control,
             sentinel_manifest=sentinel_manifest,
+            evaluable=True,
+            coverage_sufficient=coverage_sufficient,
+        )
+    if not coverage_sufficient:
+        return _policy_fail(
+            "sentinel has insufficient baseline-correct coverage: "
+            f"protected_tp={protected_tp} (minimum {minimum_tp}), "
+            f"protected_tn={protected_tn} (minimum {minimum_tn})",
+            delta=delta,
+            reroll_control=reroll_control,
+            sentinel_manifest=sentinel_manifest,
+            evaluable=False,
+            status="not_evaluated",
+            coverage_sufficient=False,
         )
     return _policy_pass(
         delta=delta,

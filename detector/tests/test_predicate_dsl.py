@@ -398,3 +398,64 @@ def test_context_judge_positive_treats_string_false_as_false():
     assert _extract_view(
         "context_judge_positive", _packet(), {"judge_positive": "true"},
     ) == "true"
+
+
+def test_recall_gate_context_matches_live_context():
+    from evolution.gates import _family_contexts
+    entry = _trigger_entry()
+    program = entry["body"]["predicate_definition"]
+    program["rules"] = [{"conditions": [
+        {"field": "context_judge_positive", "operator": "equals", "value": "false"},
+        {"field": "context_judge_confidence", "operator": "equals", "value": "high"},
+        {"field": "context_judge_hallucination_reason", "operator": "missing"},
+    ], "verdict": "violated"}]
+    judge = {"is_hallucination": False, "confidence": "high", "hallucination_reason": None}
+    rows = [{"case": "A/000.json", "result": {"proof": {"judge": judge}}}]
+    context = _family_contexts(["A/000.json"], rows)["A/000.json"]
+    assert run_predicate_program(program, _packet(), context)["verdict"] == "violated"
+    plan = InterventionPlan.from_registry(build_intervention_registry([entry]))
+    assert plan.recall_triggered(_packet(), judge_positive=False, judge_parsed=judge)
+    assert run_predicate_program(program, _packet(), {})["verdict"] == "not_applicable"
+
+
+@pytest.mark.parametrize("hook,field", [
+    ("defense.pre", "context_judge_positive"),
+    ("defense.pre", "context_judge_hallucination_reason"),
+    ("upgrade.pre", "context_contract_kinds"),
+])
+def test_unavailable_hook_fields_rejected_before_deployment(hook, field):
+    entry = _entry("IV-CONTEXT", "evidence")
+    entry["hook"] = hook
+    entry["body"]["predicate_definition"]["rules"] = [{
+        "field": field, "operator": "exists", "verdict": "violated",
+    }]
+    with pytest.raises(ValueError, match="context fields unavailable"):
+        build_intervention_registry([entry])
+
+
+def test_defense_can_use_hearing_evidence_without_judge_access():
+    entry = _entry("IV-CONTEXT", "evidence")
+    entry["hook"] = "defense.pre"
+    entry["body"]["predicate_definition"]["rules"] = [{
+        "field": "context_quote", "operator": "exists", "verdict": "violated",
+    }]
+    plan = InterventionPlan.from_registry(build_intervention_registry([entry]))
+    evidence = plan.evidence_for("defense.pre", _packet(), {"quote": "observed claim"})
+    assert evidence[0]["verdict"] == "violated"
+
+
+def test_missing_recorded_judge_is_unmeasured_not_a_false_predicate(tmp_path):
+    from evolution.gates import structural_gate
+    from evolution.engine import terminal_classification
+    from evolution.config import load_config
+    entry = _trigger_entry()
+    entry["body"]["predicate_definition"]["rules"] = [{
+        "field": "context_judge_positive", "operator": "equals", "value": "false",
+        "verdict": "violated",
+    }]
+    family = {"failure_family": "FAM-fn-test", "failure_cases": ["A/000.json", "A/001.json"]}
+    verdict = structural_gate(entry, active_entries=[], config=load_config(),
+        dataset_root=str(tmp_path), diagnosed_families=[family], patrol_rows=[])
+    assert verdict["evaluable"] is False
+    assert "missing recorded judge inputs" in verdict["reason"]
+    assert terminal_classification({"candidate": entry, "structural": verdict}, admitted=False) == "not_evaluated"

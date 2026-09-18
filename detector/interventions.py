@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from detector.packet import PACKET_FEATURE_NAMES, packet_features
+from detector.predicate_context import judge_predicate_context, validate_program_hook
 from detector.predicate_dsl import (
     PROGRAM_RUNNER,
     predicate_program_hash,
@@ -651,6 +652,9 @@ def validate_intervention(
         custom_predicate_verdicts=custom_predicate_verdicts,
         custom_conviction_verdicts=custom_conviction_verdicts,
     )
+    program = (entry.get("body") or {}).get("predicate_definition")
+    if program:
+        validate_program_hook(program, hook)
     claim = entry.get("claim")
     claim = claim if isinstance(claim, Mapping) else {}
     _require_text(
@@ -1038,15 +1042,8 @@ class InterventionPlan:
         """
         features = packet_features(packet)
         judge_parsed = dict(judge_parsed or {})
-        context = {
-            "judge_parsed": judge_parsed,
-            "judge_positive": judge_positive,
-            "judge_confidence": judge_parsed.get("confidence") or "",
-            "contracts": judge_parsed.get("contracts") or [],
-            "evidence_refs": judge_parsed.get("evidence_refs") or [],
-            "delivered_result": judge_parsed.get("delivered_result") or "",
-            "quote": (judge_parsed.get("root_cause") or {}).get("quote") or "",
-        }
+        context = judge_predicate_context(judge_parsed)
+        context["judge_positive"] = judge_positive
         for entry in self.entries:
             if (
                 entry.get("type") != "recall_trigger"

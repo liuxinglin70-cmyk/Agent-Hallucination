@@ -61,6 +61,20 @@ A rule may instead use "conditions":[{"field":...,"operator":...,"value":...}, .
 Recall-trigger schema (forces the recall net for matching judge-negative cases):
 {"type":"recall_trigger","hook":"recall.trigger","trigger":{"packet_features":["has_tool_calls"],"facts":["judge_positive=false"]},"body":{"predicate":"evo_<short_name>","runner":"typed_dsl","output_verdicts":["satisfied","violated","not_applicable"],"trigger_verdicts":["violated"],"require_judge_negative":true,"predicate_definition":{"schema_version":"detector.predicate_program.v1","name":"evo_<same_short_name>","description":"when the recall net must hear this case","verdicts":["satisfied","violated","not_applicable"],"conviction_verdicts":["violated"],"default_verdict":"not_applicable","rules":[{"field":"<one typed field below>","operator":"<valid operator for that field>","value":"<literal>","verdict":"violated","detail":"what the rule found"}]}},"claim":{"expected_behavior":"nonempty","target_polarity":"recall"},"provenance":{"failure_family":"<one supplied family>"}}
 Recall-trigger is the correct route for an FN family whose recall_path is not_run or not_needed: it spends the LLM recall net only on cases the trigger names. A recall_trigger never turns a judge-positive case and never changes the verdict by itself; a recall upgrade still needs defense substantiation.
+This route is available, not mandatory. Re-reading the same packet cannot
+supply an absent tool specification, hidden benchmark requirement, or external
+reference fact. Return an empty interventions list when no grounded treatment
+is supported; do not manufacture a trigger just to fill the proposal budget.
+
+Judge output contract (field semantics, not failure evidence):
+When is_hallucination=false, hallucination_reason, hallucination_step,
+evidence_refs and root_cause MUST be null. Their absence is normal and does
+not mean the negative decision is unreasoned or missing a justification.
+When is_hallucination=true, a nonempty hallucination_reason states the alleged
+error; its existence is not self-refutation. High confidence alone is not
+a failure mechanism. Distinguish these schema conventions from actual
+packet evidence of a violated task requirement. Shared fields across failure
+members do not establish that the same fields distinguish clean controls.
 
 Guard schema (emits one closed adjudication action):
 {"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","evidence_predicate":"<required only for convict_mechanical_violation>","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
@@ -80,6 +94,10 @@ context_contract_kinds, context_contract_requirements, context_quote,
 context_judge_delivered_result, context_judge_positive,
 context_judge_confidence, context_judge_hallucination_reason, event_count,
 tool_call_count, interaction_count, prose_event_count.
+Context fields are hook-specific: judge.post and recall.trigger support all
+listed context fields; defense.pre supports only context_evidence_refs,
+context_contract_kinds, context_contract_requirements and context_quote;
+upgrade.pre supports no context_* fields. Packet fields remain available.
 Scalar operators: equals, not_equals, contains, not_contains, starts_with,
 not_starts_with, ends_with, not_ends_with, matches, not_matches, exists,
 missing. List operators: any_contains, all_contain, none_contains,
@@ -114,8 +132,8 @@ Guidance:
   validate), so drafting it wastes the cycle budget.
 - When several stable families are supplied, cover different families with
   different candidates instead of spending every slot on one family. If an
-  FN family with recall_path not_run/not_needed is present, draft at least
-  one recall_trigger for it; if an FP family is present, draft at most one
+  FN family with recall_path not_run/not_needed has packet-grounded evidence
+  supporting a treatment, consider one recall_trigger for it; if an FP family is present, draft at most one
   evidence+guard unit for it. A HARMLESSNESS rejection with new_fn/new_fp means that
   exact executable mechanism is forbidden, including renames: choose a
   different predicate/action or a different family.

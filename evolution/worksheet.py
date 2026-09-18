@@ -13,6 +13,7 @@ import re
 from typing import Any, Mapping, Sequence
 
 from detector.dataset import load_case
+from detector.predicate_context import judge_predicate_context
 
 from evolution.metrics import source_of, binary_metrics
 
@@ -530,13 +531,7 @@ def diagnose_failure_families(
                         violations[predicate] = violations.get(predicate, 0) + 1
                     member_predicates[predicate] = verdict
                 signature = _mechanism_signature(row)
-                typed_context = {
-                    "judge_parsed": judge,
-                    "evidence_refs": refs,
-                    "contracts": judge.get("contracts") or [],
-                    "delivered_result": judge.get("delivered_result") or "",
-                    "quote": quote,
-                }
+                typed_context = judge_predicate_context(judge)
                 profile = typed_field_profile(packet, typed_context)
                 profiles.append(profile)
                 signal["member_summaries"].append({

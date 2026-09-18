@@ -1474,7 +1474,10 @@ def test_cycle_report_reports_what_the_instrument_could_measure(tmp_path):
     assert "recall" in instrument["unmeasurable_polarities"]
     counts = instrument["terminal_counts"]
     assert sum(counts.values()) == len(report["proposals"])
-    assert instrument["terminal_classification"]
+    assert report["state"] == "blocked_evaluation_preflight"
+    assert instrument["terminal_classification"] == {}
+    assert report["proposals"] == []
+    assert instrument["instrument_limited"] is True
     for verdict in instrument["terminal_classification"].values():
         assert verdict in {"admitted", "rejected", "not_evaluated", "unresolved"}
         if verdict == "not_evaluated":
@@ -1533,7 +1536,9 @@ def test_engine_supplies_retrieved_memory_to_the_proposer(tmp_path):
         name="synthetic", pool=cases, sentinel=cases[:4],
         gain=cases[4:12], patrol_pool=cases[12:], mini=True,
     )
-    base = {case: False for case in patrol_true + gain_true}
+    # Leave a measurable residual after the first admission so cycle 2 has
+    # a reason to draft, rather than spending tokens on a solved gain set.
+    base = {case: False for case in patrol_true + gain_true + ["A/008.json"]}
     overrides = {"IV-1-001": {case: True for case in gain_true}}
 
     received: list[dict] = []
@@ -1667,8 +1672,8 @@ def _unmeasurable_recall_setup(tmp_path):
     return cases, config, split, backend
 
 
-def test_strict_coverage_policy_is_the_default_and_blocks_unchanged(tmp_path):
-    """The default must reproduce the previous behaviour exactly."""
+def test_strict_coverage_policy_stops_before_drafting(tmp_path):
+    """An unmeasurable family must not consume a proposal or candidate arm."""
     cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
     assert config["coverage_response"]["mode"] == "strict"
     engine = EvolutionEngine(
@@ -1684,7 +1689,10 @@ def test_strict_coverage_policy_is_the_default_and_blocks_unchanged(tmp_path):
     # claim is classified as unmeasured rather than falsified.
     assert instrument["coverage_responses"] == {}
     assert instrument["replacement_gain_cases"] == 0
-    assert instrument["terminal_counts"].get("not_evaluated") == 1
+    assert report["state"] == "blocked_evaluation_preflight"
+    assert instrument["terminal_counts"] == {}
+    assert report["proposals"] == []
+    assert report["preflight"]["blocked_families"][0]["polarity"] == "recall"
 
 
 def test_replacement_policy_re_measures_on_the_alternative_set(tmp_path):
@@ -1735,17 +1743,16 @@ def test_replacement_or_skip_marks_unmeasured_when_no_set_matches(tmp_path):
     report = engine.run_cycle(1)
     instrument = report["instrument"]
     assert instrument["replacement_gain_cases"] == 0
-    response = next(iter(instrument["coverage_responses"].values()))
-    assert response["kind"] == "skip"
-    assert response["evaluated_on"] == "default"
+    assert report["state"] == "blocked_evaluation_preflight"
+    assert instrument["coverage_responses"] == {}
     # Skipped claims stay blocked and read as unmeasured. The four-state
     # vocabulary reports them as not_evaluated, with "skip" recorded as the
     # response detail.
     assert report["marginal_selection"]["selected"] == []
-    assert instrument["terminal_counts"].get("not_evaluated") == 1
+    assert instrument["terminal_counts"] == {}
     assert instrument["instrument_limited"] is True
-    gate = next(g for g in report["gates"] if g.get("m"))
-    assert gate["m"]["status"] == "skipped_unmeasured"
+    assert report["gates"] == []
+    assert all(f["status"] == "not_evaluated" for f in report["preflight"]["blocked_families"])
 
 
 def test_per_direction_coverage_policy_overrides_the_default(tmp_path):
@@ -1763,8 +1770,8 @@ def test_per_direction_coverage_policy_overrides_the_default(tmp_path):
     assert engine._coverage_mode("recall") == "replacement_or_skip"
     assert engine._coverage_mode("precision") == "strict"
     report = engine.run_cycle(1)
-    response = next(iter(report["instrument"]["coverage_responses"].values()))
-    assert response["kind"] == "skip"
+    assert report["state"] == "blocked_evaluation_preflight"
+    assert report["proposals"] == []
 
 
 def test_unknown_coverage_policy_is_rejected(tmp_path):
@@ -1781,7 +1788,9 @@ def test_unknown_coverage_policy_is_rejected(tmp_path):
 def test_proposer_is_told_which_directions_are_scoreable(tmp_path):
     """Drafting input names the directions this round can actually measure."""
     cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    backend.base_predictions.update({"A/013.json": True, "A/015.json": True})
     received: list[dict] = []
+    received_families = []
 
     class RecordingProposer:
         name = "recording"
@@ -1793,14 +1802,159 @@ def test_proposer_is_told_which_directions_are_scoreable(tmp_path):
             pass
 
         def propose(self, families, *, cycle, max_proposals=3):
+            received_families.extend(families)
             return ProposalBatch(candidates=[], joint_groups=[], notes=[])
 
     engine = EvolutionEngine(
         config, backend=backend, split=split, mini=True,
         proposer=RecordingProposer(),
     )
-    engine.run_cycle(1)
+    report = engine.run_cycle(1)
     assert received
+    assert report["state"] == "completed"
+    assert report["instrument"]["instrument_limited"] is True
+    assert report["instrument"]["blocked_families"]
     context = received[0]
     assert "precision" in context["scoreable_polarities"]
     assert "recall" in context["unmeasurable_polarities"]
+    assert received_families
+    assert all(f["failure_family"].startswith("FAM-fp-") for f in received_families)
+
+
+@pytest.mark.parametrize("audit_enabled", [True, False])
+def test_thin_sentinel_stops_before_audit_patrol_and_proposer(tmp_path, audit_enabled):
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = audit_enabled
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    seen = []
+
+    class RecordingBackend(MockDetectorBackend):
+        def evaluate(self, cases, **kwargs):
+            seen.extend(cases)
+            assert not (kwargs.get("registry") or {}).get("interventions")
+            return super().evaluate(cases, **kwargs)
+
+    class ForbiddenProposer:
+        name = "must_not_run"
+
+        def propose(self, *args, **kwargs):
+            pytest.fail("unmeasurable round called proposer")
+
+    engine = EvolutionEngine(config, split=split, mini=True, proposer=ForbiddenProposer(),
+                             backend=RecordingBackend(base_predictions={"A/001.json": True}))
+    result = engine.run_experiment(cycles=2)
+    assert len(result["cycles"]) == 1
+    report = result["cycles"][0]
+    assert report["state"] == "blocked_evaluation_preflight"
+    assert report["preflight"]["sentinel"]["protected_tn"] == 1
+    assert report["instrument"]["gain_measured"] is False
+    assert report["instrument"]["gain_opportunity"] is None
+    assert set(seen) == set(split.sentinel)
+    assert report["audit"]["status"] == "not_evaluated"
+    assert engine.registry.entries == []
+    assert engine.ledger.verify()["valid"]
+    assert not (engine.memory_root / "episodic.jsonl").exists()
+
+
+def test_direct_audit_does_not_certify_insufficient_coverage(tmp_path):
+    from evolution.engine import _ArmRunner
+    cases = _make_dataset(tmp_path / "data", n=20)
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    engine = EvolutionEngine(_config(tmp_path), split=split, mini=True,
+                             backend=MockDetectorBackend(base_predictions={"A/001.json": True}))
+    verdict = engine._audit(1, _ArmRunner(engine, None))
+    assert verdict["passed"] is False
+    assert verdict["frozen"] is True
+    noise = next(r for r in verdict["reports"] if r["intervention_id"] == "IV-DEFECT-002")
+    assert noise["audit_inconclusive"] is True
+    assert noise["harmlessness"]["evaluable"] is False
+
+
+def test_supplied_unmeasurable_candidate_does_not_run_or_poison_memory(tmp_path):
+    from evolution.engine import _ArmRunner, terminal_classification
+    from evolution.memory import episodic_attempts
+    cases, config, split, backend = _unmeasurable_recall_setup(tmp_path)
+    engine = EvolutionEngine(config, split=split, mini=True, backend=backend)
+    candidate = _scanner_candidate()
+    baseline = backend.evaluate([*split.sentinel, *split.gain],
+        dataset_root=config["dataset_root"], registry=empty_registry(), gold_map=engine.gold_map)
+
+    class ForbiddenArms:
+        def run(self, *args, **kwargs):
+            pytest.fail("unmeasurable candidate arm was run")
+
+    unit = engine._run_unit(candidate, partners=[], active_entries=[], active_rows=baseline,
+                            arms=ForbiddenArms())
+    assert unit["candidate_rows"] == []
+    assert terminal_classification(unit, admitted=False) == "not_evaluated"
+    engine._record_cycle_experience(cycle=1, diagnosed_families=[], gate_reports=[unit],
+        rejected=[{"intervention_id": candidate["intervention_id"], "gate": "M",
+                   "reason": unit["m"]["reason"], "not_evaluable": True}], selected=[])
+    assert episodic_attempts(engine.memory_root)[0]["falsified"] is False
+
+
+def test_memory_correction_also_corrects_loaded_ledger_feedback(tmp_path):
+    from evolution.memory import record_episode, record_episode_correction
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    candidate = _scanner_candidate()
+    ledger = Ledger(config["ledger_path"])
+    ledger.append("rejected", {"cycle": 1, "intervention_id": candidate["intervention_id"],
+        "candidate": candidate, "gate": "STRUCTURAL", "reason": "old incomplete replay",
+        "not_evaluable": False})
+    original = record_episode(config["memory_root"], cycle=1,
+        failure_family=candidate["provenance"]["failure_family"], polarity="recall",
+        outcome="rejected", gate="STRUCTURAL", reason="old incomplete replay",
+        intervention_id=candidate["intervention_id"])
+    record_episode_correction(config["memory_root"], original, unevaluable=True,
+        reason="missing evaluation input", evidence="saved replay")
+    before = Path(config["ledger_path"]).read_bytes()
+    engine = EvolutionEngine(config, split=split, mini=True, backend=MockDetectorBackend())
+    assert engine.rejection_feedback[0]["not_evaluable"] is True
+    assert engine.rejection_feedback[0]["reason"] == "missing evaluation input"
+    assert Path(config["ledger_path"]).read_bytes() == before
+
+
+def test_cycle_report_declares_whether_evidence_was_active(tmp_path):
+    """A cycle must say whether its runs carried external evidence.
+
+    Evidence is a harness input, not a learned intervention: a correction
+    that depended on a retrieved record must not be readable as something
+    the detector learned by itself.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    patrol_fn = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    backend = MockDetectorBackend(
+        base_predictions={case: False for case in patrol_fn},
+    )
+    # Evidence configured, with no bearing on the synthetic cases.
+    config["evidence"] = {"cases": {"A/000.json": "pinned.json"}}
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+    evidence = report["evidence"]
+    assert evidence["active"] is True
+    assert evidence["pinned_cases"] == ["A/000.json"]
+
+    # The declaration is a property of the configuration, not of the run
+    # reaching admission: an engine with no evidence block reports inactive.
+    fresh_config = dict(config)
+    fresh_config.pop("evidence", None)
+    inactive = EvolutionEngine(
+        fresh_config, backend=MockDetectorBackend(base_predictions={}),
+        split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    assert inactive._evidence_report() == {"active": False}

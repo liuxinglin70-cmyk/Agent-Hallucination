@@ -45,6 +45,7 @@ from evolution.gates import (
     requires_fresh_evaluation,
     structural_gate,
     harmlessness_gate,
+    sentinel_coverage,
     behavior_gate,
 )
 from evolution.ledger import Ledger, load_ledger
@@ -69,6 +70,7 @@ from evolution.harness import (
     write_manifest,
 )
 from evolution.memory import (
+    load_episodes,
     record_episode,
     record_improvement,
     record_procedure,
@@ -199,11 +201,14 @@ def gate_rejection_is_unevaluable(
 ) -> bool:
     """Whether a failing gate failed for want of a measurement.
 
-    Only BEHAVIOR and M can be unevaluable: STRUCTURAL and HARMLESSNESS decide
-    from contract and sentinel protection, which do not depend on the marginal
-    set's polarity mix. A rejection caused by an actual new error or a health
-    regression is substantive and never counts as unevaluable.
+    Missing measurement capacity is distinct from an observed regression,
+    including insufficient protected sentinel coverage.
     """
+    delta = verdict.get("delta") or {}
+    if delta.get("new_errors") or delta.get("health_regressed") or delta.get("unresolved_added"):
+        return False
+    if verdict.get("evaluable") is False:
+        return True
     if gate not in {"behavior", "m"}:
         return False
     # An M verdict that reports itself as unmeasured, or as skipped because no
@@ -387,9 +392,22 @@ class EvolutionEngine:
         # next round starts from, and they never score a candidate.
         self.harness_dir = Path(self.config["harness_dir"])
         self.memory_root = Path(self.config["memory_root"])
+        # Reviewed overlays may correct an older rejection without rewriting
+        # either its original ledger event or its original episode.
+        for episode in load_episodes(self.memory_root):
+            if not episode.get("correction_evidence"):
+                continue
+            for feedback in self.rejection_feedback:
+                candidate = feedback.get("candidate") or {}
+                if (feedback.get("cycle") == episode.get("cycle")
+                    and feedback.get("intervention_id") == episode.get("intervention_id")
+                    and feedback.get("gate") == episode.get("gate")
+                    and feedback.get("reason") == episode.get("original_reason")
+                    and (candidate.get("provenance") or {}).get("failure_family") == episode.get("failure_family")):
+                    feedback.update(reason=episode["reason"], not_evaluable=episode["unevaluable"],
+                                    correction_evidence=episode["correction_evidence"])
         self.gap_store = self.harness_dir / GAP_STORE_NAME
-        # Optional replacement evaluation set for coverage response. Empty by
-        # default, which is what keeps the strict policy behaviour-identical.
+        # Optional, explicitly installed replacement evaluation set.
         self._replacement_gain_cases: list[str] = []
         self._previous_manifest = self._load_previous_manifest()
 
@@ -508,11 +526,9 @@ class EvolutionEngine:
     def _coverage_mode(self, polarity: str) -> str:
         """Resolve the coverage response mode for one claim direction.
 
-        ``strict`` (the default) keeps the original rule: a claim whose
-        direction has no repairable case in the gain set is measured there and
-        comes back ``not_evaluated``, with admission still blocked. The other
-        modes make coverage a decision instead of only a reading, and must be
-        turned on explicitly and per direction.
+        ``strict`` never substitutes a gain set. Missing coverage stops drafting
+        or evaluation with admission blocked. Alternatives must be configured
+        explicitly and have measured baseline repair opportunities.
         """
         cfg = self.config.get("coverage_response") or {}
         per_direction = cfg.get("policies") or {}
@@ -529,8 +545,8 @@ class EvolutionEngine:
     ) -> dict[str, Any] | None:
         """What to do when a claim's direction is not repairable on ``rows``.
 
-        Returns ``None`` under the strict policy, which preserves the existing
-        behaviour exactly. Otherwise it reports whether a replacement
+        Returns ``None`` under the strict policy (no replacement). Otherwise
+        it reports whether a replacement
         evaluation set with matching coverage exists, whether the claim was
         therefore skipped as unmeasured, or that no set matched either.
         """
@@ -571,9 +587,28 @@ class EvolutionEngine:
             "available_polarities": available,
             "replacement_cases": 0,
             "note": (
-                "no replacement evaluation set configured; the claim was "
-                "measured on the default gain set"
+                "no replacement evaluation set configured; the claim cannot "
+                "be measured on the default gain set"
             ),
+        }
+
+    def _evidence_report(self) -> dict[str, Any]:
+        """Whether this cycle's runs carried external evidence, and which.
+
+        Evidence is a harness input, not a learned intervention: a run that
+        depended on it must be readable as such, and a cycle with no
+        evidence must not be confused with one that had it.
+        """
+        provider = getattr(self.backend, "evidence_provider", None)
+        block = self.config.get("evidence")
+        if not isinstance(block, Mapping) or not block:
+            return {"active": False}
+        pins = block.get("cases") if isinstance(block.get("cases"), Mapping) else {}
+        return {
+            "active": True,
+            "corpus": str(block.get("corpus") or "") or None,
+            "pinned_cases": sorted(str(key) for key in pins),
+            "provider_attached": provider is not None,
         }
 
     def _instrument_report(
@@ -582,6 +617,7 @@ class EvolutionEngine:
         baseline_gain: Sequence[Mapping[str, Any]],
         gate_reports: Sequence[Mapping[str, Any]],
         admitted_ids: set[str],
+        blocked_families: Sequence[Mapping[str, Any]] = (),
     ) -> dict[str, Any]:
         """What this round's measurement could and could not decide.
 
@@ -628,6 +664,8 @@ class EvolutionEngine:
             response_counts[kind] = response_counts.get(kind, 0) + 1
         return {
             "gain_opportunity": opportunity,
+            "gain_measured": True,
+            "blocked_families": list(blocked_families),
             "unmeasurable_polarities": sorted(
                 polarity for polarity, value in opportunity.items() if value == 0
             ),
@@ -638,8 +676,66 @@ class EvolutionEngine:
             "terminal_counts": counts,
             # A skip is reported as not_evaluated in the terminal vocabulary;
             # both mean the claim was not measured, so one check covers them.
-            "instrument_limited": bool(counts.get("not_evaluated")),
+            "instrument_limited": bool(counts.get("not_evaluated") or blocked_families),
         }
+
+    def _stop_preflight(
+        self, cycle: int, preflight: Mapping[str, Any], *,
+        baseline_gain: Sequence[Mapping[str, Any]] | None = None,
+        audit: Mapping[str, Any] | None = None,
+        patrol: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        instrument = self._instrument_report(
+            baseline_gain=baseline_gain or (), gate_reports=(), admitted_ids=set(),
+            blocked_families=preflight.get("blocked_families") or (),
+        )
+        if baseline_gain is None:
+            instrument.update(gain_measured=False, gain_opportunity=None,
+                              unmeasurable_polarities=[])
+        instrument["instrument_limited"] = True
+        report = {
+            "cycle": cycle, "state": "blocked_evaluation_preflight",
+            "split": split_manifest_report(self.split), "preflight": dict(preflight),
+            "audit": dict(audit or {"enabled": bool((self.config.get("audit") or {}).get("enabled")),
+                                    "passed": False, "status": "not_evaluated"}),
+            "patrol": dict(patrol or {}), "instrument": instrument,
+            "evidence": self._evidence_report(),
+            "proposals": [], "gates": [],
+            "proposal_summary": {"candidate_count": 0, "empty_proposal_reason": preflight["reason"]},
+            "marginal_selection": {"selected": [], "library_rejections": []},
+            "active_after_cycle": [entry["intervention_id"] for entry in self.registry.entries],
+        }
+        self._ledger("evaluation_preflight_blocked", {"cycle": cycle, **dict(preflight)})
+        self._ledger("cycle_completed", {"cycle": cycle, "state": report["state"]})
+        report["ledger_integrity"] = self.ledger.verify()
+        self._save_cycle_report(cycle, report)
+        self.cycle_reports.append(report)
+        return report
+
+    def _measurable_families(
+        self, families: Sequence[Mapping[str, Any]],
+        baseline_gain: Sequence[Mapping[str, Any]], arms: _ArmRunner,
+    ) -> tuple[list[Mapping[str, Any]], list[dict[str, Any]]]:
+        opportunity = gain_opportunity(baseline_gain)
+        replacement = None
+        ready, blocked = [], []
+        for family in families:
+            name = str(family.get("failure_family") or "")
+            polarity = "recall" if name.startswith("FAM-fn-") else (
+                "precision" if name.startswith("FAM-fp-") else "boundary")
+            count = opportunity.get(polarity, sum(opportunity.values()))
+            if count == 0 and self._coverage_mode(polarity) != "strict" and self._replacement_gain_cases:
+                if replacement is None:
+                    rows = arms.run(self._replacement_gain_cases, registry=self.registry.registry,
+                                    fresh=requires_fresh_evaluation(self.registry.entries))
+                    replacement = gain_opportunity(rows)
+                count = replacement.get(polarity, sum(replacement.values()))
+            if count:
+                ready.append(family)
+            else:
+                blocked.append({"failure_family": name, "polarity": polarity,
+                                "status": "not_evaluated", "reason": "no repair opportunities in gain"})
+        return ready, blocked
 
     def record_harness(self, cycle: int) -> dict[str, Any]:
         """Write H_t for this cycle and diff it against the previous one.
@@ -922,9 +1018,10 @@ class EvolutionEngine:
                     active_entries=self.registry.entries,
                     active_rows=[*baseline_s, *baseline_g],
                     arms=arms,
+                    audit=True,
                 )
                 report["harmlessness"] = unit["harmlessness"]
-                if unit["harmlessness"]["passed"]:
+                if (unit["harmlessness"] or {}).get("passed"):
                     report["behavior"] = unit["behavior"]
                     if unit["behavior"]["passed"]:
                         report["m"] = unit["m"]
@@ -939,6 +1036,15 @@ class EvolutionEngine:
                     infrastructure = arm_has_infrastructure_failure(
                         unit["candidate_rows"],
                     )
+                    if not infrastructure:
+                        infrastructure = arm_has_infrastructure_failure([*baseline_s, *baseline_g])
+                    unmeasured = any(
+                        verdict.get("passed") is False and verdict.get("evaluable") is False
+                        for verdict in (unit.get("harmlessness") or {},
+                                        unit.get("behavior") or {}, unit.get("m") or {})
+                    )
+                    if unmeasured:
+                        infrastructure = "defect evaluation has insufficient measurement coverage"
                     if infrastructure:
                         report["audit_inconclusive"] = True
                         report["audit_inconclusive_reason"] = infrastructure
@@ -981,6 +1087,7 @@ class EvolutionEngine:
         active_rows: Sequence[Mapping[str, Any]],
         fresh_control_rows: Sequence[Mapping[str, Any]] | None = None,
         arms: _ArmRunner,
+        audit: bool = False,
     ) -> dict[str, Any]:
         """One admission unit: one S+G arm scored by HARMLESSNESS, BEHAVIOR and M.
 
@@ -1005,10 +1112,8 @@ class EvolutionEngine:
         control_g = _subset_rows(control, self.split.gain)
         opportunity = gain_opportunity(control_g)
 
-        # Coverage is decided before any gate runs, because a claim whose
-        # direction is unrepairable on the default gain set fails the BEHAVIOR
-        # polarity check first and would never reach M. Under the strict policy
-        # (the default) this changes nothing.
+        # Decide coverage before spending a candidate arm, including candidates
+        # supplied explicitly or partners with a different declared polarity.
         response = (
             self._coverage_response(polarity, control_g)
             if polarity and opportunity.get(polarity) == 0
@@ -1034,14 +1139,29 @@ class EvolutionEngine:
             response["replacement_has_coverage"] = (
                 int(replacement_opportunity.get(polarity) or 0) > 0
             )
-        candidate_rows = arms.run(
-            [*sentinel, *measurement_gain],
-            registry=registry,
-            fresh=fresh,
-        )
-        if response is not None and response["kind"] == "skip":
-            # No evaluation set carries the declared direction: the claim is
-            # marked unmeasured and skipped rather than rejected as false.
+        baseline_s = _subset_rows(control, sentinel)
+        coverage = sentinel_coverage(baseline_s, self.config)
+        measured_opportunities = gain_opportunity(control_g)
+        unavailable = [
+            str((entry.get("claim") or {}).get("target_polarity") or "")
+            for entry in unit_entries
+            if measured_opportunities.get(
+                str((entry.get("claim") or {}).get("target_polarity") or ""),
+                sum(measured_opportunities.values()),
+            ) == 0
+        ]
+        if not coverage["evaluable"] or (unavailable and not audit):
+            reason = (
+                "insufficient baseline-correct sentinel coverage: " + coverage["reason"]
+                if not coverage["evaluable"] else
+                f"no repair opportunities in gain for {sorted(set(unavailable))}"
+            )
+            blocked = {"passed": False, "reason": reason, "delta": None,
+                       "evaluable": False, "status": "not_evaluated"}
+            if response is not None and response["kind"] == "skip":
+                blocked["status"] = "skipped_unmeasured"
+            if response is not None:
+                blocked["coverage_response"] = response
             return {
                 "intervention_id": intervention_id,
                 "candidate": dict(candidate),
@@ -1050,21 +1170,16 @@ class EvolutionEngine:
                 "gain_opportunities": opportunity,
                 "measurement_gain_cases": measurement_gain,
                 "coverage_response": response,
-                "candidate_rows": _summarise_rows(candidate_rows),
-                "harmlessness": None,
+                "candidate_rows": [],
+                "harmlessness": blocked if not coverage["evaluable"] else None,
                 "behavior": None,
                 "member_behavior": {},
-                "m": {
-                    "passed": False,
-                    "reason": response["note"],
-                    "delta": None,
-                    "evaluable": False,
-                    "status": "skipped_unmeasured",
-                    "coverage_response": response,
-                },
+                "m": blocked if coverage["evaluable"] else None,
             }
 
-        baseline_s = _subset_rows(control, sentinel)
+        candidate_rows = arms.run(
+            [*sentinel, *measurement_gain], registry=registry, fresh=fresh,
+        )
         candidate_s = _subset_rows(candidate_rows, sentinel)
         harmlessness = harmlessness_gate(
             baseline_rows=baseline_s,
@@ -1476,6 +1591,18 @@ class EvolutionEngine:
             self, (_time.monotonic() + seconds) if seconds else None,
         )
 
+        # Coverage is a property of the baseline, not a hypothesis to spend
+        # proposer or defect-arm budget on. Run even when auditing is disabled.
+        active = self.registry.registry
+        active_fresh = requires_fresh_evaluation(self.registry.entries)
+        baseline_sentinel = arms.run(self.split.sentinel, registry=active, fresh=active_fresh)
+        coverage = sentinel_coverage(baseline_sentinel, self.config)
+        if not coverage["evaluable"]:
+            return self._stop_preflight(cycle, {
+                "reason": "insufficient baseline-correct sentinel coverage: " + coverage["reason"],
+                "sentinel": coverage,
+            })
+
         audit = self._journal.state.get("audit")
         if audit is None:
             audit = self._audit(cycle, arms)
@@ -1582,6 +1709,17 @@ class EvolutionEngine:
             admitted_ids=set(),
         )
 
+        proposal_families, blocked_families = self._measurable_families(
+            diagnosed_families, baseline_gain, arms,
+        )
+        preflight = {"sentinel": coverage, "blocked_families": blocked_families,
+                     "gain_opportunity": instrument["gain_opportunity"]}
+        self._ledger("evaluation_preflight", {"cycle": cycle, **preflight})
+        if diagnosed_families and not proposal_families and proposal_batch is None:
+            return self._stop_preflight(cycle, {
+                **preflight, "reason": "no diagnosed failure direction has repair opportunities in gain",
+            }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet)
+
         if proposal_batch is None:
             self._journal.save(proposing=True)
             if hasattr(self.proposer, "active_entries"):
@@ -1611,7 +1749,7 @@ class EvolutionEngine:
                 "recurring_gaps": len(memory_context["recurring_capability_gaps"]),
             })
             proposal_batch = self.proposer.propose(
-                diagnosed_families,
+                proposal_families,
                 cycle=cycle,
                 max_proposals=int(
                     (self.config.get("budget") or {}).get("max_proposals", 3)
@@ -1792,10 +1930,8 @@ class EvolutionEngine:
             unit = unit_outcomes.get(identifier)
             if not unit or report.get("harmlessness") is not None:
                 continue
-            # A skipped unit carries no harmlessness verdict; its M verdict is
-            # already on the report, so nothing needs backfilling.
-            if unit.get("harmlessness") is None:
-                continue
+            # Skipped joint units also propagate their unmeasured M outcome
+            # to every member, without inventing a harmlessness verdict.
             report.update({
                 "harmlessness": unit["harmlessness"],
                 "behavior": (unit.get("member_behavior") or {}).get(identifier),
@@ -1945,16 +2081,19 @@ class EvolutionEngine:
         report = {
             "cycle": cycle,
             "state": "completed",
+            "preflight": preflight,
             "split": split_manifest_report(self.split),
             "audit": audit,
             "patrol": worksheet,
             "instrument": self._instrument_report(
                 baseline_gain=baseline_gain,
                 gate_reports=gate_reports,
+                blocked_families=blocked_families,
                 admitted_ids={
                     str(c.get("intervention_id") or "") for c in selected
                 },
             ),
+            "evidence": self._evidence_report(),
             "proposal_summary": {
                 "stable_families": [
                     str(item.get("failure_family") or "")
@@ -2333,7 +2472,9 @@ class EvolutionEngine:
             raise ValueError("cycles must be non-negative")
         for cycle in range(1, cycles + 1):
             started = any(r["event"] == "cycle_started" and r["payload"].get("cycle") == cycle for r in self.ledger.read())
-            self.run_cycle(cycle, resume=resume and started)
+            result = self.run_cycle(cycle, resume=resume and started)
+            if result.get("state") != "completed":
+                break
         report = {
             "cycles": self.cycle_reports,
             "active": [
@@ -2342,7 +2483,9 @@ class EvolutionEngine:
             "ledger_integrity": self.ledger.verify(),
             "registry_state": self.registry.state,
         }
-        if self.mini and self.split.validation:
+        if self.mini and self.split.validation and all(
+            item.get("state") == "completed" for item in self.cycle_reports
+        ):
             report["mini_effect"] = self._evaluate_mini_effect()
         return report
 

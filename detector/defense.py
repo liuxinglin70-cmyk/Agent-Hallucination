@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from detector.evidence import (
+    citation_error,
+    render_evidence_block,
+    snapshot_digest,
+)
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_step,
@@ -22,6 +27,24 @@ from detector.provider import (
     provider_call,
     required_quorum,
 )
+
+
+def _provider_call(
+    *, route: Mapping[str, Any], system: str, user: str, purpose: str,
+    cache_tag: str = "",
+) -> tuple[Any, dict[str, Any]]:
+    """``provider_call`` forwarding the snapshot cache tag when one exists.
+
+    Keeping the no-snapshot call shape unchanged preserves every existing
+    replay/caching contract; the tag exists solely to key prompt caches on
+    the evidence digest that rides outside the prompt text.
+    """
+    if cache_tag:
+        return provider_call(
+            route=route, system=system, user=user, purpose=purpose,
+            cache_tag=cache_tag,
+        )
+    return provider_call(route=route, system=system, user=user, purpose=purpose)
 from detector.semantics import (
     DEFENSE_CONTRACT_REPAIR,
     DEFENSE_SYSTEM,
@@ -49,6 +72,13 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
         return None, "evidence_refs must be a list of event ids"
     if verdict == "refuted" and not refs:
         return None, "refuted requires at least one evidence reference"
+    cited = parsed.get("evidence_citations")
+    if cited is None:
+        cited = []
+    if not isinstance(cited, list) or any(
+        not isinstance(x, str) for x in cited
+    ):
+        return None, "evidence_citations must be a list of snapshot ids"
     reason = str(parsed.get("reason") or "").strip()
     if not reason:
         return None, "reason is required"
@@ -56,6 +86,8 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
         "verdict": verdict,
         "confirmed_step": confirmed if verdict == "substantiated" else None,
         "evidence_refs": refs,
+        "evidence_citations": [str(x) for x in cited if str(x)],
+        "conflict_note": str(parsed.get("conflict_note") or "").strip(),
         "reason": reason,
     }, ""
 
@@ -63,6 +95,7 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
 def _validate_defense_evidence(
     parsed: Mapping[str, Any], packet: Mapping[str, Any],
     positive: Mapping[str, Any] | None = None,
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Require defense references to resolve to packet event/tool ids."""
     valid_ids = {
@@ -80,6 +113,14 @@ def _validate_defense_evidence(
     refs = [str(ref) for ref in parsed.get("evidence_refs") or ()]
     if any(ref not in valid_ids for ref in refs):
         return None, "evidence_refs contains an unknown packet event"
+    citation_error_message = citation_error(
+        snapshot, parsed.get("evidence_citations") or [],
+        where="defense",
+        require_settled=parsed.get("verdict") == "substantiated",
+        conflict_note=str(parsed.get("conflict_note") or ""),
+    )
+    if citation_error_message:
+        return None, citation_error_message
     if parsed.get("verdict") == "substantiated":
         step = parsed.get("confirmed_step")
         event_count = len(list(packet.get("events") or ()))
@@ -144,11 +185,16 @@ def _call_defense(
     system: str,
     user: str,
     positive: Mapping[str, Any],
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Sample one defense ballot; a ``None`` verdict abstains."""
+    cache_tag = (
+        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+    )
     try:
-        parsed, meta = provider_call(
+        parsed, meta = _provider_call(
             route=route, system=system, user=user, purpose="defense",
+            cache_tag=cache_tag,
         )
     except ProviderError as exc:
         return {"ok": False, "parsed": None, "error": exc.message,
@@ -158,20 +204,23 @@ def _call_defense(
         }
     result, error = _parse_defense(parsed)
     if result is not None:
-        result, error = _validate_defense_evidence(result, packet, positive)
+        result, error = _validate_defense_evidence(
+            result, packet, positive, snapshot,
+        )
     warnings: list[dict[str, str]] = []
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = provider_call(
+            parsed, meta = _provider_call(
                 route=route, system=system,
                 user=user + DEFENSE_CONTRACT_REPAIR,
                 purpose="defense_repair",
+                cache_tag=cache_tag,
             )
             result, error = _parse_defense(parsed)
             if result is not None:
                 result, error = _validate_defense_evidence(
-                    result, packet, positive,
+                    result, packet, positive, snapshot,
                 )
         except ProviderError as exc:
             return {"ok": False, "parsed": None, "error": exc.message,
@@ -201,6 +250,7 @@ def _vote_defense(
     system: str,
     user: str,
     positive: Mapping[str, Any],
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run the requested number of defense votes and collapse them.
 
@@ -226,7 +276,7 @@ def _vote_defense(
         nonlocal total_attempts, last_error, sample_meta
         result, status = _call_defense(
             packet=packet, route=route, system=system, user=user,
-            positive=positive,
+            positive=positive, snapshot=snapshot,
         )
         total_attempts += int(status.get("attempts") or 0)
         warnings.extend(status.get("warnings") or [])
@@ -334,6 +384,7 @@ def run_defense(
     positive: Mapping[str, Any],
     config: Mapping[str, Any],
     plan: InterventionPlan | None = None,
+    snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Review one positive preliminary verdict. Never raises."""
     if not positive:
@@ -378,6 +429,12 @@ def run_defense(
     )
     force_full_view = "require_full_view_defense" in pre_actions
     system = DEFENSE_SYSTEM + plan.prompt_block(packet_features(packet), hook="defense.system")
+    # The external-evidence snapshot must reach the defense as well: a
+    # stage that decided on stale trajectory evidence alone would convict
+    # or clear on facts the upgrade stage already had.
+    snapshot_block = (
+        "\n\n" + render_evidence_block(snapshot) if snapshot is not None else ""
+    )
     allegation = (
         "POSITIVE VERDICT:\n"
         f"alleged_step={facts['step']}\n"
@@ -391,6 +448,7 @@ def run_defense(
         return (
             "Review the positive verdict below using only the shown "
             "trajectory evidence.\n\n" + allegation + "\n" + view_text
+            + snapshot_block
         )
 
     if force_full_view:
@@ -401,7 +459,7 @@ def run_defense(
         )
     result, status = _vote_defense(
         packet=packet, route=route, system=system, user=user_for(view_text),
-        positive=positive,
+        positive=positive, snapshot=snapshot,
     )
     status["view"] = (
         "complete"
@@ -415,6 +473,7 @@ def run_defense(
             result2, status2 = _vote_defense(
                 packet=packet, route=route, system=system,
                 user=user_for(full_text), positive=positive,
+                snapshot=snapshot,
             )
             status2["view"] = (
                 "complete" if not full_meta.get("degraded") else "degraded"

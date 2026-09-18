@@ -10,9 +10,15 @@ from typing import Any, Mapping
 from detector.adjudication import adjudicate
 from detector.config import load_config
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
+from detector.evidence import (
+    snapshot_digest,
+    touches_packet,
+    validate_snapshot,
+)
 from detector.interventions import compile_runtime_plan, load_intervention_registry
 from detector.judge import _parse_judge, run_judge
 from detector.packet import build_packet, validate_record
+from detector.predicate_context import judge_predicate_context
 from detector.provider import case_deadline_ctx
 from detector.recaller import (
     _parse_candidates,
@@ -99,6 +105,7 @@ def _frozen_stage(
 
 def _validate_frozen_stages(
     frozen: Mapping[str, Any], packet: Mapping[str, Any],
+    snapshot: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Normalize replay payloads through the same contracts as live stages."""
     if not isinstance(frozen, Mapping):
@@ -232,7 +239,7 @@ def _validate_frozen_stages(
                         )
                     positive = {"step": clean["positive"].get("step")}
                     parsed, error = _validate_defense_evidence(
-                        parsed, packet, positive,
+                        parsed, packet, positive, snapshot,
                     )
                     if parsed is None:
                         raise ValueError(
@@ -272,6 +279,7 @@ class Detector:
         interventions: Mapping[str, Any] | None = None,
         frozen_judge: Mapping[str, Any] | None = None,
         frozen_stages: Mapping[str, Any] | None = None,
+        evidence: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Detect one ``{question, history}`` record (label-free).
 
@@ -284,6 +292,13 @@ class Detector:
         from a baseline run. If the intervention registry targets any hook
         whose stage is frozen, replay is refused (fail-closed): freezing
         that stage would mask the intervention under test.
+
+        ``evidence`` is an optional ``detector.evidence.v1`` snapshot of
+        retrieved external facts. It travels beside the record, never inside
+        it, and reaches the recall scan, the causal upgrade and the defense:
+        a stage that decided on stale trajectory evidence alone would
+        convict or clear on facts another stage already had. The snapshot
+        digest is part of the run's provenance.
         """
         with case_deadline_ctx(self.config.get("case_timeout_seconds")):
             return self._detect(
@@ -292,6 +307,7 @@ class Detector:
                 interventions=interventions,
                 frozen_judge=frozen_judge,
                 frozen_stages=frozen_stages,
+                evidence=evidence,
             )
 
     def _detect(
@@ -302,9 +318,23 @@ class Detector:
         interventions: Mapping[str, Any] | None = None,
         frozen_judge: Mapping[str, Any] | None = None,
         frozen_stages: Mapping[str, Any] | None = None,
+        evidence: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         validate_record(record)
         packet = build_packet(record)
+        attached_snapshot = (
+            validate_snapshot(evidence) if evidence is not None else None
+        )
+        # A snapshot that names nothing the question or trajectory mentions
+        # cannot testify about this case; it must not reopen the review or
+        # enter a stage prompt. The decision and its reason are recorded.
+        snapshot_application: str | None = None
+        snapshot = attached_snapshot
+        if attached_snapshot is not None:
+            applies, reason = touches_packet(attached_snapshot, packet)
+            snapshot_application = reason
+            if not applies:
+                snapshot = None
         effective_interventions = (
             interventions
             if interventions is not None
@@ -336,7 +366,29 @@ class Detector:
         ) and "judge_result" not in frozen:
             raise ValueError("frozen stage replay must include judge_result")
         if frozen is not None and "judge_result" in frozen:
-            frozen = _validate_frozen_stages(frozen, packet)
+            # A frozen stage that consumes the snapshot may only be replayed
+            # under the same evidence: replaying one recorded without it (or
+            # with another snapshot) would mask the evidence under test.
+            evidence_frozen = sorted(
+                key for key in ("recall_result", "upgrade_result", "hearings")
+                if key in frozen
+            )
+            active_digest = (
+                snapshot_digest(attached_snapshot)
+                if attached_snapshot is not None else ""
+            )
+            envelope_digest = str(
+                frozen.get("evidence_snapshot_digest") or ""
+            )
+            if evidence_frozen and envelope_digest != active_digest:
+                recorded = envelope_digest[:16] if envelope_digest else "none"
+                raise ValueError(
+                    "frozen stage replay is refused: the frozen stage(s) "
+                    f"{evidence_frozen} were recorded under evidence "
+                    f"{recorded} but this run carries "
+                    f"{active_digest[:16] if active_digest else 'none'}"
+                )
+            frozen = _validate_frozen_stages(frozen, packet, snapshot)
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
             masked = _frozen_masked_stages(frozen, targeted_hooks)
@@ -355,13 +407,7 @@ class Detector:
         plan.evidence_for(
             "judge.post",
             packet,
-            {
-                "judge_parsed": judge_parsed,
-                "evidence_refs": judge_parsed.get("evidence_refs") or [],
-                "contracts": judge_parsed.get("contracts") or [],
-                "delivered_result": judge_parsed.get("delivered_result") or "",
-                "quote": (judge_parsed.get("root_cause") or {}).get("quote") or "",
-            },
+            judge_predicate_context(judge_parsed),
         )
         # ``upgrade.pre`` evidence is produced by the causal upgrade stage
         # itself, once, if and when that stage runs. Evaluating it here too
@@ -377,6 +423,13 @@ class Detector:
         defense_result = None
         defense_status = None
 
+        # The stage runners accept the snapshot only when one is active, so
+        # the no-evidence path keeps its exact call shape (and every existing
+        # replay/caching contract built on it).
+        stage_kwargs: dict[str, Any] = (
+            {"snapshot": snapshot} if snapshot is not None else {}
+        )
+
         def run_recall_net() -> None:
             """Run the recall net (scanner + causal upgrade) on demand."""
             nonlocal recall_result, recall_status, upgrade_result, upgrade_status
@@ -388,6 +441,7 @@ class Detector:
             else:
                 recall_result, recall_status = run_recall_scan(
                     packet=packet, config=self.config, plan=plan,
+                    **(stage_kwargs),
                 )
             if recall_result.get("ok") and recall_result.get("candidates"):
                 if frozen is not None and "upgrade_result" in frozen:
@@ -399,6 +453,7 @@ class Detector:
                         candidates=recall_result["candidates"],
                         config=self.config,
                         plan=plan,
+                        **stage_kwargs,
                     )
             elif recall_result.get("ok"):
                 upgrade_result = {
@@ -413,10 +468,19 @@ class Detector:
         recall_forced = (
             judge_status.get("state") == "ok"
             and not judge_positive
-            and plan.recall_triggered(
-                packet,
-                judge_positive=judge_positive,
-                judge_parsed=judge_parsed,
+            and (
+                plan.recall_triggered(
+                    packet,
+                    judge_positive=judge_positive,
+                    judge_parsed=judge_parsed,
+                )
+                # An active evidence snapshot reopens the review on its own:
+                # the scan is the stage that can confront the delivered
+                # result with the retrieved record, and it convicts nothing
+                # by itself (the causal upgrade still has to pass both
+                # tests). Without this, a unanimous clean judge would leave
+                # the snapshot unread on exactly the cases it exists for.
+                or snapshot is not None
             )
         )
         negative_needs_recall = (
@@ -478,6 +542,7 @@ class Detector:
                 "delivered_result": "",
                 "correct_result": "",
                 "evidence_refs": candidate.get("evidence_refs") or [],
+                "evidence_citations": candidate.get("evidence_citations") or [],
                 "quote": candidate.get("quote") or "",
                 "confidence": "",
                 # Task contracts are allowed; judge verdict anchors are not.
@@ -546,6 +611,7 @@ class Detector:
                     positive=positive,
                     config=self.config,
                     plan=plan,
+                    **stage_kwargs,
                 )
             return tracer_r, tracer_s, defense_r, defense_s
 
@@ -662,6 +728,12 @@ class Detector:
             predicate_conviction_verdicts=plan.predicate_conviction_verdicts,
         )
         provenance: dict[str, Any] = {"packet_hash": _packet_hash(packet)}
+        if attached_snapshot is not None:
+            provenance["evidence_snapshot_digest"] = snapshot_digest(
+                attached_snapshot
+            )
+            provenance["evidence_applied"] = snapshot is not None
+            provenance["evidence_application_reason"] = snapshot_application
         if effective_interventions is not None:
             provenance["interventions_hash"] = str(
                 effective_interventions.get("content_hash") or ""
@@ -720,6 +792,7 @@ class Detector:
                         "delivered_result", "correct_result",
                     )
                 },
+                "evidence_citations": hearing.get("evidence_citations") or [],
                 "tracer_result": hearing.get("tracer_result"),
                 "tracer_status": hearing.get("tracer_status"),
                 "defense_result": hearing.get("defense_result"),
@@ -729,6 +802,7 @@ class Detector:
         ]
         proof["evidence"] = list(plan.evidence)
         proof["deployment"] = plan.deployment_summary()
+        proof["external_evidence"] = snapshot
         return build_detection_output(
             case_id=case_id,
             packet=packet,
@@ -757,13 +831,14 @@ def detect(
     interventions: Mapping[str, Any] | None = None,
     frozen_judge: Mapping[str, Any] | None = None,
     frozen_stages: Mapping[str, Any] | None = None,
+    evidence: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Convenience entry with optional paired-replay stage freezing."""
     detector = Detector(config) if config is not None else _default_detector()
     return detector.detect(
         record, case_id=case_id,
         interventions=interventions, frozen_judge=frozen_judge,
-        frozen_stages=frozen_stages,
+        frozen_stages=frozen_stages, evidence=evidence,
     )
 
 

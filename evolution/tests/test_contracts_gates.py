@@ -742,6 +742,24 @@ def test_harmlessness_floor_blocks_thin_sentinels_by_default():
     )
     assert verdict["passed"] is False
     assert "insufficient baseline-correct coverage" in verdict["reason"]
+    assert verdict["evaluable"] is False
+    from evolution.engine import terminal_classification
+    assert terminal_classification({"harmlessness": verdict}, admitted=False) == "not_evaluated"
+
+
+def test_thin_sentinel_does_not_hide_observed_harm():
+    from evolution.engine import terminal_classification
+    baseline = [
+        {"case": "tp", "gold": True, "prediction": True, "authority": "authoritative"},
+        {"case": "tn", "gold": False, "prediction": False, "authority": "authoritative"},
+    ]
+    candidate = [dict(row) for row in baseline]
+    candidate[0]["prediction"] = False
+    verdict = harmlessness_gate(baseline_rows=baseline, candidate_rows=candidate, config=load_config())
+    assert verdict["delta"]["new_fn"] == 1
+    assert verdict["coverage_sufficient"] is False
+    assert verdict["evaluable"] is True
+    assert terminal_classification({"harmlessness": verdict}, admitted=False) == "rejected"
 
 
 def _delta_row(case, gold, base, active):

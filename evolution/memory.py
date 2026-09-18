@@ -28,6 +28,8 @@ score, admit, or reject anything.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -41,6 +43,8 @@ EPISODIC_NAME = "episodic.jsonl"
 PROCEDURAL_NAME = "procedural.jsonl"
 IMPROVEMENT_NAME = "improvement.jsonl"
 RECALL_NAME = "recall.json"
+CORRECTION_NAME = "episode_corrections.jsonl"
+CORRECTION_SCHEMA = "evolution.experience.correction.v1"
 
 DEFAULT_RECALL_LIMIT = 3
 
@@ -56,6 +60,7 @@ def memory_paths(root: str | Path) -> dict[str, Path]:
         "procedural": root / PROCEDURAL_NAME,
         "improvement": root / IMPROVEMENT_NAME,
         "recall": root / RECALL_NAME,
+        "corrections": root / CORRECTION_NAME,
     }
 
 
@@ -136,6 +141,33 @@ def record_episode(
     return record
 
 
+def episode_digest(record: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(dict(record), sort_keys=True, ensure_ascii=False,
+                                    separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def record_episode_correction(
+    root: str | Path, original: Mapping[str, Any], *,
+    unevaluable: bool, reason: str, evidence: str,
+) -> dict[str, Any]:
+    """Append a reviewed reclassification of an exact original episode.
+
+    Hash binding prevents reuse across another run with the same cycle/id.
+    Original observations, admission decisions and ledger entries are untouched.
+    """
+    paths = _ensure(root)
+    target = episode_digest(original)
+    if not any(episode_digest(row) == target for row in read_jsonl(paths["episodic"])):
+        raise ValueError("correction target is not an original episode in this store")
+    if not reason.strip() or not evidence.strip():
+        raise ValueError("episode correction requires a reason and evidence")
+    correction = {"schema_version": CORRECTION_SCHEMA, "target_digest": target,
+                  "unevaluable": bool(unevaluable), "reason": reason, "evidence": evidence}
+    if correction not in read_jsonl(paths["corrections"]):
+        append_jsonl(paths["corrections"], correction)
+    return correction
+
+
 def load_episodes(root: str | Path) -> list[dict[str, Any]]:
     records = read_jsonl(memory_paths(root)["episodic"])
     for number, record in enumerate(records, start=1):
@@ -144,6 +176,18 @@ def load_episodes(root: str | Path) -> list[dict[str, Any]]:
             raise ValueError(
                 f"episodic store record {number} has unsupported schema {schema!r}"
             )
+    corrections = {}
+    for correction in read_jsonl(memory_paths(root)["corrections"]):
+        if correction.get("schema_version") != CORRECTION_SCHEMA:
+            raise ValueError("unsupported episode correction schema")
+        corrections[correction["target_digest"]] = correction
+    for record in records:
+        correction = corrections.get(episode_digest(record))
+        if correction:
+            record["original_reason"] = record.get("reason", "")
+            record["reason"] = correction["reason"]
+            record["unevaluable"] = correction["unevaluable"]
+            record["correction_evidence"] = correction["evidence"]
     return records
 
 
