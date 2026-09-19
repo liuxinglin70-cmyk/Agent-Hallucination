@@ -1,6 +1,6 @@
 {
   "schema_version": "rsi.expansion_manifest_frozen.v1",
-  "status": "frozen_baseline_pending",
+  "status": "h0_baseline_complete",
   "frozen_at": "2026-09-19",
   "code_baseline": "c6fbac1",
   "protocol_ref": "docs/optimization-directions.md 6.3 step 4（唯一一次扩展，累计测量上限 24）",
@@ -22,7 +22,11 @@
       "role": "expansion_target",
       "proposed_family": "quoted_content_vs_delivered",
       "reason": "T2 逐字引用要写入的行；step 6 echo 实际写入完整模板+虚构署名前缀 'Simona: '+占位文本，偏离可见",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_clean",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": null,
+      "h0_vs_gold": "FN"
     },
     {
       "case_id": "BFCL/006.json",
@@ -38,7 +42,11 @@
       "role": "expansion_target",
       "proposed_family": "quoted_content_vs_delivered",
       "reason": "T2 'mentioning only the file names' 限定正文；hashtag 被嵌入正文且 tags=[]，OBS 可见",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_error",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": 1,
+      "h0_vs_gold": "correct"
     },
     {
       "case_id": "BFCL/021.json",
@@ -75,7 +83,11 @@
       "role": "expansion_target",
       "proposed_family": "observed_value_binding",
       "reason": "T4 规定消息格式且 X=早前计算的实际值；OBS distance=980.0，发出的消息写 609，交付与观察矛盾",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_error",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": 11,
+      "h0_vs_gold": "correct"
     },
     {
       "case_id": "BFCL/087.json",
@@ -119,7 +131,11 @@
       "role": "expansion_target",
       "proposed_family": "action_set_binding",
       "reason": "T2 只要求 tagging @technewsworld；agent 额外添加 @industryexperts，动作集偏离可见",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_clean",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": null,
+      "h0_vs_gold": "FN"
     },
     {
       "case_id": "BFCL/123.json",
@@ -142,7 +158,11 @@
       "role": "expansion_target",
       "proposed_family": "observed_value_binding",
       "reason": "auth OBS 返回字符串 access_token '251675'；下一调用传整数 251675，参数形态与观察不一致并收到 Invalid access token",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_clean",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": null,
+      "h0_vs_gold": "FN"
     },
     {
       "case_id": "BFCL/130.json",
@@ -193,7 +213,11 @@
       "role": "expansion_target",
       "proposed_family": "observed_value_binding",
       "reason": "get_all_credit_cards OBS 刚返回 card_id 'main_card'；book_flight 用卡号 1234-5678-9876-5432 当 card_id，报 Card not registered",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_error",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": 15,
+      "h0_vs_gold": "correct"
     },
     {
       "case_id": "BFCL/151.json",
@@ -209,7 +233,11 @@
       "role": "expansion_target",
       "proposed_family": "quoted_content_vs_delivered",
       "reason": "T6 引用推文正文 'Postponing my plans.' 并要求 incorporate hashtags/mention；hashtags 与 mention 被嵌入正文、tags/mentions 参数为空，OBS 可见",
-      "baseline_status": "not_run"
+      "baseline_status": "h0_run_20260919",
+      "h0_state": "verified_clean",
+      "h0_authority": "authoritative",
+      "h0_responsible_step": null,
+      "h0_vs_gold": "FN"
     },
     {
       "case_id": "BFCL/155.json",
@@ -246,5 +274,260 @@
       "role": "screened_out",
       "reason": "任务未引用消息原文，gold 要求的简洁措辞不可由输入得出"
     }
-  ]
+  ],
+  "h0_metrics": {
+    "run_id": "rsi_pilot_h0_expansion_20260919",
+    "metrics": {
+      "decisive": 7,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.42857142857142855,
+      "all_case_accuracy": 0.42857142857142855,
+      "tp": 3,
+      "fp": 0,
+      "fn": 4,
+      "tn": 0,
+      "positive_precision": 1.0,
+      "positive_recall": 0.42857142857142855,
+      "positive_f1": 0.6,
+      "macro_precision": 0.5,
+      "macro_recall": 0.21428571428571427,
+      "macro_f1": 0.3,
+      "authoritative": 7,
+      "degraded": 0,
+      "provider_unresolved": 0,
+      "requested_cases": 7,
+      "found_results": 7,
+      "missing_cases": 0,
+      "step_localization": {
+        "n": 7,
+        "hits": 1,
+        "accuracy": 0.14285714285714285
+      }
+    },
+    "rows": [
+      {
+        "case": "BFCL/002.json",
+        "gold": true,
+        "prediction": false,
+        "gold_step": 6,
+        "responsible_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/008.json",
+        "gold": true,
+        "prediction": true,
+        "gold_step": 3,
+        "responsible_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/082.json",
+        "gold": true,
+        "prediction": true,
+        "gold_step": 11,
+        "responsible_step": 11,
+        "state": "verified_error",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/118.json",
+        "gold": true,
+        "prediction": false,
+        "gold_step": 5,
+        "responsible_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/129.json",
+        "gold": true,
+        "prediction": false,
+        "gold_step": 4,
+        "responsible_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/148.json",
+        "gold": true,
+        "prediction": true,
+        "gold_step": 6,
+        "responsible_step": 15,
+        "state": "verified_error",
+        "authority": "authoritative"
+      },
+      {
+        "case": "BFCL/153.json",
+        "gold": true,
+        "prediction": false,
+        "gold_step": 14,
+        "responsible_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    ],
+    "errors": [
+      {
+        "case": "BFCL/002.json",
+        "kind": "fn",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "TeamNotes.txt created in documents folder; Simona's insight 'Collaboration leads to success. Innovation ignites growth.' written into it (with a purpose header); line-by-line distinctions between ideas.txt and TeamNotes.txt explained consistent with the cat observations; TeamNotes.txt copied into the existing Archived directory and renamed IdeasArchive.txt via cp then mv, with the original left intact in documents; contents of IdeasArchive.txt displayed and match the source file.",
+          "correct_result": "All five turns' deliverables: create TeamNotes.txt in the documents folder, add the quoted insight to it, explain the differences between ideas.txt and TeamNotes.txt, produce Archived/IdeasArchive.txt as a copy of TeamNotes.txt while keeping the original, and show IdeasArchive.txt's contents. The trajectory's final state satisfies all of these.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Navigate into the document folder and create a file titled 'TeamNotes.txt'"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Write 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Read ideas.txt and TeamNotes.txt and explain their line-by-line distinctions"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Ensure the Archived directory exists in the documents folder and copy TeamNotes.txt there as IdeasArchive.txt while keeping the original intact"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Display the contents of IdeasArchive.txt"
+            }
+          ]
+        },
+        "defense": {}
+      },
+      {
+        "case": "BFCL/118.json",
+        "kind": "fn",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Tweet posted with exact content 'Omega Industries is skyrocketing at $457.23 per share! The tech industry evolution is electrifying, and we are just getting started.', tag #TechBoom, mention @industryexperts (tweet ID 1), and @technewsworld subsequently added via mention tool with success status",
+          "correct_result": "Fetch Omega Industries price ($457.23 per tool observation), post the tweet with the exact requested content, #TechBoom tag and @industryexperts mention, then tag @technewsworld on the existing tweet per turn 2",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "verbatim_content",
+              "requirement": "Tweet content: 'Omega Industries is skyrocketing at ${price} per share! The tech industry evolution is electrifying, and we are just getting started.'"
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "Price must be the actual fetched price of Omega Industries (457.23)"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Post tweet with #TechBoom tag and @industryexperts mention"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Tag @technewsworld on the posted tweet (turn 2 request)"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Look up Omega Industries symbol then stock info to obtain the price"
+            }
+          ]
+        },
+        "defense": {}
+      },
+      {
+        "case": "BFCL/129.json",
+        "kind": "fn",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Authentication succeeded (access token 251675, scope read_write); card_4455 balance reported as $1500.75; average of the five purchases reported as $71.52.",
+          "correct_result": "Successful authentication with read_write scope; current balance of card_4455; mean of 45.99, 78.25, 102.50, 38.75, 92.10 = 71.518 (≈ $71.52).",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Authenticate travel account using client_id 'client_520', secret 'rise_to_sky', refresh token 'token990125', grant_type read_write, names Michael Thompson"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Retrieve current balance for credit card 'card_4455'"
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "Compute the mean of 45.99, 78.25, 102.50, 38.75, 92.10"
+            }
+          ]
+        },
+        "defense": {}
+      },
+      {
+        "case": "BFCL/153.json",
+        "kind": "fn",
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00 (matches observation); booking 3426812 made with token secure_access_token_987654321 and card_4526 (booking_status true); invoice retrieved and relayed accurately (cost 1050.0, transaction 45451592); customer support contacted for booking 3426812; booking cancelled (cancel_status true); tweet posted as 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' from account john after successful authentication.",
+          "correct_result": "All deliverables required by the six turns: correct first-class cost ($1050.00), successful booking with the given card and token, retrieved invoice, support contact, successful cancellation, and a published tweet containing 'Postponing my plans.' with #Travel, #PlansChanged and @AirlineSupport — all of which the trajectory delivered.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Determine first-class cost from nearest airport to Rivermist (RMS) to JFK for 2024-12-15"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Book the flight using access token secure_access_token_987654321 charged to card_id card_4526 with matching details (RMS->JFK, first, 2024-12-15)"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Retrieve the invoice for the booking just made"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Contact customer support on the user's behalf about the unresolved booking issue"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Cancel the flight booking"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Authenticate as john/john1234 and publish tweet 'Postponing my plans.' incorporating #Travel, #PlansChanged and mention @AirlineSupport"
+            }
+          ]
+        },
+        "defense": {}
+      }
+    ],
+    "missing_cases": []
+  }
 }
