@@ -15,7 +15,12 @@ from pathlib import Path
 import pytest
 
 from evolution.proposer import ProposalBatch
-from evolution.research import ResearchRun, run_frozen_repeats, run_research
+from evolution.research import (
+    canonical_hash,
+    ResearchRun,
+    run_frozen_repeats,
+    run_research,
+)
 
 
 MECHANISM = {
@@ -747,3 +752,148 @@ def test_unused_dev_validation_uses_frozen_extra_cases(tmp_path):
     for rep in winner["per_repetition"]:
         assert rep["neighbors"]["BFCL/013.json"]["clean"] is True
     assert report["budget"]["used"] == 8
+
+
+# ---------------------------------------------------------------------------
+# seed_candidate: re-measuring a frozen candidate without re-drafting
+
+def _finished_source_run(tmp_path, name="source_run"):
+    """A screening run with one passing route-B version on disk."""
+    dataset_root = _write_dataset(tmp_path / name)
+    baseline = _write_baseline_ref(tmp_path / name, dataset_root)
+    manifest = _write_manifest(
+        tmp_path / name, dataset_root, baseline_runs=[baseline],
+        routes=("B",),
+    )
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_route_candidate("B")]),
+    ])
+    report = run_research(
+        manifest, tmp_path / name / "run", FakeBackend(), proposer,
+    )
+    assert report["routes"]["B"]["selected"] == "v001"
+    return tmp_path / name / "run"
+
+
+def _seed_manifest(tmp_path, dataset_root, baseline_runs, source_run, *,
+                   candidate_hash, budget=None):
+    config_path = tmp_path / "detector_config_seed.json"
+    config_path.write_text(json.dumps({"model": "fake-model"}), encoding="utf-8")
+    manifest = {
+        "schema_version": "evolution.research_manifest.v1",
+        "run_id": "seed_run",
+        "mechanism": MECHANISM,
+        "family": FAMILY,
+        "allowed_interventions": {"type": "text_boundary", "hooks": ["judge.system"]},
+        "dataset_root": str(dataset_root),
+        "detector_config": str(config_path),
+        "cases": CASES,
+        "routes": ["B"],
+        "baseline_ref": {
+            "runs": [{"run_dir": str(run)} for run in baseline_runs],
+            "detector_config_hash": "cfg-hash-1",
+        },
+        "seed_candidate": {
+            "source_run": str(source_run),
+            "version": "v001",
+            "candidate_hash": candidate_hash,
+            "route": "B",
+        },
+        "budget": budget or {
+            "baseline_case_evaluations": 0,
+            "screening_case_evaluations": 4,
+            "proposer_calls_per_route": 0,
+            "max_versions": 2,
+            "workers": 1,
+        },
+    }
+    path = tmp_path / "seed_manifest.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    return path
+
+
+def test_seed_candidate_is_screened_and_selected_without_proposer(tmp_path):
+    source_run = _finished_source_run(tmp_path)
+    source_record = json.loads(
+        (source_run / "v001" / "candidate.json").read_text(encoding="utf-8"),
+    )
+    pinned = canonical_hash(source_record["candidate"])
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _seed_manifest(
+        tmp_path, dataset_root, [baseline], source_run,
+        candidate_hash=pinned,
+    )
+    backend = FakeBackend()
+    proposer = FakeProposer([])  # must never be called: budget is 0 anyway
+    report = run_research(manifest, tmp_path / "seeded", backend, proposer)
+    assert report["status"] == "screening_complete"
+    selection = json.loads(
+        (tmp_path / "seeded" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["B"]["selected"] == "v001"
+    assert report["budget"]["used"]["proposer_calls"] == {}
+    # The seed was re-screened under this run's own identity (fresh results).
+    assert backend.calls
+    assert all(call["registry"]["interventions"] for call in backend.calls)
+    record = json.loads(
+        (tmp_path / "seeded" / "v001" / "candidate.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert record["candidate_hash"] == pinned
+    assert record["notes"][0]["seeded_from"]["candidate_hash"] == pinned
+    # No families ever reached the proposer: no draft happened.
+    assert not [kind for kind, _ in proposer.received if kind == "families"]
+
+
+def test_seed_candidate_hash_mismatch_fails_closed(tmp_path):
+    source_run = _finished_source_run(tmp_path)
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _seed_manifest(
+        tmp_path, dataset_root, [baseline], source_run,
+        candidate_hash="0" * 64,
+    )
+    report = run_research(
+        manifest, tmp_path / "seeded", FakeBackend(), FakeProposer([]),
+    )
+    assert report["status"] == "partial"
+    assert "hash mismatch" in (report["stopped"] or "")
+    # Fail closed before any evaluation budget was spent.
+    assert report["budget"]["used"]["screening_case_evaluations"] == 0
+    assert not (tmp_path / "seeded" / "v001" / "candidate.json").exists()
+
+
+def test_failed_seed_terminates_route_without_revision(tmp_path):
+    source_run = tmp_path / "failing_source"
+    dataset_root = _write_dataset(source_run)
+    baseline = _write_baseline_ref(source_run, dataset_root)
+    source_manifest = _write_manifest(
+        source_run, dataset_root, baseline_runs=[baseline], routes=("B",),
+    )
+    # A mechanism-irrelevant candidate cannot repair the training failures.
+    irrelevant = _candidate_with("Read the task text carefully before voting.")
+    proposer = FakeProposer([ProposalBatch(candidates=[irrelevant])])
+    run_research(source_manifest, source_run / "run", FakeBackend(), proposer)
+    source_record = json.loads(
+        (source_run / "run" / "v001" / "candidate.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    dataset_root2 = _write_dataset(tmp_path)
+    baseline2 = _write_baseline_ref(tmp_path, dataset_root2)
+    manifest = _seed_manifest(
+        tmp_path, dataset_root2, [baseline2], source_run / "run",
+        candidate_hash=canonical_hash(source_record["candidate"]),
+    )
+    report = run_research(
+        manifest, tmp_path / "seeded", FakeBackend(), FakeProposer([]),
+    )
+    # The seed failed screening; with zero proposer budget the route ends
+    # without a selection instead of inventing a revision.
+    selection = json.loads(
+        (tmp_path / "seeded" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["B"]["selected"] is None
+    assert report["next_stage"] is None

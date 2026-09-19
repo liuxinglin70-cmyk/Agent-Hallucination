@@ -915,6 +915,61 @@ class ResearchRun:
             note.get("provider_called") for note in record.get("notes") or []
         )
 
+    # ------------------------------------------------------------------
+    def _seed_route_candidate(self, spec: Mapping[str, Any]) -> None:
+        """Load a frozen candidate from a prior run into this one.
+
+        A seed lets an instrument round re-measure an already-frozen
+        candidate without re-drafting: the manifest pins the source run,
+        version and candidate hash, the record is re-validated by the same
+        contract checks as a fresh draft, and it is re-screened under this
+        run's own evaluation identity. Any mismatch fails closed before
+        evaluation budget is spent; a seed never bypasses the screening
+        verdict and never touches the proposer budget.
+        """
+        spec = dict(spec)
+        route = str(spec.get("route") or "C")
+        source = (
+            Path(spec["source_run"]) / str(spec["version"]) / "candidate.json"
+        )
+        try:
+            record = json.loads(source.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(
+                f"seed candidate record unreadable at {source!r}: {exc}"
+            ) from exc
+        candidate = record.get("candidate")
+        if not isinstance(candidate, Mapping):
+            raise RuntimeError(
+                f"seed candidate record {source!r} carries no candidate"
+            )
+        pinned = str(spec.get("candidate_hash") or "")
+        actual = canonical_hash(candidate)
+        if not pinned or actual != pinned:
+            raise RuntimeError(
+                f"seed candidate hash mismatch: manifest pins {pinned!r}, "
+                f"source record hashes to {actual!r}"
+            )
+        verdict, reason = self._candidate_verdict(candidate)
+        if verdict != "accepted":
+            raise RuntimeError(
+                f"seed candidate rejected by contract: {reason}"
+            )
+        version_id = self._new_version_id()
+        evaluation = self._evaluate_version(route, version_id, candidate)
+        screening = self.screening_verdict(candidate, evaluation["results"])
+        self._record_version(
+            route, version_id, candidate, parent=None, diagnosis=None,
+            draft_notes=[{
+                "seeded_from": {
+                    "source_run": str(spec["source_run"]),
+                    "version": str(spec["version"]),
+                    "candidate_hash": pinned,
+                },
+            }],
+            evaluation=evaluation, verdict=screening,
+        )
+
     def execute(self) -> dict[str, Any]:
         self.frozen_manifest = self.freeze_manifest()
         self._load_existing_versions()
@@ -923,8 +978,21 @@ class ResearchRun:
             self.output_dir / "baseline" / "summary.json",
             self.baseline_rows,
         )
+        seed_spec = dict(
+            (self.frozen_manifest.get("input_manifest") or {}).get(
+                "seed_candidate"
+            )
+            or {}
+        )
         status = "screening_complete"
         try:
+            if seed_spec:
+                seed_route = str(seed_spec.get("route") or "C")
+                # Idempotent on resume: the seed is already on disk as a
+                # route version, so a partial run continues instead of
+                # re-seeding.
+                if not self._route_records(seed_route):
+                    self._seed_route_candidate(seed_spec)
             for route in self.frozen_manifest["routes"]:
                 self.routes.setdefault(route, {"versions": [], "notes": []})
                 records = self._route_records(route)
