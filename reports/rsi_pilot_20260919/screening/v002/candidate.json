@@ -1,0 +1,123 @@
+{
+  "version_id": "v002",
+  "route": "B",
+  "kind": "revision",
+  "candidate": {
+    "type": "text_boundary",
+    "hook": "judge.system",
+    "trigger": {
+      "packet_features": [
+        "has_tool_calls"
+      ],
+      "facts": []
+    },
+    "body": {
+      "directive": "Before any positive verdict, bind the content the task quotes for delivery to the final tool-call arguments rather than to the assistant's prose summary. When the task instructs the agent to write down, jot, record, or post specific quoted content, that content must reach its delivered argument exactly as quoted: convict when the delivered argument wraps the quote in unrequested template scaffolding, invented attribution prefixes, or placeholder text, when a quoted span is dropped or altered, or when items the task assigns to dedicated parameters (such as tweet tags or mentions) are merged into the main body text while those parameters are left empty.",
+      "not_when": "Do not apply this binding check when the task asks the agent to draft, compose, or maintain a document without quoting exact lines to record, when the task explicitly requests expansion, reformatting, or elaboration beyond the quoted text, when the quoted text only names a file or record to inspect rather than content to deliver, or when the delivered arguments already carry the quoted content in the assigned parameters."
+    },
+    "claim": {
+      "expected_behavior": "The judge convicts deliveries that add unrequested scaffolding, fabricated attribution, or placeholder text around quoted content, drop or alter quoted spans, or merge parameter-assigned items such as hashtags and mentions into the body while their dedicated parameters stay empty, instead of passing them as clean completions.",
+      "target_polarity": "recall"
+    },
+    "provenance": {
+      "cycle": 2,
+      "failure_family": "FAM-fn-quoted-content-vs-delivered",
+      "failure_cases": [
+        "BFCL/002.json",
+        "BFCL/153.json"
+      ]
+    },
+    "schema_version": "detector.intervention.v1",
+    "intervention_id": "IV-2-001"
+  },
+  "candidate_hash": "226469d782db2036d720695db86d33c7ae028c25c15d60c527a5f9a6aba71b30",
+  "parent_hash": "945fa4761d2cc082928fbf79d304343612d62f3c2b96e0ad0bde716b295b25cf",
+  "notes": [
+    {
+      "generator": "llm",
+      "provider_called": true,
+      "provider_ok": true,
+      "purpose": "evolution_proposer",
+      "model": "glm-5.3-flash",
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 4182,
+        "completion_tokens": 7772,
+        "total_tokens": 11954,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 7122
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 7122
+        },
+        "input_tokens": 4182,
+        "output_tokens": 7772
+      }
+    },
+    {
+      "intervention_id": "IV-2-001",
+      "family": "FAM-fn-quoted-content-vs-delivered",
+      "generator": "llm",
+      "frozen_judge_replay_compatible": false
+    },
+    {
+      "intervention_id": "IV-2-002",
+      "family": "FAM-fn-quoted-content-vs-delivered",
+      "generator": "llm",
+      "frozen_judge_replay_compatible": false
+    }
+  ],
+  "evaluation": {
+    "identity": {
+      "candidate_hash": "226469d782db2036d720695db86d33c7ae028c25c15d60c527a5f9a6aba71b30",
+      "registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+      "case_set": [
+        "BFCL/002.json",
+        "BFCL/153.json",
+        "BFCL/020.json",
+        "BFCL/053.json"
+      ],
+      "config_hash": "9b3f6b7df772b1ae765e3dd97b047cc1185707fa85c154a9823bba6dbcf3a6db",
+      "code_baseline": "c51bbd7",
+      "evaluation_mode": "fresh_full_detection_no_judge_cache"
+    },
+    "reused": false,
+    "source_version": null
+  },
+  "verdict": {
+    "passed": true,
+    "training": {
+      "BFCL/002.json": {
+        "repaired": true,
+        "state": "verified_error",
+        "responsible_step": 6,
+        "target_step": 6,
+        "target_aligned": true
+      },
+      "BFCL/153.json": {
+        "repaired": true,
+        "state": "verified_error",
+        "responsible_step": 14,
+        "target_step": 14,
+        "target_aligned": true
+      }
+    },
+    "neighbors": {
+      "BFCL/020.json": {
+        "clean": true,
+        "state": "verified_clean"
+      },
+      "BFCL/053.json": {
+        "clean": true,
+        "state": "verified_clean"
+      }
+    },
+    "reasons": []
+  }
+}

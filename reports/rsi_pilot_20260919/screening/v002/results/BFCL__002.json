@@ -1,0 +1,560 @@
+{
+  "case_id": "BFCL/002.json",
+  "role": "training_failure",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 6,
+  "registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/002.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_006",
+    "responsible_step": 6,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_006",
+      "responsible_step": 6,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 6,
+          "traced_step": 6,
+          "defense": "substantiated",
+          "confirmed_step": 6,
+          "delivered_result": "TeamNotes.txt was written with the content 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+          "correct_result": "TeamNotes.txt should contain the quoted line 'Collaboration leads to success. Innovation ignites growth.' jotted down exactly as quoted, with no added scaffolding, attribution prefix, or placeholder text.",
+          "judge_basis": "task_requirement",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 6,
+        "hallucination_reason": "The echo call recorded the quoted insight wrapped in unrequested template scaffolding (a title, purpose statement, and divider), an invented 'Simona: ' attribution prefix, and a '[Start adding your ideas here]' placeholder, instead of jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt as the task required.",
+        "delivered_result": "TeamNotes.txt was written with the content 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+        "correct_result": "TeamNotes.txt should contain the quoted line 'Collaboration leads to success. Innovation ignites growth.' jotted down exactly as quoted, with no added scaffolding, attribution prefix, or placeholder text.",
+        "basis": "task_requirement",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_006",
+          "event_008"
+        ],
+        "root_cause": {
+          "step": 6,
+          "quote": "Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]",
+          "referent": "Collaboration leads to success. Innovation ignites growth."
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "Jot down exactly 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Create a document titled 'TeamNotes.txt' in the documents folder for keeping track of fresh ideas"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Identify and explain the line-by-line distinctions between ideas.txt and TeamNotes.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Copy TeamNotes.txt into the Archived directory (ensuring it exists in the documents folder) under the name IdeasArchive.txt while keeping the original intact"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Display the contents of IdeasArchive.txt for Simona"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 6,
+        "quote": "echo arguments={'file_name': 'TeamNotes.txt', 'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'}",
+        "referent": "The echo content should have been exactly 'Collaboration leads to success. Innovation ignites growth.' — jotting the quoted line into TeamNotes.txt with no title, purpose statement, divider, 'Simona: ' attribution prefix, or '[Start adding your ideas here]' placeholder.",
+        "evidence_refs": [
+          "event_006",
+          "event_008"
+        ],
+        "reason": "Event_006 is the first assistant-authored step that wrote the wrong content into TeamNotes.txt, wrapping the quoted insight in unrequested scaffolding, an invented 'Simona: ' prefix, and a placeholder instead of jotting the exact quoted line; event_008's cat only reveals this pre-existing error."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 6,
+        "evidence_refs": [
+          "event_006",
+          "event_008"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: Turn 2 fixes the required action as jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt. At event_006 the assistant's echo call instead wrote 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n' — a fabricated title line, purpose statement, divider, an unrequested 'Simona: ' attribution prefix attached to the quoted line, and an invented '[Start adding your ideas here]' placeholder. None of this scaffolding appears in the task contract; it is assistant-invented file content, not a mere representation of the requested value (the quoted line itself is buried inside a modified, prefixed form). The deviation is confirmed as the committed state, not a transient slip: the event_008 cat observation shows TeamNotes.txt still contains exactly this template, so the error was never corrected. RELEVANCE TEST: event_006 is the earliest assistant-authored introduction of the wrong file content and is causally connected to the delivered state — the file content the trajectory commits and later reads (event_008) is the product of this echo call. Correcting event_006 to write the quoted line as required would make the turn-2 deliverable (the file's content) correct, and no later event in the shown evidence repairs or overrides it. The added purpose text and placeholder are substantive invented content, not formatting-only or process-only deviation, and the prose at event_007 presents the file as updated as requested, so the breach stands regardless of the plausible-sounding final text."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 6,
+            "reason": "The echo call recorded the quoted insight wrapped in unrequested template scaffolding (a title, purpose statement, and divider), an invented 'Simona: ' attribution prefix, and a '[Start adding your ideas here]' placeholder, instead of jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt as the task required.",
+            "evidence_refs": [
+              "event_006",
+              "event_008"
+            ],
+            "quote": "Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]",
+            "delivered_result": "TeamNotes.txt was written with the content 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+            "correct_result": "TeamNotes.txt should contain the quoted line 'Collaboration leads to success. Innovation ignites growth.' jotted down exactly as quoted, with no added scaffolding, attribution prefix, or placeholder text."
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 6,
+              "quote": "echo arguments={'file_name': 'TeamNotes.txt', 'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'}",
+              "referent": "The echo content should have been exactly 'Collaboration leads to success. Innovation ignites growth.' — jotting the quoted line into TeamNotes.txt with no title, purpose statement, divider, 'Simona: ' attribution prefix, or '[Start adding your ideas here]' placeholder.",
+              "evidence_refs": [
+                "event_006",
+                "event_008"
+              ],
+              "reason": "Event_006 is the first assistant-authored step that wrote the wrong content into TeamNotes.txt, wrapping the quoted insight in unrequested scaffolding, an invented 'Simona: ' prefix, and a placeholder instead of jotting the exact quoted line; event_008's cat only reveals this pre-existing error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2647,
+                "completion_tokens": 760,
+                "total_tokens": 3407,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 500
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 500
+                },
+                "input_tokens": 2647,
+                "output_tokens": 760
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"echo arguments={'file_name': 'TeamNotes.txt', 'content': 'TeamNotes.txt\\\\n\\\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\\\n\\\\n---\\\\n\\\\n"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 6,
+              "reason": "The echo call recorded the quoted insight wrapped in unrequested template scaffolding (a title, purpose statement, and divider), an invented 'Simona: ' attribution prefix, and a '[Start adding your ideas here]' placeholder, instead of jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt as the task required.",
+              "delivered_result": "TeamNotes.txt was written with the content 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+              "correct_result": "TeamNotes.txt should contain the quoted line 'Collaboration leads to success. Innovation ignites growth.' jotted down exactly as quoted, with no added scaffolding, attribution prefix, or placeholder text.",
+              "evidence_refs": [
+                "event_006",
+                "event_008"
+              ],
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Jot down exactly 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Create a document titled 'TeamNotes.txt' in the documents folder for keeping track of fresh ideas"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Identify and explain the line-by-line distinctions between ideas.txt and TeamNotes.txt"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Copy TeamNotes.txt into the Archived directory (ensuring it exists in the documents folder) under the name IdeasArchive.txt while keeping the original intact"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Display the contents of IdeasArchive.txt for Simona"
+                }
+              ],
+              "confidence": "high",
+              "quote": "Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017",
+                "event_018",
+                "event_019",
+                "event_020",
+                "event_021",
+                "event_022"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006",
+                "event_008"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: Turn 2 fixes the required action as jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt. At event_006 the assistant's echo call instead wrote 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n' — a fabricated title line, purpose statement, divider, an unrequested 'Simona: ' attribution prefix attached to the quoted line, and an invented '[Start adding your ideas here]' placeholder. None of this scaffolding appears in the task contract; it is assistant-invented file content, not a mere representation of the requested value (the quoted line itself is buried inside a modified, prefixed form). The deviation is confirmed as the committed state, not a transient slip: the event_008 cat observation shows TeamNotes.txt still contains exactly this template, so the error was never corrected. RELEVANCE TEST: event_006 is the earliest assistant-authored introduction of the wrong file content and is causally connected to the delivered state — the file content the trajectory commits and later reads (event_008) is the product of this echo call. Correcting event_006 to write the quoted line as required would make the turn-2 deliverable (the file's content) correct, and no later event in the shown evidence repairs or overrides it. The added purpose text and placeholder are substantive invented content, not formatting-only or process-only deviation, and the prose at event_007 presents the file as updated as requested, so the breach stands regardless of the plausible-sounding final text."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the required action as jotting down the quoted line 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt. At event_006 the assistant's echo call instead wrote 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n' — a fabricated title line, purpose statement, divider, an unrequested 'Simona: ' attribution prefix attached to the quoted line, and an invented '[Start adding your ideas here]' placeholder. None of this scaffolding appears in the task contract; it is assistant-invented file content, not a mere representation of the requested value (the quoted line itself is buried inside a modified, prefixed form). The deviation is confirmed as the committed state, not a transient slip: the event_008 cat observation shows TeamNotes.txt still contains exactly this template, so the error was never corrected. RELEVANCE TEST: event_006 is the earliest assistant-authored introduction of the wrong file content and is causally connected to the delivered state — the file content the trajectory commits and later reads (event_008) is the product of this echo call. Correcting event_006 to write the quoted line as required would make the turn-2 deliverable (the file's content) correct, and no later event in the shown evidence repairs or overrides it. The added purpose text and placeholder are substantive invented content, not formatting-only or process-only deviation, and the prose at event_007 presents the file as updated as requested, so the breach stands regardless of the plausible-sounding final text."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The task in turn 2 was to 'jot down' the quoted line into TeamNotes.txt. The echo call at event_006 writes the line verbatim ('Simona: Collaboration leads to success. Innovation ignites growth.'), and the cat at event_008 confirms the file contains it. The added title, purpose statement, and placeholder are consistent with the turn-1 request to create a document 'for keeping track of all the fresh ideas' — an invitation to add thoughts — and no explicit contract fixes the file's exact byte content or forbids scaffolding. The required referent (the quoted insight) is present and correct; the extra scaffolding is at most stylistic, not a result error, deliverable breach, or false completion."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the deliverable as jotting down 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt. At event_006 the echo call instead wrote 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n' — the quote is embedded in an invented 'Simona: '-attributed line plus an unrequested title, purpose statement, divider and placeholder. These additions are new invented content, not a conventional representation of the quoted line, so the rule-5 serialization allowance does not apply; under grounding rule 1 the fixed write-content belongs to the deliverable and the deviation in the call is real regardless of event_007's plausible-sounding prose ('Simona's insights...have been added'), which does not repair a deliverable breach. RELEVANCE TEST: No later correction exists — the event_008 cat of TeamNotes.txt confirms the file still holds the scaffolded content, and that very invented content is what produced the ideas.txt-vs-TeamNotes.txt discrepancies Simona raises at turn 3 (ideas.txt contains exactly the quote). Correcting event_006 to write the quoted line alone would fix the committed file state that causally feeds the comparison and archive deliverables. Real and material (DELIVERABLE BREACH in the required write action)."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2569,
+                "completion_tokens": 6486,
+                "total_tokens": 9055,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 6105
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 6105
+                },
+                "input_tokens": 2569,
+                "output_tokens": 6486
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_008\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: Turn 2 fixes the deliverable as jotting down 'Collaboration leads to success. Innovation ignites growth.' into T",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "refuted",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 2,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017",
+                "event_018",
+                "event_019",
+                "event_020",
+                "event_021",
+                "event_022"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 5,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+        "active_interventions": [
+          "IV-2-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-2-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 5,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3621,
+          "completion_tokens": 3128,
+          "total_tokens": 6749,
+          "prompt_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2471
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2471
+          },
+          "input_tokens": 3621,
+          "output_tokens": 3128
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":6,\"hallucination_reason\":\"The task quoted exact content to jot down ('Collaboration leads to success. Innovation ignites growth.'), but the echo call delivered it wrapped in unrequested template scaffolding (a title line, purpose statement, section divid",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 3,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2647,
+          "completion_tokens": 760,
+          "total_tokens": 3407,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 500
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 500
+          },
+          "input_tokens": 2647,
+          "output_tokens": 760
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"echo arguments={'file_name': 'TeamNotes.txt', 'content': 'TeamNotes.txt\\\\n\\\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\\\n\\\\n---\\\\n\\\\n"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2569,
+          "completion_tokens": 6486,
+          "total_tokens": 9055,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 6105
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 6105
+          },
+          "input_tokens": 2569,
+          "output_tokens": 6486
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_008\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: Turn 2 fixes the deliverable as jotting down 'Collaboration leads to success. Innovation ignites growth.' into T",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "refuted",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 2,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "0e8650bc5c310e9305d87132ee0c9afcf8d81ba7cc2af30b9b1a7e9fdc16633d",
+      "interventions_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858"
+    },
+    "_packet_event_count": 22
+  }
+}

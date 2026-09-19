@@ -1,0 +1,21 @@
+{
+  "version_id": "v003",
+  "route": "C",
+  "kind": "draft",
+  "candidate": null,
+  "candidate_hash": null,
+  "parent_hash": null,
+  "notes": [
+    {
+      "generator": "llm",
+      "provider_called": false,
+      "reason": "llm_calls budget exhausted for this cycle"
+    },
+    {
+      "no_change": true,
+      "reason": "no research-contract candidate"
+    }
+  ],
+  "evaluation": null,
+  "verdict": null
+}

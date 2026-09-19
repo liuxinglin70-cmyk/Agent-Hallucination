@@ -1,0 +1,85 @@
+backend: detector | proposer: LLMProposer
+{
+ "schema_version": "evolution.research_report.v1",
+ "run_id": "rsi_pilot_screening_20260919",
+ "status": "screening_complete",
+ "mechanism": {
+  "name": "quoted_content_vs_delivered",
+  "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+  "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+  "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪",
+  "target_error_description": {
+   "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+   "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+  }
+ },
+ "routes": {
+  "B": {
+   "versions": [
+    "v001",
+    "v002"
+   ],
+   "notes": [],
+   "selected": "v002",
+   "all_passing": [
+    "v002"
+   ]
+  },
+  "C": {
+   "versions": [
+    "v003"
+   ],
+   "notes": [],
+   "selected": null,
+   "all_passing": []
+  }
+ },
+ "versions": [
+  {
+   "version_id": "v001",
+   "route": "B",
+   "kind": "draft",
+   "has_candidate": true,
+   "candidate_hash": "945fa4761d2cc082928fbf79d304343612d62f3c2b96e0ad0bde716b295b25cf",
+   "parent_hash": null,
+   "verdict_passed": false
+  },
+  {
+   "version_id": "v002",
+   "route": "B",
+   "kind": "revision",
+   "has_candidate": true,
+   "candidate_hash": "226469d782db2036d720695db86d33c7ae028c25c15d60c527a5f9a6aba71b30",
+   "parent_hash": "945fa4761d2cc082928fbf79d304343612d62f3c2b96e0ad0bde716b295b25cf",
+   "verdict_passed": true
+  },
+  {
+   "version_id": "v003",
+   "route": "C",
+   "kind": "draft",
+   "has_candidate": false,
+   "candidate_hash": null,
+   "parent_hash": null,
+   "verdict_passed": null
+  }
+ ],
+ "budget": {
+  "caps": {
+   "baseline_case_evaluations": 0,
+   "screening_case_evaluations": 16,
+   "proposer_calls_per_route": 3,
+   "max_versions": 4
+  },
+  "used": {
+   "baseline_case_evaluations": 0,
+   "screening_case_evaluations": 8,
+   "proposer_calls": {
+    "B": 2,
+    "C": 1
+   },
+   "versions_created": 3
+  }
+ },
+ "stopped": null,
+ "next_stage": "frozen_paired_recheck"
+}

@@ -188,7 +188,7 @@ class ResearchRun:
         files = integrity.get("files") or {}
         for case_id in self.case_ids:
             rel = str(
-                Path(self.dataset_root, case_id),
+                Path(self.dataset_root, case_id).resolve(),
             ).replace("\\", "/")
             if not rel.startswith(raw_prefix + "/"):
                 raise ValueError(
@@ -746,11 +746,19 @@ class ResearchRun:
         )
         return {"route": route, "outcome": "screened", "record": record}
 
+    # Route cycle offsets: the proposer's LLM budget is counted per cycle on
+    # the shared instance, so two routes sharing cycle 1 would silently starve
+    # the second route (observed live: route C's draft came back
+    # "llm_calls budget exhausted"). B drafts at cycle 1 / revises at 2; C
+    # drafts at 3 / revises at 4.
+    ROUTE_DRAFT_CYCLE = {"B": 1, "C": 3}
+    ROUTE_REVISION_CYCLE = {"B": 2, "C": 4}
+
     def _revision_packet(
         self, route: str, parent: Mapping[str, Any], diagnosis: Mapping[str, Any],
     ) -> dict[str, Any]:
         base = dict(self._route_packet(route))
-        base["cycle"] = 2
+        base["cycle"] = self.ROUTE_REVISION_CYCLE.get(route, 2)
         if route == "C":
             packet = dict(base.get("research_packet") or {})
             packet["revision"] = diagnosis
@@ -769,7 +777,7 @@ class ResearchRun:
 
     def _route_packet(self, route: str) -> dict[str, Any]:
         packet: dict[str, Any] = {
-            "cycle": 1,
+            "cycle": self.ROUTE_DRAFT_CYCLE.get(route, 1),
             "max_proposals": 3,
             "memory_context": self.manifest.get("memory_context") or {},
         }

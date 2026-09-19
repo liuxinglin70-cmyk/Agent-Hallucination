@@ -1,0 +1,30 @@
+{
+  "BFCL/002.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "artifacts/detector/runs/rsi_pilot_h0_expansion_20260919"
+  },
+  "BFCL/153.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "artifacts/detector/runs/rsi_pilot_h0_expansion_20260919"
+  },
+  "BFCL/020.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "artifacts/detector/runs/rsi_pilot_h0_20260919"
+  },
+  "BFCL/053.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "artifacts/detector/runs/rsi_pilot_h0_20260919"
+  }
+}
