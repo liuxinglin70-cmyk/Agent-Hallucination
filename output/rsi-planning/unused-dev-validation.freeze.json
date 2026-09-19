@@ -9,7 +9,7 @@
     "h0"
   ],
   "repetitions": 2,
-  "budget_case_evaluations": 12,
+  "budget_case_evaluations": 18,
   "cases": [
     {
       "case_id": "BFCL/008.json",
@@ -32,5 +32,6 @@
       "reason": "过度触发风险边界：任务未引用确切原文、agent 合法重编号呈现；H0 在此为 FP——候选的 not_when 必须保护它",
       "expected": "保持 verified_clean"
     }
-  ]
+  ],
+  "budget_note": "3 臂（v002/v005/h0）× 3 例 × 2 次重复 = 18；方案验证行上限 32，累计 77/96"
 }

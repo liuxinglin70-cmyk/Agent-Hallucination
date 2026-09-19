@@ -1162,7 +1162,7 @@ def _repeat_verdict(
             and row.get("state") == "verified_clean"
             and authoritative
         )
-        if role == "training_failure" and candidate:
+        if role == "training_failure":
             target_step = target_steps.get(case_id)
             target_ok = (
                 row.get("responsible_step") is None
@@ -1173,6 +1173,8 @@ def _repeat_verdict(
                 "repaired": positive and target_ok,
                 "state": row.get("state"),
                 "responsible_step": row.get("responsible_step"),
+                # Contrast read for the H0 arm (no gate of its own).
+                "prediction": bool(row.get("prediction")),
             }
         elif role == "regression":
             neighbors[case_id] = {
