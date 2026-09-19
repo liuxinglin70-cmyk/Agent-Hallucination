@@ -251,6 +251,11 @@ class LLMProposer:
         self.rejected_keys: set[tuple[Any, ...]] = set()
         self.rejected_group_keys: set[frozenset[tuple[Any, ...]]] = set()
         self.memory_context: dict[str, Any] = {}
+        # Bounded research-packet supply (research entry only, doc §8.2):
+        # full training trajectories, per-stage baseline results and the
+        # human-reviewed target-error description. Absent for every caller
+        # but the research entry, in which case drafting is unchanged.
+        self.research_packet: dict[str, Any] = {}
 
     def set_memory_context(
         self, context: Mapping[str, Any] | None,
@@ -263,6 +268,20 @@ class LLMProposer:
         scored, and supplying them changes no gate.
         """
         self.memory_context = dict(context or {})
+
+    def set_research_packet(
+        self, packet: Mapping[str, Any] | None,
+    ) -> None:
+        """Attach the bounded research packet as drafting context.
+
+        The packet carries what the truncated field profiles cannot: the
+        complete post-``project_record`` question/history of the training
+        cases, per-stage baseline results, and the human-reviewed target
+        error description. It is drafting input only — it never reaches the
+        detector, and the candidate it produces is checked for case-id
+        leakage downstream.
+        """
+        self.research_packet = dict(packet or {})
 
     def set_rejection_feedback(
         self, feedback: Sequence[Mapping[str, Any]],
@@ -412,6 +431,9 @@ class LLMProposer:
         )
         active_block = json.dumps(self._registry_digest(), ensure_ascii=False)
         memory_block = json.dumps(self.memory_context, ensure_ascii=False)
+        research_block = json.dumps(
+            self.research_packet, ensure_ascii=False,
+        ) if self.research_packet else ""
         feedback_block = json.dumps(
             [
                 {
@@ -454,7 +476,17 @@ class LLMProposer:
             f"explain families no current route can treat. Reuse a procedure "
             f"when the mechanism matches; do not re-derive it from scratch:\n"
             f"{memory_block}\n\n"
-            f"Stable bare-base failure families:\n{family_block}\n\n"
+            + (
+                f"Research packet (bounded, read-only): complete training-case "
+                f"trajectories after label projection, per-stage baseline "
+                f"results, and the reviewed target-error description. Use the "
+                f"concrete evidence to locate which claim loses which fact at "
+                f"which stage; the drafted intervention must describe a "
+                f"transferable verification operation, never per-case "
+                f"constants or case identifiers:\n{research_block}\n\n"
+                if research_block else ""
+            )
+            + f"Stable bare-base failure families:\n{family_block}\n\n"
             f"Draft at most {max_proposals} interventions."
         )
         try:
@@ -892,6 +924,12 @@ class HybridProposer:
     ) -> None:
         """Forward gate rejections so the next draft avoids them."""
         self.llm.set_rejection_feedback(feedback)
+
+    def set_research_packet(
+        self, packet: Mapping[str, Any] | None,
+    ) -> None:
+        """Forward the bounded research packet to the LLM drafting stage."""
+        self.llm.set_research_packet(packet)
 
     def set_memory_context(
         self, context: Mapping[str, Any] | None,
