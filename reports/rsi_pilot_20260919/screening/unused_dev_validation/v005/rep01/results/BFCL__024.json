@@ -1,0 +1,504 @@
+{
+  "case_id": "BFCL/024.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 5,
+  "registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/024.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_005",
+      "responsible_step": 5,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 5,
+          "traced_step": 5,
+          "defense": "substantiated",
+          "confirmed_step": 5,
+          "delivered_result": "Tweet ID 3 posted by apollo_scientist with body: '🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle'",
+          "correct_result": "A tweet on the user's profile whose body shares the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+          "judge_basis": "task_requirement",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 5,
+        "hallucination_reason": "The task required the tweet body to carry the file's content exactly as it is, but the post_tweet content parameter wrapped the JSON in markdown code fences and added an unrequested purpose-statement preamble, invented hashtags, and a fabricated placeholder mention '@YourHandle' that are not part of the file content.",
+        "delivered_result": "Tweet ID 3 posted by apollo_scientist with body: '🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle'",
+        "correct_result": "A tweet on the user's profile whose body shares the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+        "basis": "task_requirement",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "root_cause": {
+          "step": 5,
+          "quote": "🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle",
+          "referent": "{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — the file content that turn 2 required to be placed in the tweet body exactly as it is"
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "The tweet body must contain the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Craft and broadcast a tweet on the user's profile (post_tweet) sharing the discovery of the hidden test result files"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 5,
+        "quote": "name=post_tweet arguments={'content': '🚀 Unveiling the Apollo Project\\'s secret test results! Here\\'s what we found:\\n\\n\\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\\n\\n\\n#ApolloProject #Success #TechRevealed @YourHandle', 'tags': ['#ApolloProject', '#Success'], 'mentions': ['@YourHandle']}",
+        "referent": "post_tweet content should be exactly the file content as-is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} with no preamble, markdown code fences, invented hashtags, or '@YourHandle' mention",
+        "evidence_refs": [
+          "event_005"
+        ],
+        "reason": "Step 5 (event_005) is the first place the wrong tweet body appears — the preamble, code fences, hashtags, and @YourHandle are introduced in the post_tweet arguments, whereas earlier steps (event_003/event_004) only correctly retrieved and reported the file content and never authored the tweet."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 5,
+        "evidence_refs": [
+          "event_003",
+          "event_005",
+          "event_006"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: Turn 2 fixes an explicit verbatim-content contract — the tweet body must share the file's entire content 'exactly as it is'. event_003 establishes the file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}. At event_005 the assistant called post_tweet with content that wraps that JSON in ```json code fences, prepends an unrequested preamble ('🚀 Unveiling the Apollo Project's secret test results! Here's what we found:'), and appends invented hashtags (#ApolloProject #Success #TechRevealed) plus a fabricated placeholder mention '@YourHandle' — none of which exist in the file, and '@YourHandle' is not even the user's actual handle (apollo_scientist per the observation). The delivered body is therefore not the file content 'exactly as it is'; this is a DELIVERABLE BREACH of an explicit verbatim contract, material by definition, not mere formatting. RELEVANCE TEST: The error is causally connected to the delivered state — the tweet was actually posted (id 3) with this deviant body and never corrected; event_006 merely reports the posted tweet. Correcting event_005 to post the exact file content would make every deliverable correct, since event_004's turn-1 answer already matches the observed file content. Step 5 is the earliest assistant-authored introduction of the wrong tweet body."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 5,
+            "reason": "The task required the tweet body to carry the file's content exactly as it is, but the post_tweet content parameter wrapped the JSON in markdown code fences and added an unrequested purpose-statement preamble, invented hashtags, and a fabricated placeholder mention '@YourHandle' that are not part of the file content.",
+            "evidence_refs": [
+              "event_003",
+              "event_005"
+            ],
+            "quote": "🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle",
+            "delivered_result": "Tweet ID 3 posted by apollo_scientist with body: '🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle'",
+            "correct_result": "A tweet on the user's profile whose body shares the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 5,
+              "quote": "name=post_tweet arguments={'content': '🚀 Unveiling the Apollo Project\\'s secret test results! Here\\'s what we found:\\n\\n\\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\\n\\n\\n#ApolloProject #Success #TechRevealed @YourHandle', 'tags': ['#ApolloProject', '#Success'], 'mentions': ['@YourHandle']}",
+              "referent": "post_tweet content should be exactly the file content as-is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} with no preamble, markdown code fences, invented hashtags, or '@YourHandle' mention",
+              "evidence_refs": [
+                "event_005"
+              ],
+              "reason": "Step 5 (event_005) is the first place the wrong tweet body appears — the preamble, code fences, hashtags, and @YourHandle are introduced in the post_tweet arguments, whereas earlier steps (event_003/event_004) only correctly retrieved and reported the file content and never authored the tweet."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1523,
+                "completion_tokens": 805,
+                "total_tokens": 2328,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 543
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 543
+                },
+                "input_tokens": 1523,
+                "output_tokens": 805
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\"step\": 5, \"quote\": \"name=post_tweet arguments={'content': '🚀 Unveiling the Apollo Project\\\\'s secret test results! Here\\\\'s what we found:\\\\n\\\\n\\\\n{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}\\\\n\\\\n\\\\n#ApolloProject #Success #TechRevealed "
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 5,
+              "reason": "The task required the tweet body to carry the file's content exactly as it is, but the post_tweet content parameter wrapped the JSON in markdown code fences and added an unrequested purpose-statement preamble, invented hashtags, and a fabricated placeholder mention '@YourHandle' that are not part of the file content.",
+              "delivered_result": "Tweet ID 3 posted by apollo_scientist with body: '🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle'",
+              "correct_result": "A tweet on the user's profile whose body shares the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "The tweet body must contain the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Craft and broadcast a tweet on the user's profile (post_tweet) sharing the discovery of the hidden test result files"
+                }
+              ],
+              "confidence": "medium",
+              "quote": "🚀 Unveiling the Apollo Project's secret test results! Here's what we found:\n\n\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n\n\n#ApolloProject #Success #TechRevealed @YourHandle"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 5,
+              "evidence_refs": [
+                "event_003",
+                "event_005",
+                "event_006"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: Turn 2 fixes an explicit verbatim-content contract — the tweet body must share the file's entire content 'exactly as it is'. event_003 establishes the file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}. At event_005 the assistant called post_tweet with content that wraps that JSON in ```json code fences, prepends an unrequested preamble ('🚀 Unveiling the Apollo Project's secret test results! Here's what we found:'), and appends invented hashtags (#ApolloProject #Success #TechRevealed) plus a fabricated placeholder mention '@YourHandle' — none of which exist in the file, and '@YourHandle' is not even the user's actual handle (apollo_scientist per the observation). The delivered body is therefore not the file content 'exactly as it is'; this is a DELIVERABLE BREACH of an explicit verbatim contract, material by definition, not mere formatting. RELEVANCE TEST: The error is causally connected to the delivered state — the tweet was actually posted (id 3) with this deviant body and never corrected; event_006 merely reports the posted tweet. Correcting event_005 to post the exact file content would make every deliverable correct, since event_004's turn-1 answer already matches the observed file content. Step 5 is the earliest assistant-authored introduction of the wrong tweet body."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005",
+                  "event_006"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes an explicit verbatim-content contract — the tweet body must share the file's entire content 'exactly as it is'. event_003 establishes the file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}. At event_005 the assistant called post_tweet with content that wraps that JSON in ```json code fences, prepends an unrequested preamble ('🚀 Unveiling the Apollo Project's secret test results! Here's what we found:'), and appends invented hashtags (#ApolloProject #Success #TechRevealed) plus a fabricated placeholder mention '@YourHandle' — none of which exist in the file, and '@YourHandle' is not even the user's actual handle (apollo_scientist per the observation). The delivered body is therefore not the file content 'exactly as it is'; this is a DELIVERABLE BREACH of an explicit verbatim contract, material by definition, not mere formatting. RELEVANCE TEST: The error is causally connected to the delivered state — the tweet was actually posted (id 3) with this deviant body and never corrected; event_006 merely reports the posted tweet. Correcting event_005 to post the exact file content would make every deliverable correct, since event_004's turn-1 answer already matches the observed file content. Step 5 is the earliest assistant-authored introduction of the wrong tweet body."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The turn-2 contract fixes the tweet body verbatim: 'sharing ... these previously hidden test result files exactly as it is in the body of the tweet! Share the entire content of the file.' The environment fact at event_003 gives the exact file content: '{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}'. The action at event_005 instead posts content='🚀 Unveiling the Apollo Project\\'s secret test results! Here\\'s what we found:\\n\\n```json\\n{  \"experiment\": ...}\\n```\\n\\n#ApolloProject #Success #TechRevealed @YourHandle' — the file content is wrapped in markdown code fences (and its leading brace whitespace altered from '{\"experiment\"' to '{  \"experiment\"'), padded with an unrequested preamble sentence, invented hashtags (#Success, #TechRevealed), and a fabricated '@YourHandle' mention that appears nowhere in the file or task. This is an observed deviation in a fixed tool argument/deliverable content, real regardless of the final answer text, and it violates an explicit verbatim-content contract, so it is material by definition — not mere formatting. Localization: event_004 is a correct prose answer to turn 1 and does not commit the tweet; the error is first introduced in the post_tweet call at event_005; event_006 only repeats the posted tweet as evidence of delivery. RELEVANCE TEST: Correcting event_005 to post the file content exactly as given would make the turn-2 deliverable (a tweet on the user's profile whose body carries the entire file content exactly as it is) correct, and event_006 would then accurately report it; the turn-1 answer at event_004 is already correct and unaffected. Both tests pass."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "Content test: event_003's cat observation establishes the file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}. The task (turn 2) explicitly fixes the tweet body: 'sharing... these previously hidden test result files exactly as it is in the body of the tweet! Share the entire content of the file.' Yet event_005's post_tweet call passes content='🚀 Unveiling the Apollo Project\\'s secret test results! Here\\'s what we found:\\n\\n```json\\n{...}\\n```\\n\\n#ApolloProject #Success #TechRevealed @YourHandle' — the JSON is wrapped in markdown code fences with a 'json' tag, preceded by an unrequested preamble, and followed by invented hashtags '#TechRevealed' plus a fabricated mention '@YourHandle' that appears nowhere in the file or the task. The delivered body is therefore not the file content 'exactly as it is'; under the explicit verbatim-content contract this deviation is a DELIVERABLE BREACH in the tool argument itself, material by definition regardless of event_006's plausible-sounding summary. Relevance test: correcting the event_005 post_tweet arguments to post the raw file content as the body would satisfy every deliverable — event_004 already correctly reported the file contents for turn 1, and event_006 merely reports whatever tweet was posted. Step 5 is the earliest assistant-authored introduction of the wrong tweet body and is causally connected to the delivered state (tweet ID 3 with the altered body, confirmed by its own observation)."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2421,
+                "completion_tokens": 1742,
+                "total_tokens": 4163,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2368
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1333
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2368
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1333
+                },
+                "input_tokens": 2421,
+                "output_tokens": 1742
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"Content test: event_003's cat observation establishes the file content as {\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2515,
+          "completion_tokens": 5922,
+          "total_tokens": 8437,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5634
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5634
+          },
+          "input_tokens": 2515,
+          "output_tokens": 5922
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Located ./project/test_results., read it, reported its content ({\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}), and posted tweet (id 3) whose bo",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 2,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1523,
+          "completion_tokens": 805,
+          "total_tokens": 2328,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 543
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 543
+          },
+          "input_tokens": 1523,
+          "output_tokens": 805
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\"step\": 5, \"quote\": \"name=post_tweet arguments={'content': '🚀 Unveiling the Apollo Project\\\\'s secret test results! Here\\\\'s what we found:\\\\n\\\\n\\\\n{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}\\\\n\\\\n\\\\n#ApolloProject #Success #TechRevealed "
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2421,
+          "completion_tokens": 1742,
+          "total_tokens": 4163,
+          "prompt_tokens_details": {
+            "cached_tokens": 2368
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1333
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2368
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1333
+          },
+          "input_tokens": 2421,
+          "output_tokens": 1742
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"Content test: event_003's cat observation establishes the file content as {\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "a2241486cce310acfbe77d1f194b5e49144ee84c54181d72b4e0517fafdd9b02",
+      "interventions_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc"
+    },
+    "_packet_event_count": 6
+  }
+}

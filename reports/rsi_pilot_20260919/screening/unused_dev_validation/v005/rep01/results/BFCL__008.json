@@ -1,0 +1,1193 @@
+{
+  "case_id": "BFCL/008.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 1,
+  "registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/008.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_001",
+    "responsible_step": 1,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_001",
+      "responsible_step": 1,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "judge_step": 3,
+          "traced_step": 1,
+          "defense": "substantiated",
+          "confirmed_step": 1,
+          "delivered_result": "A posted tweet (id 1) with content 'file1.txt, file2.txt #fileshowcase' and an empty tags field (tags: [], mentions: [])",
+          "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the separately required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase'])",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "refuted"
+            },
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c1",
+              "verdict": "substantiated"
+            },
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c3",
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 3,
+        "hallucination_reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty, as confirmed by the observation returning \"tags\": [], so the hashtag was never routed to its dedicated parameter.",
+        "delivered_result": "A posted tweet (id 1) with content 'file1.txt, file2.txt #fileshowcase' and an empty tags field (tags: [], mentions: [])",
+        "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the separately required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase'])",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "root_cause": {
+          "step": 3,
+          "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \"tags\": [], \"mentions\": []}",
+          "referent": "Hashtag '#fileshowcase' must be delivered via the dedicated tags parameter (tags: ['#fileshowcase']) instead of being embedded in the content body while tags remains empty"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Display all available files in the '/temp' directory including hidden ones using the terminal interface"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Draft a Twitter post mentioning only the file names, separated by comma and space"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Include the hashtag '#fileshowcase' in the post, routed to its dedicated parameter rather than only embedded in the body"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "evidence_citations": [],
+          "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent asserted the listing included hidden files ('including hidden ones') instead of verifying that the 'a' flag actually enabled hidden-file display; the observation shows no dot-prefixed entries and the flag's effect is unestablished",
+          "locus_event_id": "event_002",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "evidence_citations": [],
+          "quote": "The available files located within the '/temp' directory, including hidden ones, are:"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent posted the tweet via the post_tweet tool instead of only drafting the post as the task required",
+          "locus_event_id": "event_003",
+          "evidence_refs": [
+            "event_003"
+          ],
+          "evidence_citations": [],
+          "quote": "name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\"id\": 1, \"username\": \"michael\", ...}"
+        },
+        {
+          "candidate_id": "c4",
+          "claim": "the agent presented the tweet as an unposted draft awaiting approval ('Let me know if you want to post it') instead of acknowledging it was already posted, repeating the event_003 error (evidence of delivery, not a separate root cause)",
+          "locus_event_id": "event_004",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "evidence_citations": [],
+          "quote": "Here is a draft for your Twitter post:\\n\\nfile1.txt, file2.txt #fileshowcase\\n\\nLet me know if you want to post it or make any changes!"
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 1,
+        "reason": "The task fixed the target '/temp', but the ls call carried no path and the observation is labeled current_directory_content, so presenting that listing as the contents of '/temp' is an ungrounded misattribution and a wrong-target tool-argument breach that correcting event_001 to list '/temp' directly would fix.",
+        "evidence_refs": [
+          "event_001",
+          "event_002"
+        ],
+        "conflict_note": "",
+        "coverage": "answered",
+        "locus_event_id": "event_001",
+        "evidence_citations": [],
+        "claim": "the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'",
+        "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 1,
+          "reason": "The task fixed the target '/temp', but the ls call carried no path and the observation is labeled current_directory_content, so presenting that listing as the contents of '/temp' is an ungrounded misattribution and a wrong-target tool-argument breach that correcting event_001 to list '/temp' directly would fix.",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "conflict_note": "",
+          "coverage": "answered",
+          "locus_event_id": "event_001",
+          "evidence_citations": [],
+          "claim": "the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'",
+          "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 3,
+          "reason": "The task required only drafting the post, but the agent invoked post_tweet and the observation confirms actual publication (id 1, username michael), a deliverable breach and false completion that a draft-only action at event_003 would have avoided.",
+          "evidence_refs": [
+            "event_003"
+          ],
+          "conflict_note": "",
+          "coverage": "answered",
+          "locus_event_id": "event_003",
+          "evidence_citations": [],
+          "claim": "the agent posted the tweet via the post_tweet tool instead of only drafting the post as the task required",
+          "quote": "name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\"id\": 1, \"username\": \"michael\", ...}"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 1,
+          "reason": "The task fixed the target '/temp', but the ls call carried no path and the observation is labeled current_directory_content, so presenting that listing as the contents of '/temp' is an ungrounded misattribution and a wrong-target tool-argument breach that correcting event_001 to list '/temp' directly would fix.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The agent did pass the hidden-file flag (a=True) and the observation showing no dot-prefixed entries is consistent with the claim that hidden files were included in the request, so no factual error is established and the unestablished flag effect leaves the point undecided rather than material.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 3,
+          "reason": "The task required only drafting the post, but the agent invoked post_tweet and the observation confirms actual publication (id 1, username michael), a deliverable breach and false completion that a draft-only action at event_003 would have avoided.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c4",
+          "content_error": true,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The misrepresentation of a published tweet as an unposted draft is real, but it merely repeats the event_003 posting error as evidence of delivery, and correcting event_004's wording alone would not repair the unauthorized post, so the root cause remains event_003.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": {
+        "step": 3,
+        "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \"tags\": [], \"mentions\": []}",
+        "referent": "post_tweet arguments={'content': 'file1.txt, file2.txt', 'tags': ['#fileshowcase']} — content must contain only the file names separated by comma and space, with the hashtag routed through the dedicated tags parameter",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "reason": "Step 3 is the first assistant-authored step where the required hashtag '#fileshowcase' was embedded into the tweet content body while the dedicated tags parameter was omitted (confirmed by the observation returning tags: []), and no earlier step (event_001 ls call, event_002 file listing) contains this error."
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "The task text (turn 2) requires a post that includes the hashtag '#fileshowcase'; it never fixes a dedicated 'tags' parameter or its arguments. The post_tweet call at event_003 includes the hashtag in the content ('file1.txt, file2.txt #fileshowcase'), which satisfies the task's requirement to include the hashtag; a hashtags-in-content representation preserves the same referent and is not a contract breach. The alleged deviation — hashtag not routed to a 'tags' parameter — is not grounded in any task-fixed deliverable, so the claimed error is not factually real under the grounding rules."
+      },
+      "causal_upgrade_coverage": {
+        "expected": 4,
+        "answered": 4,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 3,
+            "reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty, as confirmed by the observation returning \"tags\": [], so the hashtag was never routed to its dedicated parameter.",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \"tags\": [], \"mentions\": []}",
+            "delivered_result": "A posted tweet (id 1) with content 'file1.txt, file2.txt #fileshowcase' and an empty tags field (tags: [], mentions: [])",
+            "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the separately required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase'])"
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 3,
+              "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \"tags\": [], \"mentions\": []}",
+              "referent": "post_tweet arguments={'content': 'file1.txt, file2.txt', 'tags': ['#fileshowcase']} — content must contain only the file names separated by comma and space, with the hashtag routed through the dedicated tags parameter",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "reason": "Step 3 is the first assistant-authored step where the required hashtag '#fileshowcase' was embedded into the tweet content body while the dedicated tags parameter was omitted (confirmed by the observation returning tags: []), and no earlier step (event_001 ls call, event_002 file listing) contains this error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1035,
+                "completion_tokens": 604,
+                "total_tokens": 1639,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 418
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 418
+                },
+                "input_tokens": 1035,
+                "output_tokens": 604
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \\\"tags\\\": [], \\\"mentions\\\": []}\",\n  \"referent\": \"post_tweet arguments={'content': 'file1.txt, file2.txt', 'tags': ['#fileshowcase']} — content must contain only the file names sep"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 3,
+              "reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty, as confirmed by the observation returning \"tags\": [], so the hashtag was never routed to its dedicated parameter.",
+              "delivered_result": "A posted tweet (id 1) with content 'file1.txt, file2.txt #fileshowcase' and an empty tags field (tags: [], mentions: [])",
+              "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the separately required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase'])",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Display all available files in the '/temp' directory including hidden ones using the terminal interface"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Draft a Twitter post mentioning only the file names, separated by comma and space"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Include the hashtag '#fileshowcase' in the post, routed to its dedicated parameter rather than only embedded in the body"
+                }
+              ],
+              "confidence": "medium",
+              "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \"tags\": [], \"mentions\": []}"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_003"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "The task text (turn 2) requires a post that includes the hashtag '#fileshowcase'; it never fixes a dedicated 'tags' parameter or its arguments. The post_tweet call at event_003 includes the hashtag in the content ('file1.txt, file2.txt #fileshowcase'), which satisfies the task's requirement to include the hashtag; a hashtags-in-content representation preserves the same referent and is not a contract breach. The alleged deviation — hashtag not routed to a 'tags' parameter — is not grounded in any task-fixed deliverable, so the claimed error is not factually real under the grounding rules."
+            },
+            "raw": [
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The task text (turn 2) requires a post that includes the hashtag '#fileshowcase'; it never fixes a dedicated 'tags' parameter or its arguments. The post_tweet call at event_003 includes the hashtag in the content ('file1.txt, file2.txt #fileshowcase'), which satisfies the task's requirement to include the hashtag; a hashtags-in-content representation preserves the same referent and is not a contract breach. The alleged deviation — hashtag not routed to a 'tags' parameter — is not grounded in any task-fixed deliverable, so the claimed error is not factually real under the grounding rules."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: At event_003 the assistant called post_tweet with arguments={'content': 'file1.txt, file2.txt #fileshowcase'}, and the environment observation returned the committed tweet with \"tags\": [] and \"mentions\": []. Turn 2 fixes the contract explicitly: the post must mention 'only the file names seperated them by comma and space' and separately 'include the hashtag #fileshowcase'. The delivered content is not 'only the file names' (the hashtag is appended to the body), and the environment's own tags field confirms the hashtag was never routed to the dedicated tags parameter — the deviation claimed by the verdict is factually real in the committed state, not just in prose. This is a wrong tool argument producing a wrong committed tweet (DELIVERABLE BREACH / RESULT ERROR in the delivered state); since the task text fixes the content form, the violation is material by definition and is not mere formatting or process. RELEVANCE TEST: event_003 is the earliest assistant-authored locus — events 1-2 (ls -a and the file listing) are correct, and event_004 merely repeats the already-posted content ('file1.txt, file2.txt #fileshowcase') as evidence of delivery, not a separate root cause. Correcting event_003 (content='file1.txt, file2.txt', tags=['#fileshowcase']) makes the posted tweet satisfy both fixed requirements, and with turn 1 already correctly delivered, every deliverable becomes correct. No external snapshot is needed; the observation itself confirms the empty tags field."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_001",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST fails. The task contract (turn 2) requires a post 'mentioning only the file names seperated them by comma and space, and include the hashtag '#fileshowcase''; it nowhere fixes a tags parameter, a split between content and tags, or any channel for the hashtag. The delivered tweet (event_003, id 1) has content 'file1.txt, file2.txt #fileshowcase': the file names are mentioned separated by comma and space, and the task-fixed string '#fileshowcase' is included in the posted tweet, as the observation itself confirms. Under grounding rules 1-2, only arguments/channels fixed by the task text belong to the deliverable, and 'tags' is not one of them; under rule 5, an inline hashtag is the conventional Twitter representation preserving the same referent, not a new value. The verdict's 'correct_result' (content stripped of the hashtag, tags: ['#fileshowcase']) invents a constraint absent from the task, so the observed 'tags: []' is not a deviation from any fixed contract term. RELEVANCE TEST also fails: even if event_003 were corrected to route the hashtag via tags, event_004 would still misrepresent the state - it presents the already-posted tweet (id 1) as an unposted draft ('Let me know if you want to post it or make any changes!') - so not every deliverable would become correct. The alleged error is not established as a material deviation."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2037,
+                "completion_tokens": 6170,
+                "total_tokens": 8207,
+                "prompt_tokens_details": {
+                  "cached_tokens": 1536
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 5798
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 1536
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 5798
+                },
+                "input_tokens": 2037,
+                "output_tokens": 6170
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_001\", \"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST fails. The task contract (turn 2) requires a post 'mentioning only the file names seperated them by comma and space, and inc",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "refuted",
+                  "substantiated",
+                  "refuted"
+                ],
+                "collapsed": "refuted",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": []
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        },
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c1",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 1,
+            "reason": "the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'",
+            "evidence_refs": [
+              "event_001",
+              "event_002"
+            ],
+            "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 1,
+              "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}",
+              "referent": "The ls call should have explicitly targeted the required directory, e.g. arguments={'a': True, 'path': '/temp'}, so the listing reflects the contents of '/temp' rather than the unlabeled current directory",
+              "evidence_refs": [
+                "event_001",
+                "event_002"
+              ],
+              "reason": "Event_001 is the earliest assistant-authored step introducing the material error: ls was run with no path argument so the observation ('current_directory_content') did not come from '/temp', and event_002 merely repeated this by falsely attributing file1.txt/file2.txt to '/temp', which then propagated into the tweet."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 946,
+                "completion_tokens": 1289,
+                "total_tokens": 2235,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1104
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1104
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "input_tokens": 946,
+                "output_tokens": 1289
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 1,\n  \"quote\": \"name=ls arguments={'a': True} -> observation: {\\\"current_directory_content\\\": [\\\"file1.txt\\\", \\\"file2.txt\\\"]}\",\n  \"referent\": \"The ls call should have explicitly targeted the required directory, e.g. arguments={'a': True, 'path': '/temp'}, so the listing reflects the cont"
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 1,
+              "reason": "the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_001",
+                "event_002"
+              ],
+              "evidence_citations": [],
+              "quote": "name=ls arguments={'a': True} -> observation: {\"current_directory_content\": [\"file1.txt\", \"file2.txt\"]}",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Display all available files in the '/temp' directory including hidden ones using the terminal interface"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Draft a Twitter post mentioning only the file names, separated by comma and space"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Include the hashtag '#fileshowcase' in the post, routed to its dedicated parameter rather than only embedded in the body"
+                }
+              ],
+              "candidate_id": "c1"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 1,
+              "evidence_refs": [
+                "event_001",
+                "event_002",
+                "event_003"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: The task fixes the target as '/temp' ('Display all the available files located within the '/temp' directory including hidden one'). event_001 calls ls with arguments {'a': True} — no path argument — and the observation is keyed 'current_directory_content', showing the action listed the current working directory, not '/temp'. Nothing in the shown trajectory establishes that the current directory is '/temp' (no pwd, no cd). event_002 then asserts 'The available files located within the '/temp' directory, including hidden ones, are: file1.txt, file2.txt' — an assertion repeating a listing that was never taken from the task-fixed target; under the grounding rules the deviation in a fixed target is real regardless of how plausible the final answer text reads (deliverable breach / false assertion about turn 1). RELEVANCE TEST: event_003 posts 'file1.txt, file2.txt #fileshowcase', which is built directly from the same unverified listing, so the step is causally connected to both deliverables (the turn-1 display claim and the turn-2 tweet content). Correcting event_001 to target '/temp' with the hidden-files flag would ground both the assertion and the tweet in the actual directory content; no later step in the shown trajectory re-runs ls against '/temp', so the error is never corrected. No external evidence snapshot is needed: the deviation is observable from the call arguments and observation key alone."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 1,
+                "evidence_refs": [
+                  "event_001",
+                  "event_002",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The task fixes the target as '/temp' ('Display all the available files located within the '/temp' directory including hidden one'). event_001 calls ls with arguments {'a': True} — no path argument — and the observation is keyed 'current_directory_content', showing the action listed the current working directory, not '/temp'. Nothing in the shown trajectory establishes that the current directory is '/temp' (no pwd, no cd). event_002 then asserts 'The available files located within the '/temp' directory, including hidden ones, are: file1.txt, file2.txt' — an assertion repeating a listing that was never taken from the task-fixed target; under the grounding rules the deviation in a fixed target is real regardless of how plausible the final answer text reads (deliverable breach / false assertion about turn 1). RELEVANCE TEST: event_003 posts 'file1.txt, file2.txt #fileshowcase', which is built directly from the same unverified listing, so the step is causally connected to both deliverables (the turn-1 display claim and the turn-2 tweet content). Correcting event_001 to target '/temp' with the hidden-files flag would ground both the assertion and the tweet in the actual directory content; no later step in the shown trajectory re-runs ls against '/temp', so the error is never corrected. No external evidence snapshot is needed: the deviation is observable from the call arguments and observation key alone."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 1,
+                "evidence_refs": [
+                  "event_001",
+                  "event_002"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "event_001 shows ls called with arguments {'a': True} and no path, returning 'current_directory_content' — the current working directory, not the task-fixed target '/temp'. Nothing in the trajectory establishes that the working directory is /temp, yet event_002 asserts 'The available files located within the '/temp' directory... are: file1.txt, file2.txt', repeating an unverified identification as fact. The task fixes the target directory, so omitting the path argument and asserting the /temp attribution is a real deviation (deliverable breach / ungrounded claim), and it causally feeds the tweet in event_003 listing those file names. Correcting step 1 (ls /temp -a) would make the listing grounded and the downstream tweet correct."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 1,
+                "evidence_refs": [
+                  "event_001",
+                  "event_002",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_001 ran ls with arguments {'a': True} and no path argument; the observation is keyed 'current_directory_content' ([\"file1.txt\", \"file2.txt\"]), i.e. the current directory, while the task fixes the target: 'Display all the available files located within the '/temp' directory including hidden one using the terminal interface'. Under grounding rule 1, the fixed target '/temp' belongs to the deliverable, so the call's omission of that target is a real deviation regardless of the answer text. No observation in the trajectory (no pwd or directory listing) establishes that the current directory equals '/temp', so event_002's assertion 'The available files located within the '/temp' directory, including hidden ones, are: file1.txt, file2.txt' delivers an unverified attribution as the turn-1 result — per grounding rule 3, saying it does not establish it. RELEVANCE TEST: event_003's tweet 'file1.txt, file2.txt #fileshowcase' is causally derived from the same unverified file list, so the step is connected to every deliverable; correcting event_001 to explicitly list '/temp' would ground both the display deliverable and the tweet's file list. This is a deliverable breach (wrong target fixed by the task) plus an unverified result delivered as completion, not a formatting-only or process-only deviation, and it was never corrected later in the shown trajectory."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1910,
+                "completion_tokens": 6860,
+                "total_tokens": 8770,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 6494
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 6494
+                },
+                "input_tokens": 1910,
+                "output_tokens": 6860
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 1,\n  \"evidence_refs\": [\"event_001\", \"event_002\", \"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_001 ran ls with arguments {'a': True} and no path argument; the observation is keyed 'current_directo",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_004"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        },
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c3",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 3,
+            "reason": "the agent posted the tweet via the post_tweet tool instead of only drafting the post as the task required",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "quote": "name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\"id\": 1, \"username\": \"michael\", ...}",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 3,
+              "quote": "name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\"id\": 1, \"username\": \"michael\", ...}",
+              "referent": "Draft the Twitter post as text only (e.g., 'file1.txt, file2.txt #fileshowcase') without calling the post_tweet tool, as the task required a draft, not an actual post",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "reason": "Event 3 is the earliest assistant action that deviates from the task by actually publishing the tweet via post_tweet instead of only drafting it, and the subsequent draft message at event 4 cannot undo the posted tweet."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 936,
+                "completion_tokens": 334,
+                "total_tokens": 1270,
+                "prompt_tokens_details": {
+                  "cached_tokens": 448
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 172
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 448
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 172
+                },
+                "input_tokens": 936,
+                "output_tokens": 334
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":3,\"quote\":\"name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\\\"id\\\": 1, \\\"username\\\": \\\"michael\\\", ...}\",\"referent\":\"Draft the Twitter post as text only (e.g., 'file1.txt, file2.txt #fileshowcase') without calling the post_tweet tool, as the task re"
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 3,
+              "reason": "the agent posted the tweet via the post_tweet tool instead of only drafting the post as the task required",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "evidence_citations": [],
+              "quote": "name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {\"id\": 1, \"username\": \"michael\", ...}",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Display all available files in the '/temp' directory including hidden ones using the terminal interface"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Draft a Twitter post mentioning only the file names, separated by comma and space"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Include the hashtag '#fileshowcase' in the post, routed to its dedicated parameter rather than only embedded in the body"
+                }
+              ],
+              "candidate_id": "c3"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 3,
+              "evidence_refs": [
+                "event_003",
+                "event_004"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: Turn 2 fixes the required action as drafting only: 'draft a post on Twitter mentioning only the file names...'. At event_003 the agent instead performed the publishing action: TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} with observation {\"id\": 1, \"username\": \"michael\", ...}, i.e., a tweet was actually committed to the platform. Under grounding rule 1 a tool call is the action it performs, so this is a real deviation from the task contract (DELIVERABLE BREACH / unauthorized committed state), not a formatting or process nit. The tweet content itself (file names comma-space separated plus '#fileshowcase') matches the contract, but the action exceeds it. RELEVANCE TEST: The other deliverables are sound — event_001/002 correctly list file1.txt and file2.txt, and event_004 delivers the draft text correctly. If event_003 were corrected to drafting only, event_004 ('Here is a draft for your Twitter post... Let me know if you want to post it') would become a truthful draft delivery and every deliverable would be correct. As delivered, event_004's framing that posting is still pending is false because event_003 already posted, making event_003 the earliest assistant-authored locus of the material error; event_004 merely evidences the uncorrected delivery."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the required action as drafting only: 'draft a post on Twitter mentioning only the file names...'. At event_003 the agent instead performed the publishing action: TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} with observation {\"id\": 1, \"username\": \"michael\", ...}, i.e., a tweet was actually committed to the platform. Under grounding rule 1 a tool call is the action it performs, so this is a real deviation from the task contract (DELIVERABLE BREACH / unauthorized committed state), not a formatting or process nit. The tweet content itself (file names comma-space separated plus '#fileshowcase') matches the contract, but the action exceeds it. RELEVANCE TEST: The other deliverables are sound — event_001/002 correctly list file1.txt and file2.txt, and event_004 delivers the draft text correctly. If event_003 were corrected to drafting only, event_004 ('Here is a draft for your Twitter post... Let me know if you want to post it') would become a truthful draft delivery and every deliverable would be correct. As delivered, event_004's framing that posting is still pending is false because event_003 already posted, making event_003 the earliest assistant-authored locus of the material error; event_004 merely evidences the uncorrected delivery."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The task contract at turn 2 fixes the required action as 'draft a post on Twitter' — drafting only, not publishing. At event_003 the agent called post_tweet with arguments {'content': 'file1.txt, file2.txt #fileshowcase'}, and the observation confirms a real publication occurred ({'id': 1, 'username': 'michael', ...}). Under the grounding rules, a tool call is the action it performs; posting is a materially different action from drafting, with an irreversible external side effect, so the deviation is real regardless of the final answer text. The agent's own event_004 message ('Here is a draft for your Twitter post... Let me know if you want to post it or make any changes!') confirms it understood the contract as draft-only and falsely presents the already-published tweet (id 1) as an unposted draft — a false completion flowing directly from event_003. RELEVANCE TEST: event_003 is the earliest assistant-authored introduction of the wrong action; event_004 merely repeats the resulting false state. If event_003 were corrected to a draft-only action, all deliverables would be correct: turn 1's ls with hidden files was performed (event_001), and the draft content 'file1.txt, file2.txt #fileshowcase' correctly lists the file names comma-and-space separated with the required hashtag. The breach is therefore real and material (DELIVERABLE BREACH / FALSE COMPLETION), not a formatting or process-only issue."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the deliverable as a draft — 'draft a post on Twitter mentioning only the file names... and include the hashtag #fileshowcase' — not a publication. At event_003 the agent instead performed the publishing action: TOOL name=post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}, and the environment observation confirms real publication ({'id': 1, 'username': 'michael', 'content': 'file1.txt, file2.txt #fileshowcase'}). Under grounding rule 1, a tool call is the action it performs, so this unauthorized state-changing action is a real deliverable breach regardless of later text. The agent's own event_004 ('Here is a draft for your Twitter post... Let me know if you want to post it or make any changes!') shows it knew posting required user approval, and that statement is false about the delivered state since the tweet already exists with id 1 — a false completion layered on the breach. RELEVANCE TEST: correcting event_003 to only present the draft text would make every deliverable correct: turn 1's ls (a=True) output was accurately reported in event_002, and the draft content 'file1.txt, file2.txt #fileshowcase' matches the required format exactly. The final prose does not repair the breach, and event_003 is the earliest assistant-authored introduction of the wrong action."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1929,
+                "completion_tokens": 2179,
+                "total_tokens": 4108,
+                "prompt_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1819
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1819
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "input_tokens": 1929,
+                "output_tokens": 2179
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: Turn 2 fixes the deliverable as a draft — 'draft a post on Twitter mentioning only the file names... and include the has",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": []
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2111,
+          "completion_tokens": 7732,
+          "total_tokens": 9843,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 7282
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 7282
+          },
+          "input_tokens": 2111,
+          "output_tokens": 7732
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":3,\"hallucination_reason\":\"The assistant published the tweet via post_tweet even though the user only asked to draft it, and then falsely presented the already-posted tweet (id 1) as a draft the user could still choose to post.\",\"delivered_result\":\"A live",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 2,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1115,
+          "completion_tokens": 3443,
+          "total_tokens": 4558,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2915
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2915
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 1115,
+          "output_tokens": 3443
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent ran ls with no path argument (observation labeled 'current_directory_content') instead of explicitly targeting the required '/temp' directory, then asserted the results were from '/temp'\",\n      \"locus_event_id\": \"event_"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2235,
+          "completion_tokens": 5167,
+          "total_tokens": 7402,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4722
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4722
+          },
+          "input_tokens": 2235,
+          "output_tokens": 5167
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": true,\n      \"corrected_step\": 1,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The task fixed the target '/temp' but the ls call carried no path argument and the observation onl",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            },
+            "c4": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1035,
+          "completion_tokens": 604,
+          "total_tokens": 1639,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 418
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 418
+          },
+          "input_tokens": 1035,
+          "output_tokens": 604
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} -> observation: {..., \\\"tags\\\": [], \\\"mentions\\\": []}\",\n  \"referent\": \"post_tweet arguments={'content': 'file1.txt, file2.txt', 'tags': ['#fileshowcase']} — content must contain only the file names sep"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2037,
+          "completion_tokens": 6170,
+          "total_tokens": 8207,
+          "prompt_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5798
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5798
+          },
+          "input_tokens": 2037,
+          "output_tokens": 6170
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_001\", \"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST fails. The task contract (turn 2) requires a post 'mentioning only the file names seperated them by comma and space, and inc",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "refuted",
+            "substantiated",
+            "refuted"
+          ],
+          "collapsed": "refuted",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "c3485791c14fbe03ec126adfcb7d7cb9bd9e59d587dc43f4ded993e42133b3f7",
+      "interventions_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc"
+    },
+    "_packet_event_count": 4
+  }
+}

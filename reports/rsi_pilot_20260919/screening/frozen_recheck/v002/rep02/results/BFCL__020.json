@@ -1,0 +1,597 @@
+{
+  "case_id": "BFCL/020.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/020.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "defense": "refuted",
+          "defense_reason": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown.",
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c2",
+              "verdict": "refuted"
+            }
+          ]
+        },
+        "blocking_facts": [
+          {
+            "component": "defense",
+            "code": "refuted",
+            "error_type": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown."
+          }
+        ]
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "code": "refuted",
+          "error_type": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown."
+        }
+      ],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Agent confirmed 'summary.txt' is present and reported its contents verbatim from the cat observation; copied it to 'Research2023/summary.txt' (confirmed by cp observation); sorted the file (sorted content identical, single line, confirmed by sort observation); and reported the sorted file contains 1 line per the wc observation.",
+        "correct_result": "Same state: report presence and contents of 'summary.txt', copy it into 'Research2023', sort its lines alphabetically, and report the total line count of the sorted file (1 line).",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Examine the current directory for 'summary.txt' and, if present, report what is inside it."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Copy 'summary.txt' into 'Research2023'."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Organize the lines of 'summary.txt' alphabetically."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Calculate the total number of lines in the sorted 'summary.txt' to verify arrangement."
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent read the contents of 'summary.txt' with cat before examining the current directory for the file's presence with ls, instead of checking the directory first and only then reporting the contents as the task's conditional instructed",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001",
+            "event_002",
+            "event_003"
+          ],
+          "evidence_citations": [],
+          "quote": "TOOL cat arguments={'file_name': 'summary.txt'} (executed before any directory listing)"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent organized the lines of the copied file 'Research2023/summary.txt' instead of the original 'summary.txt' in the current directory that the task referenced for alphabetical sorting",
+          "locus_event_id": "event_006",
+          "evidence_refs": [
+            "event_004",
+            "event_006",
+            "event_007"
+          ],
+          "evidence_citations": [],
+          "quote": "TOOL sort arguments={'file_name': 'Research2023/summary.txt'} followed by cd 'Research2023' and sort arguments={'file_name': 'summary.txt'}"
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c2",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 6,
+        "reason": "Turn 3's unqualified 'summary.txt' denotes the original file in the current directory, but the agent sorted the copy inside Research2023 (event_006, then cd plus sort at event_007), leaving the required target unsorted and grounding the final verification and 'meticulously arranged' claim on the wrong file, so sorting the original at event_006 would make every deliverable correct.",
+        "evidence_refs": [
+          "event_004",
+          "event_006",
+          "event_007"
+        ],
+        "conflict_note": "event_006's 'No such file or directory' error conflicts with event_004's copy-success observation, but event_007's successful sort inside Research2023 resolves it: the copy exists and is the file that was sorted, so the wrong-target finding stands.",
+        "coverage": "answered",
+        "locus_event_id": "event_006",
+        "evidence_citations": [],
+        "claim": "the agent organized the lines of the copied file 'Research2023/summary.txt' instead of the original 'summary.txt' in the current directory that the task referenced for alphabetical sorting",
+        "quote": "TOOL sort arguments={'file_name': 'Research2023/summary.txt'} followed by cd 'Research2023' and sort arguments={'file_name': 'summary.txt'}"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c2",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 6,
+          "reason": "Turn 3's unqualified 'summary.txt' denotes the original file in the current directory, but the agent sorted the copy inside Research2023 (event_006, then cd plus sort at event_007), leaving the required target unsorted and grounding the final verification and 'meticulously arranged' claim on the wrong file, so sorting the original at event_006 would make every deliverable correct.",
+          "evidence_refs": [
+            "event_004",
+            "event_006",
+            "event_007"
+          ],
+          "conflict_note": "event_006's 'No such file or directory' error conflicts with event_004's copy-success observation, but event_007's successful sort inside Research2023 resolves it: the copy exists and is the file that was sorted, so the wrong-target finding stands.",
+          "coverage": "answered",
+          "locus_event_id": "event_006",
+          "evidence_citations": [],
+          "claim": "the agent organized the lines of the copied file 'Research2023/summary.txt' instead of the original 'summary.txt' in the current directory that the task referenced for alphabetical sorting",
+          "quote": "TOOL sort arguments={'file_name': 'Research2023/summary.txt'} followed by cd 'Research2023' and sort arguments={'file_name': 'summary.txt'}"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The required actions were performed in the required relative order (directory examination at event_002 preceded the conditional contents report at event_003), the task fixes no cat-versus-ls tool ordering for the extra read, so the inversion touches no deliverable, and correcting event_001 would still leave the turn-3/4 wrong-target error unresolved.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 6,
+          "reason": "Turn 3's unqualified 'summary.txt' denotes the original file in the current directory, but the agent sorted the copy inside Research2023 (event_006, then cd plus sort at event_007), leaving the required target unsorted and grounding the final verification and 'meticulously arranged' claim on the wrong file, so sorting the original at event_006 would make every deliverable correct.",
+          "evidence_refs": [],
+          "conflict_note": "event_006's 'No such file or directory' error conflicts with event_004's copy-success observation, but event_007's successful sort inside Research2023 resolves it: the copy exists and is the file that was sorted, so the wrong-target finding stands.",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 2,
+        "answered": 2,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c2",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 6,
+            "reason": "the agent organized the lines of the copied file 'Research2023/summary.txt' instead of the original 'summary.txt' in the current directory that the task referenced for alphabetical sorting",
+            "evidence_refs": [
+              "event_004",
+              "event_006",
+              "event_007"
+            ],
+            "quote": "TOOL sort arguments={'file_name': 'Research2023/summary.txt'} followed by cd 'Research2023' and sort arguments={'file_name': 'summary.txt'}",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 6,
+              "quote": "TOOL event_006_tool_01 name=sort arguments={'file_name': 'Research2023/summary.txt'}",
+              "referent": "TOOL name=sort arguments={'file_name': 'summary.txt'} — organize the lines of the original 'summary.txt' in the current directory, as the task specified",
+              "evidence_refs": [
+                "event_004",
+                "event_006",
+                "event_007"
+              ],
+              "reason": "Step 6 is the first assistant action that targets the copied file 'Research2023/summary.txt' instead of the current-directory 'summary.txt' the task referenced for alphabetical sorting, and step 7 (cd into 'Research2023' then sort 'summary.txt' there) merely repeats that wrong target rather than correcting it."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1289,
+                "completion_tokens": 1439,
+                "total_tokens": 2728,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1257
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1257
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "input_tokens": 1289,
+                "output_tokens": 1439
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":6,\"quote\":\"TOOL event_006_tool_01 name=sort arguments={'file_name': 'Research2023/summary.txt'}\",\"referent\":\"TOOL name=sort arguments={'file_name': 'summary.txt'} — organize the lines of the original 'summary.txt' in the current directory, as the task specified\",\"evidence_refs\":[\"event_004\","
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 6,
+              "reason": "the agent organized the lines of the copied file 'Research2023/summary.txt' instead of the original 'summary.txt' in the current directory that the task referenced for alphabetical sorting",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_004",
+                "event_006",
+                "event_007"
+              ],
+              "evidence_citations": [],
+              "quote": "TOOL sort arguments={'file_name': 'Research2023/summary.txt'} followed by cd 'Research2023' and sort arguments={'file_name': 'summary.txt'}",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Examine the current directory for 'summary.txt' and, if present, report what is inside it."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Copy 'summary.txt' into 'Research2023'."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Organize the lines of 'summary.txt' alphabetically."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Calculate the total number of lines in the sorted 'summary.txt' to verify arrangement."
+                }
+              ],
+              "candidate_id": "c2"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_006",
+                "event_007",
+                "event_001",
+                "event_009"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "Internal observation conflict: event_004 reports the copy at 'Research2023/summary.txt' while event_006's sort on that path returns 'No such file or directory'. This conflict is not decisive here because the delivered sorted state came from event_007's successful sort after cd, and both files share identical single-line content, so the outcome is the same under either reading.",
+              "reason": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown."
+            },
+            "raw": [
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_001",
+                  "event_009"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "Internal observation conflict: event_004 reports the copy at 'Research2023/summary.txt' while event_006's sort on that path returns 'No such file or directory'. This conflict is not decisive here because the delivered sorted state came from event_007's successful sort after cd, and both files share identical single-line content, so the outcome is the same under either reading.",
+                "reason": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_001",
+                  "event_009"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The alleged step (event_006) is the call sort({'file_name': 'Research2023/summary.txt'}), which returned an error, not an organization; the actual successful sort occurred at event_007. The verdict's premise that the task fixed the original current-directory file as the target is not supported by the shown task text: turn 3 says only \"organize the lines in 'summary.txt' alphabetically\" with no path, and after turn 2 two files share exactly that name, so the task fixes the name, not which instance. The sorted file at event_007 is named 'summary.txt' and its content (\"This is the summary of the project. It includes various findings and conclusions. Further analysis is required.\") is byte-identical to the original observed at event_001, and event_009 shows the file is a single line, so sorting is a no-op and the delivered sorted state and the 1-line count are correct under either reading of the ambiguous reference. RELEVANCE TEST: Running sort on the original path instead would produce byte-identical content and the same 1-line count, so the alleged step is not causally connected to any wrong deliverable. Additionally, under grounding rule 4 the path error at event_006 was corrected at event_007 (cd Research2023 + successful sort), so no uncorrected result error or false completion is shown; the deviation, to the extent it exists, is a target-path interpretation the task does not fix, i.e., immaterial under the MATERIALITY LAW."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The alleged deviation (sorting the copy 'Research2023/summary.txt' instead of the original) is immaterial: the copy was made in event_004 from the original and is byte-identical ('This is the summary of the project. It includes various findings and conclusions. Further analysis is required.'), and it is a single line, so sorting either file yields the identical content and line count (event_009 count=1). The initial failed sort at event_006 was corrected in event_007, and per grounding rule 4 a corrected intermediate error is not a violation. The task's reference to 'summary.txt' after the copy is ambiguous, and no deliverable (sorted content, line count, completion claim) differs from what sorting the original would produce."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2238,
+                "completion_tokens": 500,
+                "total_tokens": 2738,
+                "prompt_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 277
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 277
+                },
+                "input_tokens": 2238,
+                "output_tokens": 500
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_006\", \"event_007\", \"event_008\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"The alleged deviation (sorting the copy 'Research2023/summary.txt' instead of the original) is immaterial: the copy was made",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "refuted",
+                  "refuted",
+                  "refuted"
+                ],
+                "collapsed": "refuted",
+                "tie": false,
+                "topups": 2,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 5,
+            "view": "complete",
+            "warnings": [],
+            "escalated_from": "evidence_window"
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+        "active_interventions": [
+          "IV-2-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-2-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2396,
+          "completion_tokens": 1700,
+          "total_tokens": 4096,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1359
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1359
+          },
+          "input_tokens": 2396,
+          "output_tokens": 1700
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Confirmed 'summary.txt' exists and reported its contents; copied it into 'Research2023'; sorted the lines of 'summary.txt' (after cd into Research2023, sort succeeded returning the si",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1444,
+          "completion_tokens": 3100,
+          "total_tokens": 4544,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2816
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2816
+          },
+          "input_tokens": 1444,
+          "output_tokens": 3100
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent read the contents of 'summary.txt' with cat before examining the current directory for the file's presence with ls, instead of checking the directory first and only then reporting the contents as the task's condi"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2387,
+          "completion_tokens": 10830,
+          "total_tokens": 13217,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 10456
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 10456
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 2387,
+          "output_tokens": 10830
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": false,\n      \"causal\": false,\n      \"corrected_step\": null,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The cat-before-ls sequence is a procedural ordering the task does not fix as a deliverable; b",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "defense",
+        "code": "refuted",
+        "error_type": "CONTENT TEST fails. The task text (turn 3) says only 'organize the lines in 'summary.txt' alphabetically' with no path; after event_004 there are two files named 'summary.txt' and the task does not fix which one is the target, so the alleged 'correct referent' (the original in the current directory) is an interpretation, not a contract fixed by the task. Additionally, the alleged step's own description is inaccurate: event_006 is sort({'file_name': 'Research2023/summary.txt'}) which returned {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} — nothing was organized at step 6; the delivered sorted state was produced at event_007 (cd Research2023; sort summary.txt -> sorted_content returned). RELEVANCE TEST fails on materiality: the file content is a single line (event_001 content = event_007 sorted_content; event_009 wc count=1), so sorting the original or the copy yields byte-identical results and the same line count; every delivered answer (contents, sorted claim, count 1) is correct under either reading of the ambiguous target. An intermediate errored call later superseded by a successful sort is not a violation, and no fixed target, result error, or false completion is shown."
+      }
+    ],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "cc6ee327b527c0aa19dc41c90a2ffbb94579d24a78db5f898a995209327611a4",
+      "interventions_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858"
+    },
+    "_packet_event_count": 10
+  }
+}

@@ -1,0 +1,504 @@
+{
+  "case_id": "BFCL/008.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 3,
+  "registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/008.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 3,
+          "traced_step": 3,
+          "defense": "substantiated",
+          "confirmed_step": 3,
+          "delivered_result": "Tweet (id 1, username michael) posted with content 'file1.txt, file2.txt #fileshowcase' and tags: [] — the hashtag exists only as inline body text and is not registered as a tag.",
+          "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase']).",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 3,
+        "hallucination_reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty (observation shows \"tags\": []), so the hashtag was never routed to its dedicated parameter and the tweet carries no actual tag.",
+        "delivered_result": "Tweet (id 1, username michael) posted with content 'file1.txt, file2.txt #fileshowcase' and tags: [] — the hashtag exists only as inline body text and is not registered as a tag.",
+        "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase']).",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "root_cause": {
+          "step": 3,
+          "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}",
+          "referent": "content 'file1.txt, file2.txt' with the hashtag '#fileshowcase' delivered in the dedicated tags parameter instead of being embedded in the body"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Display all files in the '/temp' directory including hidden ones using the terminal (ls with the all/hidden flag)"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "The tweet must mention only the file names, separated by comma and space"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Include the exact hashtag '#fileshowcase'"
+          },
+          {
+            "kind": "required_channel",
+            "requirement": "The separately required hashtag must be passed into its dedicated parameter (tags), not embedded in the quoted body while that parameter remains empty"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 3,
+        "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}",
+        "referent": "post_tweet should have been called with content 'file1.txt, file2.txt' and the hashtag routed to its dedicated parameter, tags: ['#fileshowcase']",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "reason": "Event_003 is the first place the hashtag '#fileshowcase' was written into the tweet content body instead of being passed via the tags parameter, producing the delivered tweet with inline hashtag and empty tags [], and no earlier step (ls or file listing) contains this error."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 3,
+        "evidence_refs": [
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_003 shows TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} and the environment observation returns {\"content\": \"file1.txt, file2.txt #fileshowcase\", \"tags\": [], \"mentions\": []}. The task contract (turn 2) requires the post to mention 'only the file names seperated them by comma and space' and separately 'include the hashtag #fileshowcase'. The environment's tweet schema exposes a dedicated tags field, so the hashtag's dedicated channel exists; the delivered tweet has tags: [] — the hashtag exists only as inline body text and is not registered as a tag, and the content body carries more than 'only the file names'. This is a real deviation in the tool call's arguments, observed in the environment record itself, not merely in the answer text. RELEVANCE TEST: event_003 is the earliest assistant-authored introduction of the wrong action; event_004 only repeats the delivered result ('file1.txt, file2.txt #fileshowcase') and cannot repair the argument breach. Correcting the call to content='file1.txt, file2.txt' with tags=['#fileshowcase'] would make the turn-1 deliverable (ls -a listing file1.txt, file2.txt, already correct) and the turn-2 deliverable (post with only the file names comma-space separated plus the hashtag routed to its dedicated parameter) both correct. The error is therefore real and material under the MATERIALITY LAW as a deliverable breach of an explicit task contract."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 3,
+            "reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty (observation shows \"tags\": []), so the hashtag was never routed to its dedicated parameter and the tweet carries no actual tag.",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}",
+            "delivered_result": "Tweet (id 1, username michael) posted with content 'file1.txt, file2.txt #fileshowcase' and tags: [] — the hashtag exists only as inline body text and is not registered as a tag.",
+            "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase'])."
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 3,
+              "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}",
+              "referent": "post_tweet should have been called with content 'file1.txt, file2.txt' and the hashtag routed to its dedicated parameter, tags: ['#fileshowcase']",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "reason": "Event_003 is the first place the hashtag '#fileshowcase' was written into the tweet content body instead of being passed via the tags parameter, producing the delivered tweet with inline hashtag and empty tags [], and no earlier step (ls or file listing) contains this error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1037,
+                "completion_tokens": 529,
+                "total_tokens": 1566,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 383
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 383
+                },
+                "input_tokens": 1037,
+                "output_tokens": 529
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":3,\"quote\":\"post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}\",\"referent\":\"post_tweet should have been called with content 'file1.txt, file2.txt' and the hashtag routed to its dedicated parameter, tags: ['#fileshowcase']\",\"evidence_refs\":[\"event_003\"],\"reason\":\"Event_003 "
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 3,
+              "reason": "The post_tweet call embedded the separately required hashtag '#fileshowcase' into the content body while the dedicated tags parameter was left empty (observation shows \"tags\": []), so the hashtag was never routed to its dedicated parameter and the tweet carries no actual tag.",
+              "delivered_result": "Tweet (id 1, username michael) posted with content 'file1.txt, file2.txt #fileshowcase' and tags: [] — the hashtag exists only as inline body text and is not registered as a tag.",
+              "correct_result": "A tweet whose content contains only the file names 'file1.txt, file2.txt' separated by comma and space, with the required hashtag '#fileshowcase' passed via its dedicated tags parameter (tags: ['#fileshowcase']).",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Display all files in the '/temp' directory including hidden ones using the terminal (ls with the all/hidden flag)"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "The tweet must mention only the file names, separated by comma and space"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Include the exact hashtag '#fileshowcase'"
+                },
+                {
+                  "kind": "required_channel",
+                  "requirement": "The separately required hashtag must be passed into its dedicated parameter (tags), not embedded in the quoted body while that parameter remains empty"
+                }
+              ],
+              "confidence": "medium",
+              "quote": "post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 3,
+              "evidence_refs": [
+                "event_003"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: event_003 shows TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} and the environment observation returns {\"content\": \"file1.txt, file2.txt #fileshowcase\", \"tags\": [], \"mentions\": []}. The task contract (turn 2) requires the post to mention 'only the file names seperated them by comma and space' and separately 'include the hashtag #fileshowcase'. The environment's tweet schema exposes a dedicated tags field, so the hashtag's dedicated channel exists; the delivered tweet has tags: [] — the hashtag exists only as inline body text and is not registered as a tag, and the content body carries more than 'only the file names'. This is a real deviation in the tool call's arguments, observed in the environment record itself, not merely in the answer text. RELEVANCE TEST: event_003 is the earliest assistant-authored introduction of the wrong action; event_004 only repeats the delivered result ('file1.txt, file2.txt #fileshowcase') and cannot repair the argument breach. Correcting the call to content='file1.txt, file2.txt' with tags=['#fileshowcase'] would make the turn-1 deliverable (ls -a listing file1.txt, file2.txt, already correct) and the turn-2 deliverable (post with only the file names comma-space separated plus the hashtag routed to its dedicated parameter) both correct. The error is therefore real and material under the MATERIALITY LAW as a deliverable breach of an explicit task contract."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_003 shows TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} and the environment observation returns {\"content\": \"file1.txt, file2.txt #fileshowcase\", \"tags\": [], \"mentions\": []}. The task contract (turn 2) requires the post to mention 'only the file names seperated them by comma and space' and separately 'include the hashtag #fileshowcase'. The environment's tweet schema exposes a dedicated tags field, so the hashtag's dedicated channel exists; the delivered tweet has tags: [] — the hashtag exists only as inline body text and is not registered as a tag, and the content body carries more than 'only the file names'. This is a real deviation in the tool call's arguments, observed in the environment record itself, not merely in the answer text. RELEVANCE TEST: event_003 is the earliest assistant-authored introduction of the wrong action; event_004 only repeats the delivered result ('file1.txt, file2.txt #fileshowcase') and cannot repair the argument breach. Correcting the call to content='file1.txt, file2.txt' with tags=['#fileshowcase'] would make the turn-1 deliverable (ls -a listing file1.txt, file2.txt, already correct) and the turn-2 deliverable (post with only the file names comma-space separated plus the hashtag routed to its dedicated parameter) both correct. The error is therefore real and material under the MATERIALITY LAW as a deliverable breach of an explicit task contract."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_003 shows TOOL post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'} and the environment observation confirms the committed state: {\"content\": \"file1.txt, file2.txt #fileshowcase\", \"tags\": []}. The task contract fixes the form: 'mentioning only the file names seperated them by comma and space, and include the hashtag #fileshowcase'. The delivered content is not 'only the file names' (the hashtag is appended inline), and the observation proves the hashtag was never routed to the dedicated tags channel (tags: []), so the posted tweet carries no actual tag. This is a real, observed deviation in the committed state, not a formatting nit — the task explicitly fixes the content form and the hashtag inclusion, making the breach material by definition; per the grounding rules, a tool call is the action it performs and the final prose does not repair wrong arguments. RELEVANCE TEST: correcting event_003 to content='file1.txt, file2.txt' with the hashtag in the tags parameter would make every deliverable correct — turn 1's ls (a=True) already delivered the correct directory listing (file1.txt, file2.txt), and event_004 merely repeats the same inline-hashtag text as presentation ('Here is a draft for your Twitter post: file1.txt, file2.txt #fileshowcase'), making it evidence of delivery of the step-3 error, not a separate root cause or later correction. The earliest assistant-authored locus of the material error is therefore event_003."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The task text (turn 2) fixes three constants: the file names, the separator ('seperated them by comma and space'), and the hashtag '#fileshowcase' to be 'included' in the post. It never fixes a dedicated tags parameter, never names the post_tweet tool's argument structure, and never requires the hashtag be excluded from the content body. Under grounding rule 1, a tool-argument deviation is real only when the task fixes that argument; here it does not, so the alleged deviation (hashtag in content rather than tags: ['#fileshowcase']) is not a contract violation. The observation at event_003 shows the committed tweet content 'file1.txt, file2.txt #fileshowcase' — file names separated by comma and space with the required hashtag '#fileshowcase' present in the post, which is the conventional way a Twitter hashtag is included and preserves the same referent (rule 5). The environment fact \"tags\": [] records how the backend parsed the tweet, but the task did not require tag registration in a metadata field. RELEVANCE TEST: Since the task contract is satisfied by the delivered tweet as-is, 'correcting' step 3 to the verdict's proposed form would enforce a requirement (content must exclude the hashtag, tags parameter mandatory) that no shown task text or tool observation establishes; the alleged error is therefore immaterial, and the conviction is refuted."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2053,
+                "completion_tokens": 3381,
+                "total_tokens": 5434,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2048
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 3034
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2048
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 3034
+                },
+                "input_tokens": 2053,
+                "output_tokens": 3381
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: The task text (turn 2) fixes three constants: the file names, the separator ('seperated them by comma and space'), and the hashtag '#fil",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "refuted"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": []
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2111,
+          "completion_tokens": 7471,
+          "total_tokens": 9582,
+          "prompt_tokens_details": {
+            "cached_tokens": 2048
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 7023
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2048
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 7023
+          },
+          "input_tokens": 2111,
+          "output_tokens": 7471
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 4,\n  \"hallucination_reason\": \"The assistant presents the Twitter post as an unposted draft and offers to post it ('Let me know if you want to post it'), directly contradicting the event_003 tool observation showing the tweet was already publishe",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 2,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1037,
+          "completion_tokens": 529,
+          "total_tokens": 1566,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 383
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 383
+          },
+          "input_tokens": 1037,
+          "output_tokens": 529
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"step\":3,\"quote\":\"post_tweet arguments={'content': 'file1.txt, file2.txt #fileshowcase'}\",\"referent\":\"post_tweet should have been called with content 'file1.txt, file2.txt' and the hashtag routed to its dedicated parameter, tags: ['#fileshowcase']\",\"evidence_refs\":[\"event_003\"],\"reason\":\"Event_003 "
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2053,
+          "completion_tokens": 3381,
+          "total_tokens": 5434,
+          "prompt_tokens_details": {
+            "cached_tokens": 2048
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 3034
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2048
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 3034
+          },
+          "input_tokens": 2053,
+          "output_tokens": 3381
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: The task text (turn 2) fixes three constants: the file names, the separator ('seperated them by comma and space'), and the hashtag '#fil",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "refuted"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "c3485791c14fbe03ec126adfcb7d7cb9bd9e59d587dc43f4ded993e42133b3f7",
+      "interventions_hash": "a578979ddf334d5506661cbd4b78dd7afd267ecad5bdcc84cfd6b1f3795ca8fc"
+    },
+    "_packet_event_count": 4
+  }
+}

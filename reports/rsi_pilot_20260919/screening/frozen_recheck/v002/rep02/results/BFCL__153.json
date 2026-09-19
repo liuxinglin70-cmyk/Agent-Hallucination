@@ -1,0 +1,512 @@
+{
+  "case_id": "BFCL/153.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 14,
+  "registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/153.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_014",
+    "responsible_step": 14,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_014",
+      "responsible_step": 14,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 14,
+          "traced_step": 14,
+          "defense": "substantiated",
+          "confirmed_step": 14,
+          "delivered_result": "Tweet content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with tags: [] and mentions: []",
+          "correct_result": "Tweet 'Postponing my plans.' with hashtags #Travel and #PlansChanged in tags and @AirlineSupport in mentions",
+          "judge_basis": "task_requirement",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 14,
+        "hallucination_reason": "The post_tweet call merged the required hashtags #Travel, #PlansChanged and the mention @AirlineSupport into the main content text while the dedicated tags and mentions parameters were left empty, so the tweet was delivered without actual tags or mentions.",
+        "delivered_result": "Tweet content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with tags: [] and mentions: []",
+        "correct_result": "Tweet 'Postponing my plans.' with hashtags #Travel and #PlansChanged in tags and @AirlineSupport in mentions",
+        "basis": "task_requirement",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_014"
+        ],
+        "root_cause": {
+          "step": 14,
+          "quote": "post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> tags: [], mentions: []",
+          "referent": "content 'Postponing my plans.' with tags ['#Travel', '#PlansChanged'] and mention '@AirlineSupport' in dedicated parameters"
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "tweet text 'Postponing my plans.'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "publish tweet with hashtags #Travel, #PlansChanged and mention @AirlineSupport on account john/john1234"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 14,
+        "quote": "post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> observation: {\"id\": 10, \"username\": \"john\", \"content\": \"Postponing my plans. #Travel #PlansChanged @AirlineSupport\", \"tags\": [], \"mentions\": []}",
+        "referent": "post_tweet should have been called with content 'Postponing my plans.' plus dedicated tags=['Travel', 'PlansChanged'] and mentions=['AirlineSupport'] parameters",
+        "evidence_refs": [
+          "event_014"
+        ],
+        "reason": "The earliest step introducing the material error is event_014, where the post_tweet call merged the hashtags and mention into the content text while leaving the dedicated tags and mentions parameters unset, producing a tweet with empty tags and mentions; no earlier step in the trajectory contains this error."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 14,
+        "evidence_refs": [
+          "event_014"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: Turn 6 requires publishing the tweet 'Postponing my plans.' while incorporating hashtags #Travel, #PlansChanged and the mention @AirlineSupport. At event_014 the assistant called post_tweet with arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'}, omitting any dedicated tags/mentions arguments. The environment's own observation confirms the committed state: content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with \"tags\": [] and \"mentions\": []. The environment thus distinguishes content text from actual tags/mentions, and the delivered tweet has neither — the required deliverable (a tweet with the hashtags and mention incorporated) was not achieved; the hashtags/mention exist only as unparsed text. This is a real deviation in the committed state and in the tool arguments, not a mere representation difference, because the observation proves the system did not register any tags or mentions. RELEVANCE TEST: event_014 is the earliest assistant-authored introduction of the wrong tweet state; event_015 only reports it. Correcting the call to pass content 'Postponing my plans.' with tags ['#Travel', '#PlansChanged'] and mentions ['@AirlineSupport'] would make the posted tweet satisfy turn 6, and all prior deliverables (booking, invoice, support contact, cancellation at event_012 with cancel_status true) were already completed, so every deliverable would then be correct."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 14,
+            "reason": "The post_tweet call merged the required hashtags #Travel, #PlansChanged and the mention @AirlineSupport into the main content text while the dedicated tags and mentions parameters were left empty, so the tweet was delivered without actual tags or mentions.",
+            "evidence_refs": [
+              "event_014"
+            ],
+            "quote": "post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> tags: [], mentions: []",
+            "delivered_result": "Tweet content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with tags: [] and mentions: []",
+            "correct_result": "Tweet 'Postponing my plans.' with hashtags #Travel and #PlansChanged in tags and @AirlineSupport in mentions"
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 14,
+              "quote": "post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> observation: {\"id\": 10, \"username\": \"john\", \"content\": \"Postponing my plans. #Travel #PlansChanged @AirlineSupport\", \"tags\": [], \"mentions\": []}",
+              "referent": "post_tweet should have been called with content 'Postponing my plans.' plus dedicated tags=['Travel', 'PlansChanged'] and mentions=['AirlineSupport'] parameters",
+              "evidence_refs": [
+                "event_014"
+              ],
+              "reason": "The earliest step introducing the material error is event_014, where the post_tweet call merged the hashtags and mention into the content text while leaving the dedicated tags and mentions parameters unset, producing a tweet with empty tags and mentions; no earlier step in the trajectory contains this error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2174,
+                "completion_tokens": 370,
+                "total_tokens": 2544,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 169
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 169
+                },
+                "input_tokens": 2174,
+                "output_tokens": 370
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":14,\"quote\":\"post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> observation: {\\\"id\\\": 10, \\\"username\\\": \\\"john\\\", \\\"content\\\": \\\"Postponing my plans. #Travel #PlansChanged @AirlineSupport\\\", \\\"tags\\\": [], \\\"mentions\\\": []}\",\"referent\":\"post_tweet"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 14,
+              "reason": "The post_tweet call merged the required hashtags #Travel, #PlansChanged and the mention @AirlineSupport into the main content text while the dedicated tags and mentions parameters were left empty, so the tweet was delivered without actual tags or mentions.",
+              "delivered_result": "Tweet content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with tags: [] and mentions: []",
+              "correct_result": "Tweet 'Postponing my plans.' with hashtags #Travel and #PlansChanged in tags and @AirlineSupport in mentions",
+              "evidence_refs": [
+                "event_014"
+              ],
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "tweet text 'Postponing my plans.'"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "publish tweet with hashtags #Travel, #PlansChanged and mention @AirlineSupport on account john/john1234"
+                }
+              ],
+              "confidence": "high",
+              "quote": "post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> tags: [], mentions: []"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 14,
+              "evidence_refs": [
+                "event_014"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: Turn 6 requires publishing the tweet 'Postponing my plans.' while incorporating hashtags #Travel, #PlansChanged and the mention @AirlineSupport. At event_014 the assistant called post_tweet with arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'}, omitting any dedicated tags/mentions arguments. The environment's own observation confirms the committed state: content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with \"tags\": [] and \"mentions\": []. The environment thus distinguishes content text from actual tags/mentions, and the delivered tweet has neither — the required deliverable (a tweet with the hashtags and mention incorporated) was not achieved; the hashtags/mention exist only as unparsed text. This is a real deviation in the committed state and in the tool arguments, not a mere representation difference, because the observation proves the system did not register any tags or mentions. RELEVANCE TEST: event_014 is the earliest assistant-authored introduction of the wrong tweet state; event_015 only reports it. Correcting the call to pass content 'Postponing my plans.' with tags ['#Travel', '#PlansChanged'] and mentions ['@AirlineSupport'] would make the posted tweet satisfy turn 6, and all prior deliverables (booking, invoice, support contact, cancellation at event_012 with cancel_status true) were already completed, so every deliverable would then be correct."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 14,
+                "evidence_refs": [
+                  "event_014"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 6 requires publishing the tweet 'Postponing my plans.' while incorporating hashtags #Travel, #PlansChanged and the mention @AirlineSupport. At event_014 the assistant called post_tweet with arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'}, omitting any dedicated tags/mentions arguments. The environment's own observation confirms the committed state: content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with \"tags\": [] and \"mentions\": []. The environment thus distinguishes content text from actual tags/mentions, and the delivered tweet has neither — the required deliverable (a tweet with the hashtags and mention incorporated) was not achieved; the hashtags/mention exist only as unparsed text. This is a real deviation in the committed state and in the tool arguments, not a mere representation difference, because the observation proves the system did not register any tags or mentions. RELEVANCE TEST: event_014 is the earliest assistant-authored introduction of the wrong tweet state; event_015 only reports it. Correcting the call to pass content 'Postponing my plans.' with tags ['#Travel', '#PlansChanged'] and mentions ['@AirlineSupport'] would make the posted tweet satisfy turn 6, and all prior deliverables (booking, invoice, support contact, cancellation at event_012 with cancel_status true) were already completed, so every deliverable would then be correct."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 14,
+                "evidence_refs": [
+                  "event_014"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The task at turn 6 fixes the tweet verbatim ('with tweet 'Postponing my plans.'') and separately requires hashtags #Travel, #PlansChanged and mention @AirlineSupport. The actual call at event_014 is post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'}, and the environment observation confirms the delivered state: content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' with 'tags': [] and 'mentions': []. The content deviates from the task-fixed literal, and the platform's own observation shows zero tags and zero mentions — the hashtags and mention exist only as plain text, not as functional tags/mentions. Under grounding rule 1 the fixed argument belongs to the deliverable, and under rule 5 the exact fixed string is enforced; this is a deliverable breach (wrong tool arguments / wrong delivered state), material by definition, not mere formatting. RELEVANCE TEST: The tweet is the final deliverable of turn 6; event_015 ('the tweet has been posted. The tweet ID is 10.') merely confirms delivery of the defective tweet and is a repetition, not a correction. Correcting the post_tweet call at event_014 (content 'Postponing my plans.' with the hashtags as tags and @AirlineSupport as mentions) would make the tweet deliverable and the completion claim correct; no later step repairs the error."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 14,
+                "evidence_refs": [
+                  "event_014",
+                  "event_015"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The task (turn 6) fixed the tweet as 'Postponing my plans.' and separately required hashtags #Travel, #PlansChanged and a mention of @AirlineSupport 'for expedited assistance'. At event_014 the assistant called post_tweet with arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'}, and the environment observation itself confirms the committed state: tags: [] and mentions: []. The platform's own response schema shows tags and mentions are distinct fields, so appending the tokens to the content text did not incorporate them as actual tags or mentions — the mention cannot notify @AirlineSupport when it is only plain text. The delivered tweet both deviates from the fixed verbatim content 'Postponing my plans.' and lacks the required hashtags/mention, confirmed by the trajectory's own observation, not by outside assertion. RELEVANCE TEST: event_014 is the earliest assistant-authored introduction of the error; event_015 ('the tweet has been posted. The tweet ID is 10') merely reports delivery of the same uncorrected tweet and is evidence of delivery, not a separate root cause. Correcting the post_tweet call at event_014 to pass content 'Postponing my plans.' with dedicated tags=['#Travel','#PlansChanged'] and mentions=['@AirlineSupport'] would make the tweet deliverable satisfy the contract, so the step is causally connected to the materially deficient committed state."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2319,
+                "completion_tokens": 2348,
+                "total_tokens": 4667,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2304
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1981
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2304
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1981
+                },
+                "input_tokens": 2319,
+                "output_tokens": 2348
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 14,\n  \"evidence_refs\": [\"event_014\", \"event_015\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: The task (turn 6) fixed the tweet as 'Postponing my plans.' and separately required hashtags #Travel, #PlansCha",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858",
+        "active_interventions": [
+          "IV-2-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-2-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3238,
+          "completion_tokens": 4448,
+          "total_tokens": 7686,
+          "prompt_tokens_details": {
+            "cached_tokens": 3200
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 3967
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 3967
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3200
+          },
+          "input_tokens": 3238,
+          "output_tokens": 4448
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":14,\"hallucination_reason\":\"The post_tweet call merged the required hashtags #Travel, #PlansChanged and the mention @AirlineSupport into the main content body while leaving the tool's dedicated tags and mentions parameters empty, as the observation confir",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 3,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2174,
+          "completion_tokens": 370,
+          "total_tokens": 2544,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 169
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 169
+          },
+          "input_tokens": 2174,
+          "output_tokens": 370
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"step\":14,\"quote\":\"post_tweet arguments={'content': 'Postponing my plans. #Travel #PlansChanged @AirlineSupport'} -> observation: {\\\"id\\\": 10, \\\"username\\\": \\\"john\\\", \\\"content\\\": \\\"Postponing my plans. #Travel #PlansChanged @AirlineSupport\\\", \\\"tags\\\": [], \\\"mentions\\\": []}\",\"referent\":\"post_tweet"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2319,
+          "completion_tokens": 2348,
+          "total_tokens": 4667,
+          "prompt_tokens_details": {
+            "cached_tokens": 2304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1981
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2304
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1981
+          },
+          "input_tokens": 2319,
+          "output_tokens": 2348
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 14,\n  \"evidence_refs\": [\"event_014\", \"event_015\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: The task (turn 6) fixed the tweet as 'Postponing my plans.' and separately required hashtags #Travel, #PlansCha",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "20f77efebb4f266cbb5e23ad7f77dd5a061b0e9afa1df0fa68036149b330aa8d",
+      "interventions_hash": "99e1ca72b32b41f89cb014538dfc902022990222cade6dd9abfdc8a37c81a858"
+    },
+    "_packet_event_count": 15
+  }
+}
