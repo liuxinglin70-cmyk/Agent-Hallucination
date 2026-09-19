@@ -1141,18 +1141,28 @@ def _repeat_verdict(
     *,
     candidate: bool,
 ) -> dict[str, Any]:
-    """One repetition's gate read: repairs on target, neighbors untouched."""
+    """One repetition's gate read, per frozen case role.
+
+    ``training_failure`` must be repaired on target; ``regression`` (already
+    detected before the candidate) must stay detected; every other role
+    (normal neighbor, boundary) must stay clean.
+    """
     training, neighbors, reasons = {}, {}, []
     for case_id in case_ids:
         row = results[case_id]
         role = str(case_meta[case_id].get("role") or "unknown")
         authoritative = row.get("authority") == "authoritative"
+        positive = (
+            bool(row.get("prediction"))
+            and row.get("state") == "verified_error"
+            and authoritative
+        )
+        clean = (
+            not bool(row.get("prediction"))
+            and row.get("state") == "verified_clean"
+            and authoritative
+        )
         if role == "training_failure" and candidate:
-            repaired = (
-                bool(row.get("prediction"))
-                and row.get("state") == "verified_error"
-                and authoritative
-            )
             target_step = target_steps.get(case_id)
             target_ok = (
                 row.get("responsible_step") is None
@@ -1160,22 +1170,25 @@ def _repeat_verdict(
                 or int(row.get("responsible_step") or -1) == int(target_step)
             )
             training[case_id] = {
-                "repaired": repaired and target_ok,
+                "repaired": positive and target_ok,
                 "state": row.get("state"),
                 "responsible_step": row.get("responsible_step"),
             }
-        elif role == "normal_neighbor" or role != "training_failure":
-            clean = (
-                not bool(row.get("prediction"))
-                and row.get("state") == "verified_clean"
-                and authoritative
-            )
+        elif role == "regression":
+            neighbors[case_id] = {
+                "kept_positive": positive, "state": row.get("state"),
+            }
+            if not positive:
+                reasons.append(
+                    f"regression {case_id} lost detection "
+                    f"({row.get('state')!r})"
+                )
+        else:
             neighbors[case_id] = {"clean": clean, "state": row.get("state")}
             if not clean:
                 reasons.append(f"{case_id} degraded to {row.get('state')!r}")
     passed = (
         all(item["repaired"] for item in training.values())
-        and all(item["clean"] for item in neighbors.values())
         and not reasons
     ) if candidate else False
     return {
