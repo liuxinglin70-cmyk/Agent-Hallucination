@@ -132,3 +132,11 @@ H0 在 013 上的定罪理由是"剥离 `Line N:` 前缀并重新编号，交付
 代码基线：`65ddb44`；记录：[round2_attempt2/README.md](./round2_attempt2/README.md)（attempt 1 记录：[round2/](./round2/)）。
 
 **第 2 轮按冻结门判定：未通过；部署保持不变。** 但除一处外全部读数稳定为候选有利：修订闭环首次在真实服务成立（草案失败→反馈修订→过筛）、训练失败修复 4/4、013 边界零误标、全部近邻零退化；唯一失败单元 024 的保持检出对两臂都是纯噪声（候选 2/3、H0 1/3，合并两轮各 3/5）。工程上暴露并修复防御路由 8192 截断（`65ddb44`）。下一轮的预注册方向：回归面板聚合读数 + lane 的 `seed_candidate` 通道。
+
+---
+
+# 第 3 轮（仪器轮）：种子复筛未过，定位出剩余风险的结构性根源（2026-09-20 再续）
+
+记录：[round3/README.md](./round3/README.md)；协议：[research-manifest-round3.json](../../output/rsi-planning/research-manifest-round3.json)（提交 `b13c2b6`）。
+
+**按冻结门在种子复筛处停止**（8 次 case-eval，0 次 proposer）。seed_candidate 机制在真实条件下工作正常（哈希钉住、契约校验、零草拟），但种子 v002 在 `BFCL/020` 上读出 authoritative error：召回触发后防御听证在 32768 包络下完整执行并实质性定罪。020 由此定级为**低频、与候选相关的召回路径 FP**（H0 8/8 clean，候选臂 6/8 clean），不是 024 型两臂噪声。这命中 P2 预注册的 §9 触发条件：剩余风险的结构性根源在防御消费位，judge.system 指令不可达；下一步是把 `text_boundary` 研究面扩至已注册的 `defense.system` hook（单独协议冻结），而不是继续同仪器加轮。002/153 的机制修复在全部测量中保持稳定（候选臂累计 6/6）。

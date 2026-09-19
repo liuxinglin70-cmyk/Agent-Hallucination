@@ -1,0 +1,66 @@
+{
+  "schema_version": "evolution.research_report.v1",
+  "run_id": "rsi_round3_20260920",
+  "status": "screening_complete",
+  "mechanism": {
+    "name": "quoted_content_vs_delivered",
+    "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+    "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+    "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现（剥前缀、重编号、重排、汇总）属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+    "target_error_description": {
+      "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+      "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+    }
+  },
+  "routes": {
+    "C": {
+      "versions": [
+        "v001",
+        "v002"
+      ],
+      "notes": [
+        {
+          "reason": "proposer_call_budget_exhausted"
+        }
+      ],
+      "selected": null,
+      "all_passing": []
+    }
+  },
+  "versions": [
+    {
+      "version_id": "v001",
+      "route": "C",
+      "kind": "draft",
+      "has_candidate": true,
+      "candidate_hash": "7ac9a2268adb4c12f9328a934b33273af8754b8a86885468d5604a35bfc7106b",
+      "parent_hash": null,
+      "verdict_passed": false
+    },
+    {
+      "version_id": "v002",
+      "route": "C",
+      "kind": "draft",
+      "has_candidate": false,
+      "candidate_hash": null,
+      "parent_hash": null,
+      "verdict_passed": null
+    }
+  ],
+  "budget": {
+    "caps": {
+      "baseline_case_evaluations": 4,
+      "screening_case_evaluations": 4,
+      "proposer_calls_per_route": 0,
+      "max_versions": 1
+    },
+    "used": {
+      "baseline_case_evaluations": 4,
+      "screening_case_evaluations": 4,
+      "proposer_calls": {},
+      "versions_created": 2
+    }
+  },
+  "stopped": null,
+  "next_stage": null
+}

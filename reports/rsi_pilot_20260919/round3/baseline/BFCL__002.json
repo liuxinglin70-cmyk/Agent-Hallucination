@@ -1,0 +1,163 @@
+{
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/002.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "TeamNotes.txt created in documents folder; the insight 'Collaboration leads to success. Innovation ignites growth.' written into it (with attribution and scaffolding); line-by-line differences between ideas.txt and TeamNotes.txt explained from cat/diff observations; Archived/IdeasArchive.txt created (via cp into Archived then mv rename) with the original documents/TeamNotes.txt intact, as confirmed by tool results; contents of IdeasArchive.txt displayed to the user.",
+          "correct_result": "All required deliverables satisfied: TeamNotes.txt exists in the document folder, contains the quoted insight, the file differences are explained, a copy named IdeasArchive.txt exists in the Archived directory with the original kept intact, and its contents are shown."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "TeamNotes.txt created in documents folder; the insight 'Collaboration leads to success. Innovation ignites growth.' written into it (with attribution and scaffolding); line-by-line differences between ideas.txt and TeamNotes.txt explained from cat/diff observations; Archived/IdeasArchive.txt created (via cp into Archived then mv rename) with the original documents/TeamNotes.txt intact, as confirmed by tool results; contents of IdeasArchive.txt displayed to the user.",
+        "correct_result": "All required deliverables satisfied: TeamNotes.txt exists in the document folder, contains the quoted insight, the file differences are explained, a copy named IdeasArchive.txt exists in the Archived directory with the original kept intact, and its contents are shown.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Create a document titled 'TeamNotes.txt' in the document folder (satisfied: touch in 'documents' after ls showed the correct folder name)."
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Write 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt (satisfied: the quote appears verbatim in the file per cat observation)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Identify and explain line-by-line distinctions between ideas.txt and TeamNotes.txt (satisfied: explanation matches cat/diff observations)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Copy TeamNotes.txt to the Archived directory as IdeasArchive.txt while keeping the original intact, ensuring Archived exists in the document folder (satisfied: ls confirmed Archived exists; cp+mv produced Archived/IdeasArchive.txt with original untouched)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Display the contents of IdeasArchive.txt (satisfied: cat observation and content shown to user)."
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3332,
+          "completion_tokens": 401,
+          "total_tokens": 3733,
+          "prompt_tokens_details": {
+            "cached_tokens": 3200
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 152
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3200
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 152
+          },
+          "input_tokens": 3332,
+          "output_tokens": 401
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"TeamNotes.txt created in documents with Simona's insight included; line-by-line differences explained; IdeasArchive.txt created in Archived directory with original TeamNotes.txt intact",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "0e8650bc5c310e9305d87132ee0c9afcf8d81ba7cc2af30b9b1a7e9fdc16633d",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 22
+  },
+  "source_run": "fresh_baseline"
+}

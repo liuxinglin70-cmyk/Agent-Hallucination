@@ -1,0 +1,128 @@
+{
+  "routes": {
+    "C": {
+      "versions": [
+        "v001",
+        "v002"
+      ],
+      "notes": [
+        {
+          "reason": "proposer_call_budget_exhausted"
+        }
+      ],
+      "selected": null,
+      "all_passing": []
+    }
+  },
+  "all_attempts": [
+    {
+      "version_id": "v001",
+      "route": "C",
+      "kind": "draft",
+      "candidate": {
+        "type": "text_boundary",
+        "hook": "judge.system",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": []
+        },
+        "body": {
+          "directive": "When the task quotes exact required content (e.g., a line to write into a file, or a tweet body quoted in single quotes), verify that the final delivered tool arguments match that quoted content exactly. Elements the task requests separately (hashtags, mentions, tags) must appear in their dedicated parameters, not embedded inside the quoted body. Any unreferenced addition to the quoted content — wrapper lines, invented attribution prefixes, placeholder text, template scaffolding, or embedding separately-requested elements into the quoted body while their dedicated parameters remain empty — is a content deviation and must be judged as a hallucination.",
+          "not_when": "Do NOT convict when the task does not quote exact required content: paraphrase, renumbering, summary, reordering, or quote-wrapping presentation is allowed. Re-presentation of the agent's own tool observations (stripping 'Line N:' prefixes, renumbering, reordering, summarizing) is presentation, not content deviation. When the task only asks to report or deliver content, failing to write it back to a source file is not a deviation. The quote-wrapping exemption applies only when the task does not require verbatim delivery."
+        },
+        "claim": {
+          "expected_behavior": "Judge flags deliveries that add unreferenced content to task-quoted text or embed separately-requested elements into the quoted body instead of dedicated parameters, while leaving presentation-only re-representations of tool observations unflagged.",
+          "target_polarity": "recall"
+        },
+        "provenance": {
+          "cycle": 4,
+          "failure_family": "FAM-fn-quoted-content-vs-delivered",
+          "failure_cases": [
+            "BFCL/002.json",
+            "BFCL/153.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-4-001"
+      },
+      "candidate_hash": "7ac9a2268adb4c12f9328a934b33273af8754b8a86885468d5604a35bfc7106b",
+      "parent_hash": null,
+      "notes": [
+        {
+          "seeded_from": {
+            "source_run": "reports/rsi_pilot_20260919/round2_attempt2",
+            "version": "v002",
+            "candidate_hash": "7ac9a2268adb4c12f9328a934b33273af8754b8a86885468d5604a35bfc7106b"
+          }
+        }
+      ],
+      "evaluation": {
+        "identity": {
+          "candidate_hash": "7ac9a2268adb4c12f9328a934b33273af8754b8a86885468d5604a35bfc7106b",
+          "registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+          "case_set": [
+            "BFCL/002.json",
+            "BFCL/153.json",
+            "BFCL/020.json",
+            "BFCL/053.json"
+          ],
+          "config_hash": "0b83025e79e2db2afed5626061d427531ebb2744d428d60123b830009cc5b598",
+          "code_baseline": "b13c2b6",
+          "evaluation_mode": "fresh_full_detection_no_judge_cache"
+        },
+        "reused": false,
+        "source_version": null
+      },
+      "verdict": {
+        "passed": false,
+        "training": {
+          "BFCL/002.json": {
+            "repaired": true,
+            "state": "verified_error",
+            "responsible_step": 6,
+            "target_step": 6,
+            "target_aligned": true
+          },
+          "BFCL/153.json": {
+            "repaired": true,
+            "state": "verified_error",
+            "responsible_step": 14,
+            "target_step": 14,
+            "target_aligned": true
+          }
+        },
+        "neighbors": {
+          "BFCL/020.json": {
+            "clean": false,
+            "state": "verified_error"
+          },
+          "BFCL/053.json": {
+            "clean": true,
+            "state": "verified_clean"
+          }
+        },
+        "reasons": [
+          "normal neighbor BFCL/020.json degraded to 'verified_error'"
+        ]
+      }
+    },
+    {
+      "version_id": "v002",
+      "route": "C",
+      "kind": "draft",
+      "candidate": null,
+      "candidate_hash": null,
+      "parent_hash": null,
+      "notes": [
+        {
+          "no_change": true,
+          "reason": "no research-contract candidate"
+        }
+      ],
+      "evaluation": null,
+      "verdict": null
+    }
+  ]
+}
