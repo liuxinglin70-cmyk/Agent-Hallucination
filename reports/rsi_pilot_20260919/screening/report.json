@@ -26,11 +26,15 @@
     },
     "C": {
       "versions": [
-        "v003"
+        "v003",
+        "v004",
+        "v005"
       ],
       "notes": [],
-      "selected": null,
-      "all_passing": []
+      "selected": "v005",
+      "all_passing": [
+        "v005"
+      ]
     }
   },
   "versions": [
@@ -60,6 +64,24 @@
       "candidate_hash": null,
       "parent_hash": null,
       "verdict_passed": null
+    },
+    {
+      "version_id": "v004",
+      "route": "C",
+      "kind": "draft",
+      "has_candidate": true,
+      "candidate_hash": "b2d87e312a7d369cc3a6674db0a3fc702145ec1bf008b3adfa3341e67483be66",
+      "parent_hash": null,
+      "verdict_passed": false
+    },
+    {
+      "version_id": "v005",
+      "route": "C",
+      "kind": "revision",
+      "has_candidate": true,
+      "candidate_hash": "cacbbf1ebf20214f656f9f4b387c46cc780ce9cb9251e546b71cbf8d7a1c9f85",
+      "parent_hash": "b2d87e312a7d369cc3a6674db0a3fc702145ec1bf008b3adfa3341e67483be66",
+      "verdict_passed": true
     }
   ],
   "budget": {
@@ -73,10 +95,9 @@
       "baseline_case_evaluations": 0,
       "screening_case_evaluations": 8,
       "proposer_calls": {
-        "B": 2,
-        "C": 1
+        "C": 2
       },
-      "versions_created": 3
+      "versions_created": 5
     }
   },
   "stopped": null,

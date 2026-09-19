@@ -1,0 +1,13 @@
+{
+  "candidate_hash": "b2d87e312a7d369cc3a6674db0a3fc702145ec1bf008b3adfa3341e67483be66",
+  "registry_hash": "3a10210d0fd57b2b8fbe00f00bed59e3b4bfa157c152a2056366b2d060ebeb85",
+  "case_set": [
+    "BFCL/002.json",
+    "BFCL/153.json",
+    "BFCL/020.json",
+    "BFCL/053.json"
+  ],
+  "config_hash": "9b3f6b7df772b1ae765e3dd97b047cc1185707fa85c154a9823bba6dbcf3a6db",
+  "code_baseline": "c51bbd7",
+  "evaluation_mode": "fresh_full_detection_no_judge_cache"
+}

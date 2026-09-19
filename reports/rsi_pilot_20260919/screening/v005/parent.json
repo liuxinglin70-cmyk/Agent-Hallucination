@@ -1,0 +1,31 @@
+{
+  "parent_hash": "b2d87e312a7d369cc3a6674db0a3fc702145ec1bf008b3adfa3341e67483be66",
+  "parent_candidate": {
+    "type": "text_boundary",
+    "hook": "judge.system",
+    "trigger": {
+      "packet_features": [
+        "has_tool_calls"
+      ],
+      "facts": []
+    },
+    "body": {
+      "directive": "When the task text places a span inside quotation marks as content that must be reproduced verbatim in the deliverable, such as a line to write into a file or a message body to publish, treat that quoted span as the binding requirement. Before ruling the fulfilling turn correct, compare the quoted span against the final delivery argument of the tool that stores or transmits it (the content written, posted, or sent), not against the assistant's prose summary. Rule the delivery a violation when the delivered argument contains material the task never supplied, including invented attribution prefixes, placeholder or template text, and added headings or scaffolding, even when the quoted span also appears inside it and even when the assistant narrates that the quoted text was added.",
+      "not_when": "Never apply this check when the task does not quote the exact required content inside quotation marks: summarizing, paraphrasing, renumbering, restructuring, and wrapping text in quotation marks for presentation are permitted presentation behaviors and are never violations. Also do not flag a delivery whose argument reproduces exactly the quoted span with nothing added."
+    },
+    "claim": {
+      "expected_behavior": "The judge binds each task-quoted verbatim span to the final delivered tool argument and flags unquoted additions embedded in the delivery, detecting quoted-content binding failures that were previously scored clean.",
+      "target_polarity": "recall"
+    },
+    "provenance": {
+      "cycle": 3,
+      "failure_family": "FAM-fn-quoted-content-vs-delivered",
+      "failure_cases": [
+        "BFCL/002.json",
+        "BFCL/153.json"
+      ]
+    },
+    "schema_version": "detector.intervention.v1",
+    "intervention_id": "IV-3-001"
+  }
+}
