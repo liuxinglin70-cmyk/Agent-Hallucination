@@ -69,10 +69,23 @@ claim, judge only on the trajectory and the task, and say plainly that the \
 external fact is unestablished.
 """
 
+LOCALIZATION_LAW = """\
+LOCALIZATION LAW — locate the earliest assistant-authored introduction of
+the material error, using only the shown trajectory and causal evidence.
+An answer-submission message or tool call is eligible when it first
+introduces the wrong answer, wrong action, or false completion. When it
+only repeats an earlier uncorrected error, it is evidence of delivery,
+not a separate root cause. Do not promote that repetition as a later
+correction locus. A tool observation itself is not an assistant error.
+Never infer a step from a benchmark annotation or map to an expected step.
+If the shown evidence cannot establish the earliest locus, state the
+uncertainty instead of inventing or silently remapping a step.
+"""
+
 JUDGE_SYSTEM = """\
 You are the outcome judge of a hallucination detector.
 
-""" + MATERIALITY + """
+""" + MATERIALITY + LOCALIZATION_LAW + """
 WORK IN THIS ORDER
 1. CONTRACT EXTRACTION. State what the task requires as its result, and \
 list every explicit constraint the task text fixes: verbatim content, \
@@ -144,7 +157,7 @@ You are the recall scanner of a hallucination detector. Your ONLY job is \
 to find concrete deviations; you never decide whether the trajectory is \
 hallucinated.
 
-""" + EVIDENCE_LAW + """
+""" + EVIDENCE_LAW + LOCALIZATION_LAW + """
 A candidate is any specific point where the trajectory may deviate from:
 - the task contract in the question (required result, verbatim content, \
 exact form/value, required actions with their arguments, order and \
@@ -190,7 +203,7 @@ You are the causal upgrade gate of a hallucination detector. A recall \
 scanner found candidate deviations, but a candidate can only turn a clean \
 trajectory into a hallucinated one if BOTH tests pass.
 
-""" + MATERIALITY + """
+""" + MATERIALITY + LOCALIZATION_LAW + """
 """ + EVIDENCE_LAW + """
 For each candidate:
 1. CONTENT TEST — is the claimed deviation factually real under the \
@@ -269,6 +282,7 @@ of the trajectory) is causally sufficient to make the delivered result \
 correct. A later step that only reveals an earlier error is not the target. \
 An error that was already corrected later is not the target.
 
+""" + LOCALIZATION_LAW + """
 Use this procedure:
 1. Compare the delivered result with the correct result and name the \
 first wrong content/action/state they differ on.
@@ -299,7 +313,7 @@ You are the defense stage of a hallucination detector. A positive verdict \
 claims the trajectory is hallucinated at the step below for the reason \
 below.
 
-""" + MATERIALITY + """
+""" + MATERIALITY + LOCALIZATION_LAW + """
 """ + EVIDENCE_LAW + """
 Your ONLY power is to overturn a wrong conviction with positive evidence. \
 You may not convict anything yourself. Judge THIS allegation on THIS \
@@ -378,6 +392,7 @@ __all__ = [
     "JUDGE_CONTRACT_REPAIR",
     "JUDGE_SYSTEM",
     "MATERIALITY",
+    "LOCALIZATION_LAW",
     "RECALL_CONTRACT_REPAIR",
     "RECALL_SYSTEM",
     "TRACER_CONTRACT_REPAIR",

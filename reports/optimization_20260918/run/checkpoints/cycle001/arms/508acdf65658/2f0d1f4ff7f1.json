@@ -1,0 +1,362 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "SmolAgents/019.json",
+    "gold": false,
+    "prediction": null,
+    "state": "verified_error",
+    "authority": "degraded_judge_only",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "SmolAgents/019.json",
+      "state": "verified_error",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "defense": "unsettled",
+            "judge_basis": "world_knowledge",
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "none"
+              }
+            ]
+          },
+          "blocking_facts": [
+            {
+              "component": "defense",
+              "candidate_id": "",
+              "code": "case_deadline_exceeded",
+              "error_type": "case_deadline_exceeded",
+              "error": "case deadline exceeded"
+            }
+          ]
+        },
+        "authority_failure_reasons": [
+          {
+            "component": "defense",
+            "candidate_id": "",
+            "code": "case_deadline_exceeded",
+            "error_type": "case_deadline_exceeded",
+            "error": "case deadline exceeded"
+          }
+        ],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The final answer fabricates a 31P chemical shift for POCl3 of '+35 to +48 ppm' (often 'near +38 ppm'), a value supported by none of the search observations and contradicting the well-established resonance of POCl3 at about +4 to +5 ppm, while also downgrading the key diastereomer prediction to a hedge and giving the P-stereogenic dialkyl chlorophosphoridate only one signal.",
+          "delivered_result": "A stepwise 31P NMR account claiming: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate as a single signal at ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with 'one or two peaks' depending on whether the diastereomers happen to be resolved.",
+          "correct_result": "POCl3 resonates near +4 to +5 ppm; the monoalkyl phosphorodichloridate (P not stereogenic) gives one singlet; after addition of the second enantiopure chiral alcohol phosphorus becomes a stereocenter, so the dialkyl phosphorochloridate exists as two diastereomers giving two singlets; hydrolysis retains the P stereocenter, so over the final reaction the two chloridate singlets are replaced by two new singlets of the diastereomeric dialkylphosphate product.",
+          "basis": "world_knowledge",
+          "confidence": "medium",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+            "referent": "POCl3 gives a 31P singlet at approximately +4 to +5 ppm (δ ≈ +4.4 vs 85% H3PO4); the P-stereogenic dialkyl chlorophosphoridate and the final dialkylphosphate each appear as two diastereomeric singlets"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Chemical-shift information delivered in the answer must be factually correct (POCl3 ~+4 to +5 ppm, not +35 to +48 ppm)"
+            },
+            {
+              "kind": "exact_form",
+              "requirement": "Correct number of proton-decoupled 31P signals at each stage: one singlet for non-stereogenic P species (POCl3, monoalkyl dichloridate) and two diastereomeric singlets once P is stereogenic (dialkyl chlorophosphoridate intermediate and final dialkylphosphate)"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+          "referent": "POCl3 resonates as a sharp singlet near +4 to +5 ppm in 31P NMR; none of the search observations in events 002-003 supplied any POCl3 shift value, so this figure was fabricated in the final answer",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "The wrong POCl3 chemical shift first appears in the event_004 final_answer tool call; the preceding search observations (events 002-003) contain no POCl3 shift data, so no earlier assistant step introduced this fabricated value."
+        },
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The final answer fabricates a 31P chemical shift for POCl3 of '+35 to +48 ppm' (often 'near +38 ppm'), a value supported by none of the search observations and contradicting the well-established resonance of POCl3 at about +4 to +5 ppm, while also downgrading the key diastereomer prediction to a hedge and giving the P-stereogenic dialkyl chlorophosphoridate only one signal.",
+              "evidence_refs": [
+                "event_004"
+              ],
+              "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+              "delivered_result": "A stepwise 31P NMR account claiming: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate as a single signal at ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with 'one or two peaks' depending on whether the diastereomers happen to be resolved.",
+              "correct_result": "POCl3 resonates near +4 to +5 ppm; the monoalkyl phosphorodichloridate (P not stereogenic) gives one singlet; after addition of the second enantiopure chiral alcohol phosphorus becomes a stereocenter, so the dialkyl phosphorochloridate exists as two diastereomers giving two singlets; hydrolysis retains the P stereocenter, so over the final reaction the two chloridate singlets are replaced by two new singlets of the diastereomeric dialkylphosphate product."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+                "referent": "POCl3 resonates as a sharp singlet near +4 to +5 ppm in 31P NMR; none of the search observations in events 002-003 supplied any POCl3 shift value, so this figure was fabricated in the final answer",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "The wrong POCl3 chemical shift first appears in the event_004 final_answer tool call; the preceding search observations (events 002-003) contain no POCl3 shift data, so no earlier assistant step introduced this fabricated value."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 7982,
+                  "completion_tokens": 524,
+                  "total_tokens": 8506,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 331
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 331
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "input_tokens": 7982,
+                  "output_tokens": 524
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)\",\n  \"referent\": \"POCl3 resonates as a sharp singlet near +4 to +5 ppm in 31P NMR; none of the search observations in events 00"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The final answer fabricates a 31P chemical shift for POCl3 of '+35 to +48 ppm' (often 'near +38 ppm'), a value supported by none of the search observations and contradicting the well-established resonance of POCl3 at about +4 to +5 ppm, while also downgrading the key diastereomer prediction to a hedge and giving the P-stereogenic dialkyl chlorophosphoridate only one signal.",
+                "delivered_result": "A stepwise 31P NMR account claiming: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate as a single signal at ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with 'one or two peaks' depending on whether the diastereomers happen to be resolved.",
+                "correct_result": "POCl3 resonates near +4 to +5 ppm; the monoalkyl phosphorodichloridate (P not stereogenic) gives one singlet; after addition of the second enantiopure chiral alcohol phosphorus becomes a stereocenter, so the dialkyl phosphorochloridate exists as two diastereomers giving two singlets; hydrolysis retains the P stereocenter, so over the final reaction the two chloridate singlets are replaced by two new singlets of the diastereomeric dialkylphosphate product.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Chemical-shift information delivered in the answer must be factually correct (POCl3 ~+4 to +5 ppm, not +35 to +48 ppm)"
+                  },
+                  {
+                    "kind": "exact_form",
+                    "requirement": "Correct number of proton-decoupled 31P signals at each stage: one singlet for non-stereogenic P species (POCl3, monoalkyl dichloridate) and two diastereomeric singlets once P is stereogenic (dialkyl chlorophosphoridate intermediate and final dialkylphosphate)"
+                  }
+                ],
+                "confidence": "medium",
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": false,
+              "parsed": null,
+              "error": "case deadline exceeded",
+              "error_type": "case_deadline_exceeded",
+              "provider": {},
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "case_deadline_exceeded",
+              "attempts": 2,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "case_deadline_exceeded",
+          "attempts": 2,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 8411,
+            "completion_tokens": 10170,
+            "total_tokens": 18581,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 9479
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 9479
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "input_tokens": 8411,
+            "output_tokens": 10170
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 4,\n  \"hallucination_reason\": \"The final answer predicts a single 31P resonance for the dialkylphosphorochloridate RO–P(O)(Cl)(OR') and places POCl3 at +35 to +48 ppm, but the phosphorus in RO–P(O)(Cl)(OR') bearing two different enantiopure alkox",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 7982,
+            "completion_tokens": 524,
+            "total_tokens": 8506,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 331
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 331
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "input_tokens": 7982,
+            "output_tokens": 524
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)\",\n  \"referent\": \"POCl3 resonates as a sharp singlet near +4 to +5 ppm in 31P NMR; none of the search observations in events 00"
+        },
+        "defense": {}
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "case_deadline_exceeded",
+          "error_type": "case_deadline_exceeded",
+          "error": "case deadline exceeded"
+        }
+      ],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "ba1b1ea12623e6e748c862332e3b28ac0301a82462f4249c79d00bfb55510869",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "42959a0f05b4"
+}

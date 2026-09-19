@@ -999,8 +999,15 @@ def build_evidence_provider(
                 block.get("questions"), Mapping
             ) else ""
             if not question:
-                cache[key] = None
-                return None
+                if not config.get("dataset_root"):
+                    cache[key] = None
+                    return None
+                root = resolve_path(config["dataset_root"]).resolve()
+                target = (root / key).resolve()
+                if root not in target.parents:
+                    raise ValueError("evidence case path escapes dataset_root")
+                record = load_record(root, key)
+                question = build_packet(record)["question"]
             snapshot, _report = build_case_snapshot(corpus, question)
         cache[key] = snapshot
         return snapshot
@@ -1016,12 +1023,24 @@ def evidence_namespace(
     block = config.get("evidence")
     if not isinstance(block, Mapping) or not block or provider is None:
         return {"enabled": False}
+    from detector.retrieval import load_corpus
+
+    corpus = load_corpus(resolve_path(str(block["corpus"]))) if block.get("corpus") else None
     return {
         "enabled": True,
         "corpus": file_digest(
             resolve_path(str(block["corpus"])) / "corpus.json"
         ) if block.get("corpus") else "none",
         "cases": sorted(str(key) for key in (block.get("cases") or {})),
+        "documents": {
+            doc["doc_id"]: hashlib.sha256(doc["text"].encode("utf-8")).hexdigest()
+            for doc in (corpus["documents"] if corpus else [])
+        },
+        "pins": {
+            str(key): file_digest(resolve_path(str(path)))
+            for key, path in (block.get("cases") or {}).items()
+        },
+        "questions": fingerprint(block.get("questions") or {}),
     }
 
 

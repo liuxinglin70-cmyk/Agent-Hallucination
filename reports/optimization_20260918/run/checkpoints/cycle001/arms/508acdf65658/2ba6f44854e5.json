@@ -1,0 +1,484 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/088.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/088.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_003",
+        "responsible_step": 3,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 3,
+            "traced_step": 3,
+            "defense": "substantiated",
+            "confirmed_step": 3,
+            "delivered_result": "Anti addition of Br2 across the C1=C2 double bond giving the vicinal dibromide '1,2-dibromo-4,4-dimethylcyclopentanol' (OH at C1, Br at C1 and C2, methyls at C4), with bromines added anti.",
+            "correct_result": "α-Bromination of the enol: Br2 reacts with the enol double bond and, after loss of the vinylic proton and keto tautomerization, the major product is 2-bromo-4,4-dimethylcyclopentanone (an α-bromoketone), not a vicinal dibromide.",
+            "judge_basis": "world_knowledge",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 3,
+          "hallucination_reason": "The final answer asserts that bromine adds anti across the double bond to give a vicinal dibromide, but 4,4-dimethylcyclopent-1-enol is an enol, and enols react with Br2 by α-halogenation followed by tautomerization to the α-bromoketone, so the delivered major product is chemically wrong.",
+          "delivered_result": "Anti addition of Br2 across the C1=C2 double bond giving the vicinal dibromide '1,2-dibromo-4,4-dimethylcyclopentanol' (OH at C1, Br at C1 and C2, methyls at C4), with bromines added anti.",
+          "correct_result": "α-Bromination of the enol: Br2 reacts with the enol double bond and, after loss of the vinylic proton and keto tautomerization, the major product is 2-bromo-4,4-dimethylcyclopentanone (an α-bromoketone), not a vicinal dibromide.",
+          "basis": "world_knowledge",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_003",
+            "event_002"
+          ],
+          "root_cause": {
+            "step": 3,
+            "quote": "The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.",
+            "referent": "The major outcome is α-bromination: the enol reacts with Br2 to give 2-bromo-4,4-dimethylcyclopentanone after tautomerization to the ketone."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The major product/outcome of the reaction between 4,4-dimethylcyclopent-1-enol and bromine must be the chemically correct major product."
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Provide a final answer identifying the major outcome of the reaction."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 3,
+          "quote": "The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.",
+          "referent": "4,4-Dimethylcyclopent-1-enol is an enol; Br2 reacts via α-halogenation of the enol double bond followed by loss of the vinylic proton and keto tautomerization, so the major product is the α-bromoketone 2-bromo-4,4-dimethylcyclopentanone, not a vicinal dibromide.",
+          "evidence_refs": [
+            "event_003"
+          ],
+          "reason": "The wrong product (anti-addition vicinal dibromide) is first asserted in the event_003 final_answer; event_001 only plans possible outcomes without asserting the error, and event_002 is a failed search, so step 3 is the earliest introduction of the material error."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 3,
+          "evidence_refs": [
+            "event_003",
+            "event_002"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: event_003 (the final_answer call) delivers: 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2. Thus, the major product is 1,2-dibromo-4,4-dimethylcyclopentanol (with the -OH at C1, Br at C2 and C1, and methyls at C4), with bromines added anti.' The task's substrate, 4,4-dimethylcyclopent-1-enol, places the OH on vinylic C1 of the C1=C2 bond, i.e. it is an enol (the enol tautomer of 4,4-dimethylcyclopentanone). Enols do not undergo alkene-style anti addition of Br2 to vicinal dibromides; they react by α-halogenation — bromination at the α-carbon (C2) with loss of the vinylic proton and keto-tautomerization — so the major product is 2-bromo-4,4-dimethylcyclopentanone. The delivered mechanism and product are therefore factually wrong, a RESULT ERROR on the sole deliverable (the major outcome). No external evidence snapshot was provided, so this chemical fact rests on standard organic-chemistry knowledge; nothing in the trajectory supports the dibromide claim — the only lookup (event_002) returned no information, making the committed answer ungrounded assertion. RELEVANCE TEST: event_003 is the terminal final_answer and the earliest assistant-authored assertion of the wrong product (event_001 merely lists dibromide as a possibility in the plan and delivers nothing); correcting event_003 to the α-bromoketone answer makes every required deliverable correct, and no later event corrects or supersedes it. Both tests pass."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 3,
+              "reason": "The final answer asserts that bromine adds anti across the double bond to give a vicinal dibromide, but 4,4-dimethylcyclopent-1-enol is an enol, and enols react with Br2 by α-halogenation followed by tautomerization to the α-bromoketone, so the delivered major product is chemically wrong.",
+              "evidence_refs": [
+                "event_003",
+                "event_002"
+              ],
+              "quote": "The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.",
+              "delivered_result": "Anti addition of Br2 across the C1=C2 double bond giving the vicinal dibromide '1,2-dibromo-4,4-dimethylcyclopentanol' (OH at C1, Br at C1 and C2, methyls at C4), with bromines added anti.",
+              "correct_result": "α-Bromination of the enol: Br2 reacts with the enol double bond and, after loss of the vinylic proton and keto tautomerization, the major product is 2-bromo-4,4-dimethylcyclopentanone (an α-bromoketone), not a vicinal dibromide."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 3,
+                "quote": "The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.",
+                "referent": "4,4-Dimethylcyclopent-1-enol is an enol; Br2 reacts via α-halogenation of the enol double bond followed by loss of the vinylic proton and keto tautomerization, so the major product is the α-bromoketone 2-bromo-4,4-dimethylcyclopentanone, not a vicinal dibromide.",
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "reason": "The wrong product (anti-addition vicinal dibromide) is first asserted in the event_003 final_answer; event_001 only plans possible outcomes without asserting the error, and event_002 is a failed search, so step 3 is the earliest introduction of the material error."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1961,
+                  "completion_tokens": 1035,
+                  "total_tokens": 2996,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 802
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 802
+                  },
+                  "input_tokens": 1961,
+                  "output_tokens": 1035
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.\",\n  \"referent\": \"4,4-Dimethylcyclopent-1-enol is an enol; Br2 reacts via α-halogenation o"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 3,
+                "reason": "The final answer asserts that bromine adds anti across the double bond to give a vicinal dibromide, but 4,4-dimethylcyclopent-1-enol is an enol, and enols react with Br2 by α-halogenation followed by tautomerization to the α-bromoketone, so the delivered major product is chemically wrong.",
+                "delivered_result": "Anti addition of Br2 across the C1=C2 double bond giving the vicinal dibromide '1,2-dibromo-4,4-dimethylcyclopentanol' (OH at C1, Br at C1 and C2, methyls at C4), with bromines added anti.",
+                "correct_result": "α-Bromination of the enol: Br2 reacts with the enol double bond and, after loss of the vinylic proton and keto tautomerization, the major product is 2-bromo-4,4-dimethylcyclopentanone (an α-bromoketone), not a vicinal dibromide.",
+                "evidence_refs": [
+                  "event_003",
+                  "event_002"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The major product/outcome of the reaction between 4,4-dimethylcyclopent-1-enol and bromine must be the chemically correct major product."
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Provide a final answer identifying the major outcome of the reaction."
+                  }
+                ],
+                "confidence": "high",
+                "quote": "The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003",
+                  "event_002"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_003 (the final_answer call) delivers: 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2. Thus, the major product is 1,2-dibromo-4,4-dimethylcyclopentanol (with the -OH at C1, Br at C2 and C1, and methyls at C4), with bromines added anti.' The task's substrate, 4,4-dimethylcyclopent-1-enol, places the OH on vinylic C1 of the C1=C2 bond, i.e. it is an enol (the enol tautomer of 4,4-dimethylcyclopentanone). Enols do not undergo alkene-style anti addition of Br2 to vicinal dibromides; they react by α-halogenation — bromination at the α-carbon (C2) with loss of the vinylic proton and keto-tautomerization — so the major product is 2-bromo-4,4-dimethylcyclopentanone. The delivered mechanism and product are therefore factually wrong, a RESULT ERROR on the sole deliverable (the major outcome). No external evidence snapshot was provided, so this chemical fact rests on standard organic-chemistry knowledge; nothing in the trajectory supports the dibromide claim — the only lookup (event_002) returned no information, making the committed answer ungrounded assertion. RELEVANCE TEST: event_003 is the terminal final_answer and the earliest assistant-authored assertion of the wrong product (event_001 merely lists dibromide as a possibility in the plan and delivers nothing); correcting event_003 to the α-bromoketone answer makes every required deliverable correct, and no later event corrects or supersedes it. Both tests pass."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_002"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_003 (the final_answer call) delivers: 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2. Thus, the major product is 1,2-dibromo-4,4-dimethylcyclopentanol (with the -OH at C1, Br at C2 and C1, and methyls at C4), with bromines added anti.' The task's substrate, 4,4-dimethylcyclopent-1-enol, places the OH on vinylic C1 of the C1=C2 bond, i.e. it is an enol (the enol tautomer of 4,4-dimethylcyclopentanone). Enols do not undergo alkene-style anti addition of Br2 to vicinal dibromides; they react by α-halogenation — bromination at the α-carbon (C2) with loss of the vinylic proton and keto-tautomerization — so the major product is 2-bromo-4,4-dimethylcyclopentanone. The delivered mechanism and product are therefore factually wrong, a RESULT ERROR on the sole deliverable (the major outcome). No external evidence snapshot was provided, so this chemical fact rests on standard organic-chemistry knowledge; nothing in the trajectory supports the dibromide claim — the only lookup (event_002) returned no information, making the committed answer ungrounded assertion. RELEVANCE TEST: event_003 is the terminal final_answer and the earliest assistant-authored assertion of the wrong product (event_001 merely lists dibromide as a possibility in the plan and delivers nothing); correcting event_003 to the α-bromoketone answer makes every required deliverable correct, and no later event corrects or supersedes it. Both tests pass."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_003 (final_answer) delivers: 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2. Thus, the major product is 1,2-dibromo-4,4-dimethylcyclopentanol (with the -OH at C1, Br at C2 and C1, and methyls at C4), with bromines added anti to each other.' The substrate, 4,4-dimethylcyclopent-1-enol, is an enol: the OH sits on the vinylic C1 of the C1=C2 double bond (the answer itself states 'an alcohol group (-OH) on carbon 1' on the double-bond carbon). Enols do not undergo alkene-style anti addition to vicinal dibromides with Br2; they undergo α-halogenation — attack of the enol double bond on Br2 followed by loss of the vinylic proton and keto tautomerization — giving the α-bromoketone, 2-bromo-4,4-dimethylcyclopentanone. The delivered major product is therefore a genuine RESULT ERROR, not a representation difference. The earlier search failure at event_002 (observation: no structural information found) is an intermediate state that was not corrected; event_003 is the earliest assistant-authored locus introducing the wrong product, and the plan at event_001 only listed 'vicinal dibromide' as a hypothesis to check, not a committed answer. RELEVANCE TEST: the task's sole deliverable is the major outcome, delivered exclusively in the event_003 final_answer; there is no later correction in the trajectory. Replacing the event_003 product with the α-bromoketone would make every deliverable correct, so the error is causally connected to and material for the delivered result. No external snapshot was provided; the finding rests on the trajectory and standard chemistry of enol halogenation."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_003 (final_answer) states 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2. Thus, the major product is 1,2-dibromo-4,4-dimethylcyclopentanol (with the -OH at C1, Br at C2 and C1, and methyls at C4), with bromines added anti to each other on the former double bond.' This treats the substrate as a plain alkene. 4,4-Dimethylcyclopent-1-enol is the enol tautomer of 4,4-dimethylcyclopentanone (vinylic OH at C1, C1=C2 double bond); enols react with Br2 by α-halogenation — the enol π bond attacks Br2 and the resulting oxonium loses a proton to give the keto tautomer — so the major product is the α-bromoketone 2-bromo-4,4-dimethylcyclopentanone, not a vicinal dibromide retaining the OH. The delivered answer is therefore a RESULT ERROR on the task's sole deliverable. The only lookup (event_002) returned no structural or reactivity information, so the confident product claim is ungrounded. RELEVANCE TEST: event_003 is the earliest and only assistant-authored introduction of the wrong product (event_001 is a neutral plan, event_002 is a failed search); it is itself the final answer delivery, so correcting it would make every deliverable correct. No EXTERNAL EVIDENCE SNAPSHOT was provided; the correct outcome rests on standard organic chemistry applied to the task question, not on snapshot data."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 3188,
+                  "completion_tokens": 4427,
+                  "total_tokens": 7615,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 3136
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 3987
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 3136
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 3987
+                  },
+                  "input_tokens": 3188,
+                  "output_tokens": 4427
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_003 (final_answer) states 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of br",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": []
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2479,
+            "completion_tokens": 1972,
+            "total_tokens": 4451,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1463
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 1463
+            },
+            "input_tokens": 2479,
+            "output_tokens": 1972
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 3,\n  \"hallucination_reason\": \"The final answer asserts that bromine adds as a vicinal dibromide across the double bond of 4,4-dimethylcyclopent-1-enol, but this substrate is an enol (OH on the vinylic C1), and enols react with Br2 by alpha-bromi",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1961,
+            "completion_tokens": 1035,
+            "total_tokens": 2996,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 802
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 802
+            },
+            "input_tokens": 1961,
+            "output_tokens": 1035
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of bromine across the double bond, resulting in a vicinal dibromide at carbons 1 and 2.\",\n  \"referent\": \"4,4-Dimethylcyclopent-1-enol is an enol; Br2 reacts via α-halogenation o"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 3188,
+            "completion_tokens": 4427,
+            "total_tokens": 7615,
+            "prompt_tokens_details": {
+              "cached_tokens": 3136
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3987
+            },
+            "input_tokens_details": {
+              "cached_tokens": 3136
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3987
+            },
+            "input_tokens": 3188,
+            "output_tokens": 4427
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_003 (final_answer) states 'The major outcome of its reaction with bromine (Br₂) under typical conditions is anti addition of br",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "c085d44973cc03eba6dc6e180c40ba08fcc00ebe6c18097affc9519e9d161efa",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 3
+    },
+    "backend": "detector"
+  },
+  "row_hash": "d21b8122e023"
+}

@@ -70,6 +70,8 @@ python -m evolution verify-ledger
 11. [真实服务联调结果](reports/live/README.md)
 12. [真实数据集小规模路径与重复运行结果](reports/real/README.md)
 13. [真实两轮自进化实验结果](reports/evolution_real/README.md)
+14. [根因定位与答案提交步](docs/localization.md)
+15. [证据覆盖优化与预检记录](reports/optimization_20260918/README.md)
 
 原始数据共 693 个案例、7 个来源。原始目录 695 个文件的摘要保存在 `datasets/integrity.json`。当前默认协议为开发复测；没有预先配置可宣称独立泛化的终审集。离线 smoke 使用 mock 后端，证明机制闭环，不代表真实模型准确率。
 
@@ -80,3 +82,6 @@ python -m evolution verify-ledger
 同日完成两项评估侧优化，测试由 244 增至 **251 passed**：边际集（G）加极性下限，使两种 claim 方向都可被计分；巡检改测已部署版本并保留裸底座对照，把新引入退化、常驻残余与已修复分离为可读字段。依据是真实第 1 轮出现的「做出了有效修改却读数为 0」——G 中没有被修改机制的案例。逐条对照与理由见 [方向对照评估](docs/directions-assessment.md)。
 
 2026-09-17 完成实验框架的结构性重构，测试增至 **312 passed**，离线验证九项全 PASS：`evolution/harness.py` 把 H_t = (G, C, T, M, R) 做成可装载、双层哈希可核验的清单与代际差异；`evolution/gaps.py` 把不可执行的稳定失败族从「当轮丢弃」变为去重后备清单；`evolution/memory.py` 提供三类经验存储。在此基础上，cycle 报告新增 `instrument` 块按轮报告「本轮能计分哪类机制」（`gain_opportunity` / `unmeasurable_polarities`），终态区分为 `admitted` / `rejected` / `not_evaluated` / `unresolved`（「未测量」不再等于「已证伪」），已准入的程序性经验与开放缺口作为草拟输入交给 proposer（记入账本 `proposal_memory`），覆盖不足时按 `coverage_response` 策略改用替代评估集或跳过（默认 `strict`，行为与改动前一致），并修复了断点续跑：契约去除 registry 哈希，已提交本轮准入后中断也能在同一账本继续，观察按 `(arm, case)` 复用。清单、缺口与经验不参与门判定；记忆「被供给」已由测试证明，**替代评估集模式实测可改变准入，故默认关闭**。详见 [H_t 基座说明](evolution/README.md#h_t-基座) 与 [当前进展](docs/progress.md)。
+
+2026-09-18 完成证据覆盖优化与固定划分预检，测试由 312 增至 **385 passed**。语料补入四项来源记录，固定 S/G 的可用证据覆盖由 0/10 变为 1/10，其余缺口逐例保留、没有放宽匹配；修复 corpus 后端未自动读取数据集、缓存未指纹化来源正文两处接线缺陷；五个定位阶段统一到同一份答案提交步口径（[根因定位](docs/localization.md)）。真实预检为 2 TP + 1 TN，未达 2 TP + 2 TN，按协议停止，未启动两轮实验，也未重抽种子、降门限或切换诊断集。详见 [本轮报告](reports/optimization_20260918/README.md)。
+

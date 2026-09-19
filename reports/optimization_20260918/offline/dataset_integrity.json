@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "file_count": 695,
+  "case_count": 693,
+  "sources": {
+    "BFCL": 164,
+    "Camel": 93,
+    "Magentic_One": 94,
+    "Octotools": 47,
+    "OpenDeepSearch": 100,
+    "OpenManus": 104,
+    "SmolAgents": 91
+  },
+  "missing": [],
+  "added": [],
+  "changed": []
+}

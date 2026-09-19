@@ -194,6 +194,45 @@ def test_evidence_absent_from_config_reports_inactive():
     assert evidence_namespace({}, None) == {"enabled": False}
 
 
+def test_corpus_provider_reads_projected_dataset_question_and_invalidates_content(tmp_path):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    document = corpus / "source.txt"
+    document.write_text("The schooner Example carried 116 tons.", encoding="utf-8")
+    (corpus / "corpus.json").write_text(json.dumps({
+        "schema_version": "detector.corpus.v1", "documents": [{
+            "doc_id": "d", "path": "source.txt", "url": "https://example.org/source",
+            "title": "Example", "publisher": "Example", "retrieved_at": "2026-09-18T00:00:00+00:00",
+        }],
+    }), encoding="utf-8")
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    (dataset / "case.json").write_text(json.dumps({
+        "question": [["How many tons did the schooner Example carry?"]],
+        "history": [{"step": 1, "content": "Some answer"}],
+        "true_answer": "SECRET GOLD", "is_hallucination": True,
+    }), encoding="utf-8")
+    config = {"dataset_root": str(dataset), "evidence": {"corpus": str(corpus)}}
+    provider = build_evidence_provider(config)
+    snapshot = provider("case.json")
+    assert snapshot["sources"][0]["verifies"]["value"] == "116 ton"
+    assert "SECRET GOLD" not in json.dumps(snapshot)
+    before = evidence_namespace(config, provider)
+    document.write_text("The schooner Example carried 200 tons.", encoding="utf-8")
+    assert evidence_namespace(config, provider) != before
+    assert build_evidence_provider(config)("case.json")["sources"][0]["verifies"]["value"] == "200 ton"
+
+
+def test_evidence_namespace_tracks_pin_contents(tmp_path):
+    pin = tmp_path / "pin.json"
+    pin.write_text(json.dumps(_snapshot(value="116")), encoding="utf-8")
+    config = {"evidence": {"cases": {CASE: str(pin)}}}
+    provider = build_evidence_provider(config)
+    before = evidence_namespace(config, provider)
+    pin.write_text(json.dumps(_snapshot(value="200")), encoding="utf-8")
+    assert evidence_namespace(config, provider) != before
+
+
 def test_provider_returns_none_when_the_corpus_has_no_bearing(tmp_path):
     corpus = tmp_path / "corpus"
     (corpus / "documents").mkdir(parents=True)

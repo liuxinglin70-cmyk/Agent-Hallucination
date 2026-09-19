@@ -1,0 +1,93 @@
+{
+  "contract": {
+    "cycle": 1,
+    "config": "e3f1521a1573",
+    "source": "caa5eef8c963267a",
+    "detector_config": "cc1e128e93c64111",
+    "split": {
+      "name": "mini",
+      "mini": true,
+      "seed": 20260824,
+      "pool_size": 30,
+      "sentinel": [
+        "BFCL/041.json",
+        "Magentic_One/036.json",
+        "Octotools/023.json",
+        "OpenDeepSearch/077.json",
+        "OpenDeepSearch/088.json",
+        "SmolAgents/019.json"
+      ],
+      "sentinel_size": 6,
+      "sentinel_polarity": {
+        "error": 3,
+        "clean": 3
+      },
+      "gain": [
+        "OpenDeepSearch/080.json",
+        "Octotools/005.json",
+        "Magentic_One/050.json",
+        "OpenDeepSearch/002.json"
+      ],
+      "gain_size": 4,
+      "gain_polarity": {
+        "error": 2,
+        "clean": 2
+      },
+      "patrol_pool_size": 20,
+      "validation": [
+        "BFCL/012.json",
+        "BFCL/068.json",
+        "BFCL/106.json",
+        "Camel/028.json",
+        "Magentic_One/067.json",
+        "Magentic_One/074.json",
+        "OpenDeepSearch/076.json",
+        "OpenDeepSearch/078.json",
+        "SmolAgents/022.json",
+        "SmolAgents/036.json"
+      ],
+      "validation_size": 10,
+      "final_size": 0,
+      "final_reads": 0
+    },
+    "data": {
+      "BFCL/017.json": "1f87b9b729981699",
+      "BFCL/041.json": "2e31d397fec79037",
+      "BFCL/062.json": "8c938b8cfa2dbc55",
+      "BFCL/107.json": "ff270a43033931d5",
+      "Camel/018.json": "805a0c50132f4e47",
+      "Camel/048.json": "191ad88d678e9ac3",
+      "Camel/054.json": "629d33e73665b661",
+      "Magentic_One/036.json": "845734ed932b45d8",
+      "Magentic_One/049.json": "f8fcebca7f4f241f",
+      "Magentic_One/050.json": "1a00961447267a0c",
+      "Magentic_One/085.json": "4df65f6eb4b9af03",
+      "Magentic_One/093.json": "7365ffdbaa7fdef3",
+      "Octotools/005.json": "6396d64b9db30b17",
+      "Octotools/023.json": "3936acd203bdd418",
+      "Octotools/030.json": "c17eaea9b4719611",
+      "Octotools/040.json": "8645f077c37fda21",
+      "OpenDeepSearch/002.json": "00f7c1d90ba49d24",
+      "OpenDeepSearch/035.json": "4cae7a9e011c0344",
+      "OpenDeepSearch/063.json": "9e3b5ab3c6718c9a",
+      "OpenDeepSearch/067.json": "fb48002721320d14",
+      "OpenDeepSearch/077.json": "27df43a4fef2b517",
+      "OpenDeepSearch/080.json": "d6b3d8b2545b993b",
+      "OpenDeepSearch/084.json": "2d38baa0939a177e",
+      "OpenDeepSearch/086.json": "f703304fa2465f74",
+      "OpenDeepSearch/088.json": "a730efb05568199c",
+      "OpenDeepSearch/095.json": "dda5d7168527cfda",
+      "OpenManus/064.json": "b48ed317967fdf94",
+      "OpenManus/073.json": "4f7edd6b5db3b030",
+      "SmolAgents/019.json": "4ef9f079bf8ce401",
+      "SmolAgents/037.json": "7487eb708703c91d"
+    }
+  },
+  "status": "completed",
+  "used_seconds": 901.9336480000056,
+  "registry_before": {
+    "schema_version": "detector.intervention_registry.v1",
+    "interventions": [],
+    "content_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+  }
+}

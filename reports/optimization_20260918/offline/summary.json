@@ -1,0 +1,98 @@
+{
+  "started_at_utc": "2026-09-18T10:02:56.035440+00:00",
+  "finished_at_utc": "2026-09-18T10:03:50.652478+00:00",
+  "python": "3.13.7",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "scope": "Offline regression and mock mechanism validation; no live provider accuracy measurement.",
+  "source_sha256": "69281d2c03702da1185ef93f031e767c8744506b4d91cd929d7a1ccdf6098a7c",
+  "passed": true,
+  "tests": {
+    "tests": 385,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 385
+  },
+  "checks": [
+    {
+      "name": "dataset_integrity",
+      "exit_code": 0
+    },
+    {
+      "name": "pytest",
+      "arguments": [
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=reports/latest/pytest.xml"
+      ],
+      "exit_code": 0,
+      "seconds": 40.134
+    },
+    {
+      "name": "detector_cli",
+      "arguments": [
+        "-m",
+        "detector",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.399
+    },
+    {
+      "name": "evolution_cli",
+      "arguments": [
+        "-m",
+        "evolution",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.333
+    },
+    {
+      "name": "capability_audit",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-audit"
+      ],
+      "exit_code": 0,
+      "seconds": 0.34
+    },
+    {
+      "name": "smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_q0y445_8\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 4.468
+    },
+    {
+      "name": "smoke_admission_and_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_q0y445_8\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 2.313
+    },
+    {
+      "name": "source_unchanged_during_checks",
+      "exit_code": 0
+    }
+  ],
+  "report_repair": "verify.py hardcodes junit output to reports/latest; copied this run XML into this archive, restored prior tracked latest XML, and recomputed counts from the copied XML. No test result was changed."
+}

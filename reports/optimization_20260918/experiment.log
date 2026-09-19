@@ -1,0 +1,121 @@
+{
+  "cycles": [
+    {
+      "cycle": 1,
+      "state": "blocked_evaluation_preflight",
+      "split": {
+        "name": "mini",
+        "mini": true,
+        "seed": 20260824,
+        "pool_size": 30,
+        "sentinel": [
+          "BFCL/041.json",
+          "Magentic_One/036.json",
+          "Octotools/023.json",
+          "OpenDeepSearch/077.json",
+          "OpenDeepSearch/088.json",
+          "SmolAgents/019.json"
+        ],
+        "sentinel_size": 6,
+        "sentinel_polarity": {
+          "error": 3,
+          "clean": 3
+        },
+        "gain": [
+          "OpenDeepSearch/080.json",
+          "Octotools/005.json",
+          "Magentic_One/050.json",
+          "OpenDeepSearch/002.json"
+        ],
+        "gain_size": 4,
+        "gain_polarity": {
+          "error": 2,
+          "clean": 2
+        },
+        "patrol_pool_size": 20,
+        "validation": [
+          "BFCL/012.json",
+          "BFCL/068.json",
+          "BFCL/106.json",
+          "Camel/028.json",
+          "Magentic_One/067.json",
+          "Magentic_One/074.json",
+          "OpenDeepSearch/076.json",
+          "OpenDeepSearch/078.json",
+          "SmolAgents/022.json",
+          "SmolAgents/036.json"
+        ],
+        "validation_size": 10,
+        "final_size": 0,
+        "final_reads": 0
+      },
+      "preflight": {
+        "reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2",
+        "sentinel": {
+          "protected_tp": 2,
+          "protected_tn": 1,
+          "minimum": {
+            "protected_tp": 2,
+            "protected_tn": 2
+          },
+          "evaluable": false,
+          "reason": "protected_tn=1 < 2"
+        }
+      },
+      "audit": {
+        "enabled": true,
+        "passed": false,
+        "status": "not_evaluated"
+      },
+      "patrol": {},
+      "instrument": {
+        "gain_opportunity": null,
+        "gain_measured": false,
+        "blocked_families": [],
+        "unmeasurable_polarities": [],
+        "replacement_gain_cases": 0,
+        "coverage_responses": {},
+        "coverage_response_counts": {},
+        "terminal_classification": {},
+        "terminal_counts": {},
+        "instrument_limited": true
+      },
+      "evidence": {
+        "active": true,
+        "corpus": "reports\\optimization_20260918\\corpus",
+        "pinned_cases": [],
+        "provider_attached": true
+      },
+      "proposals": [],
+      "gates": [],
+      "proposal_summary": {
+        "candidate_count": 0,
+        "empty_proposal_reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2"
+      },
+      "marginal_selection": {
+        "selected": [],
+        "library_rejections": []
+      },
+      "active_after_cycle": [],
+      "ledger_integrity": {
+        "valid": true,
+        "records": 3,
+        "broken_at": null,
+        "reason": ""
+      }
+    }
+  ],
+  "active": [],
+  "ledger_integrity": {
+    "valid": true,
+    "records": 3,
+    "broken_at": null,
+    "reason": ""
+  },
+  "registry_state": {
+    "cycle": 0,
+    "net_contribution_history": [],
+    "interventions": {},
+    "snapshots": []
+  }
+}

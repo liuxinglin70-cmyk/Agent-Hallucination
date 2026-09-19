@@ -1,0 +1,13 @@
+PREDEMICS Project Final Report _M1-M66 Page 39 of 44 Page 39 of 44 for two weeks to provide further in-depth support and inform the vaccination strategies to curb the ongoing outbreak.
+
+They also informed the EYE (Elimination of Yellow Fever Epidemics) strategy, which is a long-term plan to increase YF vaccination coverage across the endemic areas in Africa, by analysing YF transmission intensity and current population-level vaccination coverage to estimate populations at risk and prioritise districts and countries for vaccination.
+
+As part of this they have developed an online tool to visualise the vaccination coverage across Africa (https://polici.shinyapps.io/yellow_fever_africa/).
+
+Middle Eastern Respiratory Syndrome (MERS) is another example where PREDEMICS-funded researchers undertook real-time analyses to understand the transmission dynamics of an emerging infectious disease and provided insights which were used by public health collaborators to inform control efforts in affected areas.
+
+The research is most comprehensively described in these publications which were published jointly with staff from Saudi Arabia’s Ministry of Health: https://www.ncbi.nlm.nih.gov/pubmed/27457935 [Cauchemez et al.] https://www.ncbi.nlm.nih.gov/pubmed/26851269 [Lessler et al.] PREDEMICS-funded researchers also looked more broadly bringing together data from across the Middle East to estimate the risks of exported cases: https://www.ncbi.nlm.nih.gov/pubmed/24239323 [Cauchemez et al.] Vittoria Colizza’s group has worked more generally on the use of realistic networks to improve epidemics models, e.g. https://www.ncbi.nlm.nih.gov/pubmed/27842507 [Bioglio et al.].
+
+It was announced in June 2017 that she was awarded the 2017 Erdős–Rényi Prize in recognition of her “contributions to fundamental and data-driven network-based modelling of epidemic processes, including seminal studies on metapopulation systems, the impact of air transportation, and the predictability of epidemic outbreaks” https://isi.it/en/news-events/vittoria-colizza-receives-prestigious-erd-s-r-nyi-prize-2017-in-network-science.
+
+Methodological research is crucial to underpin applied epidemiological studies to allow them to have the greatest relevance and impact.

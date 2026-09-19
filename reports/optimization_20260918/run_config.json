@@ -1,0 +1,71 @@
+{
+  "schema_version": "evolution.framework.v1",
+  "detector_config": "detector/configs/autodl.json",
+  "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+  "mini_split_manifest": "datasets/protocols/development.json",
+  "work_root": "artifacts/evolution_evidence_20260918",
+  "registry_dir": "artifacts/evolution_evidence_20260918/registry",
+  "ledger_path": "artifacts/evolution_evidence_20260918/ledger.jsonl",
+  "cycles": 2,
+  "split": {
+    "seed": 20260824,
+    "sentinel_positives": 3,
+    "sentinel_negatives": 3,
+    "mini_pool_size": 30,
+    "mini_gain_size": 4
+  },
+  "budget": {
+    "patrol_cases": 20,
+    "stable_failure_rerun_cases": 20,
+    "llm_calls": 2,
+    "max_proposals": 4,
+    "max_admits": 2,
+    "cycle_timeout_seconds": 7200
+  },
+  "gates": {
+    "structural_jaccard_threshold": 0.72,
+    "harmlessness_new_fn_allowed": 0,
+    "harmlessness_new_fp_allowed": 0,
+    "harmlessness_new_unresolved_allowed": 0,
+    "harmlessness_min_protected_tp": 2,
+    "harmlessness_min_protected_tn": 2,
+    "behavior_require_fired": true,
+    "m_min_marginal_cases": 1,
+    "m_new_errors_allowed": 0
+  },
+  "mini_effect": {
+    "min_marginal_cases": 1,
+    "max_new_errors": 0,
+    "max_unresolved_added": 0
+  },
+  "library": {
+    "max_width": 6,
+    "max_text_boundary_per_hook": 1,
+    "max_decision_guards": 4,
+    "retire_after_cycles_marginal_le0": 2,
+    "rollback_after_cycles_net_negative": 2
+  },
+  "audit": {
+    "enabled": true
+  },
+  "backend": {
+    "name": "detector",
+    "workers": 8,
+    "cache": true
+  },
+  "proposer": {
+    "mode": "hybrid",
+    "max_output_tokens": 32768,
+    "thinking_level": "",
+    "max_repair_calls": 1
+  },
+  "split_manifest": null,
+  "historical_development_manifests": [
+    "datasets/protocols/development_exposure.json"
+  ],
+  "harness_dir": "artifacts/evolution_evidence_20260918/harness",
+  "memory_root": "artifacts/evolution_evidence_20260918/memory",
+  "evidence": {
+    "corpus": "reports\\optimization_20260918\\corpus"
+  }
+}

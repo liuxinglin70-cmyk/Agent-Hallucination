@@ -1,0 +1,48 @@
+{
+  "schema_version": "detector.evidence.v1",
+  "query": {
+    "text": "ton topsail schooner lisette built 1873 duke sutherland formerly owned before she began working decoy craft",
+    "derivation": "task",
+    "task_excerpt": "How many tons was the topsail schooner \"Lisette,\" built in 1873, which the Duke of Sutherland had formerly owned before she began working as a decoy craft in 1917?"
+  },
+  "sources": [
+    {
+      "evidence_id": "E1",
+      "url": "https://www.gutenberg.org/cache/epub/54338/pg54338.txt",
+      "title": "Q-Ships and Their Story (E. Keble Chatterton, 1922)",
+      "publisher": "gutenberg.org",
+      "retrieved_at": "2026-09-18T16:40:00+08:00",
+      "excerpt": "Even a private yacht was taken up for this work in June. This was the\n116-ton topsail schooner _Lisette_, which had formerly belonged to\nthe Duke of Sutherland. She had been built as far back as 1873 with a\nstanding bowsprit and jibboom. She was taken from Cowes to Falmouth,\nwhere she was commissioned in August, and armed with three 6-pounders.\nBut this old yacht was found to leak so much through her seams, and\nher construction was so light, that she was never a success, and\nwas paid off in the following spring. In April, 1917, the auxiliary\nschooner _Sidney_ (alias _Glen_) began service as a decoy, having been\nrequisitioned from her owners and fitted out at Portsmouth. A crew was\nselected from the Trawler Reserve, but the guns’ crews were naval.\nArmed with a 12-pounder and a 3-pounder, she was fitted with wireless,\nand cruised about in the English Channel, her complement consisting\nof L",
+      "content_sha256": "3f17e914631eaf4090545a4e12ca4b408ea6776711467e05a633ceaba991f18d",
+      "verifies": {
+        "entity": "Lisette",
+        "attribute": "ton",
+        "value": "116 ton"
+      },
+      "applicable_context": "Passage selected by lexical retrieval from q-ships-1922 for the query terms ton, topsail, schooner, lisette, built, 1873, duke, sutherland, formerly, owned; primary account of the decoy-ship service; fetched for the Lisette tonnage question"
+    },
+    {
+      "evidence_id": "E2",
+      "url": "https://www.heritage-images.com/preview/the-76-ton-schooner-lisette-under-sail-creator-kirk-sons-of-cowes-2696189",
+      "title": "The 76 ton schooner 'Lisette' under sail (Heritage Images)",
+      "publisher": "heritage-images.com",
+      "retrieved_at": "2026-09-18T16:42:00+08:00",
+      "excerpt": "The 76 ton schooner 'Lisette' under sail. 'Lisette' was built at Cowes in 1873.",
+      "content_sha256": "5fbd2a981b00f598f814f149e11fc7c57b41bed30890c6efec4098094f1eb78e",
+      "verifies": {
+        "entity": "Lisette",
+        "attribute": "ton",
+        "value": "76 ton"
+      },
+      "applicable_context": "Passage selected by lexical retrieval from heritage-lisette for the query terms ton, topsail, schooner, lisette, built, 1873, duke, sutherland, formerly, owned; photograph catalogue caption surfaced by the same search"
+    }
+  ],
+  "resolutions": [
+    {
+      "entity": "lisette",
+      "attribute": "ton",
+      "resolved_by": "E1",
+      "reason": "The task's own descriptors decide applicability: E1 matches 11 of them (ton, topsail, schooner, built, duke, sutherland, formerly, owned) while E2 matches 8 (ton, topsail, schooner, built, duke, sutherland, formerly, owned). Repetition and gallery captions were not counted."
+    }
+  ]
+}

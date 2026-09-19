@@ -1,0 +1,504 @@
+{
+  "states": [
+    "blocked_evaluation_preflight"
+  ],
+  "frozen_inputs_unchanged": true,
+  "original_gates_split_budget": true,
+  "snapshot_schema_valid": true,
+  "mini_coverage": {
+    "covered": 1,
+    "total": 10
+  },
+  "ledger": {
+    "valid": true,
+    "records": 3,
+    "broken_at": null,
+    "reason": ""
+  },
+  "preflight": {
+    "reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2",
+    "sentinel": {
+      "protected_tp": 2,
+      "protected_tn": 1,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": false,
+      "reason": "protected_tn=1 < 2"
+    }
+  },
+  "recomputed_sentinel": {
+    "protected_tp": 2,
+    "protected_tn": 1,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": false,
+    "reason": "protected_tn=1 < 2"
+  },
+  "baseline": [
+    {
+      "case": "OpenDeepSearch/088.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error",
+      "authority": "authoritative",
+      "responsible_step": 3,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 2479,
+          "completion_tokens": 1972,
+          "total_tokens": 4451,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1463
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1463
+          },
+          "input_tokens": 2479,
+          "output_tokens": 1972
+        },
+        "step_tracer": {
+          "prompt_tokens": 1961,
+          "completion_tokens": 1035,
+          "total_tokens": 2996,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 802
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 802
+          },
+          "input_tokens": 1961,
+          "output_tokens": 1035
+        },
+        "defense": {
+          "prompt_tokens": 3188,
+          "completion_tokens": 4427,
+          "total_tokens": 7615,
+          "prompt_tokens_details": {
+            "cached_tokens": 3136
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 3987
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3136
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 3987
+          },
+          "input_tokens": 3188,
+          "output_tokens": 4427
+        }
+      },
+      "authority_failure_reasons": []
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "gold": false,
+      "prediction": null,
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "responsible_step": 4,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "case_deadline_exceeded",
+          "attempts": 2,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 8411,
+          "completion_tokens": 10170,
+          "total_tokens": 18581,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 9479
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 9479
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 8411,
+          "output_tokens": 10170
+        },
+        "step_tracer": {
+          "prompt_tokens": 7982,
+          "completion_tokens": 524,
+          "total_tokens": 8506,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 331
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 331
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 7982,
+          "output_tokens": 524
+        },
+        "defense": null
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "case_deadline_exceeded",
+          "error_type": "case_deadline_exceeded",
+          "error": "case deadline exceeded"
+        }
+      ]
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "gold": false,
+      "prediction": true,
+      "state": "verified_error",
+      "authority": "authoritative",
+      "responsible_step": 6,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 2528,
+          "completion_tokens": 2024,
+          "total_tokens": 4552,
+          "prompt_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1860
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1860
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "input_tokens": 2528,
+          "output_tokens": 2024
+        },
+        "step_tracer": {
+          "prompt_tokens": 1857,
+          "completion_tokens": 2752,
+          "total_tokens": 4609,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2591
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2591
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 1857,
+          "output_tokens": 2752
+        },
+        "defense": {
+          "prompt_tokens": 1987,
+          "completion_tokens": 1027,
+          "total_tokens": 3014,
+          "prompt_tokens_details": {
+            "cached_tokens": 1984
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 779
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1984
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 779
+          },
+          "input_tokens": 1987,
+          "output_tokens": 1027
+        }
+      },
+      "authority_failure_reasons": []
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error",
+      "authority": "authoritative",
+      "responsible_step": 4,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 6031,
+          "completion_tokens": 3123,
+          "total_tokens": 9154,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2693
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2693
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 6031,
+          "output_tokens": 3123
+        },
+        "step_tracer": {
+          "prompt_tokens": 5418,
+          "completion_tokens": 653,
+          "total_tokens": 6071,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 469
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 469
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 5418,
+          "output_tokens": 653
+        },
+        "defense": {
+          "prompt_tokens": 5931,
+          "completion_tokens": 2516,
+          "total_tokens": 8447,
+          "prompt_tokens_details": {
+            "cached_tokens": 5888
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2183
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2183
+          },
+          "input_tokens_details": {
+            "cached_tokens": 5888
+          },
+          "input_tokens": 5931,
+          "output_tokens": 2516
+        }
+      },
+      "authority_failure_reasons": []
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "gold": false,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "responsible_step": null,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 5537,
+          "completion_tokens": 3071,
+          "total_tokens": 8608,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2844
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2844
+          },
+          "input_tokens": 5537,
+          "output_tokens": 3071
+        }
+      },
+      "authority_failure_reasons": []
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "responsible_step": null,
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "usage_by_stage": {
+        "judge": {
+          "prompt_tokens": 2020,
+          "completion_tokens": 1351,
+          "total_tokens": 3371,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 937
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 937
+          },
+          "input_tokens": 2020,
+          "output_tokens": 1351
+        }
+      },
+      "authority_failure_reasons": []
+    }
+  ],
+  "completed_two_cycles": false
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": "detector.evidence.v1",
+  "query": {
+    "text": "track 12 jet set radio soundtrack 2000",
+    "derivation": "task",
+    "task_excerpt": "What is the name of track 12 on the Jet Set Radio original soundtrack released in 2000?"
+  },
+  "sources": [
+    {
+      "evidence_id": "E1",
+      "url": "https://musicbrainz.org/ws/2/release/be5b825d-5bb7-38b2-8fd7-dc0eef9501a9?inc=recordings+artist-credits&fmt=json",
+      "title": "MusicBrainz release be5b825d: Jet Set Radio Original Sound Tracks (2000-12-20, JP)",
+      "publisher": "musicbrainz.org",
+      "retrieved_at": "2026-09-18T16:45:00+08:00",
+      "excerpt": "media[0]/tracks[11]/length: 207866\nmedia[0]/tracks[11]/id: fe13cc93-8ed4-37a4-b2b8-728ca37d6f78\nmedia[0]/tracks[11]/artist-credit[0]/artist/name: B.B.Rights\nmedia[0]/tracks[11]/artist-credit[0]/artist/id: a4d0f218-ff1f-4e01-bf5a-103fe6cd54ab\nmedia[0]/tracks[11]/artist-credit[0]/artist/sort-name: B.B.Rights\nmedia[0]/tracks[11]/artist-credit[0]/name: B.B.Rights\nmedia[0]/tracks[11]/position: 12\nmedia[0]/tracks[11]/recording/title: Funky Radio\nmedia[0]/tracks[11]/recording/first-release-date: 2000-12-20\nmedia[0]/tracks[11]/recording/artist-credit[0]/artist/sort-name: B.B.Rights\nmedia[0]/tracks[11]/recording/artist-credit[0]/artist/id: a4d0f218-ff1f-4e01-bf5a-103fe6cd54ab\nmedia[0]/tracks[11]/recording/artist-credit[0]/artist/name: B.B.Rights\nmedia[0]/tracks[11]/recording/artist-credit[0]/name: B.B.Rights\nmedia[0]/tracks[11]/recording/video: False\nmedia[0]/tracks[11]/recording/id: caad2b54-07c7-4e97-be97-b810cd27b8ce\nmedia[0]/tracks[11]/recording/length: 207866\nmedia[0]/tracks[11]/title: Funky Radio\nmedia[0]/tracks[11]/number: 12",
+      "content_sha256": "6c165568547aadc864e583189d434bb9830a6d297a18f1a613435092a7598e15",
+      "verifies": {
+        "entity": "Jet Set Radio",
+        "attribute": "track",
+        "value": "Funky Radio"
+      },
+      "applicable_context": "Passage selected by lexical retrieval from musicbrainz-jsr for the query terms track, 12, jet, set, radio, soundtrack, 2000; the case entity is named by the document title; release tracklist for the 2000 soundtrack question"
+    }
+  ]
+}

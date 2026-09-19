@@ -1,0 +1,476 @@
+packaging: Jewel Case
+cover-art-archive/count: 12
+cover-art-archive/darkened: False
+cover-art-archive/front: True
+cover-art-archive/artwork: True
+cover-art-archive/back: True
+status-id: 4e304316-386d-3409-af2e-78857eec5cfe
+id: be5b825d-5bb7-38b2-8fd7-dc0eef9501a9
+status: Official
+release-events[0]/area/iso-3166-1-codes[0]: JP
+release-events[0]/area/id: 2db42837-c832-3c27-b4a3-08198f75693c
+release-events[0]/area/sort-name: Japan
+release-events[0]/area/name: Japan
+release-events[0]/date: 2000-12-20
+title: Jet Set Radio Original Sound Tracks
+date: 2000-12-20
+packaging-id: ec27701a-4a22-37f4-bfac-6616e0f9750a
+text-representation/script: Latn
+text-representation/language: eng
+media[0]/id: 247a9089-2e87-33eb-8221-a73574a326d1
+media[0]/tracks[0]/id: c25ef54b-e8d3-3eb4-a760-d4eaebf5b77f
+media[0]/tracks[0]/length: 173160
+media[0]/tracks[0]/position: 1
+media[0]/tracks[0]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[0]/artist-credit[0]/artist/type: Person
+media[0]/tracks[0]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[0]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[0]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[0]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[0]/artist-credit[0]/artist/country: JP
+media[0]/tracks[0]/number: 1
+media[0]/tracks[0]/title: Let Mom Sleep
+media[0]/tracks[0]/recording/title: Let Mom Sleep
+media[0]/tracks[0]/recording/id: e3cd384f-a79c-4e32-a654-8136fe9d170d
+media[0]/tracks[0]/recording/length: 173160
+media[0]/tracks[0]/recording/video: False
+media[0]/tracks[0]/recording/first-release-date: 2000-12-20
+media[0]/tracks[0]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[0]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[0]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[0]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[0]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[0]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[0]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[1]/recording/title: Humming the Bassline
+media[0]/tracks[1]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[1]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[1]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[1]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[1]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[1]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[1]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[1]/recording/first-release-date: 2000-12-20
+media[0]/tracks[1]/recording/id: e1b0dac1-91bb-4933-b90a-957d647b0a17
+media[0]/tracks[1]/recording/length: 176240
+media[0]/tracks[1]/recording/video: False
+media[0]/tracks[1]/title: Humming the Bassline
+media[0]/tracks[1]/number: 2
+media[0]/tracks[1]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[1]/artist-credit[0]/artist/country: JP
+media[0]/tracks[1]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[1]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[1]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[1]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[1]/artist-credit[0]/artist/type: Person
+media[0]/tracks[1]/position: 2
+media[0]/tracks[1]/id: 1dc2f4fe-1fdb-3c4f-a06e-36f7aaf6b4e6
+media[0]/tracks[1]/length: 176240
+media[0]/tracks[2]/position: 3
+media[0]/tracks[2]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[2]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[2]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[2]/artist-credit[0]/artist/country: JP
+media[0]/tracks[2]/artist-credit[0]/artist/type: Person
+media[0]/tracks[2]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[2]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[2]/id: 0cbce490-e0ec-38ac-9cd5-0a6842e77a27
+media[0]/tracks[2]/length: 225560
+media[0]/tracks[2]/number: 3
+media[0]/tracks[2]/recording/id: 984ee2d5-0e95-41b7-a32a-613ad9997044
+media[0]/tracks[2]/recording/length: 225560
+media[0]/tracks[2]/recording/video: False
+media[0]/tracks[2]/recording/first-release-date: 2000-12-20
+media[0]/tracks[2]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[2]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[2]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[2]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[2]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[2]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[2]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[2]/recording/title: That’s Enough
+media[0]/tracks[2]/title: That’s Enough
+media[0]/tracks[3]/length: 249706
+media[0]/tracks[3]/id: dc7cc9b0-618f-3e39-b4e6-aa0cfae3f2a6
+media[0]/tracks[3]/artist-credit[0]/artist/id: c365d5ee-72a7-41ef-994c-d6acba131192
+media[0]/tracks[3]/artist-credit[0]/artist/sort-name: Jacques, Richard
+media[0]/tracks[3]/artist-credit[0]/artist/country: GB
+media[0]/tracks[3]/artist-credit[0]/artist/type: Person
+media[0]/tracks[3]/artist-credit[0]/artist/name: Richard Jacques
+media[0]/tracks[3]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[3]/artist-credit[0]/name: Richard Jacques
+media[0]/tracks[3]/position: 4
+media[0]/tracks[3]/recording/title: Everybody Jump Around
+media[0]/tracks[3]/recording/video: False
+media[0]/tracks[3]/recording/length: 249706
+media[0]/tracks[3]/recording/id: 34c3fa77-2456-43dc-b6d9-db8d25defe88
+media[0]/tracks[3]/recording/first-release-date: 2000-12-20
+media[0]/tracks[3]/recording/artist-credit[0]/artist/sort-name: Jacques, Richard
+media[0]/tracks[3]/recording/artist-credit[0]/artist/id: c365d5ee-72a7-41ef-994c-d6acba131192
+media[0]/tracks[3]/recording/artist-credit[0]/artist/country: GB
+media[0]/tracks[3]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[3]/recording/artist-credit[0]/artist/name: Richard Jacques
+media[0]/tracks[3]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[3]/recording/artist-credit[0]/name: Richard Jacques
+media[0]/tracks[3]/title: Everybody Jump Around
+media[0]/tracks[3]/number: 4
+media[0]/tracks[4]/title: Sneakman
+media[0]/tracks[4]/recording/title: Sneakman
+media[0]/tracks[4]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[4]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[4]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[4]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[4]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[4]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[4]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[4]/recording/first-release-date: 2000-12-20
+media[0]/tracks[4]/recording/video: False
+media[0]/tracks[4]/recording/length: 233360
+media[0]/tracks[4]/recording/id: 6308c0ae-58bb-4f2f-aca9-0931e40f50e0
+media[0]/tracks[4]/number: 5
+media[0]/tracks[4]/artist-credit[0]/artist/type: Person
+media[0]/tracks[4]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[4]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[4]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[4]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[4]/artist-credit[0]/artist/country: JP
+media[0]/tracks[4]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[4]/position: 5
+media[0]/tracks[4]/id: 5c7faf5a-b004-3b8b-b099-f55215b7640c
+media[0]/tracks[4]/length: 233360
+media[0]/tracks[5]/number: 6
+media[0]/tracks[5]/recording/id: 1d9314d9-b187-4ace-91c9-7984ab74b074
+media[0]/tracks[5]/recording/length: 222800
+media[0]/tracks[5]/recording/video: False
+media[0]/tracks[5]/recording/artist-credit[0]/artist/type-id: e431f5f6-b5d2-343d-8b36-72607fffb74b
+media[0]/tracks[5]/recording/artist-credit[0]/artist/name: Reps
+media[0]/tracks[5]/recording/artist-credit[0]/artist/type: Group
+media[0]/tracks[5]/recording/artist-credit[0]/artist/id: de8b38f9-9b9e-4276-969e-be789aa28bd6
+media[0]/tracks[5]/recording/artist-credit[0]/artist/sort-name: Reps
+media[0]/tracks[5]/recording/artist-credit[0]/artist/disambiguation: Jet Set Radio
+media[0]/tracks[5]/recording/artist-credit[0]/name: Reps
+media[0]/tracks[5]/recording/first-release-date: 2000-12-20
+media[0]/tracks[5]/recording/title: Bout the City
+media[0]/tracks[5]/title: Bout the City
+media[0]/tracks[5]/id: 83998e15-3d74-3a6b-a751-c5fce63987f6
+media[0]/tracks[5]/length: 222800
+media[0]/tracks[5]/position: 6
+media[0]/tracks[5]/artist-credit[0]/name: Reps
+media[0]/tracks[5]/artist-credit[0]/artist/sort-name: Reps
+media[0]/tracks[5]/artist-credit[0]/artist/id: de8b38f9-9b9e-4276-969e-be789aa28bd6
+media[0]/tracks[5]/artist-credit[0]/artist/disambiguation: Jet Set Radio
+media[0]/tracks[5]/artist-credit[0]/artist/type: Group
+media[0]/tracks[5]/artist-credit[0]/artist/type-id: e431f5f6-b5d2-343d-8b36-72607fffb74b
+media[0]/tracks[5]/artist-credit[0]/artist/name: Reps
+media[0]/tracks[6]/title: Mischievous Boy
+media[0]/tracks[6]/recording/title: Mischievous Boy
+media[0]/tracks[6]/recording/first-release-date: 2000-12-20
+media[0]/tracks[6]/recording/artist-credit[0]/artist/id: 856d9814-97c1-4b7a-9b31-0a13f3a3f6d3
+media[0]/tracks[6]/recording/artist-credit[0]/artist/sort-name: Castle Logical
+media[0]/tracks[6]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[6]/recording/artist-credit[0]/artist/name: Castle Logical
+media[0]/tracks[6]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[6]/recording/artist-credit[0]/name: Castle Logical
+media[0]/tracks[6]/recording/video: False
+media[0]/tracks[6]/recording/id: aab0ce08-e445-4f99-a12d-96f6219c918b
+media[0]/tracks[6]/recording/length: 135000
+media[0]/tracks[6]/number: 7
+media[0]/tracks[6]/id: f7db86be-ef0a-3cbb-8365-9dd93309e261
+media[0]/tracks[6]/length: 135000
+media[0]/tracks[6]/artist-credit[0]/artist/type: Person
+media[0]/tracks[6]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[6]/artist-credit[0]/artist/name: Castle Logical
+media[0]/tracks[6]/artist-credit[0]/artist/id: 856d9814-97c1-4b7a-9b31-0a13f3a3f6d3
+media[0]/tracks[6]/artist-credit[0]/artist/sort-name: Castle Logical
+media[0]/tracks[6]/artist-credit[0]/name: Castle Logical
+media[0]/tracks[6]/position: 7
+media[0]/tracks[7]/length: 176306
+media[0]/tracks[7]/id: 129d2878-7edb-3a69-99ed-26dfe2006112
+media[0]/tracks[7]/position: 8
+media[0]/tracks[7]/artist-credit[0]/artist/country: JP
+media[0]/tracks[7]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[7]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[7]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[7]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[7]/artist-credit[0]/artist/type: Person
+media[0]/tracks[7]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[7]/number: 8
+media[0]/tracks[7]/recording/first-release-date: 2000-12-20
+media[0]/tracks[7]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[7]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[7]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[7]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[7]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[7]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[7]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[7]/recording/video: False
+media[0]/tracks[7]/recording/length: 176306
+media[0]/tracks[7]/recording/id: 43bcadea-7536-4f79-9fc1-b88601dd9552
+media[0]/tracks[7]/recording/title: Sweet Soul Brother
+media[0]/tracks[7]/title: Sweet Soul Brother
+media[0]/tracks[8]/number: 9
+media[0]/tracks[8]/recording/title: Rock It On
+media[0]/tracks[8]/recording/first-release-date: 2000-12-20
+media[0]/tracks[8]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[8]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[8]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[8]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[8]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[8]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[8]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[8]/recording/id: 3ede8fff-a65d-4699-9290-3a66c9cea3f6
+media[0]/tracks[8]/recording/length: 226066
+media[0]/tracks[8]/recording/video: False
+media[0]/tracks[8]/title: Rock It On
+media[0]/tracks[8]/position: 9
+media[0]/tracks[8]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[8]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[8]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[8]/artist-credit[0]/artist/country: JP
+media[0]/tracks[8]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[8]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[8]/artist-credit[0]/artist/type: Person
+media[0]/tracks[8]/length: 226066
+media[0]/tracks[8]/id: a7623e36-c2ee-3986-bb17-48fea962f5a9
+media[0]/tracks[9]/artist-credit[0]/artist/id: fd297cad-3126-4a3a-9b19-12a672bbf08d
+media[0]/tracks[9]/artist-credit[0]/artist/sort-name: F‐Fields
+media[0]/tracks[9]/artist-credit[0]/artist/name: F‐Fields
+media[0]/tracks[9]/artist-credit[0]/name: F‐Fields
+media[0]/tracks[9]/position: 10
+media[0]/tracks[9]/length: 196133
+media[0]/tracks[9]/id: 89efaba0-2b5d-3ace-a93e-0aca8422b92f
+media[0]/tracks[9]/title: Yellow Bream
+media[0]/tracks[9]/recording/title: Yellow Bream
+media[0]/tracks[9]/recording/artist-credit[0]/artist/sort-name: F‐Fields
+media[0]/tracks[9]/recording/artist-credit[0]/artist/id: fd297cad-3126-4a3a-9b19-12a672bbf08d
+media[0]/tracks[9]/recording/artist-credit[0]/artist/name: F‐Fields
+media[0]/tracks[9]/recording/artist-credit[0]/name: F‐Fields
+media[0]/tracks[9]/recording/first-release-date: 2000-12-20
+media[0]/tracks[9]/recording/length: 196133
+media[0]/tracks[9]/recording/id: f2a9f493-1cdb-4156-88d8-ca2dfa0b53c5
+media[0]/tracks[9]/recording/video: False
+media[0]/tracks[9]/number: 10
+media[0]/tracks[10]/length: 256760
+media[0]/tracks[10]/id: ae0fd182-01de-3758-a013-a8e5acbbc8b5
+media[0]/tracks[10]/artist-credit[0]/name: Toronto
+media[0]/tracks[10]/artist-credit[0]/artist/id: 38867b4a-0f6f-499f-afa7-59e209ff5803
+media[0]/tracks[10]/artist-credit[0]/artist/sort-name: Toronto
+media[0]/tracks[10]/artist-credit[0]/artist/disambiguation: SEGA music composer Tomonori Sawada
+media[0]/tracks[10]/artist-credit[0]/artist/country: JP
+media[0]/tracks[10]/artist-credit[0]/artist/name: Toronto
+media[0]/tracks[10]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[10]/artist-credit[0]/artist/type: Person
+media[0]/tracks[10]/position: 11
+media[0]/tracks[10]/title: Electric Tooth Brush
+media[0]/tracks[10]/recording/title: Electric Tooth Brush
+media[0]/tracks[10]/recording/artist-credit[0]/name: Toronto
+media[0]/tracks[10]/recording/artist-credit[0]/artist/id: 38867b4a-0f6f-499f-afa7-59e209ff5803
+media[0]/tracks[10]/recording/artist-credit[0]/artist/sort-name: Toronto
+media[0]/tracks[10]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[10]/recording/artist-credit[0]/artist/disambiguation: SEGA music composer Tomonori Sawada
+media[0]/tracks[10]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[10]/recording/artist-credit[0]/artist/name: Toronto
+media[0]/tracks[10]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[10]/recording/first-release-date: 2000-12-20
+media[0]/tracks[10]/recording/id: 8a0222a9-bcce-4c08-ba96-64f4d42868d8
+media[0]/tracks[10]/recording/length: 256760
+media[0]/tracks[10]/recording/video: False
+media[0]/tracks[10]/number: 11
+media[0]/tracks[11]/length: 207866
+media[0]/tracks[11]/id: fe13cc93-8ed4-37a4-b2b8-728ca37d6f78
+media[0]/tracks[11]/artist-credit[0]/artist/name: B.B.Rights
+media[0]/tracks[11]/artist-credit[0]/artist/id: a4d0f218-ff1f-4e01-bf5a-103fe6cd54ab
+media[0]/tracks[11]/artist-credit[0]/artist/sort-name: B.B.Rights
+media[0]/tracks[11]/artist-credit[0]/name: B.B.Rights
+media[0]/tracks[11]/position: 12
+media[0]/tracks[11]/recording/title: Funky Radio
+media[0]/tracks[11]/recording/first-release-date: 2000-12-20
+media[0]/tracks[11]/recording/artist-credit[0]/artist/sort-name: B.B.Rights
+media[0]/tracks[11]/recording/artist-credit[0]/artist/id: a4d0f218-ff1f-4e01-bf5a-103fe6cd54ab
+media[0]/tracks[11]/recording/artist-credit[0]/artist/name: B.B.Rights
+media[0]/tracks[11]/recording/artist-credit[0]/name: B.B.Rights
+media[0]/tracks[11]/recording/video: False
+media[0]/tracks[11]/recording/id: caad2b54-07c7-4e97-be97-b810cd27b8ce
+media[0]/tracks[11]/recording/length: 207866
+media[0]/tracks[11]/title: Funky Radio
+media[0]/tracks[11]/number: 12
+media[0]/tracks[12]/position: 13
+media[0]/tracks[12]/artist-credit[0]/artist/country: JP
+media[0]/tracks[12]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[12]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[12]/artist-credit[0]/artist/type: Person
+media[0]/tracks[12]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[12]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[12]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[12]/id: 9f8d233c-cb4c-3c3c-8579-6dfe75220c24
+media[0]/tracks[12]/length: 77973
+media[0]/tracks[12]/number: 13
+media[0]/tracks[12]/recording/video: False
+media[0]/tracks[12]/recording/id: 67ad1002-1dc4-48d4-9ab5-e6ed4ce8219c
+media[0]/tracks[12]/recording/length: 77973
+media[0]/tracks[12]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[12]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[12]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[12]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[12]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[12]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[12]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[12]/recording/first-release-date: 2000-12-20
+media[0]/tracks[12]/recording/title: Moody’s Shuffle
+media[0]/tracks[12]/title: Moody’s Shuffle
+media[0]/tracks[13]/title: Grace & Glory
+media[0]/tracks[13]/recording/id: d4adeb72-107f-4cac-a5fb-353b57f02276
+media[0]/tracks[13]/recording/length: 198266
+media[0]/tracks[13]/recording/video: False
+media[0]/tracks[13]/recording/first-release-date: 2000-12-20
+media[0]/tracks[13]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[13]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[13]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[13]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[13]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[13]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[13]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[13]/recording/title: Grace & Glory
+media[0]/tracks[13]/number: 14
+media[0]/tracks[13]/artist-credit[0]/artist/country: JP
+media[0]/tracks[13]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[13]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[13]/artist-credit[0]/artist/type: Person
+media[0]/tracks[13]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[13]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[13]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[13]/position: 14
+media[0]/tracks[13]/length: 198266
+media[0]/tracks[13]/id: 78e0c98d-302c-36f5-80e2-df68d0dcce1b
+media[0]/tracks[14]/length: 409000
+media[0]/tracks[14]/id: 2d37828c-79cf-3de9-b249-d2ad6a127f2a
+media[0]/tracks[14]/position: 15
+media[0]/tracks[14]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[14]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[14]/artist-credit[0]/artist/type: Person
+media[0]/tracks[14]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[14]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[14]/artist-credit[0]/artist/country: JP
+media[0]/tracks[14]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[14]/number: 15
+media[0]/tracks[14]/recording/title: Jet Set Medley
+media[0]/tracks[14]/recording/video: False
+media[0]/tracks[14]/recording/id: 3f3e212b-0b68-41cd-a5ca-34c25e8e2210
+media[0]/tracks[14]/recording/length: 409000
+media[0]/tracks[14]/recording/first-release-date: 2000-12-20
+media[0]/tracks[14]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[14]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[14]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[14]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[14]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[14]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[14]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[14]/title: Jet Set Medley
+media[0]/tracks[15]/title: Jet Set Station
+media[0]/tracks[15]/recording/first-release-date: 2000-12-20
+media[0]/tracks[15]/recording/artist-credit[0]/artist/sort-name: Toronto
+media[0]/tracks[15]/recording/artist-credit[0]/artist/id: 38867b4a-0f6f-499f-afa7-59e209ff5803
+media[0]/tracks[15]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[15]/recording/artist-credit[0]/artist/disambiguation: SEGA music composer Tomonori Sawada
+media[0]/tracks[15]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[15]/recording/artist-credit[0]/artist/name: Toronto
+media[0]/tracks[15]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[15]/recording/artist-credit[0]/joinphrase:  feat. 
+media[0]/tracks[15]/recording/artist-credit[0]/name: Toronto
+media[0]/tracks[15]/recording/artist-credit[1]/artist/id: 19aaaaa4-c4ac-4d1f-8607-5079cb388d80
+media[0]/tracks[15]/recording/artist-credit[1]/artist/sort-name: Professor K, DJ
+media[0]/tracks[15]/recording/artist-credit[1]/artist/disambiguation: Fictional Jet Set Radio character
+media[0]/tracks[15]/recording/artist-credit[1]/artist/country: JP
+media[0]/tracks[15]/recording/artist-credit[1]/artist/type-id: 5c1375b0-f18d-3db7-a164-a49d7a63773f
+media[0]/tracks[15]/recording/artist-credit[1]/artist/name: DJ Professor K
+media[0]/tracks[15]/recording/artist-credit[1]/artist/type: Character
+media[0]/tracks[15]/recording/artist-credit[1]/name: DJ‐K
+media[0]/tracks[15]/recording/video: False
+media[0]/tracks[15]/recording/id: 424bcc71-1efd-466a-a287-2a67f2c35bcb
+media[0]/tracks[15]/recording/length: 10666
+media[0]/tracks[15]/recording/title: Jet Set Station
+media[0]/tracks[15]/number: 16
+media[0]/tracks[15]/id: fcdffb55-52fe-32ce-896d-0e04efbfbba4
+media[0]/tracks[15]/length: 10666
+media[0]/tracks[15]/artist-credit[0]/name: Toronto
+media[0]/tracks[15]/artist-credit[0]/joinphrase:  feat. 
+media[0]/tracks[15]/artist-credit[0]/artist/country: JP
+media[0]/tracks[15]/artist-credit[0]/artist/disambiguation: SEGA music composer Tomonori Sawada
+media[0]/tracks[15]/artist-credit[0]/artist/sort-name: Toronto
+media[0]/tracks[15]/artist-credit[0]/artist/id: 38867b4a-0f6f-499f-afa7-59e209ff5803
+media[0]/tracks[15]/artist-credit[0]/artist/name: Toronto
+media[0]/tracks[15]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[15]/artist-credit[0]/artist/type: Person
+media[0]/tracks[15]/artist-credit[1]/artist/type: Character
+media[0]/tracks[15]/artist-credit[1]/artist/name: DJ Professor K
+media[0]/tracks[15]/artist-credit[1]/artist/type-id: 5c1375b0-f18d-3db7-a164-a49d7a63773f
+media[0]/tracks[15]/artist-credit[1]/artist/sort-name: Professor K, DJ
+media[0]/tracks[15]/artist-credit[1]/artist/id: 19aaaaa4-c4ac-4d1f-8607-5079cb388d80
+media[0]/tracks[15]/artist-credit[1]/artist/country: JP
+media[0]/tracks[15]/artist-credit[1]/artist/disambiguation: Fictional Jet Set Radio character
+media[0]/tracks[15]/artist-credit[1]/name: DJ‐K
+media[0]/tracks[15]/position: 16
+media[0]/tracks[16]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[16]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[16]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[16]/artist-credit[0]/artist/type: Person
+media[0]/tracks[16]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[16]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[16]/artist-credit[0]/artist/country: JP
+media[0]/tracks[16]/position: 17
+media[0]/tracks[16]/length: 10293
+media[0]/tracks[16]/id: cac43f31-9aef-3702-b73a-b5582e453fc6
+media[0]/tracks[16]/title: Jet Set Groove #1
+media[0]/tracks[16]/recording/title: Jet Set Groove #1
+media[0]/tracks[16]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[16]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[16]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[16]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[16]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[16]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[16]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[16]/recording/first-release-date: 2000-12-20
+media[0]/tracks[16]/recording/length: 10293
+media[0]/tracks[16]/recording/id: 1ef65733-5fc5-44c0-9559-fa3605b32850
+media[0]/tracks[16]/recording/video: False
+media[0]/tracks[16]/number: 17
+media[0]/tracks[17]/recording/video: False
+media[0]/tracks[17]/recording/length: 9973
+media[0]/tracks[17]/recording/id: 793adce6-cb9d-4d66-9a2c-ea1bb430cd35
+media[0]/tracks[17]/recording/first-release-date: 2000-12-20
+media[0]/tracks[17]/recording/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[17]/recording/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[17]/recording/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[17]/recording/artist-credit[0]/artist/country: JP
+media[0]/tracks[17]/recording/artist-credit[0]/artist/type: Person
+media[0]/tracks[17]/recording/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[17]/recording/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[17]/recording/title: Jet Set Groove #2
+media[0]/tracks[17]/title: Jet Set Groove #2
+media[0]/tracks[17]/number: 18
+media[0]/tracks[17]/artist-credit[0]/artist/name: 長沼英樹
+media[0]/tracks[17]/artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+media[0]/tracks[17]/artist-credit[0]/artist/type: Person
+media[0]/tracks[17]/artist-credit[0]/artist/sort-name: Naganuma, Hideki
+media[0]/tracks[17]/artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+media[0]/tracks[17]/artist-credit[0]/artist/country: JP
+media[0]/tracks[17]/artist-credit[0]/name: Hideki Naganuma
+media[0]/tracks[17]/position: 18
+media[0]/tracks[17]/length: 9973
+media[0]/tracks[17]/id: 27baecb3-d78a-3ffc-84a5-b8cfd0a78fc8
+media[0]/format-id: 8a08dc62-1aa2-34de-a904-fa467c53052c
+media[0]/format: Enhanced CD
+media[0]/track-count: 18
+media[0]/position: 1
+media[0]/track-offset: 0
+quality: normal
+artist-credit[0]/artist/type: Person
+artist-credit[0]/artist/name: 長沼英樹
+artist-credit[0]/artist/type-id: b6e035f4-3ce9-331c-97df-83397230b0df
+artist-credit[0]/artist/id: 24164692-3223-48bf-9cea-2a76b5afce94
+artist-credit[0]/artist/sort-name: Naganuma, Hideki
+artist-credit[0]/artist/country: JP
+artist-credit[0]/name: Hideki Naganuma
+asin: B00005HROO
+country: JP
+barcode: 4988005260192

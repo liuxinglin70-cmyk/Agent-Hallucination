@@ -1,0 +1,12 @@
+usage: detector [-h] {detect,batch,evaluate} ...
+
+Outcome-oriented hallucination detector.
+
+positional arguments:
+  {detect,batch,evaluate}
+    detect              detect one record
+    batch               run a batch of cases
+    evaluate            join gold and compute metrics
+
+options:
+  -h, --help            show this help message and exit

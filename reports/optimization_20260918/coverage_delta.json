@@ -1,0 +1,9 @@
+{
+  "before": 0,
+  "after": 1,
+  "total": 10,
+  "newly_covered": [
+    "OpenDeepSearch/080.json"
+  ],
+  "lost_coverage": []
+}

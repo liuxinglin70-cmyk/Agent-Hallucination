@@ -1,0 +1,900 @@
+{
+  "config": "evolution/configs/development.json",
+  "seed": 20260824,
+  "corpus": "reports/optimization_20260918/corpus",
+  "corpus_sha256": {
+    "q-ships-1922": "a3df3024831b649d267f4d3b92d9c98237df9df34d26abca4d6c5e968acb16fe",
+    "heritage-lisette": "1567cc069d8b6ccf5b930ed7bfd881002260f20d059d15f2faf83080120b076e",
+    "musicbrainz-jsr": "1d0ec9892c35b31ed7e4b150ed9b16fea2ecc51b41450fa1afe20c8d20f75f04",
+    "unesco-water": "46e5b15858907085cb751536510615a4d38ca67f790e0cfe8df0d61cb561587c",
+    "predemics": "f2144ec1022364dc5f84051dc311459afcdd02ce16fdb0f2c991892194260b87",
+    "bayern-final": "26b0fd86757e6dc4650975535053cea821b180a050e17b684fa78ce9187a4959",
+    "clinical-trial": "e6d49692f56bb5195477e955b0a53722e1483e98c7d51217ab3f81dc1043b1c1"
+  },
+  "rows": [
+    {
+      "split": "S",
+      "case": "BFCL/041.json",
+      "question": "[turn 1] First, you need to know how much gasoline you added to your car, expressed in liters. You've just filled up with 30 gallons, so how many liters of fuel does that equate to?\n[turn 2] Let's take the initiative to start the engine in start mode. We want to ascertain that it operates smoothly with the increased fuel level.\n[turn 3] Inspect each tire's condition and confirm they are in optimal shape.\n[turn 4] Upon verifying the tire pressure, we should share our findings on Twitter to keep everyone informed. Post the tweet message 'Tire pressures are optimal!'. Utilize hashtags #CarMaintenance and tag @VehicleGuru for professional insights.",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "turn",
+          "1",
+          "you",
+          "need",
+          "know",
+          "gasoline",
+          "added",
+          "your",
+          "car",
+          "expressed",
+          "liter",
+          "you've",
+          "just",
+          "filled",
+          "30",
+          "gallon",
+          "fuel",
+          "equate",
+          "2",
+          "let'",
+          "take",
+          "initiative",
+          "start",
+          "engine",
+          "mode",
+          "want",
+          "ascertain",
+          "operate",
+          "smoothly",
+          "increased",
+          "level",
+          "3",
+          "inspect",
+          "each",
+          "tire'",
+          "condition",
+          "confirm",
+          "they",
+          "optimal",
+          "shape",
+          "4",
+          "upon",
+          "verifying",
+          "tire",
+          "pressure",
+          "should",
+          "share",
+          "our",
+          "finding",
+          "twitter",
+          "keep",
+          "everyone",
+          "informed",
+          "post",
+          "tweet",
+          "message",
+          "utilize",
+          "hashtag",
+          "carmaintenance",
+          "tag",
+          "vehicleguru",
+          "professional",
+          "insight"
+        ],
+        "entity": "Tire pressures are optimal",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "turn",
+              "1",
+              "you",
+              "need",
+              "know",
+              "added",
+              "your",
+              "expressed",
+              "just",
+              "filled",
+              "30",
+              "fuel",
+              "2",
+              "take",
+              "initiative",
+              "start",
+              "engine",
+              "mode",
+              "want",
+              "ascertain",
+              "operate",
+              "smoothly",
+              "increased",
+              "3",
+              "inspect",
+              "each",
+              "condition",
+              "confirm",
+              "they",
+              "shape",
+              "4",
+              "upon",
+              "pressure",
+              "should",
+              "share",
+              "our",
+              "keep",
+              "everyone",
+              "informed",
+              "post",
+              "message",
+              "professional",
+              "insight"
+            ],
+            "passage_terms": [
+              "1",
+              "just",
+              "2",
+              "3",
+              "they",
+              "4"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Tire pressures are optimal'"
+          },
+          {
+            "doc_id": "clinical-trial",
+            "matched_terms": [
+              "1",
+              "30",
+              "2",
+              "3",
+              "each",
+              "condition",
+              "4",
+              "upon"
+            ],
+            "passage_terms": [
+              "1",
+              "condition"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Tire pressures are optimal'"
+          },
+          {
+            "doc_id": "predemics",
+            "matched_terms": [
+              "level",
+              "they",
+              "informed",
+              "insight"
+            ],
+            "passage_terms": [
+              "level",
+              "they",
+              "informed"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Tire pressures are optimal'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "1",
+              "2",
+              "level",
+              "3",
+              "they"
+            ],
+            "passage_terms": [
+              "2"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Tire pressures are optimal'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "S",
+      "case": "Magentic_One/036.json",
+      "question": "Who was the first cardiologist in Kashmir?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "cardiologist",
+          "kashmir"
+        ],
+        "entity": "Kashmir",
+        "value_mode": "number",
+        "documents": [],
+        "outcome": "no corpus document matched at least 2 question terms"
+      }
+    },
+    {
+      "split": "S",
+      "case": "Octotools/023.json",
+      "question": "How many fouls did Inter commit in the Champions League final match between Bayern and Inter on May 23, 2010?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "foul",
+          "inter",
+          "commit",
+          "champion",
+          "league",
+          "final",
+          "match",
+          "between",
+          "bayern",
+          "may",
+          "23",
+          "2010"
+        ],
+        "entity": "Champions League",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "foul",
+              "inter",
+              "final",
+              "match",
+              "between",
+              "may",
+              "23"
+            ],
+            "passage_terms": [
+              "may",
+              "23"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Champions League'"
+          },
+          {
+            "doc_id": "bayern-final",
+            "matched_terms": [
+              "foul",
+              "inter",
+              "bayern"
+            ],
+            "passage_terms": [
+              "inter",
+              "bayern"
+            ],
+            "decision": "dropped: no number value found near the attribute 'foul'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "between",
+              "may",
+              "2010"
+            ],
+            "passage_terms": [
+              "2010"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Champions League'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "S",
+      "case": "OpenDeepSearch/077.json",
+      "question": "Who was the recipient of the 2017 Erdős–Rényi Prize?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "recipient",
+          "2017",
+          "erd",
+          "nyi",
+          "prize"
+        ],
+        "entity": "Erd",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "predemics",
+            "matched_terms": [
+              "2017",
+              "erd",
+              "nyi",
+              "prize"
+            ],
+            "passage_terms": [
+              "2017",
+              "erd",
+              "nyi",
+              "prize"
+            ],
+            "decision": "dropped: no number value found near the attribute 'recipient'"
+          },
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "2017",
+              "prize"
+            ],
+            "passage_terms": [
+              "2017"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Erd'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "S",
+      "case": "OpenDeepSearch/088.json",
+      "question": "What is the major outcome of the reaction between 4,4-dimethylcyclopent-1-enol and bromine?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "major",
+          "outcome",
+          "reaction",
+          "between",
+          "4",
+          "dimethylcyclopent",
+          "1",
+          "enol",
+          "bromine"
+        ],
+        "entity": null,
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "major",
+              "between",
+              "4",
+              "1"
+            ],
+            "passage_terms": [
+              "between"
+            ],
+            "decision": "dropped: the question names no subject to look up"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "between",
+              "1"
+            ],
+            "passage_terms": [
+              "1"
+            ],
+            "decision": "dropped: the question names no subject to look up"
+          },
+          {
+            "doc_id": "clinical-trial",
+            "matched_terms": [
+              "4",
+              "1"
+            ],
+            "passage_terms": [
+              "1"
+            ],
+            "decision": "dropped: the question names no subject to look up"
+          },
+          {
+            "doc_id": "musicbrainz-jsr",
+            "matched_terms": [
+              "4",
+              "1"
+            ],
+            "passage_terms": [
+              "1"
+            ],
+            "decision": "dropped: the question names no subject to look up"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "S",
+      "case": "SmolAgents/019.json",
+      "question": "You are synthesizing a dialkylphosphate from two different enantiopure chiral alcohols and POCl3. In the first step, you reacted one equiv. of the first chiral alcohol with one equiv. of POCl3 (and some base). In the second step, you treated the product of this reaction with one equiv. of the second chiral alcohol (and some more base). In the final step, you add water to generate the final product. You are following the progress of the final reaction using 31P NMR.\n\nWhat do you expect to see in the proton-decoupled 31P NMR spectrum over the course of the reaction?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "you",
+          "synthesizing",
+          "dialkylphosphate",
+          "two",
+          "different",
+          "enantiopure",
+          "chiral",
+          "alcohol",
+          "pocl3",
+          "step",
+          "reacted",
+          "one",
+          "equiv",
+          "some",
+          "base",
+          "second",
+          "treated",
+          "product",
+          "reaction",
+          "more",
+          "final",
+          "add",
+          "water",
+          "generate",
+          "following",
+          "progress",
+          "using",
+          "31p",
+          "nmr",
+          "expect",
+          "see",
+          "proton",
+          "decoupled",
+          "spectrum",
+          "course"
+        ],
+        "entity": "You",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "you",
+              "two",
+              "different",
+              "step",
+              "reacted",
+              "one",
+              "some",
+              "base",
+              "second",
+              "more",
+              "final",
+              "add",
+              "water",
+              "following",
+              "progress",
+              "using",
+              "expect",
+              "see",
+              "course"
+            ],
+            "passage_terms": [
+              "you",
+              "two",
+              "one",
+              "some",
+              "water"
+            ],
+            "decision": "dropped: no number value found near the attribute 'two'"
+          },
+          {
+            "doc_id": "clinical-trial",
+            "matched_terms": [
+              "two",
+              "one",
+              "proton"
+            ],
+            "passage_terms": [
+              "two",
+              "proton"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'You'"
+          },
+          {
+            "doc_id": "predemics",
+            "matched_terms": [
+              "two",
+              "more",
+              "final"
+            ],
+            "passage_terms": [
+              "two",
+              "final"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'You'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "different",
+              "some",
+              "water"
+            ],
+            "passage_terms": [
+              "some"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'You'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "G",
+      "case": "OpenDeepSearch/080.json",
+      "question": "According to \"The United Nations World Water Development Report 2022: Groundwater: Making the Invisible Visible,\" how many oases are documented in the Sahara and Arabian Oases Atlas?",
+      "covered": true,
+      "schema_valid": true,
+      "retrieval": {
+        "query_terms": [
+          "according",
+          "united",
+          "nation",
+          "world",
+          "water",
+          "development",
+          "report",
+          "2022",
+          "groundwater",
+          "making",
+          "invisible",
+          "visible",
+          "oase",
+          "documented",
+          "sahara",
+          "arabian",
+          "atla"
+        ],
+        "entity": "United Nations World Water Development Report",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "according",
+              "united",
+              "nation",
+              "world",
+              "water",
+              "development",
+              "report",
+              "making",
+              "invisible",
+              "visible"
+            ],
+            "passage_terms": [
+              "water",
+              "report",
+              "making"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'United Nations World Water Development Report'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "world",
+              "water",
+              "groundwater",
+              "oase",
+              "documented",
+              "sahara",
+              "arabian",
+              "atla"
+            ],
+            "passage_terms": [
+              "groundwater",
+              "oase",
+              "documented",
+              "sahara",
+              "arabian",
+              "atla"
+            ],
+            "decision": "kept",
+            "verifies": {
+              "entity": "United Nations World Water Development Report",
+              "attribute": "oase",
+              "value": "774"
+            },
+            "excerpt_sha256": "bd815eeceab8809e7e5192cf97b76a0298badb79ee11ea2bf546f976a5c7ceb2"
+          }
+        ],
+        "outcome": "snapshot with 1 source(s)",
+        "snapshot_digest": "9486a04dedd76345"
+      },
+      "snapshot": "OpenDeepSearch__080.json"
+    },
+    {
+      "split": "G",
+      "case": "Octotools/005.json",
+      "question": "Activity of a material containing pure Caesium-137 (10^17 atoms in total) is being measured. A perfect detector for gamma-rays has a rectangular shape of 2x3 centimeters, and is placed 4 meters away from the material, facing it directly.\n\nAfter 80 minutes, approximately how many gamma-rays were detected?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "activity",
+          "material",
+          "containing",
+          "pure",
+          "caesium",
+          "137",
+          "10",
+          "17",
+          "atom",
+          "total",
+          "measured",
+          "perfect",
+          "detector",
+          "gamma",
+          "ray",
+          "rectangular",
+          "shape",
+          "2x3",
+          "centimeter",
+          "placed",
+          "4",
+          "meter",
+          "away",
+          "facing",
+          "directly",
+          "after",
+          "80",
+          "minute",
+          "approximately",
+          "detected"
+        ],
+        "entity": "After",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "activity",
+              "material",
+              "containing",
+              "pure",
+              "10",
+              "17",
+              "total",
+              "measured",
+              "perfect",
+              "ray",
+              "shape",
+              "placed",
+              "4",
+              "away",
+              "directly",
+              "after",
+              "80",
+              "minute"
+            ],
+            "passage_terms": [
+              "10",
+              "perfect",
+              "after",
+              "minute"
+            ],
+            "decision": "dropped: no number value found near the attribute 'gamma'"
+          },
+          {
+            "doc_id": "clinical-trial",
+            "matched_terms": [
+              "17",
+              "4",
+              "directly",
+              "after"
+            ],
+            "passage_terms": [
+              "17"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'After'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "after",
+              "detected"
+            ],
+            "passage_terms": [
+              "detected"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'After'"
+          },
+          {
+            "doc_id": "musicbrainz-jsr",
+            "matched_terms": [
+              "10",
+              "17",
+              "4"
+            ],
+            "passage_terms": [
+              "4"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'After'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "G",
+      "case": "Magentic_One/050.json",
+      "question": "What was the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients from Jan-May 2018 as listed on the NIH website?",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "actual",
+          "enrollment",
+          "count",
+          "clinical",
+          "trial",
+          "pylori",
+          "acne",
+          "vulgari",
+          "patient",
+          "jan",
+          "may",
+          "2018",
+          "listed",
+          "nih",
+          "website"
+        ],
+        "entity": "Jan May",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "clinical-trial",
+            "matched_terms": [
+              "actual",
+              "count",
+              "clinical",
+              "pylori",
+              "acne",
+              "vulgari",
+              "patient",
+              "2018"
+            ],
+            "passage_terms": [
+              "2018"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Jan May'"
+          },
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "actual",
+              "trial",
+              "patient",
+              "may",
+              "listed",
+              "website"
+            ],
+            "passage_terms": [
+              "trial",
+              "may"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Jan May'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "may",
+              "2018"
+            ],
+            "passage_terms": [
+              "2018"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Jan May'"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    },
+    {
+      "split": "G",
+      "case": "OpenDeepSearch/002.json",
+      "question": "Given this table defining * on the set S = {a, b, c, d, e}\n\n|*|a|b|c|d|e|\n|---|---|---|---|---|---|\n|a|a|b|c|b|d|\n|b|b|c|a|e|c|\n|c|c|a|b|b|a|\n|d|b|e|b|e|d|\n|e|d|b|a|d|c|\n\nprovide the subset of S involved in any possible counter-examples that prove * is not commutative. Provide your answer as a comma separated list of the elements in the set in alphabetical order.",
+      "covered": false,
+      "schema_valid": null,
+      "retrieval": {
+        "query_terms": [
+          "given",
+          "table",
+          "defining",
+          "set",
+          "provide",
+          "subset",
+          "involved",
+          "any",
+          "possible",
+          "counter",
+          "example",
+          "prove",
+          "not",
+          "commutative",
+          "your",
+          "answer",
+          "comma",
+          "separated",
+          "list",
+          "element",
+          "alphabetical",
+          "order"
+        ],
+        "entity": "Provide",
+        "value_mode": "number",
+        "documents": [
+          {
+            "doc_id": "q-ships-1922",
+            "matched_terms": [
+              "given",
+              "table",
+              "set",
+              "provide",
+              "involved",
+              "any",
+              "possible",
+              "counter",
+              "example",
+              "not",
+              "your",
+              "answer",
+              "separated",
+              "list",
+              "element",
+              "order"
+            ],
+            "passage_terms": [
+              "given",
+              "any",
+              "not",
+              "order"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Provide'"
+          },
+          {
+            "doc_id": "unesco-water",
+            "matched_terms": [
+              "provide",
+              "example",
+              "not",
+              "list"
+            ],
+            "passage_terms": [
+              "list"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Provide'"
+          },
+          {
+            "doc_id": "heritage-lisette",
+            "matched_terms": [
+              "your",
+              "order"
+            ],
+            "passage_terms": [
+              "order"
+            ],
+            "decision": "dropped: passage does not mention the case entity 'Provide'"
+          },
+          {
+            "doc_id": "predemics",
+            "matched_terms": [
+              "provide",
+              "example"
+            ],
+            "passage_terms": [
+              "provide"
+            ],
+            "decision": "dropped: passage shares no attribute term with the question"
+          }
+        ],
+        "outcome": "the corpus matched but stated no usable value"
+      }
+    }
+  ],
+  "covered": 1,
+  "total": 10
+}
