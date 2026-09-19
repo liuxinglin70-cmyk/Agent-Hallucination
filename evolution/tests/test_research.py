@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from evolution.proposer import ProposalBatch
-from evolution.research import ResearchRun, run_research
+from evolution.research import ResearchRun, run_frozen_repeats, run_research
 
 
 MECHANISM = {
@@ -480,7 +480,7 @@ def test_screening_budget_exhaustion_stops_partial(tmp_path):
     assert report["routes"]["C"]["versions"] == []
 
 
-def test_resume_reuses_stored_results_without_new_backend_calls(tmp_path):
+def test_resume_skips_routes_that_already_froze_a_passing_version(tmp_path):
     dataset_root = _write_dataset(tmp_path)
     baseline = _write_baseline_ref(tmp_path, dataset_root)
     manifest = _write_manifest(tmp_path, dataset_root, baseline_runs=[baseline])
@@ -491,30 +491,87 @@ def test_resume_reuses_stored_results_without_new_backend_calls(tmp_path):
     ])
     first = run_research(manifest, tmp_path / "run", backend, proposer)
     assert first["budget"]["used"]["screening_case_evaluations"] == 8
-    calls_after_first_run = len(backend.calls)
-    # A resumed run with identical inputs redrafts (drafting is not
-    # deterministic) but must reuse the stored evaluation results: the new
-    # version's identity matches the stored one, so nothing is re-run.
+    assert first["next_stage"] == "frozen_paired_recheck"
+    # A resumed run skips both routes: each already froze a passing version.
     second_backend = FakeBackend()
-    # The resumed run drafts the identical candidates again.
-    second_proposer = FakeProposer([
-        ProposalBatch(candidates=[_route_candidate("B")]),
-        ProposalBatch(candidates=[_route_candidate("C")]),
-    ])
-    second = run_research(manifest, tmp_path / "run", second_backend, second_proposer)
+    second_proposer = FakeProposer([])
+    second = run_research(
+        manifest, tmp_path / "run", second_backend, second_proposer,
+    )
     assert second["status"] == "screening_complete"
     assert second["next_stage"] == "frozen_paired_recheck"
-    # The identical candidate's stored results were found and reused, so the
-    # resumed run spent nothing on the backend.
     assert second_backend.calls == []
     assert second["budget"]["used"]["screening_case_evaluations"] == 0
-    resumed = json.loads(
-        (tmp_path / "run" / "v003" / "candidate.json").read_text(
+    assert second["budget"]["used"]["proposer_calls"] == {}
+    assert len(second["versions"]) == len(first["versions"])
+
+
+def test_resume_redrafts_a_route_starved_by_infrastructure(tmp_path):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(tmp_path, dataset_root, baseline_runs=[baseline])
+    backend = FakeBackend()
+    # Route B passes; route C's draft never reaches the provider (the live
+    # per-cycle budget bug this test guards against).
+    starved = ProposalBatch(notes=[{
+        "generator": "llm",
+        "provider_called": False,
+        "reason": "llm_calls budget exhausted for this cycle",
+    }])
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_route_candidate("B")]),
+        starved,
+    ])
+    first = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert first["status"] == "screening_complete"
+    assert first["routes"]["C"]["selected"] is None
+    # The resumed run redrafts route C; its candidate is evaluated fresh.
+    second_backend = FakeBackend()
+    second_proposer = FakeProposer([
+        ProposalBatch(candidates=[_route_candidate("C")]),
+    ])
+    second = run_research(
+        manifest, tmp_path / "run", second_backend, second_proposer,
+    )
+    assert second["status"] == "screening_complete"
+    assert second["routes"]["C"]["selected"] is not None
+    assert second["budget"]["used"]["screening_case_evaluations"] == 4
+    selected = second["routes"]["C"]["selected"]
+    record = json.loads(
+        (tmp_path / "run" / selected / "candidate.json").read_text(
             encoding="utf-8",
         ),
     )
-    assert resumed["evaluation"]["reused"] is True
-    assert resumed["evaluation"]["source_version"] == "v001"
+    assert record["route"] == "C"
+    assert record["candidate"] and record["verdict"]["passed"]
+
+
+def test_resume_does_not_redraft_after_a_real_empty_provider_return(tmp_path):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(tmp_path, dataset_root, baseline_runs=[baseline])
+    backend = FakeBackend()
+    empty = ProposalBatch(notes=[{
+        "generator": "llm",
+        "provider_called": True,
+        "provider_ok": True,
+        "reason": "provider interventions field is not a list",
+    }])
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_route_candidate("B")]),
+        empty,
+    ])
+    first = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert first["routes"]["C"]["selected"] is None
+    # A real empty return is terminal: the resumed run must not re-draft.
+    second_backend = FakeBackend()
+    second_proposer = FakeProposer([])
+    second = run_research(
+        manifest, tmp_path / "run", second_backend, second_proposer,
+    )
+    assert second["routes"]["C"]["selected"] is None
+    assert second_backend.calls == []
+    assert second["budget"]["used"]["proposer_calls"] == {}
 
 
 def test_identity_mismatch_forces_new_version_not_overwrite(tmp_path):
@@ -560,3 +617,133 @@ def test_fresh_baseline_fallback_spends_baseline_budget(tmp_path):
     assert report["budget"]["used"]["baseline_case_evaluations"] == 4
     # The fresh baseline runs the bare registry (no candidate attached).
     assert backend.calls[0]["registry"]["interventions"] == []
+
+
+def _finish_screening(tmp_path):
+    """Screening run that leaves a passing version selected for route B."""
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(tmp_path, dataset_root, baseline_runs=[baseline])
+    backend = FakeBackend()
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_candidate_with(
+            "Read the task text carefully before voting.",
+        )]),  # B draft: mechanism-irrelevant, fails
+        ProposalBatch(candidates=[_route_candidate("B")]),  # B revision passes
+        ProposalBatch(),  # C draft: real empty return (terminal)
+    ])
+    first = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert first["routes"]["B"]["selected"] == "v002"
+    assert first["routes"]["C"]["selected"] is None
+    return manifest_path(tmp_path), tmp_path / "run"
+
+
+def manifest_path(tmp_path):
+    return tmp_path / "research_manifest.json"
+
+
+def test_frozen_recheck_reports_every_repetition(tmp_path):
+    _, run_dir = _finish_screening(tmp_path)
+    meta = {
+        case["case_id"]: {
+            "raw_gold": bool(case["raw_gold"]),
+            "target_step": case.get("target_step"),
+            "role": case["role"],
+        }
+        for case in CASES
+    }
+    backend = FakeBackend()
+    report = run_frozen_repeats(
+        manifest_path(tmp_path), run_dir, backend,
+        stage="frozen_recheck", case_ids=[c["case_id"] for c in CASES],
+        case_meta=meta, repetitions=2, budget_case_evaluations=24,
+        workers=1,
+    )
+    assert report["status"] == "complete"
+    h0 = report["arms"]["h0"]
+    assert h0["passed"] is None  # contrast arm, not a gate
+    # H0 misses both training failures in both repetitions.
+    for rep in h0["per_repetition"]:
+        assert all(not item["repaired"] for item in rep["training"].values())
+    winner = report["arms"]["v002"]
+    assert winner["passed"] is True
+    assert winner["repetitions"] == 2
+    for rep in winner["per_repetition"]:
+        assert all(item["repaired"] for item in rep["training"].values())
+        assert all(item["clean"] for item in rep["neighbors"].values())
+    # 2 arms x 4 cases x 2 repetitions, all fresh.
+    assert report["budget"]["used"] == 16
+    assert (run_dir / "frozen_recheck" / "report.json").exists()
+    assert (run_dir / "frozen_recheck" / "v002" / "rep01" / "identity.json").exists()
+
+
+def test_frozen_recheck_fails_when_any_repetition_degrades(tmp_path):
+    _, run_dir = _finish_screening(tmp_path)
+
+    class FlipFlopBackend(FakeBackend):
+        """Alternates the neighbor outcome: one bad repetition fails all."""
+
+        def __init__(self):
+            super().__init__()
+            self.toggle = 0
+
+        def evaluate_fresh(self, cases, **kwargs):
+            self.toggle += 1
+            if self.toggle % 2 == 0:
+                registry = kwargs.get("registry")
+                # Poison one neighbor on alternating calls to model an
+                # unstable candidate: the FP appears on the second call.
+                rows = super().evaluate_fresh(cases, **kwargs)
+                for row in rows:
+                    if row["case"] == "BFCL/020.json":
+                        row["state"] = "verified_error"
+                        row["prediction"] = True
+                        row["result"]["state"] = "verified_error"
+                return rows
+            return super().evaluate_fresh(cases, **kwargs)
+
+    meta = {
+        case["case_id"]: {
+            "raw_gold": bool(case["raw_gold"]),
+            "target_step": case.get("target_step"),
+            "role": case["role"],
+        }
+        for case in CASES
+    }
+    report = run_frozen_repeats(
+        manifest_path(tmp_path), run_dir, FlipFlopBackend(),
+        stage="frozen_recheck", case_ids=[c["case_id"] for c in CASES],
+        case_meta=meta, repetitions=2, budget_case_evaluations=24,
+        workers=1,
+    )
+    winner = report["arms"]["v002"]
+    assert winner["passed"] is False
+    flags = [rep["passed"] for rep in winner["per_repetition"]]
+    assert flags == [True, False]
+
+
+def test_unused_dev_validation_uses_frozen_extra_cases(tmp_path):
+    _, run_dir = _finish_screening(tmp_path)
+    extra = [
+        {"case_id": "BFCL/008.json", "role": "regression", "raw_gold": True},
+        {"case_id": "BFCL/013.json", "role": "boundary", "raw_gold": False},
+    ]
+    meta = {
+        c["case_id"]: {"raw_gold": c["raw_gold"], "role": c["role"],
+                       "target_step": None}
+        for c in extra
+    }
+    backend = FakeBackend()
+    report = run_frozen_repeats(
+        manifest_path(tmp_path), run_dir, backend,
+        stage="unused_dev_validation", case_ids=[c["case_id"] for c in extra],
+        case_meta=meta, repetitions=2, budget_case_evaluations=32,
+        workers=1,
+    )
+    assert report["status"] == "complete"
+    winner = report["arms"]["v002"]
+    # Regression stays repaired; the boundary case (no quoted content) stays
+    # clean: the not_when protected it.
+    for rep in winner["per_repetition"]:
+        assert rep["neighbors"]["BFCL/013.json"]["clean"] is True
+    assert report["budget"]["used"] == 8

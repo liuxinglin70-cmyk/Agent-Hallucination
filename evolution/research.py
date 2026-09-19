@@ -792,6 +792,12 @@ class ResearchRun:
         parent = screened["record"].get("candidate")
         if not parent:
             return None
+        return self._revise(route, parent, verdict)
+
+    def _revise(
+        self, route: str, parent: Mapping[str, Any],
+        verdict: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
         diagnosis = {
             "parent_hash": canonical_hash(parent),
             "reasons": list(verdict.get("reasons") or []),
@@ -897,6 +903,18 @@ class ResearchRun:
         return report
 
     # ------------------------------------------------------------------
+    def _route_records(self, route: str) -> list[dict[str, Any]]:
+        return [v for v in self.versions if str(v.get("route")) == route]
+
+    @staticmethod
+    def _draft_reached_provider(record: Mapping[str, Any]) -> bool:
+        # A draft that never reached the provider (infrastructure failure,
+        # e.g. a starved per-cycle budget) did not test the route and may be
+        # redrafted on resume; a real empty provider return is terminal.
+        return any(
+            note.get("provider_called") for note in record.get("notes") or []
+        )
+
     def execute(self) -> dict[str, Any]:
         self.frozen_manifest = self.freeze_manifest()
         self._load_existing_versions()
@@ -909,6 +927,30 @@ class ResearchRun:
         try:
             for route in self.frozen_manifest["routes"]:
                 self.routes.setdefault(route, {"versions": [], "notes": []})
+                records = self._route_records(route)
+                candidates = [v for v in records if v.get("candidate")]
+                if any(
+                    (v.get("verdict") or {}).get("passed")
+                    for v in candidates
+                ):
+                    # This route already froze a screening-passing version.
+                    continue
+                if candidates:
+                    # A draft exists and failed: only its one revision may
+                    # still run on a resume.
+                    if not any(
+                        v.get("kind") == "revision" for v in records
+                    ):
+                        latest = candidates[-1]
+                        self._revise(
+                            route, latest["candidate"],
+                            latest.get("verdict") or {},
+                        )
+                    continue
+                drafts = [v for v in records if v.get("kind") == "draft"]
+                if drafts and self._draft_reached_provider(drafts[-1]):
+                    # A real no-change draft is terminal for this route.
+                    continue
                 screened = self._screen_route(route, self._route_packet(route))
                 self._maybe_revise(route, screened)
         except RuntimeError as exc:
@@ -917,6 +959,229 @@ class ResearchRun:
         self.selection = self.select()
         report = self.write_report(status)
         return report
+
+
+def run_frozen_repeats(
+    manifest_path: str | Path,
+    run_dir: str | Path,
+    backend: Any,
+    *,
+    stage: str,
+    case_ids: Sequence[str],
+    case_meta: Mapping[str, Mapping[str, Any]],
+    repetitions: int,
+    budget_case_evaluations: int,
+    workers: int = 2,
+) -> dict[str, Any]:
+    """Fixed-repetition paired evaluation after the screening gate.
+
+    Stage ``frozen_recheck`` pairs H0 with every route's selected version on
+    the training set; stage ``unused_dev_validation`` does the same on a
+    frozen candidate-unused development list. Protocol rules enforced here:
+    the repetition count is fixed in advance, every repetition is reported
+    (the best round is never selected post hoc), each (arm, repetition) pair
+    is a full fresh detection with its own identity bundle, and stored
+    results are reused only under an identical identity.
+
+    ``case_meta`` maps case_id -> {"raw_gold": bool, "target_step": int|None,
+    "role": str}; it is research-side supervision and never reaches the
+    detector.
+    """
+    run_dir = Path(run_dir)
+    manifest = json.loads(
+        (run_dir / "manifest.json").read_text(encoding="utf-8-sig"),
+    )
+    selection = json.loads(
+        (run_dir / "selection.json").read_text(encoding="utf-8-sig"),
+    )
+    arms: list[dict[str, Any]] = [{"arm": "h0", "version_id": None, "candidate": None}]
+    for route, info in (selection.get("routes") or {}).items():
+        selected = info.get("selected")
+        if not selected:
+            continue
+        record = json.loads(
+            (run_dir / selected / "candidate.json").read_text(
+                encoding="utf-8-sig",
+            ),
+        )
+        arms.append({
+            "arm": selected, "version_id": selected,
+            "candidate": record.get("candidate"),
+        })
+    gold_map = {
+        case_id: bool(case_meta[case_id]["raw_gold"]) for case_id in case_ids
+    }
+    target_steps = {
+        case_id: case_meta[case_id].get("target_step")
+        for case_id in case_ids
+        if case_meta[case_id].get("target_step") is not None
+    }
+    stage_dir = run_dir / stage
+    used = 0
+    stopped: str | None = None
+    arm_reports: dict[str, Any] = {}
+    for arm in arms:
+        if arm["candidate"] is None:
+            registry = build_intervention_registry([])
+            candidate_hash = None
+        else:
+            registry = build_intervention_registry([dict(arm["candidate"])])
+            candidate_hash = canonical_hash(arm["candidate"])
+        reps: list[dict[str, Any]] = []
+        for rep in range(1, int(repetitions) + 1):
+            identity = {
+                "stage": stage,
+                "arm": arm["arm"],
+                "candidate_hash": candidate_hash,
+                "registry_hash": str(registry.get("content_hash") or ""),
+                "repetition": rep,
+                "case_set": list(case_ids),
+                "config_hash": manifest["detector_config_hash"],
+                "code_baseline": manifest["code_baseline"],
+                "evaluation_mode": "fresh_full_detection_no_judge_cache",
+            }
+            arm_dir = stage_dir / arm["arm"] / f"rep{rep:02d}"
+            identity_path = arm_dir / "identity.json"
+            results_dir = arm_dir / "results"
+            results: dict[str, dict[str, Any]] = {}
+            if identity_path.exists():
+                stored = json.loads(identity_path.read_text(encoding="utf-8-sig"))
+                if stored != identity:
+                    raise ValueError(
+                        f"{stage}/{arm['arm']}/rep{rep} exists with a "
+                        "different identity; repetitions are frozen and "
+                        "must not be silently re-run",
+                    )
+                for path in results_dir.glob("*.json"):
+                    entry = json.loads(path.read_text(encoding="utf-8-sig"))
+                    results[str(entry.get("case_id"))] = entry
+            missing = [c for c in case_ids if c not in results]
+            if missing:
+                if used + len(missing) > budget_case_evaluations:
+                    stopped = (
+                        f"{stage} case-evaluation budget exhausted "
+                        f"({used} used, {len(missing)} missing)"
+                    )
+                    break
+                rows = backend.evaluate_fresh(
+                    missing,
+                    dataset_root=manifest["input_manifest"]["dataset_root"],
+                    registry=registry,
+                    gold_map=gold_map,
+                    workers=workers,
+                )
+                used += len(missing)
+                for row in rows:
+                    case_id = str(row.get("case"))
+                    result = dict(row.get("result") or {})
+                    entry = {
+                        "case_id": case_id,
+                        "gold": gold_map.get(case_id),
+                        "state": result.get("state"),
+                        "authority": result.get("decision_authority"),
+                        "prediction": result.get("state") == "verified_error",
+                        "responsible_step": result.get("responsible_step"),
+                        "registry_hash": identity["registry_hash"],
+                        "runtime_valid": result.get("runtime_valid"),
+                        "result": result,
+                    }
+                    results[case_id] = entry
+                    save_json(results_dir / case_file_name(case_id), entry)
+            if identity_path.exists() is False:
+                save_json(identity_path, identity)
+            reps.append(results)
+        if stopped:
+            break
+        # Verdict over ALL repetitions: the best round is never selected.
+        rep_verdicts = []
+        for results in reps:
+            rep_verdicts.append(_repeat_verdict(
+                results, case_ids, case_meta, target_steps,
+                candidate=arm["candidate"] is not None,
+            ))
+        if arm["candidate"] is None:
+            passed = None  # the H0 arm is the contrast, not a gate
+        else:
+            passed = bool(rep_verdicts) and all(
+                item["passed"] for item in rep_verdicts
+            )
+        arm_reports[arm["arm"]] = {
+            "version_id": arm["version_id"],
+            "repetitions": len(reps),
+            "complete": len(reps) == repetitions,
+            "passed": passed,
+            "per_repetition": rep_verdicts,
+        }
+    report = {
+        "schema_version": RESEARCH_REPORT_SCHEMA,
+        "stage": stage,
+        "arms": arm_reports,
+        "case_ids": list(case_ids),
+        "repetitions": repetitions,
+        "budget": {
+            "cap": budget_case_evaluations, "used": used,
+        },
+        "stopped": stopped,
+        "status": (
+            "complete" if not stopped and all(
+                item["complete"] for item in arm_reports.values()
+            ) else "partial"
+        ),
+        "frozen_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    save_json(stage_dir / "report.json", report)
+    return report
+
+
+def _repeat_verdict(
+    results: Mapping[str, Mapping[str, Any]],
+    case_ids: Sequence[str],
+    case_meta: Mapping[str, Mapping[str, Any]],
+    target_steps: Mapping[str, Any],
+    *,
+    candidate: bool,
+) -> dict[str, Any]:
+    """One repetition's gate read: repairs on target, neighbors untouched."""
+    training, neighbors, reasons = {}, {}, []
+    for case_id in case_ids:
+        row = results[case_id]
+        role = str(case_meta[case_id].get("role") or "unknown")
+        authoritative = row.get("authority") == "authoritative"
+        if role == "training_failure" and candidate:
+            repaired = (
+                bool(row.get("prediction"))
+                and row.get("state") == "verified_error"
+                and authoritative
+            )
+            target_step = target_steps.get(case_id)
+            target_ok = (
+                row.get("responsible_step") is None
+                or target_step is None
+                or int(row.get("responsible_step") or -1) == int(target_step)
+            )
+            training[case_id] = {
+                "repaired": repaired and target_ok,
+                "state": row.get("state"),
+                "responsible_step": row.get("responsible_step"),
+            }
+        elif role == "normal_neighbor" or role != "training_failure":
+            clean = (
+                not bool(row.get("prediction"))
+                and row.get("state") == "verified_clean"
+                and authoritative
+            )
+            neighbors[case_id] = {"clean": clean, "state": row.get("state")}
+            if not clean:
+                reasons.append(f"{case_id} degraded to {row.get('state')!r}")
+    passed = (
+        all(item["repaired"] for item in training.values())
+        and all(item["clean"] for item in neighbors.values())
+        and not reasons
+    ) if candidate else False
+    return {
+        "passed": passed, "training": training,
+        "neighbors": neighbors, "reasons": reasons,
+    }
 
 
 def run_research(
@@ -939,5 +1204,6 @@ def run_research(
 
 __all__ = [
     "ALLOWED_HOOK", "ALLOWED_INTERVENTION_TYPE", "RESEARCH_MANIFEST_SCHEMA",
-    "RESEARCH_REPORT_SCHEMA", "ResearchBudget", "ResearchRun", "run_research",
+    "RESEARCH_REPORT_SCHEMA", "ResearchBudget", "ResearchRun",
+    "run_frozen_repeats", "run_research",
 ]
