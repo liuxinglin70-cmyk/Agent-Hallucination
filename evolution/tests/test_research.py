@@ -248,6 +248,7 @@ def _write_manifest(
     baseline_runs=None,
     config_hash="cfg-hash-1",
     routes=("B", "C"),
+    surface=None,
 ):
     config_path = tmp_path / "detector_config.json"
     config_path.write_text(json.dumps({"model": "fake-model"}), encoding="utf-8")
@@ -261,6 +262,7 @@ def _write_manifest(
         "detector_config": str(config_path),
         "cases": CASES,
         "routes": list(routes),
+        "intervention_surface": surface,
         "baseline_ref": {
             "runs": [
                 {"run_dir": str(run)} for run in (baseline_runs or [])
@@ -896,4 +898,122 @@ def test_failed_seed_terminates_route_without_revision(tmp_path):
         (tmp_path / "seeded" / "selection.json").read_text(encoding="utf-8"),
     )
     assert selection["routes"]["B"]["selected"] is None
+    assert report["next_stage"] is None
+
+
+# ---------------------------------------------------------------------------
+# intervention_surface widening + joint candidates (later-round protocol)
+
+def _defense_entry():
+    entry = _valid_candidate()
+    entry["intervention_id"] = "IV-R-002-DEF"
+    entry["hook"] = "defense.system"
+    entry["body"] = {
+        "directive": (
+            "When a hearing concerns quoted-content binding, also check "
+            "that the delivered argument matches the quoted text and treat "
+            "unquoted additions as content deviation."
+        ),
+        "not_when": (
+            "Never convict re-presentation of the agent's own tool "
+            "observations (stripping prefixes, renumbering): that is "
+            "presentation, not content deviation."
+        ),
+    }
+    return entry
+
+
+def test_joint_candidate_deploys_all_entries_on_widened_surface(tmp_path):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[baseline], routes=("C",),
+        surface={
+            "types": ["text_boundary"],
+            "hooks": ["judge.system", "defense.system"],
+            "max_entries": 2,
+        },
+    )
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_valid_candidate(), _defense_entry()]),
+    ])
+    backend = FakeBackend()
+    report = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert report["status"] == "screening_complete"
+    selection = json.loads(
+        (tmp_path / "run" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["C"]["selected"] == "v001"
+    record = json.loads(
+        (tmp_path / "run" / "v001" / "candidate.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    # The joint candidate is a two-entry list deployed as one version.
+    assert isinstance(record["candidate"], list)
+    assert len(record["candidate"]) == 2
+    assert {e["hook"] for e in record["candidate"]} == {
+        "judge.system", "defense.system",
+    }
+    # Both entries were live in the evaluation registry.
+    assert all(
+        len(call["registry"]["interventions"]) == 2 for call in backend.calls
+    )
+
+
+def test_undeclared_hook_rejected_without_surface_widening(tmp_path):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[baseline], routes=("C",),
+    )
+    # Defense entry comes first: it is examined, rejected as undeclared,
+    # and the judge entry alone is screened as a single-entry candidate.
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_defense_entry(), _valid_candidate()]),
+    ])
+    report = run_research(manifest, tmp_path / "run", FakeBackend(), proposer)
+    selection = json.loads(
+        (tmp_path / "run" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["C"]["selected"] == "v001"
+    record = json.loads(
+        (tmp_path / "run" / "v001" / "candidate.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert isinstance(record["candidate"], dict)
+    assert record["candidate"]["hook"] == "judge.system"
+    assert any(
+        note.get("rejected") == "research_hook_not_allowed"
+        for note in record["notes"]
+    )
+
+
+def test_joint_candidate_over_max_entries_fails_closed(tmp_path):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[baseline], routes=("C",),
+        surface={
+            "types": ["text_boundary"],
+            "hooks": ["judge.system", "defense.system", "scanner.system"],
+            "max_entries": 2,
+        },
+    )
+    third = _defense_entry()
+    third["intervention_id"] = "IV-R-003-DEF"
+    third["hook"] = "scanner.system"
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[
+            _valid_candidate(), _defense_entry(), third,
+        ]),
+    ])
+    # All three entries are surface-valid, so the batch exceeds max_entries
+    # and must fail closed instead of being trimmed to two.
+    report = run_research(manifest, tmp_path / "run", FakeBackend(), proposer)
+    selection = json.loads(
+        (tmp_path / "run" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["C"]["selected"] is None
     assert report["next_stage"] is None

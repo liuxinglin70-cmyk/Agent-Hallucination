@@ -10,9 +10,12 @@ select for ONE mechanism, writing immutable artifacts under
 
 Protocol invariants enforced here:
 
-- First round allows only ``text_boundary`` at hook ``judge.system``, at most
-  one intervention per candidate version. Any other type or hook is rejected
-  before it can spend evaluation budget.
+- Intervention surface: by default one ``text_boundary`` on ``judge.system``
+  (first-round restriction). A frozen manifest may declare
+  ``intervention_surface`` (types, hooks, max_entries) for later rounds; with
+  ``max_entries > 1`` every contract-valid entry in one proposer batch
+  deploys together as ONE joint candidate version. Any undeclared type or
+  hook is rejected before it can spend evaluation budget.
 - Training supervision (gold, reviewed target-error descriptions) stays on
   the research side: evaluations run through the normal fresh backend with
   the candidate as the only intervention, and every candidate is checked for
@@ -154,6 +157,18 @@ class ResearchRun:
             workers=int(budget.get("workers", 2)),
         )
         self.dataset_root = self.manifest["dataset_root"]
+        # Intervention surface: first-round restriction by default; a frozen
+        # manifest may widen it for later rounds (doc §9-style decisions).
+        surface = dict(self.manifest.get("intervention_surface") or {})
+        self.surface_types = frozenset(
+            str(item) for item in (
+                surface.get("types") or [ALLOWED_INTERVENTION_TYPE]
+            )
+        )
+        self.surface_hooks = frozenset(
+            str(item) for item in (surface.get("hooks") or [ALLOWED_HOOK])
+        )
+        self.max_entries = max(1, int(surface.get("max_entries") or 1))
         self.gold_map = {
             str(item.get("case_id")): bool(item.get("raw_gold"))
             for item in self.cases
@@ -381,8 +396,14 @@ class ResearchRun:
         return {
             "mechanism": self.manifest.get("mechanism") or {},
             "constraints": {
-                "allowed_intervention": ALLOWED_INTERVENTION_TYPE,
-                "allowed_hook": ALLOWED_HOOK,
+                "allowed_intervention_types": sorted(self.surface_types),
+                "allowed_hooks": sorted(self.surface_hooks),
+                "max_interventions_per_candidate": self.max_entries,
+                "joint_candidate_convention": (
+                    "when more than one intervention is allowed, every "
+                    "contract-valid intervention in the returned array is "
+                    "deployed together as ONE joint candidate version"
+                ) if self.max_entries > 1 else "",
                 "boundary_rule": (
                     "the directive must include an explicit not_when: tasks "
                     "that do not quote the exact required content allow "
@@ -423,6 +444,27 @@ class ResearchRun:
             max_proposals=int(packet.get("max_proposals") or 3),
         )
         notes = list(batch.notes)
+        if self.max_entries > 1:
+            # Joint-candidate mode: every contract-valid entry in the batch
+            # deploys together as one candidate version. Oversized or partly
+            # invalid batches fail closed instead of being trimmed.
+            accepted: list[Mapping[str, Any]] = []
+            for candidate in batch.candidates:
+                verdict, reason = self._candidate_verdict(candidate)
+                if verdict != "accepted":
+                    notes.append({
+                        "intervention_id": candidate.get("intervention_id"),
+                        "rejected": reason,
+                    })
+                    continue
+                accepted.append(candidate)
+            if not accepted:
+                return {"candidate": None, "notes": notes}
+            verdict, reason = self._joint_verdict(accepted)
+            if verdict != "accepted":
+                notes.append({"joint_rejected": reason})
+                return {"candidate": None, "notes": notes}
+            return {"candidate": list(accepted), "notes": notes}
         for candidate in batch.candidates:
             verdict, reason = self._candidate_verdict(candidate)
             if verdict != "accepted":
@@ -437,9 +479,9 @@ class ResearchRun:
     def _candidate_verdict(
         self, candidate: Mapping[str, Any],
     ) -> tuple[str, str]:
-        if str(candidate.get("type") or "") != ALLOWED_INTERVENTION_TYPE:
+        if str(candidate.get("type") or "") not in self.surface_types:
             return "rejected", "research_type_not_allowed"
-        if str(candidate.get("hook") or "") != ALLOWED_HOOK:
+        if str(candidate.get("hook") or "") not in self.surface_hooks:
             return "rejected", "research_hook_not_allowed"
         leaked = candidate_contains_case_id(candidate)
         if leaked:
@@ -450,10 +492,35 @@ class ResearchRun:
             return "rejected", f"invalid_contract:{exc}"
         return "accepted", ""
 
+    def _joint_verdict(
+        self, entries: Sequence[Mapping[str, Any]],
+    ) -> tuple[str, str]:
+        """Validate a multi-entry joint candidate against the run surface."""
+        if not entries:
+            return "rejected", "joint_candidate_empty"
+        if len(entries) > self.max_entries:
+            return "rejected", (
+                f"joint_candidate_too_large:{len(entries)}>"
+                f"{self.max_entries}"
+            )
+        hooks: list[str] = []
+        for entry in entries:
+            verdict, reason = self._candidate_verdict(entry)
+            if verdict != "accepted":
+                return "rejected", f"entry:{reason}"
+            hooks.append(str(entry.get("hook") or ""))
+        if len(set(hooks)) != len(hooks):
+            return "rejected", "joint_candidate_duplicate_hooks"
+        return "accepted", ""
+
     # ------------------------------------------------------------------
     # stage 4: paired screening evaluation of one candidate version
-    def _registry_for(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
-        return build_intervention_registry([dict(candidate)])
+    def _registry_for(
+        self, candidate: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        if isinstance(candidate, Mapping):
+            return build_intervention_registry([dict(candidate)])
+        return build_intervention_registry([dict(entry) for entry in candidate])
 
     def _version_identity(
         self, candidate: Mapping[str, Any], registry: Mapping[str, Any],
@@ -674,20 +741,26 @@ class ResearchRun:
         self,
         route: str,
         version_id: str,
-        candidate: Mapping[str, Any] | None,
+        candidate: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None,
         *,
-        parent: Mapping[str, Any] | None,
+        parent: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None,
         diagnosis: Mapping[str, Any] | None,
         draft_notes: Sequence[Mapping[str, Any]],
         evaluation: Mapping[str, Any] | None,
         verdict: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
         version_dir = self.output_dir / version_id
+        stored_candidate: Any = None
+        if candidate is not None:
+            stored_candidate = (
+                [dict(entry) for entry in candidate]
+                if not isinstance(candidate, Mapping) else dict(candidate)
+            )
         record = {
             "version_id": version_id,
             "route": route,
             "kind": "draft" if diagnosis is None else "revision",
-            "candidate": dict(candidate) if candidate else None,
+            "candidate": stored_candidate,
             "candidate_hash": (
                 canonical_hash(candidate) if candidate else None
             ),
@@ -711,7 +784,10 @@ class ResearchRun:
         if parent is not None and diagnosis is not None:
             save_json(version_dir / "parent.json", {
                 "parent_hash": canonical_hash(parent),
-                "parent_candidate": dict(parent),
+                "parent_candidate": (
+                    [dict(entry) for entry in parent]
+                    if not isinstance(parent, Mapping) else dict(parent)
+                ),
             })
             save_json(version_dir / "diagnosis.json", diagnosis)
         self.versions.append(record)
@@ -766,9 +842,12 @@ class ResearchRun:
         else:
             base["rejection_feedback"] = [{
                 "gate": "RESEARCH_SCREEN",
-                "candidate": dict(parent),
-                "type": parent.get("type"),
-                "hook": parent.get("hook"),
+                "candidate": (
+                    [dict(entry) for entry in parent]
+                    if not isinstance(parent, Mapping) else dict(parent)
+                ),
+                "type": parent.get("type") if isinstance(parent, Mapping) else None,
+                "hook": parent.get("hook") if isinstance(parent, Mapping) else None,
                 "reason": "; ".join(diagnosis.get("reasons") or []),
                 "delta": None,
                 "not_evaluable": False,
@@ -939,7 +1018,7 @@ class ResearchRun:
                 f"seed candidate record unreadable at {source!r}: {exc}"
             ) from exc
         candidate = record.get("candidate")
-        if not isinstance(candidate, Mapping):
+        if not isinstance(candidate, Mapping) and not isinstance(candidate, list):
             raise RuntimeError(
                 f"seed candidate record {source!r} carries no candidate"
             )
@@ -950,7 +1029,10 @@ class ResearchRun:
                 f"seed candidate hash mismatch: manifest pins {pinned!r}, "
                 f"source record hashes to {actual!r}"
             )
-        verdict, reason = self._candidate_verdict(candidate)
+        if isinstance(candidate, list):
+            verdict, reason = self._joint_verdict(candidate)
+        else:
+            verdict, reason = self._candidate_verdict(candidate)
         if verdict != "accepted":
             raise RuntimeError(
                 f"seed candidate rejected by contract: {reason}"
@@ -1089,12 +1171,18 @@ def run_frozen_repeats(
     stopped: str | None = None
     arm_reports: dict[str, Any] = {}
     for arm in arms:
-        if arm["candidate"] is None:
+        candidate = arm["candidate"]
+        if candidate is None:
             registry = build_intervention_registry([])
             candidate_hash = None
+        elif isinstance(candidate, Mapping):
+            registry = build_intervention_registry([dict(candidate)])
+            candidate_hash = canonical_hash(candidate)
         else:
-            registry = build_intervention_registry([dict(arm["candidate"])])
-            candidate_hash = canonical_hash(arm["candidate"])
+            registry = build_intervention_registry(
+                [dict(entry) for entry in candidate],
+            )
+            candidate_hash = canonical_hash(list(candidate))
         reps: list[dict[str, Any]] = []
         for rep in range(1, int(repetitions) + 1):
             identity = {
