@@ -1,0 +1,71 @@
+{
+  "attempt": "attempt3_cache_path_fix",
+  "terminal_states": [
+    "frozen_after_defect_injection_audit"
+  ],
+  "authorized_cycles": 2,
+  "frozen_detector_config": "reports/error_scope_20260918/attempts/attempt3_cache_path_fix/frozen/detector-config-autodl.json",
+  "change_under_test": {
+    "files": [
+      "detector\\semantics.py",
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py"
+    ],
+    "changed_since_previous_protocol": [
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py"
+    ],
+    "declared_by_attempt": [
+      "detector\\semantics.py",
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py"
+    ],
+    "summary": "Attempts 1-2's fixes, plus bounding the detector-stage cache file name so an evidence-tagged case cannot exceed the Windows path ceiling. In attempt 2 the preflight passed (2 TP + 2 TN), and the run then froze at the defect-injection audit because one gain case, OpenDeepSearch/080, failed its cache write with WinError 3 at a 268-character path and fail-closed to unresolved, which the audit must not certify as a gate rejection. The cache name now degrades to a digest past the budget. No gate, split, seed or label changed."
+  },
+  "source_check": {
+    "tree_validated": true,
+    "frozen_source_matches_tree": true,
+    "mismatched_files": []
+  },
+  "fixed_fields": {
+    "gates": true,
+    "split": true
+  },
+  "budget_deviation": {},
+  "declared_envelope_overrides": [],
+  "ledger": {
+    "valid": true,
+    "records": 3,
+    "broken_at": null,
+    "reason": ""
+  },
+  "baseline_arm": "508acdf65658",
+  "baseline_arm_rows": 10,
+  "preflight_recorded": null,
+  "preflight_block_reason": "",
+  "sentinel_blocked": false,
+  "gain_opportunity": null,
+  "preflight_recomputed": {
+    "protected_tp": 2,
+    "protected_tn": 2,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": true,
+    "reason": ""
+  },
+  "preflight_agrees": true,
+  "archive_complete": true,
+  "checks": {
+    "frozen_detector_config_matches_protocol": true,
+    "source_matches_tree_or_historical": true,
+    "gates_and_split_unchanged": true,
+    "budget_deviations_declared": true,
+    "ledger_valid": true,
+    "preflight_recomputed_agrees": true,
+    "archive_complete": true,
+    "terminal_state_protocol_legal": true
+  },
+  "passed": true
+}

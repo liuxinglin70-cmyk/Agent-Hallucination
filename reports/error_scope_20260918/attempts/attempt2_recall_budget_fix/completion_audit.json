@@ -1,0 +1,70 @@
+{
+  "attempt": "attempt2_recall_budget_fix",
+  "terminal_states": [
+    "frozen_after_defect_injection_audit"
+  ],
+  "authorized_cycles": 2,
+  "frozen_detector_config": "reports/error_scope_20260918/attempts/attempt2_recall_budget_fix/frozen/detector-config-autodl.json",
+  "change_under_test": {
+    "files": [
+      "detector\\configs\\autodl.json",
+      "detector\\semantics.py"
+    ],
+    "changed_since_previous_protocol": [
+      "detector\\configs\\autodl.json"
+    ],
+    "declared_by_attempt": [
+      "detector\\semantics.py"
+    ],
+    "summary": "Attempt 1's rule 6 fix, plus raising the recall scanner's max_tokens from 8192 to 32768. In attempt 1 the scanner's reply was cut at the 8192 ceiling (finish_reason=length), which is a provider error rather than a contract violation, so the stage read as unavailable and degraded an authoritative clean verdict to degraded_judge_only. No gate, split, seed or label changed."
+  },
+  "source_check": {
+    "tree_validated": false,
+    "frozen_source_matches_tree": false,
+    "mismatched_files": [
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py"
+    ]
+  },
+  "fixed_fields": {
+    "gates": true,
+    "split": true
+  },
+  "budget_deviation": {},
+  "declared_envelope_overrides": [],
+  "ledger": {
+    "valid": true,
+    "records": 3,
+    "broken_at": null,
+    "reason": ""
+  },
+  "baseline_arm": "508acdf65658",
+  "baseline_arm_rows": 10,
+  "preflight_recorded": null,
+  "preflight_block_reason": "",
+  "sentinel_blocked": false,
+  "gain_opportunity": null,
+  "preflight_recomputed": {
+    "protected_tp": 2,
+    "protected_tn": 2,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": true,
+    "reason": ""
+  },
+  "preflight_agrees": true,
+  "archive_complete": true,
+  "checks": {
+    "frozen_detector_config_matches_protocol": true,
+    "source_matches_tree_or_historical": true,
+    "gates_and_split_unchanged": true,
+    "budget_deviations_declared": true,
+    "ledger_valid": true,
+    "preflight_recomputed_agrees": true,
+    "archive_complete": true,
+    "terminal_state_protocol_legal": true
+  },
+  "passed": true
+}

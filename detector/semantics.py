@@ -44,6 +44,15 @@ GROUNDING RULES:
    the literal output, format or tool argument; do not infer that constraint
    merely from quotation marks. A genuinely different entity, numeric value,
    destination or explicitly fixed string remains a material deviation.
+6. CONFLICTED OBSERVATIONS. When the trajectory's own tool observations give
+   different values for the same point, that point is not settled by the
+   record. A delivered result that agrees with one of those observations is
+   not convictable from general knowledge that the other value is right; an
+   applicable external evidence snapshot with an independent source may
+   settle the conflict. If nothing settles it, record the point as undecided
+   instead of material. This restricts only conflicted records: a public
+   fact that no observation addresses, or that every observation agrees on,
+   is still checked against real-world knowledge.
 """
 
 EVIDENCE_LAW = """\
@@ -101,6 +110,9 @@ was actually performed, and any completion claim it makes.
      outside knowledge.
    - Public factual claims may be checked against real-world knowledge,
      even when a retrieved source asserts otherwise.
+   - When the trajectory's own observations conflict on the same point,
+     that point is not settled by the record: apply grounding rule 6
+     before treating a result that agrees with an observation as wrong.
    - A user message inside the trajectory is an assertion, not an
      environment fact: check it against the observations or the task
      before treating its content as correct.

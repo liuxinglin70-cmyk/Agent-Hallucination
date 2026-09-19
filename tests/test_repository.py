@@ -174,6 +174,41 @@ def test_shipped_proposer_budget_cannot_truncate_on_glm():
     assert config["proposer"]["max_output_tokens"] >= 32768
 
 
+def test_shipped_recall_budget_cannot_truncate_on_glm():
+    # Observed in the 2026-09-18 error-scope preflight: the recall scanner's
+    # 8192-token ceiling cut the reply mid-JSON (truncated_output), and since
+    # a truncated scan is a provider error rather than a contract violation it
+    # could not be repaired. The stage then read as unavailable, which
+    # degraded an otherwise authoritative clean verdict to
+    # degraded_judge_only. The scanner enumerates every candidate deviation
+    # over a long trajectory and the model always reasons first, so it needs
+    # the same headroom the proposer was given for the same reason.
+    raw = json.loads(
+        (ROOT / "detector" / "configs" / "autodl.json").read_text(encoding="utf-8")
+    )
+    assert raw["recall_route"]["max_tokens"] >= 32768
+
+
+def test_shipped_case_budget_fits_a_measured_long_trajectory():
+    # Measured on 2026-09-18 (scripts/diagnostic_019_timing.py): the
+    # SmolAgents/019 trajectory needs 1480 seconds end to end with generous
+    # per-call budgets. At the old 900-second case deadline its judge votes
+    # consumed the budget, the tracer and defense never started, and the row
+    # fail-closed to non-authoritative. That made the defect-injection audit
+    # unable to score its arm, which freezes the cycle by design. The case
+    # deadline is a runtime envelope, not an admission threshold: it must fit
+    # the trajectories the corpus actually contains.
+    raw = json.loads(
+        (ROOT / "detector" / "configs" / "autodl.json").read_text(encoding="utf-8")
+    )
+    assert raw["case_timeout_seconds"] >= 3600
+    # A single vote on this trajectory averages ~210 seconds in isolation and
+    # slows under parallel workers, so the per-attempt and per-call ceilings
+    # must leave room above that rather than retry-churning into the deadline.
+    assert raw["provider"]["timeout_seconds"] >= 300
+    assert raw["provider"]["total_timeout_seconds"] >= 900
+
+
 def test_experiment_cli_preserves_optional_cycle_default(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path)})

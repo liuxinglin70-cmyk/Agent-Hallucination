@@ -1,0 +1,81 @@
+{
+  "attempt": "attempt1_semantics_fix",
+  "terminal_states": [
+    "blocked_evaluation_preflight"
+  ],
+  "authorized_cycles": 2,
+  "frozen_detector_config": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/frozen/detector-config-autodl.json",
+  "change_under_test": {
+    "files": [
+      "detector\\semantics.py"
+    ],
+    "changed_since_previous_protocol": [
+      "detector\\semantics.py"
+    ],
+    "declared_by_attempt": [
+      "detector\\semantics.py"
+    ],
+    "summary": "MATERIALITY grounding rule 6 (conflicted observations are not settled by the record) plus the judge's step-3 application note; see docs/error-scope.md."
+  },
+  "source_check": {
+    "tree_validated": false,
+    "frozen_source_matches_tree": false,
+    "mismatched_files": [
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py"
+    ]
+  },
+  "fixed_fields": {
+    "gates": true,
+    "split": true
+  },
+  "budget_deviation": {},
+  "declared_envelope_overrides": [],
+  "ledger": {
+    "valid": true,
+    "records": 3,
+    "broken_at": null,
+    "reason": ""
+  },
+  "baseline_arm": "508acdf65658",
+  "baseline_arm_rows": 6,
+  "preflight_recorded": {
+    "reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2",
+    "sentinel": {
+      "protected_tp": 2,
+      "protected_tn": 1,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": false,
+      "reason": "protected_tn=1 < 2"
+    }
+  },
+  "preflight_block_reason": "insufficient baseline-correct sentinel coverage: protected_tn=1 < 2",
+  "sentinel_blocked": true,
+  "gain_opportunity": null,
+  "preflight_recomputed": {
+    "protected_tp": 2,
+    "protected_tn": 1,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": false,
+    "reason": "protected_tn=1 < 2"
+  },
+  "preflight_agrees": true,
+  "archive_complete": true,
+  "checks": {
+    "frozen_detector_config_matches_protocol": true,
+    "source_matches_tree_or_historical": true,
+    "gates_and_split_unchanged": true,
+    "budget_deviations_declared": true,
+    "ledger_valid": true,
+    "preflight_recomputed_agrees": true,
+    "archive_complete": true,
+    "terminal_state_protocol_legal": true
+  },
+  "passed": true
+}

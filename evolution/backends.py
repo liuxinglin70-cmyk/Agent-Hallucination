@@ -866,6 +866,15 @@ class CachedRunBackend(DetectionBackend):
         return self.live.evaluate_fresh(cases, **kwargs)
 
 
+# Windows' legacy path ceiling is 260 characters and an over-long write fails
+# with WinError 3 from ``os.replace``, which reads like a missing directory.
+# Keep the whole path under a ceiling that also leaves room for the temporary
+# sibling file ``save_json`` creates (``.tmp-`` + 8 random chars + ``.json``).
+_CACHE_PATH_MAX = 250
+_CACHE_TEMP_NAME = ".tmp-XXXXXXXX.json"
+_DIGEST_NAME_WIDTH = 16
+
+
 class CachingBackend(DetectionBackend):
     def __init__(
         self,
@@ -896,10 +905,28 @@ class CachingBackend(DetectionBackend):
         tag = ""
         if self._extra_key is not None:
             tag = "." + str(self._extra_key(case_id))
-        return (
-            self.cache_dir / registry_key(registry)
-            / f"{safe_case}.{record_hash}{tag}.json"
-        )
+        directory = self.cache_dir / registry_key(registry)
+        name = f"{safe_case}.{record_hash}{tag}.json"
+        # The name carries case id, record hash and evidence tag, so a
+        # snapshot-tagged case under a nested work root can cross the ceiling
+        # while its neighbours fit. Past the budget the name becomes a digest
+        # of exactly those inputs; a read still verifies the payload's case id
+        # and registry hash, so a collision would cost a recomputation and
+        # never return another case's result.
+        allowance = _CACHE_PATH_MAX - len(str(directory)) - 1
+        if len(name) > allowance:
+            name = hashlib.sha256(name.encode("utf-8")).hexdigest()
+            name = name[:_DIGEST_NAME_WIDTH].rstrip(".") + ".json"
+            if len(name) > allowance:
+                # A directory deep enough to overflow even the digest cannot
+                # be served by a shorter name; fail with the real reason
+                # instead of an os.replace that blames the path.
+                raise ValueError(
+                    f"cache directory leaves {allowance} characters for a "
+                    f"file name, which cannot hold even a truncated digest: "
+                    f"{directory}"
+                )
+        return directory / name
 
     def run_case(
         self,

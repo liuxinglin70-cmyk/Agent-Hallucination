@@ -1,17 +1,17 @@
 {
-  "started_at_utc": "2026-09-17T09:12:14.183928+00:00",
-  "finished_at_utc": "2026-09-17T09:12:49.259202+00:00",
+  "started_at_utc": "2026-09-18T13:18:23.747667+00:00",
+  "finished_at_utc": "2026-09-18T13:19:16.035249+00:00",
   "python": "3.13.7",
   "platform": "Windows-10-10.0.19045-SP0",
   "scope": "Offline regression and mock mechanism validation; no live provider accuracy measurement.",
-  "source_sha256": "e26093fa38df91151ca8882c9dae77ae91bca9c71728dbda93f432e11f33290f",
+  "source_sha256": "b8331e4b1c8adccdb0e811b718957dedd951235b24b843f545a135778370df11",
   "passed": true,
   "tests": {
-    "tests": 312,
+    "tests": 392,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
-    "passed": 312
+    "passed": 392
   },
   "checks": [
     {
@@ -29,7 +29,7 @@
         "--junitxml=reports/latest/pytest.xml"
       ],
       "exit_code": 0,
-      "seconds": 28.267
+      "seconds": 32.854
     },
     {
       "name": "detector_cli",
@@ -39,7 +39,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.249
+      "seconds": 0.212
     },
     {
       "name": "evolution_cli",
@@ -49,7 +49,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.254
+      "seconds": 0.239
     },
     {
       "name": "capability_audit",
@@ -59,7 +59,7 @@
         "capability-audit"
       ],
       "exit_code": 0,
-      "seconds": 0.241
+      "seconds": 0.238
     },
     {
       "name": "smoke",
@@ -68,10 +68,10 @@
         "evolution",
         "smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_o91endis\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_jeagc8c0\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 3.507
+      "seconds": 3.77
     },
     {
       "name": "smoke_admission_and_audit",
@@ -84,10 +84,10 @@
         "evolution",
         "capability-smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_o91endis\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_jeagc8c0\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 2.177
+      "seconds": 1.935
     },
     {
       "name": "source_unchanged_during_checks",

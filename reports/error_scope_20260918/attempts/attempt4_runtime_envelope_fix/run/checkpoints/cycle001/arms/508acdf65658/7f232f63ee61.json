@@ -1,0 +1,538 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Camel/048.json",
+    "gold": false,
+    "prediction": null,
+    "state": "verified_error",
+    "authority": "degraded_judge_only",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Camel/048.json",
+      "state": "verified_error",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": "event_013",
+      "responsible_step": 13,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": "event_013",
+        "responsible_step": 13,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 13,
+            "traced_step": 13,
+            "defense": "substantiated_upgraded",
+            "confirmed_step": 13,
+            "delivered_result": "Sir James Thornhill presented as the substantiated/authoritative painter of the Great Hall ceiling, with the book's attribution to Louis Laguerre reported only as a conflicting claim rather than as the answer.",
+            "correct_result": "Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter (per the human's explicit statements in events 003 and 016), optionally noting that modern sources credit Sir James Thornhill.",
+            "judge_basis": "task_requirement",
+            "authority": "degraded_judge_only",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated_upgraded"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 13,
+          "hallucination_reason": "The question asks for the painter's name specifically as mentioned in the cited book, and the only evidence in the trajectory about the book's content (the human's replies in events 003 and 016) explicitly names Louis Laguerre, yet the agent submitted Sir James Thornhill as the substantiated answer based on modern sources that address who actually painted the ceiling, not what the book says.",
+          "delivered_result": "Sir James Thornhill presented as the substantiated/authoritative painter of the Great Hall ceiling, with the book's attribution to Louis Laguerre reported only as a conflicting claim rather than as the answer.",
+          "correct_result": "Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter (per the human's explicit statements in events 003 and 016), optionally noting that modern sources credit Sir James Thornhill.",
+          "basis": "task_requirement",
+          "confidence": "medium",
+          "evidence_refs": [
+            "event_003",
+            "event_013",
+            "event_016",
+            "event_021"
+          ],
+          "root_cause": {
+            "step": 13,
+            "quote": "As it stands, the most substantiated answer is Sir James Thornhill.",
+            "referent": "Louis Laguerre, the painter the specified book names according to the human's replies ('The ceiling was actually painted by Louis Laguerre' / 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill')"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The answer must name the man the specified book mentions as painting the ceiling of the Great Hall at Blenheim Palace — Louis Laguerre per the trajectory's only evidence about the book's content."
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Consult the human user via ask_human_via_console and incorporate the reply (performed in events 003 and 016)."
+            },
+            {
+              "kind": "exact_form",
+              "requirement": "Final deliverable: a brief paragraph naming the person, explaining the reasoning, and listing consulted sources."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 13,
+          "quote": "As it stands, the most substantiated answer is Sir James Thornhill.",
+          "referent": "The submitted answer should be Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter per the human's explicit statements (events 003 and 016) — optionally noting that modern sources credit Sir James Thornhill.",
+          "evidence_refs": [
+            "event_003",
+            "event_013",
+            "event_016",
+            "event_021"
+          ],
+          "reason": "Step 13 is the first assistant-authored submission of the wrong answer, declaring Thornhill 'the most substantiated answer' based on modern authorship sources even though the question asks what the book says and the human twice stated (events 003, 016) the book attributes the Great Hall ceiling to Louis Laguerre; earlier steps (006, 011) only recorded evidence and explicitly kept the book's wording unconfirmed, while event_021 merely repeats the uncorrected error as delivery."
+        },
+        "defense": {
+          "verdict": "substantiated_upgraded",
+          "confirmed_step": 13,
+          "evidence_refs": [
+            "event_013",
+            "event_003",
+            "event_016",
+            "event_021"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "No external snapshot present. The apparent tension (modern sources credit Thornhill for the actual painting; the book reportedly credits Laguerre) is not a conflicted observation on the judged point: the task fixes the source ('as mentioned in' the named book), and no trajectory observation contradicts the human's tool-observation replies on what the book says.",
+          "reason": "CONTENT TEST: The task fixes the deliverable as the name 'as mentioned in' the named book. The only trajectory evidence about the book's content comes from ask_human_via_console tool observations — event_003: 'The ceiling was actually painted by Louis Laguerre...' and event_016: 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill' — and the agent's own event_021 concedes 'the cited book says Louis Laguerre.' Yet at event_013 the agent submitted: 'As it stands, the most substantiated answer is Sir James Thornhill,' explicitly admitting it could not access the book and substituting modern sources that address who actually painted the ceiling — a different question from what the book says. This is a real result error against the task's fixed source. RELEVANCE TEST: The error is not later corrected. After the replan, event_021 still frames Thornhill as what 'present-day trusted sources agree' and reports the book's Louis Laguerre only as 'the human's recollection' and a 'direct conflict,' never delivering the book's name as the answer to the asked question. Event_021 is a repetition/delivery of the event_013 error, not a correction; correcting step 13 to answer Louis Laguerre (optionally noting modern sources credit Thornhill) would make the deliverable correct, and the error causally propagates to the final report via the replan triggered by event_013's inconclusive submission."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 13,
+              "reason": "The question asks for the painter's name specifically as mentioned in the cited book, and the only evidence in the trajectory about the book's content (the human's replies in events 003 and 016) explicitly names Louis Laguerre, yet the agent submitted Sir James Thornhill as the substantiated answer based on modern sources that address who actually painted the ceiling, not what the book says.",
+              "evidence_refs": [
+                "event_003",
+                "event_013",
+                "event_016",
+                "event_021"
+              ],
+              "quote": "As it stands, the most substantiated answer is Sir James Thornhill.",
+              "delivered_result": "Sir James Thornhill presented as the substantiated/authoritative painter of the Great Hall ceiling, with the book's attribution to Louis Laguerre reported only as a conflicting claim rather than as the answer.",
+              "correct_result": "Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter (per the human's explicit statements in events 003 and 016), optionally noting that modern sources credit Sir James Thornhill."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 13,
+                "quote": "As it stands, the most substantiated answer is Sir James Thornhill.",
+                "referent": "The submitted answer should be Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter per the human's explicit statements (events 003 and 016) — optionally noting that modern sources credit Sir James Thornhill.",
+                "evidence_refs": [
+                  "event_003",
+                  "event_013",
+                  "event_016",
+                  "event_021"
+                ],
+                "reason": "Step 13 is the first assistant-authored submission of the wrong answer, declaring Thornhill 'the most substantiated answer' based on modern authorship sources even though the question asks what the book says and the human twice stated (events 003, 016) the book attributes the Great Hall ceiling to Louis Laguerre; earlier steps (006, 011) only recorded evidence and explicitly kept the book's wording unconfirmed, while event_021 merely repeats the uncorrected error as delivery."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 18702,
+                  "completion_tokens": 6418,
+                  "total_tokens": 25120,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 448
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 6163
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 448
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 6163
+                  },
+                  "input_tokens": 18702,
+                  "output_tokens": 6418
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":13,\"quote\":\"As it stands, the most substantiated answer is Sir James Thornhill.\",\"referent\":\"The submitted answer should be Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall "
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 13,
+                "reason": "The question asks for the painter's name specifically as mentioned in the cited book, and the only evidence in the trajectory about the book's content (the human's replies in events 003 and 016) explicitly names Louis Laguerre, yet the agent submitted Sir James Thornhill as the substantiated answer based on modern sources that address who actually painted the ceiling, not what the book says.",
+                "delivered_result": "Sir James Thornhill presented as the substantiated/authoritative painter of the Great Hall ceiling, with the book's attribution to Louis Laguerre reported only as a conflicting claim rather than as the answer.",
+                "correct_result": "Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall ceiling painter (per the human's explicit statements in events 003 and 016), optionally noting that modern sources credit Sir James Thornhill.",
+                "evidence_refs": [
+                  "event_003",
+                  "event_013",
+                  "event_016",
+                  "event_021"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The answer must name the man the specified book mentions as painting the ceiling of the Great Hall at Blenheim Palace — Louis Laguerre per the trajectory's only evidence about the book's content."
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Consult the human user via ask_human_via_console and incorporate the reply (performed in events 003 and 016)."
+                  },
+                  {
+                    "kind": "exact_form",
+                    "requirement": "Final deliverable: a brief paragraph naming the person, explaining the reasoning, and listing consulted sources."
+                  }
+                ],
+                "confidence": "medium",
+                "quote": "As it stands, the most substantiated answer is Sir James Thornhill."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015",
+                  "event_016",
+                  "event_017",
+                  "event_018",
+                  "event_019",
+                  "event_020",
+                  "event_021"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated_upgraded",
+                "confirmed_step": 13,
+                "evidence_refs": [
+                  "event_013",
+                  "event_003",
+                  "event_016",
+                  "event_021"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "No external snapshot present. The apparent tension (modern sources credit Thornhill for the actual painting; the book reportedly credits Laguerre) is not a conflicted observation on the judged point: the task fixes the source ('as mentioned in' the named book), and no trajectory observation contradicts the human's tool-observation replies on what the book says.",
+                "reason": "CONTENT TEST: The task fixes the deliverable as the name 'as mentioned in' the named book. The only trajectory evidence about the book's content comes from ask_human_via_console tool observations — event_003: 'The ceiling was actually painted by Louis Laguerre...' and event_016: 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill' — and the agent's own event_021 concedes 'the cited book says Louis Laguerre.' Yet at event_013 the agent submitted: 'As it stands, the most substantiated answer is Sir James Thornhill,' explicitly admitting it could not access the book and substituting modern sources that address who actually painted the ceiling — a different question from what the book says. This is a real result error against the task's fixed source. RELEVANCE TEST: The error is not later corrected. After the replan, event_021 still frames Thornhill as what 'present-day trusted sources agree' and reports the book's Louis Laguerre only as 'the human's recollection' and a 'direct conflict,' never delivering the book's name as the answer to the asked question. Event_021 is a repetition/delivery of the event_013 error, not a correction; correcting step 13 to answer Louis Laguerre (optionally noting modern sources credit Thornhill) would make the deliverable correct, and the error causally propagates to the final report via the replan triggered by event_013's inconclusive submission."
+              },
+              "raw": [
+                {
+                  "verdict": "refuted",
+                  "confirmed_step": null,
+                  "evidence_refs": [
+                    "event_013",
+                    "event_014",
+                    "event_016",
+                    "event_021"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "Trajectory-internal conflict: the human's recollection (events 003, 016: the book credits Louis Laguerre) versus the agent's tool observations (Grand Tourist transcript, V&A and Blenheim pages: Sir James Thornhill). This verdict does not need to settle that conflict: the final delivered state (event_021) reports both sides, attributing Louis Laguerre to the book per the human and Thornhill to the observed sources, so no external snapshot citation is decisive here.",
+                  "reason": "CONTENT TEST: event_013 does submit 'the most substantiated answer is Sir James Thornhill' while admitting 'I cannot definitively confirm if that book misattributes the painter or not'. However, at that point the only book-content evidence was event_003's ambiguous reply ('The ceiling was actually painted by Louis Laguerre'), which under the grounding rules is a human assertion, not an established fact; the explicit statement that the book names Laguerre (event_016) postdates step 13. RELEVANCE TEST: step 13 was not the delivered state. The Planner rejected the pass and replanned (event_014: 'document authoritative sources... and explicitly note whether the attribution matches or differs from any summary references related to the book'), and the final prose event (event_021) explicitly states 'the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — i.e., the delivered result answers the literal question (the book's attribution: Louis Laguerre, per the human's recollection) while noting the modern-source conflict, exactly as the replan required. Under grounding rule 4, an intermediate error the trajectory later corrected is not a violation; the step-13 defect does not survive into what the trajectory actually delivers, so the conviction is refuted as already corrected."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 13,
+                  "evidence_refs": [
+                    "event_013",
+                    "event_003",
+                    "event_016",
+                    "event_021"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "No external snapshot present. The apparent tension (modern sources credit Thornhill for the actual painting; the book reportedly credits Laguerre) is not a conflicted observation on the judged point: the task fixes the source ('as mentioned in' the named book), and no trajectory observation contradicts the human's tool-observation replies on what the book says.",
+                  "reason": "CONTENT TEST: The task fixes the deliverable as the name 'as mentioned in' the named book. The only trajectory evidence about the book's content comes from ask_human_via_console tool observations — event_003: 'The ceiling was actually painted by Louis Laguerre...' and event_016: 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill' — and the agent's own event_021 concedes 'the cited book says Louis Laguerre.' Yet at event_013 the agent submitted: 'As it stands, the most substantiated answer is Sir James Thornhill,' explicitly admitting it could not access the book and substituting modern sources that address who actually painted the ceiling — a different question from what the book says. This is a real result error against the task's fixed source. RELEVANCE TEST: The error is not later corrected. After the replan, event_021 still frames Thornhill as what 'present-day trusted sources agree' and reports the book's Louis Laguerre only as 'the human's recollection' and a 'direct conflict,' never delivering the book's name as the answer to the asked question. Event_021 is a repetition/delivery of the event_013 error, not a correction; correcting step 13 to answer Louis Laguerre (optionally noting modern sources credit Thornhill) would make the deliverable correct, and the error causally propagates to the final report via the replan triggered by event_013's inconclusive submission."
+                }
+              ],
+              "provider": {
+                "attempts": 2,
+                "usage": {
+                  "prompt_tokens": 3773,
+                  "completion_tokens": 6262,
+                  "total_tokens": 10035,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 3712
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 5796
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 3712
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 5796
+                  },
+                  "input_tokens": 3773,
+                  "output_tokens": 6262
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 13,\n  \"evidence_refs\": [\"event_013\", \"event_003\", \"event_016\", \"event_021\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"No external snapshot present. The apparent tension (modern sources credit Thornhill for the actual painting; the book repor",
+                "vote": {
+                  "votes": 3,
+                  "cast": 2,
+                  "verdicts": [
+                    "refuted",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated_upgraded",
+                  "tie": true,
+                  "topups": 2,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_003",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015",
+                  "event_016",
+                  "event_021"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_017",
+                  "event_018",
+                  "event_019",
+                  "event_020"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 6,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 6,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 19438,
+            "completion_tokens": 12212,
+            "total_tokens": 31650,
+            "prompt_tokens_details": {
+              "cached_tokens": 19392
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 11682
+            },
+            "input_tokens_details": {
+              "cached_tokens": 19392
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 11682
+            },
+            "input_tokens": 19438,
+            "output_tokens": 12212
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 13,\n  \"hallucination_reason\": \"The question fixes the referent to what the named book attributes, and the human consulted via the task-mandated ask_human_via_console channel twice and consistently stated the book attributes the Great Hall ceilin",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 18702,
+            "completion_tokens": 6418,
+            "total_tokens": 25120,
+            "prompt_tokens_details": {
+              "cached_tokens": 448
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6163
+            },
+            "input_tokens_details": {
+              "cached_tokens": 448
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 6163
+            },
+            "input_tokens": 18702,
+            "output_tokens": 6418
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":13,\"quote\":\"As it stands, the most substantiated answer is Sir James Thornhill.\",\"referent\":\"The submitted answer should be Louis Laguerre — the name the book 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' gives for the Great Hall "
+        },
+        "defense": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 3773,
+            "completion_tokens": 6262,
+            "total_tokens": 10035,
+            "prompt_tokens_details": {
+              "cached_tokens": 3712
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5796
+            },
+            "input_tokens_details": {
+              "cached_tokens": 3712
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 5796
+            },
+            "input_tokens": 3773,
+            "output_tokens": 6262
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 13,\n  \"evidence_refs\": [\"event_013\", \"event_003\", \"event_016\", \"event_021\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"No external snapshot present. The apparent tension (modern sources credit Thornhill for the actual painting; the book repor",
+          "vote": {
+            "votes": 3,
+            "cast": 2,
+            "verdicts": [
+              "refuted",
+              "substantiated"
+            ],
+            "collapsed": "substantiated_upgraded",
+            "tie": true,
+            "topups": 2,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "c3624def97d8706a615e9b2e69bd3952f58dc1dedd7200e0b35780e618959c61",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 21
+    },
+    "backend": "detector"
+  },
+  "row_hash": "089743aad222"
+}

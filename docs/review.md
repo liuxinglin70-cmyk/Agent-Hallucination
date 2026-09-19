@@ -304,7 +304,7 @@ Judge 有 topup 但**有上限**，放弃后仍用收缩后的 quorum；**Causal
 - **`run_defense` 里 guard 检查有副作用**（`defense.py:312-320` 调 `plan.guard_actions`，会追加 `guard_fired` 与机械证据），
   与 `api.py:635` 的终态调用叠加 ⇒ `deployment.fired` 可能重复记录同一 guard。
 - **配置别名共享可变嵌套默认**（`config.py:68` 浅拷贝 `_PROVIDER_DEFAULTS`）：三个路由共享同一 `context_cache` dict 对象。
-- **`deepseek.json` 缺 `case_timeout_seconds`** ⇒ 整案 deadline 为 `None`（无上限），与 `autodl.json:3` 的 900 不一致。
+- **`deepseek.json` 缺 `case_timeout_seconds`** ⇒ 整案 deadline 为 `None`（无上限），与 `autodl.json` 的整案上限不一致。**仍未修复**（2026-09-19 复核）：`autodl.json` 的整案上限已按实测由 900 改为 3600 秒，`deepseek.json` 仍无此字段。该配置为显式可选、未被默认路径使用；修改属代码变更，需单独冻结与验证，故未随文档整理一并改动。
 - **`invalid_json` 被归类为传输错误**（`runner.py:54-62`）⇒ 纯模型不守格式也会触发最多 3 次整案重跑，抬高成本并引入重掷噪声。
 - **`.env` 发现会向上走出仓库**（`env.py:27-28` 沿 `parents` 上溯），且 `load_local_env` 返回最远的命中文件，与"最近仓库 .env"的文档相反。
 - **`ledger.append` 无 fsync 且仅进程内锁**：同一 work_root 并发多进程可交错破坏哈希链（README 只说"不要并发"，未强制）。

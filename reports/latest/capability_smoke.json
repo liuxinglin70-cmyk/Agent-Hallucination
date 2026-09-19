@@ -1,6 +1,23 @@
 {
   "cycle": 1,
   "state": "completed",
+  "preflight": {
+    "sentinel": {
+      "protected_tp": 2,
+      "protected_tn": 2,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": true,
+      "reason": ""
+    },
+    "blocked_families": [],
+    "gain_opportunity": {
+      "recall": 2,
+      "precision": 0
+    }
+  },
   "split": {
     "name": "capability-smoke",
     "mini": true,
@@ -355,6 +372,8 @@
       "recall": 2,
       "precision": 0
     },
+    "gain_measured": true,
+    "blocked_families": [],
     "unmeasurable_polarities": [
       "precision"
     ],
@@ -369,6 +388,9 @@
       "admitted": 2
     },
     "instrument_limited": false
+  },
+  "evidence": {
+    "active": false
   },
   "proposal_summary": {
     "stable_families": [
@@ -471,7 +493,7 @@
       "structural": {
         "passed": true,
         "reason": "",
-        "jaccard_base": 0.0475
+        "jaccard_base": 0.043
       },
       "harmlessness": {
         "passed": true,
@@ -1077,7 +1099,7 @@
       "structural": {
         "passed": true,
         "reason": "",
-        "jaccard_base": 0.0259
+        "jaccard_base": 0.0221
       },
       "harmlessness": {
         "passed": true,
@@ -1795,7 +1817,7 @@
   },
   "ledger_integrity": {
     "valid": true,
-    "records": 8,
+    "records": 9,
     "broken_at": null,
     "reason": ""
   },
@@ -1819,7 +1841,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "8915d61c71b9",
+          "digest": "54d87855f1a7",
           "payload": {
             "stages": [
               "validate",
@@ -1840,7 +1862,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "00b049063521f76b",
+            "source_digest": "9c2c66f5ab64588c",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2077,11 +2099,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "0a3e8fbe9c27"
+      "digest": "42bd086ad004"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "0a3e8fbe9c27",
+      "current_digest": "42bd086ad004",
       "first_manifest": true,
       "changed": [
         "G",

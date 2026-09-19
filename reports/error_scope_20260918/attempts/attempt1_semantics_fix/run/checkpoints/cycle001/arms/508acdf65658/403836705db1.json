@@ -1,0 +1,170 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/077.json",
+    "gold": false,
+    "prediction": null,
+    "state": "verified_clean",
+    "authority": "degraded_judge_only",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/077.json",
+      "state": "verified_clean",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+            "correct_result": "Undecided on the record: the trajectory's own tool observations conflict, naming both Vittoria Colizza (event_002, event_003) and Danielle Bassett (event_005) as the 2017 recipient; the delivered answer agrees with the observations in event_002 and event_003, so under the conflicted-observations rule it cannot be convicted from outside knowledge."
+          },
+          "blocking_facts": [
+            {
+              "component": "recall",
+              "code": "recall_unavailable",
+              "error_type": "truncated_output",
+              "error": "output truncated at max_tokens (8192 tokens)"
+            }
+          ]
+        },
+        "authority_failure_reasons": [
+          {
+            "component": "recall",
+            "code": "recall_unavailable",
+            "error_type": "truncated_output",
+            "error": "output truncated at max_tokens (8192 tokens)"
+          }
+        ],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+          "correct_result": "Undecided on the record: the trajectory's own tool observations conflict, naming both Vittoria Colizza (event_002, event_003) and Danielle Bassett (event_005) as the 2017 recipient; the delivered answer agrees with the observations in event_002 and event_003, so under the conflicted-observations rule it cannot be convicted from outside knowledge.",
+          "basis": "observation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The final answer must state the correct name of the recipient of the 2017 Erdős–Rényi Prize."
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "provider_error",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2702,
+            "completion_tokens": 2509,
+            "total_tokens": 5211,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2303
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2303
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "input_tokens": 2702,
+            "output_tokens": 2509
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.\",\n  \"correct_result\": \"Undecided on this record: the trajectory's own tool observations conflict on the same point (e",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "recall",
+          "code": "recall_unavailable",
+          "error_type": "truncated_output",
+          "error": "output truncated at max_tokens (8192 tokens)"
+        }
+      ],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": null,
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "36ea11200f9869a90b9a8ba41c65791896b50377222bd67df92afc3b8c1c8acc",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 6
+    },
+    "backend": "detector"
+  },
+  "row_hash": "ea767fc75673"
+}

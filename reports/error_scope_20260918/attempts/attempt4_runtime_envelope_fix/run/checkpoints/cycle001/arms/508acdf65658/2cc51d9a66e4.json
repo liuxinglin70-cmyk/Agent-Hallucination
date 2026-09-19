@@ -1,0 +1,508 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Camel/054.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Camel/054.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_005",
+      "responsible_step": 5,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_005",
+        "responsible_step": 5,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 6,
+            "traced_step": 5,
+            "defense": "substantiated",
+            "confirmed_step": 6,
+            "delivered_result": "Most deshielded: α-protons next to the carbonyl group (quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (doublet due to coupling with one adjacent proton).",
+            "correct_result": "H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation; methyl isoamyl ketone gives isoamyl acetate (CH3COOCH2CH2CH(CH3)2). Most deshielded hydrogens: O-CH2 protons (~4.1 ppm), triplet (coupled to the adjacent CH2). Second most deshielded hydrogens: acetyl methyl CH3COO- (~2.0 ppm), singlet (no vicinal protons across the carbonyl).",
+            "judge_basis": "world_knowledge",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 6,
+          "hallucination_reason": "The Developer Agent submits an answer built on an unverified human assertion (per grounding rule 3, not an environment fact) that the product 'retains the original ketone' with a transient peroxide alkoxy oxygen, when H2O2/BF3 in ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate, whose most deshielded protons (O-CH2, ~4.1 ppm) appear as a triplet and whose second most deshielded protons (acetyl CH3, ~2.0 ppm) appear as a singlet — so the delivered quartet/doublet assignment is chemically wrong and even internally inconsistent (a ketone-retaining product cannot contain a peroxide-formed alkoxy oxygen, and no α-protons in 5-methyl-2-hexanone have three adjacent protons to give a quartet).",
+          "delivered_result": "Most deshielded: α-protons next to the carbonyl group (quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (doublet due to coupling with one adjacent proton).",
+          "correct_result": "H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation; methyl isoamyl ketone gives isoamyl acetate (CH3COOCH2CH2CH(CH3)2). Most deshielded hydrogens: O-CH2 protons (~4.1 ppm), triplet (coupled to the adjacent CH2). Second most deshielded hydrogens: acetyl methyl CH3COO- (~2.0 ppm), singlet (no vicinal protons across the carbonyl).",
+          "basis": "world_knowledge",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_003",
+            "event_005",
+            "event_006"
+          ],
+          "root_cause": {
+            "step": 6,
+            "quote": "Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).",
+            "referent": "Baeyer–Villiger product isoamyl acetate: most deshielded = O-CH2 protons appearing as a triplet; second most deshielded = acetyl CH3 protons appearing as a singlet"
+          },
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Consult the human user via ask_human_via_console, determine the confirmed product structure from the reaction, then identify and report the splitting patterns of the most and second most deshielded protons"
+            },
+            {
+              "kind": "exact_form",
+              "requirement": "Output as: 'Most deshielded: [describe environment, splitting pattern]. Second most deshielded: [describe environment, splitting pattern].'"
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "Correct multiplicities for the actual product (Baeyer–Villiger ester, isoamyl acetate): most deshielded = triplet (O-CH2), second most deshielded = singlet (acetyl CH3)"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 5,
+          "quote": "The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Therefore, the most deshielded hydrogens should be assigned to the α-protons next to the carbonyl (which will appear in the NMR as a quartet due to three adjacent protons). The second most deshielded set should be taken as the methylene group next to the alkoxy-like oxygen formed transiently during peroxide coordination (which will appear as a doublet).",
+          "referent": "H2O2/BF3 in diethyl ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate; the most deshielded hydrogens are the O-CH2 protons (~4.1 ppm, triplet) and the second most deshielded are the acetyl CH3 protons (~2.0 ppm, singlet). The unverified human assertion of ketone retention should have been rejected as not an environment fact.",
+          "evidence_refs": [
+            "event_003",
+            "event_005",
+            "event_006"
+          ],
+          "reason": "Event_005 is the first assistant-authored step that adopts and asserts the false premise (ketone retention with a transient alkoxy oxygen) as the basis for analysis; event_006 merely delivers the resulting wrong answer, and the event_003 observation itself is user input, not an assistant error."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 6,
+          "evidence_refs": [
+            "event_006",
+            "event_003"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: event_006 delivers 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).' The required referent is the actual reaction product: H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation, converting methyl isoamyl ketone (5-methyl-2-hexanone) to isoamyl acetate, whose most deshielded protons are the O-CH2 (~4.1 ppm, triplet) and second most deshielded are the acetyl CH3 (~2.0 ppm, singlet). The delivered quartet/doublet assignment is chemically wrong and internally incoherent: a ketone-retaining product cannot contain a 'peroxide-formed alkoxy oxygen,' and no α-proton set in 5-methyl-2-hexanone has three adjacent protons to give a quartet (CO-CH3 is a singlet; CO-CH2 is a triplet). The answer merely repeats the unverified console-human assertion at event_003 ('You may assume the product retains the original ketone...'), which under grounding rule 3 is an assertion, not an environment fact, so repetition does not make the delivered result correct. RELEVANCE TEST: event_006 is the trajectory's final answer (last_prose_event_id=event_006) and the first assistant-authored delivery of the wrong result; the earlier events only ask and document the human claim. Correcting event_006 to the Baeyer–Villiger product's triplet/singlet assignments makes the sole deliverable correct, and no later correction exists in the shown trajectory."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 6,
+              "reason": "The Developer Agent submits an answer built on an unverified human assertion (per grounding rule 3, not an environment fact) that the product 'retains the original ketone' with a transient peroxide alkoxy oxygen, when H2O2/BF3 in ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate, whose most deshielded protons (O-CH2, ~4.1 ppm) appear as a triplet and whose second most deshielded protons (acetyl CH3, ~2.0 ppm) appear as a singlet — so the delivered quartet/doublet assignment is chemically wrong and even internally inconsistent (a ketone-retaining product cannot contain a peroxide-formed alkoxy oxygen, and no α-protons in 5-methyl-2-hexanone have three adjacent protons to give a quartet).",
+              "evidence_refs": [
+                "event_003",
+                "event_005",
+                "event_006"
+              ],
+              "quote": "Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).",
+              "delivered_result": "Most deshielded: α-protons next to the carbonyl group (quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (doublet due to coupling with one adjacent proton).",
+              "correct_result": "H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation; methyl isoamyl ketone gives isoamyl acetate (CH3COOCH2CH2CH(CH3)2). Most deshielded hydrogens: O-CH2 protons (~4.1 ppm), triplet (coupled to the adjacent CH2). Second most deshielded hydrogens: acetyl methyl CH3COO- (~2.0 ppm), singlet (no vicinal protons across the carbonyl)."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 5,
+                "quote": "The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Therefore, the most deshielded hydrogens should be assigned to the α-protons next to the carbonyl (which will appear in the NMR as a quartet due to three adjacent protons). The second most deshielded set should be taken as the methylene group next to the alkoxy-like oxygen formed transiently during peroxide coordination (which will appear as a doublet).",
+                "referent": "H2O2/BF3 in diethyl ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate; the most deshielded hydrogens are the O-CH2 protons (~4.1 ppm, triplet) and the second most deshielded are the acetyl CH3 protons (~2.0 ppm, singlet). The unverified human assertion of ketone retention should have been rejected as not an environment fact.",
+                "evidence_refs": [
+                  "event_003",
+                  "event_005",
+                  "event_006"
+                ],
+                "reason": "Event_005 is the first assistant-authored step that adopts and asserts the false premise (ketone retention with a transient alkoxy oxygen) as the basis for analysis; event_006 merely delivers the resulting wrong answer, and the event_003 observation itself is user input, not an assistant error."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2125,
+                  "completion_tokens": 485,
+                  "total_tokens": 2610,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 1920
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 161
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 1920
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 161
+                  },
+                  "input_tokens": 2125,
+                  "output_tokens": 485
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"step\": 5,\n  \"quote\": \"The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Therefore, the most deshielded hydrogens should be assigned to the α-protons next to the carbonyl (which will appear in the NMR as a quartet due to th"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 6,
+                "reason": "The Developer Agent submits an answer built on an unverified human assertion (per grounding rule 3, not an environment fact) that the product 'retains the original ketone' with a transient peroxide alkoxy oxygen, when H2O2/BF3 in ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate, whose most deshielded protons (O-CH2, ~4.1 ppm) appear as a triplet and whose second most deshielded protons (acetyl CH3, ~2.0 ppm) appear as a singlet — so the delivered quartet/doublet assignment is chemically wrong and even internally inconsistent (a ketone-retaining product cannot contain a peroxide-formed alkoxy oxygen, and no α-protons in 5-methyl-2-hexanone have three adjacent protons to give a quartet).",
+                "delivered_result": "Most deshielded: α-protons next to the carbonyl group (quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (doublet due to coupling with one adjacent proton).",
+                "correct_result": "H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation; methyl isoamyl ketone gives isoamyl acetate (CH3COOCH2CH2CH(CH3)2). Most deshielded hydrogens: O-CH2 protons (~4.1 ppm), triplet (coupled to the adjacent CH2). Second most deshielded hydrogens: acetyl methyl CH3COO- (~2.0 ppm), singlet (no vicinal protons across the carbonyl).",
+                "evidence_refs": [
+                  "event_003",
+                  "event_005",
+                  "event_006"
+                ],
+                "contracts": [
+                  {
+                    "kind": "required_action",
+                    "requirement": "Consult the human user via ask_human_via_console, determine the confirmed product structure from the reaction, then identify and report the splitting patterns of the most and second most deshielded protons"
+                  },
+                  {
+                    "kind": "exact_form",
+                    "requirement": "Output as: 'Most deshielded: [describe environment, splitting pattern]. Second most deshielded: [describe environment, splitting pattern].'"
+                  },
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Correct multiplicities for the actual product (Baeyer–Villiger ester, isoamyl acetate): most deshielded = triplet (O-CH2), second most deshielded = singlet (acetyl CH3)"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton)."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_006 delivers 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).' The required referent is the actual reaction product: H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation, converting methyl isoamyl ketone (5-methyl-2-hexanone) to isoamyl acetate, whose most deshielded protons are the O-CH2 (~4.1 ppm, triplet) and second most deshielded are the acetyl CH3 (~2.0 ppm, singlet). The delivered quartet/doublet assignment is chemically wrong and internally incoherent: a ketone-retaining product cannot contain a 'peroxide-formed alkoxy oxygen,' and no α-proton set in 5-methyl-2-hexanone has three adjacent protons to give a quartet (CO-CH3 is a singlet; CO-CH2 is a triplet). The answer merely repeats the unverified console-human assertion at event_003 ('You may assume the product retains the original ketone...'), which under grounding rule 3 is an assertion, not an environment fact, so repetition does not make the delivered result correct. RELEVANCE TEST: event_006 is the trajectory's final answer (last_prose_event_id=event_006) and the first assistant-authored delivery of the wrong result; the earlier events only ask and document the human claim. Correcting event_006 to the Baeyer–Villiger product's triplet/singlet assignments makes the sole deliverable correct, and no later correction exists in the shown trajectory."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_006 delivers 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).' The required referent is the actual reaction product: H2O2/BF3 in diethyl ether is a Baeyer–Villiger oxidation, converting methyl isoamyl ketone (5-methyl-2-hexanone) to isoamyl acetate, whose most deshielded protons are the O-CH2 (~4.1 ppm, triplet) and second most deshielded are the acetyl CH3 (~2.0 ppm, singlet). The delivered quartet/doublet assignment is chemically wrong and internally incoherent: a ketone-retaining product cannot contain a 'peroxide-formed alkoxy oxygen,' and no α-proton set in 5-methyl-2-hexanone has three adjacent protons to give a quartet (CO-CH3 is a singlet; CO-CH2 is a triplet). The answer merely repeats the unverified console-human assertion at event_003 ('You may assume the product retains the original ketone...'), which under grounding rule 3 is an assertion, not an environment fact, so repetition does not make the delivered result correct. RELEVANCE TEST: event_006 is the trajectory's final answer (last_prose_event_id=event_006) and the first assistant-authored delivery of the wrong result; the earlier events only ask and document the human claim. Correcting event_006 to the Baeyer–Villiger product's triplet/singlet assignments makes the sole deliverable correct, and no later correction exists in the shown trajectory."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "No external evidence snapshot was provided, so the Baeyer–Villiger outcome (isoamyl acetate, O-CH2 triplet / acetyl CH3 singlet) rests on standard chemistry knowledge rather than a snapshot source. The conviction does not depend on any unsettled conflict: the delivered answer is impossible even under the trajectory's own asserted ketone-retaining structure, since 5-methyl-2-hexanone has no α-protons with three adjacent protons (CH3CO is adjacent to zero H; COCH2 is adjacent to two H) and a ketone-retaining product contains no peroxide-formed alkoxy oxygen.",
+                  "reason": "CONTENT TEST: event_006 delivers 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).' This merely repeats the unverified console human assertion at event_003 ('the product retains the original ketone... quartet due to three adjacent protons... doublet'), which per grounding rule 3 is an assertion, not an environment fact, so repetition does not make it correct. It is in fact wrong: H2O2/BF3 in ether performs a Baeyer–Villiger oxidation of methyl isoamyl ketone to isoamyl acetate, whose most deshielded protons (O-CH2, ~4.1 ppm) are a triplet and whose second most deshielded protons (acetyl CH3, ~2.0 ppm) are a singlet. The delivered assignment is also internally incoherent under any structure: it simultaneously retains a carbonyl ketone and a peroxide-formed alkoxy oxygen in one product, and neither candidate structure yields a quartet-from-three-adjacent-protons (the named ketone's α positions have 0 or 2 adjacent protons) or an O-adjacent CH2 coupled to only one proton. RELEVANCE TEST: event_006 is the last prose event and the delivered answer (no other deliverables or later corrections exist); replacing it with the correct triplet/singlet assignment makes every deliverable correct. Steps 004–005 only document the human input as notes and do not submit the answer, so step 6 is the earliest assistant-authored locus of the delivered wrong result."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_006 delivers: 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with three adjacent protons). Second most deshielded: methylene group next to the alkoxy-like oxygen formed by peroxide coordination (appear as a doublet due to coupling with one adjacent proton).' This answer merely repeats the human console assertion at event_003, which under grounding rule 3 is an unverified user assertion, not an environment fact, so it cannot make the delivered result correct. The chemistry is a public fact no tool observation addresses: H2O2/BF3 in diethyl ether is a standard Baeyer–Villiger oxidation system, converting methyl isoamyl ketone (5-methyl-2-hexanone) to isoamyl acetate, whose most deshielded protons are the O-CH2 (~4.1 ppm) as a triplet and whose second most deshielded protons are the acetyl CH3 (~2.0 ppm) as a singlet. The delivered assignment is also internally inconsistent under its own premise: a ketone-retaining product cannot contain an 'alkoxy-like oxygen formed by peroxide coordination,' and no α-proton set in 5-methyl-2-hexanone has three adjacent protons to give a quartet (α-CH3 is a singlet across the C=O; α-CH2 couples to two protons). RESULT ERROR is factually real. RELEVANCE TEST: event_006 is the final delivered prose (last_prose_event_id=event_006) and the first assistant-authored submission of the wrong answer as the result; correcting it to the triplet/singlet assignment for isoamyl acetate makes the only deliverable — the final answer to the NMR question — correct, with no later correction present. No external snapshot is needed since no environment observation bears on the chemistry."
+                }
+              ],
+              "provider": {
+                "attempts": 2,
+                "usage": {
+                  "prompt_tokens": 2826,
+                  "completion_tokens": 2900,
+                  "total_tokens": 5726,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 2752
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2430
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 2752
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2430
+                  },
+                  "input_tokens": 2826,
+                  "output_tokens": 2900
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_006 delivers: 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with thr",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 4,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2685,
+            "completion_tokens": 4675,
+            "total_tokens": 7360,
+            "prompt_tokens_details": {
+              "cached_tokens": 2624
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3865
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3865
+            },
+            "input_tokens_details": {
+              "cached_tokens": 2624
+            },
+            "input_tokens": 2685,
+            "output_tokens": 4675
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":5,\"hallucination_step_note\":null,\"hallucination_reason\":\"The agent adopted the user console message's unverified and chemically false assertion that the product retains the ketone, instead of the Baeyer–Villiger ester actually formed by H2O2/BF3 oxidatio",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2125,
+            "completion_tokens": 485,
+            "total_tokens": 2610,
+            "prompt_tokens_details": {
+              "cached_tokens": 1920
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 161
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1920
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 161
+            },
+            "input_tokens": 2125,
+            "output_tokens": 485
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"step\": 5,\n  \"quote\": \"The user clarified that the product retains the original ketone rather than undergoing full Baeyer–Villiger rearrangement. Therefore, the most deshielded hydrogens should be assigned to the α-protons next to the carbonyl (which will appear in the NMR as a quartet due to th"
+        },
+        "defense": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 2826,
+            "completion_tokens": 2900,
+            "total_tokens": 5726,
+            "prompt_tokens_details": {
+              "cached_tokens": 2752
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2430
+            },
+            "input_tokens_details": {
+              "cached_tokens": 2752
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2430
+            },
+            "input_tokens": 2826,
+            "output_tokens": 2900
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_003\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_006 delivers: 'Most deshielded: α-protons next to the carbonyl group (appear as a quartet due to coupling with thr",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "719140e3551bf11c0c1d03b5b3d42beaea6986d30d033321663cbf4f18d38e3d",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 6
+    },
+    "backend": "detector"
+  },
+  "row_hash": "f97694785b0f"
+}

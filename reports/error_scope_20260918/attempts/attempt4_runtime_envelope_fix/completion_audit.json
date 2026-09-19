@@ -1,0 +1,107 @@
+{
+  "attempt": "attempt4_runtime_envelope_fix",
+  "terminal_states": [
+    "blocked_evaluation_preflight"
+  ],
+  "authorized_cycles": 2,
+  "frozen_detector_config": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/frozen/detector-config-autodl.json",
+  "change_under_test": {
+    "files": [
+      "detector\\configs\\autodl.json",
+      "detector\\semantics.py",
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py",
+      "tests\\test_repository.py"
+    ],
+    "changed_since_previous_protocol": [
+      "detector\\configs\\autodl.json"
+    ],
+    "declared_by_attempt": [
+      "detector\\semantics.py",
+      "evolution\\backends.py",
+      "evolution\\tests\\test_concurrent_cache.py",
+      "tests\\test_repository.py"
+    ],
+    "summary": "Attempts 1-3's fixes, plus runtime envelopes sized from a measurement instead of a guess. Measured with scripts/diagnostic_019_timing.py: SmolAgents/019 needs 1480 s end to end with generous per-call budgets. At the 900 s case deadline its judge votes consumed the whole budget with two 480 s call timeouts, the tracer and defense never started, and the row resolved non-authoritative, which froze the defect-injection audit because it must not certify a gate rejection it could not score. Raised: case deadline 900->3600, per-attempt 240->300, per-call total 480->900, and (in this attempt's config only) the cycle deadline 7200->14400, since that case appears in three sequential arm evaluations per cycle. These are fail-closed bounding envelopes: they can only convert an unmeasurable row into a measured one and cannot change any admission threshold, gate, split, seed or label."
+  },
+  "source_check": {
+    "tree_validated": true,
+    "frozen_source_matches_tree": true,
+    "mismatched_files": []
+  },
+  "fixed_fields": {
+    "gates": true,
+    "split": true
+  },
+  "budget_deviation": {
+    "cycle_timeout_seconds": {
+      "attempt": 14400,
+      "baseline": 7200
+    }
+  },
+  "declared_envelope_overrides": [
+    "cycle_timeout_seconds"
+  ],
+  "ledger": {
+    "valid": true,
+    "records": 6,
+    "broken_at": null,
+    "reason": ""
+  },
+  "baseline_arm": "508acdf65658",
+  "baseline_arm_rows": 30,
+  "preflight_recorded": {
+    "sentinel": {
+      "protected_tp": 2,
+      "protected_tn": 2,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": true,
+      "reason": ""
+    },
+    "blocked_families": [
+      {
+        "failure_family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93",
+        "polarity": "recall",
+        "status": "not_evaluated",
+        "reason": "no repair opportunities in gain"
+      }
+    ],
+    "gain_opportunity": {
+      "recall": 0,
+      "precision": 0
+    },
+    "reason": "no diagnosed failure direction has repair opportunities in gain"
+  },
+  "preflight_block_reason": "no diagnosed failure direction has repair opportunities in gain",
+  "sentinel_blocked": false,
+  "gain_opportunity": {
+    "recall": 0,
+    "precision": 0
+  },
+  "preflight_recomputed": {
+    "protected_tp": 2,
+    "protected_tn": 2,
+    "minimum": {
+      "protected_tp": 2,
+      "protected_tn": 2
+    },
+    "evaluable": true,
+    "reason": ""
+  },
+  "preflight_agrees": true,
+  "archive_complete": true,
+  "checks": {
+    "frozen_detector_config_matches_protocol": true,
+    "source_matches_tree_or_historical": true,
+    "gates_and_split_unchanged": true,
+    "budget_deviations_declared": true,
+    "ledger_valid": true,
+    "preflight_recomputed_agrees": true,
+    "archive_complete": true,
+    "terminal_state_protocol_legal": true
+  },
+  "passed": true
+}

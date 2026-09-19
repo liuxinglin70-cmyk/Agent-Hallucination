@@ -1,0 +1,511 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Magentic_One/093.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Magentic_One/093.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_018",
+      "responsible_step": 18,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_018",
+        "responsible_step": 18,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 18,
+            "traced_step": 18,
+            "defense": "substantiated",
+            "confirmed_step": 18,
+            "delivered_result": "50",
+            "correct_result": "62",
+            "judge_basis": "derivation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 18,
+          "hallucination_reason": "The orchestrator's final answer asserts a+b+c = 50, overriding the correct value 62 (a=3, b=57, c=2, from y=(3-√57)/2) that the Coder had correctly stated in event_017 and that independent derivation confirms.",
+          "delivered_result": "50",
+          "correct_result": "62",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_017",
+            "event_018"
+          ],
+          "root_cause": {
+            "step": 18,
+            "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+            "referent": "a = 3, b = 57, c = 2, so a + b + c = 62"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Find a+b+c where the y-coordinate of the unique fourth-quadrant intersection of y=x^2-4 and its 60° CCW rotated image is (a-√b)/c with a, c coprime positive integers; the correct y-coordinate is (3-√57)/2, giving a+b+c = 3+57+2 = 62"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 18,
+          "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+          "referent": "The value of \\( a + b + c \\) is \\(\\boxed{62}\\), since a = 3, b = 57, c = 2 (as correctly stated in event_017 from y = (3 - \\sqrt{57})/2).",
+          "evidence_refs": [
+            "event_017",
+            "event_018"
+          ],
+          "reason": "The wrong value 50 first appears in the orchestrator's final answer at step 18, which contradicts the correct sum 62 (a=3, b=57, c=2) that the Coder had already delivered in event_017, so step 18 is the earliest introduction of the error."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 18,
+          "evidence_refs": [
+            "event_017",
+            "event_018"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "event_018 states 'The value of a + b + c is \\boxed{50}', while event_017 (the Coder's derivation, which the orchestrator explicitly requested in event_016) gives a=3, b=57, c=2, sum 62. Independent check: substituting x≈1.316 (so y=(3-√57)/2≈-2.27) into the intersection quartic 3x⁴+2√3x³-25x²-6√3x+40=0 gives ≈0, confirming 62 is correct and 50 is a result error in the delivered final answer. No later correction exists; event_018 is the final prose event."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 18,
+              "reason": "The orchestrator's final answer asserts a+b+c = 50, overriding the correct value 62 (a=3, b=57, c=2, from y=(3-√57)/2) that the Coder had correctly stated in event_017 and that independent derivation confirms.",
+              "evidence_refs": [
+                "event_017",
+                "event_018"
+              ],
+              "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+              "delivered_result": "50",
+              "correct_result": "62"
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 18,
+                "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+                "referent": "The value of \\( a + b + c \\) is \\(\\boxed{62}\\), since a = 3, b = 57, c = 2 (as correctly stated in event_017 from y = (3 - \\sqrt{57})/2).",
+                "evidence_refs": [
+                  "event_017",
+                  "event_018"
+                ],
+                "reason": "The wrong value 50 first appears in the orchestrator's final answer at step 18, which contradicts the correct sum 62 (a=3, b=57, c=2) that the Coder had already delivered in event_017, so step 18 is the earliest introduction of the error."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 6591,
+                  "completion_tokens": 619,
+                  "total_tokens": 7210,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 448
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 423
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 423
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 448
+                  },
+                  "input_tokens": 6591,
+                  "output_tokens": 619
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 18,\n  \"quote\": \"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).\",\n  \"referent\": \"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{62}\\\\), since a = 3, b = 57, c = 2 (as correctly stated in event_017 from y = (3 - \\\\sqrt{57})/2).\",\n  \"evidence_refs\": [\"event_017\", \"event_018\"],\n  \"reaso"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 18,
+                "reason": "The orchestrator's final answer asserts a+b+c = 50, overriding the correct value 62 (a=3, b=57, c=2, from y=(3-√57)/2) that the Coder had correctly stated in event_017 and that independent derivation confirms.",
+                "delivered_result": "50",
+                "correct_result": "62",
+                "evidence_refs": [
+                  "event_017",
+                  "event_018"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Find a+b+c where the y-coordinate of the unique fourth-quadrant intersection of y=x^2-4 and its 60° CCW rotated image is (a-√b)/c with a, c coprime positive integers; the correct y-coordinate is (3-√57)/2, giving a+b+c = 3+57+2 = 62"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\)."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015",
+                  "event_016",
+                  "event_017",
+                  "event_018"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 18,
+                "evidence_refs": [
+                  "event_017",
+                  "event_018"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "event_018 states 'The value of a + b + c is \\boxed{50}', while event_017 (the Coder's derivation, which the orchestrator explicitly requested in event_016) gives a=3, b=57, c=2, sum 62. Independent check: substituting x≈1.316 (so y=(3-√57)/2≈-2.27) into the intersection quartic 3x⁴+2√3x³-25x²-6√3x+40=0 gives ≈0, confirming 62 is correct and 50 is a result error in the delivered final answer. No later correction exists; event_018 is the final prose event."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 18,
+                  "evidence_refs": [
+                    "event_017",
+                    "event_018"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "event_018 states 'The value of a + b + c is \\boxed{50}', while event_017 (the Coder's derivation, which the orchestrator explicitly requested in event_016) gives a=3, b=57, c=2, sum 62. Independent check: substituting x≈1.316 (so y=(3-√57)/2≈-2.27) into the intersection quartic 3x⁴+2√3x³-25x²-6√3x+40=0 gives ≈0, confirming 62 is correct and 50 is a result error in the delivered final answer. No later correction exists; event_018 is the final prose event."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 18,
+                  "evidence_refs": [
+                    "event_018",
+                    "event_017"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_018 (the trajectory's final prose event) delivers 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\)', but the correct value is 62. Independent derivation: rotating y=x²−4 by 60° CCW, a point (x,y) on the original parabola lies on the image iff its −60° rotation lies on the original, giving 3x⁴+2√3x³−25x²−6√3x+40=0, which factors as (x²+√3x−4)(3x²−√3x−10)=0. The only Q4 root is x=(−√3+√19)/2, so y=x²−4=(3−√57)/2, i.e. a=3, b=57, c=2 and a+b+c=62 — exactly what the Coder stated in event_017 ('a = 3, b = 57, c = 2 ... 3 + 57 + 2 = \\boxed{62}'). The orchestrator's 50 is a RESULT ERROR on the final deliverable and directly overrides a correct, observation-backed answer. RELEVANCE TEST: event_018 is the last prose event and the claim of completion; correcting it to 62 makes every deliverable correct, since the Coder at event_017 already stated the right values and no later event exists to repair or repeat the error."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 18,
+                  "evidence_refs": [
+                    "event_018",
+                    "event_017"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_018, the last prose event and delivered final answer, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct referent is 62: the Coder stated a=3, b=57, c=2 with a+b+c=62 in event_017, and independent derivation confirms it — rotating y=x²-4 by 60° CCW and intersecting with the original yields 3x⁴-25x²+40+2√3x(x²-3)=0; the fourth-quadrant root has x²=(11-√57)/2, so y=x²-4=(3-√57)/2, giving a=3, b=57, c=2, gcd(3,2)=1, sum=62 (numerically y≈-2.2749 matches (3-√57)/2, not e.g. (3-√45)/2≈-1.854 which would give 50). The deviation 50≠62 is factually real. RELEVANCE TEST: event_018 IS the delivered result (last_prose_event_id=event_018); correcting it to 62 makes every deliverable correct, since event_017 already carries the right value and no later event repairs or repeats the error. This is a RESULT ERROR on the required final deliverable, material by definition."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2085,
+                  "completion_tokens": 6663,
+                  "total_tokens": 8748,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 2048
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 6276
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 2048
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 6276
+                  },
+                  "input_tokens": 2085,
+                  "output_tokens": 6663
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 18,\n  \"evidence_refs\": [\"event_018\", \"event_017\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_018, the last prose event and delivered final answer, states 'The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\)",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 2,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_016",
+                  "event_017",
+                  "event_018"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 5,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 5,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 7456,
+            "completion_tokens": 8979,
+            "total_tokens": 16435,
+            "prompt_tokens_details": {
+              "cached_tokens": 7424
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 8613
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 8613
+            },
+            "input_tokens_details": {
+              "cached_tokens": 7424
+            },
+            "input_tokens": 7456,
+            "output_tokens": 8979
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":18,\"hallucination_reason\":\"The orchestrator's final answer asserts a+b+c=50, contradicting both the correct value 62 and the trajectory's own correct derivation at event_017 (a=3, b=57, c=2).\",\"delivered_result\":\"a + b + c = 50\",\"correct_result\":\"a + b +",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 6591,
+            "completion_tokens": 619,
+            "total_tokens": 7210,
+            "prompt_tokens_details": {
+              "cached_tokens": 448
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 423
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 423
+            },
+            "input_tokens_details": {
+              "cached_tokens": 448
+            },
+            "input_tokens": 6591,
+            "output_tokens": 619
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 18,\n  \"quote\": \"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).\",\n  \"referent\": \"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{62}\\\\), since a = 3, b = 57, c = 2 (as correctly stated in event_017 from y = (3 - \\\\sqrt{57})/2).\",\n  \"evidence_refs\": [\"event_017\", \"event_018\"],\n  \"reaso"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2085,
+            "completion_tokens": 6663,
+            "total_tokens": 8748,
+            "prompt_tokens_details": {
+              "cached_tokens": 2048
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6276
+            },
+            "input_tokens_details": {
+              "cached_tokens": 2048
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 6276
+            },
+            "input_tokens": 2085,
+            "output_tokens": 6663
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 18,\n  \"evidence_refs\": [\"event_018\", \"event_017\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_018, the last prose event and delivered final answer, states 'The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\)",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 2,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "87b3f541c80426c1164a16d05adc00ba2859f89bd7652b2529e6312422b3fc36",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 18
+    },
+    "backend": "detector"
+  },
+  "row_hash": "032e50dcb270"
+}

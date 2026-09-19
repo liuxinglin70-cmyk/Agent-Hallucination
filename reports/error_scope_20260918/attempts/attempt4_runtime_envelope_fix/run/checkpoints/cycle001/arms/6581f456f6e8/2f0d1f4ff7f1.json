@@ -1,0 +1,489 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "SmolAgents/019.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "SmolAgents/019.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "POCl3 at +35 to +48 ppm; monoalkylphosphorodichloridate as a single signal at +10 to +25 ppm; dialkylphosphorochloridate as a single signal ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with only 'possibly' two closely spaced singlets for diastereomers, otherwise a single peak.",
+            "correct_result": "POCl3 appears near +3 to +5 ppm; the monoalkylphosphorodichloridate from an enantiopure chiral alcohol is a pair of diastereomers at phosphorus and shows two 31P signals; after the second chiral alcohol the dialkylphosphorochloridate likewise shows two diastereomeric signals; after hydrolysis the final dialkylphosphate, being a mixture of two diastereomers (two different chiral alcohols), is expected to show two singlets in the 31P NMR spectrum.",
+            "judge_basis": "world_knowledge",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (it actually appears near +3 to +5 ppm, and the answer even calls it the 'high-field' peak, contradicting its own number), and it claims a single signal for the chiral monoalkylphosphorodichloridate intermediate and only 'possibly' two peaks for the final product, when substitution of one Cl by an enantiopure chiral alcohol makes phosphorus a stereocenter so each chiral intermediate and the final dialkylphosphate exist as two diastereomers expected to give two 31P singlets.",
+          "delivered_result": "POCl3 at +35 to +48 ppm; monoalkylphosphorodichloridate as a single signal at +10 to +25 ppm; dialkylphosphorochloridate as a single signal ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with only 'possibly' two closely spaced singlets for diastereomers, otherwise a single peak.",
+          "correct_result": "POCl3 appears near +3 to +5 ppm; the monoalkylphosphorodichloridate from an enantiopure chiral alcohol is a pair of diastereomers at phosphorus and shows two 31P signals; after the second chiral alcohol the dialkylphosphorochloridate likewise shows two diastereomeric signals; after hydrolysis the final dialkylphosphate, being a mixture of two diastereomers (two different chiral alcohols), is expected to show two singlets in the 31P NMR spectrum.",
+          "basis": "world_knowledge",
+          "confidence": "medium",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.",
+            "referent": "POCl3 near +3 to +5 ppm; each chiral phosphorus center (monoalkyl- and dialkylphosphorochloridate and final dialkylphosphate) gives two diastereomeric 31P signals, with the final product expected to show two singlets."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Correct expected 31P NMR signals (number of peaks and approximate chemical shifts) for POCl3, the chiral intermediates, and the final dialkylphosphate over the reaction course"
+            },
+            {
+              "kind": "verbatim_content",
+              "requirement": "Describe the proton-decoupled 31P NMR spectral evolution, including the diastereomeric signal pattern arising from the two different enantiopure chiral alcohols"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.",
+          "referent": "POCl3 resonates near +3 to +5 ppm; because substitution of one Cl by an enantiopure chiral alcohol makes phosphorus a stereocenter, the monoalkylphosphorodichloridate intermediate (and likewise the dialkylphosphorochloridate and the final dialkylphosphate from two different chiral alcohols) each exist as two diastereomers expected to give two 31P singlets.",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "Events 001-003 contain only a plan and search queries/observations with no asserted shift values or signal counts, so event_004 (the final answer) is the first assistant-authored step introducing the wrong POCl3 shift (+35 to +48 ppm instead of ~+3 to +5) and the single/'possibly two' peak description instead of two diastereomeric singlets for each chiral phosphorus intermediate and product."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: event_004's final answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its table lists POCl3 at '+35 to +48'. The correct referent is ~+3 to +5 ppm for POCl3 (public chemical fact no observation in the trajectory addresses — the searches in event_002/event_003 returned no POCl3 shift value, so the specific range and the '+38 ppm in CDCl3' figure are ungrounded fabrications). The answer is also internally contradictory on its face: it calls POCl3 'the high-field POCl3 peak' while assigning it the largest ppm value (most downfield) in its own table. This is a RESULT ERROR in the sole deliverable. (The verdict's secondary claim about the monoalkylphosphorodichloridate is itself chemically wrong — P bearing two identical Cl is not a stereocenter, so a single signal there is correct — but the POCl3 shift error independently stands.) RELEVANCE TEST: the final answer at event_004 is the only deliverable and is where the wrong value is first introduced; correcting step 4 (POCl3 near +3 to +5 ppm, consistent field terminology, proper diastereomer treatment) would make every deliverable correct, so the step is causally connected to what is delivered."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (it actually appears near +3 to +5 ppm, and the answer even calls it the 'high-field' peak, contradicting its own number), and it claims a single signal for the chiral monoalkylphosphorodichloridate intermediate and only 'possibly' two peaks for the final product, when substitution of one Cl by an enantiopure chiral alcohol makes phosphorus a stereocenter so each chiral intermediate and the final dialkylphosphate exist as two diastereomers expected to give two 31P singlets.",
+              "evidence_refs": [
+                "event_004"
+              ],
+              "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.",
+              "delivered_result": "POCl3 at +35 to +48 ppm; monoalkylphosphorodichloridate as a single signal at +10 to +25 ppm; dialkylphosphorochloridate as a single signal ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with only 'possibly' two closely spaced singlets for diastereomers, otherwise a single peak.",
+              "correct_result": "POCl3 appears near +3 to +5 ppm; the monoalkylphosphorodichloridate from an enantiopure chiral alcohol is a pair of diastereomers at phosphorus and shows two 31P signals; after the second chiral alcohol the dialkylphosphorochloridate likewise shows two diastereomeric signals; after hydrolysis the final dialkylphosphate, being a mixture of two diastereomers (two different chiral alcohols), is expected to show two singlets in the 31P NMR spectrum."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.",
+                "referent": "POCl3 resonates near +3 to +5 ppm; because substitution of one Cl by an enantiopure chiral alcohol makes phosphorus a stereocenter, the monoalkylphosphorodichloridate intermediate (and likewise the dialkylphosphorochloridate and the final dialkylphosphate from two different chiral alcohols) each exist as two diastereomers expected to give two 31P singlets.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "Events 001-003 contain only a plan and search queries/observations with no asserted shift values or signal counts, so event_004 (the final answer) is the first assistant-authored step introducing the wrong POCl3 shift (+35 to +48 ppm instead of ~+3 to +5) and the single/'possibly two' peak description instead of two diastereomeric singlets for each chiral phosphorus intermediate and product."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 8017,
+                  "completion_tokens": 1624,
+                  "total_tokens": 9641,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 1347
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 1347
+                  },
+                  "input_tokens": 8017,
+                  "output_tokens": 1624
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.\",\n  \"referent\": \"POCl3 resonates near +3 to +5 ppm; because substitution of one Cl "
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (it actually appears near +3 to +5 ppm, and the answer even calls it the 'high-field' peak, contradicting its own number), and it claims a single signal for the chiral monoalkylphosphorodichloridate intermediate and only 'possibly' two peaks for the final product, when substitution of one Cl by an enantiopure chiral alcohol makes phosphorus a stereocenter so each chiral intermediate and the final dialkylphosphate exist as two diastereomers expected to give two 31P singlets.",
+                "delivered_result": "POCl3 at +35 to +48 ppm; monoalkylphosphorodichloridate as a single signal at +10 to +25 ppm; dialkylphosphorochloridate as a single signal ~0 to +10 ppm; final dialkylphosphate at 0 to -5 ppm with only 'possibly' two closely spaced singlets for diastereomers, otherwise a single peak.",
+                "correct_result": "POCl3 appears near +3 to +5 ppm; the monoalkylphosphorodichloridate from an enantiopure chiral alcohol is a pair of diastereomers at phosphorus and shows two 31P signals; after the second chiral alcohol the dialkylphosphorochloridate likewise shows two diastereomeric signals; after hydrolysis the final dialkylphosphate, being a mixture of two diastereomers (two different chiral alcohols), is expected to show two singlets in the 31P NMR spectrum.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Correct expected 31P NMR signals (number of peaks and approximate chemical shifts) for POCl3, the chiral intermediates, and the final dialkylphosphate over the reaction course"
+                  },
+                  {
+                    "kind": "verbatim_content",
+                    "requirement": "Describe the proton-decoupled 31P NMR spectral evolution, including the diastereomeric signal pattern arising from the two different enantiopure chiral alcohols"
+                  }
+                ],
+                "confidence": "medium",
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_004's final answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its table lists POCl3 at '+35 to +48'. The correct referent is ~+3 to +5 ppm for POCl3 (public chemical fact no observation in the trajectory addresses — the searches in event_002/event_003 returned no POCl3 shift value, so the specific range and the '+38 ppm in CDCl3' figure are ungrounded fabrications). The answer is also internally contradictory on its face: it calls POCl3 'the high-field POCl3 peak' while assigning it the largest ppm value (most downfield) in its own table. This is a RESULT ERROR in the sole deliverable. (The verdict's secondary claim about the monoalkylphosphorodichloridate is itself chemically wrong — P bearing two identical Cl is not a stereocenter, so a single signal there is correct — but the POCl3 shift error independently stands.) RELEVANCE TEST: the final answer at event_004 is the only deliverable and is where the wrong value is first introduced; correcting step 4 (POCl3 near +3 to +5 ppm, consistent field terminology, proper diastereomer treatment) would make every deliverable correct, so the step is causally connected to what is delivered."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_004's final answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its table lists POCl3 at '+35 to +48'. The correct referent is ~+3 to +5 ppm for POCl3 (public chemical fact no observation in the trajectory addresses — the searches in event_002/event_003 returned no POCl3 shift value, so the specific range and the '+38 ppm in CDCl3' figure are ungrounded fabrications). The answer is also internally contradictory on its face: it calls POCl3 'the high-field POCl3 peak' while assigning it the largest ppm value (most downfield) in its own table. This is a RESULT ERROR in the sole deliverable. (The verdict's secondary claim about the monoalkylphosphorodichloridate is itself chemically wrong — P bearing two identical Cl is not a stereocenter, so a single signal there is correct — but the POCl3 shift error independently stands.) RELEVANCE TEST: the final answer at event_004 is the only deliverable and is where the wrong value is first introduced; correcting step 4 (POCl3 near +3 to +5 ppm, consistent field terminology, proper diastereomer treatment) would make every deliverable correct, so the step is causally connected to what is delivered."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: The deliverable at event_004 states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR' and the summary table lists 'POCl3 | +35 to +48'. The correct referent is ~+3 to +5 ppm (public fact no trajectory observation addresses, so checked against real-world knowledge; phosphoryl P(V) esters sit near 0, e.g. the event_003 search snippet shows OP(OMe)3 at 2.1 ppm, while 36.2 ppm in that same snippet belongs to a different compound, OPMe3 — the likely source of the conflation). The trajectory itself proves the delivered number is confabulated: the answer calls it 'the high-field POCl3 peak' (+35 to +48 would be downfield) and says intermediates 'appear and shift downfield' at +10 to +25 ppm while its own table places POCl3 above them, and step 2 says monoesters appear 'downfield from POCl3' — internally irreconcilable, confirming a real RESULT ERROR, not a representation difference. RELEVANCE TEST: event_004 is the sole deliverable (the final answer); the material error is introduced first there (the event_002/003 search observations contain no POCl3 value that was misquoted) and there are no later steps, so correcting step 4 makes every deliverable correct. Note: the verdict's sub-claim that the monoalkylphosphorodichloridate must show two 31P signals is chemically dubious (P bears two identical Cl and is not a stereocenter there), but this does not rescue the step, since the POCl3 misassignment alone is a material, factually real error in the delivered answer."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "No external snapshot provided; POCl3's shift is a public fact no trajectory observation addresses, so it is checked against real-world knowledge. Caveat recorded: the verdict's sub-claim that the monoalkylphosphorodichloridate must show two 31P signals is chemically incorrect (P bears two identical Cl substituents, so it is not a stereocenter and a single signal is right); this overreach does not rescue the delivered POCl3 value, which independently sustains the conviction.",
+                  "reason": "CONTENT TEST: event_004 (final_answer) delivers 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm' and its own summary calls it 'the high-field POCl3 peak' while its table places every other species at +25 ppm or below — an internally contradictory assignment, since a +35 to +48 ppm peak would be the most downfield signal in its own spectrum. The real-world proton-decoupled 31P shift of POCl3 is ~+3 to +5 ppm (e.g., ~+4.4 ppm vs 85% H3PO4); no tool observation in the trajectory gives POCl3's shift, so this public fact is checked against real-world knowledge, and the delivered value is wrong by ~30-40 ppm for a central species of the requested spectrum — a RESULT ERROR in the sole deliverable. RELEVANCE TEST: event_004 is the final answer itself and the only deliverable; correcting it (POCl3 to ~+3 to +5 ppm, consistent with its own 'high-field' description) makes the deliverable correct, and no later step exists to correct or repeat it. The conviction stands on the POCl3 error even though the verdict's stereochemical theory is partly wrong (the mono-dichloridate correctly gives one signal; the final product's hedged 'possibly two singlets' is a defensible resolution caveat)."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 9882,
+                  "completion_tokens": 5380,
+                  "total_tokens": 15262,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 9856
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 4922
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 9856
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 4922
+                  },
+                  "input_tokens": 9882,
+                  "output_tokens": 5380
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"No external snapshot provided; POCl3's shift is a public fact no trajectory observation addresses, so it is checked against real-world knowledge. Caveat recorded: ",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "unresolved",
+            "detail": "refs exist but the cited quote cannot be located",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=unresolved"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "unresolved",
+              "detail": "refs exist but the cited quote cannot be located",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "unresolved"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 8017,
+            "completion_tokens": 1624,
+            "total_tokens": 9641,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1347
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 1347
+            },
+            "input_tokens": 8017,
+            "output_tokens": 1624
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** ... two closely spaced singlets **may appear** for the two diastereomers, otherwise a single peak if they are unresolved.\",\n  \"referent\": \"POCl3 resonates near +3 to +5 ppm; because substitution of one Cl "
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 9882,
+            "completion_tokens": 5380,
+            "total_tokens": 15262,
+            "prompt_tokens_details": {
+              "cached_tokens": 9856
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4922
+            },
+            "input_tokens_details": {
+              "cached_tokens": 9856
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 4922
+            },
+            "input_tokens": 9882,
+            "output_tokens": 5380
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"No external snapshot provided; POCl3's shift is a public fact no trajectory observation addresses, so it is checked against real-world knowledge. Caveat recorded: ",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "ba1b1ea12623e6e748c862332e3b28ac0301a82462f4249c79d00bfb55510869",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "e5754d9a9fb0"
+}

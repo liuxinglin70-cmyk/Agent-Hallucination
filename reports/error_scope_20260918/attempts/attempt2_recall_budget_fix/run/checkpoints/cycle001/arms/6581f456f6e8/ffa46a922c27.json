@@ -1,0 +1,32 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "OpenDeepSearch/080.json",
+    "gold": true,
+    "prediction": null,
+    "state": "unresolved",
+    "authority": "invalid",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/080.json",
+      "state": "unresolved",
+      "decision_authority": "invalid",
+      "runtime_valid": false,
+      "authority_failure_reasons": [
+        {
+          "component": "backend",
+          "code": "case_evaluation_exception",
+          "error_type": "ValueError",
+          "message": "frozen replay envelope is empty for OpenDeepSearch/080.json: the baseline carries no settled stage to replay"
+        }
+      ],
+      "stage_status": {},
+      "proof": {
+        "deployment": {},
+        "state": "unresolved"
+      }
+    },
+    "backend": "detector"
+  },
+  "row_hash": "264b78a4a2ba"
+}

@@ -1,6 +1,23 @@
 {
   "cycle": 1,
   "state": "completed",
+  "preflight": {
+    "sentinel": {
+      "protected_tp": 3,
+      "protected_tn": 3,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": true,
+      "reason": ""
+    },
+    "blocked_families": [],
+    "gain_opportunity": {
+      "recall": 2,
+      "precision": 0
+    }
+  },
   "split": {
     "name": "mini",
     "mini": true,
@@ -79,7 +96,7 @@
         "structural": {
           "passed": true,
           "reason": "",
-          "jaccard_base": 0.0118
+          "jaccard_base": 0.0092
         },
         "harmlessness": {
           "passed": true,
@@ -855,6 +872,8 @@
       "recall": 2,
       "precision": 0
     },
+    "gain_measured": true,
+    "blocked_families": [],
     "unmeasurable_polarities": [
       "precision"
     ],
@@ -868,6 +887,9 @@
       "admitted": 1
     },
     "instrument_limited": false
+  },
+  "evidence": {
+    "active": false
   },
   "proposal_summary": {
     "stable_families": [
@@ -923,7 +945,7 @@
       "structural": {
         "passed": true,
         "reason": "",
-        "jaccard_base": 0.0506
+        "jaccard_base": 0.0432
       },
       "harmlessness": {
         "passed": true,
@@ -1831,7 +1853,7 @@
   },
   "ledger_integrity": {
     "valid": true,
-    "records": 8,
+    "records": 9,
     "broken_at": null,
     "reason": ""
   },
@@ -1855,7 +1877,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "8915d61c71b9",
+          "digest": "54d87855f1a7",
           "payload": {
             "stages": [
               "validate",
@@ -1876,7 +1898,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "00b049063521f76b",
+            "source_digest": "9c2c66f5ab64588c",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2042,11 +2064,11 @@
         }
       },
       "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
-      "digest": "4c5d77669c47"
+      "digest": "5b7e5b7223cf"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "4c5d77669c47",
+      "current_digest": "5b7e5b7223cf",
       "first_manifest": true,
       "changed": [
         "G",
@@ -2081,4 +2103,4 @@
   }
 }
 
-smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_o91endis\work\smoke\experiments\smoke_cycle.json
+smoke report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_jeagc8c0\work\smoke\experiments\smoke_cycle.json

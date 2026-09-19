@@ -1,0 +1,500 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/067.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/067.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_006",
+      "responsible_step": 6,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_006",
+        "responsible_step": 6,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 6,
+            "traced_step": 6,
+            "defense": "substantiated",
+            "confirmed_step": 6,
+            "delivered_result": "Sergey Brin",
+            "correct_result": "An evidence-grounded identification of the director responsible for Google's core web search algorithms from 2002 to 2005; no observation in the trajectory identifies any such person, and the observations only establish Brin as President of Technology overseeing general technological advancements, not as director of core search algorithms.",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 6,
+          "hallucination_reason": "The agent submitted 'Sergey Brin' as the director responsible for core web search algorithms based purely on its own assumption ('it is reasonable to assume', 'likely the primary person responsible'), even though its own observations never established this and explicitly noted only that Brin was President of Technology, with the agent itself admitting the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'.",
+          "delivered_result": "Sergey Brin",
+          "correct_result": "An evidence-grounded identification of the director responsible for Google's core web search algorithms from 2002 to 2005; no observation in the trajectory identifies any such person, and the observations only establish Brin as President of Technology overseeing general technological advancements, not as director of core search algorithms.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_005",
+            "event_006"
+          ],
+          "root_cause": {
+            "step": 6,
+            "quote": "Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005.",
+            "referent": "The task requires the actual director responsible for core web search algorithms 2002-2005; no tool observation names this person, so delivering 'Sergey Brin' as a settled answer is an unsupported fabrication rather than a grounded result."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The name of the director responsible for the core web search algorithms at Google Inc. from 2002 to 2005, established by evidence rather than assumption"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Research and verify the identity of the responsible director via grounded sources before committing a final answer"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 6,
+          "quote": "Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005. ... final_answer(\"Sergey Brin\")",
+          "referent": "The agent should have concluded that no observation identifies the director responsible for Google's core web search algorithms (the observations only establish Brin as President of Technology overseeing general technological advancements) and either continued searching or declined to name a person, instead of submitting 'Sergey Brin' based on its own assumption.",
+          "evidence_refs": [
+            "event_005",
+            "event_006"
+          ],
+          "reason": "The delivered wrong answer 'Sergey Brin' as the director responsible for core web search algorithms is first committed at step 6, where the agent—despite its own admission at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'—submits final_answer(\"Sergey Brin\") purely on the assumption that his President of Technology role implies responsibility, whereas earlier steps only hypothesized or searched without asserting the answer."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 6,
+          "evidence_refs": [
+            "event_004",
+            "event_005",
+            "event_006"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: At event_006 the agent states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and 'I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005', then commits final_answer(\"Sergey Brin\"). The trajectory's own observation (event_004) establishes only that Brin 'served as the president of technology... overseeing the company's growth and technological advancements' — a different role than director of core search algorithms — and the agent itself admitted at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'. No observation in the shown trajectory identifies anyone as the director responsible for core web search algorithms, so the delivered identification is an unsupported assumption, not an environment fact; under grounding rule 3 a delivered result resting on the agent's own assertion is not thereby correct. The Rajen Sheth observation (event_005) likewise does not support Brin. RELEVANCE TEST: event_006 is the terminal final_answer submission and the earliest point the wrong answer is committed (event_005 had not yet committed to Brin); correcting it to an evidence-grounded answer would make the sole deliverable — the answer to the question — correct, and no later events exist to remain defective. No external evidence snapshot was provided, so the true identity of the correct director is unestablished by snapshot; the conviction rests on the trajectory's own evidence that the delivered answer was assumption-based and contradicted by the observed role description, which suffices for a result error/false completion."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 6,
+              "reason": "The agent submitted 'Sergey Brin' as the director responsible for core web search algorithms based purely on its own assumption ('it is reasonable to assume', 'likely the primary person responsible'), even though its own observations never established this and explicitly noted only that Brin was President of Technology, with the agent itself admitting the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'.",
+              "evidence_refs": [
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "quote": "Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005.",
+              "delivered_result": "Sergey Brin",
+              "correct_result": "An evidence-grounded identification of the director responsible for Google's core web search algorithms from 2002 to 2005; no observation in the trajectory identifies any such person, and the observations only establish Brin as President of Technology overseeing general technological advancements, not as director of core search algorithms."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 6,
+                "quote": "Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005. ... final_answer(\"Sergey Brin\")",
+                "referent": "The agent should have concluded that no observation identifies the director responsible for Google's core web search algorithms (the observations only establish Brin as President of Technology overseeing general technological advancements) and either continued searching or declined to name a person, instead of submitting 'Sergey Brin' based on its own assumption.",
+                "evidence_refs": [
+                  "event_005",
+                  "event_006"
+                ],
+                "reason": "The delivered wrong answer 'Sergey Brin' as the director responsible for core web search algorithms is first committed at step 6, where the agent—despite its own admission at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'—submits final_answer(\"Sergey Brin\") purely on the assumption that his President of Technology role implies responsibility, whereas earlier steps only hypothesized or searched without asserting the answer."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2232,
+                  "completion_tokens": 1578,
+                  "total_tokens": 3810,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 1301
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 1301
+                  },
+                  "input_tokens": 2232,
+                  "output_tokens": 1578
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorith"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 6,
+                "reason": "The agent submitted 'Sergey Brin' as the director responsible for core web search algorithms based purely on its own assumption ('it is reasonable to assume', 'likely the primary person responsible'), even though its own observations never established this and explicitly noted only that Brin was President of Technology, with the agent itself admitting the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'.",
+                "delivered_result": "Sergey Brin",
+                "correct_result": "An evidence-grounded identification of the director responsible for Google's core web search algorithms from 2002 to 2005; no observation in the trajectory identifies any such person, and the observations only establish Brin as President of Technology overseeing general technological advancements, not as director of core search algorithms.",
+                "evidence_refs": [
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The name of the director responsible for the core web search algorithms at Google Inc. from 2002 to 2005, established by evidence rather than assumption"
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Research and verify the identity of the responsible director via grounded sources before committing a final answer"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: At event_006 the agent states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and 'I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005', then commits final_answer(\"Sergey Brin\"). The trajectory's own observation (event_004) establishes only that Brin 'served as the president of technology... overseeing the company's growth and technological advancements' — a different role than director of core search algorithms — and the agent itself admitted at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'. No observation in the shown trajectory identifies anyone as the director responsible for core web search algorithms, so the delivered identification is an unsupported assumption, not an environment fact; under grounding rule 3 a delivered result resting on the agent's own assertion is not thereby correct. The Rajen Sheth observation (event_005) likewise does not support Brin. RELEVANCE TEST: event_006 is the terminal final_answer submission and the earliest point the wrong answer is committed (event_005 had not yet committed to Brin); correcting it to an evidence-grounded answer would make the sole deliverable — the answer to the question — correct, and no later events exist to remain defective. No external evidence snapshot was provided, so the true identity of the correct director is unestablished by snapshot; the conviction rests on the trajectory's own evidence that the delivered answer was assumption-based and contradicted by the observed role description, which suffices for a result error/false completion."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_005",
+                    "event_006"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: At event_006 the agent states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and 'I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005', then commits final_answer(\"Sergey Brin\"). The trajectory's own observation (event_004) establishes only that Brin 'served as the president of technology... overseeing the company's growth and technological advancements' — a different role than director of core search algorithms — and the agent itself admitted at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms'. No observation in the shown trajectory identifies anyone as the director responsible for core web search algorithms, so the delivered identification is an unsupported assumption, not an environment fact; under grounding rule 3 a delivered result resting on the agent's own assertion is not thereby correct. The Rajen Sheth observation (event_005) likewise does not support Brin. RELEVANCE TEST: event_006 is the terminal final_answer submission and the earliest point the wrong answer is committed (event_005 had not yet committed to Brin); correcting it to an evidence-grounded answer would make the sole deliverable — the answer to the question — correct, and no later events exist to remain defective. No external evidence snapshot was provided, so the true identity of the correct director is unestablished by snapshot; the conviction rests on the trajectory's own evidence that the delivered answer was assumption-based and contradicted by the observed role description, which suffices for a result error/false completion."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_006"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "At event_006 the agent submitted final_answer(\"Sergey Brin\") while explicitly reasoning 'it is reasonable to assume' and 'likely the primary person responsible'. Its own observations (event_004, event_005) establish only that Brin was President of Technology and that Rajen Sheth worked on Google Apps/Gmail — neither identifies a director of core web search algorithms. The delivered answer is an unverified assumption, a RESULT ERROR on the required deliverable; no later correction exists, as this is the final answer call."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 6,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_005"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: at event_006 the agent wrote 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms ... I will conclude that he was likely the primary person responsible for the core web search algorithms during 2002 to 2005' and submitted final_answer(\"Sergey Brin\"). This is explicitly an assumption, not a grounded fact: the agent itself admitted at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms', and the observations (event_004: Brin was 'president of technology ... overseeing the company's growth and technological advancements'; event_005: Rajen Sheth worked on Google Apps/Gmail/Chrome, not search) never identify anyone as director of core web search algorithms. Under grounding rule 3 the delivered result repeats an unverified assertion rather than an environment fact, and the public record (checked per rule 6, since no observation addresses who held the role) shows Brin was not the person in charge of Google's core search algorithms from 2002 — the delivered answer is factually wrong. RELEVANCE TEST: event_006 is the answer-submission step and the only deliverable-producing action for the question; the later observation ('Sergey Brin') merely echoes the same call, so correcting step 6 to an evidence-grounded identification would make every deliverable correct. No later repair exists; the error is material (RESULT ERROR / false completion of the query)."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2503,
+                  "completion_tokens": 5474,
+                  "total_tokens": 7977,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 1536
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 5099
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 1536
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 5099
+                  },
+                  "input_tokens": 2503,
+                  "output_tokens": 5474
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: at event_006 the agent wrote 'it is reasonable to assume that he was responsible for overseeing the development of the w",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 2925,
+            "completion_tokens": 506,
+            "total_tokens": 3431,
+            "prompt_tokens_details": {
+              "cached_tokens": 2560
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 210
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 210
+            },
+            "input_tokens_details": {
+              "cached_tokens": 2560
+            },
+            "input_tokens": 2925,
+            "output_tokens": 506
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 6,\n  \"hallucination_reason\": \"The trajectory concluded Sergey Brin was the director responsible for core web search algorithms purely by assumption from his President of Technology role, without any observation supporting that specific claim, and",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2232,
+            "completion_tokens": 1578,
+            "total_tokens": 3810,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1301
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 1301
+            },
+            "input_tokens": 2232,
+            "output_tokens": 1578
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"Given the lack of specific information about a dedicated director for web search algorithms, and considering Sergey Brin's high-level position and involvement in technology, I will conclude that he was likely the primary person responsible for the core web search algorith"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2503,
+            "completion_tokens": 5474,
+            "total_tokens": 7977,
+            "prompt_tokens_details": {
+              "cached_tokens": 1536
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5099
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1536
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 5099
+            },
+            "input_tokens": 2503,
+            "output_tokens": 5474
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: at event_006 the agent wrote 'it is reasonable to assume that he was responsible for overseeing the development of the w",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "4e4fb458bcec9327f56a6005a063fb0529d6530998d2e848c9b61fcb067ffa3d",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 6
+    },
+    "backend": "detector"
+  },
+  "row_hash": "8d226faa0ad6"
+}

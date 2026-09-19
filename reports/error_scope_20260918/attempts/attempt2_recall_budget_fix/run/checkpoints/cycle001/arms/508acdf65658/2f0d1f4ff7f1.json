@@ -1,0 +1,476 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "SmolAgents/019.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "SmolAgents/019.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "POCl3 appears as a sharp singlet near +35 to +48 ppm (often near +38 ppm), with intermediates at +10 to +25 ppm and ~0 to +10 ppm, and the final dialkylphosphate at 0 to -5 ppm (one or two diastereomer peaks).",
+            "correct_result": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm, not +35 to +48 ppm); the rest of the qualitative evolution (disappearance of POCl3, intermediate signals, final dialkylphosphate near 0 ppm with possibly two diastereomeric singlets) is reasonable.",
+            "judge_basis": "world_knowledge",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (often near +38 ppm) in 31P NMR, but POCl3 actually appears near +4 to +5 ppm, and no retrieved source supports the fabricated value; the answer even contradicts itself by calling it the 'high-field POCl3 peak'.",
+          "delivered_result": "POCl3 appears as a sharp singlet near +35 to +48 ppm (often near +38 ppm), with intermediates at +10 to +25 ppm and ~0 to +10 ppm, and the final dialkylphosphate at 0 to -5 ppm (one or two diastereomer peaks).",
+          "correct_result": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm, not +35 to +48 ppm); the rest of the qualitative evolution (disappearance of POCl3, intermediate signals, final dialkylphosphate near 0 ppm with possibly two diastereomeric singlets) is reasonable.",
+          "basis": "world_knowledge",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+            "referent": "POCl3 31P chemical shift is approximately +4 to +5 ppm relative to 85% H3PO4"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Correct expected 31P NMR spectral features (species, number of signals, approximate chemical shifts) for the POCl3/chiral alcohol dialkylphosphate synthesis"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+          "referent": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm), not +35 to +48 ppm",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "The fabricated +35 to +48 ppm POCl3 shift first appears in the final answer at event_004; the earlier search observations contain no such value, so this is the earliest introduction of the error."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004",
+            "event_003"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: The event_004 final_answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its summary table lists 'POCl3 | +35 to +48', while the same answer calls it 'the high-field POCl3 peak' — self-contradictory, since +35 to +48 ppm is the most downfield value in its own table. The searches in event_002/event_003 returned no 31P shift for POCl3 (the nearest snippet, event_003_tool_01 result 2, gives O=PMe3 at 36.2 ppm — a different compound), so the delivered value is unsupported by any retrieved source. POCl3's shift is a public fact no observation addresses, so it is checked against real-world knowledge: POCl3 resonates at ~+4 to +5 ppm vs 85% H3PO4, not +35 to +48 ppm. The delivered starting-material peak position is therefore factually wrong — a RESULT ERROR in the sole deliverable (the final answer), with fabricated literature-like specificity. RELEVANCE TEST: event_004 is the final answer and the last event, so there is no later correction; correcting the POCl3 value there to ~+4 to +5 ppm leaves the rest of the qualitative evolution (intermediate signals downfield of POCl3, final dialkylphosphate near 0 to -5 ppm, possibly two diastereomeric singlets) chemically reasonable, making the deliverable correct. Caveat: event_001 is omitted from this view; if it already contained the same wrong value, event_004 is the delivery locus of that same error — the error in the delivered answer is real and material either way."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (often near +38 ppm) in 31P NMR, but POCl3 actually appears near +4 to +5 ppm, and no retrieved source supports the fabricated value; the answer even contradicts itself by calling it the 'high-field POCl3 peak'.",
+              "evidence_refs": [
+                "event_004"
+              ],
+              "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+              "delivered_result": "POCl3 appears as a sharp singlet near +35 to +48 ppm (often near +38 ppm), with intermediates at +10 to +25 ppm and ~0 to +10 ppm, and the final dialkylphosphate at 0 to -5 ppm (one or two diastereomer peaks).",
+              "correct_result": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm, not +35 to +48 ppm); the rest of the qualitative evolution (disappearance of POCl3, intermediate signals, final dialkylphosphate near 0 ppm with possibly two diastereomeric singlets) is reasonable."
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)",
+                "referent": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm), not +35 to +48 ppm",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "The fabricated +35 to +48 ppm POCl3 shift first appears in the final answer at event_004; the earlier search observations contain no such value, so this is the earliest introduction of the error."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 7830,
+                  "completion_tokens": 175,
+                  "total_tokens": 8005,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 7680
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 20
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 7680
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 20
+                  },
+                  "input_tokens": 7830,
+                  "output_tokens": 175
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\": 4, \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)\", \"referent\": \"POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm), not +35 to +48 ppm\", \"evidence_refs\": [\"event_004\"], \""
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The final answer asserts POCl3 resonates at +35 to +48 ppm (often near +38 ppm) in 31P NMR, but POCl3 actually appears near +4 to +5 ppm, and no retrieved source supports the fabricated value; the answer even contradicts itself by calling it the 'high-field POCl3 peak'.",
+                "delivered_result": "POCl3 appears as a sharp singlet near +35 to +48 ppm (often near +38 ppm), with intermediates at +10 to +25 ppm and ~0 to +10 ppm, and the final dialkylphosphate at 0 to -5 ppm (one or two diastereomer peaks).",
+                "correct_result": "POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm, not +35 to +48 ppm); the rest of the qualitative evolution (disappearance of POCl3, intermediate signals, final dialkylphosphate near 0 ppm with possibly two diastereomeric singlets) is reasonable.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Correct expected 31P NMR spectral features (species, number of signals, approximate chemical shifts) for the POCl3/chiral alcohol dialkylphosphate synthesis"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The event_004 final_answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its summary table lists 'POCl3 | +35 to +48', while the same answer calls it 'the high-field POCl3 peak' — self-contradictory, since +35 to +48 ppm is the most downfield value in its own table. The searches in event_002/event_003 returned no 31P shift for POCl3 (the nearest snippet, event_003_tool_01 result 2, gives O=PMe3 at 36.2 ppm — a different compound), so the delivered value is unsupported by any retrieved source. POCl3's shift is a public fact no observation addresses, so it is checked against real-world knowledge: POCl3 resonates at ~+4 to +5 ppm vs 85% H3PO4, not +35 to +48 ppm. The delivered starting-material peak position is therefore factually wrong — a RESULT ERROR in the sole deliverable (the final answer), with fabricated literature-like specificity. RELEVANCE TEST: event_004 is the final answer and the last event, so there is no later correction; correcting the POCl3 value there to ~+4 to +5 ppm leaves the rest of the qualitative evolution (intermediate signals downfield of POCl3, final dialkylphosphate near 0 to -5 ppm, possibly two diastereomeric singlets) chemically reasonable, making the deliverable correct. Caveat: event_001 is omitted from this view; if it already contained the same wrong value, event_004 is the delivery locus of that same error — the error in the delivered answer is real and material either way."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_003"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: The event_004 final_answer states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and its summary table lists 'POCl3 | +35 to +48', while the same answer calls it 'the high-field POCl3 peak' — self-contradictory, since +35 to +48 ppm is the most downfield value in its own table. The searches in event_002/event_003 returned no 31P shift for POCl3 (the nearest snippet, event_003_tool_01 result 2, gives O=PMe3 at 36.2 ppm — a different compound), so the delivered value is unsupported by any retrieved source. POCl3's shift is a public fact no observation addresses, so it is checked against real-world knowledge: POCl3 resonates at ~+4 to +5 ppm vs 85% H3PO4, not +35 to +48 ppm. The delivered starting-material peak position is therefore factually wrong — a RESULT ERROR in the sole deliverable (the final answer), with fabricated literature-like specificity. RELEVANCE TEST: event_004 is the final answer and the last event, so there is no later correction; correcting the POCl3 value there to ~+4 to +5 ppm leaves the rest of the qualitative evolution (intermediate signals downfield of POCl3, final dialkylphosphate near 0 to -5 ppm, possibly two diastereomeric singlets) chemically reasonable, making the deliverable correct. Caveat: event_001 is omitted from this view; if it already contained the same wrong value, event_004 is the delivery locus of that same error — the error in the delivered answer is real and material either way."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "The final answer at event_004 states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)'. POCl3 in 31P NMR actually resonates near +4 to +5 ppm (close to 0 ppm); this is a public chemical fact no observation in the trajectory addresses or contradicts, so it is checked against real-world knowledge. The searches (event_002, event_003) returned no source supporting +35 to +48 ppm for POCl3 — the Springer table snippet even shows O=P(OMe)3 at 2.1 ppm, consistent with phosphoryl compounds near 0 ppm. The answer also self-contradicts by calling the disappearing POCl3 peak the 'high-field POCl3 peak' while placing it at +35 to +48 ppm. This is a RESULT ERROR in the delivered answer, not corrected anywhere later; the rest of the qualitative evolution is reasonable, but the POCl3 shift is a material factual error in the deliverable."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_004 (final_answer) states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' and repeats '+35 to +48' in the summary table, while also calling it the 'high-field POCl3 peak' — self-contradictory, since +35 to +48 ppm is downfield. The correct referent is a well-established public fact no shown observation addresses (the searches in event_002/event_003 returned no numeric POCl3 shift; the nearest snippet, event_003_tool_01, lists OPMe3 at 36.2 ppm and OP(OMe)3 at 2.1 ppm, consistent with the agent misattributing a phosphine-oxide value): POCl3 resonates near +4 to +5 ppm vs 85% H3PO4, close to 0 ppm, not +35 to +48. Asserting a specific fabricated range with no retrieved support is a RESULT ERROR in the delivered answer. RELEVANCE TEST: event_004 is the deliverable itself and the earliest shown locus of the error; correcting the POCl3 value to ~+4 to +5 ppm leaves the rest of the answer (intermediates +10 to +25 and ~0 to +10 ppm, final dialkylphosphate 0 to -5 ppm with possible diastereomeric singlets, disappearance of the POCl3 peak tracking the reaction) correct and internally consistent, so the single correction repairs every deliverable."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 9747,
+                  "completion_tokens": 4212,
+                  "total_tokens": 13959,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 9728
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 3814
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 9728
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 3814
+                  },
+                  "input_tokens": 9747,
+                  "output_tokens": 4212
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_004 (final_answer) states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent,",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 8585,
+            "completion_tokens": 10144,
+            "total_tokens": 18729,
+            "prompt_tokens_details": {
+              "cached_tokens": 8576
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 9399
+            },
+            "input_tokens_details": {
+              "cached_tokens": 8576
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 9399
+            },
+            "input_tokens": 8585,
+            "output_tokens": 10144
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 4,\n  \"hallucination_reason\": \"The final answer predicts a single 31P signal for the dialkylphosphorochloridate intermediate and summarizes 'clean single peaks for each major species', but with two different enantiopure alcohols the phosphorus in",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 7830,
+            "completion_tokens": 175,
+            "total_tokens": 8005,
+            "prompt_tokens_details": {
+              "cached_tokens": 7680
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "input_tokens_details": {
+              "cached_tokens": 7680
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "input_tokens": 7830,
+            "output_tokens": 175
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\": 4, \"quote\": \"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)\", \"referent\": \"POCl3 in 31P NMR resonates near +4 to +5 ppm (close to 0 ppm), not +35 to +48 ppm\", \"evidence_refs\": [\"event_004\"], \""
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 9747,
+            "completion_tokens": 4212,
+            "total_tokens": 13959,
+            "prompt_tokens_details": {
+              "cached_tokens": 9728
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3814
+            },
+            "input_tokens_details": {
+              "cached_tokens": 9728
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3814
+            },
+            "input_tokens": 9747,
+            "output_tokens": 4212
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_004 (final_answer) states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent,",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "ba1b1ea12623e6e748c862332e3b28ac0301a82462f4249c79d00bfb55510869",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "89e32786bf59"
+}
