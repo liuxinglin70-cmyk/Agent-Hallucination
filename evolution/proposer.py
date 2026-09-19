@@ -1,12 +1,17 @@
 """Candidate proposer.
 
-The LLM is the only proposal source. Drafting an intervention from a failure
-family is a generative step; a fixed template library would hard-code the
-experimenter's hypotheses into the loop and silently cap what the framework
-can discover. Discipline stays mechanical: the draft must fit the closed
-detector-side schema, must not echo an active intervention, and is validated
-before it can spend gate budget. On any parse or provider error the proposer
-returns zero candidates (the cycle is reported, not padded).
+Drafting an intervention from a failure family is a generative step; a fixed
+template library as the primary source would hard-code the experimenter's
+hypotheses into the loop and silently cap what the framework can discover.
+The LLM is therefore the primary proposal source. ``HybridProposer`` keeps a
+deterministic typed-DSL template batch as a fallback, but only when the LLM
+produces zero valid candidates in the same call; it never re-drafts after a
+downstream gate (STRUCTURAL/HARMLESSNESS/BEHAVIOR/M) rejected an LLM
+candidate — those rejections come back through ``set_rejection_feedback`` to
+shape the next draft instead. Discipline stays mechanical: the draft must fit
+the closed detector-side schema, must not echo an active intervention, and is
+validated before it can spend gate budget. On any parse or provider error the
+proposer returns zero candidates (the cycle is reported, not padded).
 """
 
 from __future__ import annotations
@@ -269,6 +274,10 @@ class LLMProposer:
                 for item in self.rejection_feedback if not item.get("not_evaluable")
             ) if key is not None
         }
+        # Same not_evaluable filter as single candidates: missing evaluation
+        # coverage is not a falsified mechanism, so an unevaluable group must
+        # stay visible as diagnostic feedback without permanently banning the
+        # combination from a later retry.
         self.rejected_group_keys = {
             frozenset(keys)
             for keys in (
@@ -279,6 +288,7 @@ class LLMProposer:
                     ) if key is not None
                 ]
                 for item in self.rejection_feedback
+                if not item.get("not_evaluable")
             )
             if len(keys) >= 2
         }
@@ -842,8 +852,13 @@ class HybridProposer:
     """LLM-first proposer with deterministic typed-DSL fallback templates.
 
     The LLM remains the semantic proposal source and spends its normal
-    budget first. When every LLM candidate is invalid or rejected, this
-    proposer emits mechanically safe candidates from the family diagnostics:
+    budget first. The template batch runs only when the LLM path yields zero
+    valid candidates in the same call (provider error, parse failure, or
+    local contract rejections) — never after the downstream
+    STRUCTURAL/HARMLESSNESS/BEHAVIOR/M gates rejected an LLM candidate; those
+    rejections reach the next draft through ``set_rejection_feedback``
+    instead. Fallback emits mechanically safe candidates from the family
+    diagnostics:
     shared packet-feature recall_trigger policies, a missing-search
     evidence+conviction unit, and unanimous built-in FP withhold units. All
     fallback candidates still pass STRUCTURAL-HARMLESSNESS-BEHAVIOR-M; they never bypass a gate.
@@ -860,6 +875,23 @@ class HybridProposer:
         self.llm = LLMProposer(
             framework_config, active_entries=active_entries,
         )
+
+    @property
+    def active_entries(self) -> list[dict[str, Any]]:
+        return self.llm.active_entries
+
+    @active_entries.setter
+    def active_entries(self, entries: Sequence[Mapping[str, Any]]) -> None:
+        # The engine re-binds the registry before every drafting call with a
+        # plain attribute assignment; forwarding the setter keeps the inner
+        # LLM proposer in sync without changing that call site.
+        self.llm.active_entries = [dict(entry) for entry in entries]
+
+    def set_rejection_feedback(
+        self, feedback: Sequence[Mapping[str, Any]],
+    ) -> None:
+        """Forward gate rejections so the next draft avoids them."""
+        self.llm.set_rejection_feedback(feedback)
 
     def set_memory_context(
         self, context: Mapping[str, Any] | None,
