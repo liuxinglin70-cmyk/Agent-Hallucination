@@ -1,17 +1,20 @@
-"""第 2 轮（v006）研究驱动：screening → frozen_recheck → unused_dev_validation。
+"""RSI 研究轮驱动：screening（草拟或种子）→ manifest 声明的冻结阶段序列。
 
 从仓库根目录运行：
-    python output/rsi-planning/run_round2.py             # 真实运行（调用模型服务）
-    python output/rsi-planning/run_round2.py --dry-run   # 离线 mock 演练（写临时目录）
+    python output/rsi-planning/run_round.py \
+        --manifest output/rsi-planning/research-manifest-round3.json \
+        --output-dir reports/rsi_pilot_20260919/round3
+    python output/rsi-planning/run_round.py --dry-run --manifest <manifest>   # 离线演练
 
-阶段门在冻结 manifest（output/rsi-planning/research-manifest-round2.json）中预先声明；
-任一阶段未过即停止并报告原因。各阶段结果可按 identity 断点续跑（research.py 自带）。
+阶段与门在冻结 manifest 中预先声明（stages + panel_gate）；任一阶段未过即
+停止并报告原因。各阶段结果可按 identity 断点续跑（research.py 自带）。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -23,8 +26,8 @@ if str(REPO) not in sys.path:
 from detector.env import load_local_env  # noqa: E402
 from evolution.research import run_frozen_repeats, run_research  # noqa: E402
 
-DEFAULT_MANIFEST = REPO / "output/rsi-planning/research-manifest-round2.json"
-DEFAULT_OUTPUT = REPO / "reports/rsi_pilot_20260919/round2"
+DEFAULT_MANIFEST = REPO / "output/rsi-planning/research-manifest-round3.json"
+DEFAULT_OUTPUT = REPO / "reports/rsi_pilot_20260919/round3"
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +92,7 @@ class _FakeProposer:
         candidate = {
             "type": "text_boundary",
             "hook": "judge.system",
-            "intervention_id": "IV-R2-FAKE",
+            "intervention_id": "IV-R-FAKE",
             "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
             "body": {
                 "directive": "Bind quoted content to delivered arguments (fake dry-run directive).",
@@ -138,9 +141,9 @@ def _screening_ids(manifest: dict) -> list[str]:
 
 
 def _validation_ids(manifest: dict) -> list[str]:
-    ids = [str(item["case_id"]) for item in manifest["validation_cases"]]
+    ids = [str(item["case_id"]) for item in manifest.get("validation_cases") or []]
     if not ids:
-        raise SystemExit("manifest has no validation_cases; validation not frozen")
+        raise SystemExit("manifest has no validation_cases")
     return ids
 
 
@@ -156,7 +159,8 @@ def _selected_candidate(run_dir: Path) -> str | None:
     return selected[0] if selected else None
 
 
-def _gate_arm_passed(stage_dir: Path) -> bool | None:
+def _candidate_arm_passed(stage_dir: Path) -> bool | None:
+    """严格读：候选臂每次重复都须通过（训练修复 + 全部回归保持 + clean）。"""
     report = json.loads(
         (stage_dir / "report.json").read_text(encoding="utf-8-sig"),
     )
@@ -167,6 +171,58 @@ def _gate_arm_passed(stage_dir: Path) -> bool | None:
     return all(
         a.get("passed") is True and a.get("complete") for a in candidate_arms
     )
+
+
+def _panel_gate_passed(stage_dir: Path, spec: dict) -> bool | None:
+    """预注册面板读：训练/clean/稳定回归零容忍，噪声案例配对支配；逐例照报。"""
+    report = json.loads(
+        (stage_dir / "report.json").read_text(encoding="utf-8-sig"),
+    )
+    arms = report.get("arms") or {}
+    candidate_arms = {k: v for k, v in arms.items() if k != "h0"}
+    if not candidate_arms:
+        return None
+    training = [str(c) for c in spec.get("training_cases") or []]
+    clean = [str(c) for c in spec.get("clean_cases") or []]
+    regression = [str(c) for c in spec.get("regression_cases") or []]
+    for arm in candidate_arms.values():
+        if not (arm.get("complete") and arm.get("per_repetition")):
+            return False
+        for pv in arm["per_repetition"]:
+            training_rows = pv.get("training") or {}
+            for cid in training:
+                row = training_rows.get(cid)
+                if row is None or not row.get("repaired"):
+                    return False
+            neighbors = pv.get("neighbors") or {}
+            for cid in clean:
+                row = neighbors.get(cid)
+                if row is None or not row.get("clean"):
+                    return False
+            for cid in regression:
+                row = neighbors.get(cid)
+                if row is None or not row.get("kept_positive"):
+                    return False
+
+    def _kept(arm: dict, cid: str) -> int | None:
+        reps = arm.get("per_repetition") or []
+        if not reps:
+            return None
+        return sum(
+            1 for pv in reps
+            if ((pv.get("neighbors") or {}).get(cid) or {}).get("kept_positive")
+        )
+
+    for item in spec.get("noisy_cases") or []:
+        cid = str(item.get("case_id"))
+        for arm in candidate_arms.values():
+            cand_kept = _kept(arm, cid)
+            h0_kept = _kept(arms.get("h0") or {}, cid)
+            if cand_kept is None or h0_kept is None:
+                return False
+            if cand_kept < h0_kept:
+                return False
+    return True
 
 
 def main() -> int:
@@ -183,12 +239,30 @@ def main() -> int:
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8-sig"))
 
     if args.dry_run:
-        run_dir = Path(tempfile.mkdtemp(prefix="rsi_round2_dry_")) / "round2"
+        run_dir = Path(tempfile.mkdtemp(prefix="rsi_round_dry_")) / "round"
         backend = _FakeBackend(target_steps={
             str(item["case_id"]): item["target_step"]
             for item in manifest["cases"] if item.get("target_step")
         })
         proposer = _FakeProposer()
+        if manifest.get("seed_candidate"):
+            # 种子源暂存：把真实源版本记录拷进临时源运行目录，演练哈希钉住。
+            source = REPO / manifest["seed_candidate"]["source_run"]
+            staged = run_dir.parent / "staged_source"
+            version = manifest["seed_candidate"]["version"]
+            (staged / version).mkdir(parents=True, exist_ok=True)
+            shutil.copy(
+                source / version / "candidate.json",
+                staged / version / "candidate.json",
+            )
+            manifest = dict(manifest)
+            manifest["seed_candidate"] = dict(manifest["seed_candidate"])
+            manifest["seed_candidate"]["source_run"] = str(staged)
+            manifest_path = run_dir.parent / "dry_manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False), encoding="utf-8",
+            )
+            args = argparse.Namespace(**{**vars(args), "manifest": str(manifest_path)})
         print(json.dumps({"dry_run": True, "run_dir": str(run_dir)}, ensure_ascii=False))
     else:
         from evolution.backends import LiveDetectorBackend
@@ -201,7 +275,7 @@ def main() -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     stage_log: dict = {"run_id": manifest["run_id"], "run_dir": str(run_dir)}
 
-    # ---- stage 1: screening（含草拟/修订，消费 proposer 预算）------------
+    # ---- stage 1: screening（草拟或种子；消费/不消费 proposer 预算）------
     screening = run_research(args.manifest, run_dir, backend, proposer)
     stage_log["screening"] = {
         "status": screening.get("status"),
@@ -215,57 +289,46 @@ def main() -> int:
         print(json.dumps(stage_log, ensure_ascii=False))
         return 2
 
-    # ---- stage 2: frozen paired recheck（3 次重复，训练集）--------------
-    stage_cfg = manifest["stages"]["frozen_recheck"]
-    recheck = run_frozen_repeats(
-        args.manifest, run_dir, backend,
-        stage="frozen_recheck",
-        case_ids=_screening_ids(manifest),
-        case_meta=_case_meta(manifest, _screening_ids(manifest)),
-        repetitions=int(stage_cfg["repetitions"]),
-        budget_case_evaluations=int(stage_cfg["budget_case_evaluations"]),
-        workers=int(manifest["budget"]["workers"]),
-    )
-    recheck_passed = _gate_arm_passed(run_dir / "frozen_recheck")
-    stage_log["frozen_recheck"] = {
-        "status": recheck.get("status"), "stopped": recheck.get("stopped"),
-        "candidate_passed": recheck_passed,
-    }
-    print(json.dumps(
-        {"stage": "frozen_recheck", **stage_log["frozen_recheck"]},
-        ensure_ascii=False,
-    ))
-    if recheck_passed is not True:
-        stage_log["verdict"] = "frozen_recheck_failed"
-        print(json.dumps(stage_log, ensure_ascii=False))
-        return 3
+    # ---- stage 2..n: manifest 声明的冻结阶段 ------------------------------
+    for index, (stage_name, cfg) in enumerate(
+        (manifest.get("stages") or {}).items()
+    ):
+        case_ids = (
+            _screening_ids(manifest)
+            if cfg.get("case_set") == "screening"
+            else _validation_ids(manifest)
+        )
+        run_frozen_repeats(
+            args.manifest, run_dir, backend,
+            stage=stage_name,
+            case_ids=case_ids,
+            case_meta=_case_meta(manifest, case_ids),
+            repetitions=int(cfg["repetitions"]),
+            budget_case_evaluations=int(cfg["budget_case_evaluations"]),
+            workers=int(manifest["budget"]["workers"]),
+        )
+        stage_dir = run_dir / stage_name
+        if cfg.get("gate") == "panel":
+            panel_spec = dict(cfg.get("panel") or manifest.get("panel_gate") or {})
+            passed = _panel_gate_passed(stage_dir, panel_spec)
+        else:
+            passed = _candidate_arm_passed(stage_dir)
+        stage_log[stage_name] = {
+            "gate": cfg.get("gate") or "candidate_all_reps",
+            "candidate_passed": passed,
+        }
+        print(json.dumps(
+            {"stage": stage_name, **stage_log[stage_name]},
+            ensure_ascii=False,
+        ))
+        if passed is not True:
+            stage_log["verdict"] = f"{stage_name}_failed"
+            print(json.dumps(stage_log, ensure_ascii=False))
+            return 3 + index
 
-    # ---- stage 3: candidate-unused development validation（3 次重复）----
-    vcfg = manifest["stages"]["unused_dev_validation"]
-    validation = run_frozen_repeats(
-        args.manifest, run_dir, backend,
-        stage="unused_dev_validation",
-        case_ids=_validation_ids(manifest),
-        case_meta=_case_meta(manifest, _validation_ids(manifest)),
-        repetitions=int(vcfg["repetitions"]),
-        budget_case_evaluations=int(vcfg["budget_case_evaluations"]),
-        workers=int(manifest["budget"]["workers"]),
-    )
-    validation_passed = _gate_arm_passed(run_dir / "unused_dev_validation")
-    stage_log["unused_dev_validation"] = {
-        "status": validation.get("status"), "stopped": validation.get("stopped"),
-        "candidate_passed": validation_passed,
-    }
-    print(json.dumps(
-        {"stage": "unused_dev_validation", **stage_log["unused_dev_validation"]},
-        ensure_ascii=False,
-    ))
-    stage_log["verdict"] = (
-        "initial_validation_passed" if validation_passed is True
-        else "unused_dev_validation_failed"
-    )
+    stage_log["verdict"] = "initial_validation_passed"
     print(json.dumps(stage_log, ensure_ascii=False))
-    return 0 if validation_passed is True else 4
+    return 0
 
 
 if __name__ == "__main__":

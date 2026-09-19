@@ -10,7 +10,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 spec = importlib.util.spec_from_file_location(
-    "run_round2", Path(__file__).resolve().parent / "run_round2.py",
+    "run_round2", Path(__file__).resolve().parent / "run_round.py",
 )
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
@@ -35,7 +35,7 @@ class OverEagerBackend(mod._FakeBackend):
 
 def main() -> int:
     manifest = json.loads(mod.DEFAULT_MANIFEST.read_text(encoding="utf-8-sig"))
-    run_dir = Path(tempfile.mkdtemp(prefix="rsi_round2_neg_")) / "round2"
+    run_dir = Path(tempfile.mkdtemp(prefix="rsi_round_neg_")) / "round2"
     run_dir.mkdir(parents=True)
     backend = OverEagerBackend(target_steps={
         str(i["case_id"]): i["target_step"]
