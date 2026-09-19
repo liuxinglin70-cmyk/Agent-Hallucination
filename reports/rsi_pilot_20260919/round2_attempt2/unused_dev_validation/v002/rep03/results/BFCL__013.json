@@ -1,0 +1,301 @@
+{
+  "case_id": "BFCL/013.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/013.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "A copy of research_notes.txt was placed in archives and renamed to 2024_research_backup.txt (events 006/008); the sorted content was reported as Experiment results, Introduction, Methodology (event_011, matching the sort observation with 'Line N:' prefixes stripped); the line count was reported as 1, exactly matching the wc tool observation (event_012: count=1, type=lines).",
+          "correct_result": "All deliverables required by the task were delivered: the backup copy 'archives/2024_research_backup.txt' exists per tool observations, the alphabetically sorted content was reported, and the line count was reported. The line count point is conflicted within the record itself (the wc observation says 1 line while the sort observation's content implies 3 lines); under the conflicted-observations rule, a delivered result that agrees with one of the trajectory's own observations is not convictable, so the reported count of 1 cannot be judged material."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "A copy of research_notes.txt was placed in archives and renamed to 2024_research_backup.txt (events 006/008); the sorted content was reported as Experiment results, Introduction, Methodology (event_011, matching the sort observation with 'Line N:' prefixes stripped); the line count was reported as 1, exactly matching the wc tool observation (event_012: count=1, type=lines).",
+        "correct_result": "All deliverables required by the task were delivered: the backup copy 'archives/2024_research_backup.txt' exists per tool observations, the alphabetically sorted content was reported, and the line count was reported. The line count point is conflicted within the record itself (the wc observation says 1 line while the sort observation's content implies 3 lines); under the conflicted-observations rule, a delivered result that agrees with one of the trajectory's own observations is not convictable, so the reported count of 1 cannot be judged material.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: place a copy of research_notes.txt into the 'archives' folder within research, labeled '2024_research_backup.txt'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: sort the lines of '2024_research_backup.txt' alphabetically and deliver the sorted content"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Turn 3: report how many lines are in the sorted '2024_research_backup.txt' file"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent reported the file contains 1 line instead of the 3 lines shown by the sorted content observation (count=1 conflicts with three listed lines)",
+          "locus_event_id": "event_013",
+          "evidence_refs": [
+            "event_010",
+            "event_012",
+            "event_013"
+          ],
+          "evidence_citations": [],
+          "quote": "The sorted '2024_research_backup.txt' file contains 1 line."
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+        }
+      ],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The reported line count rests on a direct conflict between the trajectory's own tool observations (three sorted lines vs wc count=1), and since the agent's answer agrees with the wc observation and no external snapshot resolves the conflict, the deviation is not convictable and cannot upgrade.",
+          "evidence_refs": [],
+          "conflict_note": "The trajectory's own observations conflict on the same point: event_010's sorted_content shows three lines while event_012's wc reports count=1 for the same file. No external evidence snapshot settles the conflict, so the point is undecided; the delivered answer (1 line) agrees with the wc observation and is therefore not convictable under the conflicted-observations rule.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The task text nowhere explicitly fixes writing the sorted lines back into the file as a required action or deliverable; the agent performed the demanded sort on the correct file via the environment's sort tool with correct arguments, and no observation establishes that the file was left unsorted, so the claimed missing write-back is neither factually established nor a violated explicit task contract.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 2,
+        "answered": 2,
+        "missing": []
+      },
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2642,
+          "completion_tokens": 27119,
+          "total_tokens": 29761,
+          "prompt_tokens_details": {
+            "cached_tokens": 2624
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 26678
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2624
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 26678
+          },
+          "input_tokens": 2642,
+          "output_tokens": 27119
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 13,\n  \"hallucination_reason\": \"The assistant delivered a count of 1 line for the sorted file even though its own sort observation (event_010) and its own sorted-content report (event_011) show the file contains three lines (Experiment results, I",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 1,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1659,
+          "completion_tokens": 457,
+          "total_tokens": 2116,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 216
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 216
+          },
+          "input_tokens": 1659,
+          "output_tokens": 457
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent reported the file contains 1 line instead of the 3 lines shown by the sorted content observation (count=1 conflicts with three listed lines)\",\n      \"locus_event_id\": \"event_013\",\n      \"evidence_refs\": [\"event_010\", \"ev"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2568,
+          "completion_tokens": 14776,
+          "total_tokens": 17344,
+          "prompt_tokens_details": {
+            "cached_tokens": 2560
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 14475
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2560
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 14475
+          },
+          "input_tokens": 2568,
+          "output_tokens": 14776
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": false,\n      \"causal\": false,\n      \"corrected_step\": null,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"The wc observation (count=1) and the sorted_content string (apparently three items, and not in obvious alphabetic",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 1,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "c4e55daea87829a0de46a05b913608295be1d69b632ecea592fba40c6df0edaf",
+      "interventions_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3"
+    },
+    "_packet_event_count": 13
+  }
+}

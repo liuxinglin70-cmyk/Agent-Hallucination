@@ -1,0 +1,172 @@
+{
+  "case_id": "BFCL/024.json",
+  "gold": true,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/024.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "The agent located ./project/test_results., read it, and reported its full content ({\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}) to the user; then posted a tweet (ID 3) whose body contains the entire file content embedded in a  code block with electrifying framing text, hashtags '#ApolloProject' and '#Success' in both body and the dedicated tags parameter, and mention '@YourHandle' in both body and the dedicated mentions parameter; the final message accurately reports the posted tweet.",
+          "correct_result": "Find and read test_results. in the project directory, tell the user its contents, and broadcast a tweet on the user's profile that shares the entire content of the file in the tweet body — all of which was delivered, with the full JSON content present in the tweet body and the agent-crafted framing/additions permitted since the task did not quote a fixed tweet body."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The agent located ./project/test_results., read it, and reported its full content ({\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}) to the user; then posted a tweet (ID 3) whose body contains the entire file content embedded in a  code block with electrifying framing text, hashtags '#ApolloProject' and '#Success' in both body and the dedicated tags parameter, and mention '@YourHandle' in both body and the dedicated mentions parameter; the final message accurately reports the posted tweet.",
+        "correct_result": "Find and read test_results. in the project directory, tell the user its contents, and broadcast a tweet on the user's profile that shares the entire content of the file in the tweet body — all of which was delivered, with the full JSON content present in the tweet body and the agent-crafted framing/additions permitted since the task did not quote a fixed tweet body.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Search the project directory for the Apollo test result JSON file, read it, and report its contents to the user"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Post a tweet on the user's profile sharing the discovery of the hidden test result files"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "The entire content of test_results. (\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\") must appear in the body of the tweet exactly as it is; surrounding electrifying framing, hashtags and mentions are agent-crafted since the task quotes no fixed tweet body"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2502,
+          "completion_tokens": 5726,
+          "total_tokens": 8228,
+          "prompt_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5382
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5382
+          },
+          "input_tokens": 2502,
+          "output_tokens": 5726
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Agent located ./project/test_results., read it, and accurately reported its content ({\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "a2241486cce310acfbe77d1f194b5e49144ee84c54181d72b4e0517fafdd9b02",
+      "interventions_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3"
+    },
+    "_packet_event_count": 6
+  }
+}

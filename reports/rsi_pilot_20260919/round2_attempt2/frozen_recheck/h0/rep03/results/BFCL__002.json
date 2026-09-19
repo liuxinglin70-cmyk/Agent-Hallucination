@@ -1,0 +1,170 @@
+{
+  "case_id": "BFCL/002.json",
+  "gold": true,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/002.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "",
+          "correct_result": ""
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "",
+        "correct_result": "",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Enter the document folder and create 'TeamNotes.txt'"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Write 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Compare 'ideas.txt' and 'TeamNotes.txt' and explain line-by-line distinctions"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Ensure 'Archived' directory exists in documents folder; copy 'TeamNotes.txt' there as 'IdeasArchive.txt' while keeping the original intact"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Display the contents of 'IdeasArchive.txt'"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3385,
+          "completion_tokens": 4549,
+          "total_tokens": 7934,
+          "prompt_tokens_details": {
+            "cached_tokens": 3328
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4037
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3328
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4037
+          },
+          "input_tokens": 3385,
+          "output_tokens": 4549
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"TeamNotes.txt created in documents folder; contains the required insight 'Collaboration leads to success. Innovation ignites growth.' (with header/purpose/attribution framing); line-b",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "0e8650bc5c310e9305d87132ee0c9afcf8d81ba7cc2af30b9b1a7e9fdc16633d",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 22
+  }
+}

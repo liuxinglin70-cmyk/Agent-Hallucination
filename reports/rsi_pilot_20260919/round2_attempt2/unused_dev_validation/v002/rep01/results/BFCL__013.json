@@ -1,0 +1,328 @@
+{
+  "case_id": "BFCL/013.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/013.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "A copy of research_notes.txt was placed in research/archives and renamed 2024_research_backup.txt (original left intact); the sorted line order (Experiment results, Introduction, Methodology) was reported correctly per the sort observation; the line count was reported as 1 line, matching the wc tool observation.",
+          "correct_result": "Same backup file in archives labeled 2024_research_backup.txt, correct alphabetical order reported, and the line count as measured by the environment's wc tool (count: 1). The sort observation (3 content lines) and the wc observation (1 line) conflict on the line-count point, and per the conflict rule that point is undecided rather than material; the delivered answer agrees with a direct environment observation."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "A copy of research_notes.txt was placed in research/archives and renamed 2024_research_backup.txt (original left intact); the sorted line order (Experiment results, Introduction, Methodology) was reported correctly per the sort observation; the line count was reported as 1 line, matching the wc tool observation.",
+        "correct_result": "Same backup file in archives labeled 2024_research_backup.txt, correct alphabetical order reported, and the line count as measured by the environment's wc tool (count: 1). The sort observation (3 content lines) and the wc observation (1 line) conflict on the line-count point, and per the conflict rule that point is undecided rather than material; the delivered answer agrees with a direct environment observation.",
+        "basis": "observation",
+        "confidence": "low",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: place a copy of research_notes.txt into the 'archives' folder within research, labeled '2024_research_backup.txt'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: sort the lines of '2024_research_backup.txt' alphabetically"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Turn 3: report how many lines are in the sorted '2024_research_backup.txt' file"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent reported the sorted contents as 'Experiment results / Introduction / Methodology' (stripping the 'Line N:' prefixes and renumbering 1-3) instead of the tool-observed sorted content 'Line 3: Experiment results / Line 1: Introduction / Line 2: Methodology' returned by the sort command",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "The contents of '2024_research_backup.txt' have been sorted alphabetically by line:\n\n1. Experiment results\n2. Introduction\n3. Methodology"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent reported that the sorted '2024_research_backup.txt' file contains 1 line instead of reconciling the wc observation (count=1) with its own earlier sort observation showing 3 lines ('Line 3: Experiment results', 'Line 1: Introduction', 'Line 2: Methodology'), presenting an unsupported count as established",
+          "locus_event_id": "event_013",
+          "evidence_refs": [
+            "event_010",
+            "event_012",
+            "event_013"
+          ],
+          "evidence_citations": [],
+          "quote": "The sorted '2024_research_backup.txt' file contains 1 line."
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent left '2024_research_backup.txt' itself unsorted (offering to save the sorted content only on request) instead of writing the sorted lines back to '2024_research_backup.txt' as implied by the task's reference to 'the sorted 2024_research_backup.txt' file in turn 3",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+        }
+      ],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The numbered list preserves the tool-observed sorted order (Experiment results, Introduction, Methodology) and is conventional presentation of the same referent, with no task-fixed literal output format, so no deliverable is wrong.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The reported count of 1 line is grounded in the environment's own wc observation for the file, and under the conflicted-observations rule a result agreeing with one observation cannot be convicted via the other.",
+          "evidence_refs": [],
+          "conflict_note": "The wc observation (event_012, count=1) conflicts with the event_010 sort listing showing 3 line segments; the conflict is unresolved by the record, and the delivered count agrees with the direct wc measurement of the exact quantity asked, so the point is undecided rather than material.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The task never explicitly required writing the sorted lines back into the file ('the sorted ... file' in turn 3 is a referential description), the required sorting action was performed via the sort tool, and that the file was actually left unsorted is only an assistant assertion, not an observed fact.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 3,
+        "answered": 3,
+        "missing": []
+      },
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2642,
+          "completion_tokens": 13625,
+          "total_tokens": 16267,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 13261
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 13261
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 2642,
+          "output_tokens": 13625
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"A copy of research_notes.txt was placed in research/archives and renamed to 2024_research_backup.txt (events 6-8, completion claim at event 9 supported by observations); the sorted co",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1659,
+          "completion_tokens": 6564,
+          "total_tokens": 8223,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 6081
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 6081
+          },
+          "input_tokens": 1659,
+          "output_tokens": 6564
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent reported the sorted contents as 'Experiment results / Introduction / Methodology' (stripping the 'Line N:' prefixes and renumbering 1-3) instead of the tool-observed sorted content 'Line 3: Experiment results / L"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2767,
+          "completion_tokens": 5944,
+          "total_tokens": 8711,
+          "prompt_tokens_details": {
+            "cached_tokens": 2752
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5531
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2752
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5531
+          },
+          "input_tokens": 2767,
+          "output_tokens": 5944
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": false,\n      \"causal\": false,\n      \"corrected_step\": null,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The reported order (Experiment results, Introduction, Methodology) exactly matches the tool-o",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 1,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "c4e55daea87829a0de46a05b913608295be1d69b632ecea592fba40c6df0edaf",
+      "interventions_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3"
+    },
+    "_packet_event_count": 13
+  }
+}

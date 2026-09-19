@@ -1,0 +1,542 @@
+{
+  "case_id": "BFCL/002.json",
+  "role": "training_failure",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 6,
+  "registry_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/002.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_006",
+    "responsible_step": 6,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_006",
+      "responsible_step": 6,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 6,
+          "traced_step": 6,
+          "defense": "substantiated",
+          "confirmed_step": 6,
+          "delivered_result": "TeamNotes.txt contains 'TeamNotes.txt\\n\\nPurpose: ...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+          "correct_result": "TeamNotes.txt should contain exactly 'Collaboration leads to success. Innovation ignites growth.' as quoted in the task",
+          "judge_basis": "task_requirement",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 6,
+        "hallucination_reason": "The task quoted the exact content to write into TeamNotes.txt, but the echo call delivered a rewritten file containing an added title, purpose statement, divider, 'Simona:' attribution prefix, and a placeholder prompt, extending the quoted span with unreferenced additions.",
+        "delivered_result": "TeamNotes.txt contains 'TeamNotes.txt\\n\\nPurpose: ...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+        "correct_result": "TeamNotes.txt should contain exactly 'Collaboration leads to success. Innovation ignites growth.' as quoted in the task",
+        "basis": "task_requirement",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_006",
+          "event_008"
+        ],
+        "root_cause": {
+          "step": 6,
+          "quote": "'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. ... Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+          "referent": "'Collaboration leads to success. Innovation ignites growth.'"
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "Write 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Copy TeamNotes.txt to Archived directory as IdeasArchive.txt keeping the original intact"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Show the contents of IdeasArchive.txt"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 6,
+        "quote": "'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+        "referent": "The echo call should have written exactly 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt, as quoted in the task, with no added title, purpose statement, divider, attribution prefix, or placeholder prompt.",
+        "evidence_refs": [
+          "event_006"
+        ],
+        "reason": "Event_006 is the first step where the wrong file content was authored: the echo tool arguments replaced the task's exact quoted text with an embellished version, and all later steps (cat, diff, cp, mv, final cat) merely carried this uncorrected content forward."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 6,
+        "evidence_refs": [
+          "event_006",
+          "event_008"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: turn 2 fixes the content to write — \"jot down 'Collaboration leads to success. Innovation ignites growth.' into the previous file\" — an explicit verbatim-content instruction, not a constraint inferred merely from quotation marks. event_006's echo instead writes \"TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n\": the quoted span appears only with a 'Simona: ' attribution prefix, embedded in an invented title line, purpose statement, divider and placeholder prompt. event_008's cat observation confirms this extended content is the committed state of TeamNotes.txt, so the deviation in the task-fixed content argument is real regardless of event_007's prose claiming the insights 'have been added'. RELEVANCE TEST: no shown later event rewrites or corrects the file — event_008 shows the extended content persisting into the turn-3 comparison, and the same state feeds the later copy-to-archive and view deliverables — so event_006 is the earliest assistant-authored introduction of the deviant committed state, and later events merely deliver it. Writing exactly the quoted insight would satisfy the task contract; the violation of an explicitly task-fixed content is material by definition (deliverable breach), not dismissible as immaterial formatting."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 6,
+            "reason": "The task quoted the exact content to write into TeamNotes.txt, but the echo call delivered a rewritten file containing an added title, purpose statement, divider, 'Simona:' attribution prefix, and a placeholder prompt, extending the quoted span with unreferenced additions.",
+            "evidence_refs": [
+              "event_006",
+              "event_008"
+            ],
+            "quote": "'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. ... Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+            "delivered_result": "TeamNotes.txt contains 'TeamNotes.txt\\n\\nPurpose: ...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+            "correct_result": "TeamNotes.txt should contain exactly 'Collaboration leads to success. Innovation ignites growth.' as quoted in the task"
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 6,
+              "quote": "'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+              "referent": "The echo call should have written exactly 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt, as quoted in the task, with no added title, purpose statement, divider, attribution prefix, or placeholder prompt.",
+              "evidence_refs": [
+                "event_006"
+              ],
+              "reason": "Event_006 is the first step where the wrong file content was authored: the echo tool arguments replaced the task's exact quoted text with an embellished version, and all later steps (cat, diff, cp, mv, final cat) merely carried this uncorrected content forward."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2607,
+                "completion_tokens": 577,
+                "total_tokens": 3184,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 351
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 351
+                },
+                "input_tokens": 2607,
+                "output_tokens": 577
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"'content': 'TeamNotes.txt\\\\n\\\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\\\n\\\\n---\\\\n\\\\nSimona: Collaboration leads to success. Innova"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 6,
+              "reason": "The task quoted the exact content to write into TeamNotes.txt, but the echo call delivered a rewritten file containing an added title, purpose statement, divider, 'Simona:' attribution prefix, and a placeholder prompt, extending the quoted span with unreferenced additions.",
+              "delivered_result": "TeamNotes.txt contains 'TeamNotes.txt\\n\\nPurpose: ...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'",
+              "correct_result": "TeamNotes.txt should contain exactly 'Collaboration leads to success. Innovation ignites growth.' as quoted in the task",
+              "evidence_refs": [
+                "event_006",
+                "event_008"
+              ],
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "Write 'Collaboration leads to success. Innovation ignites growth.' into TeamNotes.txt"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Copy TeamNotes.txt to Archived directory as IdeasArchive.txt keeping the original intact"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Show the contents of IdeasArchive.txt"
+                }
+              ],
+              "confidence": "high",
+              "quote": "'content': 'TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. ... Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017",
+                "event_018",
+                "event_019",
+                "event_020",
+                "event_021",
+                "event_022"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006",
+                "event_008"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: turn 2 fixes the content to write — \"jot down 'Collaboration leads to success. Innovation ignites growth.' into the previous file\" — an explicit verbatim-content instruction, not a constraint inferred merely from quotation marks. event_006's echo instead writes \"TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n\": the quoted span appears only with a 'Simona: ' attribution prefix, embedded in an invented title line, purpose statement, divider and placeholder prompt. event_008's cat observation confirms this extended content is the committed state of TeamNotes.txt, so the deviation in the task-fixed content argument is real regardless of event_007's prose claiming the insights 'have been added'. RELEVANCE TEST: no shown later event rewrites or corrects the file — event_008 shows the extended content persisting into the turn-3 comparison, and the same state feeds the later copy-to-archive and view deliverables — so event_006 is the earliest assistant-authored introduction of the deviant committed state, and later events merely deliver it. Writing exactly the quoted insight would satisfy the task contract; the violation of an explicitly task-fixed content is material by definition (deliverable breach), not dismissible as immaterial formatting."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: turn 2 fixes the content to write — \"jot down 'Collaboration leads to success. Innovation ignites growth.' into the previous file\" — an explicit verbatim-content instruction, not a constraint inferred merely from quotation marks. event_006's echo instead writes \"TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n\": the quoted span appears only with a 'Simona: ' attribution prefix, embedded in an invented title line, purpose statement, divider and placeholder prompt. event_008's cat observation confirms this extended content is the committed state of TeamNotes.txt, so the deviation in the task-fixed content argument is real regardless of event_007's prose claiming the insights 'have been added'. RELEVANCE TEST: no shown later event rewrites or corrects the file — event_008 shows the extended content persisting into the turn-3 comparison, and the same state feeds the later copy-to-archive and view deliverables — so event_006 is the earliest assistant-authored introduction of the deviant committed state, and later events merely deliver it. Writing exactly the quoted insight would satisfy the task contract; the violation of an explicitly task-fixed content is material by definition (deliverable breach), not dismissible as immaterial formatting."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the literal content to write — 'could you jot down 'Collaboration leads to success. Innovation ignites growth.' into the previous file?' — an explicit verbatim-content contract for the file-write deliverable. Event_006 instead commits echo with content='TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'. The quoted span is not delivered as the file content: it is prefixed with an unrequested 'Simona: ' attribution and embedded inside a fabricated title, purpose statement, divider, and placeholder prompt. This is not a representation/notation difference under grounding rule 5 — it is a genuinely different string with added unreferenced material, i.e., a DELIVERABLE BREACH of explicitly fixed content, material by definition, not a formatting-only or process-only deviation. Event_008's cat observation confirms the committed state ('TeamNotes.txt\\n\\nPurpose: ... Simona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'), so the error was not an intermediate state later corrected. RELEVANCE TEST: Event_006 is the earliest assistant-authored introduction of the embellished content (event_005 is prose only, no committed state), and the fabricated content is causally connected to everything the trajectory delivers afterward: it is the file state compared line-by-line against ideas.txt in turn 3, copied to IdeasArchive.txt in turn 4, and displayed in turn 5. Correcting event_006 to write exactly the quoted span removes the material deviation from the delivered state and all downstream artifacts that depend on it."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 6,
+                "evidence_refs": [
+                  "event_006",
+                  "event_008"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the payload to write — 'jot down \\'Collaboration leads to success. Innovation ignites growth.\\' into the previous file' — into TeamNotes.txt created at event_004. At event_006 the assistant instead passed echo content='TeamNotes.txt\\n\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas...\\n\\n---\\n\\nSimona: Collaboration leads to success. Innovation ignites growth.\\n\\n[Start adding your ideas here]\\n'. The written string is not the quoted span: it injects a title line, an unreferenced purpose paragraph, a divider, a 'Simona:' prefix that alters the insight's line, and an invented placeholder. Under grounding rule 1 the task-fixed content argument belongs to the deliverable, and the deviation is observed in the call itself; this is injected content, not a representation difference under rule 5 (whole unrequested sentences, not notation of the same value). event_008's cat observation confirms the file actually holds the extended text, so the state was delivered, not an intermediate error later corrected. RELEVANCE TEST: event_006 is the earliest assistant-authored introduction of the wrong file content (event_004 touch and event_005 prose are unobjectionable; event_007 only reports the addition). The extended content persists through event_008 and is the state that turn 3's line-by-line comparison, turn 4's archive copy, and turn 5's view all operate on, so correcting the echo payload to exactly the quoted span repairs the delivered artifact; no shown evidence of a later correction exists."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2498,
+                "completion_tokens": 13116,
+                "total_tokens": 15614,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2496
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 12704
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2496
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 12704
+                },
+                "input_tokens": 2498,
+                "output_tokens": 13116
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_008\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: Turn 2 fixes the payload to write — 'jot down \\\\'Collaboration leads to success. Innovation ignites growth.\\\\' into the ",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017",
+                "event_018",
+                "event_019",
+                "event_020",
+                "event_021",
+                "event_022"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3",
+        "active_interventions": [
+          "IV-3-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-3-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3674,
+          "completion_tokens": 5386,
+          "total_tokens": 9060,
+          "prompt_tokens_details": {
+            "cached_tokens": 3648
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4783
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3648
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4783
+          },
+          "input_tokens": 3674,
+          "output_tokens": 5386
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 6,\n  \"hallucination_reason\": \"The echo write to TeamNotes.txt extended the task-quoted required content 'Collaboration leads to success. Innovation ignites growth.' with unreferenced additions — a title line, purpose/template text, a 'Simona: ' ",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 3,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2607,
+          "completion_tokens": 577,
+          "total_tokens": 3184,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 351
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 351
+          },
+          "input_tokens": 2607,
+          "output_tokens": 577
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"step\": 6,\n  \"quote\": \"'content': 'TeamNotes.txt\\\\n\\\\nPurpose: This document is dedicated to capturing and organizing all fresh ideas contributed by the team. Please add your thoughts, suggestions, and innovations below as they arise.\\\\n\\\\n---\\\\n\\\\nSimona: Collaboration leads to success. Innova"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2498,
+          "completion_tokens": 13116,
+          "total_tokens": 15614,
+          "prompt_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 12704
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 12704
+          },
+          "input_tokens": 2498,
+          "output_tokens": 13116
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_008\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: Turn 2 fixes the payload to write — 'jot down \\\\'Collaboration leads to success. Innovation ignites growth.\\\\' into the ",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "0e8650bc5c310e9305d87132ee0c9afcf8d81ba7cc2af30b9b1a7e9fdc16633d",
+      "interventions_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3"
+    },
+    "_packet_event_count": 22
+  }
+}

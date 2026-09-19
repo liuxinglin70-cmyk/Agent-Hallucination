@@ -1,0 +1,16 @@
+{
+  "stage": "unused_dev_validation",
+  "arm": "h0",
+  "candidate_hash": null,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "repetition": 2,
+  "case_set": [
+    "BFCL/008.json",
+    "BFCL/024.json",
+    "BFCL/013.json",
+    "BFCL/018.json"
+  ],
+  "config_hash": "0b83025e79e2db2afed5626061d427531ebb2744d428d60123b830009cc5b598",
+  "code_baseline": "65ddb44",
+  "evaluation_mode": "fresh_full_detection_no_judge_cache"
+}

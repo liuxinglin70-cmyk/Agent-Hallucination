@@ -1,0 +1,174 @@
+{
+  "case_id": "BFCL/153.json",
+  "gold": true,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/153.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00; booking 3426812 (transaction 45451592) made with card_4526 and secure_access_token_987654321; invoice retrieved and reported accurately; customer support contacted for booking 3426812; booking cancelled successfully; tweet posted from account 'john' with content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' (tweet ID 10).",
+          "correct_result": "Same as delivered: cost $1050.00 per tool observation; booking, invoice retrieval, support contact, cancellation, and tweet posting all performed with the required arguments and confirmed by tool observations."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00; booking 3426812 (transaction 45451592) made with card_4526 and secure_access_token_987654321; invoice retrieved and reported accurately; customer support contacted for booking 3426812; booking cancelled successfully; tweet posted from account 'john' with content 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' (tweet ID 10).",
+        "correct_result": "Same as delivered: cost $1050.00 per tool observation; booking, invoice retrieval, support contact, cancellation, and tweet posting all performed with the required arguments and confirmed by tool observations.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "First-class cost from Rivermist's nearest airport (RMS) to JFK on 2024-12-15; observation returned 1050.0 and the answer reported $1050.00."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Book the flight using access token secure_access_token_987654321 and card card_4526 for RMS->JFK, first class, 2024-12-15; done in event_004 with booking confirmed."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Retrieve the invoice for the recent booking (3426812); done in event_007 and reported accurately in event_009."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Contact customer support on the user's behalf regarding the booking issue; done in event_010 for booking 3426812."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Cancel the flight booking; done in event_012 with cancel_status true."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Authenticate to Twitter as 'john'/'john1234' and post tweet 'Postponing my plans.' incorporating #Travel, #PlansChanged and @AirlineSupport; done in event_014 with all elements present in the posted content."
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3002,
+          "completion_tokens": 1784,
+          "total_tokens": 4786,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1295
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1295
+          },
+          "input_tokens": 3002,
+          "output_tokens": 1784
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00; booking 3426812 (transaction 45451592) made with card_4526 and secure_access_token_987654321; invoice retrieved an",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "20f77efebb4f266cbb5e23ad7f77dd5a061b0e9afa1df0fa68036149b330aa8d",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 15
+  }
+}

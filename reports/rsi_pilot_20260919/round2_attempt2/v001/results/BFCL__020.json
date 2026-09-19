@@ -1,0 +1,334 @@
+{
+  "case_id": "BFCL/020.json",
+  "role": "normal_neighbor",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/020.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "Confirmed 'summary.txt' exists and reported its contents; copied it into 'Research2023'; sorted 'summary.txt' (after cd into Research2023, recovering from the failed path-based sort); reported the sorted content and a line count of 1, claiming everything is arranged.",
+          "correct_result": "Verify 'summary.txt' exists, report its contents, copy it into 'Research2023', sort its lines alphabetically, and report the total line count of the sorted file."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Confirmed 'summary.txt' exists and reported its contents; copied it into 'Research2023'; sorted 'summary.txt' (after cd into Research2023, recovering from the failed path-based sort); reported the sorted content and a line count of 1, claiming everything is arranged.",
+        "correct_result": "Verify 'summary.txt' exists, report its contents, copy it into 'Research2023', sort its lines alphabetically, and report the total line count of the sorted file.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Check current directory for 'summary.txt' and report its contents if present"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Copy 'summary.txt' into 'Research2023'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Sort the lines of 'summary.txt' alphabetically"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Count total lines in the sorted 'summary.txt' to verify arrangement"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent read 'summary.txt' with cat before examining the current directory for the file's presence, instead of first listing the directory as the task's sequence ('Examine current directory for any presence of the file... If there is one, what's inside?') requires",
+          "locus_event_id": "event_001",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "evidence_citations": [],
+          "quote": "TOOL event_001_tool_01 name=cat arguments={'file_name': 'summary.txt'} (issued before any directory listing; the ls examination only occurs in event_002)"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent organized the lines of the copy 'Research2023/summary.txt' instead of the original 'summary.txt' in the starting directory, leaving the original file in the root unsorted (the task's 'organize the lines in summary.txt' is ambiguous, but the agent targeted only the copy)",
+          "locus_event_id": "event_006",
+          "evidence_refs": [
+            "event_002",
+            "event_006",
+            "event_007"
+          ],
+          "evidence_citations": [],
+          "quote": "TOOL event_006_tool_01 name=sort arguments={'file_name': 'Research2023/summary.txt'}; subsequently TOOL event_007_tool_02 name=sort arguments={'file_name': 'summary.txt'} after cd into 'Research2023'"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent changed directory and re-ran sort on 'summary.txt' instead of resolving the 'No such file or directory' error that directly contradicted the earlier observation that the file was copied to 'Research2023/summary.txt' (no re-verification of the copy, e.g. via ls, was performed before proceeding)",
+          "locus_event_id": "event_007",
+          "evidence_refs": [
+            "event_004",
+            "event_006",
+            "event_007"
+          ],
+          "evidence_citations": [],
+          "quote": "observation: {\"error\": \"sort: Research2023/summary.txt: No such file or directory\"} followed by TOOL event_007_tool_01 name=cd arguments={'folder': 'Research2023'} and TOOL event_007_tool_02 name=sort arguments={'file_name': 'summary.txt'}"
+        }
+      ],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The cat-before-ls inversion factually occurred (event_001 cat precedes event_002 ls), but both turn-1 deliverables — confirming presence and reporting contents — were correctly delivered in event_003 and the task fixes no tool-call order, so the deviation touches no deliverable.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": true,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "It is factually accurate that only the Research2023 copy was sorted while the root original stayed unsorted, but turn 3's bare 'summary.txt' is ambiguous after the turn-2 copy and fixes no target, so no deliverable breach is established and the delivered sorted-content and line-count claims match the observations.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The cd into Research2023 followed by a successful sort and a successful wc did resolve the event_006 error and verify the copy's existence and sorted state, so the claimed unresolved-contradiction deviation is not real and no task contract requires an ls re-verification.",
+          "evidence_refs": [],
+          "conflict_note": "The event_004 copy-success vs event_006 no-such-file conflict is settled by the later observations event_007 (successful cd plus successful sort) and event_009 (wc count), confirming Research2023/summary.txt exists and is sorted.",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 3,
+        "answered": 3,
+        "missing": []
+      },
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3",
+        "active_interventions": [
+          "IV-3-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-3-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2449,
+          "completion_tokens": 1678,
+          "total_tokens": 4127,
+          "prompt_tokens_details": {
+            "cached_tokens": 2432
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1399
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2432
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1399
+          },
+          "input_tokens": 2449,
+          "output_tokens": 1678
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Confirmed 'summary.txt' exists and reported its contents; copied it into 'Research2023'; sorted the copy's lines alphabetically (after correcting an initial path error by cd'ing into ",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1444,
+          "completion_tokens": 6893,
+          "total_tokens": 8337,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 6347
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 6347
+          },
+          "input_tokens": 1444,
+          "output_tokens": 6893
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent read 'summary.txt' with cat before examining the current directory for the file's presence, instead of first listing the directory as the task's sequence ('Examine current directory for any presence of the file.."
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2614,
+          "completion_tokens": 8168,
+          "total_tokens": 10782,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 7787
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 7787
+          },
+          "input_tokens": 2614,
+          "output_tokens": 8168
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": true,\n      \"corrected_step\": 1,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"Turn 1 explicitly fixes the sequence 'examine current directory for presence of summary.txt; if th",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 1,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "cc6ee327b527c0aa19dc41c90a2ffbb94579d24a78db5f898a995209327611a4",
+      "interventions_hash": "71d94f215df8e60a31804b2d65218292154deb626ee4af6cfa63434f7c33ffd3"
+    },
+    "_packet_event_count": 10
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "case_id": "BFCL/018.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/018.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "30 gallons converted to ~113.56 liters; engine started in START mode after locking doors and pressing brake; tire pressures reported (32/32/30/30 psi, healthy); tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru in dedicated parameters.",
+          "correct_result": "Same as delivered: correct conversion, successful engine start, tire inspection report, and tweet with exact quoted message plus hashtag and mention in their dedicated parameters."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "30 gallons converted to ~113.56 liters; engine started in START mode after locking doors and pressing brake; tire pressures reported (32/32/30/30 psi, healthy); tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru in dedicated parameters.",
+        "correct_result": "Same as delivered: correct conversion, successful engine start, tire inspection report, and tweet with exact quoted message plus hashtag and mention in their dedicated parameters.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "30 gallons converted to liters (~113.56 L)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Start engine in START mode"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Inspect each tire's condition/pressure"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet body exactly 'Tire pressures are optimal!' with #CarMaintenance hashtag and @VehicleGuru mention in dedicated parameters"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3",
+        "active_interventions": [
+          "IV-4-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-4-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2867,
+          "completion_tokens": 666,
+          "total_tokens": 3533,
+          "prompt_tokens_details": {
+            "cached_tokens": 2816
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 309
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2816
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 309
+          },
+          "input_tokens": 2867,
+          "output_tokens": 666
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"All four deliverables were completed correctly: (1) 30 gallons converted to ~113.56 liters via gallon_to_liter tool; (2) engine started in START mode after resolving door-lock and brake-pedal prerequi",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "0d2a12002945a08198b6af9110e8b4b881061da8f3f4c29e048047dd5b6e7660",
+      "interventions_hash": "c2eca84bde09c23c4d0bc684877fe45d2a62c72402a48808a25d9a6cb139a7f3"
+    },
+    "_packet_event_count": 13
+  }
+}

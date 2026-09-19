@@ -1,0 +1,31 @@
+{
+  "parent_hash": "0da64b891d88a31896a66a633eceba5977ebd3aa0dc14d045f2baad5ccb879aa",
+  "parent_candidate": {
+    "type": "text_boundary",
+    "hook": "judge.system",
+    "trigger": {
+      "packet_features": [
+        "has_tool_calls"
+      ],
+      "facts": []
+    },
+    "body": {
+      "directive": "Before ruling a delivery turn clean, locate every span the task quotes as exact required content (text inside quotation marks that the task instructs to write, send, or deliver) and compare it against the tool argument that finally delivers that content, such as a file-write content argument or a message or post body argument. Convict as content deviation when the delivered argument rewrites, truncates, or extends the quoted span with unreferenced additions: added title or header lines, template or purpose text, attribution prefixes naming a person absent from the quoted span, placeholder prompts, or appended commentary. The comparison target is the delivering tool argument itself, not the prose narration surrounding the tool call.",
+      "not_when": "Do not run this conviction when the task does not quote the exact required content: paraphrase, renumbering, reordering, summary, and reformatting are then allowed presentation choices. Do not convict the agent's re-presentation of its own tool observations, including stripping prefixes, renumbering, reordering, or summarizing observed content. Do not convict when the task only asks to report or display content and the agent did not write it back to a source file. Do not convict quotation-mark or code-fence wrapping of quoted content when the task does not require verbatim delivery."
+    },
+    "claim": {
+      "expected_behavior": "The judge convicts deliveries whose tool argument adds template text, attribution prefixes, or placeholder content around a task-quoted span instead of delivering the quoted content itself, while clean controls that paraphrase, summarize, or re-present their own tool observations remain clean.",
+      "target_polarity": "recall"
+    },
+    "provenance": {
+      "cycle": 3,
+      "failure_family": "FAM-fn-quoted-content-vs-delivered",
+      "failure_cases": [
+        "BFCL/002.json",
+        "BFCL/153.json"
+      ]
+    },
+    "schema_version": "detector.intervention.v1",
+    "intervention_id": "IV-3-001"
+  }
+}
