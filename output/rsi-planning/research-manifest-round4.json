@@ -1,0 +1,202 @@
+{
+  "schema_version": "evolution.research_manifest.v1",
+  "run_id": "rsi_round4_20260920",
+  "protocol_ref": "docs/optimization-directions.md §8/§9/§10；reports/rsi_pilot_20260919/round3/README.md（§9 触发证据）；reports/rsi_pilot_20260919/round2_attempt2/README.md（024 噪声证据）；本 manifest 在 round-4 任何真实评估之前冻结并提交",
+  "round4_note": "第 3 轮把剩余风险定位到防御消费位（P2 预注册的 §9 触发条件成立）：judge.system 指令不可达防御听证，013/020 的连坐定罪均经召回→升级→防御路径。第 4 轮按 §9 放宽研究面至已注册的 defense.system hook，允许联合候选（judge.system 召回指令 + defense.system 边界豁免）。024 维持噪声案例定级，沿用第 3 轮面板门。",
+  "intervention_surface": {
+    "types": [
+      "text_boundary"
+    ],
+    "hooks": [
+      "judge.system",
+      "defense.system"
+    ],
+    "max_entries": 2
+  },
+  "mechanism": {
+    "name": "quoted_content_vs_delivered",
+    "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+    "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+    "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现（剥前缀、重编号、重排、汇总）属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+    "round4_feedback": {
+      "source": "reports/rsi_pilot_20260919/round3/README.md 与 round2_attempt2/README.md",
+      "lessons": [
+        "BFCL/020（第 3 轮种子复筛 authoritative error）：judge 判阴后召回触发，升级实质性通过『整理副本而非原文件』声明，防御完整执行并定罪。该声明与引用内容绑定机制无关，却因召回触发被连带定罪；H0 从未在此例翻转（8/8 clean），候选臂 8 次测量 2 次 error。联合候选的 defense.system 条目必须携带边界豁免：对任务未钉死确切目标的任务解释类声明（整理哪个文件、是否写回源文件、呈现顺序）不得定罪",
+        "BFCL/013（第 2 轮 v002 文本曾 2/2 误标）：合法的剥 Line N: 前缀重编号再呈现。defense.system 条目必须显式豁免对自身工具观察的再呈现",
+        "防御条目的职责是边界豁免而非新增定罪面：judge.system 条目继续承担召回增益（002/153 的引用内容绑定核对），defense.system 条目以 not_when 收紧听证定罪面"
+      ]
+    },
+    "target_error_description": {
+      "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+      "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+    }
+  },
+  "family": {
+    "failure_family": "FAM-fn-quoted-content-vs-delivered",
+    "kind": "FN",
+    "mechanism_summary": "任务引用原文与交付内容绑定失败：judge 未核对任务引号内容与最终交付参数",
+    "actionability": {
+      "routes": [
+        "text_boundary"
+      ]
+    }
+  },
+  "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+  "detector_config": "detector/configs/autodl.json",
+  "cases": [
+    {
+      "case_id": "BFCL/002.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 6,
+      "target_error": "T2 逐字引用写入行；step 6 echo 写入完整模板+Simona: 虚构署名+占位文本"
+    },
+    {
+      "case_id": "BFCL/153.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 14,
+      "target_error": "T6 引用正文 'Postponing my plans.'；step 14 把 #Travel #PlansChanged @AirlineSupport 嵌入正文，tags/mentions 为空"
+    },
+    {
+      "case_id": "BFCL/020.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    },
+    {
+      "case_id": "BFCL/053.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    }
+  ],
+  "validation_cases": [
+    {
+      "case_id": "BFCL/002.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 6,
+      "reason": "训练失败修复必须在本轮仪器内成立（目标步对齐）"
+    },
+    {
+      "case_id": "BFCL/153.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 14,
+      "reason": "同上"
+    },
+    {
+      "case_id": "BFCL/008.json",
+      "role": "regression",
+      "raw_gold": true,
+      "reason": "同族回归样本；稳定单元（两轮两臂零翻转）"
+    },
+    {
+      "case_id": "BFCL/082.json",
+      "role": "regression",
+      "raw_gold": true,
+      "reason": "P1 扩展筛查在案的同表面回归样本（H0 检出 step 11）"
+    },
+    {
+      "case_id": "BFCL/148.json",
+      "role": "regression",
+      "raw_gold": true,
+      "reason": "P1 扩展筛查在案的同表面回归样本（H0 检出 step 15）"
+    },
+    {
+      "case_id": "BFCL/024.json",
+      "role": "regression",
+      "raw_gold": true,
+      "reason": "预注册噪声案例：P2（H0 2/2、v005 1/2）与第 2 轮（H0 1/3、v002 2/3），合并 3/5 vs 3/5；采用配对支配读数"
+    },
+    {
+      "case_id": "BFCL/013.json",
+      "role": "boundary",
+      "raw_gold": false,
+      "reason": "P2 中 v002 文本的 FP 边界例；继续零容忍"
+    },
+    {
+      "case_id": "BFCL/020.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "reason": "第 3 轮发现低频候选相关召回路径 FP 的邻居；本轮 defense.system 条目是其修复目标，继续零容忍"
+    },
+    {
+      "case_id": "BFCL/018.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "reason": "P1 试点正常近邻，两轮两臂均稳定 clean；继续零容忍"
+    }
+  ],
+  "panel_gate": {
+    "training_cases": [
+      "BFCL/002.json",
+      "BFCL/153.json"
+    ],
+    "clean_cases": [
+      "BFCL/013.json",
+      "BFCL/018.json",
+      "BFCL/020.json"
+    ],
+    "regression_cases": [
+      "BFCL/008.json",
+      "BFCL/082.json",
+      "BFCL/148.json"
+    ],
+    "noisy_cases": [
+      {
+        "case_id": "BFCL/024.json",
+        "rule": "candidate_kept_count >= h0_kept_count",
+        "evidence": "两臂翻转记录：P2（H0 2/2、v005 1/2）与第 2 轮（H0 1/3、v002 2/3），合并 3/5 vs 3/5——纯噪声单元，零容忍不可区分；配对支配读数并逐次照报"
+      }
+    ],
+    "rationale": "训练两例、clean 三例（含 020——本轮 defense.system 条目的修复对象）与稳定回归三例零容忍，每次重复都必须成立；024 为预注册噪声案例，配对支配读数，逐次读数与 H0 对照全部照报；全部逐例严格读数同时照报。"
+  },
+  "baseline_ref": {},
+  "framework_config": {
+    "detector_config": "detector/configs/autodl.json",
+    "budget": {
+      "llm_calls": 1
+    },
+    "proposer": {
+      "mode": "llm",
+      "max_output_tokens": 32768,
+      "max_repair_calls": 0
+    }
+  },
+  "routes": [
+    "C"
+  ],
+  "route_notes": {
+    "C": "完整轨迹诊断路线（P2 证据裁定）；本轮允许联合候选（judge.system + defense.system 各一条）"
+  },
+  "stages": {
+    "frozen_recheck": {
+      "case_set": "screening",
+      "gate": "candidate_all_reps",
+      "repetitions": 3,
+      "budget_case_evaluations": 24
+    },
+    "unused_dev_validation_r4": {
+      "case_set": "validation",
+      "gate": "panel",
+      "repetitions": 3,
+      "budget_case_evaluations": 54
+    }
+  },
+  "pass_conditions": [
+    "screening：两条训练失败在目标步修复为 authoritative verified_error，020/053 保持 authoritative verified_clean",
+    "frozen_recheck：候选臂 3 次重复全部通过（每次重复同条件）；H0 对照报告",
+    "unused_dev_validation_r4 面板门：候选臂 3 次重复全部满足——训练两例每次修复（零容忍）、clean 三例（013/018/020）每次 clean（零容忍）、稳定回归三例（008/082/148）每次保持检出（零容忍）、024 配对支配（候选保持次数 ≥ H0）",
+    "严格逐例读数（含 024 单例零容忍）同时照报；其不可区分性已预注册",
+    "任一阶段未过即停止并报告原因；不调门限、不改划分、不重抽种子、不更换验证集"
+  ],
+  "budget": {
+    "baseline_case_evaluations": 4,
+    "screening_case_evaluations": 8,
+    "proposer_calls_per_route": 2,
+    "max_versions": 2,
+    "workers": 2
+  }
+}
