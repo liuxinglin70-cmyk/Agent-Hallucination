@@ -1,0 +1,184 @@
+{
+  "case_id": "BFCL/053.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "14648848c9841ea3eac1a9ce8154a1273167f87826634e6fa278fdf1ee478c17",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/053.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "Filled 3.96 gallons (15 liters converted and rounded to two decimals), checked tire pressures (32/32/30/30, healthy), posted the tweet with the exact requested message, started the engine after locking doors and pressing the brake, reported fuel level 13.96 gallons and battery voltage 12.6 volts, then retweeted tweet id 5 and added the comment 'Ready for the next adventure!'",
+          "correct_result": "All required deliverables: fill 15 liters converted to gallons with second-decimal precision (3.96 gal), check tire pressures, post the verbatim tweet, start engine and report battery voltage and fuel level, retweet the tweet, and add the verbatim comment 'Ready for the next adventure!'"
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Filled 3.96 gallons (15 liters converted and rounded to two decimals), checked tire pressures (32/32/30/30, healthy), posted the tweet with the exact requested message, started the engine after locking doors and pressing the brake, reported fuel level 13.96 gallons and battery voltage 12.6 volts, then retweeted tweet id 5 and added the comment 'Ready for the next adventure!'",
+        "correct_result": "All required deliverables: fill 15 liters converted to gallons with second-decimal precision (3.96 gal), check tire pressures, post the verbatim tweet, start engine and report battery voltage and fuel level, retweet the tweet, and add the verbatim comment 'Ready for the next adventure!'",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Fill 15 liters of gasoline converted to gallon with second decimal digit precision (3.96 gallons)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Check tire pressures"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet with message 'Just filled up the tank and checked the tire pressures. Ready for the next adventure!'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Start the engine and report battery voltage and fuel level"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Retweet the previously posted tweet"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Comment 'Ready for the next adventure!' on the tweet"
+          }
+        ]
+      },
+      "recall_candidates": [],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": null,
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "14648848c9841ea3eac1a9ce8154a1273167f87826634e6fa278fdf1ee478c17",
+        "active_interventions": [
+          "IV-3-001"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-3-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "not_needed",
+        "attempts": 0,
+        "view": "not_rendered",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2694,
+          "completion_tokens": 847,
+          "total_tokens": 3541,
+          "prompt_tokens_details": {
+            "cached_tokens": 2688
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 462
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2688
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 462
+          },
+          "input_tokens": 2694,
+          "output_tokens": 847
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Filled 3.96 gallons (15 liters at second-decimal precision), checked tire pressures (32/32/30/30, healthy), posted the exact requested tweet (id 5), started the engine after locking d",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "not_rendered",
+      "upgrade_view": "not_rendered",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "6e9842f7a32c132189764490691d6400366922dd7f8ef164798a6a11f96b27a0",
+      "interventions_hash": "14648848c9841ea3eac1a9ce8154a1273167f87826634e6fa278fdf1ee478c17"
+    },
+    "_packet_event_count": 6
+  }
+}

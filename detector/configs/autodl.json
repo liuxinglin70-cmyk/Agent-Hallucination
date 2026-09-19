@@ -23,7 +23,7 @@
   },
   "defense_route": {
     "model": "GLM-5.3-flash",
-    "max_tokens": 8192,
+    "max_tokens": 32768,
     "votes": 3,
     "vote_topup": 2
   },

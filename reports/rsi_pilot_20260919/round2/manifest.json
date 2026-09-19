@@ -1,0 +1,198 @@
+{
+  "schema_version": "evolution.research_report.v1",
+  "run_id": "rsi_round2_20260920",
+  "input_manifest": {
+    "schema_version": "evolution.research_manifest.v1",
+    "run_id": "rsi_round2_20260920",
+    "protocol_ref": "docs/optimization-directions.md §8；reports/rsi_pilot_20260919/README.md（P2 未用开发验证未过的三条下轮输入）；本 manifest 在任何第 2 轮真实评估之前冻结并提交",
+    "mechanism": {
+      "name": "quoted_content_vs_delivered",
+      "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+      "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+      "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现（剥前缀、重编号、重排、汇总）属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+      "round2_feedback": {
+        "source": "reports/rsi_pilot_20260919/README.md（P2 未用开发验证：v002 两轮把 013 误标、v005 第 2 轮丢失 024）",
+        "lessons": [
+          "BFCL/024（v005 第 2 轮翻转）：任务要求逐字分享文件内容（exactly as it is），交付正文以 code fence 包裹文件内容并添加介绍行。指令必须给出可机械核对的判据：任务要求逐字时，对被引内容的任何未引用添加（包裹符号、介绍行、评注）都是偏离；引号包裹豁免不适用于要求逐字的情形",
+          "BFCL/013（v002 两轮误标）：judge 判阴后经召回→升级→防御定罪，防御以交付与观察内容一致性把合法的剥 Line N: 前缀重编号呈现判错。judge.system 的 not_when 约束不到 defense 消费位，因此指令必须显式声明：对自身工具观察的剥前缀/重编号再呈现不构成内容偏离，且任务只要求报告内容时不以未写回源文件定罪。若第 2 轮仍经召回→防御路径把 013 定罪，按方案 §9 触发消费位扩展的单独决定",
+          "轮间方差：temperature 0 下贴近边界案例两次重复即出现翻转（v005@024、H0@008/013）；第 2 轮把冻结复核与未用验证的重复次数提高到 3，并要求指令给出可机械核对的判据以降低模型自行权衡的空间"
+        ]
+      },
+      "target_error_description": {
+        "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+        "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+      }
+    },
+    "family": {
+      "failure_family": "FAM-fn-quoted-content-vs-delivered",
+      "kind": "FN",
+      "mechanism_summary": "任务引用原文与交付内容绑定失败：judge 未核对任务引号内容与最终交付参数",
+      "actionability": {
+        "routes": [
+          "text_boundary"
+        ]
+      }
+    },
+    "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+    "detector_config": "detector/configs/autodl.json",
+    "cases": [
+      {
+        "case_id": "BFCL/002.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 6,
+        "target_error": "T2 逐字引用写入行；step 6 echo 写入完整模板+Simona: 虚构署名+占位文本"
+      },
+      {
+        "case_id": "BFCL/153.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 14,
+        "target_error": "T6 引用正文 'Postponing my plans.'；step 14 把 #Travel #PlansChanged @AirlineSupport 嵌入正文，tags/mentions 为空"
+      },
+      {
+        "case_id": "BFCL/020.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "target_error": null
+      },
+      {
+        "case_id": "BFCL/053.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "target_error": null
+      }
+    ],
+    "validation_cases": [
+      {
+        "case_id": "BFCL/008.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "同族已判对回归样本（P1 扩展筛查入选理由在案）；候选不得丢失既有检出"
+      },
+      {
+        "case_id": "BFCL/024.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "同族已判对回归样本；P2 中 v005 第 2 轮在此翻转，是本轮下修 not_when 的主要验证点"
+      },
+      {
+        "case_id": "BFCL/013.json",
+        "role": "boundary",
+        "raw_gold": false,
+        "reason": "P2 中 v002 的 FP 边界例：合法重编号呈现；H0 自身两轮翻转，对照读数只报告不设门"
+      },
+      {
+        "case_id": "BFCL/018.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "reason": "P1 试点正常近邻（H0 判对），未参与任何候选筛查或修订；按 P2 下轮输入第 2 条扩大未用验证集"
+      }
+    ],
+    "baseline_ref": {
+      "runs": [
+        {
+          "run_dir": "artifacts/detector/runs/rsi_pilot_h0_expansion_20260919"
+        },
+        {
+          "run_dir": "artifacts/detector/runs/rsi_pilot_h0_20260919"
+        }
+      ],
+      "detector_config_hash": "b0f9348a4c3f6cb543099b06251c9fd166325208bb83c23ad00fd34398ead033"
+    },
+    "framework_config": {
+      "detector_config": "detector/configs/autodl.json",
+      "budget": {
+        "llm_calls": 1
+      },
+      "proposer": {
+        "mode": "llm",
+        "max_output_tokens": 32768,
+        "max_repair_calls": 0
+      }
+    },
+    "routes": [
+      "C"
+    ],
+    "route_notes": {
+      "C": "P2 证据裁定 C 路线（完整轨迹诊断）为唯一继续路线：v005 是唯一通过未用验证第 1 轮的版本；B 路线 v002 两轮把 013 误标"
+    },
+    "stages": {
+      "frozen_recheck": {
+        "repetitions": 3,
+        "budget_case_evaluations": 24
+      },
+      "unused_dev_validation": {
+        "repetitions": 3,
+        "budget_case_evaluations": 24
+      }
+    },
+    "pass_conditions": [
+      "screening：两条训练失败在目标步（002@6、153@14）修复为 authoritative verified_error，020/053 保持 authoritative verified_clean",
+      "frozen_recheck：候选臂 3 次重复全部通过（每次重复同条件）；H0 臂作对照报告、不设门",
+      "unused_dev_validation：候选臂 3 次重复全部通过——008/024 保持 authoritative 检出，013/018 保持 authoritative clean；任一重复失败即本轮验证未过",
+      "任一阶段未过即停止并报告原因；不调门限、不改划分、不重抽种子、不在看过读数后更换验证集"
+    ],
+    "budget": {
+      "baseline_case_evaluations": 0,
+      "screening_case_evaluations": 8,
+      "proposer_calls_per_route": 2,
+      "max_versions": 2,
+      "workers": 2
+    }
+  },
+  "input_manifest_hash": "a4ff0eca010093acc8d8403aec41d9b66c468c21948fdda155d525374d21f3c6",
+  "code_baseline": "b6a278b",
+  "detector_config_hash": "9b3f6b7df772b1ae765e3dd97b047cc1185707fa85c154a9823bba6dbcf3a6db",
+  "mechanism": {
+    "name": "quoted_content_vs_delivered",
+    "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+    "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+    "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现（剥前缀、重编号、重排、汇总）属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+    "round2_feedback": {
+      "source": "reports/rsi_pilot_20260919/README.md（P2 未用开发验证：v002 两轮把 013 误标、v005 第 2 轮丢失 024）",
+      "lessons": [
+        "BFCL/024（v005 第 2 轮翻转）：任务要求逐字分享文件内容（exactly as it is），交付正文以 code fence 包裹文件内容并添加介绍行。指令必须给出可机械核对的判据：任务要求逐字时，对被引内容的任何未引用添加（包裹符号、介绍行、评注）都是偏离；引号包裹豁免不适用于要求逐字的情形",
+        "BFCL/013（v002 两轮误标）：judge 判阴后经召回→升级→防御定罪，防御以交付与观察内容一致性把合法的剥 Line N: 前缀重编号呈现判错。judge.system 的 not_when 约束不到 defense 消费位，因此指令必须显式声明：对自身工具观察的剥前缀/重编号再呈现不构成内容偏离，且任务只要求报告内容时不以未写回源文件定罪。若第 2 轮仍经召回→防御路径把 013 定罪，按方案 §9 触发消费位扩展的单独决定",
+        "轮间方差：temperature 0 下贴近边界案例两次重复即出现翻转（v005@024、H0@008/013）；第 2 轮把冻结复核与未用验证的重复次数提高到 3，并要求指令给出可机械核对的判据以降低模型自行权衡的空间"
+      ]
+    },
+    "target_error_description": {
+      "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+      "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "BFCL/002.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 6,
+      "target_error": "T2 逐字引用写入行；step 6 echo 写入完整模板+Simona: 虚构署名+占位文本"
+    },
+    {
+      "case_id": "BFCL/153.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 14,
+      "target_error": "T6 引用正文 'Postponing my plans.'；step 14 把 #Travel #PlansChanged @AirlineSupport 嵌入正文，tags/mentions 为空"
+    },
+    {
+      "case_id": "BFCL/020.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    },
+    {
+      "case_id": "BFCL/053.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    }
+  ],
+  "routes": [
+    "C"
+  ],
+  "evaluation_mode": "fresh_full_detection_no_judge_cache",
+  "frozen_at": "2026-09-20T01:48:34"
+}
