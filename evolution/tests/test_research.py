@@ -1017,3 +1017,64 @@ def test_joint_candidate_over_max_entries_fails_closed(tmp_path):
     )
     assert selection["routes"]["C"]["selected"] is None
     assert report["next_stage"] is None
+
+
+# ---------------------------------------------------------------------------
+# joint-candidate revision path (list parent through _revise)
+
+def test_joint_candidate_revision_keeps_both_entries(tmp_path):
+    """A failing joint candidate is revised as a joint candidate.
+
+    R4-R6 saw joint candidates pass on the first screen, so this path had
+    no live coverage: a list parent must survive the diagnosis packet, the
+    parent record and the revised candidate record without being flattened
+    into a single mapping.
+    """
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[baseline], routes=("C",),
+        surface={
+            "types": ["text_boundary"],
+            "hooks": ["judge.system", "defense.system"],
+            "max_entries": 2,
+        },
+    )
+    # Draft is mechanism-irrelevant (fails screening); the revision carries
+    # the quote operation in BOTH entries so the joint revision passes.
+    failing = _candidate_with("Read the task text carefully before voting.")
+    failing_defense = _defense_entry()
+    failing_defense["body"]["directive"] = "Weigh testimony before voting."
+    revised_defense = _defense_entry()
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[failing, failing_defense]),
+        ProposalBatch(candidates=[_valid_candidate(), revised_defense]),
+    ])
+    backend = FakeBackend()
+    report = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert report["status"] == "screening_complete"
+    selection = json.loads(
+        (tmp_path / "run" / "selection.json").read_text(encoding="utf-8"),
+    )
+    assert selection["routes"]["C"]["selected"] == "v002"
+    parent = json.loads(
+        (tmp_path / "run" / "v002" / "parent.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert isinstance(parent["parent_candidate"], list)
+    assert len(parent["parent_candidate"]) == 2
+    revised = json.loads(
+        (tmp_path / "run" / "v002" / "candidate.json").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert isinstance(revised["candidate"], list)
+    assert len(revised["candidate"]) == 2
+    assert {e["hook"] for e in revised["candidate"]} == {
+        "judge.system", "defense.system",
+    }
+    # Both revision entries were live in the evaluation registry.
+    assert all(
+        len(call["registry"]["interventions"]) == 2 for call in backend.calls
+    )
