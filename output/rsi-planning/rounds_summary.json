@@ -1,0 +1,406 @@
+{
+ "BFCL/002.json": {
+  "tier": "training_fix",
+  "arms": {
+   "h0": {
+    "good": 4,
+    "total": 14,
+    "flips": [
+     {
+      "round": "r2a2",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r5-conf",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r5-conf",
+      "rep": "rep02",
+      "state": "verified_clean"
+     }
+    ]
+   },
+   "v001": {
+    "good": 11,
+    "total": 11,
+    "flips": []
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/008.json": {
+  "tier": "stable_regression",
+  "arms": {
+   "h0": {
+    "good": 14,
+    "total": 16,
+    "flips": [
+     {
+      "round": "r6-008",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-008",
+      "rep": "rep06",
+      "state": "verified_clean"
+     }
+    ]
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   },
+   "v001": {
+    "good": 10,
+    "total": 13,
+    "flips": [
+     {
+      "round": "r5-conf",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-008",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-008",
+      "rep": "rep08",
+      "state": "verified_clean"
+     }
+    ]
+   }
+  }
+ },
+ "BFCL/013.json": {
+  "tier": "clean_boundary",
+  "arms": {
+   "h0": {
+    "good": 6,
+    "total": 8,
+    "flips": [
+     {
+      "round": "r4-val",
+      "rep": "rep02",
+      "state": "verified_error"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep03",
+      "state": "verified_error"
+     }
+    ]
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   },
+   "v001": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/018.json": {
+  "tier": "clean_neighbor",
+  "arms": {
+   "h0": {
+    "good": 8,
+    "total": 8,
+    "flips": []
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   },
+   "v001": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/020.json": {
+  "tier": "clean_neighbor",
+  "arms": {
+   "h0": {
+    "good": 14,
+    "total": 14,
+    "flips": []
+   },
+   "v001": {
+    "good": 10,
+    "total": 11,
+    "flips": [
+     {
+      "round": "r2a1",
+      "rep": "rep01",
+      "state": "verified_error"
+     }
+    ]
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/024.json": {
+  "tier": "noisy_regression",
+  "arms": {
+   "h0": {
+    "good": 10,
+    "total": 14,
+    "flips": [
+     {
+      "round": "r2a2-val",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2-val",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-024",
+      "rep": "rep05",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-024",
+      "rep": "rep06",
+      "state": "verified_clean"
+     }
+    ]
+   },
+   "v002": {
+    "good": 2,
+    "total": 3,
+    "flips": [
+     {
+      "round": "r2a2-val",
+      "rep": "rep03",
+      "state": "verified_clean"
+     }
+    ]
+   },
+   "v001": {
+    "good": 7,
+    "total": 11,
+    "flips": [
+     {
+      "round": "r4-val",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-024",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-024",
+      "rep": "rep05",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r6-024",
+      "rep": "rep06",
+      "state": "verified_clean"
+     }
+    ]
+   }
+  }
+ },
+ "BFCL/053.json": {
+  "tier": "clean_neighbor",
+  "arms": {
+   "h0": {
+    "good": 9,
+    "total": 9,
+    "flips": []
+   },
+   "v001": {
+    "good": 6,
+    "total": 6,
+    "flips": []
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/082.json": {
+  "tier": "stable_regression",
+  "arms": {
+   "h0": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   },
+   "v001": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/148.json": {
+  "tier": "stable_regression",
+  "arms": {
+   "h0": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   },
+   "v001": {
+    "good": 5,
+    "total": 5,
+    "flips": []
+   }
+  }
+ },
+ "BFCL/153.json": {
+  "tier": "training_fix",
+  "arms": {
+   "h0": {
+    "good": 0,
+    "total": 14,
+    "flips": [
+     {
+      "round": "r2a1",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a1",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a1",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r2a2",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep02",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r4-val",
+      "rep": "rep03",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r5-conf",
+      "rep": "rep01",
+      "state": "verified_clean"
+     },
+     {
+      "round": "r5-conf",
+      "rep": "rep02",
+      "state": "verified_clean"
+     }
+    ]
+   },
+   "v001": {
+    "good": 11,
+    "total": 11,
+    "flips": []
+   },
+   "v002": {
+    "good": 3,
+    "total": 3,
+    "flips": []
+   }
+  }
+ }
+}

@@ -1,0 +1,593 @@
+{
+  "case_id": "BFCL/024.json",
+  "gold": true,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/024.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "defense": "refuted",
+          "defense_reason": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered.",
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c1",
+              "verdict": "refuted"
+            }
+          ]
+        },
+        "blocking_facts": [
+          {
+            "component": "defense",
+            "code": "refuted",
+            "error_type": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered."
+          }
+        ]
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "code": "refuted",
+          "error_type": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered."
+        }
+      ],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The agent located ./project/test_results. via find, read it with cat (observation: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}), reported that exact content to the user in turn 1, and in turn 2 posted tweet ID 3 via post_tweet whose body contains the entire file content (all three fields and values, wrapped in a  code fence with requested 'electrifying' framing), with hashtags placed in the tags parameter and the mention in the mentions parameter; the posted observation confirms the tweet content.",
+        "correct_result": "Find and read the Apollo Project test result JSON file in the project directory, report its contents, and broadcast a tweet on the user's profile whose body shares the entire file content exactly as it is.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Search the project directory for the Apollo test result file (likely JSON) and report what is inside"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "The tweet body must contain the entire content of test_results. exactly as it is"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Craft and broadcast (post) the tweet on the user's profile"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exactly as it is in the body of the tweet')",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_003",
+            "event_005"
+          ],
+          "evidence_citations": [],
+          "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n``` (posted content) vs {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} (actual file content from event_003)"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent appended invented hashtags '#ApolloProject', '#Success', '#TechRevealed' and a placeholder mention '@YourHandle' to the tweet instead of broadcasting only the discovery content, adding material not present in the file and using a fabricated handle though the user specified only 'on my profile'",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_003",
+            "event_005"
+          ],
+          "evidence_citations": [],
+          "quote": "'tags': ['#ApolloProject', '#Success'], 'mentions': ['@YourHandle'] and trailing text '#ApolloProject #Success #TechRevealed @YourHandle'"
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 5,
+        "reason": "The task explicitly fixed the tweet body to carry the file content 'exactly as it is', but the post_tweet call at event_005 delivers a byte-altered serialization (two inserted spaces after '{' plus  fencing) versus the verbatim content observed in event_003, a deliverable breach that posting the verbatim string at event_005 would fully cure.",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "conflict_note": "",
+        "coverage": "answered",
+        "locus_event_id": "event_005",
+        "evidence_citations": [],
+        "claim": "the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exactly as it is in the body of the tweet')",
+        "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n``` (posted content) vs {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} (actual file content from event_003)"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 5,
+          "reason": "The task explicitly fixed the tweet body to carry the file content 'exactly as it is', but the post_tweet call at event_005 delivers a byte-altered serialization (two inserted spaces after '{' plus  fencing) versus the verbatim content observed in event_003, a deliverable breach that posting the verbatim string at event_005 would fully cure.",
+          "evidence_refs": [
+            "event_003",
+            "event_005"
+          ],
+          "conflict_note": "",
+          "coverage": "answered",
+          "locus_event_id": "event_005",
+          "evidence_citations": [],
+          "claim": "the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exactly as it is in the body of the tweet')",
+          "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n``` (posted content) vs {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} (actual file content from event_003)"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 5,
+          "reason": "The task explicitly fixed the tweet body to carry the file content 'exactly as it is', but the post_tweet call at event_005 delivers a byte-altered serialization (two inserted spaces after '{' plus  fencing) versus the verbatim content observed in event_003, a deliverable breach that posting the verbatim string at event_005 would fully cure.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The hashtags and placeholder mention were genuinely appended, but the task's 'electrifying tweet' framing left styling free and fixed only that the file content appear exactly and be posted on the user's profile (which happened), so the additions are non-contractual wording touching no deliverable and removing them alone would not change deliverable correctness.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 2,
+        "answered": 2,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c1",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 5,
+            "reason": "the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exactly as it is in the body of the tweet')",
+            "evidence_refs": [
+              "event_003",
+              "event_005"
+            ],
+            "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n``` (posted content) vs {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} (actual file content from event_003)",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 5,
+              "quote": "{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+              "referent": "{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — the exact file content returned by event_003, which the task required to be shared 'exactly as it is in the body of the tweet'",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "reason": "The material deviation first appears at event_005's post_tweet call, where the tweet body wraps the file content in  fences and inserts two extra spaces after '{', differing from the exact file content observed at event_003; earlier steps (find/cd/cat) and event_004's chat display did not alter the tweet content, so step 5 is the earliest introduction of the error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1411,
+                "completion_tokens": 1457,
+                "total_tokens": 2868,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1242
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1242
+                },
+                "input_tokens": 1411,
+                "output_tokens": 1457
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":5,\"quote\":\"\\n{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}\\n\",\"referent\":\"{\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"} — the exact file content returned by event_003, which the "
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 5,
+              "reason": "the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exactly as it is in the body of the tweet')",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "evidence_citations": [],
+              "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n``` (posted content) vs {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} (actual file content from event_003)",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Search the project directory for the Apollo test result file (likely JSON) and report what is inside"
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "The tweet body must contain the entire content of test_results. exactly as it is"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Craft and broadcast (post) the tweet on the user's profile"
+                }
+              ],
+              "candidate_id": "c1"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered."
+            },
+            "raw": [
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005",
+                  "event_006"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The deviation is factually real but non-convictable under the deployed quoted-content-binding rule. event_003's cat observation shows the file as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}; event_005's post_tweet body contains that same JSON with two added spaces after '{' and wrapped in ```json fences. However, the task never quotes the exact required content — the JSON is established only by the agent's own tool observation — and the intervention mandates conviction solely when the task quotes the exact required span and the delivered parameters deviate from it, or when separately-required elements are embedded in the body while dedicated parameters (tags/mentions) are left empty. Neither condition holds: the JSON re-presentation is a formatting-only presentation change (whitespace, code fences, framing preamble) of the agent's own observation, every key and value of the file content appears in the tweet body so the 'entire content' requirement is met, and the dedicated tags=['#ApolloProject','#Success'] and mentions=['@YourHandle'] parameters were filled, not empty. The observation in event_005 confirms the tweet was actually posted, so event_006's completion claim is true. Immaterial formatting deviation; the positive verdict is overturned."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The task text (turn 2) says to share the file content 'exactly as it is in the body of the tweet' but never quotes any required content span; the content exists in the trajectory only as the agent's own tool observation (event_003: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}). The delivered tweet body (event_005) contains that same JSON value in full — every key and value identical — with only presentation changes (```json fences, two spaces after '{') plus template scaffolding (intro line, hashtags) appropriate to the requested 'electrifying tweet', and the dedicated 'tags' and 'mentions' parameters were filled, not left empty. Under the quoted-content binding, conviction is available only when the task itself quotes the exact required content and the delivered parameters deviate from that quoted span, or when separately required elements were embedded while tags/mentions fields were left empty; neither condition holds. Re-presentation of the agent's own tool observation with whitespace/fence changes preserves the same referent and shares the entire file content as required, so the formatting deviation is immaterial and the step cannot stand."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2508,
+                "completion_tokens": 5200,
+                "total_tokens": 7708,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2496
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 4894
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 4894
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2496
+                },
+                "input_tokens": 2508,
+                "output_tokens": 5200
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"The task text (turn 2) says to share the file content 'exactly as it is in the body of the tweet' but never quotes any required content s",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "refuted",
+                  "refuted",
+                  "refuted"
+                ],
+                "collapsed": "refuted",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 4,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6",
+        "active_interventions": [
+          "IV-3-001",
+          "IV-3-002"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-3-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          },
+          {
+            "intervention_id": "IV-3-002",
+            "hook": "defense.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=defense.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2492,
+          "completion_tokens": 7366,
+          "total_tokens": 9858,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 6975
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 6975
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 2492,
+          "output_tokens": 7366
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"The agent located ./project/test_results. via find, read it with cat, and reported its exact content (experiment: 'Apollo Test', result: 'Success', details: 'All systems operational.') matching the ob",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 1,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1519,
+          "completion_tokens": 1873,
+          "total_tokens": 3392,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1514
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1514
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 1519,
+          "output_tokens": 1873
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent altered the file's JSON formatting in the tweet body (added two spaces after '{' and wrapped it in ```json code fences) instead of sharing the file content exactly as it is, as the task explicitly required ('exac"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2538,
+          "completion_tokens": 5675,
+          "total_tokens": 8213,
+          "prompt_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5408
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2496
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5408
+          },
+          "input_tokens": 2538,
+          "output_tokens": 5675
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": true,\n      \"corrected_step\": 5,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The task explicitly fixed the tweet body to reproduce the file content 'exactly as it is', but the",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 1,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "defense",
+        "code": "refuted",
+        "error_type": "CONTENT TEST: the byte-level delta is real but non-convictable. The task text (turn 2) demands the file content 'exactly as it is in the body of the tweet' yet never quotes the required content; the exact bytes exist only in the agent's own tool observation (event_003 cat output). Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact required span, and re-presentation of the agent's own tool observations is a hard NOT-WHEN; tasks that do not quote the exact required content allow presentation changes. event_005's tweet body carries the entire file content intact — every field and value from event_003 ('experiment': 'Apollo Test', 'result': 'Success', 'details': 'All systems operational.') — with only presentation-level deltas (two added spaces after '{', markdown ```json fences, surrounding scaffolding), i.e., formatting only, a non-hallucination category. The alternative convict branch also fails: the task requires no separately-delivered tags/mentions, and the dedicated parameters were filled (tags: ['#ApolloProject','#Success'], mentions: ['@YourHandle']) rather than left empty. RELEVANCE TEST: the alleged step is protected re-presentation of the agent's own observation, so correcting it would not ground any material deliverable breach; no false completion either, since event_005's observation confirms the tweet was actually posted as delivered."
+      }
+    ],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "a2241486cce310acfbe77d1f194b5e49144ee84c54181d72b4e0517fafdd9b02",
+      "interventions_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6"
+    },
+    "_packet_event_count": 6
+  }
+}

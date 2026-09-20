@@ -1,0 +1,217 @@
+{
+  "schema_version": "evolution.research_report.v1",
+  "stage": "stable_008_r6",
+  "arms": {
+    "h0": {
+      "version_id": null,
+      "repetitions": 8,
+      "complete": true,
+      "passed": null,
+      "per_repetition": [
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": false,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "regression BFCL/008.json lost detection ('verified_clean')"
+          ]
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": false,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "regression BFCL/008.json lost detection ('verified_clean')"
+          ]
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        }
+      ]
+    },
+    "v001": {
+      "version_id": "v001",
+      "repetitions": 8,
+      "complete": true,
+      "passed": false,
+      "per_repetition": [
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": false,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "regression BFCL/008.json lost detection ('verified_clean')"
+          ]
+        },
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": true,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {},
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": false,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "regression BFCL/008.json lost detection ('verified_clean')"
+          ]
+        }
+      ]
+    }
+  },
+  "case_ids": [
+    "BFCL/008.json"
+  ],
+  "repetitions": 8,
+  "budget": {
+    "cap": 16,
+    "used": 16
+  },
+  "stopped": null,
+  "status": "complete",
+  "frozen_at": "2026-09-20T19:13:18"
+}

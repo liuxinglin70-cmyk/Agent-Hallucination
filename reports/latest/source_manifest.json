@@ -1,5 +1,5 @@
 {
-  "sha256": "429cef644280a830409bfe88c27463d4f797a4132214525167c06e87ede606ec",
+  "sha256": "25370d6f80b56c6bad057e3501c1bd08e9c48594932a2ce1590c4eac45abcb56",
   "files": {
     "datasets/integrity.json": "753981500701c5241e9b53800587c75dd9a114c569bd6789fbb0816e95792a04",
     "datasets/protocols/development.json": "5d52a99ef961622ccb032d9951fc776d39ea690fe2c7b6571460f3207fd43d14",
@@ -91,7 +91,7 @@
     "evolution/tests/test_harness_manifest.py": "344ce81dd35fe05a3e2b206c0a1c3992d341c40ece39c7e25c63dd8a496c46bc",
     "evolution/tests/test_hybrid_proposer.py": "07915596137fbd2418ab1bc6341e2df5ee179dbd8f69b1343af753456eb759c2",
     "evolution/tests/test_ledger_registry_metrics.py": "97eb7426cfb1fc57d2f667344beb932cb11ec75b6617b44ff6b5408f979cd95c",
-    "evolution/tests/test_research.py": "e56852627a18b26c1f67a92320154df1a12dffe5b84a22faf43753538df0ba2d",
+    "evolution/tests/test_research.py": "bde6aa9f8e422069b6a08398fb89a69e98c807b25ecf935de0cdb7f0d27ab036",
     "evolution/tests/test_review_regressions.py": "6e6116d2284d8d067be653e31f5956809b564dbb82db275337482b2b136963f0",
     "evolution/tests/test_worksheet_actionability.py": "2b6f8ab00295f687425be105f2a6aa29b7e468631f2fc8575a6109785d025e85",
     "evolution/worksheet.py": "43bb47ebbfb805295fc8880af8518c422df3ff4b81ed9770cb4bff7c77228362",

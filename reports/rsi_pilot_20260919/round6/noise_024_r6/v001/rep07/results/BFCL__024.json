@@ -1,0 +1,554 @@
+{
+  "case_id": "BFCL/024.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 5,
+  "registry_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/024.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_005",
+      "responsible_step": 5,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "judge_step": null,
+          "traced_step": 5,
+          "defense": "substantiated",
+          "confirmed_step": 5,
+          "delivered_result": "",
+          "correct_result": "",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c1",
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The agent located ./project/test_results., read it, and accurately reported its content ({\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}); it then posted a tweet (confirmed by observation, id 3) whose body contains the entire file content intact, wrapped in 'electrifying' framing (intro line,  code fence, hashtags, a mention) consistent with the task's request to craft an electrifying tweet, with tags and mentions also placed in their dedicated parameters.",
+        "correct_result": "A posted tweet on the user's profile whose body shares the entire content of test_results. exactly as it is, plus a turn-1 report of the file's contents — both of which were delivered.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: search the project directory for the Apollo test result JSON file and report what is inside it to the user."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: craft and broadcast a tweet on the user's profile announcing the discovery of the hidden test result files."
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "The entire content of the file ({\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}) must appear exactly as it is in the body of the tweet."
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \"experiment\"' instead of the file's '{\"experiment\"') instead of sharing the file content exactly as it is, as the task explicitly required",
+          "locus_event_id": "event_005",
+          "evidence_refs": [
+            "event_003",
+            "event_005"
+          ],
+          "evidence_citations": [],
+          "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n```"
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 5,
+        "reason": "The task explicitly required sharing the file content 'exactly as it is' in the tweet body, but event_005's post_tweet content argument altered the exact characters observed in event_003 ('{\"experiment\"' became '{  \"experiment\"' with two extra spaces), a deliverable breach of a task-fixed literal output; correcting the content argument at event_005 would make the tweet match the file exactly and the event_006 report would then be accurate, so every deliverable becomes correct.",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "conflict_note": "",
+        "coverage": "answered",
+        "locus_event_id": "event_005",
+        "evidence_citations": [],
+        "claim": "the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \"experiment\"' instead of the file's '{\"experiment\"') instead of sharing the file content exactly as it is, as the task explicitly required",
+        "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n```"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 5,
+          "reason": "The task explicitly required sharing the file content 'exactly as it is' in the tweet body, but event_005's post_tweet content argument altered the exact characters observed in event_003 ('{\"experiment\"' became '{  \"experiment\"' with two extra spaces), a deliverable breach of a task-fixed literal output; correcting the content argument at event_005 would make the tweet match the file exactly and the event_006 report would then be accurate, so every deliverable becomes correct.",
+          "evidence_refs": [
+            "event_003",
+            "event_005"
+          ],
+          "conflict_note": "",
+          "coverage": "answered",
+          "locus_event_id": "event_005",
+          "evidence_citations": [],
+          "claim": "the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \"experiment\"' instead of the file's '{\"experiment\"') instead of sharing the file content exactly as it is, as the task explicitly required",
+          "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n```"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 5,
+          "reason": "The task explicitly required sharing the file content 'exactly as it is' in the tweet body, but event_005's post_tweet content argument altered the exact characters observed in event_003 ('{\"experiment\"' became '{  \"experiment\"' with two extra spaces), a deliverable breach of a task-fixed literal output; correcting the content argument at event_005 would make the tweet match the file exactly and the event_006 report would then be accurate, so every deliverable becomes correct.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 1,
+        "answered": 1,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c1",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 5,
+            "reason": "the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \"experiment\"' instead of the file's '{\"experiment\"') instead of sharing the file content exactly as it is, as the task explicitly required",
+            "evidence_refs": [
+              "event_003",
+              "event_005"
+            ],
+            "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n```",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 5,
+              "quote": "{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+              "referent": "{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — the exact file content observed in event_003, with no extra spaces after the opening brace, as required to be shared \"exactly as it is\" in the tweet body",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "reason": "The two extra spaces after the opening brace in the tweet body first appear in the post_tweet content argument at event_005, deviating from the exact file content returned by the cat at event_003; event_004's pretty-printed display was the turn-1 answer and does not contain this specific two-space alteration, so event_005 is the earliest introduction of the traced deviation."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1367,
+                "completion_tokens": 1271,
+                "total_tokens": 2638,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 1058
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1058
+                },
+                "input_tokens": 1367,
+                "output_tokens": 1271
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":5,\"quote\":\"{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}\",\"referent\":\"{\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"} — the exact file content observed in event_003, with no extra "
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 5,
+              "reason": "the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \"experiment\"' instead of the file's '{\"experiment\"') instead of sharing the file content exactly as it is, as the task explicitly required",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "evidence_citations": [],
+              "quote": "```json\n{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}\n```",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 1: search the project directory for the Apollo test result JSON file and report what is inside it to the user."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 2: craft and broadcast a tweet on the user's profile announcing the discovery of the hidden test result files."
+                },
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "The entire content of the file ({\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}) must appear exactly as it is in the body of the tweet."
+                }
+              ],
+              "candidate_id": "c1"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 5,
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "The task explicitly fixes the tweet body to the file's content 'exactly as it is'. The observation at event_003 shows the file content as '{\"experiment\": \"Apollo Test\", ...}' with no space after the opening brace, but the post_tweet call at event_005 delivers '{  \"experiment\": ...' with two extra spaces after the brace, deviating from the exact form the task pinned. This is not mere re-presentation: the task's explicit exactness contract makes the byte-level deviation material, and no later step corrects the posted tweet (event_006 confirms the altered content was published)."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The task explicitly fixes the tweet body to the file's content 'exactly as it is'. The observation at event_003 shows the file content as '{\"experiment\": \"Apollo Test\", ...}' with no space after the opening brace, but the post_tweet call at event_005 delivers '{  \"experiment\": ...' with two extra spaces after the brace, deviating from the exact form the task pinned. This is not mere re-presentation: the task's explicit exactness contract makes the byte-level deviation material, and no later step corrects the posted tweet (event_006 confirms the altered content was published)."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_005",
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 fixes the tweet body by an explicit exact-form contract: 'sharing... exactly as it is in the body of the tweet! Share the entire content of the file.' The file content as observed in event_003 is '{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}' — no space after the opening brace. The post_tweet content argument in event_005 delivers '{  \"experiment\": \"Apollo Test\", ...}' — two extra spaces inserted inside the content span — so the delivered tool parameter deviates from the exact content span the task bound into the tweet body. This is a DELIVERABLE BREACH of an explicit exact-form contract (verbatim content/exact form), which is material by definition and may not be refuted as immaterial formatting; the task pins the exact target and exact form, so the unpinned-target/re-presentation protections (for tasks that do not pin down content) do not apply, and the conviction is grounded in quoted-content binding (the observed file content incorporated by the task's 'exactly as it is' requirement). RELEVANCE TEST: correcting event_005's content argument to the exact file content makes the tweet deliverable correct; event_004's chat report satisfies turn 1 ('tell me what's inside'), and event_006's completion claim (tweet posted) is true per the observation — so step 5 is the sole material locus."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The byte-level difference is real: event_005's post_tweet content contains '{  \"experiment\": \"Apollo Test\", ...' while event_003's cat observation returned '{\"experiment\": \"Apollo Test\", ...}'. However, the task never quotes the exact required content — it only says 'exactly as it is in the body of the tweet! Share the entire content of the file', pointing at a file whose content exists solely as the agent's own tool observation. Under the deployed quoted-content binding for this hook, conviction requires the task itself to quote the exact span and the delivered parameters to deviate from that quoted span; tasks that do not quote the exact required content allow re-presentation of the agent's own observations. The two added spaces are insignificant JSON whitespace that preserves the identical data (same experiment, result, details values — same referent), i.e., re-presentation of the agent's own observation, not a new value. The second conviction condition also fails: the dedicated 'tags' and 'mentions' parameters were populated (['#ApolloProject','#Success'], ['@YourHandle']), so no separately-required element was improperly embedded with its dedicated field left empty. The deviation is therefore immaterial re-presentation, not a RESULT ERROR or DELIVERABLE BREACH, and the positive verdict does not survive."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2500,
+                "completion_tokens": 5119,
+                "total_tokens": 7619,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 4790
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 4790
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "input_tokens": 2500,
+                "output_tokens": 5119
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"The byte-level difference is real: event_005's post_tweet content contains '{  \\\"experiment\\\": \\\"Apollo Test\\\", ...' while event_003's ca",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "refuted"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6",
+        "active_interventions": [
+          "IV-3-001",
+          "IV-3-002"
+        ],
+        "fired": [
+          {
+            "intervention_id": "IV-3-001",
+            "hook": "judge.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=judge.system"
+          },
+          {
+            "intervention_id": "IV-3-002",
+            "hook": "defense.system",
+            "type": "text_boundary",
+            "event": "text_injected",
+            "detail": "hook=defense.system"
+          }
+        ],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2492,
+          "completion_tokens": 3055,
+          "total_tokens": 5547,
+          "prompt_tokens_details": {
+            "cached_tokens": 2432
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 2718
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2432
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 2718
+          },
+          "input_tokens": 2492,
+          "output_tokens": 3055
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Agent located ./project/test_results., read it (content: {\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}), reported it accurately in turn 1, and p",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 1,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1519,
+          "completion_tokens": 1456,
+          "total_tokens": 2975,
+          "prompt_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1296
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1296
+          },
+          "input_tokens": 1519,
+          "output_tokens": 1456
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent posted the file content with altered formatting (two extra spaces after the opening brace: '{  \\\"experiment\\\"' instead of the file's '{\\\"experiment\\\"') instead of sharing the file content exactly as it is, as the"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2371,
+          "completion_tokens": 1657,
+          "total_tokens": 4028,
+          "prompt_tokens_details": {
+            "cached_tokens": 2368
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1520
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2368
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 1520
+          },
+          "input_tokens": 2371,
+          "output_tokens": 1657
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": true,\n      \"corrected_step\": 5,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The task explicitly fixed the tweet body to contain the file content 'exactly as it is', and event",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "a2241486cce310acfbe77d1f194b5e49144ee84c54181d72b4e0517fafdd9b02",
+      "interventions_hash": "149d5175e30601aaf72a6249e816d4bbbe03270fcb123afe89b7567308536ba6"
+    },
+    "_packet_event_count": 6
+  }
+}
