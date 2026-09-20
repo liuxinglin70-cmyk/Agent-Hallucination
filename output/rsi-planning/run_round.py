@@ -173,8 +173,33 @@ def _candidate_arm_passed(stage_dir: Path) -> bool | None:
     )
 
 
+def _fisher_degradation_p(cand_kept: int, cand_total: int,
+                          h0_kept: int, h0_total: int) -> float:
+    """单侧 Fisher 精确检验：候选保持率显著低于 H0 的 p 值。
+
+    边缘固定的 2x2 表下，P(X=k) = C(K, k)*C(N-K, n-k)/C(N, n)，其中
+    N 为两臂总测量数，K 为总保持数，n 为候选测量数；单侧 p = sum_{k<=cand_kept}。
+    """
+    from math import comb
+
+    n = cand_total
+    total = cand_total + h0_total
+    kept = cand_kept + h0_kept
+    if total == 0 or kept > total:
+        return 1.0
+    denom = comb(total, n)
+    if denom == 0:
+        return 1.0
+    p = 0.0
+    for k in range(0, min(cand_kept, kept) + 1):
+        if n - k > total - kept:
+            continue
+        p += comb(kept, k) * comb(total - kept, n - k) / denom
+    return min(1.0, p)
+
+
 def _panel_gate_passed(stage_dir: Path, spec: dict) -> bool | None:
-    """预注册面板读：训练/clean/稳定回归零容忍，噪声案例配对支配；逐例照报。"""
+    """预注册面板读：训练/clean/稳定回归零容忍，噪声案例按预注册规则；逐例照报。"""
     report = json.loads(
         (stage_dir / "report.json").read_text(encoding="utf-8-sig"),
     )
@@ -213,15 +238,27 @@ def _panel_gate_passed(stage_dir: Path, spec: dict) -> bool | None:
             if ((pv.get("neighbors") or {}).get(cid) or {}).get("kept_positive")
         )
 
+    h0_arm = arms.get("h0") or {}
+    h0_reps = len(h0_arm.get("per_repetition") or [])
     for item in spec.get("noisy_cases") or []:
         cid = str(item.get("case_id"))
+        rule = str(item.get("rule") or "dominance")
         for arm in candidate_arms.values():
             cand_kept = _kept(arm, cid)
-            h0_kept = _kept(arms.get("h0") or {}, cid)
+            h0_kept = _kept(h0_arm, cid)
+            cand_reps = len(arm.get("per_repetition") or [])
             if cand_kept is None or h0_kept is None:
                 return False
-            if cand_kept < h0_kept:
-                return False
+            if rule == "no_significant_degradation":
+                # 单侧 Fisher：只有在候选保持率显著低于 H0 时才判定退化。
+                if _fisher_degradation_p(
+                    cand_kept, cand_reps, h0_kept, h0_reps
+                ) < 0.05:
+                    return False
+            else:
+                tolerance = int(item.get("tolerance") or 0)
+                if cand_kept < h0_kept - tolerance:
+                    return False
     return True
 
 
@@ -293,11 +330,13 @@ def main() -> int:
     for index, (stage_name, cfg) in enumerate(
         (manifest.get("stages") or {}).items()
     ):
-        case_ids = (
-            _screening_ids(manifest)
-            if cfg.get("case_set") == "screening"
-            else _validation_ids(manifest)
-        )
+        explicit = cfg.get("case_ids")
+        if explicit:
+            case_ids = [str(c) for c in explicit]
+        elif cfg.get("case_set") == "screening":
+            case_ids = _screening_ids(manifest)
+        else:
+            case_ids = _validation_ids(manifest)
         run_frozen_repeats(
             args.manifest, run_dir, backend,
             stage=stage_name,

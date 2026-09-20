@@ -1,0 +1,335 @@
+{
+  "schema_version": "evolution.research_report.v1",
+  "stage": "unused_dev_validation_r4",
+  "arms": {
+    "h0": {
+      "version_id": null,
+      "repetitions": 3,
+      "complete": true,
+      "passed": null,
+      "per_repetition": [
+        {
+          "passed": false,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            },
+            "BFCL/153.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/013.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            },
+            "BFCL/153.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/013.json": {
+              "clean": false,
+              "state": "verified_error"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "BFCL/013.json degraded to 'verified_error'"
+          ]
+        },
+        {
+          "passed": false,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            },
+            "BFCL/153.json": {
+              "repaired": false,
+              "state": "verified_clean",
+              "responsible_step": null,
+              "prediction": false
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/013.json": {
+              "clean": false,
+              "state": "verified_error"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "BFCL/013.json degraded to 'verified_error'"
+          ]
+        }
+      ]
+    },
+    "v001": {
+      "version_id": "v001",
+      "repetitions": 3,
+      "complete": true,
+      "passed": false,
+      "per_repetition": [
+        {
+          "passed": true,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 6,
+              "prediction": true
+            },
+            "BFCL/153.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 14,
+              "prediction": true
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/013.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": []
+        },
+        {
+          "passed": false,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 6,
+              "prediction": true
+            },
+            "BFCL/153.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 14,
+              "prediction": true
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": false,
+              "state": "verified_clean"
+            },
+            "BFCL/013.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": [
+            "regression BFCL/024.json lost detection ('verified_clean')"
+          ]
+        },
+        {
+          "passed": true,
+          "training": {
+            "BFCL/002.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 6,
+              "prediction": true
+            },
+            "BFCL/153.json": {
+              "repaired": true,
+              "state": "verified_error",
+              "responsible_step": 14,
+              "prediction": true
+            }
+          },
+          "neighbors": {
+            "BFCL/008.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/082.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/148.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/024.json": {
+              "kept_positive": true,
+              "state": "verified_error"
+            },
+            "BFCL/013.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/020.json": {
+              "clean": true,
+              "state": "verified_clean"
+            },
+            "BFCL/018.json": {
+              "clean": true,
+              "state": "verified_clean"
+            }
+          },
+          "reasons": []
+        }
+      ]
+    }
+  },
+  "case_ids": [
+    "BFCL/002.json",
+    "BFCL/153.json",
+    "BFCL/008.json",
+    "BFCL/082.json",
+    "BFCL/148.json",
+    "BFCL/024.json",
+    "BFCL/013.json",
+    "BFCL/020.json",
+    "BFCL/018.json"
+  ],
+  "repetitions": 3,
+  "budget": {
+    "cap": 54,
+    "used": 54
+  },
+  "stopped": null,
+  "status": "complete",
+  "frozen_at": "2026-09-20T11:44:23"
+}

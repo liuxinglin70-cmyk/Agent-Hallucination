@@ -1,0 +1,493 @@
+{
+  "case_id": "BFCL/024.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 5,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/024.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_005",
+    "responsible_step": 5,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_005",
+      "responsible_step": 5,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 5,
+          "traced_step": 5,
+          "defense": "substantiated",
+          "confirmed_step": 5,
+          "delivered_result": "Tweet id 3 posted with body: '🚀 Unveiling the Apollo Project's secret test results! ...  {  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}  #ApolloProject #Success #TechRevealed @YourHandle' — the JSON differs from the file content by two inserted spaces after the opening brace.",
+          "correct_result": "A tweet whose body contains the entire content of test_results. exactly as stored: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 5,
+        "hallucination_reason": "The posted tweet embeds the file content with two extra spaces after the opening brace ('{  \"experiment\"...') instead of the file's exact content ('{\"experiment\"...'), breaching the user's explicit contract that the file content be shared in the tweet body 'exactly as it is'.",
+        "delivered_result": "Tweet id 3 posted with body: '🚀 Unveiling the Apollo Project's secret test results! ...  {  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}  #ApolloProject #Success #TechRevealed @YourHandle' — the JSON differs from the file content by two inserted spaces after the opening brace.",
+        "correct_result": "A tweet whose body contains the entire content of test_results. exactly as stored: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "root_cause": {
+          "step": 5,
+          "quote": "{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+          "referent": "{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "The tweet body must contain the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Search the project directory for the test result file, read it, report what is inside, then broadcast a tweet on the user's profile containing that content"
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 5,
+        "quote": "post_tweet arguments content: '...{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}...'",
+        "referent": "The tweet body must embed the file content exactly as read in event_003: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — with no spaces after the opening brace.",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "reason": "The two extra spaces after the opening brace ('{  \"experiment\"') first appear in the assistant-authored post_tweet arguments at event_005, deviating from the exact file content returned by the cat observation at event_003 and violating the user's 'exactly as it is' requirement; event_004's pretty-printed display is a permitted human-readable rendering and does not contain this inline spacing error."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 5,
+        "evidence_refs": [
+          "event_003_tool_01",
+          "event_005_tool_01"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: the cat observation (event_003_tool_01) shows the stored file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — no space after the opening brace. The post_tweet call (event_005_tool_01) embeds '{  \"experiment\": \"Apollo Test\", ...}' with two spaces after '{', and the environment's posted-tweet observation confirms the delivered body contains those two spaces, so the deviation is factually real in the committed state, not just in prose. The user's turn-2 contract fixes verbatim content ('sharing ... exactly as it is in the body of the tweet', 'Share the entire content of the file'); under the explicit verbatim-content rule this two-character insertion is a material deliverable breach and may not be dismissed as immaterial formatting. RELEVANCE TEST: event_005 is the earliest assistant-authored introduction of the altered body — the posting action itself — while event_006 only repeats the delivered state as evidence of delivery. Correcting event_005 to embed the exact stored content would make every deliverable correct: event_004's turn-1 chat report ('tell me what's inside') is not bound by the tweet's verbatim contract, and no later step independently breaks a deliverable."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 5,
+            "reason": "The posted tweet embeds the file content with two extra spaces after the opening brace ('{  \"experiment\"...') instead of the file's exact content ('{\"experiment\"...'), breaching the user's explicit contract that the file content be shared in the tweet body 'exactly as it is'.",
+            "evidence_refs": [
+              "event_003",
+              "event_005"
+            ],
+            "quote": "{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+            "delivered_result": "Tweet id 3 posted with body: '🚀 Unveiling the Apollo Project's secret test results! ...  {  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}  #ApolloProject #Success #TechRevealed @YourHandle' — the JSON differs from the file content by two inserted spaces after the opening brace.",
+            "correct_result": "A tweet whose body contains the entire content of test_results. exactly as stored: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 5,
+              "quote": "post_tweet arguments content: '...{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}...'",
+              "referent": "The tweet body must embed the file content exactly as read in event_003: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — with no spaces after the opening brace.",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "reason": "The two extra spaces after the opening brace ('{  \"experiment\"') first appear in the assistant-authored post_tweet arguments at event_005, deviating from the exact file content returned by the cat observation at event_003 and violating the user's 'exactly as it is' requirement; event_004's pretty-printed display is a permitted human-readable rendering and does not contain this inline spacing error."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1485,
+                "completion_tokens": 937,
+                "total_tokens": 2422,
+                "prompt_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 721
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 721
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 64
+                },
+                "input_tokens": 1485,
+                "output_tokens": 937
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\"step\":5,\"quote\":\"post_tweet arguments content: '...{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}...'\",\"referent\":\"The tweet body must embed the file content exactly as read in event_003: {\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Succe"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 5,
+              "reason": "The posted tweet embeds the file content with two extra spaces after the opening brace ('{  \"experiment\"...') instead of the file's exact content ('{\"experiment\"...'), breaching the user's explicit contract that the file content be shared in the tweet body 'exactly as it is'.",
+              "delivered_result": "Tweet id 3 posted with body: '🚀 Unveiling the Apollo Project's secret test results! ...  {  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}  #ApolloProject #Success #TechRevealed @YourHandle' — the JSON differs from the file content by two inserted spaces after the opening brace.",
+              "correct_result": "A tweet whose body contains the entire content of test_results. exactly as stored: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}",
+              "evidence_refs": [
+                "event_003",
+                "event_005"
+              ],
+              "contracts": [
+                {
+                  "kind": "verbatim_content",
+                  "requirement": "The tweet body must contain the entire content of test_results. exactly as it is: {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Search the project directory for the test result file, read it, report what is inside, then broadcast a tweet on the user's profile containing that content"
+                }
+              ],
+              "confidence": "medium",
+              "quote": "{  \"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 5,
+              "evidence_refs": [
+                "event_003_tool_01",
+                "event_005_tool_01"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: the cat observation (event_003_tool_01) shows the stored file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — no space after the opening brace. The post_tweet call (event_005_tool_01) embeds '{  \"experiment\": \"Apollo Test\", ...}' with two spaces after '{', and the environment's posted-tweet observation confirms the delivered body contains those two spaces, so the deviation is factually real in the committed state, not just in prose. The user's turn-2 contract fixes verbatim content ('sharing ... exactly as it is in the body of the tweet', 'Share the entire content of the file'); under the explicit verbatim-content rule this two-character insertion is a material deliverable breach and may not be dismissed as immaterial formatting. RELEVANCE TEST: event_005 is the earliest assistant-authored introduction of the altered body — the posting action itself — while event_006 only repeats the delivered state as evidence of delivery. Correcting event_005 to embed the exact stored content would make every deliverable correct: event_004's turn-1 chat report ('tell me what's inside') is not bound by the tweet's verbatim contract, and no later step independently breaks a deliverable."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003_tool_01",
+                  "event_005_tool_01"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: the cat observation (event_003_tool_01) shows the stored file content as {\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"} — no space after the opening brace. The post_tweet call (event_005_tool_01) embeds '{  \"experiment\": \"Apollo Test\", ...}' with two spaces after '{', and the environment's posted-tweet observation confirms the delivered body contains those two spaces, so the deviation is factually real in the committed state, not just in prose. The user's turn-2 contract fixes verbatim content ('sharing ... exactly as it is in the body of the tweet', 'Share the entire content of the file'); under the explicit verbatim-content rule this two-character insertion is a material deliverable breach and may not be dismissed as immaterial formatting. RELEVANCE TEST: event_005 is the earliest assistant-authored introduction of the altered body — the posting action itself — while event_006 only repeats the delivered state as evidence of delivery. Correcting event_005 to embed the exact stored content would make every deliverable correct: event_004's turn-1 chat report ('tell me what's inside') is not bound by the tweet's verbatim contract, and no later step independently breaks a deliverable."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: The turn-2 contract fixes the tweet body verbatim — 'sharing ... these previously hidden test result files exactly as it is in the body of the tweet! Share the entire content of the file.' event_003's tool observation establishes the file content as '{\"experiment\": \"Apollo Test\", \"result\": \"Success\", \"details\": \"All systems operational.\"}' — no space after the opening brace. event_005's post_tweet call and its echoing observation show the posted tweet body contains '```json\\n{  \"experiment\": \"Apollo Test\"...' — two spaces inserted after the opening brace. The tweet body therefore does not embed the file content 'exactly as it is'; the deviation is factually real, and since the task fixes the literal content, it is a material DELIVERABLE BREACH by definition (not dismissible as formatting). RELEVANCE TEST: The error is assistant-authored at event_005 (the tweet content string) and never corrected — event_006 merely repeats the altered content ('{  \"experiment\"...') as proof of delivery. Turn 1's deliverable (event_004, telling the user what is inside) is independently satisfied. Correcting the tweet content at event_005 to the exact file text would make every remaining deliverable correct, so the step is causally connected to the sole material breach. Verdict: substantiated at step 5."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_003",
+                  "event_005"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "The file observation (event_003) shows the exact content '{\"experiment\": \"Apollo Test\", ...}' with no space after the opening brace. The post_tweet call (event_005) embeds '{  \"experiment\": ...' with two extra spaces after '{'. The user's contract fixes the tweet body to share the file content 'exactly as it is' and 'the entire content of the file', so the inserted whitespace is a verbatim-content breach of an explicit contract, material by definition. No later correction exists; event_006 confirms delivery of the altered content."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2421,
+                "completion_tokens": 227,
+                "total_tokens": 2648,
+                "prompt_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 46
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 1920
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 46
+                },
+                "input_tokens": 2421,
+                "output_tokens": 227
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"The file observation (event_003) shows the exact content '{\\\"experiment\\\": \\\"Apollo Test\\\", ...}' with no space after the opening brac",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2235,
+          "completion_tokens": 7536,
+          "total_tokens": 9771,
+          "prompt_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 7027
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 7027
+          },
+          "input_tokens": 2235,
+          "output_tokens": 7536
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 5,\n  \"hallucination_reason\": \"The posted tweet does not contain the file content 'exactly as it is' as the task demands: the JSON body was altered, inserting two extra spaces after the opening brace ('{  \\\"experiment\\\"' instead of '{\\\"experiment",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 2,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1485,
+          "completion_tokens": 937,
+          "total_tokens": 2422,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 721
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 721
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "input_tokens": 1485,
+          "output_tokens": 937
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"step\":5,\"quote\":\"post_tweet arguments content: '...{  \\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Success\\\", \\\"details\\\": \\\"All systems operational.\\\"}...'\",\"referent\":\"The tweet body must embed the file content exactly as read in event_003: {\\\"experiment\\\": \\\"Apollo Test\\\", \\\"result\\\": \\\"Succe"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2421,
+          "completion_tokens": 227,
+          "total_tokens": 2648,
+          "prompt_tokens_details": {
+            "cached_tokens": 1920
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 46
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1920
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 46
+          },
+          "input_tokens": 2421,
+          "output_tokens": 227
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"The file observation (event_003) shows the exact content '{\\\"experiment\\\": \\\"Apollo Test\\\", ...}' with no space after the opening brac",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "a2241486cce310acfbe77d1f194b5e49144ee84c54181d72b4e0517fafdd9b02",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 6
+  }
+}

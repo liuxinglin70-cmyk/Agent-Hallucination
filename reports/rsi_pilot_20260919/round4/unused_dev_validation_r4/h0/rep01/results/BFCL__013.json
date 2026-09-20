@@ -1,0 +1,621 @@
+{
+  "case_id": "BFCL/013.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/013.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "positive_source": "recall_upgrade",
+          "defense": "refuted",
+          "defense_reason": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted.",
+          "hearings": [
+            {
+              "source": "recall_upgrade",
+              "candidate_id": "c2",
+              "verdict": "refuted"
+            }
+          ]
+        },
+        "blocking_facts": [
+          {
+            "component": "defense",
+            "code": "refuted",
+            "error_type": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted."
+          }
+        ]
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "code": "refuted",
+          "error_type": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted."
+        }
+      ],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Backup created as archives/2024_research_backup.txt (copy then rename, original left in research); sorted content presented in alphabetical order (Experiment results, Introduction, Methodology); final answer reports the sorted file contains 1 line, exactly matching the wc tool observation.",
+        "correct_result": "No settled line count exists in the record: the wc observation reports count=1 while the sort observation's content implies 3 lines; under the conflict rule the point is undecided, and a delivered answer agreeing with a tool observation is not material.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Place a copy of research_notes.txt into the archives folder within research, labeled 2024_research_backup.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Sort the lines of 2024_research_backup.txt alphabetically"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Report how many lines are in the sorted 2024_research_backup.txt file"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent copied the file to 'archives/research_notes.txt' instead of directly creating 'archives/2024_research_backup.txt' as labeled in the task",
+          "locus_event_id": "event_006",
+          "evidence_refs": [
+            "event_002",
+            "event_006"
+          ],
+          "evidence_citations": [],
+          "quote": "cp arguments={'source': 'research_notes.txt', 'destination': 'archives'} -> 'research_notes.txt' copied to 'archives/research_notes.txt'"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent reported the file contains 1 line instead of the 3 lines shown by its own sort observation (Line 1, Line 2, Line 3), misreporting the wc result",
+          "locus_event_id": "event_013",
+          "evidence_refs": [
+            "event_010",
+            "event_012",
+            "event_013"
+          ],
+          "evidence_citations": [],
+          "quote": "The sorted '2024_research_backup.txt' file contains 1 line."
+        }
+      ],
+      "causal_upgrade": {
+        "candidate_id": "c2",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 11,
+        "reason": "Turn 2's deliverable is the sorted file, yet the agent only displayed the sorted content and its own event_011 message concedes it was not saved ('If you want this sorted content saved... let me know'), leaving the demanded file state undelivered and the completion claim false; writing the sorted lines back at event_011 would make every deliverable correct.",
+        "evidence_refs": [
+          "event_010",
+          "event_011"
+        ],
+        "conflict_note": "The sort/wc line-count conflict (3 vs 1) is not relied on here; the breach rests on event_011's own admission that the sorted content was never saved plus the sort observation carrying no write confirmation, while turn 3's 'the sorted 2024_research_backup.txt file' fixes the sorted-file state as a deliverable.",
+        "coverage": "answered",
+        "locus_event_id": "event_011",
+        "evidence_citations": [],
+        "claim": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+        "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+      },
+      "causal_upgrades": [
+        {
+          "candidate_id": "c2",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 11,
+          "reason": "Turn 2's deliverable is the sorted file, yet the agent only displayed the sorted content and its own event_011 message concedes it was not saved ('If you want this sorted content saved... let me know'), leaving the demanded file state undelivered and the completion claim false; writing the sorted lines back at event_011 would make every deliverable correct.",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "conflict_note": "The sort/wc line-count conflict (3 vs 1) is not relied on here; the breach rests on event_011's own admission that the sorted content was never saved plus the sort observation carrying no write confirmation, while turn 3's 'the sorted 2024_research_backup.txt file' fixes the sorted-file state as a deliverable.",
+          "coverage": "answered",
+          "locus_event_id": "event_011",
+          "evidence_citations": [],
+          "claim": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+          "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+        }
+      ],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The event_006 copy to 'archives/research_notes.txt' was an intermediate detour the agent itself corrected at event_008 by renaming the copy to '2024_research_backup.txt' inside archives, so the delivered state (a copy in archives under the required label, original untouched) satisfies the task and no deliverable is breached.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 11,
+          "reason": "Turn 2's deliverable is the sorted file, yet the agent only displayed the sorted content and its own event_011 message concedes it was not saved ('If you want this sorted content saved... let me know'), leaving the demanded file state undelivered and the completion claim false; writing the sorted lines back at event_011 would make every deliverable correct.",
+          "evidence_refs": [],
+          "conflict_note": "The sort/wc line-count conflict (3 vs 1) is not relied on here; the breach rests on event_011's own admission that the sorted content was never saved plus the sort observation carrying no write confirmation, while turn 3's 'the sorted 2024_research_backup.txt file' fixes the sorted-file state as a deliverable.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The agent accurately reported its own wc observation (count 1), and since the sort and wc observations conflict on the same point with nothing to settle them, the delivered answer agreeing with wc is recorded as undecided rather than material.",
+          "evidence_refs": [],
+          "conflict_note": "event_010 sort shows three lines while event_012 wc reports count 1 for the same file; with no external evidence snapshot the line count is undecided, and a delivered result agreeing with one of the conflicting observations is not convictable.",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 3,
+        "answered": 3,
+        "missing": []
+      },
+      "hearings": [
+        {
+          "source": "recall_upgrade",
+          "candidate_id": "c2",
+          "positive": {
+            "source": "recall_upgrade",
+            "step": 11,
+            "reason": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+            "evidence_refs": [
+              "event_010",
+              "event_011"
+            ],
+            "quote": "If you want this sorted content saved to a new file or need further actions, let me know!",
+            "delivered_result": "",
+            "correct_result": ""
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 11,
+              "quote": "If you want this sorted content saved to a new file or need further actions, let me know!",
+              "referent": "The assistant should have written the sorted lines back into '2024_research_backup.txt' (overwriting the file with the sorted content from event_010's sorted_content) so the file itself is alphabetically sorted, as turn 2 and turn 3's reference to 'the sorted 2024_research_backup.txt file' require.",
+              "evidence_refs": [
+                "event_010",
+                "event_011"
+              ],
+              "reason": "event_010's sort tool only returned 'sorted_content' as display output without modifying the file, and event_011 is the first assistant-authored step falsely declaring 'The contents of 2024_research_backup.txt have been sorted alphabetically by line' while explicitly offering to save the sorted content to a file, revealing the required write-back into '2024_research_backup.txt' never happened."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 1480,
+                "completion_tokens": 5220,
+                "total_tokens": 6700,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 5002
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 5002
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "input_tokens": 1480,
+                "output_tokens": 5220
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 11,\n  \"quote\": \"If you want this sorted content saved to a new file or need further actions, let me know!\",\n  \"referent\": \"The assistant should have written the sorted lines back into '2024_research_backup.txt' (overwriting the file with the sorted content from event_010's sorted_conten"
+            },
+            "hearing_target": {
+              "source": "recall_upgrade",
+              "step": 11,
+              "reason": "the agent only displayed the sorted content instead of writing the sorted lines back into '2024_research_backup.txt' as the task required (sort the lines of the file)",
+              "delivered_result": "",
+              "correct_result": "",
+              "evidence_refs": [
+                "event_010",
+                "event_011"
+              ],
+              "evidence_citations": [],
+              "quote": "If you want this sorted content saved to a new file or need further actions, let me know!",
+              "confidence": "",
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Place a copy of research_notes.txt into the archives folder within research, labeled 2024_research_backup.txt"
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Sort the lines of 2024_research_backup.txt alphabetically"
+                },
+                {
+                  "kind": "exact_value",
+                  "requirement": "Report how many lines are in the sorted 2024_research_backup.txt file"
+                }
+              ],
+              "candidate_id": "c2"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "refuted",
+              "confirmed_step": null,
+              "evidence_refs": [
+                "event_010",
+                "event_011",
+                "event_012"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "The wc observation (count=1, event_012) does not create a decisive conflict with sorted_content: it matches the flat single-string serialization the record itself displays and cannot establish that the sorted content was never written back.",
+              "reason": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 11,
+                "evidence_refs": [
+                  "event_010",
+                  "event_011",
+                  "event_012"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "sorted_content (three segments) and wc count=1 are observations of different objects (the sort tool's returned output vs. the file's actual line count), so they do not form an unresolved same-point conflict. The direct file observation (event_012, count=1) shows the file does not contain the three sorted lines, and no trajectory action ever wrote them there; this corroborates rather than undermines the missing write-back.",
+                "reason": "CONTENT TEST: at event_011 the assistant asserts 'The contents of '2024_research_backup.txt' have been sorted alphabetically by line' while only printing the three lines, and even offers 'If you want this sorted content saved to a new file ... let me know!' — treating persistence as not yet done. The task makes the file's sorted state a required deliverable (turn 3: 'how many lines are in the sorted '2024_research_backup.txt' file'). The only sorting action is event_010's sort call, whose observation returns a 'sorted_content' payload with no write/persistence indication, and no write/edit call exists anywhere after it; event_012's wc on the file returns count=1, showing the file does not hold the three sorted lines (which would count 3). Thus the agent claimed a file state (contents sorted) that no action produced — a false completion of a required deliverable, not formatting or process-only. RELEVANCE TEST: correcting step 11 by actually writing the sorted lines back into '2024_research_backup.txt' would make the file sorted, and the subsequent wc/event_013 count would then be computed on the genuinely sorted file, making every deliverable correct; event_013 ('The sorted ... file contains 1 line') merely repeats the step-11 completion claim and is evidence of delivery, not a separate root cause."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_010",
+                  "event_011",
+                  "event_012"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "The wc observation (count=1, event_012) does not create a decisive conflict with sorted_content: it matches the flat single-string serialization the record itself displays and cannot establish that the sorted content was never written back.",
+                "reason": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted."
+              },
+              {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "sorted_content (event_010) shows three 'Line N' segments while wc (event_012) reports count=1 line; the record itself resolves this: the sorted_content string contains no newline characters, so the environment consistently represents the file's content as a single line, and the conviction's implicit '3 lines' premise is a general expectation, not an observed fact.",
+                "reason": "At the alleged step the agent stated: 'The contents of '2024_research_backup.txt' have been sorted alphabetically by line: 1. Experiment results 2. Introduction 3. Methodology. If you want this sorted content saved to a new file or need further actions, let me know!' The claimed deviation (displayed instead of writing back) rests on no environment fact: the sort observation (event_010) returns the file's sorted content, and the subsequent wc observation (event_012) shows '2024_research_backup.txt' contains 1 line — consistent with the sorted content (a single line, no newline characters) being the file's actual state, and inconsistent with the conviction's premise that an unsorted multi-line file was left in place. The only support for non-persistence is the agent's own offer to save 'to a new file', which is an assertion, not an environment fact, and refers to a new file rather than the backup. Materially the conviction fails in every branch: with the file observed at 1 line, the turn-2 deliverable ('sort the lines') is trivially satisfied whether or not a write-back occurred (a one-line file is sorted), and the turn-3 deliverable — the line count of the sorted file — was delivered as 1 (event_013), agreeing with the wc observation; under the conflicted-observations principle a delivered result that agrees with an observation cannot be convicted in favor of a '3 lines' value derived from expectation alone. Every deliverable is correct under every reading of the record consistent with the observations, so the step-11 deviation is not established and would at most be a process-only, immaterial omission."
+              }
+            ],
+            "provider": {
+              "attempts": 2,
+              "usage": {
+                "prompt_tokens": 2098,
+                "completion_tokens": 25916,
+                "total_tokens": 28014,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2048
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 25417
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2048
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 25417
+                },
+                "input_tokens": 2098,
+                "output_tokens": 25916
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_010\", \"event_011\", \"event_012\", \"event_013\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"sorted_content (event_010) shows three 'Line N' segments while wc (event_012) reports count=1 line; the record itself resolves ",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "refuted",
+                  "refuted"
+                ],
+                "collapsed": "refuted",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 5,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2375,
+          "completion_tokens": 20121,
+          "total_tokens": 22496,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 19695
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 19695
+          },
+          "input_tokens": 2375,
+          "output_tokens": 20121
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Turn 1: a copy of research_notes.txt now exists as research/archives/2024_research_backup.txt (created via cp into archives then mv rename inside archives), with the original left in ",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1659,
+          "completion_tokens": 621,
+          "total_tokens": 2280,
+          "prompt_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 241
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 241
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1280
+          },
+          "input_tokens": 1659,
+          "output_tokens": 621
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "```json\n{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent copied the file to 'archives/research_notes.txt' instead of directly creating 'archives/2024_research_backup.txt' as labeled in the task\",\n      \"locus_event_id\": \"event_006\",\n      \"evidence_refs\": [\"event_002\","
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2667,
+          "completion_tokens": 17888,
+          "total_tokens": 20555,
+          "prompt_tokens_details": {
+            "cached_tokens": 2624
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 17427
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2624
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 17427
+          },
+          "input_tokens": 2667,
+          "output_tokens": 17888
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"upgrades\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"content_error\": true,\n      \"causal\": false,\n      \"corrected_step\": null,\n      \"evidence_refs\": [],\n      \"conflict_note\": \"\",\n      \"reason\": \"The cp at event_006 really did produce 'archives/research_notes.txt' instead of the labeled na",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 3,
+              "winner": true,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "defense",
+        "code": "refuted",
+        "error_type": "CONTENT TEST fails. The alleged deviation is that the agent 'only displayed the sorted content instead of writing the sorted lines back.' But the trajectory at event_010 shows the agent performed the sorting action itself on the exact required target: TOOL sort with arguments {'file_name': '2024_research_backup.txt'}, and the environment observation returned the file's sorted content. Under the grounding rules a tool call is the action it performs, so event_011's statement ('The contents of 2024_research_backup.txt have been sorted alphabetically by line') is a relay of an environment tool report, not an ungrounded claim; no observation in the shown record establishes that the file remained unsorted or that the sort tool is non-persistent. The task text ('take the contents ... and sort the lines alphabetically') does not explicitly fix a separate manual write-back step, and the conviction's premise that a write-back was skipped rests on an assumed tool semantics with no positive support. RELEVANCE TEST also fails: the alleged locus mischaracterizes event_010's sort call as mere display; the subsequent deliverable (line count) was delivered from the wc observation (event_012) and is not causally dependent on any omitted write-back. With the deviation not established as factually real, the conviction is refuted."
+      }
+    ],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "c4e55daea87829a0de46a05b913608295be1d69b632ecea592fba40c6df0edaf",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 13
+  }
+}

@@ -1,0 +1,549 @@
+{
+  "case_id": "BFCL/148.json",
+  "gold": true,
+  "state": "verified_error",
+  "authority": "authoritative",
+  "prediction": true,
+  "responsible_step": 15,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/148.json",
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_015",
+    "responsible_step": 15,
+    "incident_occurred": true,
+    "occurrence_state": "verified_error",
+    "proof": {
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_015",
+      "responsible_step": 15,
+      "incident_occurred": true,
+      "terminal_basis": {
+        "state": "verified_error",
+        "decisive_facts": {
+          "positive_source": "judge",
+          "judge_step": 15,
+          "traced_step": 15,
+          "defense": "substantiated",
+          "confirmed_step": 15,
+          "delivered_result": "A claim that the invoice issue was successfully escalated to customer support (booking ID 7223063, request for formal documentation) with assurance that a support agent would contact the user directly.",
+          "correct_result": "The contact_customer_support call failed with error 'Booking not found'; the assistant should have reported that the customer-support contact/escalation did not go through rather than asserting it had been escalated.",
+          "judge_basis": "observation",
+          "authority": "authoritative",
+          "guard_actions": [],
+          "hearings": [
+            {
+              "source": "judge",
+              "candidate_id": null,
+              "verdict": "substantiated"
+            }
+          ]
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 15,
+        "hallucination_reason": "The assistant claimed 'I've escalated your request to customer support' and that an agent would contact the user, but the contact_customer_support tool call in event_014 returned the error {\"error\": \"Booking not found\"}, so no support contact or escalation actually occurred — a false completion claim.",
+        "delivered_result": "A claim that the invoice issue was successfully escalated to customer support (booking ID 7223063, request for formal documentation) with assurance that a support agent would contact the user directly.",
+        "correct_result": "The contact_customer_support call failed with error 'Booking not found'; the assistant should have reported that the customer-support contact/escalation did not go through rather than asserting it had been escalated.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_014",
+          "event_015"
+        ],
+        "root_cause": {
+          "step": 15,
+          "quote": "I've escalated your request to customer support with the following details",
+          "referent": "The immediately preceding tool observation was {\"error\": \"Booking not found\"}; the escalation was never completed, so the required deliverable was an accurate report of the failed contact, not a success claim."
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 5: liaise with customer support explaining the invoice issue and escalate if needed — any claim of escalation must reflect an actually completed action."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: set the travel budget cap of 20,000 RMB (converted value with tenth/hundredth digits, e.g. 12.34 format) using access token abc123xyz."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: verify flight cost, then book a business class LAX→JFK ticket on 2024-10-12 charged to the main credit card within budget."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 3: cancel the previous booking and process any refunds due."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 4: retrieve and provide full invoice details for the recent flight."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 6: log in with mzhang/SecurePass123 and create a support ticket titled 'Invoice Discrepancy' with priority level 3."
+          }
+        ]
+      },
+      "recall_candidates": null,
+      "causal_upgrade": null,
+      "causal_upgrades": null,
+      "causal_upgrade_rows": null,
+      "step_tracer": {
+        "step": 15,
+        "quote": "I've escalated your request to customer support with the following details",
+        "referent": "The contact_customer_support call in event_014 returned {\"error\": \"Booking not found\"}, so the assistant should have reported that the escalation did not go through and no support agent contact was initiated, rather than asserting a successful escalation.",
+        "evidence_refs": [
+          "event_014",
+          "event_015"
+        ],
+        "reason": "The false completion claim first appears in event_015, where the assistant asserts the request was escalated to customer support despite the tool call in event_014 having failed with 'Booking not found'; the tool call itself was a correct action and the error observation is not an assistant error, so step 15 is the earliest introduction of the wrong content."
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 15,
+        "evidence_refs": [
+          "event_014",
+          "event_015"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_014's contact_customer_support call returned the environment observation {\"error\": \"Booking not found\"} — the escalation did not occur. Yet event_015 states 'I've escalated your request to customer support with the following details... A customer support agent will contact you directly to resolve this.' This is a success claim contradicted by the trajectory's own tool observation, a FALSE COMPLETION under the MATERIALITY LAW (turn 5's deliverable was liaising with/escalating to customer support). RELEVANCE TEST: the false claim is never corrected — event_017's create_ticket fulfills turn 6's separate explicit request and is never framed as a retraction, and the user is never told the contact_customer_support escalation failed. Correcting event_015 to honestly report the failed escalation would remove the only false completion claim; the tool call itself in event_014 used correct arguments and is not the error, and a tool observation is not an assistant error, so event_015 is the earliest assistant-authored locus of the false claim."
+      },
+      "causal_upgrade_coverage": null,
+      "hearings": [
+        {
+          "source": "judge",
+          "candidate_id": null,
+          "positive": {
+            "source": "judge",
+            "step": 15,
+            "reason": "The assistant claimed 'I've escalated your request to customer support' and that an agent would contact the user, but the contact_customer_support tool call in event_014 returned the error {\"error\": \"Booking not found\"}, so no support contact or escalation actually occurred — a false completion claim.",
+            "evidence_refs": [
+              "event_014",
+              "event_015"
+            ],
+            "quote": "I've escalated your request to customer support with the following details",
+            "delivered_result": "A claim that the invoice issue was successfully escalated to customer support (booking ID 7223063, request for formal documentation) with assurance that a support agent would contact the user directly.",
+            "correct_result": "The contact_customer_support call failed with error 'Booking not found'; the assistant should have reported that the customer-support contact/escalation did not go through rather than asserting it had been escalated."
+          },
+          "evidence_citations": [],
+          "tracer_result": {
+            "ok": true,
+            "parsed": {
+              "step": 15,
+              "quote": "I've escalated your request to customer support with the following details",
+              "referent": "The contact_customer_support call in event_014 returned {\"error\": \"Booking not found\"}, so the assistant should have reported that the escalation did not go through and no support agent contact was initiated, rather than asserting a successful escalation.",
+              "evidence_refs": [
+                "event_014",
+                "event_015"
+              ],
+              "reason": "The false completion claim first appears in event_015, where the assistant asserts the request was escalated to customer support despite the tool call in event_014 having failed with 'Booking not found'; the tool call itself was a correct action and the error observation is not an assistant error, so step 15 is the earliest introduction of the wrong content."
+            },
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2868,
+                "completion_tokens": 681,
+                "total_tokens": 3549,
+                "prompt_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 499
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 499
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "input_tokens": 2868,
+                "output_tokens": 681
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "step_tracer",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "\n{\n  \"step\": 15,\n  \"quote\": \"I've escalated your request to customer support with the following details\",\n  \"referent\": \"The contact_customer_support call in event_014 returned {\\\"error\\\": \\\"Booking not found\\\"}, so the assistant should have reported that the escalation did not go through and no sup"
+            },
+            "hearing_target": {
+              "source": "judge",
+              "step": 15,
+              "reason": "The assistant claimed 'I've escalated your request to customer support' and that an agent would contact the user, but the contact_customer_support tool call in event_014 returned the error {\"error\": \"Booking not found\"}, so no support contact or escalation actually occurred — a false completion claim.",
+              "delivered_result": "A claim that the invoice issue was successfully escalated to customer support (booking ID 7223063, request for formal documentation) with assurance that a support agent would contact the user directly.",
+              "correct_result": "The contact_customer_support call failed with error 'Booking not found'; the assistant should have reported that the customer-support contact/escalation did not go through rather than asserting it had been escalated.",
+              "evidence_refs": [
+                "event_014",
+                "event_015"
+              ],
+              "contracts": [
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 5: liaise with customer support explaining the invoice issue and escalate if needed — any claim of escalation must reflect an actually completed action."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 1: set the travel budget cap of 20,000 RMB (converted value with tenth/hundredth digits, e.g. 12.34 format) using access token abc123xyz."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 2: verify flight cost, then book a business class LAX→JFK ticket on 2024-10-12 charged to the main credit card within budget."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 3: cancel the previous booking and process any refunds due."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 4: retrieve and provide full invoice details for the recent flight."
+                },
+                {
+                  "kind": "required_action",
+                  "requirement": "Turn 6: log in with mzhang/SecurePass123 and create a support ticket titled 'Invoice Discrepancy' with priority level 3."
+                }
+              ],
+              "confidence": "high",
+              "quote": "I've escalated your request to customer support with the following details"
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017",
+                "event_018"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "degraded": false
+            }
+          },
+          "tracer_status": {
+            "stage": "step_tracer",
+            "state": "ok",
+            "attempts": 1,
+            "view": "complete",
+            "warnings": []
+          },
+          "defense_result": {
+            "ok": true,
+            "parsed": {
+              "verdict": "substantiated",
+              "confirmed_step": 15,
+              "evidence_refs": [
+                "event_014",
+                "event_015"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: event_014's contact_customer_support call returned the environment observation {\"error\": \"Booking not found\"} — the escalation did not occur. Yet event_015 states 'I've escalated your request to customer support with the following details... A customer support agent will contact you directly to resolve this.' This is a success claim contradicted by the trajectory's own tool observation, a FALSE COMPLETION under the MATERIALITY LAW (turn 5's deliverable was liaising with/escalating to customer support). RELEVANCE TEST: the false claim is never corrected — event_017's create_ticket fulfills turn 6's separate explicit request and is never framed as a retraction, and the user is never told the contact_customer_support escalation failed. Correcting event_015 to honestly report the failed escalation would remove the only false completion claim; the tool call itself in event_014 used correct arguments and is not the error, and a tool observation is not an assistant error, so event_015 is the earliest assistant-authored locus of the false claim."
+            },
+            "raw": [
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 15,
+                "evidence_refs": [
+                  "event_014",
+                  "event_015"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_014's contact_customer_support call returned the environment observation {\"error\": \"Booking not found\"} — the escalation did not occur. Yet event_015 states 'I've escalated your request to customer support with the following details... A customer support agent will contact you directly to resolve this.' This is a success claim contradicted by the trajectory's own tool observation, a FALSE COMPLETION under the MATERIALITY LAW (turn 5's deliverable was liaising with/escalating to customer support). RELEVANCE TEST: the false claim is never corrected — event_017's create_ticket fulfills turn 6's separate explicit request and is never framed as a retraction, and the user is never told the contact_customer_support escalation failed. Correcting event_015 to honestly report the failed escalation would remove the only false completion claim; the tool call itself in event_014 used correct arguments and is not the error, and a tool observation is not an assistant error, so event_015 is the earliest assistant-authored locus of the false claim."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 15,
+                "evidence_refs": [
+                  "event_014",
+                  "event_015"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: At event_014 the assistant's contact_customer_support call returned the environment observation {\"error\": \"Booking not found\"}, so no support contact or escalation occurred. At event_015 the assistant nevertheless stated 'I've escalated your request to customer support with the following details' and 'A customer support agent will contact you directly to resolve this.' This asserts a success directly contradicted by the trajectory's own tool observation — a FALSE COMPLETION under the MATERIALITY LAW. The tool call itself is not the error (a tool observation is not an assistant error, and the arguments were reasonable); the earliest assistant-authored locus of the false claim is event_015. RELEVANCE TEST: Correcting event_015 to report that the contact attempt failed would make the turn-5 deliverable an honest account of a failed escalation rather than a fabricated success. The later ticket creation at event_017 (turn 6's separate request) does not retroactively repair the false claim delivered at event_015 — it neither retracts the statement nor establishes that the claimed direct-agent contact occurred. Thus the step is causally connected to a delivered false state and its correction leaves every shown deliverable correct."
+              },
+              {
+                "verdict": "substantiated",
+                "confirmed_step": 15,
+                "evidence_refs": [
+                  "event_014",
+                  "event_015"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: At event_015 the assistant states 'I've escalated your request to customer support with the following details... A customer support agent will contact you directly to resolve this.' But the only escalation action, the contact_customer_support call at event_014 (arguments {'booking_id': '7223063', ...}), returned the environment fact {\"error\": \"Booking not found\"} — the call failed and no support contact or escalation occurred. Asserting a success that the trajectory's own observation contradicts is a FALSE COMPLETION, a material category; the assistant's partial acknowledgment that the booking ID is invalid does not repair the explicit claim that escalation happened and an agent would make contact. RELEVANCE TEST: event_015 is the earliest assistant-authored introduction of the false completion claim (event_014 is a tool observation, not an assistant error). The later ticket creation at event_017 fulfills the separate turn-6 request ('Invoice Discrepancy' ticket, priority 3) and does not correct or retract the false escalation claim delivered to the user at event_015. Correcting event_015 to report the failed escalation would make the turn-5 deliverable honest, so the step is causally connected to the delivered result. No external snapshot is needed; the contradiction is internal to the trajectory."
+              }
+            ],
+            "provider": {
+              "attempts": 1,
+              "usage": {
+                "prompt_tokens": 2783,
+                "completion_tokens": 1307,
+                "total_tokens": 4090,
+                "prompt_tokens_details": {
+                  "cached_tokens": 2752
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 972
+                },
+                "input_tokens_details": {
+                  "cached_tokens": 2752
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 972
+                },
+                "input_tokens": 2783,
+                "output_tokens": 1307
+              },
+              "cache_hit": false,
+              "prompt_cache_hit_tokens": 0,
+              "prompt_cache_miss_tokens": 0,
+              "prompt_cache_read_tokens": 0,
+              "prompt_cache_write_tokens": 0,
+              "purpose": "defense",
+              "model": "glm-5.3-flash",
+              "finish_reason": "stop",
+              "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 15,\n  \"evidence_refs\": [\"event_014\", \"event_015\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: At event_015 the assistant states 'I've escalated your request to customer support with the following details... A cust",
+              "vote": {
+                "votes": 3,
+                "cast": 3,
+                "verdicts": [
+                  "substantiated",
+                  "substantiated",
+                  "substantiated"
+                ],
+                "collapsed": "substantiated",
+                "tie": false,
+                "topups": 0,
+                "quorum": 2,
+                "quorum_met": true
+              }
+            },
+            "view_meta": {
+              "rendered_event_ids": [
+                "event_013",
+                "event_014",
+                "event_015",
+                "event_016",
+                "event_017"
+              ],
+              "truncated_event_ids": [],
+              "packet_truncated": false,
+              "omitted_event_ids": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010",
+                "event_011",
+                "event_012",
+                "event_018"
+              ]
+            }
+          },
+          "defense_status": {
+            "stage": "defense",
+            "state": "ok",
+            "attempts": 3,
+            "view": "complete",
+            "warnings": []
+          }
+        }
+      ],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "step_tracer": {
+        "stage": "step_tracer",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "defense": {
+        "stage": "defense",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 3672,
+          "completion_tokens": 5226,
+          "total_tokens": 8898,
+          "prompt_tokens_details": {
+            "cached_tokens": 3648
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4594
+          },
+          "input_tokens_details": {
+            "cached_tokens": 3648
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 4594
+          },
+          "input_tokens": 3672,
+          "output_tokens": 5226
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 15,\n  \"hallucination_reason\": \"The assistant claims 'I've escalated your request to customer support... A customer support agent will contact you directly' even though the contact_customer_support tool call in event_014 returned an error (\\\"Book",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 3,
+          "winner": true,
+          "tie": false
+        }
+      },
+      "step_tracer": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2868,
+          "completion_tokens": 681,
+          "total_tokens": 3549,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 499
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 499
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 2868,
+          "output_tokens": 681
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "step_tracer",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "\n{\n  \"step\": 15,\n  \"quote\": \"I've escalated your request to customer support with the following details\",\n  \"referent\": \"The contact_customer_support call in event_014 returned {\\\"error\\\": \\\"Booking not found\\\"}, so the assistant should have reported that the escalation did not go through and no sup"
+      },
+      "defense": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2783,
+          "completion_tokens": 1307,
+          "total_tokens": 4090,
+          "prompt_tokens_details": {
+            "cached_tokens": 2752
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 972
+          },
+          "input_tokens_details": {
+            "cached_tokens": 2752
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 972
+          },
+          "input_tokens": 2783,
+          "output_tokens": 1307
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "defense",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 15,\n  \"evidence_refs\": [\"event_014\", \"event_015\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: At event_015 the assistant states 'I've escalated your request to customer support with the following details... A cust",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "verdicts": [
+            "substantiated",
+            "substantiated",
+            "substantiated"
+          ],
+          "collapsed": "substantiated",
+          "tie": false,
+          "topups": 0,
+          "quorum": 2,
+          "quorum_met": true
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": null,
+      "upgrade_view": null,
+      "tracer_view": "complete",
+      "defense_view": "complete"
+    },
+    "provenance": {
+      "packet_hash": "c782062a57c89a03811f8ac4335458388018519effe71daec425153c7081244d",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 18
+  }
+}
