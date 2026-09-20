@@ -1841,7 +1841,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "54d87855f1a7",
+          "digest": "75b7d1dba188",
           "payload": {
             "stages": [
               "validate",
@@ -1862,7 +1862,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "9c2c66f5ab64588c",
+            "source_digest": "1d0b912b9eb00497",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2099,11 +2099,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "42bd086ad004"
+      "digest": "b2cbabbe0119"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "42bd086ad004",
+      "current_digest": "b2cbabbe0119",
       "first_manifest": true,
       "changed": [
         "G",
@@ -2200,4 +2200,4 @@
   }
 }
 
-capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_jeagc8c0\work\capability_smoke\capability_smoke_report.json
+capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_c9rqx4n_\work\capability_smoke\capability_smoke_report.json

@@ -1,0 +1,30 @@
+{
+  "BFCL/002.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "fresh_baseline"
+  },
+  "BFCL/153.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "fresh_baseline"
+  },
+  "BFCL/020.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "fresh_baseline"
+  },
+  "BFCL/053.json": {
+    "state": "verified_clean",
+    "prediction": false,
+    "authority": "authoritative",
+    "responsible_step": null,
+    "source_run": "fresh_baseline"
+  }
+}

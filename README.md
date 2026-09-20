@@ -75,6 +75,7 @@ python -m evolution verify-ledger
 16. [判错对象口径决定](docs/error-scope.md)
 17. [口径决定与固定预检复跑记录](reports/error_scope_20260918/README.md)
 18. [RSI 试点 P1/P2：机会筛查、训练机制冻结与有限修订实验](reports/rsi_pilot_20260919/README.md)
+19. [第 2–5 轮：消费位扩展、种子复用与初步验证汇总](reports/rsi_pilot_20260919/README.md#第-5-轮终局轮种子确认未过零容忍门跨轮汇总给出初步可用判定2026-09-20-续)
 
 原始数据共 693 个案例、7 个来源。原始目录 695 个文件的摘要保存在 `datasets/integrity.json`。当前默认协议为开发复测；没有预先配置可宣称独立泛化的终审集。离线 smoke 使用 mock 后端，证明机制闭环，不代表真实模型准确率。
 

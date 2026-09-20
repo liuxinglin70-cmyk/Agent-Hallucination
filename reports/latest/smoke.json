@@ -1877,7 +1877,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "54d87855f1a7",
+          "digest": "75b7d1dba188",
           "payload": {
             "stages": [
               "validate",
@@ -1898,7 +1898,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "9c2c66f5ab64588c",
+            "source_digest": "1d0b912b9eb00497",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2064,11 +2064,11 @@
         }
       },
       "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
-      "digest": "5b7e5b7223cf"
+      "digest": "3ec1e41389a8"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "5b7e5b7223cf",
+      "current_digest": "3ec1e41389a8",
       "first_manifest": true,
       "changed": [
         "G",

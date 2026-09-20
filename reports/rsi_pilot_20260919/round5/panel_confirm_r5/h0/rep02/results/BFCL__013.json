@@ -1,0 +1,310 @@
+{
+  "case_id": "BFCL/013.json",
+  "gold": false,
+  "state": "verified_clean",
+  "authority": "authoritative",
+  "prediction": false,
+  "responsible_step": null,
+  "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+  "runtime_valid": true,
+  "result": {
+    "schema_version": "detector.detection_result.v1",
+    "case_id": "BFCL/013.json",
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "occurrence_state": "verified_clean",
+    "proof": {
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "terminal_basis": {
+        "state": "verified_clean",
+        "decisive_facts": {
+          "judge": "false",
+          "recall_upgrade": "none",
+          "delivered_result": "The sorted '2024_research_backup.txt' file contains 1 line.",
+          "correct_result": "Undetermined: the trajectory's own observations conflict — the sort output shows 3 lines while wc reports 1 line — so the line count is not settled by the record."
+        },
+        "blocking_facts": []
+      },
+      "authority_failure_reasons": [],
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The sorted '2024_research_backup.txt' file contains 1 line.",
+        "correct_result": "Undetermined: the trajectory's own observations conflict — the sort output shows 3 lines while wc reports 1 line — so the line count is not settled by the record.",
+        "basis": "observation",
+        "confidence": "low",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The number of lines in the sorted '2024_research_backup.txt' file"
+          }
+        ]
+      },
+      "recall_candidates": [
+        {
+          "candidate_id": "c1",
+          "claim": "the agent only displayed the sorted content and offered to save it later, instead of writing the sorted lines back into '2024_research_backup.txt' so that the sorted file exists as turns 2-3 require ('the sorted 2024_research_backup.txt file')",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "If you want this sorted content saved to a new file or need further actions, let me know!"
+        },
+        {
+          "candidate_id": "c2",
+          "claim": "the agent reported the file contains 1 line instead of reconciling the wc count with its own sort observation showing three line contents ('Line 3: Experiment results', 'Line 1: Introduction', 'Line 2: Methodology'), presenting an unverified count as established",
+          "locus_event_id": "event_013",
+          "evidence_refs": [
+            "event_012",
+            "event_013",
+            "event_010"
+          ],
+          "evidence_citations": [],
+          "quote": "The sorted '2024_research_backup.txt' file contains 1 line."
+        },
+        {
+          "candidate_id": "c3",
+          "claim": "the agent presented the tool's returned order ('Line 3: Experiment results, Line 1: Introduction, Line 2: Methodology') as 'sorted alphabetically by line' and re-rendered it with the original 'Line N:' labels dropped and new 1-3 numbering, instead of reporting the observed lines and flagging that the returned order is not alphabetical by full line",
+          "locus_event_id": "event_011",
+          "evidence_refs": [
+            "event_010",
+            "event_011"
+          ],
+          "evidence_citations": [],
+          "quote": "The contents of '2024_research_backup.txt' have been sorted alphabetically by line:\\n\\n1. Experiment results\\n2. Introduction\\n3. Methodology"
+        }
+      ],
+      "causal_upgrade": null,
+      "causal_upgrades": [],
+      "causal_upgrade_rows": [
+        {
+          "candidate_id": "c1",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "Turn 2 asks to sort the lines and fixes no write-back action or output channel, the sort tool was invoked on the file itself, and no observation establishes the file's post-sort state, so the claimed missing action is not an established deliverable breach.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c2",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "Under the conflicted-observations rule the delivered count of 1 matches the wc tool observation and the conflicting sort observation leaves the point undecided, so this is not a material result error.",
+          "evidence_refs": [],
+          "conflict_note": "The sort observation shows three labeled line contents while the wc observation reports count=1 for the same file; this conflict is unresolved and no external snapshot settles it, so the line count is undecided, and the delivered answer agrees with the wc environment fact and is not convictable.",
+          "coverage": "answered"
+        },
+        {
+          "candidate_id": "c3",
+          "content_error": false,
+          "causal": false,
+          "corrected_step": null,
+          "reason": "The agent preserved the exact order of the sort tool's sorted_content (Experiment results, Introduction, Methodology) and only re-rendered labels and numbering, which is presentational with no format fixed by the task, and the tool's sorted_content is the environment fact the agent was entitled to relay.",
+          "evidence_refs": [],
+          "conflict_note": "",
+          "coverage": "answered"
+        }
+      ],
+      "step_tracer": null,
+      "defense": null,
+      "causal_upgrade_coverage": {
+        "expected": 3,
+        "answered": 3,
+        "missing": []
+      },
+      "hearings": [],
+      "evidence": [],
+      "deployment": {
+        "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+        "active_interventions": [],
+        "fired": [],
+        "evidence": [],
+        "facts": {},
+        "guard_actions": [],
+        "mechanical_guard_evidence": [],
+        "typed_predicate_programs": [],
+        "policy_conflict": false
+      },
+      "external_evidence": null
+    },
+    "stage_status": {
+      "judge": {
+        "stage": "judge",
+        "state": "ok",
+        "attempts": 3,
+        "view": "complete",
+        "warnings": []
+      },
+      "recall_scanner": {
+        "stage": "recall_scanner",
+        "state": "ok",
+        "attempts": 1,
+        "view": "complete",
+        "warnings": []
+      },
+      "causal_upgrade": {
+        "stage": "causal_upgrade",
+        "state": "ok",
+        "attempts": 4,
+        "view": "complete",
+        "warnings": []
+      }
+    },
+    "providers": {
+      "judge": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2375,
+          "completion_tokens": 5616,
+          "total_tokens": 7991,
+          "prompt_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5322
+          },
+          "input_tokens_details": {
+            "cached_tokens": 1472
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5322
+          },
+          "input_tokens": 2375,
+          "output_tokens": 5616
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "judge",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Backup created as archives/2024_research_backup.txt (copy then rename, events 6-8); sorted content produced (event_010/011); final answer: 'The sorted 2024_research_backup.txt file contains 1 line.'\",",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "positives": 0,
+          "winner": false,
+          "tie": false
+        }
+      },
+      "recall_scanner": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 1659,
+          "completion_tokens": 5607,
+          "total_tokens": 7266,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 5142
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 5142
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "input_tokens": 1659,
+          "output_tokens": 5607
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "recall_scanner",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent only displayed the sorted content and offered to save it later, instead of writing the sorted lines back into '2024_research_backup.txt' so that the sorted file exists as turns 2-3 require ('the sorted 2024_research_back"
+      },
+      "causal_upgrade": {
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 2752,
+          "completion_tokens": 12756,
+          "total_tokens": 15508,
+          "prompt_tokens_details": {
+            "cached_tokens": 64
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 12303
+          },
+          "input_tokens_details": {
+            "cached_tokens": 64
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 12303
+          },
+          "input_tokens": 2752,
+          "output_tokens": 12756
+        },
+        "cache_hit": false,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 0,
+        "prompt_cache_read_tokens": 0,
+        "prompt_cache_write_tokens": 0,
+        "purpose": "causal_upgrade",
+        "model": "glm-5.3-flash",
+        "finish_reason": "stop",
+        "raw_content_preview": "{\"upgrades\":[{\"candidate_id\":\"c1\",\"content_error\":true,\"causal\":true,\"corrected_step\":11,\"evidence_refs\":[],\"conflict_note\":\"\",\"reason\":\"The sort tool only returned sorted_content with no file-modification confirmation and the agent's own offer to 'save this sorted content to a new file' proves no w",
+        "vote": {
+          "votes": 3,
+          "cast": 3,
+          "per_candidate": {
+            "c1": {
+              "cast": 3,
+              "positives": 1,
+              "winner": false,
+              "tie": false
+            },
+            "c2": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            },
+            "c3": {
+              "cast": 3,
+              "positives": 0,
+              "winner": false,
+              "tie": false
+            }
+          }
+        }
+      }
+    },
+    "authority_failure_reasons": [],
+    "evidence_health": {
+      "judge_view": "complete",
+      "recall_view": "complete",
+      "upgrade_view": "complete",
+      "tracer_view": null,
+      "defense_view": null
+    },
+    "provenance": {
+      "packet_hash": "c4e55daea87829a0de46a05b913608295be1d69b632ecea592fba40c6df0edaf",
+      "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    },
+    "_packet_event_count": 13
+  }
+}

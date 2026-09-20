@@ -140,3 +140,19 @@ H0 在 013 上的定罪理由是"剥离 `Line N:` 前缀并重新编号，交付
 记录：[round3/README.md](./round3/README.md)；协议：[research-manifest-round3.json](../../output/rsi-planning/research-manifest-round3.json)（提交 `b13c2b6`）。
 
 **按冻结门在种子复筛处停止**（8 次 case-eval，0 次 proposer）。seed_candidate 机制在真实条件下工作正常（哈希钉住、契约校验、零草拟），但种子 v002 在 `BFCL/020` 上读出 authoritative error：召回触发后防御听证在 32768 包络下完整执行并实质性定罪。020 由此定级为**低频、与候选相关的召回路径 FP**（H0 8/8 clean，候选臂 6/8 clean），不是 024 型两臂噪声。这命中 P2 预注册的 §9 触发条件：剩余风险的结构性根源在防御消费位，judge.system 指令不可达；下一步是把 `text_boundary` 研究面扩至已注册的 `defense.system` hook（单独协议冻结），而不是继续同仪器加轮。002/153 的机制修复在全部测量中保持稳定（候选臂累计 6/6）。
+
+---
+
+# 第 4 轮（联合候选）：非噪声单元全通过，败于 024 支配读数（2026-09-20 续）
+
+代码基线：`8f3603f`；协议：[research-manifest-round4.json](../../output/rsi-planning/research-manifest-round4.json)（提交 `7e1131d`）；记录：[round4/README.md](./round4/README.md)。
+
+按 §9 放宽研究面后，proposer 一次产出**联合候选**（judge.system 召回指令 + defense.system 边界豁免）。筛查、复核（3/3）通过；**全部非噪声单元 3/3 通过**——002/153 修复、013/018/020 clean（R3 的 020 失败单元被修复）、008/082/148 零退化；唯一失败为预注册噪声单元 024 的配对支配读数（候选 2/3 vs H0 3/3）。§9 消费位扩展被证实为正确方向。
+
+---
+
+# 第 5 轮（终局轮）：种子确认未过零容忍门；跨轮汇总给出初步可用判定（2026-09-20 续）
+
+代码基线：`dc7bfa6`；协议：[research-manifest-round5.json](../../output/rsi-planning/research-manifest-round5.json)（提交 `dc7bfa6`）；记录：[round5/README.md](./round5/README.md)。
+
+种子复用联合候选；种子复筛通过、关键单元确认 rep01 全过，**rep02 在 008 上单次 judge 高置信翻转**（无召回/防御路径）→ 按零容忍门停止，024 统计判据阶段未启动。跨轮汇总（全部读数如实照报）：**联合候选 57/59 vs H0 38/55**；机制收益 18/18（002/153 各 9/9，H0 对照 1/8 与 0/8）；唯二翻转定性为 judge 采样方差与已知噪声单元。**判定：系统闭环初步验证可用（收益可复现、代价不可复现），但候选未通过部署前零容忍门，部署晋升未启动。**

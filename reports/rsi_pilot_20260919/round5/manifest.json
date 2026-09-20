@@ -1,0 +1,262 @@
+{
+  "schema_version": "evolution.research_report.v1",
+  "run_id": "rsi_round5_20260920",
+  "input_manifest": {
+    "schema_version": "evolution.research_manifest.v1",
+    "run_id": "rsi_round5_20260920",
+    "protocol_ref": "docs/optimization-directions.md §8/§10；reports/rsi_pilot_20260919/round4/README.md（全部非噪声单元 3/3 通过、024 支配失败）；reports/rsi_pilot_20260919/README.md（P2 预注册：边界样本需要更多重复）；本 manifest 在 round-5 任何真实评估之前冻结并提交",
+    "round5_note": "第 5 轮是初步验证的终局轮：以 seed 复用第 4 轮通过筛查与复核的联合候选（哈希钉住），关键单元做 2 次重复再确认，024 单元按 P2 预注册的方向提高重复次数并改用统计非劣性判据（单侧 Fisher 精确检验，p ≥ 0.05 视为无显著退化）。判据变更的理由在冻结前记录在案：024 在两臂上均有翻转史（H0：P2 2/2、R2 1/3、R4 3/3；候选：P2 1/2、R2 2/3、R4 2/3，合并 8/10 vs 5/8，Fisher p≈0.64），单轮 3 次点比较（零容忍或严格支配）在该单元上不可区分真伪退化。本轮的 024 判据仍是门（显著退化即停止该分支），不是放宽为观察项；逐次读数全部照报。",
+    "seed_candidate": {
+      "source_run": "reports/rsi_pilot_20260919/round4",
+      "version": "v001",
+      "candidate_hash": "1df71e0e9b51abfbb98be60433a4928dae13e9482a2f39ffc963d3980f2fac43",
+      "route": "C"
+    },
+    "intervention_surface": {
+      "types": [
+        "text_boundary"
+      ],
+      "hooks": [
+        "judge.system",
+        "defense.system"
+      ],
+      "max_entries": 2
+    },
+    "mechanism": {
+      "name": "quoted_content_vs_delivered",
+      "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+      "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+      "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+      "target_error_description": {
+        "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+        "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+      }
+    },
+    "family": {
+      "failure_family": "FAM-fn-quoted-content-vs-delivered",
+      "kind": "FN",
+      "mechanism_summary": "任务引用原文与交付内容绑定失败：judge 未核对任务引号内容与最终交付参数",
+      "actionability": {
+        "routes": [
+          "text_boundary"
+        ]
+      }
+    },
+    "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+    "detector_config": "detector/configs/autodl.json",
+    "cases": [
+      {
+        "case_id": "BFCL/002.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 6,
+        "target_error": "T2 逐字引用写入行；step 6 echo 写入完整模板+Simona: 虚构署名+占位文本"
+      },
+      {
+        "case_id": "BFCL/153.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 14,
+        "target_error": "T6 引用正文 'Postponing my plans.'；step 14 把 #Travel #PlansChanged @AirlineSupport 嵌入正文，tags/mentions 为空"
+      },
+      {
+        "case_id": "BFCL/020.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "target_error": null
+      },
+      {
+        "case_id": "BFCL/053.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "target_error": null
+      }
+    ],
+    "validation_cases": [
+      {
+        "case_id": "BFCL/002.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 6,
+        "reason": "训练修复再确认（目标步对齐）"
+      },
+      {
+        "case_id": "BFCL/153.json",
+        "role": "training_failure",
+        "raw_gold": true,
+        "target_step": 14,
+        "reason": "同上"
+      },
+      {
+        "case_id": "BFCL/008.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "稳定回归单元（历史零翻转）"
+      },
+      {
+        "case_id": "BFCL/082.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "稳定回归单元"
+      },
+      {
+        "case_id": "BFCL/148.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "稳定回归单元"
+      },
+      {
+        "case_id": "BFCL/013.json",
+        "role": "boundary",
+        "raw_gold": false,
+        "reason": "边界单元；候选在 R4 为 3/3 clean（H0 1/3）"
+      },
+      {
+        "case_id": "BFCL/018.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "reason": "正常近邻；历史稳定 clean"
+      },
+      {
+        "case_id": "BFCL/020.json",
+        "role": "normal_neighbor",
+        "raw_gold": false,
+        "reason": "R3 失败单元、R4 被联合候选修复（3/3 clean）"
+      },
+      {
+        "case_id": "BFCL/024.json",
+        "role": "regression",
+        "raw_gold": true,
+        "reason": "噪声单元：本轮按统计非劣性判据（8 次重复、单侧 Fisher p ≥ 0.05）"
+      }
+    ],
+    "panel_gate": {
+      "training_cases": [
+        "BFCL/002.json",
+        "BFCL/153.json"
+      ],
+      "clean_cases": [
+        "BFCL/013.json",
+        "BFCL/018.json",
+        "BFCL/020.json"
+      ],
+      "regression_cases": [
+        "BFCL/008.json",
+        "BFCL/082.json",
+        "BFCL/148.json"
+      ],
+      "rationale": "关键单元维持零容忍（每次重复都必须成立）；024 在独立的 noise_024_r5 阶段以统计非劣性判据判定。"
+    },
+    "baseline_ref": {},
+    "framework_config": {
+      "detector_config": "detector/configs/autodl.json",
+      "budget": {
+        "llm_calls": 1
+      },
+      "proposer": {
+        "mode": "llm",
+        "max_output_tokens": 32768,
+        "max_repair_calls": 0
+      }
+    },
+    "routes": [
+      "C"
+    ],
+    "route_notes": {
+      "C": "本轮 route C 仅承接 seed_candidate，无草拟"
+    },
+    "stages": {
+      "panel_confirm_r5": {
+        "case_ids": [
+          "BFCL/002.json",
+          "BFCL/153.json",
+          "BFCL/008.json",
+          "BFCL/082.json",
+          "BFCL/148.json",
+          "BFCL/013.json",
+          "BFCL/018.json",
+          "BFCL/020.json"
+        ],
+        "gate": "panel",
+        "repetitions": 2,
+        "budget_case_evaluations": 32
+      },
+      "noise_024_r5": {
+        "case_ids": [
+          "BFCL/024.json"
+        ],
+        "gate": "panel",
+        "panel": {
+          "noisy_cases": [
+            {
+              "case_id": "BFCL/024.json",
+              "rule": "no_significant_degradation"
+            }
+          ]
+        },
+        "repetitions": 8,
+        "budget_case_evaluations": 16
+      }
+    },
+    "pass_conditions": [
+      "screening（种子复筛）：002@6、153@14 修复，020/053 clean，全部 authoritative",
+      "panel_confirm_r5：候选臂 2 次重复全部通过——训练两例每次修复（零容忍）、clean 三例（013/018/020）每次 clean（零容忍）、稳定回归三例（008/082/148）每次保持检出（零容忍）",
+      "noise_024_r5：候选臂 8 次重复的保持率相对 H0 无显著退化（单侧 Fisher 精确检验 p ≥ 0.05）；逐次读数与两臂保持次数全部照报",
+      "全部阶段通过即判定候选通过冻结验证门，进入方案 §10 部署前检查；任一阶段未过即停止并如实报告",
+      "不调门限、不改划分、不重抽种子、不更换验证集；上一条判据的变更依据已在本 manifest 冻结前记录"
+    ],
+    "budget": {
+      "baseline_case_evaluations": 4,
+      "screening_case_evaluations": 4,
+      "proposer_calls_per_route": 0,
+      "max_versions": 1,
+      "workers": 2
+    }
+  },
+  "input_manifest_hash": "06a1a844c6750a1e907156cc083818394dc6c7a89b2b905bf25cec4f7484a52a",
+  "code_baseline": "dc7bfa6",
+  "detector_config_hash": "0b83025e79e2db2afed5626061d427531ebb2744d428d60123b830009cc5b598",
+  "mechanism": {
+    "name": "quoted_content_vs_delivered",
+    "description": "交付内容必须与任务原文引用的确切文本一致；任务单独要求的元素应进入专用参数而非嵌入引用正文",
+    "repair_operation": "先在任务原文中定位引号引用的必需内容，再对照最终交付参数与专用 tags/mentions 参数，标记未经引用的添加或嵌入",
+    "not_when": "任务未以引号给出确切内容时，摘要、改写、重编号、引用包装等呈现行为不定罪；agent 对自身工具观察的再呈现属于呈现行为而非内容偏离；任务只要求报告或交付内容时，未把内容写回源文件不定罪；引号包裹豁免只适用于任务未要求逐字交付的情形",
+    "target_error_description": {
+      "BFCL/002.json": "任务 T2 逐字引用要写入文件的行，agent 实际写入完整模板并添加虚构署名前缀与占位文本",
+      "BFCL/153.json": "任务 T6 引用推文正文并单独要求 hashtags 与 mention，agent 把两者嵌入正文且 tags/mentions 参数为空"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "BFCL/002.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 6,
+      "target_error": "T2 逐字引用写入行；step 6 echo 写入完整模板+Simona: 虚构署名+占位文本"
+    },
+    {
+      "case_id": "BFCL/153.json",
+      "role": "training_failure",
+      "raw_gold": true,
+      "target_step": 14,
+      "target_error": "T6 引用正文 'Postponing my plans.'；step 14 把 #Travel #PlansChanged @AirlineSupport 嵌入正文，tags/mentions 为空"
+    },
+    {
+      "case_id": "BFCL/020.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    },
+    {
+      "case_id": "BFCL/053.json",
+      "role": "normal_neighbor",
+      "raw_gold": false,
+      "target_error": null
+    }
+  ],
+  "routes": [
+    "C"
+  ],
+  "evaluation_mode": "fresh_full_detection_no_judge_cache",
+  "frozen_at": "2026-09-20T12:27:25"
+}
