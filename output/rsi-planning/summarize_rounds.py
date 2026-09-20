@@ -20,6 +20,8 @@ ROUNDS = [
     ("r4-val", "round4/unused_dev_validation_r4"),
     ("r5-seed", "round5/v001/results"),     # 种子复筛单次
     ("r5-conf", "round5/panel_confirm_r5"),
+    ("r6-008", "round6/stable_008_r6"),
+    ("r6-024", "round6/noise_024_r6"),
 ]
 
 TIER = {  # 单元定级（依据历史证据，见各轮报告）
