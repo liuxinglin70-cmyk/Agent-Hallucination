@@ -1,12 +1,14 @@
 # 检测器底座与自进化框架：整体机制梳理与代码 Review
 
+> **历史文档（2026-09-17）。** 缺陷编号 A1–A10、B1–B4 仍被 `reports/verification_20260917/` 引用；当前实现见 [技术方案](../technical-solution.md)。保留原因见 [历史文档索引](README.md)。
+
 Review 日期：2026-09-17。范围：`detector/`、`evolution/` 全部源码与 `docs/`。
 方法：逐文件通读 + 对关键结论做最小复现（下文中标「本机复现」的条目均由我实际运行代码确认）。
 离线测试基线：`python -m pytest -q` → **220 passed**（`reports/latest` 记录的 204 项已增至 220）。
 
 > **2026-09-17 更新：第 5 节的 A/B 修复已全部实施完成，测试增至 244 项并通过全部 7 项离线校验。**
 > 逐条修复与新增回归测试见 [第 8 节 修复记录](#8-修复记录2026-09-17-实施)；跳出当前循环的后续方向见
-> [optimization-directions.md](optimization-directions.md)。
+> [optimization-directions.md](../optimization-directions.md)。
 
 ---
 
@@ -414,5 +416,6 @@ A/B 阶段全部完成。**`python -m pytest -q` → 244 passed**（原 220）�
 - 新增持久化一度导致测试写入仓库默认 `artifacts/evolution/`，已在测试与 smoke 配置中补齐隔离路径。
 
 **方法论提醒**：以上修复让"测出来的东西是对的、且有统计意义"成为前提；但**它们本身不产生收益**。
-真正的收益问题见 [optimization-directions.md](optimization-directions.md)——当前自进化仍处在无效循环中；
+真正的收益问题见 [optimization-directions.md](../optimization-directions.md)——当前自进化仍处在无效循环中；
 H_t 基座提供了描述、记忆与工单能力，但能力增长仍取决于后续把记忆接入改进过程。
+

@@ -2,7 +2,7 @@
 
 Patrol -> failure families -> proposals -> structural/harmlessness/behavior/
 marginal gates -> registry admission, attribution, retirement and rollback.
-See docs/architecture.md and docs/interventions.md for the runtime contracts.
+See docs/technical-solution.md for the runtime contracts.
 """
 
 from evolution.engine import EvolutionEngine, run_experiment

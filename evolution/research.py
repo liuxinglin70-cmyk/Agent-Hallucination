@@ -1,7 +1,7 @@
 """Bounded-revision research entry: one mechanism, existing hooks only.
 
-This module is the independent research lane from the optimization plan
-(docs/optimization-directions.md §8). It is deliberately separate from the
+This module is the independent research lane from the current technical
+solution (docs/technical-solution.md §7). It is deliberately separate from the
 deployment engine: ``run_cycle``, the S/G splits, the four gates and the
 active registry are neither consulted nor modified. The entry reads a frozen
 research manifest and executes baseline -> draft -> evaluate -> revise ->

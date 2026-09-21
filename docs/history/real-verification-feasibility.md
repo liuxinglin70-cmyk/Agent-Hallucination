@@ -1,5 +1,7 @@
 # 真实验证可行性评估：检测器底座与自进化框架
 
+> **历史文档（2026-09-17）。** 其中「没有独立终审集」的阻断项仍然成立，但代码基线与测试数量已过时；当前口径见 [技术方案](../technical-solution.md) 第 9 节。保留原因见 [历史文档索引](README.md)。
+
 评估日期：2026-09-17。范围：`detector/`、`evolution/` 全部源码、`datasets/`、`reports/` 与 `artifacts/` 中的真实运行记录。
 方法：通读源码与文档 + 本机实测（真实 provider 调用、离线回归、划分复算、成本复算）。下文标「实测」的条目均由本次实际运行确认。
 
@@ -314,3 +316,4 @@ python -m evolution verify-ledger
 | `development_exposure.json` | 693 案例，7 个来源，与整合语料逐一对应 |
 | 正式 `final` manifest 检索 | 全仓库无 `final_verification` 记录 |
 | cycle 1 成本复算 | 40 个缓存结果 / 133 次调用 / 948,380 token |
+

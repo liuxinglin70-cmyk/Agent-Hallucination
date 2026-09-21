@@ -24,4 +24,4 @@ result = Detector().detect(project_record(raw_record), case_id="example")
 
 真实数据集上的小规模路径与重复运行检查运行 `python scripts/real_path_check.py`。它按 `datasets/protocols/real_path_check.json` 固定案例清单、模型、票数和预算，冻结底座后多次运行 `batch → evaluate`，记录终态一致性、authority、unresolved、定位、耗时和 token；结果位于 `reports/real/`。案例已被开发使用，结论只覆盖路径连通与运行一致性，不是准确率。
 
-完整逻辑见 [架构](../docs/architecture.md)；部署接口见 [干预契约](../docs/interventions.md)。
+完整逻辑见 [框架技术方案](../docs/technical-solution.md)；部署接口见其中的第 5 节。

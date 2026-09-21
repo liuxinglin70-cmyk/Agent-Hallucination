@@ -38,7 +38,7 @@ DSL 上下文字段按 hook 校验：`judge.post` 与 `recall.trigger` 共用 ju
 
 **边界：** 清单与缺口是**记录**设施，不参与任何门的判定，因此不会移动准入结果。经验存储已接入草拟：`_proposal_memory_context` 为当前失败族检索已准入程序性经验并附开放缺口，经 `set_memory_context` 进入 proposer 提示；供给情况记入账本 `proposal_memory` / `proposal_memory_used`。记忆是草拟先验，不是约束，也不参与门判定——是否真正改善了草拟质量，需要在后续实验中用带/不带记忆的对照来判定，不能由「已接入」直接推出。
 
-`final` 和 `full-self-evolution` 需要显式的正式协议；默认开发配置不提供 `split_manifest`，因此会拒绝正式终审。详见 [评估协议](../docs/evaluation.md)。
+`final` 和 `full-self-evolution` 需要显式的正式协议；默认开发配置不提供 `split_manifest`，因此会拒绝正式终审。详见 [框架技术方案](../docs/technical-solution.md) 第 9.2 节。
 
 测试：`python -m pytest evolution/tests -q`。全仓库可复现验证：`python scripts/verify.py`。
 
@@ -73,4 +73,4 @@ DSL 上下文字段按 hook 校验：`judge.post` 与 `recall.trigger` 共用 ju
 
 自动化退出码：`smoke` 只有在目标干预准入、缺陷审计、账本完整性均通过且 cycle 完成时才返回 0；否则返回 2。`verify-ledger` 对有效账本返回 0、哈希链校验失败返回 2；无法解析的损坏文件也不会返回成功。
 
-当前已验证离线框架闭环和检测器真实服务连通性；尚未在整理后的代码上完成真实模型驱动的整轮进化效果验证。阶段目标见 [当前进展与计划](../docs/progress.md)。
+当前已验证离线框架闭环和检测器真实服务连通性；尚未在整理后的代码上完成真实模型驱动的整轮进化效果验证。阶段目标见 [当前进展与计划](../docs/history/progress.md)。

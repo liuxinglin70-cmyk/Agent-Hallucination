@@ -1,6 +1,8 @@
 # 方向对照评估：文档主张与代码现状
 
-更新日期：2026-09-17。配套资料：[架构](architecture.md)、[当前进展](progress.md)、[优化方向](optimization-directions.md)、[代码 review](review.md)、[真实进化报告](../reports/evolution_real/README.md)。
+> **历史文档（2026-09-17）。** 「先修尺子」的裁定依据；相关改动已落地并写入 [技术方案](../technical-solution.md)。保留原因见 [历史文档索引](README.md)。
+
+更新日期：2026-09-17。配套资料：[架构](../technical-solution.md)、[当前进展](progress.md)、[优化方向](../optimization-directions.md)、[代码 review](review.md)、[真实进化报告](../../reports/evolution_real/README.md)。
 
 本文把 `optimization-directions.md` 的设计主张逐条比到 `detector/` 与 `evolution/` 的当前实现，判断哪些已经具备、哪些缺失、以及下一步真正该动哪里。所有结论都给出代码位置；设计建议与已实现事实分开陈述。
 
@@ -229,3 +231,4 @@ resolved_by_active  巡检版本判对、裸底座判错  → 被更新修好的
 ## 9. 一句话区分「优化」与「累积自改进」
 
 只有执行过程变化发生时，应称为一次 harness 优化；程序性能力积累、学习任务推进、改进策略复用**持续发生**，才有理由讨论累积自改进。当前项目处于「描述、记忆、覆盖读数与响应机制均已具备，但真实运行中尚未验证其作用」的阶段——框架完备不等于收益成立，这正是把重跑真实实验列为下一步的理由。
+

@@ -10,7 +10,7 @@
 | 版本编号的准入门 | structural / harmlessness / behavior / marginal |
 | 多轮框架配置 | `evolution/configs/development.json` |
 | 供应商检测配置 | `detector/configs/autodl.json`、`deepseek.json` |
-| 多份迭代设计文档 | `docs/architecture.md`、`interventions.md`、`evaluation.md`、`maintenance.md` |
+| 多份迭代设计文档 | 2026-09-16 整理为 `docs/architecture.md`、`interventions.md`、`evaluation.md`、`maintenance.md`；2026-09-21 前三份合并进 `docs/technical-solution.md`，历史过程文档移入 `docs/history/` |
 | 最新验证 | `reports/latest/` |
 | 日常运行输出 | `artifacts/` |
 
