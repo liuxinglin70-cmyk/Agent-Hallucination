@@ -1,6 +1,6 @@
 # RSI 试点第 6 轮：008/024 统计非劣性确认——三阶段门全部通过
 
-日期：2026-09-20；协议：[research-manifest-round6.json](../../output/rsi-planning/research-manifest-round6.json)（运行前冻结，提交 `ac8df72`）；代码基线：`ac8df72`（424 passed）。
+日期：2026-09-20；协议：[research-manifest-round6.json](../../../output/rsi-planning/research-manifest-round6.json)（运行前冻结，提交 `ac8df72`）；代码基线：`ac8df72`（424 passed）。
 
 ## 结论摘要
 

@@ -1,6 +1,6 @@
 # RSI 试点第 4 轮（联合候选）：全部非噪声单元通过，面板门仅败于 024 支配读数
 
-日期：2026-09-20；协议：[research-manifest-round4.json](../../output/rsi-planning/research-manifest-round4.json)（运行前冻结，提交 `7e1131d`）；代码基线：`8f3603f`（研究面放宽 + 联合候选，全库 420 passed）。
+日期：2026-09-20；协议：[research-manifest-round4.json](../../../output/rsi-planning/research-manifest-round4.json)（运行前冻结，提交 `7e1131d`）；代码基线：`8f3603f`（研究面放宽 + 联合候选，全库 420 passed）。
 
 ## 结论摘要
 

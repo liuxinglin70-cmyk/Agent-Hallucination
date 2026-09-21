@@ -1,0 +1,495 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "BFCL/107.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "BFCL/107.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "A statement that 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' — with no actual NVDA data values delivered to the user.",
+            "correct_result": "Delivery of NVDA's comprehensive information as retrieved: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67.",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The final message only describes the tool call in future tense and never delivers the comprehensive NVDA stock information (price, percent change, volume, moving averages) that the observation already returned and the task required to be delivered.",
+          "delivered_result": "A statement that 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' — with no actual NVDA data values delivered to the user.",
+          "correct_result": "Delivery of NVDA's comprehensive information as retrieved: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_003"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.",
+            "referent": "The user-facing answer should report the retrieved NVDA data: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67."
+          },
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Add Apple's stock (AAPL) to the current watchlist — satisfied by event_001 add_to_watchlist({'stock': 'AAPL'}) with observation [\"NVDA\", \"AAPL\"]."
+            },
+            {
+              "kind": "exact_form",
+              "requirement": "Provide a detailed breakdown of the watchlist's contents — satisfied by event_002 reporting the watchlist contains NVDA and AAPL, matching the get_watchlist observation."
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Retrieve comprehensive information about NVDA — satisfied by event_003 get_stock_info({'symbol': 'NVDA'})."
+            },
+            {
+              "kind": "verbatim_content",
+              "requirement": "Deliver the comprehensive NVDA information (price, percent change, volume, MA(5), MA(20)) to the user in the final answer — breached: event_004 contains no actual data values."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.",
+          "referent": "Deliver the already-retrieved NVDA data to the user: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67.",
+          "evidence_refs": [
+            "event_004",
+            "event_003"
+          ],
+          "reason": "The failure to deliver the NVDA data first appears at event_004, where the assistant merely describes the tool call in future tense instead of reporting the values that event_003's observation had already returned correctly."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004",
+            "event_003"
+          ],
+          "reason": "CONTENT TEST: event_004, the final prose event (has_explicit_final_answer=False), states only 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.' Turn 2's contract explicitly requires 'retrieve and delivery of comprehensive information about the stock NVDA.' The observation at event_003 already returned the concrete data ({'price': 220.34, 'percent_change': 0.34, 'volume': 1.234, 'MA(5)': 220.45, 'MA(20)': 220.67}), yet event_004 merely describes the call in future tense and delivers none of the values. The required deliverable — delivery of the comprehensive NVDA information — is therefore missing, a real deviation under the grounding rules (the observation is an environment fact that was never conveyed). This is substantive missing content, not formatting or process only. RELEVANCE TEST: event_004 is the trajectory's last deliverable for turn 2; correcting it to actually deliver the retrieved values would fulfill that deliverable directly, and no shown evidence indicates any remaining broken deliverable that step 4's correction would leave unfixed. Both tests pass."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The final message only describes the tool call in future tense and never delivers the comprehensive NVDA stock information (price, percent change, volume, moving averages) that the observation already returned and the task required to be delivered.",
+              "evidence_refs": [
+                "event_004",
+                "event_003"
+              ],
+              "quote": "The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.",
+              "delivered_result": "A statement that 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' — with no actual NVDA data values delivered to the user.",
+              "correct_result": "Delivery of NVDA's comprehensive information as retrieved: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67."
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.",
+                "referent": "Deliver the already-retrieved NVDA data to the user: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67.",
+                "evidence_refs": [
+                  "event_004",
+                  "event_003"
+                ],
+                "reason": "The failure to deliver the NVDA data first appears at event_004, where the assistant merely describes the tool call in future tense instead of reporting the values that event_003's observation had already returned correctly."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 901,
+                  "completion_tokens": 761,
+                  "total_tokens": 1662,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 583
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 583
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "input_tokens": 901,
+                  "output_tokens": 761
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":4,\"quote\":\"The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.\",\"referent\":\"Deliver the already-retrieved NVDA data to the user: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45,"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The final message only describes the tool call in future tense and never delivers the comprehensive NVDA stock information (price, percent change, volume, moving averages) that the observation already returned and the task required to be delivered.",
+                "delivered_result": "A statement that 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' — with no actual NVDA data values delivered to the user.",
+                "correct_result": "Delivery of NVDA's comprehensive information as retrieved: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67.",
+                "evidence_refs": [
+                  "event_004",
+                  "event_003"
+                ],
+                "contracts": [
+                  {
+                    "kind": "required_action",
+                    "requirement": "Add Apple's stock (AAPL) to the current watchlist — satisfied by event_001 add_to_watchlist({'stock': 'AAPL'}) with observation [\"NVDA\", \"AAPL\"]."
+                  },
+                  {
+                    "kind": "exact_form",
+                    "requirement": "Provide a detailed breakdown of the watchlist's contents — satisfied by event_002 reporting the watchlist contains NVDA and AAPL, matching the get_watchlist observation."
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Retrieve comprehensive information about NVDA — satisfied by event_003 get_stock_info({'symbol': 'NVDA'})."
+                  },
+                  {
+                    "kind": "verbatim_content",
+                    "requirement": "Deliver the comprehensive NVDA information (price, percent change, volume, MA(5), MA(20)) to the user in the final answer — breached: event_004 contains no actual data values."
+                  }
+                ],
+                "confidence": "high",
+                "quote": "The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004",
+                  "event_003"
+                ],
+                "reason": "CONTENT TEST: event_004, the final prose event (has_explicit_final_answer=False), states only 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.' Turn 2's contract explicitly requires 'retrieve and delivery of comprehensive information about the stock NVDA.' The observation at event_003 already returned the concrete data ({'price': 220.34, 'percent_change': 0.34, 'volume': 1.234, 'MA(5)': 220.45, 'MA(20)': 220.67}), yet event_004 merely describes the call in future tense and delivers none of the values. The required deliverable — delivery of the comprehensive NVDA information — is therefore missing, a real deviation under the grounding rules (the observation is an environment fact that was never conveyed). This is substantive missing content, not formatting or process only. RELEVANCE TEST: event_004 is the trajectory's last deliverable for turn 2; correcting it to actually deliver the retrieved values would fulfill that deliverable directly, and no shown evidence indicates any remaining broken deliverable that step 4's correction would leave unfixed. Both tests pass."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_003"
+                  ],
+                  "reason": "CONTENT TEST: event_004, the final prose event (has_explicit_final_answer=False), states only 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.' Turn 2's contract explicitly requires 'retrieve and delivery of comprehensive information about the stock NVDA.' The observation at event_003 already returned the concrete data ({'price': 220.34, 'percent_change': 0.34, 'volume': 1.234, 'MA(5)': 220.45, 'MA(20)': 220.67}), yet event_004 merely describes the call in future tense and delivers none of the values. The required deliverable — delivery of the comprehensive NVDA information — is therefore missing, a real deviation under the grounding rules (the observation is an environment fact that was never conveyed). This is substantive missing content, not formatting or process only. RELEVANCE TEST: event_004 is the trajectory's last deliverable for turn 2; correcting it to actually deliver the retrieved values would fulfill that deliverable directly, and no shown evidence indicates any remaining broken deliverable that step 4's correction would leave unfixed. Both tests pass."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: event_004, the final prose event (last_prose_event_id=event_004, has_explicit_final_answer=False), states only 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.' Turn 2 of the task explicitly requires 'retrieve and delivery of comprehensive information about the stock NVDA.' The observation at event_003 already returned the concrete data ({'price': 220.34, 'percent_change': 0.34, 'volume': 1.234, 'MA(5)': 220.45, 'MA(20)': 220.67}), yet the final message delivers none of these values — it merely describes the call in future tense after the call already executed. The required deliverable (delivery of the comprehensive NVDA information to the user) is therefore missing, a real deviation under the grounding rules. RELEVANCE TEST: event_004 is itself the trajectory's delivered final result for turn 2; correcting it to state the actual retrieved values would satisfy the deliverable, and no later event corrects it. The error is causally identical to the failed deliverable and is material (missing required deliverable content / false completion of the delivery step)."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: event_004 states 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' — a future-tense description with no data values. The task (turn 2) demands 'retrieve and delivery of comprehensive information about the stock NVDA', and the observation attached to event_003 already returned the concrete facts (price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45, MA(20) 220.67). The delivered final message therefore contains none of the required deliverable content and misdescribes an already-completed call as a future action. RELEVANCE TEST: event_004 is the trajectory's last event (last_prose_event_id=event_004, has_explicit_final_answer=False), so nothing later corrects the omission; correcting event_004 to actually deliver the observed values would complete the only remaining deliverable, while event_003's tool call already satisfies the retrieval half. The breach is a material result error/false completion, not formatting or an intermediate corrected error."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1250,
+                  "completion_tokens": 3655,
+                  "total_tokens": 4905,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 3364
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 3364
+                  },
+                  "input_tokens": 1250,
+                  "output_tokens": 3655
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: event_004 states 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' ",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1405,
+            "completion_tokens": 4065,
+            "total_tokens": 5470,
+            "prompt_tokens_details": {
+              "cached_tokens": 1344
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3629
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3629
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1344
+            },
+            "input_tokens": 1405,
+            "output_tokens": 4065
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"AAPL was added to the watchlist (observation confirms watchlist is now [NVDA, AAPL]) and the contents were correctly reported to the user; NVDA stock info was retrieved via get_stock_info (price 220.3",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 2,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 901,
+            "completion_tokens": 761,
+            "total_tokens": 1662,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 583
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 583
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "input_tokens": 901,
+            "output_tokens": 761
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":4,\"quote\":\"The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA.\",\"referent\":\"Deliver the already-retrieved NVDA data to the user: price 220.34, percent_change 0.34, volume 1.234, MA(5) 220.45,"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1250,
+            "completion_tokens": 3655,
+            "total_tokens": 4905,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3364
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3364
+            },
+            "input_tokens": 1250,
+            "output_tokens": 3655
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: event_004 states 'The function call will retrieve the current price, percentage change, trading volume, 5-day moving average, and 20-day moving average of the stock NVDA' ",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "0ab28dbcd0562316ee68dec9d4003d4b0b0e23b0eb903fa20790ded25b0075ef",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "de53e379e558"
+}

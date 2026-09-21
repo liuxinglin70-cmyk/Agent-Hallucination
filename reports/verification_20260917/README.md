@@ -15,6 +15,8 @@
 
 ---
 
+> **产物归档说明（2026-09-21）。** 下文命令与配置表中的 `artifacts/...` 路径是**运行当时的记录**，便于精确复现当初执行了什么。`artifacts/` 是自动生成的运行时目录、不进入 Git，其内容已在 2026-09-21 整理：本次运行的原始产物归档到本报告目录（见第 6 节），其余运行残留已删除。需要查看当初的原始数据时，请使用第 6 节给出的归档路径，而不是命令中的 `artifacts/` 路径。
+
 ## 1. 运行范围与合规性
 
 | 项 | 值 |
@@ -22,8 +24,8 @@
 | 检测器配置 | `detector/configs/autodl.json` |
 | 进化配置 | `evolution/configs/development_real_run.json` |
 | 进化协议 | `datasets/protocols/development.json`（仓库既有，未新增/未修改） |
-| 检测器案例清单 | `artifacts/_dev40_cases.json`（由既有协议的两个集合拼接，40 例） |
-| 进化工作目录 | `artifacts/evolution_real/` |
+| 检测器案例清单 | [detector_dev40/cases_file.json](detector_dev40/cases_file.json)（由既有协议的两个集合拼接，40 例；原路径 `artifacts/_dev40_cases.json`） |
+| 进化工作目录 | `artifacts/evolution_real/`（运行时目录，已回收；归档见 [evolution_run/](evolution_run/)） |
 | 原始数据 | 未改动；`datasets/protocols/` 下仅既有 3 个文件 |
 | 模型调用 | 真实服务，无 mock |
 
@@ -250,14 +252,18 @@ protected_baseline = [
 
 ## 6. 产物位置
 
+本次运行的原始产物经过整理，已从运行目录归档到本报告目录下（2026-09-21 整理，见 [reports 归档说明](../README.md)）：
+
 | 内容 | 路径 |
 |---|---|
-| 检测器 40 例结果 | `artifacts/detector_dev40/dev40/`（`cases/*/result.json`、`evaluation.json`） |
-| 案例清单（本次拼接） | `artifacts/_dev40_cases.json` |
-| 进化 cycle 报告 | `artifacts/evolution_real/cycles/cycle001.json`、`cycle002.json` |
-| 进化账本 | `artifacts/evolution_real/ledger.jsonl` |
-| 逐例观测检查点 | `artifacts/evolution_real/checkpoints/cycle00{1,2}/` |
-| 缺陷审计判定 | `artifacts/evolution_real/reports/defect_audit_verdict.json` |
-| H_t 清单与历史 | `artifacts/evolution/harness/harness.json`、`harness_history.jsonl` |
-| 情景经验 | `artifacts/evolution/memory/episodic.jsonl` |
-| 上一份（修复前）运行记录 | `artifacts/evolution_real_20260916_stale/`、`reports/evolution_real/` |
+| 检测器 40 例结果 | [detector_dev40/](detector_dev40/)（`cases/*/result.json`、`evaluation.json`） |
+| 案例清单（本次拼接） | [detector_dev40/cases_file.json](detector_dev40/cases_file.json) |
+| 进化 cycle 报告 | [evolution_run/cycles/cycle001.json](evolution_run/cycles/cycle001.json)、`cycle002.json` |
+| 进化账本 | [evolution_run/ledger.jsonl](evolution_run/ledger.jsonl) |
+| 逐例观测检查点 | [evolution_run/checkpoints/](evolution_run/checkpoints/)（`cycle00{1,2}/arms/`） |
+| 缺陷审计判定 | [evolution_run/reports/defect_audit_verdict.json](evolution_run/reports/defect_audit_verdict.json) |
+| H_t 清单与历史 | [harness_memory/harness.json](harness_memory/harness.json)、`harness_history.jsonl` |
+| 情景经验 | [harness_memory/episodic.jsonl](harness_memory/episodic.jsonl)（含人工更正 `episode_corrections.jsonl`） |
+| 上一份（修复前）运行记录 | [../evolution_real/run_20260916/](../evolution_real/run_20260916/)、[../evolution_real/](../evolution_real/) |
+
+复现命令仍写入默认的 `artifacts/` 运行目录；该目录是自动生成的运行时输出，不进入 Git，也不作为历史证据保存。长期保存的实验结果统一归档到 `reports/`。

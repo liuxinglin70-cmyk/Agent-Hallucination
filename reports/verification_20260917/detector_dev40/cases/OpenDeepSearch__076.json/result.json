@@ -1,0 +1,455 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "OpenDeepSearch/076.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_003",
+  "responsible_step": 3,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 3,
+        "traced_step": 3,
+        "defense": "substantiated",
+        "confirmed_step": 3,
+        "delivered_result": "Radcliffe College (with a major in biology)",
+        "correct_result": "Connecticut College for Women (B.S. in zoology, 1924)",
+        "judge_basis": "observation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 3,
+      "hallucination_reason": "The final answer asserts Gloria Hollister earned her B.S. from Radcliffe College, directly contradicting the tool observation in event_002 which states she graduated with a B.S. in zoology from Connecticut College for Women in 1924.",
+      "delivered_result": "Radcliffe College (with a major in biology)",
+      "correct_result": "Connecticut College for Women (B.S. in zoology, 1924)",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_002",
+        "event_003"
+      ],
+      "root_cause": {
+        "step": 3,
+        "quote": "Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.",
+        "referent": "Gloria Hollister attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924."
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "The name of the college from which research scientist Gloria Hollister earned her Bachelor of Science degree."
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 3,
+      "quote": "Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.",
+      "referent": "Gloria Hollister earned her B.S. in zoology from Connecticut College for Women in 1924, as stated in the web search observation at event_002.",
+      "evidence_refs": [
+        "event_002",
+        "event_003"
+      ],
+      "reason": "The tool observation at event_002 already correctly reported Connecticut College for Women, so the wrong institution first appears at step 3, where the final answer contradicts that evidence by asserting Radcliffe College."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 3,
+      "evidence_refs": [
+        "event_002",
+        "event_003"
+      ],
+      "reason": "CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology... making it the most probable source of her undergraduate education.' This directly contradicts the environment fact in event_002, whose tool observation states she 'attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924.' Under grounding rule 3, the tool observation is an environment fact, while the final answer substitutes speculation ('most probable source') for the verified evidence — a real RESULT ERROR, not a formatting or process issue. RELEVANCE TEST: The alleged step is the delivered final answer itself (last_answer_tool_call=event_003); correcting it to Connecticut College for Women would make the sole deliverable correct, and there are no later events that repair or supersede the wrong claim. The error is causally identical to the delivered result, so it is material."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 3,
+          "reason": "The final answer asserts Gloria Hollister earned her B.S. from Radcliffe College, directly contradicting the tool observation in event_002 which states she graduated with a B.S. in zoology from Connecticut College for Women in 1924.",
+          "evidence_refs": [
+            "event_002",
+            "event_003"
+          ],
+          "quote": "Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.",
+          "delivered_result": "Radcliffe College (with a major in biology)",
+          "correct_result": "Connecticut College for Women (B.S. in zoology, 1924)"
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 3,
+            "quote": "Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.",
+            "referent": "Gloria Hollister earned her B.S. in zoology from Connecticut College for Women in 1924, as stated in the web search observation at event_002.",
+            "evidence_refs": [
+              "event_002",
+              "event_003"
+            ],
+            "reason": "The tool observation at event_002 already correctly reported Connecticut College for Women, so the wrong institution first appears at step 3, where the final answer contradicts that evidence by asserting Radcliffe College."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1195,
+              "completion_tokens": 315,
+              "total_tokens": 1510,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 167
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 167
+              },
+              "input_tokens": 1195,
+              "output_tokens": 315
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":3,\"quote\":\"Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.\",\"referent\":\"Gloria Hollister earned her B.S. in zoology from Connecticut College for Women in 1924, as stated in the web search observation at event_002.\",\""
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 3,
+            "reason": "The final answer asserts Gloria Hollister earned her B.S. from Radcliffe College, directly contradicting the tool observation in event_002 which states she graduated with a B.S. in zoology from Connecticut College for Women in 1924.",
+            "delivered_result": "Radcliffe College (with a major in biology)",
+            "correct_result": "Connecticut College for Women (B.S. in zoology, 1924)",
+            "evidence_refs": [
+              "event_002",
+              "event_003"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "The name of the college from which research scientist Gloria Hollister earned her Bachelor of Science degree."
+              }
+            ],
+            "confidence": "high",
+            "quote": "Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology."
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 3,
+            "evidence_refs": [
+              "event_002",
+              "event_003"
+            ],
+            "reason": "CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology... making it the most probable source of her undergraduate education.' This directly contradicts the environment fact in event_002, whose tool observation states she 'attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924.' Under grounding rule 3, the tool observation is an environment fact, while the final answer substitutes speculation ('most probable source') for the verified evidence — a real RESULT ERROR, not a formatting or process issue. RELEVANCE TEST: The alleged step is the delivered final answer itself (last_answer_tool_call=event_003); correcting it to Connecticut College for Women would make the sole deliverable correct, and there are no later events that repair or supersede the wrong claim. The error is causally identical to the delivered result, so it is material."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 3,
+              "evidence_refs": [
+                "event_002",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology... making it the most probable source of her undergraduate education.' This directly contradicts the environment fact in event_002, whose tool observation states she 'attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924.' Under grounding rule 3, the tool observation is an environment fact, while the final answer substitutes speculation ('most probable source') for the verified evidence — a real RESULT ERROR, not a formatting or process issue. RELEVANCE TEST: The alleged step is the delivered final answer itself (last_answer_tool_call=event_003); correcting it to Connecticut College for Women would make the sole deliverable correct, and there are no later events that repair or supersede the wrong claim. The error is causally identical to the delivered result, so it is material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 3,
+              "evidence_refs": [
+                "event_002",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology... making it the most probable source of her undergraduate education.' This directly contradicts the environment fact in event_002's tool observation: 'attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924.' Under grounding rule 3, the tool observation is an environment fact; the final answer substitutes an unverified probabilistic guess ('most probable source') for it, so the delivered result is factually wrong (RESULT ERROR). RELEVANCE TEST: The final answer is the sole deliverable of this question-answering task, and event_003 is the answer-delivering step with no later corrections in the trajectory. Correcting event_003 to name Connecticut College for Women would make every deliverable correct, and the error is causally identical to the delivered result. Both tests pass."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 3,
+              "evidence_refs": [
+                "event_002",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.' This directly contradicts the environment fact in the event_002 tool observation: 'attended Connecticut College for Women, where she graduated with a B.S. in zoology in 1924.' Under grounding rule 3, the tool observation is an environment fact; the delivered answer ignores it and instead asserts an institution with no supporting evidence, apparently following the plan's speculative shortlist ('Radcliffe College or Vassar College') from event_001. This is a RESULT ERROR: the delivered answer to the task's question is factually wrong. RELEVANCE TEST: event_003 is the final answer and the last event in the trajectory — it is the deliverable itself, with no later correction. Correcting step 3 to name Connecticut College for Women would make the sole deliverable correct, so the error is causally connected to and material for what the trajectory delivers."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1752,
+              "completion_tokens": 597,
+              "total_tokens": 2349,
+              "prompt_tokens_details": {
+                "cached_tokens": 768
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 338
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 338
+              },
+              "input_tokens_details": {
+                "cached_tokens": 768
+              },
+              "input_tokens": 1752,
+              "output_tokens": 597
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_002\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.' This dir",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": []
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1775,
+        "completion_tokens": 688,
+        "total_tokens": 2463,
+        "prompt_tokens_details": {
+          "cached_tokens": 1728
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 409
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1728
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 409
+        },
+        "input_tokens": 1775,
+        "output_tokens": 688
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":3,\"hallucination_reason\":\"The final answer asserts Gloria Hollister earned her B.S. from Radcliffe College, directly contradicting the tool observation in event_002 which states she graduated with a B.S. in zoology from Connecticut College for Women in 1",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1195,
+        "completion_tokens": 315,
+        "total_tokens": 1510,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 167
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 167
+        },
+        "input_tokens": 1195,
+        "output_tokens": 315
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":3,\"quote\":\"Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.\",\"referent\":\"Gloria Hollister earned her B.S. in zoology from Connecticut College for Women in 1924, as stated in the web search observation at event_002.\",\""
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1752,
+        "completion_tokens": 597,
+        "total_tokens": 2349,
+        "prompt_tokens_details": {
+          "cached_tokens": 768
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 338
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 338
+        },
+        "input_tokens_details": {
+          "cached_tokens": 768
+        },
+        "input_tokens": 1752,
+        "output_tokens": 597
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_002\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: The final answer at event_003 states 'Gloria Hollister earned her Bachelor of Science degree from Radcliffe College, where she graduated with a major in biology.' This dir",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "2cc8bfe1dd6fc4bc024c2b280e38738270d0cbbd4859f25a19cbc709e50b1cf8"
+  },
+  "_packet_event_count": 3
+}

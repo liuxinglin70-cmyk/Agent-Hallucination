@@ -1,0 +1,532 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Camel/048.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Camel/048.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_014",
+      "responsible_step": 14,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_014",
+        "responsible_step": 14,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 21,
+            "traced_step": 14,
+            "defense": "substantiated",
+            "confirmed_step": 21,
+            "delivered_result": "A conflict statement: modern authoritative sources attribute the Great Hall ceiling to Sir James Thornhill, while the book (per the human's recollection) attributes it to Louis Laguerre; no single person is committed to as the answer to the question.",
+            "correct_result": "Louis Laguerre — the name mentioned in 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' as the painter of the Great Hall ceiling at Blenheim Palace, as consistently reported by the consulted human (events 003 and 016) whom the task required incorporating.",
+            "judge_basis": "task_requirement",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 21,
+          "hallucination_reason": "The final deliverable fails to name the person required by the question — Louis Laguerre, the painter the book attributes the Great Hall ceiling to per the human consultation the task explicitly instructed the agent to incorporate — and instead delivers a non-committal 'conflict' that endorses Sir James Thornhill per modern sources, overriding the book-anchored question.",
+          "delivered_result": "A conflict statement: modern authoritative sources attribute the Great Hall ceiling to Sir James Thornhill, while the book (per the human's recollection) attributes it to Louis Laguerre; no single person is committed to as the answer to the question.",
+          "correct_result": "Louis Laguerre — the name mentioned in 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' as the painter of the Great Hall ceiling at Blenheim Palace, as consistently reported by the consulted human (events 003 and 016) whom the task required incorporating.",
+          "basis": "task_requirement",
+          "confidence": "medium",
+          "evidence_refs": [
+            "event_021",
+            "event_016",
+            "event_003"
+          ],
+          "root_cause": {
+            "step": 21,
+            "quote": "Therefore, there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill.",
+            "referent": "The question fixes the answer as the name 'as mentioned in' the specified book; the human consultation (the evidence source the task mandated incorporating, since the book itself could not be accessed) twice confirmed the book attributes the ceiling painting to Louis Laguerre, so the deliverable should have named Louis Laguerre as the answer."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The answer must state the name of the man who painted the Great Hall ceiling at Blenheim Palace as mentioned in the specified book (Louis Laguerre, per the human's reply)."
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Consult the human via ask_human_via_console and incorporate the human's reply into determining the exact name."
+            },
+            {
+              "kind": "exact_form",
+              "requirement": "Final deliverable: a brief paragraph naming the person, explaining the reasoning, and listing consulted sources."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 14,
+          "quote": "If specific access to 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' is not available, document authoritative sources that confirm the ceiling painter, provide supporting evidence, and explicitly note whether the attribution matches or differs from any summary references related to the book.",
+          "referent": "The replan should have preserved the original task's deliverable requirement (event_001: 'a brief paragraph naming the person'): answer with the name the specified book gives for the Great Hall ceiling painter — Louis Laguerre, as consistently reported by the consulted human in events 003 and 016 — instead of redefining the task as documenting modern authoritative sources and noting a match/difference, which directly produced the non-committal conflict deliverable at event 021.",
+          "evidence_refs": [
+            "event_014",
+            "event_001"
+          ],
+          "reason": "The event_014 replan is the first step where the traced deviation originates: it dropped the book-anchored 'name the person' requirement and mandated a sources-vs-book comparison, causing the final deliverable to be a non-committal conflict statement rather than 'Louis Laguerre' (event_013's earlier Thornhill endorsement was superseded by this replan and is a distinct, corrected error)."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 21,
+          "evidence_refs": [
+            "event_021",
+            "event_003",
+            "event_016",
+            "event_020"
+          ],
+          "reason": "CONTENT TEST: The question fixes the referent — 'the name of the man who painted the ceiling... as mentioned in [the book]'. Tool observations are environment facts (Grounding Rule 3): event_003 states 'The ceiling was actually painted by Louis Laguerre' and event_016 states 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill.' The correct deliverable is therefore 'Louis Laguerre'. The delivered answer at event_021 instead states 'All authoritative modern sources identify Sir James Thornhill as the painter' and ends with 'there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — it commits to no single name answering the book-anchored question and endorses Thornhill per sources outside the book the task anchors to. This is a RESULT ERROR / DELIVERABLE BREACH: the required answer (a name per the book, a constant fixed by the question text) is not delivered. RELEVANCE TEST: event_021 is the last prose event and the delivered result anchor (has_explicit_final_answer=False); no later step corrects it. Correcting event_021 to answer 'Louis Laguerre' would make every deliverable correct, since the notes (event_019/020) are internal artifacts and the final answer is the only outstanding deliverable. The error is real and causally connected to the delivered result."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 21,
+              "reason": "The final deliverable fails to name the person required by the question — Louis Laguerre, the painter the book attributes the Great Hall ceiling to per the human consultation the task explicitly instructed the agent to incorporate — and instead delivers a non-committal 'conflict' that endorses Sir James Thornhill per modern sources, overriding the book-anchored question.",
+              "evidence_refs": [
+                "event_021",
+                "event_016",
+                "event_003"
+              ],
+              "quote": "Therefore, there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill.",
+              "delivered_result": "A conflict statement: modern authoritative sources attribute the Great Hall ceiling to Sir James Thornhill, while the book (per the human's recollection) attributes it to Louis Laguerre; no single person is committed to as the answer to the question.",
+              "correct_result": "Louis Laguerre — the name mentioned in 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' as the painter of the Great Hall ceiling at Blenheim Palace, as consistently reported by the consulted human (events 003 and 016) whom the task required incorporating."
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 14,
+                "quote": "If specific access to 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' is not available, document authoritative sources that confirm the ceiling painter, provide supporting evidence, and explicitly note whether the attribution matches or differs from any summary references related to the book.",
+                "referent": "The replan should have preserved the original task's deliverable requirement (event_001: 'a brief paragraph naming the person'): answer with the name the specified book gives for the Great Hall ceiling painter — Louis Laguerre, as consistently reported by the consulted human in events 003 and 016 — instead of redefining the task as documenting modern authoritative sources and noting a match/difference, which directly produced the non-committal conflict deliverable at event 021.",
+                "evidence_refs": [
+                  "event_014",
+                  "event_001"
+                ],
+                "reason": "The event_014 replan is the first step where the traced deviation originates: it dropped the book-anchored 'name the person' requirement and mandated a sources-vs-book comparison, causing the final deliverable to be a non-committal conflict statement rather than 'Louis Laguerre' (event_013's earlier Thornhill endorsement was superseded by this replan and is a distinct, corrected error)."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 18571,
+                  "completion_tokens": 6330,
+                  "total_tokens": 24901,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 6035
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 6035
+                  },
+                  "input_tokens": 18571,
+                  "output_tokens": 6330
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":14,\"quote\":\"If specific access to 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' is not available, document authoritative sources that confirm the ceiling painter, provide supporting evidence, and explicitly note whether the attrib"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 21,
+                "reason": "The final deliverable fails to name the person required by the question — Louis Laguerre, the painter the book attributes the Great Hall ceiling to per the human consultation the task explicitly instructed the agent to incorporate — and instead delivers a non-committal 'conflict' that endorses Sir James Thornhill per modern sources, overriding the book-anchored question.",
+                "delivered_result": "A conflict statement: modern authoritative sources attribute the Great Hall ceiling to Sir James Thornhill, while the book (per the human's recollection) attributes it to Louis Laguerre; no single person is committed to as the answer to the question.",
+                "correct_result": "Louis Laguerre — the name mentioned in 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' as the painter of the Great Hall ceiling at Blenheim Palace, as consistently reported by the consulted human (events 003 and 016) whom the task required incorporating.",
+                "evidence_refs": [
+                  "event_021",
+                  "event_016",
+                  "event_003"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The answer must state the name of the man who painted the Great Hall ceiling at Blenheim Palace as mentioned in the specified book (Louis Laguerre, per the human's reply)."
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Consult the human via ask_human_via_console and incorporate the human's reply into determining the exact name."
+                  },
+                  {
+                    "kind": "exact_form",
+                    "requirement": "Final deliverable: a brief paragraph naming the person, explaining the reasoning, and listing consulted sources."
+                  }
+                ],
+                "confidence": "medium",
+                "quote": "Therefore, there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015",
+                  "event_016",
+                  "event_017",
+                  "event_018",
+                  "event_019",
+                  "event_020",
+                  "event_021"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 21,
+                "evidence_refs": [
+                  "event_021",
+                  "event_003",
+                  "event_016",
+                  "event_020"
+                ],
+                "reason": "CONTENT TEST: The question fixes the referent — 'the name of the man who painted the ceiling... as mentioned in [the book]'. Tool observations are environment facts (Grounding Rule 3): event_003 states 'The ceiling was actually painted by Louis Laguerre' and event_016 states 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill.' The correct deliverable is therefore 'Louis Laguerre'. The delivered answer at event_021 instead states 'All authoritative modern sources identify Sir James Thornhill as the painter' and ends with 'there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — it commits to no single name answering the book-anchored question and endorses Thornhill per sources outside the book the task anchors to. This is a RESULT ERROR / DELIVERABLE BREACH: the required answer (a name per the book, a constant fixed by the question text) is not delivered. RELEVANCE TEST: event_021 is the last prose event and the delivered result anchor (has_explicit_final_answer=False); no later step corrects it. Correcting event_021 to answer 'Louis Laguerre' would make every deliverable correct, since the notes (event_019/020) are internal artifacts and the final answer is the only outstanding deliverable. The error is real and causally connected to the delivered result."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 21,
+                  "evidence_refs": [
+                    "event_021",
+                    "event_003",
+                    "event_016",
+                    "event_020"
+                  ],
+                  "reason": "CONTENT TEST: The question fixes the referent — 'the name of the man who painted the ceiling... as mentioned in [the book]'. Tool observations are environment facts (Grounding Rule 3): event_003 states 'The ceiling was actually painted by Louis Laguerre' and event_016 states 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill.' The correct deliverable is therefore 'Louis Laguerre'. The delivered answer at event_021 instead states 'All authoritative modern sources identify Sir James Thornhill as the painter' and ends with 'there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — it commits to no single name answering the book-anchored question and endorses Thornhill per sources outside the book the task anchors to. This is a RESULT ERROR / DELIVERABLE BREACH: the required answer (a name per the book, a constant fixed by the question text) is not delivered. RELEVANCE TEST: event_021 is the last prose event and the delivered result anchor (has_explicit_final_answer=False); no later step corrects it. Correcting event_021 to answer 'Louis Laguerre' would make every deliverable correct, since the notes (event_019/020) are internal artifacts and the final answer is the only outstanding deliverable. The error is real and causally connected to the delivered result."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 21,
+                  "evidence_refs": [
+                    "event_021",
+                    "event_003",
+                    "event_016"
+                  ],
+                  "reason": "CONTENT TEST: The question fixes the referent to 'the name of the man who painted the ceiling of the Great Hall at Blenheim Palace, as mentioned in' the named book. Tool observations are environment facts (grounding rule 3): event_003 states 'The ceiling was actually painted by Louis Laguerre' and event_016 states 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill.' The correct deliverable is therefore 'Louis Laguerre.' The final deliverable at event_021 instead concludes: 'Therefore, there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — it commits to no single name as the answer and endorses Sir James Thornhill per modern sources, answering a different question (who actually painted it) than the one asked (what the book mentions). The deviation is factually real and is a RESULT ERROR/DELIVERABLE BREACH on the core deliverable, not a formatting or process issue. RELEVANCE TEST: event_021 is the last prose event (last_prose_event_id=event_021, has_explicit_final_answer=False) with no later correction; correcting it to deliver 'Louis Laguerre' as the book-anchored answer would make every deliverable correct, so the step is causally connected to the delivered result and material."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 21,
+                  "evidence_refs": [
+                    "event_021",
+                    "event_003",
+                    "event_016"
+                  ],
+                  "reason": "The question fixes the referent: the name 'as mentioned in' the specified book. The only evidence in the trajectory of the book's content is the human consultation the agent itself initiated (event_003: 'The ceiling was actually painted by Louis Laguerre'; event_016: 'the book specifically attributes the ceiling painting to Louis Laguerre, not James Thornhill'). Yet the final deliverable at event_021 states 'there is a direct conflict: the cited book says Louis Laguerre, but present-day trusted sources agree it is Sir James Thornhill' — it commits to no name and effectively endorses Thornhill per external sources, overriding the book-anchored question. The delivered result is a hedged conflict statement instead of the required answer (Louis Laguerre), so the content test passes. Relevance: event_021 is the last prose event and the delivered result anchor with no explicit final answer elsewhere, so correcting it to name Louis Laguerre would make the sole deliverable correct; no later step repairs it."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2613,
+                  "completion_tokens": 526,
+                  "total_tokens": 3139,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 2560
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 259
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 259
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 2560
+                  },
+                  "input_tokens": 2613,
+                  "output_tokens": 526
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 21,\n  \"evidence_refs\": [\"event_021\", \"event_003\", \"event_016\"],\n  \"reason\": \"The question fixes the referent: the name 'as mentioned in' the specified book. The only evidence in the trajectory of the book's content is the human consultation the age",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_003",
+                  "event_016",
+                  "event_019",
+                  "event_020",
+                  "event_021"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011",
+                  "event_012",
+                  "event_013",
+                  "event_014",
+                  "event_015",
+                  "event_017",
+                  "event_018"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 19022,
+            "completion_tokens": 19953,
+            "total_tokens": 38975,
+            "prompt_tokens_details": {
+              "cached_tokens": 19008
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 19438
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 19438
+            },
+            "input_tokens_details": {
+              "cached_tokens": 19008
+            },
+            "input_tokens": 19022,
+            "output_tokens": 19953
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":13,\"hallucination_reason\":\"The agent committed to 'Sir James Thornhill' as the substantiated answer and, in the final deliverable, framed the book's attribution (Louis Laguerre, confirmed twice by the consulted human whose reply the task explicitly requi",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 2,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 18571,
+            "completion_tokens": 6330,
+            "total_tokens": 24901,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6035
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 6035
+            },
+            "input_tokens": 18571,
+            "output_tokens": 6330
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":14,\"quote\":\"If specific access to 'Historic Houses and Their Gardens: Palaces, Castles, Country Places and Gardens of the Old and New Worlds' is not available, document authoritative sources that confirm the ceiling painter, provide supporting evidence, and explicitly note whether the attrib"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2613,
+            "completion_tokens": 526,
+            "total_tokens": 3139,
+            "prompt_tokens_details": {
+              "cached_tokens": 2560
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 259
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 259
+            },
+            "input_tokens_details": {
+              "cached_tokens": 2560
+            },
+            "input_tokens": 2613,
+            "output_tokens": 526
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 21,\n  \"evidence_refs\": [\"event_021\", \"event_003\", \"event_016\"],\n  \"reason\": \"The question fixes the referent: the name 'as mentioned in' the specified book. The only evidence in the trajectory of the book's content is the human consultation the age",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "c3624def97d8706a615e9b2e69bd3952f58dc1dedd7200e0b35780e618959c61",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 21
+    },
+    "backend": "detector"
+  },
+  "row_hash": "7a9578186f2d"
+}

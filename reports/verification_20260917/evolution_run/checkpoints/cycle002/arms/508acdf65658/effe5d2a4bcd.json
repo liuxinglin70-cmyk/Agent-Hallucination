@@ -1,0 +1,155 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/035.json",
+    "gold": true,
+    "prediction": false,
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/035.json",
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "Barcelona took 2 corners in the Champions League semi-final match against Milan on April 26, 2006.",
+            "correct_result": "The number of corners Barcelona took in the Barcelona vs Milan Champions League semi-final; per the tool observation the match was played on April 26, 2006 and Barcelona had 2 corner kicks."
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Barcelona took 2 corners in the Champions League semi-final match against Milan on April 26, 2006.",
+          "correct_result": "The number of corners Barcelona took in the Barcelona vs Milan Champions League semi-final; per the tool observation the match was played on April 26, 2006 and Barcelona had 2 corner kicks.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The number of corner kicks taken by Barcelona in the Champions League semi-final between Barcelona and Milan referenced in the question (question cites April 27, 2006, but the environment observation establishes the match occurred April 26, 2006)."
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": [],
+        "causal_upgrade_rows": [],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1583,
+            "completion_tokens": 3168,
+            "total_tokens": 4751,
+            "prompt_tokens_details": {
+              "cached_tokens": 1536
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2924
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1536
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2924
+            },
+            "input_tokens": 1583,
+            "output_tokens": 3168
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Barcelona took 2 corners in the Champions League semi-final match against Milan on April 26, 2006.\",\"correct_result\":\"Barcelona took 2 corners in the Champions League semi-final against Milan; the too",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "not_rendered",
+        "upgrade_view": "not_rendered",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "f4edb59f06bfe42c33edbb2a3cfe19ae7919810048b59c005d7b92bd03454372",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 3
+    },
+    "backend": "detector"
+  },
+  "row_hash": "33a4682c66ac"
+}

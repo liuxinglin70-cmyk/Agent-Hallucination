@@ -1,0 +1,93 @@
+[
+  {
+    "case": "Magentic_One/093.json",
+    "gold": "true",
+    "state": "verified_error",
+    "authority": "authoritative",
+    "step": 18,
+    "stages": {
+      "judge": "ok",
+      "step_tracer": "ok",
+      "defense": "ok"
+    },
+    "elapsed": 432.1
+  },
+  {
+    "case": "Camel/018.json",
+    "gold": "true",
+    "state": "verified_error",
+    "authority": "authoritative",
+    "step": 5,
+    "stages": {
+      "judge": "ok",
+      "step_tracer": "ok",
+      "defense": "ok"
+    },
+    "elapsed": 883.8
+  },
+  {
+    "case": "BFCL/017.json",
+    "gold": "true",
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "step": null,
+    "stages": {
+      "judge": "ok",
+      "recall_scanner": "not_needed",
+      "causal_upgrade": "not_needed"
+    },
+    "elapsed": 67.9
+  },
+  {
+    "case": "Octotools/023.json",
+    "gold": "true",
+    "state": "verified_error",
+    "authority": "authoritative",
+    "step": 4,
+    "stages": {
+      "judge": "ok",
+      "step_tracer": "ok",
+      "defense": "ok"
+    },
+    "elapsed": 197.3
+  },
+  {
+    "case": "OpenManus/064.json",
+    "gold": "true",
+    "state": "verified_error",
+    "authority": "authoritative",
+    "step": 4,
+    "stages": {
+      "judge": "ok",
+      "step_tracer": "ok",
+      "defense": "ok"
+    },
+    "elapsed": 302.3
+  },
+  {
+    "case": "OpenDeepSearch/067.json",
+    "gold": "true",
+    "state": "verified_error",
+    "authority": "authoritative",
+    "step": 6,
+    "stages": {
+      "judge": "ok",
+      "step_tracer": "ok",
+      "defense": "ok"
+    },
+    "elapsed": 203.7
+  },
+  {
+    "case": "BFCL/041.json",
+    "gold": "true",
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "step": null,
+    "stages": {
+      "judge": "ok",
+      "recall_scanner": "not_needed",
+      "causal_upgrade": "not_needed"
+    },
+    "elapsed": 45.2
+  }
+]

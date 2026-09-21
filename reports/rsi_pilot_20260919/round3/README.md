@@ -1,6 +1,6 @@
 # RSI 试点第 3 轮（仪器轮）：种子候选复筛未过，按协议停止
 
-日期：2026-09-20；协议：[research-manifest-round3.json](../../output/rsi-planning/research-manifest-round3.json)（运行前冻结，提交 `b13c2b6`）；代码基线：`78f7c4c`（seed_candidate 能力 + 3 项离线测试，全库 417 passed）。
+日期：2026-09-20；协议：[research-manifest-round3.json](../../../output/rsi-planning/research-manifest-round3.json)（运行前冻结，提交 `b13c2b6`）；代码基线：`78f7c4c`（seed_candidate 能力 + 3 项离线测试，全库 417 passed）。
 
 ## 结论摘要
 

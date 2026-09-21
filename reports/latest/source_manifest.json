@@ -1,5 +1,5 @@
 {
-  "sha256": "25370d6f80b56c6bad057e3501c1bd08e9c48594932a2ce1590c4eac45abcb56",
+  "sha256": "20ad0d938bfc8884eda4b447d99d3302653e75e995eac1b677f8208cf3e76a55",
   "files": {
     "datasets/integrity.json": "753981500701c5241e9b53800587c75dd9a114c569bd6789fbb0816e95792a04",
     "datasets/protocols/development.json": "5d52a99ef961622ccb032d9951fc776d39ea690fe2c7b6571460f3207fd43d14",
@@ -54,7 +54,7 @@
     "detector/tests/test_runner.py": "5ed2e28a525e0c636c9e4ac72e6c2f0a8a0c406576cf2cc94f0f93208b550925",
     "detector/tests/test_upgrade_coverage.py": "dee3f61b31e99041614798e7aa027d907b0fb6b40fcef3e25bd7e72b7b30fb59",
     "detector/tests/test_voting_hearings.py": "3df0831fe2c0c99fed41a13e0d44a8ea43647e2409a04b386362496e7d5a3ceb",
-    "evolution/__init__.py": "669b7575291eb2f6266b23e407eb21df7644d9e133c66189ecbb0c4e23168d54",
+    "evolution/__init__.py": "3f3b370f60e140c5d901ebe9e140ac482efb578aaf30de8e49226af113f412f0",
     "evolution/__main__.py": "b4923c5f798e35a022dec009fd3e306aaba11b1dafabbd4d03b6cffe4f955f29",
     "evolution/backends.py": "89db0367fdb8dcc46c324b84af9aee72d9f2dd895c04635b5a89b98f52e25c8c",
     "evolution/capability_surface.py": "b9a735d6f145b7af86e9665c374c25fcdff30e8ee865c83dae35416ba3d7a76e",
@@ -75,7 +75,7 @@
     "evolution/metrics.py": "29b8f4fd1fd6f3780f88c4d3f6e9fa4a0f5b038f80cb2bb9a2b296b6d6a8c90c",
     "evolution/proposer.py": "8f5245c7ed49f54358d1aa448acf99a1313f8f229eab5801ddb7a4fd90525189",
     "evolution/registry.py": "699016245dee4e1a4ac009c0d79f3be728b6451a3100a3996a66c4f7aaf7d166",
-    "evolution/research.py": "4eb4bda04c3c45472a3cb30581985e7ea90d2b9f7f743189b3a0932c25e67d2b",
+    "evolution/research.py": "cf517931b27963f0796a5e1c73a9c50e74d2674c6f225da22f0a9727f434c77b",
     "evolution/smoke.py": "1cc209c2213ab70821786e6a6ec7a202cd58c628615d689a71d1e9f9624a3a4d",
     "evolution/splits.py": "51139fc1ae380bd162f0a425e8a17953c68a9f0363affb228cf328e9fa9cea7a",
     "evolution/tests/test_backends.py": "033c2e5efb0384429b0ad06a85293e527a35994534c5e98f2125918186558867",

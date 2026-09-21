@@ -1,0 +1,154 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/106.json",
+  "state": "verified_clean",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "Market status updated to 'Open' via update_market_status using the fetched time (10:30 AM); SYNX info retrieved (price 345.67, +0.11%, volume 2.112, MA5 345.34, MA20 346.12) and SYNX added to the watchlist (confirmed in returned list with NVDA); order history retrieved and details of both orders (12345 Buy AAPL Completed; 12446 Sell GOOG Pending) accurately reported, with a correct note that only the GOOG sell order is pending and cancellable, followed by an offer to assess whether to cancel.",
+        "correct_result": "Update market status to obtain current state, provide SYNX performance details and add SYNX to the watchlist, and review the placed order's details to advise on cancellation — all as delivered, with every reported value matching the tool observations."
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "Market status updated to 'Open' via update_market_status using the fetched time (10:30 AM); SYNX info retrieved (price 345.67, +0.11%, volume 2.112, MA5 345.34, MA20 346.12) and SYNX added to the watchlist (confirmed in returned list with NVDA); order history retrieved and details of both orders (12345 Buy AAPL Completed; 12446 Sell GOOG Pending) accurately reported, with a correct note that only the GOOG sell order is pending and cancellable, followed by an offer to assess whether to cancel.",
+      "correct_result": "Update market status to obtain current state, provide SYNX performance details and add SYNX to the watchlist, and review the placed order's details to advise on cancellation — all as delivered, with every reported value matching the tool observations.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "required_action",
+          "requirement": "Update the market status to determine current market state"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Fetch stock info for symbol 'SYNX' and add 'SYNX' to the watchlist"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Retrieve order history/details for the user's placed order and address whether it should be cancelled"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Reported market status, SYNX metrics, watchlist membership, and order details must match the tool observations"
+        }
+      ]
+    },
+    "recall_candidates": [],
+    "causal_upgrade": null,
+    "causal_upgrades": [],
+    "causal_upgrade_rows": [],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": null,
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1835,
+        "completion_tokens": 263,
+        "total_tokens": 2098,
+        "prompt_tokens_details": {
+          "cached_tokens": 1280
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 28
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1280
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 28
+        },
+        "input_tokens": 1835,
+        "output_tokens": 263
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"Market status updated to Open; SYNX details (price 345.67, +0.11%, volume 2.112, MA5 345.34, MA20 346.12) reported and added to watchlist; both orders reviewed with pending GOOG sell o",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "not_rendered",
+    "upgrade_view": "not_rendered",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "packet_hash": "83f99931d049b8b65a75594924457a256be9753998c48932e55de3fabed27af0"
+  },
+  "_packet_event_count": 9
+}

@@ -1,0 +1,494 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "Magentic_One/093.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_018",
+  "responsible_step": 18,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_018",
+    "responsible_step": 18,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 18,
+        "traced_step": 18,
+        "defense": "substantiated",
+        "confirmed_step": 18,
+        "delivered_result": "a + b + c = 50",
+        "correct_result": "a + b + c = 62 (the fourth-quadrant intersection is x = (√19 − √3)/2, y = (3 − √57)/2, so a=3, b=57, c=2)",
+        "judge_basis": "derivation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 18,
+      "hallucination_reason": "The orchestrator's final answer asserts a+b+c = 50, contradicting both the correct mathematical result and the trajectory's own correct computation in event_017 that a=3, b=57, c=2 gives a+b+c = 62.",
+      "delivered_result": "a + b + c = 50",
+      "correct_result": "a + b + c = 62 (the fourth-quadrant intersection is x = (√19 − √3)/2, y = (3 − √57)/2, so a=3, b=57, c=2)",
+      "basis": "derivation",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_018",
+        "event_017"
+      ],
+      "root_cause": {
+        "step": 18,
+        "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+        "referent": "a + b + c = 62, since y = (3 − √57)/2 gives a=3, b=57, c=2 (as correctly stated in event_017)"
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Find a+b+c where the fourth-quadrant intersection y-coordinate equals (a − √b)/c with a, b, c positive integers and gcd(a,c)=1"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Solve the intersection of y = x² − 4 with its 60° counterclockwise rotation and deliver the correct value of a+b+c as the final answer"
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 18,
+      "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+      "referent": "The value of a + b + c is 62 (a=3, b=57, c=2, as correctly computed in event_017).",
+      "evidence_refs": [
+        "event_018",
+        "event_017"
+      ],
+      "reason": "The delivered result a+b+c=50 first appears at event_018, where the orchestrator contradicts its own correct computation in event_017 (a=3, b=57, c=2, sum=62); all earlier steps are consistent with the correct result, so correcting step 18 alone suffices."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 18,
+      "evidence_refs": [
+        "event_018",
+        "event_017"
+      ],
+      "reason": "CONTENT TEST: event_018, the trajectory's final delivered answer, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct referent is event_017, where the Coder explicitly computed 'a = 3, b = 57, c = 2 ... a + b + c = 3 + 57 + 2 = \\boxed{62}'. Independent verification confirms 62: solving the intersection system (y = x² − 4 and the −60° pre-image condition −x√3/2 + y/2 = (x/2 + y√3/2)² − 4) yields the quartic 3x⁴ + 2√3x³ − 25x² − 6√3x + 40 = 0, whose fourth-quadrant root x ≈ 1.313 gives y = (3 − √57)/2 ≈ −2.275, so a=3, b=57, c=2 and a+b+c = 62 (the other positive root x ≈ 2.13 lies in the first quadrant, confirming uniqueness). The delivered answer 50 is factually wrong — a RESULT ERROR. RELEVANCE TEST: event_018 is the last prose event and the final answer itself, the primary deliverable; correcting it to 62 would make every deliverable correct, and no later event repairs the error. The deviation is real and material."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 18,
+          "reason": "The orchestrator's final answer asserts a+b+c = 50, contradicting both the correct mathematical result and the trajectory's own correct computation in event_017 that a=3, b=57, c=2 gives a+b+c = 62.",
+          "evidence_refs": [
+            "event_018",
+            "event_017"
+          ],
+          "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+          "delivered_result": "a + b + c = 50",
+          "correct_result": "a + b + c = 62 (the fourth-quadrant intersection is x = (√19 − √3)/2, y = (3 − √57)/2, so a=3, b=57, c=2)"
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 18,
+            "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\).",
+            "referent": "The value of a + b + c is 62 (a=3, b=57, c=2, as correctly computed in event_017).",
+            "evidence_refs": [
+              "event_018",
+              "event_017"
+            ],
+            "reason": "The delivered result a+b+c=50 first appears at event_018, where the orchestrator contradicts its own correct computation in event_017 (a=3, b=57, c=2, sum=62); all earlier steps are consistent with the correct result, so correcting step 18 alone suffices."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 6497,
+              "completion_tokens": 358,
+              "total_tokens": 6855,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 186
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 186
+              },
+              "input_tokens": 6497,
+              "output_tokens": 358
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":18,\"quote\":\"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).\",\"referent\":\"The value of a + b + c is 62 (a=3, b=57, c=2, as correctly computed in event_017).\",\"evidence_refs\":[\"event_018\",\"event_017\"],\"reason\":\"The delivered result a+b+c=50 first appears at event_018, where the orchestrat"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 18,
+            "reason": "The orchestrator's final answer asserts a+b+c = 50, contradicting both the correct mathematical result and the trajectory's own correct computation in event_017 that a=3, b=57, c=2 gives a+b+c = 62.",
+            "delivered_result": "a + b + c = 50",
+            "correct_result": "a + b + c = 62 (the fourth-quadrant intersection is x = (√19 − √3)/2, y = (3 − √57)/2, so a=3, b=57, c=2)",
+            "evidence_refs": [
+              "event_018",
+              "event_017"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Find a+b+c where the fourth-quadrant intersection y-coordinate equals (a − √b)/c with a, b, c positive integers and gcd(a,c)=1"
+              },
+              {
+                "kind": "required_action",
+                "requirement": "Solve the intersection of y = x² − 4 with its 60° counterclockwise rotation and deliver the correct value of a+b+c as the final answer"
+              }
+            ],
+            "confidence": "high",
+            "quote": "The value of \\( a + b + c \\) is \\(\\boxed{50}\\)."
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010",
+              "event_011",
+              "event_012",
+              "event_013",
+              "event_014",
+              "event_015",
+              "event_016",
+              "event_017",
+              "event_018"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 18,
+            "evidence_refs": [
+              "event_018",
+              "event_017"
+            ],
+            "reason": "CONTENT TEST: event_018, the trajectory's final delivered answer, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct referent is event_017, where the Coder explicitly computed 'a = 3, b = 57, c = 2 ... a + b + c = 3 + 57 + 2 = \\boxed{62}'. Independent verification confirms 62: solving the intersection system (y = x² − 4 and the −60° pre-image condition −x√3/2 + y/2 = (x/2 + y√3/2)² − 4) yields the quartic 3x⁴ + 2√3x³ − 25x² − 6√3x + 40 = 0, whose fourth-quadrant root x ≈ 1.313 gives y = (3 − √57)/2 ≈ −2.275, so a=3, b=57, c=2 and a+b+c = 62 (the other positive root x ≈ 2.13 lies in the first quadrant, confirming uniqueness). The delivered answer 50 is factually wrong — a RESULT ERROR. RELEVANCE TEST: event_018 is the last prose event and the final answer itself, the primary deliverable; correcting it to 62 would make every deliverable correct, and no later event repairs the error. The deviation is real and material."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 18,
+              "evidence_refs": [
+                "event_018",
+                "event_017"
+              ],
+              "reason": "CONTENT TEST: event_018, the trajectory's final delivered answer, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct referent is event_017, where the Coder explicitly computed 'a = 3, b = 57, c = 2 ... a + b + c = 3 + 57 + 2 = \\boxed{62}'. Independent verification confirms 62: solving the intersection system (y = x² − 4 and the −60° pre-image condition −x√3/2 + y/2 = (x/2 + y√3/2)² − 4) yields the quartic 3x⁴ + 2√3x³ − 25x² − 6√3x + 40 = 0, whose fourth-quadrant root x ≈ 1.313 gives y = (3 − √57)/2 ≈ −2.275, so a=3, b=57, c=2 and a+b+c = 62 (the other positive root x ≈ 2.13 lies in the first quadrant, confirming uniqueness). The delivered answer 50 is factually wrong — a RESULT ERROR. RELEVANCE TEST: event_018 is the last prose event and the final answer itself, the primary deliverable; correcting it to 62 would make every deliverable correct, and no later event repairs the error. The deviation is real and material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 18,
+              "evidence_refs": [
+                "event_018",
+                "event_017"
+              ],
+              "reason": "CONTENT TEST: event_018, the trajectory's final delivered prose, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct value is 62: the fourth-quadrant intersection has y = (3 − √57)/2 (a=3, b=57, c=2), which the trajectory itself computed correctly in event_017 ('a = 3, b = 57, c = 2 ... a + b + c = 3 + 57 + 2 = \\boxed{62}'), and independent verification of the rotated-parabola quartic 3x⁴ + 2√3x³ − 25x² − 6√3x + 40 = 0 gives the fourth-quadrant root x ≈ 1.3134, y ≈ −2.2749 = (3 − √57)/2. The delivered answer 50 is a genuine RESULT ERROR, not a formatting or process issue. RELEVANCE TEST: event_018 is the last prose event and the delivered result anchor; the final answer is the task's required deliverable, and no later event corrects it. Correcting step 18 to 62 would make every deliverable correct, so the error is causally connected to and material in what the trajectory delivers."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 18,
+              "evidence_refs": [
+                "event_018",
+                "event_017"
+              ],
+              "reason": "CONTENT TEST: event_018, the final prose event delivering the answer, states 'The value of \\( a + b + c \\) is \\(\\boxed{50}\\).' The correct value is 62: the fourth-quadrant intersection of y=x^2-4 with its 60° CCW image is at y=(3-√57)/2 (verified by rotating the point back by -60° to ((√(11-√57)/2)·(-1)... i.e., a point satisfying y=x^2-4), giving a=3, b=57, c=2, sum 62. The trajectory's own Coder in event_017 correctly computed 'a = 3, b = 57, c = 2 ... a + b + c = 3 + 57 + 2 = 62'. The orchestrator's delivered result of 50 contradicts both the correct mathematics and its own agent's verified computation, so the deviation is factually real (RESULT ERROR). RELEVANCE TEST: event_018 is the last_prose_event_id and the delivered final answer; there is no later event correcting it, so the wrong value 50 is what the trajectory delivers for the task's sole deliverable. Correcting step 18 to 62 would make the deliverable correct. The error is material and uncorrected."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1405,
+              "completion_tokens": 6428,
+              "total_tokens": 7833,
+              "prompt_tokens_details": {
+                "cached_tokens": 1344
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 6064
+              },
+              "input_tokens_details": {
+                "cached_tokens": 1344
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 6064
+              },
+              "input_tokens": 1405,
+              "output_tokens": 6428
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 18,\n  \"evidence_refs\": [\"event_018\", \"event_017\"],\n  \"reason\": \"CONTENT TEST: event_018, the final prose event delivering the answer, states 'The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).' The correct value is 62: the fourth-quadrant interse",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 2,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_016",
+              "event_017",
+              "event_018"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010",
+              "event_011",
+              "event_012",
+              "event_013",
+              "event_014",
+              "event_015"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 5,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 5,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 7040,
+        "completion_tokens": 5411,
+        "total_tokens": 12451,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4987
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 4987
+        },
+        "input_tokens": 7040,
+        "output_tokens": 5411
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":18,\"hallucination_reason\":\"The orchestrator's final delivered answer states a+b+c=50, which contradicts both the independently verifiable correct solution (y=(3-√57)/2, so a=3, b=57, c=2, sum=62) and the Coder's own correct result in event_017.\",\"deliver",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 6497,
+        "completion_tokens": 358,
+        "total_tokens": 6855,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 186
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 186
+        },
+        "input_tokens": 6497,
+        "output_tokens": 358
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":18,\"quote\":\"The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).\",\"referent\":\"The value of a + b + c is 62 (a=3, b=57, c=2, as correctly computed in event_017).\",\"evidence_refs\":[\"event_018\",\"event_017\"],\"reason\":\"The delivered result a+b+c=50 first appears at event_018, where the orchestrat"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1405,
+        "completion_tokens": 6428,
+        "total_tokens": 7833,
+        "prompt_tokens_details": {
+          "cached_tokens": 1344
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 6064
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1344
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 6064
+        },
+        "input_tokens": 1405,
+        "output_tokens": 6428
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 18,\n  \"evidence_refs\": [\"event_018\", \"event_017\"],\n  \"reason\": \"CONTENT TEST: event_018, the final prose event delivering the answer, states 'The value of \\\\( a + b + c \\\\) is \\\\(\\\\boxed{50}\\\\).' The correct value is 62: the fourth-quadrant interse",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 2,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "87b3f541c80426c1164a16d05adc00ba2859f89bd7652b2529e6312422b3fc36"
+  },
+  "_packet_event_count": 18
+}

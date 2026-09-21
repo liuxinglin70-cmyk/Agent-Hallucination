@@ -1,0 +1,482 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "SmolAgents/022.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_004",
+  "responsible_step": 4,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_004",
+    "responsible_step": 4,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 4,
+        "traced_step": 4,
+        "defense": "substantiated",
+        "confirmed_step": 4,
+        "delivered_result": "360,573,1200",
+        "correct_result": "360,1100,1200",
+        "judge_basis": "task_requirement",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 4,
+      "hallucination_reason": "The trajectory replaced the task-mandated Holliday-Segar maintenance calculation (1000 + 50×(12−10) = 1100 mL/24h) with an unspecifed 2/3 reduction for mechanical ventilation and subtraction of antibiotic/milk volumes, delivering 573 instead of the required 1100.",
+      "delivered_result": "360,573,1200",
+      "correct_result": "360,1100,1200",
+      "basis": "task_requirement",
+      "confidence": "medium",
+      "evidence_refs": [
+        "event_004",
+        "event_005"
+      ],
+      "root_cause": {
+        "step": 4,
+        "quote": "reduced_maintenance = maintenance * (2/3) ... final_maintenance = reduced_maintenance - other_intake",
+        "referent": "Holliday-Segar for 12 kg: 1000 mL + 50 mL × (12−10) = 1100 mL per 24 hours, as fixed by the task's Phase 2 definition"
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Phase 1 resuscitation volume = 30 mL/kg × 12 kg = 360 mL"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Phase 2 daily maintenance volume calculated by the Holliday-Segar method for 12 kg = 1000 + 50×2 = 1100 mL/24h"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Phase 3 total deficit replacement = 10% × 12 kg = 1.2 kg = 1200 mL over 48 hours"
+        },
+        {
+          "kind": "exact_form",
+          "requirement": "Answer formatted as three exact numbers separated by commas"
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 4,
+      "quote": "reduced_maintenance = maintenance * (2/3)\n\n# Subtracting enteral and IV intake (antibiotics + milk) per day\nother_intake = 60 + 100\nfinal_maintenance = reduced_maintenance - other_intake",
+      "referent": "Phase 2 must report the Holliday-Segar 24-hour maintenance volume directly: maintenance = 1000 + 50*(12-10) = 1100 mL, with no 2/3 mechanical-ventilation reduction and no subtraction of the 60 mL antibiotic or 100 mL milk volumes",
+      "evidence_refs": [
+        "event_004"
+      ],
+      "reason": "Event_004 is the first step where the wrong maintenance value (573 mL) appears, produced by replacing the task-mandated Holliday-Segar calculation (1100 mL) with an unsolicited 2/3 reduction for ventilation and subtraction of antibiotic/milk intake, while events 001-003 contain no wrong value and event_005 merely relays the corrupted output."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 4,
+      "evidence_refs": [
+        "event_004",
+        "event_005"
+      ],
+      "reason": "CONTENT TEST: The task contract fixes the method verbatim — 'Phase 2: Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours' — which for 12 kg yields 1000 + 50×(12−10) = 1100 mL (confirmed by the Merck/RCH sources retrieved in event_003: '10–20 | 1000 plus 50 x (weight minus 10)'). At event_004 the trajectory instead executed 'reduced_maintenance = maintenance * (2/3)' and 'final_maintenance = reduced_maintenance - other_intake' (subtracting 60+100=160), producing 573, an unspecified 2/3 reduction and subtraction that are not part of the Holliday-Segar method the task fixed. This wrong value propagates directly to the committed deliverable at event_005: final_answer '360,573,1200', where the second number is 573 instead of the required 1100. The deviation is real: constants and methods fixed by the task text are grounded in the task itself and cannot be overridden by externally retrieved guidelines (and even the cited RCH guideline applies 2/3 maintenance only to children 'unless they are dehydrated', while this patient has severe dehydration). RELEVANCE TEST: event_004 is the sole computation step feeding the final answer; correcting it to Holliday-Segar (1100) yields '360,1100,1200', which matches the correct result in every deliverable (bolus 360, deficit 1200 already correct), and no later step corrects the error. Both tests pass, so the error is real and material."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 4,
+          "reason": "The trajectory replaced the task-mandated Holliday-Segar maintenance calculation (1000 + 50×(12−10) = 1100 mL/24h) with an unspecifed 2/3 reduction for mechanical ventilation and subtraction of antibiotic/milk volumes, delivering 573 instead of the required 1100.",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "quote": "reduced_maintenance = maintenance * (2/3) ... final_maintenance = reduced_maintenance - other_intake",
+          "delivered_result": "360,573,1200",
+          "correct_result": "360,1100,1200"
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 4,
+            "quote": "reduced_maintenance = maintenance * (2/3)\n\n# Subtracting enteral and IV intake (antibiotics + milk) per day\nother_intake = 60 + 100\nfinal_maintenance = reduced_maintenance - other_intake",
+            "referent": "Phase 2 must report the Holliday-Segar 24-hour maintenance volume directly: maintenance = 1000 + 50*(12-10) = 1100 mL, with no 2/3 mechanical-ventilation reduction and no subtraction of the 60 mL antibiotic or 100 mL milk volumes",
+            "evidence_refs": [
+              "event_004"
+            ],
+            "reason": "Event_004 is the first step where the wrong maintenance value (573 mL) appears, produced by replacing the task-mandated Holliday-Segar calculation (1100 mL) with an unsolicited 2/3 reduction for ventilation and subtraction of antibiotic/milk intake, while events 001-003 contain no wrong value and event_005 merely relays the corrupted output."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 10382,
+              "completion_tokens": 1404,
+              "total_tokens": 11786,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1162
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1162
+              },
+              "input_tokens": 10382,
+              "output_tokens": 1404
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":4,\"quote\":\"reduced_maintenance = maintenance * (2/3)\\n\\n# Subtracting enteral and IV intake (antibiotics + milk) per day\\nother_intake = 60 + 100\\nfinal_maintenance = reduced_maintenance - other_intake\",\"referent\":\"Phase 2 must report the Holliday-Segar 24-hour maintenance volume directly: m"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 4,
+            "reason": "The trajectory replaced the task-mandated Holliday-Segar maintenance calculation (1000 + 50×(12−10) = 1100 mL/24h) with an unspecifed 2/3 reduction for mechanical ventilation and subtraction of antibiotic/milk volumes, delivering 573 instead of the required 1100.",
+            "delivered_result": "360,573,1200",
+            "correct_result": "360,1100,1200",
+            "evidence_refs": [
+              "event_004",
+              "event_005"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Phase 1 resuscitation volume = 30 mL/kg × 12 kg = 360 mL"
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Phase 2 daily maintenance volume calculated by the Holliday-Segar method for 12 kg = 1000 + 50×2 = 1100 mL/24h"
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Phase 3 total deficit replacement = 10% × 12 kg = 1.2 kg = 1200 mL over 48 hours"
+              },
+              {
+                "kind": "exact_form",
+                "requirement": "Answer formatted as three exact numbers separated by commas"
+              }
+            ],
+            "confidence": "medium",
+            "quote": "reduced_maintenance = maintenance * (2/3) ... final_maintenance = reduced_maintenance - other_intake"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 4,
+            "evidence_refs": [
+              "event_004",
+              "event_005"
+            ],
+            "reason": "CONTENT TEST: The task contract fixes the method verbatim — 'Phase 2: Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours' — which for 12 kg yields 1000 + 50×(12−10) = 1100 mL (confirmed by the Merck/RCH sources retrieved in event_003: '10–20 | 1000 plus 50 x (weight minus 10)'). At event_004 the trajectory instead executed 'reduced_maintenance = maintenance * (2/3)' and 'final_maintenance = reduced_maintenance - other_intake' (subtracting 60+100=160), producing 573, an unspecified 2/3 reduction and subtraction that are not part of the Holliday-Segar method the task fixed. This wrong value propagates directly to the committed deliverable at event_005: final_answer '360,573,1200', where the second number is 573 instead of the required 1100. The deviation is real: constants and methods fixed by the task text are grounded in the task itself and cannot be overridden by externally retrieved guidelines (and even the cited RCH guideline applies 2/3 maintenance only to children 'unless they are dehydrated', while this patient has severe dehydration). RELEVANCE TEST: event_004 is the sole computation step feeding the final answer; correcting it to Holliday-Segar (1100) yields '360,1100,1200', which matches the correct result in every deliverable (bolus 360, deficit 1200 already correct), and no later step corrects the error. Both tests pass, so the error is real and material."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005"
+              ],
+              "reason": "CONTENT TEST: The task contract fixes the method verbatim — 'Phase 2: Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours' — which for 12 kg yields 1000 + 50×(12−10) = 1100 mL (confirmed by the Merck/RCH sources retrieved in event_003: '10–20 | 1000 plus 50 x (weight minus 10)'). At event_004 the trajectory instead executed 'reduced_maintenance = maintenance * (2/3)' and 'final_maintenance = reduced_maintenance - other_intake' (subtracting 60+100=160), producing 573, an unspecified 2/3 reduction and subtraction that are not part of the Holliday-Segar method the task fixed. This wrong value propagates directly to the committed deliverable at event_005: final_answer '360,573,1200', where the second number is 573 instead of the required 1100. The deviation is real: constants and methods fixed by the task text are grounded in the task itself and cannot be overridden by externally retrieved guidelines (and even the cited RCH guideline applies 2/3 maintenance only to children 'unless they are dehydrated', while this patient has severe dehydration). RELEVANCE TEST: event_004 is the sole computation step feeding the final answer; correcting it to Holliday-Segar (1100) yields '360,1100,1200', which matches the correct result in every deliverable (bolus 360, deficit 1200 already correct), and no later step corrects the error. Both tests pass, so the error is real and material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005"
+              ],
+              "reason": "CONTENT TEST: At event_004 the code deviates from the task contract 'Phase 2: Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours'. After correctly computing maintenance = 1000 + 50*(12-10) = 1100, it applies 'reduced_maintenance = maintenance * (2/3)' citing RCH ventilation guidance and 'final_maintenance = reduced_maintenance - other_intake' with other_intake = 60+100, yielding 573. The task-fixed method (Holliday-Segar for 24h) requires 1100 mL; per grounding rule 2, the method fixed in the task text cannot be overridden by tool observations about fluid restriction practice. The delivered value 573 ≠ 1100 is a real result/deliverable breach. RELEVANCE TEST: event_005's final_answer '360,573,1200' transmits the wrong maintenance value with no later correction; correcting step 4 to 1100 yields '360,1100,1200', the correct result, and phases 1 (360) and 3 (1200) are independently correct. The error is causally connected to the delivered answer and material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005"
+              ],
+              "reason": "CONTENT TEST: The task contract fixes Phase 2 verbatim: 'Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours', which for 12 kg is 1000 + 50×(12−10) = 1100 mL/24h (confirmed by the Merck/RCH sources retrieved in event_003: '1000 plus 50 x (weight minus 10)'). At event_004 the trajectory computed 'reduced_maintenance = maintenance * (2/3)' and 'final_maintenance = reduced_maintenance - other_intake' (subtracting 60 mL antibiotics + 100 mL milk), yielding 573, and event_005 delivered '360,573,1200'. This deviation is factually real: the notes about ventilation, antibiotics, and milk are context, not instructions to alter the mandated Holliday-Segar calculation; moreover, the RCH guideline the trajectory itself cites applies 2/3 maintenance to unwell children 'unless they are dehydrated' — this patient has severe dehydration — and no retrieved source supports subtracting antibiotic/enteral volumes (search results explicitly noted 'Missing: subtracting antibiotics'). The delivered 573 is therefore both a RESULT ERROR and a DELIVERABLE BREACH of an explicit task contract, which is material by definition. RELEVANCE TEST: event_005's final answer is the direct output of event_004's computation with no later correction; fixing step 4 to use pure Holliday-Segar yields 360,1100,1200, exactly the correct result, making every deliverable correct. Both tests pass."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 10103,
+              "completion_tokens": 1734,
+              "total_tokens": 11837,
+              "prompt_tokens_details": {
+                "cached_tokens": 10048
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1348
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1348
+              },
+              "input_tokens_details": {
+                "cached_tokens": 10048
+              },
+              "input_tokens": 10103,
+              "output_tokens": 1734
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: The task contract fixes Phase 2 verbatim: 'Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours', which for 12 kg is 1000 + 50×(12−10) = 1100 m",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 10948,
+        "completion_tokens": 3251,
+        "total_tokens": 14199,
+        "prompt_tokens_details": {
+          "cached_tokens": 10944
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2836
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2836
+        },
+        "input_tokens_details": {
+          "cached_tokens": 10944
+        },
+        "input_tokens": 10948,
+        "output_tokens": 3251
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":4,\"hallucination_reason\":\"The trajectory replaced the task-prescribed Holliday-Segar maintenance calculation (1000 + 50×(12−10) = 1100 mL/24h) with an unrequested 2/3 reduction for mechanical ventilation and a 160 mL subtraction for antibiotics/milk, yie",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 10382,
+        "completion_tokens": 1404,
+        "total_tokens": 11786,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1162
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1162
+        },
+        "input_tokens": 10382,
+        "output_tokens": 1404
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":4,\"quote\":\"reduced_maintenance = maintenance * (2/3)\\n\\n# Subtracting enteral and IV intake (antibiotics + milk) per day\\nother_intake = 60 + 100\\nfinal_maintenance = reduced_maintenance - other_intake\",\"referent\":\"Phase 2 must report the Holliday-Segar 24-hour maintenance volume directly: m"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 10103,
+        "completion_tokens": 1734,
+        "total_tokens": 11837,
+        "prompt_tokens_details": {
+          "cached_tokens": 10048
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1348
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1348
+        },
+        "input_tokens_details": {
+          "cached_tokens": 10048
+        },
+        "input_tokens": 10103,
+        "output_tokens": 1734
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: The task contract fixes Phase 2 verbatim: 'Maintenance fluids to be calculated using the Holliday-Segar method for 24 hours', which for 12 kg is 1000 + 50×(12−10) = 1100 m",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "dfd09f9ad11eb7dc34c00a8ebff2db6fff60a14fb4877a08ea2884da3a14a2a6"
+  },
+  "_packet_event_count": 5
+}

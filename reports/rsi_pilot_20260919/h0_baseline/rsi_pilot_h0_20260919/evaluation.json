@@ -1,0 +1,337 @@
+{
+  "run_id": "rsi_pilot_h0_20260919",
+  "metrics": {
+    "decisive": 12,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.5833333333333334,
+    "all_case_accuracy": 0.5833333333333334,
+    "tp": 4,
+    "fp": 1,
+    "fn": 4,
+    "tn": 3,
+    "positive_precision": 0.8,
+    "positive_recall": 0.5,
+    "positive_f1": 0.6153846153846154,
+    "macro_precision": 0.6142857142857143,
+    "macro_recall": 0.625,
+    "macro_f1": 0.5804195804195804,
+    "authoritative": 12,
+    "degraded": 0,
+    "provider_unresolved": 0,
+    "requested_cases": 12,
+    "found_results": 12,
+    "missing_cases": 0,
+    "step_localization": {
+      "n": 8,
+      "hits": 4,
+      "accuracy": 0.5
+    }
+  },
+  "rows": [
+    {
+      "case": "BFCL/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 5,
+      "responsible_step": 5,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/024.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 5,
+      "responsible_step": 5,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/042.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 8,
+      "responsible_step": 8,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 3,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/013.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 11,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/020.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/018.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/053.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/017.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 4,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/028.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 10,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 3,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/062.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 4,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "BFCL/013.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 11,
+        "hallucination_reason": "The assistant reported the sorted contents as '1. Experiment results 2. Introduction 3. Methodology', stripping the 'Line N: ' prefixes that are part of the file's lines, so the delivered sorted content does not match the sort tool's observed output 'Line 3: Experiment results Line 1: Introduction Line 2: Methodology'.",
+        "delivered_result": "Sorted contents of '2024_research_backup.txt' reported as: 1. Experiment results 2. Introduction 3. Methodology (line labels 'Line N:' removed and items renumbered)",
+        "correct_result": "The sorted contents as returned by the sort tool: 'Line 3: Experiment results', 'Line 1: Introduction', 'Line 2: Methodology'",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_010",
+          "event_011"
+        ],
+        "root_cause": {
+          "step": 11,
+          "quote": "1. Experiment results\n2. Introduction\n3. Methodology",
+          "referent": "Line 3: Experiment results / Line 1: Introduction / Line 2: Methodology (the sorted content observed in event_010)"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Place a copy of 'research_notes.txt' into the 'archives' folder within research, labeled '2024_research_backup.txt' (satisfied via cp then mv rename in events 006-008)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Sort the lines of '2024_research_backup.txt' alphabetically and deliver the sorted line contents as they exist in the file"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Report how many lines are in the sorted '2024_research_backup.txt' file (wc observation: 1 line, which the agent correctly relayed in event_013)"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 11,
+        "evidence_refs": [
+          "event_010",
+          "event_011"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "The wc observation (count=1) sits in tension with the three labeled segments in the sort output, but that bears on the separate turn-3 line-count deliverable, not this step; the sort observation is the sole environment fact about the sorted content and is not itself conflicted.",
+        "reason": "CONTENT TEST: event_011 delivers 'The contents of '2024_research_backup.txt' have been sorted alphabetically by line: 1. Experiment results 2. Introduction 3. Methodology', while the sort tool's observation (event_010) returns sorted_content 'Line 3: Experiment results Line 1: Introduction Line 2: Methodology'. The delivered rendition strips the 'Line N: ' labels carried by the environment's own sorted content and renumbers the items, presenting the line labeled 'Line 3' as item '1.'. The task deliverable is the file's sorted lines, so the delivered value is not the sorted contents requested; this is a content alteration, not protected conventional notation under the representation rule, because the dropped labels are content tokens of the lines and the new ordinals do not preserve the same referent (they misattribute line identity). RELEVANCE TEST: event_011 is the assistant-authored delivery of the turn-2 deliverable and the earliest locus (the event_010 sort call has correct arguments and its observation is an environment fact, not an assistant error); reporting the observed sorted content there would make that deliverable correct, and the remaining deliverables are independent of it — the backup claim at event_009 is uncontradicted and the line count at event_013 faithfully reports the wc observation — so correcting this step makes every deliverable correct."
+      }
+    },
+    {
+      "case": "BFCL/017.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "ProjectOverview.txt was written with 'To be discussed'; after the cp failed, Draft.txt was written via echo with the same content 'To be discussed' so both files are identical; Twitter authentication succeeded with the provided credentials and the tweet 'Initial summary of the project. To be discussed.' was posted with tag '#ProjectUpdate' and mentions '@manager' and '@team_lead', as confirmed by the post_tweet observation.",
+        "correct_result": "Exactly what the task required: 'To be discussed' placed in ProjectOverview.txt, both ProjectOverview.txt and Draft.txt made identical, and the tweet posted with the specified content, ProjectUpdate tag, and @manager/@team_lead mentions using the given credentials.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Modify ProjectOverview.txt to contain 'To be discussed'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Make ProjectOverview.txt and Draft.txt identical in content"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Authenticate to Twitter with username tech_guru and password securePass123, then post the update tweet"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet content: 'Initial summary of the project. To be discussed.'"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tag with 'ProjectUpdate' and mention @manager and @team_lead"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/028.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Turn 1: located './projects/deep_folder/config.py' as the first occurring match and displayed its last line ('Initialization of the system Error in module Setup complete Initialization successful Error detected') exactly as returned by tail. Turn 2: displayed the entire content of the second file 'real_config.py' ('Real Config.') as returned by cat. Turn 3: ran diff on the two files and wrote the diff output ('- Initialization of the system Error in module Setup complete Initialization successful Error detected\\n+ Real Config.') into a new file 'diff.txt' via echo, then reported completion.",
+        "correct_result": "Find 'config.py', display the last line of the first occurring match, display the entire content of the second match, and store the differences of the two files in a new file named diff.txt — all of which the trajectory did in accordance with the tool observations.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Find a file named 'config.py' somewhere deep in the file system"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Display the last line of the first occurring matching file"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Display the entire content of the second file found"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Store the differences of the two files in a new file called diff.txt"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/041.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "30 gallons converted to ~113.56 liters; engine start attempted in START mode but honestly reported as blocked by an environment error (doors unlocked, no false completion claimed); tire pressures checked (32.0/32.0/30.0/30.0 psi, healthy) and reported as optimal; tweet posted with exact content 'Tire pressures are optimal!', hashtag #CarMaintenance and mention @VehicleGuru, confirmed by observation.",
+        "correct_result": "Convert 30 gallons to liters (~113.56 L); attempt engine start in START mode; inspect tire condition/pressure and confirm optimal; post tweet 'Tire pressures are optimal!' with #CarMaintenance and @VehicleGuru.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "30 gallons expressed in liters"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Start the engine using start mode (ignitionMode='START')"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Inspect each tire's condition/pressure and confirm optimal shape"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Post tweet with message 'Tire pressures are optimal!', hashtag #CarMaintenance, and tag @VehicleGuru"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/062.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Fuel tank filled with 10.04 gallons (38 liters rounded to 2 decimal places, confirmed by fuelLevel 20.04); startEngine called with ignitionMode 'START' but environment returned a door-lock error; assistant honestly reported engine stopped, battery 12.6V, AC auto mode at 25.0°C, fan speed 50%, and offered to lock doors and retry.",
+        "correct_result": "Fill tank with 38 liters expressed as a 2-decimal gallon amount (10.04 gallons), attempt engine start in 'START' mode, and report engine status, battery voltage, AC speed and fan speed truthfully.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Refill fuel tank with precisely 38 liters, using 2 decimal digits for the gallon amount (10.04 gallons)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Activate the engine using startEngine with ignitionMode 'START'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Report engine operational status, battery voltage, AC speed and fan speed"
+          }
+        ]
+      },
+      "defense": {}
+    }
+  ],
+  "missing_cases": []
+}

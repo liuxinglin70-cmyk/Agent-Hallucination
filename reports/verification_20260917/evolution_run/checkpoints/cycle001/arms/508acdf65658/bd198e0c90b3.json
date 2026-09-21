@@ -1,0 +1,471 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Octotools/030.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Octotools/030.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "Minimum value ≈ 98.95, claimed to occur at (x, y) = (20, 25)",
+            "correct_result": "Minimum value = 70√2 ≈ 98.99, attained at (x, y) = (20, 30)",
+            "judge_basis": "derivation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The trajectory concludes the minimum is approximately 98.95 at (20, 25), but the true minimum is 70√2 ≈ 98.99 at (20, 30); the claimed value 98.95 is even below the actual minimum (unattainable), and f(20,25) is actually ≈ 99.35, so the delivered result is a result error.",
+          "delivered_result": "Minimum value ≈ 98.95, claimed to occur at (x, y) = (20, 25)",
+          "correct_result": "Minimum value = 70√2 ≈ 98.99, attained at (x, y) = (20, 30)",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "From the cases tested, the minimum value occurs at \\( (x, y) = (20, 25) \\), and the minimum value of \\( f(x, y) \\) is approximately: \\boxed{98.95}",
+            "referent": "The minimum value is 70√2 ≈ 98.99, attained at (x, y) = (20, 30); the gradient vanishes at (20, 30) and the function is convex, and f(20,25) ≈ 99.35 (not 98.95)"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The minimum value of sqrt(x^2+400)+sqrt(y^2+900)+sqrt(x^2+y^2-80x-100y+4100) for 0≤x≤40, 0≤y≤50, which is 70√2 ≈ 98.99 at (x, y) = (20, 30)"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "f(20, 25) \\approx 28.28 + 39.05 + 31.62 = 98.95. ... From the cases tested, the minimum value occurs at \\( (x, y) = (20, 25) \\), and the minimum value of \\( f(x, y) \\) is approximately: \\boxed{98.95}",
+          "referent": "\\(\\sqrt{1025} \\approx 32.02\\) (not 31.62), so \\(f(20,25) \\approx 99.35\\); the true minimum is \\(70\\sqrt{2} \\approx 98.99\\) attained at \\((x, y) = (20, 30)\\), which the case analysis failed to test.",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "Event_004 is the first step where the wrong result (minimum ≈ 98.95 at (20,25)) appears, caused by the arithmetic error √1025 ≈ 31.62 (actually ≈ 32.02, giving f(20,25) ≈ 99.35) and by concluding the minimum from an incomplete case check that omitted (20,30) where f = 70√2 ≈ 98.99; event_005 merely repeats this conclusion."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "reason": "CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95'. This is factually wrong on two counts: (1) the arithmetic is wrong — f(20,25) = √800 + √1525 + √1025 ≈ 28.28 + 39.05 + 32.02 ≈ 99.35 (the trajectory used √1025 ≈ 31.62, confusing it with √1000), so 98.95 is not even the value at (20,25); (2) the true minimum is at (20, 30), where ∂f/∂x = 20/√800 − 20/√800 = 0 and ∂f/∂y = 30/√1800 − 20/√800 = 0, giving f(20,30) = 20√2 + 30√2 + 20√2 = 70√2 ≈ 98.99, which is less than f(20,25) ≈ 99.35 (f is a sum of convex functions, so this critical point is the global minimum; boundary points like f(0,0) ≈ 114.03 and f(40,50) ≈ 103.03 are larger). The delivered 98.95 is below the attainable minimum and thus a RESULT ERROR. RELEVANCE TEST: the error is not corrected downstream — event_005, the final prose deliverable, repeats verbatim 'The minimum value of f(x, y) occurs at (x, y) = (20, 25)... approximately 98.95', so the step-4 error is causally connected to the delivered final answer, and correcting it would make the deliverable correct. Material under the MATERIALITY LAW."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The trajectory concludes the minimum is approximately 98.95 at (20, 25), but the true minimum is 70√2 ≈ 98.99 at (20, 30); the claimed value 98.95 is even below the actual minimum (unattainable), and f(20,25) is actually ≈ 99.35, so the delivered result is a result error.",
+              "evidence_refs": [
+                "event_004",
+                "event_005"
+              ],
+              "quote": "From the cases tested, the minimum value occurs at \\( (x, y) = (20, 25) \\), and the minimum value of \\( f(x, y) \\) is approximately: \\boxed{98.95}",
+              "delivered_result": "Minimum value ≈ 98.95, claimed to occur at (x, y) = (20, 25)",
+              "correct_result": "Minimum value = 70√2 ≈ 98.99, attained at (x, y) = (20, 30)"
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "f(20, 25) \\approx 28.28 + 39.05 + 31.62 = 98.95. ... From the cases tested, the minimum value occurs at \\( (x, y) = (20, 25) \\), and the minimum value of \\( f(x, y) \\) is approximately: \\boxed{98.95}",
+                "referent": "\\(\\sqrt{1025} \\approx 32.02\\) (not 31.62), so \\(f(20,25) \\approx 99.35\\); the true minimum is \\(70\\sqrt{2} \\approx 98.99\\) attained at \\((x, y) = (20, 30)\\), which the case analysis failed to test.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "Event_004 is the first step where the wrong result (minimum ≈ 98.95 at (20,25)) appears, caused by the arithmetic error √1025 ≈ 31.62 (actually ≈ 32.02, giving f(20,25) ≈ 99.35) and by concluding the minimum from an incomplete case check that omitted (20,30) where f = 70√2 ≈ 98.99; event_005 merely repeats this conclusion."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 3516,
+                  "completion_tokens": 1308,
+                  "total_tokens": 4824,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 995
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 995
+                  },
+                  "input_tokens": 3516,
+                  "output_tokens": 1308
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":4,\"quote\":\"f(20, 25) \\\\approx 28.28 + 39.05 + 31.62 = 98.95. ... From the cases tested, the minimum value occurs at \\\\( (x, y) = (20, 25) \\\\), and the minimum value of \\\\( f(x, y) \\\\) is approximately: \\\\boxed{98.95}\",\"referent\":\"\\\\(\\\\sqrt{1025} \\\\approx 32.02\\\\) (not 31.62), so \\\\(f(20,25) "
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The trajectory concludes the minimum is approximately 98.95 at (20, 25), but the true minimum is 70√2 ≈ 98.99 at (20, 30); the claimed value 98.95 is even below the actual minimum (unattainable), and f(20,25) is actually ≈ 99.35, so the delivered result is a result error.",
+                "delivered_result": "Minimum value ≈ 98.95, claimed to occur at (x, y) = (20, 25)",
+                "correct_result": "Minimum value = 70√2 ≈ 98.99, attained at (x, y) = (20, 30)",
+                "evidence_refs": [
+                  "event_004",
+                  "event_005"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The minimum value of sqrt(x^2+400)+sqrt(y^2+900)+sqrt(x^2+y^2-80x-100y+4100) for 0≤x≤40, 0≤y≤50, which is 70√2 ≈ 98.99 at (x, y) = (20, 30)"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "From the cases tested, the minimum value occurs at \\( (x, y) = (20, 25) \\), and the minimum value of \\( f(x, y) \\) is approximately: \\boxed{98.95}"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004",
+                  "event_005"
+                ],
+                "reason": "CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95'. This is factually wrong on two counts: (1) the arithmetic is wrong — f(20,25) = √800 + √1525 + √1025 ≈ 28.28 + 39.05 + 32.02 ≈ 99.35 (the trajectory used √1025 ≈ 31.62, confusing it with √1000), so 98.95 is not even the value at (20,25); (2) the true minimum is at (20, 30), where ∂f/∂x = 20/√800 − 20/√800 = 0 and ∂f/∂y = 30/√1800 − 20/√800 = 0, giving f(20,30) = 20√2 + 30√2 + 20√2 = 70√2 ≈ 98.99, which is less than f(20,25) ≈ 99.35 (f is a sum of convex functions, so this critical point is the global minimum; boundary points like f(0,0) ≈ 114.03 and f(40,50) ≈ 103.03 are larger). The delivered 98.95 is below the attainable minimum and thus a RESULT ERROR. RELEVANCE TEST: the error is not corrected downstream — event_005, the final prose deliverable, repeats verbatim 'The minimum value of f(x, y) occurs at (x, y) = (20, 25)... approximately 98.95', so the step-4 error is causally connected to the delivered final answer, and correcting it would make the deliverable correct. Material under the MATERIALITY LAW."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_005"
+                  ],
+                  "reason": "CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95'. This is factually wrong on two counts: (1) the arithmetic is wrong — f(20,25) = √800 + √1525 + √1025 ≈ 28.28 + 39.05 + 32.02 ≈ 99.35 (the trajectory used √1025 ≈ 31.62, confusing it with √1000), so 98.95 is not even the value at (20,25); (2) the true minimum is at (20, 30), where ∂f/∂x = 20/√800 − 20/√800 = 0 and ∂f/∂y = 30/√1800 − 20/√800 = 0, giving f(20,30) = 20√2 + 30√2 + 20√2 = 70√2 ≈ 98.99, which is less than f(20,25) ≈ 99.35 (f is a sum of convex functions, so this critical point is the global minimum; boundary points like f(0,0) ≈ 114.03 and f(40,50) ≈ 103.03 are larger). The delivered 98.95 is below the attainable minimum and thus a RESULT ERROR. RELEVANCE TEST: the error is not corrected downstream — event_005, the final prose deliverable, repeats verbatim 'The minimum value of f(x, y) occurs at (x, y) = (20, 25)... approximately 98.95', so the step-4 error is causally connected to the delivered final answer, and correcting it would make the deliverable correct. Material under the MATERIALITY LAW."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_005"
+                  ],
+                  "reason": "CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95', and event_005 (the delivered final answer) repeats 'The minimum value of f(x, y) occurs at (x, y) = (20, 25), and the minimum value is approximately: 98.95.' The shown computation itself contains the error: it writes f(20,25) = √800 + √1525 + √1025 but then evaluates √1025 ≈ 31.62, when in fact √1025 ≈ 32.02 (31.62 ≈ √1000). Correctly, f(20,25) ≈ 28.28 + 39.05 + 32.02 ≈ 99.35, not 98.95. Moreover, the true minimum is at the critical point (20, 30): f(20,30) = √800 + √1800 + √800 = 20√2 + 30√2 + 20√2 = 70√2 ≈ 98.99 (gradient vanishes there: 20/√800 - 20/√800 = 0 and 30/√1800 - 20/√800 = 0; the function is convex, so this is the global minimum). The delivered 98.95 is even below 70√2 ≈ 98.99, i.e., an unattainable value. The deviation is factually real under the grounding rules. RELEVANCE TEST: the error at event_004 is not corrected anywhere — event_005, the last prose event and the delivered result, propagates the identical wrong value and wrong minimizer, so the final deliverable (the answer to the task) is wrong. Correcting event_004's computation would fix the delivered result; as it stands, this is a RESULT ERROR on the required deliverable."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_005"
+                  ],
+                  "reason": "CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95', and the final prose event_005 repeats 'the minimum value ... occurs at (x, y) = (20, 25) ... approximately 98.95'. This is factually false by the trajectory's own arithmetic: the observation itself writes f(20,25) = √800 + √1525 + √1025, but approximates √1025 ≈ 31.62 when in fact √1025 ≈ 32.02 (31.62² ≈ 1000). Correctly, f(20,25) ≈ 28.28 + 39.05 + 32.02 ≈ 99.35, not 98.95. Moreover, f(20,30) = √800 + √1800 + √800 = 20√2 + 30√2 + 20√2 = 70√2 ≈ 98.99 < 99.35, and since f is a sum of convex terms (verified: gradient vanishes at (20,30)), the true minimum is 70√2 ≈ 98.99 at (20,30). The delivered 98.95 is even below the attainable minimum, i.e., unattainable — a RESULT ERROR under the MATERIALITY LAW. RELEVANCE TEST: event_005, the last prose event and delivered answer, propagates the same erroneous conclusion with no later correction, so correcting step 4's optimization is causally necessary and sufficient to make the required deliverable (the minimum value) correct. Both tests pass."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 3789,
+                  "completion_tokens": 4641,
+                  "total_tokens": 8430,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 3776
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 4217
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 4217
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 3776
+                  },
+                  "input_tokens": 3789,
+                  "output_tokens": 4641
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95', and the final prose event_005 repeat",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 4008,
+            "completion_tokens": 5598,
+            "total_tokens": 9606,
+            "prompt_tokens_details": {
+              "cached_tokens": 3968
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5050
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 5050
+            },
+            "input_tokens_details": {
+              "cached_tokens": 3968
+            },
+            "input_tokens": 4008,
+            "output_tokens": 5598
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":5,\"hallucination_reason\":\"The delivered minimum of approximately 98.95 at (20, 25) is a result error: the expression is convex and its true minimum is 70√2 ≈ 98.99 at (x, y) = (20, 30), so 98.95 (which is below the actual attainable minimum, caused by th",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 3516,
+            "completion_tokens": 1308,
+            "total_tokens": 4824,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 995
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 995
+            },
+            "input_tokens": 3516,
+            "output_tokens": 1308
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":4,\"quote\":\"f(20, 25) \\\\approx 28.28 + 39.05 + 31.62 = 98.95. ... From the cases tested, the minimum value occurs at \\\\( (x, y) = (20, 25) \\\\), and the minimum value of \\\\( f(x, y) \\\\) is approximately: \\\\boxed{98.95}\",\"referent\":\"\\\\(\\\\sqrt{1025} \\\\approx 32.02\\\\) (not 31.62), so \\\\(f(20,25) "
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 3789,
+            "completion_tokens": 4641,
+            "total_tokens": 8430,
+            "prompt_tokens_details": {
+              "cached_tokens": 3776
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4217
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 4217
+            },
+            "input_tokens_details": {
+              "cached_tokens": 3776
+            },
+            "input_tokens": 3789,
+            "output_tokens": 4641
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: event_004 concludes 'the minimum value occurs at (x, y) = (20, 25), and the minimum value of f(x, y) is approximately: 98.95', and the final prose event_005 repeat",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "c9d669be288bde7126f03ff780a4780c9767fe6391f6cc807d82e7aa88eda7c6",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 5
+    },
+    "backend": "detector"
+  },
+  "row_hash": "f249966f6f6e"
+}

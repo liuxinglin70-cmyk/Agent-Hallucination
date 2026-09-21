@@ -1,6 +1,8 @@
 # RSI 试点 P1：机会筛查与训练机制冻结
 
-日期：2026-09-19；代码基线：`8c6dcde`（P0 修复后）；方案：[docs/optimization-directions.md](../../docs/optimization-directions.md) 第 6–8 节。
+日期：2026-09-19；代码基线：`8c6dcde`（P0 修复后）；方案：[docs/optimization-directions.md](../../docs/optimization-directions.md) 第 6–8 节（历史方案，当前优化路线见 [docs/optimization-plan.md](../../docs/optimization-plan.md)）。
+
+> **独立复核入口**：`output/repository-review/audit_snapshot.py` 只读重算本目录 round4–round6 已落盘结果，给出逐阶段两臂计数、跨轮配对总数（72/79 vs H0 50/71）与数据集完整性核对（695 文件 / 693 案例），输出 `audit_snapshot.json`。该脚本不调用模型、不写 registry，可复核下列结论而不依赖报告正文。
 
 ## 结论摘要
 

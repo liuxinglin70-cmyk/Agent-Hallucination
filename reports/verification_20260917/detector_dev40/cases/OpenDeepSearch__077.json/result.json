@@ -1,0 +1,587 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "OpenDeepSearch/077.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_006",
+  "responsible_step": 6,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_006",
+    "responsible_step": 6,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "recall_upgrade",
+        "judge_step": null,
+        "traced_step": 6,
+        "defense": "substantiated",
+        "confirmed_step": 6,
+        "delivered_result": "",
+        "correct_result": "",
+        "judge_basis": "observation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c3",
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+      "correct_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza, as reported by the environment observations in event_002 and event_003.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Identify the recipient of the 2017 Erdős–Rényi Prize"
+        }
+      ]
+    },
+    "recall_candidates": [
+      {
+        "candidate_id": "c1",
+        "claim": "the search observation reported Vittoria Colizza as the 2017 Erdős–Rényi Prize winner instead of the actual recipient Danielle Bassett",
+        "locus_event_id": "event_002",
+        "evidence_refs": [
+          "event_002",
+          "event_005"
+        ],
+        "quote": "2017: Vittoria Colizza"
+      },
+      {
+        "candidate_id": "c2",
+        "claim": "the search observation claimed the official Network Science Society announcement awarded the 2017 Erdős–Rényi Prize to Vittoria Colizza instead of the actual recipient Danielle Bassett",
+        "locus_event_id": "event_003",
+        "evidence_refs": [
+          "event_003",
+          "event_005"
+        ],
+        "quote": "The official announcement for the 2017 Erdős–Rényi Prize was made by the Network Science Society, awarding the prize to Vittoria Colizza."
+      },
+      {
+        "candidate_id": "c3",
+        "claim": "the agent gave Vittoria Colizza as the final answer instead of the actual 2017 recipient Danielle Bassett, presenting the Colizza claim as established although event_005's observation contradicted it and no observation resolved the conflict",
+        "locus_event_id": "event_006",
+        "evidence_refs": [
+          "event_005",
+          "event_006"
+        ],
+        "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza."
+      },
+      {
+        "candidate_id": "c4",
+        "claim": "the agent researched the contributions of Vittoria Colizza instead of the actual 2017 recipient Danielle Bassett, per the contradicting observation in event_005",
+        "locus_event_id": "event_004",
+        "evidence_refs": [
+          "event_004",
+          "event_005"
+        ],
+        "quote": "Vittoria Colizza's research contributions to the study of random networks before 2017 include her work on epidemic processes in adaptive activity-driven temporal networks"
+      },
+      {
+        "candidate_id": "c5",
+        "claim": "the agent stated the prize information can be found on the website of the 'International Network for the Study of Complex Systems' instead of the actual awarding body, the Network Science Society",
+        "locus_event_id": "event_001",
+        "evidence_refs": [
+          "event_001",
+          "event_003"
+        ],
+        "quote": "This information can be found on the official website of the International Network for the Study of Complex Systems or through announcements on Mathematical Society web pages."
+      }
+    ],
+    "causal_upgrade": {
+      "candidate_id": "c3",
+      "content_error": true,
+      "causal": true,
+      "corrected_step": 6,
+      "reason": "The sole deliverable, the final answer, is factually wrong (Bassett is the actual recipient per the event_005 environment fact) and was committed while disregarding that on-record contradiction, so correcting event_006 to name Danielle Bassett makes the trajectory clean.",
+      "coverage": "answered",
+      "locus_event_id": "event_006",
+      "evidence_refs": [
+        "event_005",
+        "event_006"
+      ],
+      "claim": "the agent gave Vittoria Colizza as the final answer instead of the actual 2017 recipient Danielle Bassett, presenting the Colizza claim as established although event_005's observation contradicted it and no observation resolved the conflict",
+      "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza."
+    },
+    "causal_upgrades": [
+      {
+        "candidate_id": "c3",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 6,
+        "reason": "The sole deliverable, the final answer, is factually wrong (Bassett is the actual recipient per the event_005 environment fact) and was committed while disregarding that on-record contradiction, so correcting event_006 to name Danielle Bassett makes the trajectory clean.",
+        "coverage": "answered",
+        "locus_event_id": "event_006",
+        "evidence_refs": [
+          "event_005",
+          "event_006"
+        ],
+        "claim": "the agent gave Vittoria Colizza as the final answer instead of the actual 2017 recipient Danielle Bassett, presenting the Colizza claim as established although event_005's observation contradicted it and no observation resolved the conflict",
+        "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza."
+      }
+    ],
+    "causal_upgrade_rows": [
+      {
+        "candidate_id": "c1",
+        "content_error": true,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The event_002 observation did misreport Colizza, but it is an environment fact that the later observation event_005 corrected with Bassett, so fixing this point alone would not by itself guarantee a correct delivered answer.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c2",
+        "content_error": true,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The event_003 observation did misreport Colizza as the official awardee, but the environment itself supplied the correct recipient at event_005, so correcting this single observation would not ensure every deliverable becomes correct.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c3",
+        "content_error": true,
+        "causal": true,
+        "corrected_step": 6,
+        "reason": "The sole deliverable, the final answer, is factually wrong (Bassett is the actual recipient per the event_005 environment fact) and was committed while disregarding that on-record contradiction, so correcting event_006 to name Danielle Bassett makes the trajectory clean.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c4",
+        "content_error": true,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The agent did research the wrong person, but at event_004 both prior environment facts named Colizza so the action was grounded and merely derivative of the corrupted observations, and fixing this step alone would not fix the final answer.",
+        "coverage": "answered"
+      },
+      {
+        "candidate_id": "c5",
+        "content_error": true,
+        "causal": false,
+        "corrected_step": null,
+        "reason": "The plan's claimed source body is factually wrong (the Network Science Society awards the prize per event_003), but it is an unverified internal planning assertion that touches no required deliverable, so correcting it changes nothing delivered.",
+        "coverage": "answered"
+      }
+    ],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": {
+      "expected": 5,
+      "answered": 5,
+      "missing": []
+    },
+    "hearings": [
+      {
+        "source": "recall_upgrade",
+        "candidate_id": "c3",
+        "positive": {
+          "source": "recall_upgrade",
+          "step": 6,
+          "reason": "the agent gave Vittoria Colizza as the final answer instead of the actual 2017 recipient Danielle Bassett, presenting the Colizza claim as established although event_005's observation contradicted it and no observation resolved the conflict",
+          "evidence_refs": [
+            "event_005",
+            "event_006"
+          ],
+          "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+          "delivered_result": "",
+          "correct_result": ""
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 6,
+            "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+            "referent": "Danielle Bassett — event_005's observation already states the 2017 Erdős–Rényi Prize was awarded to Danielle Bassett, so the final answer must name her",
+            "evidence_refs": [
+              "event_005",
+              "event_006"
+            ],
+            "reason": "The earlier Colizza claims at event_002 and event_003 were already contradicted and corrected by event_005's observation naming Danielle Bassett, so step 6 is the earliest step where the false claim is re-asserted as the delivered result and left uncorrected."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1681,
+              "completion_tokens": 7440,
+              "total_tokens": 9121,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 7272
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 7272
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "input_tokens": 1681,
+              "output_tokens": 7440
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":6,\"quote\":\"The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.\",\"referent\":\"Danielle Bassett — event_005's observation already states the 2017 Erdős–Rényi Prize was awarded to Danielle Bassett, so the final answer must name her\",\"evidence_refs\":[\"event_005\",\"event_006\"],\"reason"
+          },
+          "hearing_target": {
+            "source": "recall_upgrade",
+            "step": 6,
+            "reason": "the agent gave Vittoria Colizza as the final answer instead of the actual 2017 recipient Danielle Bassett, presenting the Colizza claim as established although event_005's observation contradicted it and no observation resolved the conflict",
+            "delivered_result": "",
+            "correct_result": "",
+            "evidence_refs": [
+              "event_005",
+              "event_006"
+            ],
+            "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+            "confidence": "",
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Identify the recipient of the 2017 Erdős–Rényi Prize"
+              }
+            ],
+            "candidate_id": "c3"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 6,
+            "evidence_refs": [
+              "event_005",
+              "event_006"
+            ],
+            "reason": "CONTENT TEST: event_006 delivers final_answer 'The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.', while event_005's tool observation — an environment fact under grounding rule 3 — states 'The 2017 Erdős–Rényi Prize was awarded to Danielle Bassett for her contributions to network science.' The delivered answer directly contradicts the environment observation and no later observation resolves the conflict in Colizza's favor; the event_006 observation merely echoes the agent's own argument, not an independent fact. RESULT ERROR is real. RELEVANCE TEST: the final answer is the sole deliverable and event_006 is the last answer tool call with no subsequent correction; replacing Colizza with Bassett (the observation-supported referent) would make the deliverable correct, so the error is causally material to what the trajectory delivers."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_005",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers final_answer 'The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.', while event_005's tool observation — an environment fact under grounding rule 3 — states 'The 2017 Erdős–Rényi Prize was awarded to Danielle Bassett for her contributions to network science.' The delivered answer directly contradicts the environment observation and no later observation resolves the conflict in Colizza's favor; the event_006 observation merely echoes the agent's own argument, not an independent fact. RESULT ERROR is real. RELEVANCE TEST: the final answer is the sole deliverable and event_006 is the last answer tool call with no subsequent correction; replacing Colizza with Bassett (the observation-supported referent) would make the deliverable correct, so the error is causally material to what the trajectory delivers."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_005",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers final_answer 'The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.', but event_005's tool observation — an environment fact under grounding rule 3 — states 'The 2017 Erdős–Rényi Prize was awarded to Danielle Bassett for her contributions to network science.' The delivered answer directly contradicts the observation and no later event resolves the conflict; the deviation is factually real (RESULT ERROR). RELEVANCE TEST: the final answer is the sole deliverable and event_006 is the last answer tool call per the delivered result anchors, so correcting step 6 to name Danielle Bassett would make every deliverable correct; the error is causally identical to the delivered result and was never corrected."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_005",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers final_answer 'The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.' while the environment observation at event_005 states 'The 2017 Erdős–Rényi Prize was awarded to Danielle Bassett for her contributions to network science.' Under grounding rule 3 the event_005 observation is an environment fact, and no shown observation supports the Colizza claim (event_004 only describes her research, not any prize). The delivered answer therefore contradicts the grounded fact — a real RESULT ERROR, not a formatting or process issue. RELEVANCE TEST: event_006 is the trajectory's final answer and the sole deliverable; correcting it to Danielle Bassett would make every deliverable correct, and there is no later correction. The error is causally identical to the delivered result, so it is material."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1350,
+              "completion_tokens": 730,
+              "total_tokens": 2080,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 500
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 500
+              },
+              "input_tokens": 1350,
+              "output_tokens": 730
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_005\", \"event_006\"],\n  \"reason\": \"CONTENT TEST: event_006 delivers final_answer 'The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.' while the environment observation at event_005 states 'The 2017 Erdős–R",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2286,
+        "completion_tokens": 2832,
+        "total_tokens": 5118,
+        "prompt_tokens_details": {
+          "cached_tokens": 2240
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2668
+        },
+        "input_tokens_details": {
+          "cached_tokens": 2240
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2668
+        },
+        "input_tokens": 2286,
+        "output_tokens": 2832
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.\",\"correct_result\":\"Vittoria Colizza was the recipient of the 2017 Erdős–Rényi Prize.\",\"basis\":\"observation\",\"confidence\":\"high\",\"evide",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 1,
+        "winner": false,
+        "tie": false
+      }
+    },
+    "recall_scanner": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1527,
+        "completion_tokens": 2664,
+        "total_tokens": 4191,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2077
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2077
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "input_tokens": 1527,
+        "output_tokens": 2664
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "recall_scanner",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the search observation reported Vittoria Colizza as the 2017 Erdős–Rényi Prize winner instead of the actual recipient Danielle Bassett\",\n      \"locus_event_id\": \"event_002\",\n      \"evidence_refs\": [\"event_002\", \"event_005\"],\n     "
+    },
+    "causal_upgrade": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2420,
+        "completion_tokens": 10993,
+        "total_tokens": 13413,
+        "prompt_tokens_details": {
+          "cached_tokens": 768
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 10504
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 10504
+        },
+        "input_tokens_details": {
+          "cached_tokens": 768
+        },
+        "input_tokens": 2420,
+        "output_tokens": 10993
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "causal_upgrade",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"upgrades\":[{\"candidate_id\":\"c1\",\"content_error\":false,\"causal\":false,\"corrected_step\":null,\"reason\":\"The event_002 observation is an environment fact under grounding rule 3, not an agent fabrication or misreport, and correcting that single observation would not make the final answer correct while ",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "per_candidate": {
+          "c1": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          },
+          "c2": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          },
+          "c3": {
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          },
+          "c4": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          },
+          "c5": {
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "complete",
+    "upgrade_view": "complete",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "packet_hash": "36ea11200f9869a90b9a8ba41c65791896b50377222bd67df92afc3b8c1c8acc"
+  },
+  "_packet_event_count": 6
+}

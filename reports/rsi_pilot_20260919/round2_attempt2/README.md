@@ -1,6 +1,6 @@
 # RSI 试点第 2 轮（v006）：协议、两轮尝试与结果
 
-日期：2026-09-20；方案：[docs/optimization-directions.md](../../docs/optimization-directions.md) 第 6–8 节；上轮记录：[reports/rsi_pilot_20260919/README.md](../README.md)。
+日期：2026-09-20；方案：[docs/optimization-directions.md](../../../docs/optimization-directions.md) 第 6–8 节；上轮记录：[reports/rsi_pilot_20260919/README.md](../README.md)。
 
 ## 结论摘要
 
@@ -8,7 +8,7 @@
 
 ## 冻结协议
 
-- 输入 manifest：[research-manifest-round2.json](../../output/rsi-planning/research-manifest-round2.json)（attempt 1 评估前冻结，提交 `b6a278b`）；attempt 2 变更见 [research-manifest-round2-attempt2.json](../../output/rsi-planning/research-manifest-round2-attempt2.json)（提交 `65ddb44`）。
+- 输入 manifest：[research-manifest-round2.json](../../../output/rsi-planning/research-manifest-round2.json)（attempt 1 评估前冻结，提交 `b6a278b`）；attempt 2 变更见 [research-manifest-round2-attempt2.json](../../../output/rsi-planning/research-manifest-round2-attempt2.json)（提交 `65ddb44`）。
 - 筛查集：训练失败 `BFCL/002`（目标步 6）、`BFCL/153`（目标步 14）；正常近邻 `020`、`053`。
 - 未用开发验证集 4 例：回归 `008`、`024`；边界 `013`；新增正常近邻 `018`（P1 试点 TN）。
 - 重复次数由 P2 的 2 提高到 3；候选臂每次重复都须通过；H0 只作对照。

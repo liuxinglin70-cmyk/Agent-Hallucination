@@ -1,0 +1,143 @@
+{
+  "arm": "58fbdde643c6",
+  "row": {
+    "case": "OpenDeepSearch/002.json",
+    "gold": false,
+    "prediction": false,
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/002.json",
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "b, e",
+            "correct_result": "b, e"
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "b, e",
+          "correct_result": "b, e",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_form",
+              "requirement": "Answer must be a comma-separated list of the elements in the counter-example subset, in alphabetical order"
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "The subset of S = {a, b, c, d, e} consisting of all elements appearing in at least one pair (x, y) with x*y != y*x per the given table"
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": [],
+        "causal_upgrade_rows": [],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+          "active_interventions": [
+            "IV-2-001",
+            "IV-2-002"
+          ],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [
+            {
+              "name": "evo_self_refuting_conviction",
+              "definition_hash": "0a16039c03da7099",
+              "rules": 1
+            }
+          ],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "not_rendered",
+        "upgrade_view": "not_rendered",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "8c28a1d1cd9db4156d614337a44c0ec83e082bbaf8fb7d278769a10b810eedda",
+        "interventions_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 3
+    },
+    "backend": "detector"
+  },
+  "row_hash": "ebaeff4bb21f"
+}

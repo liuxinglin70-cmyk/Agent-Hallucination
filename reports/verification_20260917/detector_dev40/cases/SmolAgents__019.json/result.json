@@ -1,0 +1,466 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "SmolAgents/019.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_004",
+  "responsible_step": 4,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_004",
+    "responsible_step": 4,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 4,
+        "traced_step": 4,
+        "defense": "substantiated",
+        "confirmed_step": 4,
+        "delivered_result": "A stepwise 31P NMR prediction: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate RO–P(O)(Cl)(OR') as a single signal at ~0 to +10 ppm; final dialkyl phosphate at 0 to −5 ppm as one peak or 'two closely spaced singlets' for diastereomers (hedged, and at one point called a possible 'doublet'), all singlets due to proton decoupling.",
+        "correct_result": "In the proton-decoupled 31P spectrum every resonance is a singlet; once two different enantiopure alkoxy groups are on phosphorus it is a stereocenter, so the dialkylphosphorochloridate intermediate (starting material of the final hydrolysis step) already appears as two diastereomeric singlets, which over the final reaction are replaced by two diastereomeric singlets of the dialkyl phosphate product; additionally, POCl3 itself resonates near +3 to +5 ppm relative to 85% H3PO4, not +35 to +48 ppm.",
+        "judge_basis": "world_knowledge",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 4,
+      "hallucination_reason": "The final answer fabricates chemical-shift values supported by no observation in the trajectory (POCl3 at +35 to +48 ppm, even calling this 'high-field' and claiming intermediates 'shift downfield' while its own table moves upfield), and it wrongly describes the dialkylphosphorochloridate intermediate as a single signal when its stereogenic phosphorus bearing two different enantiopure alkoxy groups must appear as two diastereomeric singlets, as must the final dialkyl phosphate.",
+      "delivered_result": "A stepwise 31P NMR prediction: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate RO–P(O)(Cl)(OR') as a single signal at ~0 to +10 ppm; final dialkyl phosphate at 0 to −5 ppm as one peak or 'two closely spaced singlets' for diastereomers (hedged, and at one point called a possible 'doublet'), all singlets due to proton decoupling.",
+      "correct_result": "In the proton-decoupled 31P spectrum every resonance is a singlet; once two different enantiopure alkoxy groups are on phosphorus it is a stereocenter, so the dialkylphosphorochloridate intermediate (starting material of the final hydrolysis step) already appears as two diastereomeric singlets, which over the final reaction are replaced by two diastereomeric singlets of the dialkyl phosphate product; additionally, POCl3 itself resonates near +3 to +5 ppm relative to 85% H3PO4, not +35 to +48 ppm.",
+      "basis": "world_knowledge",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_004"
+      ],
+      "root_cause": {
+        "step": 4,
+        "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).",
+        "referent": "POCl3 resonates as a singlet near +3 to +5 ppm (relative to 85% H3PO4); and the chiral dialkylphosphorochloridate intermediate RO–P(O)Cl(OR') (R ≠ R') must show two singlets from its two phosphorus diastereomers, as must the final dialkyl phosphate."
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Expected proton-decoupled 31P NMR: only singlets; the dialkylphosphorochloridate intermediate and the final dialkyl phosphate each give two singlets because phosphorus is a stereocenter bearing two different enantiopure alkoxy groups (two diastereomers resolved in achiral NMR)."
+        },
+        {
+          "kind": "verbatim_content",
+          "requirement": "All chemical-shift claims in the delivered answer must be factually correct and internally consistent (e.g., POCl3 near +3–5 ppm, not +35–48 ppm; no contradictory 'high-field'/'downfield' descriptions of the same values)."
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 4,
+      "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).",
+      "referent": "POCl3 resonates near +3 to +5 ppm relative to 85% H3PO4; no observation in event_002 or event_003 contains any POCl3 chemical-shift value (the ~36 ppm figure in event_003 refers to O=PMe3, not POCl3), so this value was fabricated at the final-answer step.",
+      "evidence_refs": [
+        "event_004"
+      ],
+      "reason": "The fabricated POCl3 shift of +35 to +48 ppm is absent from all prior search observations and first appears in the final answer at event_004, making it the earliest step where the wrong content exists."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 4,
+      "evidence_refs": [
+        "event_004",
+        "event_003",
+        "event_002"
+      ],
+      "reason": "CONTENT TEST: event_004 asserts 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' — a citation-precision value supported by no observation: the searches in event_002/event_003 returned only generic snippets (e.g., 'Peaks in the chemical shift range 10 to −10 ppm' and the Springer table listing O=PMe3 36.2 / O=P(OMe)3 2.1 ppm), never a POCl3 shift; the true POCl3 resonance is ~+3 to +5 ppm vs 85% H3PO4, so the value is both ungrounded and wrong, and the same answer contradicts itself by calling +35–48 ppm 'the high-field POCl3 peak' and saying intermediates 'shift downfield' while its own table decreases from +35–48 to 0 to −5 ppm. Second deviation is also in event_004: step 3 delivers the dialkylphosphorochloridate 'RO–P(O)(Cl)(OR')' as one signal ('This intermediate generally resonates ~0 to +10 ppm', single row in the table), but with two different enantiopure alkoxy groups phosphorus is a stereocenter, so this intermediate — the starting material of the very final reaction the user is monitoring — must show two diastereomeric singlets, replaced by two diastereomeric singlets of the product; the answer only hedged splitting for the final product and even called the two peaks a possible 'doublet' despite proton decoupling. RELEVANCE TEST: step 4 is itself the final-answer deliverable with no later events; correcting its fabricated shifts and its single-signal description of the stereogenic intermediate would make the only deliverable correct, so the error is causally connected to what the trajectory delivers and is not repaired anywhere."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 4,
+          "reason": "The final answer fabricates chemical-shift values supported by no observation in the trajectory (POCl3 at +35 to +48 ppm, even calling this 'high-field' and claiming intermediates 'shift downfield' while its own table moves upfield), and it wrongly describes the dialkylphosphorochloridate intermediate as a single signal when its stereogenic phosphorus bearing two different enantiopure alkoxy groups must appear as two diastereomeric singlets, as must the final dialkyl phosphate.",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).",
+          "delivered_result": "A stepwise 31P NMR prediction: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate RO–P(O)(Cl)(OR') as a single signal at ~0 to +10 ppm; final dialkyl phosphate at 0 to −5 ppm as one peak or 'two closely spaced singlets' for diastereomers (hedged, and at one point called a possible 'doublet'), all singlets due to proton decoupling.",
+          "correct_result": "In the proton-decoupled 31P spectrum every resonance is a singlet; once two different enantiopure alkoxy groups are on phosphorus it is a stereocenter, so the dialkylphosphorochloridate intermediate (starting material of the final hydrolysis step) already appears as two diastereomeric singlets, which over the final reaction are replaced by two diastereomeric singlets of the dialkyl phosphate product; additionally, POCl3 itself resonates near +3 to +5 ppm relative to 85% H3PO4, not +35 to +48 ppm."
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 4,
+            "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).",
+            "referent": "POCl3 resonates near +3 to +5 ppm relative to 85% H3PO4; no observation in event_002 or event_003 contains any POCl3 chemical-shift value (the ~36 ppm figure in event_003 refers to O=PMe3, not POCl3), so this value was fabricated at the final-answer step.",
+            "evidence_refs": [
+              "event_004"
+            ],
+            "reason": "The fabricated POCl3 shift of +35 to +48 ppm is absent from all prior search observations and first appears in the final answer at event_004, making it the earliest step where the wrong content exists."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 7896,
+              "completion_tokens": 1794,
+              "total_tokens": 9690,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1585
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1585
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "input_tokens": 7896,
+              "output_tokens": 1794
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":4,\"quote\":\"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).\",\"referent\":\"POCl3 resonates near +3 to +5 ppm relative to 85% H3PO4; no observation in event_002 or event_003 contains any POCl3 chem"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 4,
+            "reason": "The final answer fabricates chemical-shift values supported by no observation in the trajectory (POCl3 at +35 to +48 ppm, even calling this 'high-field' and claiming intermediates 'shift downfield' while its own table moves upfield), and it wrongly describes the dialkylphosphorochloridate intermediate as a single signal when its stereogenic phosphorus bearing two different enantiopure alkoxy groups must appear as two diastereomeric singlets, as must the final dialkyl phosphate.",
+            "delivered_result": "A stepwise 31P NMR prediction: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate RO–P(O)(Cl)(OR') as a single signal at ~0 to +10 ppm; final dialkyl phosphate at 0 to −5 ppm as one peak or 'two closely spaced singlets' for diastereomers (hedged, and at one point called a possible 'doublet'), all singlets due to proton decoupling.",
+            "correct_result": "In the proton-decoupled 31P spectrum every resonance is a singlet; once two different enantiopure alkoxy groups are on phosphorus it is a stereocenter, so the dialkylphosphorochloridate intermediate (starting material of the final hydrolysis step) already appears as two diastereomeric singlets, which over the final reaction are replaced by two diastereomeric singlets of the dialkyl phosphate product; additionally, POCl3 itself resonates near +3 to +5 ppm relative to 85% H3PO4, not +35 to +48 ppm.",
+            "evidence_refs": [
+              "event_004"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Expected proton-decoupled 31P NMR: only singlets; the dialkylphosphorochloridate intermediate and the final dialkyl phosphate each give two singlets because phosphorus is a stereocenter bearing two different enantiopure alkoxy groups (two diastereomers resolved in achiral NMR)."
+              },
+              {
+                "kind": "verbatim_content",
+                "requirement": "All chemical-shift claims in the delivered answer must be factually correct and internally consistent (e.g., POCl3 near +3–5 ppm, not +35–48 ppm; no contradictory 'high-field'/'downfield' descriptions of the same values)."
+              }
+            ],
+            "confidence": "high",
+            "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)."
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 4,
+            "evidence_refs": [
+              "event_004",
+              "event_003",
+              "event_002"
+            ],
+            "reason": "CONTENT TEST: event_004 asserts 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' — a citation-precision value supported by no observation: the searches in event_002/event_003 returned only generic snippets (e.g., 'Peaks in the chemical shift range 10 to −10 ppm' and the Springer table listing O=PMe3 36.2 / O=P(OMe)3 2.1 ppm), never a POCl3 shift; the true POCl3 resonance is ~+3 to +5 ppm vs 85% H3PO4, so the value is both ungrounded and wrong, and the same answer contradicts itself by calling +35–48 ppm 'the high-field POCl3 peak' and saying intermediates 'shift downfield' while its own table decreases from +35–48 to 0 to −5 ppm. Second deviation is also in event_004: step 3 delivers the dialkylphosphorochloridate 'RO–P(O)(Cl)(OR')' as one signal ('This intermediate generally resonates ~0 to +10 ppm', single row in the table), but with two different enantiopure alkoxy groups phosphorus is a stereocenter, so this intermediate — the starting material of the very final reaction the user is monitoring — must show two diastereomeric singlets, replaced by two diastereomeric singlets of the product; the answer only hedged splitting for the final product and even called the two peaks a possible 'doublet' despite proton decoupling. RELEVANCE TEST: step 4 is itself the final-answer deliverable with no later events; correcting its fabricated shifts and its single-signal description of the stereogenic intermediate would make the only deliverable correct, so the error is causally connected to what the trajectory delivers and is not repaired anywhere."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_003",
+                "event_002"
+              ],
+              "reason": "CONTENT TEST: event_004 asserts 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' — a citation-precision value supported by no observation: the searches in event_002/event_003 returned only generic snippets (e.g., 'Peaks in the chemical shift range 10 to −10 ppm' and the Springer table listing O=PMe3 36.2 / O=P(OMe)3 2.1 ppm), never a POCl3 shift; the true POCl3 resonance is ~+3 to +5 ppm vs 85% H3PO4, so the value is both ungrounded and wrong, and the same answer contradicts itself by calling +35–48 ppm 'the high-field POCl3 peak' and saying intermediates 'shift downfield' while its own table decreases from +35–48 to 0 to −5 ppm. Second deviation is also in event_004: step 3 delivers the dialkylphosphorochloridate 'RO–P(O)(Cl)(OR')' as one signal ('This intermediate generally resonates ~0 to +10 ppm', single row in the table), but with two different enantiopure alkoxy groups phosphorus is a stereocenter, so this intermediate — the starting material of the very final reaction the user is monitoring — must show two diastereomeric singlets, replaced by two diastereomeric singlets of the product; the answer only hedged splitting for the final product and even called the two peaks a possible 'doublet' despite proton decoupling. RELEVANCE TEST: step 4 is itself the final-answer deliverable with no later events; correcting its fabricated shifts and its single-signal description of the stereogenic intermediate would make the only deliverable correct, so the error is causally connected to what the trajectory delivers and is not repaired anywhere."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_003",
+                "event_002"
+              ],
+              "reason": "CONTENT TEST: The final answer (event_004) states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm' and 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)'. No observation in the trajectory supports the +35 to +48 ppm value: the POCl3 searches (event_002_tool_01, event_003_tool_01) returned no numeric shift for POCl3; the only nearby number in the shown evidence is 'O¨PMe3. 36.2' in the Springer table snippet (event_003), which is trimethylphosphine oxide, not POCl3 — the correct referent is ~+3 to +5 ppm vs 85% H3PO4. The answer is also internally incoherent: it calls the +35 to +48 ppm POCl3 peak 'high-field' and says intermediates 'appear and shift downfield' while its own table moves from +35–48 to +10–25 to ~0–10 (upfield). On multiplicity, the dialkylphosphorochloridate RO–P(O)(Cl)(OR') bears two different enantiopure alkoxy groups plus Cl and =O, making phosphorus a stereocenter; the two configurations are diastereomers that must give two distinct singlets in an achiral proton-decoupled 31P spectrum, yet the answer delivers a single signal at '~0 to +10 ppm' and 'clean single peaks for each major species', and even offers a 'possible doublet for diastereomers', impossible with one phosphorus per molecule under 1H decoupling. RELEVANCE TEST: The final answer is the sole deliverable and is the last event — no later correction exists; correcting step 4 would fix every deliverable, and the errors (fabricated shift values, wrong peak count for the key intermediate) are exactly what the trajectory delivers, a RESULT ERROR in the committed answer."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_003",
+                "event_002"
+              ],
+              "reason": "CONTENT TEST: The final answer at event_004 states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR... often near +38 ppm in CDCl3 or DMSO' and later 'the high-field POCl3 peak gradually disappear[es]'. No observation in the trajectory supports any of these numbers: the searches in event_002 and event_003 returned no POCl3 shift value at all, and the only concrete datum shown (event_003, Springer table: 'OP(OMe)3. 2.1' ppm; ResearchGate: phosphate peaks 'around −3 ppm') places phosphoryl compounds near 0 to +5 ppm, consistent with POCl3 at ~+3 to +5 ppm, not +35 to +48. The prose also contradicts its own table: the table moves from +35/+48 to +10/+25 to ~0/+10 to 0/−5 (upfield), yet the answer says 'intermediate(s) appear and shift downfield', and it labels +35 to +48 ppm 'high-field' when higher ppm is downfield. Additionally, step 3 presents the dialkylphosphorochloridate RO–P(O)(Cl)(OR') as one signal ('This intermediate generally resonates ~0 to +10 ppm'; 'clean single peaks for each major species'), but with two different enantiopure alkoxy groups phosphorus is a stereocenter, so this intermediate — the starting material of the final hydrolysis step the user is monitoring — must already show two diastereomeric singlets; the answer concedes diastereomers only for the final product and even mislabels them a 'possible doublet' under proton decoupling. RELEVANCE TEST: The alleged step IS the deliverable (the final answer); correcting it yields a correct deliverable, and no later event repairs or supersedes it. The fabricated shift values and the missing diastereomeric splitting are result errors in the delivered answer, material under the MATERIALITY LAW."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 9173,
+              "completion_tokens": 3818,
+              "total_tokens": 12991,
+              "prompt_tokens_details": {
+                "cached_tokens": 9152
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 3327
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 3327
+              },
+              "input_tokens_details": {
+                "cached_tokens": 9152
+              },
+              "input_tokens": 9173,
+              "output_tokens": 3818
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_003\", \"event_002\"],\n  \"reason\": \"CONTENT TEST: The final answer at event_004 states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR... often near +38 ppm in CDCl3 or DMSO' and la",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_002",
+              "event_003",
+              "event_004"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 8169,
+        "completion_tokens": 5523,
+        "total_tokens": 13692,
+        "prompt_tokens_details": {
+          "cached_tokens": 1088
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4741
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1088
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 4741
+        },
+        "input_tokens": 8169,
+        "output_tokens": 5523
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":4,\"hallucination_reason\":\"The final answer mispredicts the central spectral features: it reports a single 31P resonance for the RO-P(O)(Cl)(OR') intermediate even though phosphorus there bears four different substituents (P=O, Cl, OR, OR') and must appea",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 7896,
+        "completion_tokens": 1794,
+        "total_tokens": 9690,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1585
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1585
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "input_tokens": 7896,
+        "output_tokens": 1794
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":4,\"quote\":\"POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).\",\"referent\":\"POCl3 resonates near +3 to +5 ppm relative to 85% H3PO4; no observation in event_002 or event_003 contains any POCl3 chem"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 9173,
+        "completion_tokens": 3818,
+        "total_tokens": 12991,
+        "prompt_tokens_details": {
+          "cached_tokens": 9152
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3327
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 3327
+        },
+        "input_tokens_details": {
+          "cached_tokens": 9152
+        },
+        "input_tokens": 9173,
+        "output_tokens": 3818
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_003\", \"event_002\"],\n  \"reason\": \"CONTENT TEST: The final answer at event_004 states 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR... often near +38 ppm in CDCl3 or DMSO' and la",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "ba1b1ea12623e6e748c862332e3b28ac0301a82462f4249c79d00bfb55510869"
+  },
+  "_packet_event_count": 4
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "detector.run_manifest.v1",
+  "run_id": "rsi_pilot_h0_expansion_20260919",
+  "cases": [
+    "BFCL/002.json",
+    "BFCL/008.json",
+    "BFCL/082.json",
+    "BFCL/118.json",
+    "BFCL/129.json",
+    "BFCL/148.json",
+    "BFCL/153.json"
+  ],
+  "config_hash": "b0f9348a4c3f6cb543099b06251c9fd166325208bb83c23ad00fd34398ead033",
+  "interventions_hash": null
+}

@@ -1,0 +1,173 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Magentic_One/049.json",
+    "gold": false,
+    "prediction": null,
+    "state": "verified_clean",
+    "authority": "degraded_judge_only",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Magentic_One/049.json",
+      "state": "verified_clean",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "The oxidation is least favorable for compound 2, 1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline, because methyl groups at the 1,10 (bay/peri) positions disrupt the planarity and conjugation of the aromatic product and raise the reorganization energy, while naphtho-fusion (compound 3) favors oxidation and 3,8-methyl groups (compound 4) are relatively innocuous.",
+            "correct_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is indeed the correct answer: its oxidized product, 1,10-dimethylbenzo[c]cinnoline, suffers severe bay-region steric strain between the peri methyl groups and the azo N=N bridge, forcing a twisted, less aromatic, destabilized product, whereas the folded dihydro precursor relieves this strain; hence its oxidation is least favorable (approximate favorability ranking 3 > 4 > 1 > 2)."
+          },
+          "blocking_facts": [
+            {
+              "component": "recall",
+              "code": "recall_unavailable",
+              "error_type": "truncated_output",
+              "error": "output truncated at max_tokens (8192 tokens)"
+            }
+          ]
+        },
+        "authority_failure_reasons": [
+          {
+            "component": "recall",
+            "code": "recall_unavailable",
+            "error_type": "truncated_output",
+            "error": "output truncated at max_tokens (8192 tokens)"
+          }
+        ],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "The oxidation is least favorable for compound 2, 1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline, because methyl groups at the 1,10 (bay/peri) positions disrupt the planarity and conjugation of the aromatic product and raise the reorganization energy, while naphtho-fusion (compound 3) favors oxidation and 3,8-methyl groups (compound 4) are relatively innocuous.",
+          "correct_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is indeed the correct answer: its oxidized product, 1,10-dimethylbenzo[c]cinnoline, suffers severe bay-region steric strain between the peri methyl groups and the azo N=N bridge, forcing a twisted, less aromatic, destabilized product, whereas the folded dihydro precursor relieves this strain; hence its oxidation is least favorable (approximate favorability ranking 3 > 4 > 1 > 2).",
+          "basis": "derivation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "Determine which of the four named dihydro compounds is least favorably oxidized by oxygen to its corresponding aromatic compound."
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "The answer must correctly identify one of compounds 1-4; the chemically correct identification is compound 2, 1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline, due to bay-region steric destabilization of the 1,10-dimethylbenzo[c]cinnoline product."
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "provider_error",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 7076,
+            "completion_tokens": 14977,
+            "total_tokens": 22053,
+            "prompt_tokens_details": {
+              "cached_tokens": 7040
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 14705
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 14705
+            },
+            "input_tokens_details": {
+              "cached_tokens": 7040
+            },
+            "input_tokens": 7076,
+            "output_tokens": 14977
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the compound whose oxidation to its aromatic counterpart is least favorable.\",\"correct_result\":\"Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "recall",
+          "code": "recall_unavailable",
+          "error_type": "truncated_output",
+          "error": "output truncated at max_tokens (8192 tokens)"
+        }
+      ],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": null,
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "11e5a5b2dbff7b99b88f1b699dfcdeb7940bb374acb0bfd7173e5a9711061aff",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 10
+    },
+    "backend": "detector"
+  },
+  "row_hash": "984c853b85fc"
+}

@@ -1,0 +1,744 @@
+{
+  "run_id": "dev40",
+  "metrics": {
+    "decisive": 40,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.725,
+    "all_case_accuracy": 0.725,
+    "tp": 17,
+    "fp": 4,
+    "fn": 7,
+    "tn": 12,
+    "positive_precision": 0.8095238095238095,
+    "positive_recall": 0.7083333333333334,
+    "positive_f1": 0.7555555555555556,
+    "macro_precision": 0.7205513784461153,
+    "macro_recall": 0.7291666666666667,
+    "macro_f1": 0.7206349206349207,
+    "authoritative": 38,
+    "degraded": 2,
+    "provider_unresolved": 0,
+    "requested_cases": 40,
+    "found_results": 40,
+    "missing_cases": 0,
+    "step_localization": {
+      "n": 24,
+      "hits": 10,
+      "accuracy": 0.4166666666666667
+    }
+  },
+  "rows": [
+    {
+      "case": "BFCL/017.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 4,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 3,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/062.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 4,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/107.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 5,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/048.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 21,
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "Camel/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 3,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/049.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "Magentic_One/050.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 8,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/085.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/093.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 18,
+      "responsible_step": 18,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 2,
+      "responsible_step": 2,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 4,
+      "responsible_step": 4,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/030.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 4,
+      "responsible_step": 4,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/040.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/035.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 2,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/063.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 2,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/067.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 4,
+      "responsible_step": 6,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 6,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/080.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 1,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/084.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 2,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/088.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/095.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 3,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 1,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 3,
+      "responsible_step": 4,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "gold": false,
+      "prediction": true,
+      "gold_step": null,
+      "responsible_step": 4,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/037.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 2,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/012.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/068.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/106.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/028.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "gold": false,
+      "prediction": false,
+      "gold_step": null,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "gold": true,
+      "prediction": false,
+      "gold_step": 3,
+      "responsible_step": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/078.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 1,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 1,
+      "responsible_step": 4,
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/036.json",
+      "gold": true,
+      "prediction": true,
+      "gold_step": 3,
+      "responsible_step": 3,
+      "state": "verified_error",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "BFCL/017.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "ProjectOverview.txt written with 'To be discussed'; after the cp failure, Draft.txt was written directly with the same content 'To be discussed' making both files identical; Twitter authenticated as tech_guru and tweet posted with content 'Initial summary of the project. To be discussed.', tag '#ProjectUpdate', mentions '@manager' and '@team_lead', confirmed by the post_tweet observation.",
+        "correct_result": "ProjectOverview.txt contains 'To be discussed'; Draft.txt is identical to ProjectOverview.txt; a tweet with content 'Initial summary of the project. To be discussed.', tagged ProjectUpdate and mentioning @manager and @team_lead is posted using the provided credentials.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Write 'To be discussed' into ProjectOverview.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Make Draft.txt identical in content to ProjectOverview.txt"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Authenticate to Twitter with username tech_guru and password securePass123, then post the tweet"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet text: 'Initial summary of the project. To be discussed.' with tag 'ProjectUpdate' and mentions @manager and @team_lead"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/041.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Conversion of 30 gallons to ~113.56 liters; honest report that the engine could not start because all doors are unlocked (with an offer to lock them); tire inspection reporting 32.0 psi front / 30.0 psi rear within healthy range; tweet 'Tire pressures are optimal!' posted with #CarMaintenance and @VehicleGuru, confirmed by tool observation.",
+        "correct_result": "30 gallons ≈ 113.56 liters; engine started in START mode (blocked by environment requiring locked doors); tires confirmed optimal per healthy_tire_pressure=true; tweet posted with exact content 'Tire pressures are optimal!', hashtag #CarMaintenance, and mention @VehicleGuru.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Convert 30 gallons to liters (tool returned 113.5623 L)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Start the engine in START mode (attempted with ignitionMode='START'; environment returned a door-lock error, honestly reported without a false completion claim)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Inspect each tire's condition and confirm optimal shape (check_tire_pressure returned healthy_tire_pressure=true)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Post tweet with exact content 'Tire pressures are optimal!', hashtag #CarMaintenance, and mention @VehicleGuru (post_tweet observation confirms all three)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/062.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Fuel tank filled with 10.04 gallons (38 liters converted at 2 decimal places, fuelLevel 20.04 confirmed); startEngine called with ignitionMode 'START' but returned an environment error requiring all doors locked; assistant honestly reported engine stopped, battery 12.6V, AC auto mode at 25.0°C, and fan speed 50%, and offered to lock doors and retry.",
+        "correct_result": "Fill tank with 38 liters expressed as a 2-decimal gallon amount (10.04 gallons), attempt engine start in 'START' mode, and report engine status, battery voltage, AC speed and fan speed truthfully from observations.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Refill fuel tank with precisely 38 liters of petrol via the fuel tank fill tool"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Gallon amount must use 2 decimal digits (10.04)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Activate the engine with ignitionMode 'START'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Convey engine operational status, battery voltage, AC speed and fan speed"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Camel/048.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "A reasoned paragraph reporting that authoritative modern sources (V&A, Blenheim Palace official site, 360 tour) attribute the Great Hall ceiling to Sir James Thornhill, while the consulted human respondent recalls that 'Historic Houses and Their Gardens' attributes it to Louis Laguerre, explicitly flagging this as a direct conflict and noting the book itself could not be accessed to confirm.",
+        "correct_result": "The name of the man the specified book mentions as painting the Great Hall ceiling at Blenheim Palace; per the only in-trajectory evidence about the book's content (the human respondent consulted via ask_human_via_console, as the task required), that name is Louis Laguerre, which the final answer does state as the book's attribution.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Consult the human user via ask_human_via_console for information about the ceiling painter referenced in the specified book (satisfied in events 003 and 016)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Incorporate the human's reply and search/analyze credible sources to determine the exact name as mentioned in the book (satisfied in events 004-012 and 017-020)."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Final deliverable: a brief paragraph naming the person, explaining the reasoning, and listing consulted sources (event_021 names Louis Laguerre as the book's attribution, explains the conflict with modern sources, and cites the consulted sources)."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Magentic_One/050.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 8,
+        "hallucination_reason": "The orchestrator claims the enrollment count of 90 is 'as listed on the NIH website (ClinicalTrials.gov NCT03411733)', but the trajectory never visited ClinicalTrials.gov; the figure was read only from the third-party mirror ichgcp.net, so the NIH-sourcing claim is unverified.",
+        "delivered_result": "90 participants, claimed to be as listed on the NIH website (ClinicalTrials.gov NCT03411733)",
+        "correct_result": "The actual enrollment count of the H. pylori / acne vulgaris trial as listed on the NIH website (ClinicalTrials.gov), verified from the official NIH record itself",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_005",
+          "event_007",
+          "event_008"
+        ],
+        "root_cause": {
+          "step": 8,
+          "quote": "as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants",
+          "referent": "The 90 figure was observed only on ichgcp.net (event_007); the NIH website was never accessed to verify the listing"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Look up the actual enrollment count as listed on the NIH website (ClinicalTrials.gov)"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Report the actual enrollment count of the H. pylori in acne vulgaris trial (Jan-May 2018)"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 8,
+        "evidence_refs": [
+          "event_008",
+          "event_007",
+          "event_006"
+        ],
+        "reason": "CONTENT TEST: At event_008 the orchestrator delivered: 'The actual enrollment count ... as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.' The task fixes the source ('as listed on the NIH website'), so that sourcing is part of the deliverable. The only environment observation of the figure is event_007's 'Enrollment (Actual) 90', read from the third-party mirror page https://ichgcp.net/clinical-trials-registry/NCT03411733 ('Clinical Trials Registry - ICH GCP'), not from clinicaltrials.gov. The orchestrator's own event_006 instruction — 'check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record' — was never executed; event_007 only scrolled down on the ichgcp.net page. No shown event grounds the NIH-sourcing claim, making it an unverified assertion attributed to a source never consulted (false completion / deliverable breach of the task-fixed target). RELEVANCE TEST: event_008 is the final delivered result (last_prose_event_id=event_008) with no later correction; correcting it — actually confirming 90 from the official NIH record as event_006 itself planned — is exactly what would make the deliverable correct, so the error is causally connected to what the trajectory delivers and is material."
+      }
+    },
+    {
+      "case": "OpenDeepSearch/035.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Barcelona took 2 corners in the Champions League semi-final match against Milan (stated as played on April 26, 2006).",
+        "correct_result": "The number of corners Barcelona took in the Champions League semi-final against Milan; the tool observation (environment fact) confirms Barcelona had 2 corner kicks, with the match dated April 26, 2006.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The number of corner kicks taken by Barcelona in the Champions League semi-final match between Barcelona and Milan referenced in the question."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/063.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\", which has a duration of 3:20.",
+        "correct_result": "Track 12 on the Jet Set Radio original soundtrack released in 2000 is \"Fly Like a Butterfly\".",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The name of track 12 on the Jet Set Radio original soundtrack released in 2000"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+        "correct_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza, as reported by the environment observations in event_002 and event_003.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Identify the recipient of the 2017 Erdős–Rényi Prize"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "76 tons",
+        "correct_result": "76 tons",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The tonnage of the topsail schooner 'Lisette', built in 1873, formerly owned by the Duke of Sutherland before serving as a decoy craft in 1917"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 4,
+        "hallucination_reason": "The final answer fabricates chemical-shift values supported by no observation in the trajectory (POCl3 at +35 to +48 ppm, even calling this 'high-field' and claiming intermediates 'shift downfield' while its own table moves upfield), and it wrongly describes the dialkylphosphorochloridate intermediate as a single signal when its stereogenic phosphorus bearing two different enantiopure alkoxy groups must appear as two diastereomeric singlets, as must the final dialkyl phosphate.",
+        "delivered_result": "A stepwise 31P NMR prediction: POCl3 singlet at +35 to +48 ppm; monoalkyl phosphorodichloridate at +10 to +25 ppm; dialkyl phosphorochloridate RO–P(O)(Cl)(OR') as a single signal at ~0 to +10 ppm; final dialkyl phosphate at 0 to −5 ppm as one peak or 'two closely spaced singlets' for diastereomers (hedged, and at one point called a possible 'doublet'), all singlets due to proton decoupling.",
+        "correct_result": "In the proton-decoupled 31P spectrum every resonance is a singlet; once two different enantiopure alkoxy groups are on phosphorus it is a stereocenter, so the dialkylphosphorochloridate intermediate (starting material of the final hydrolysis step) already appears as two diastereomeric singlets, which over the final reaction are replaced by two diastereomeric singlets of the dialkyl phosphate product; additionally, POCl3 itself resonates near +3 to +5 ppm relative to 85% H3PO4, not +35 to +48 ppm.",
+        "basis": "world_knowledge",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_004"
+        ],
+        "root_cause": {
+          "step": 4,
+          "quote": "POCl3 typically appears as a sharp singlet near **+35 to +48 ppm** in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO).",
+          "referent": "POCl3 resonates as a singlet near +3 to +5 ppm (relative to 85% H3PO4); and the chiral dialkylphosphorochloridate intermediate RO–P(O)Cl(OR') (R ≠ R') must show two singlets from its two phosphorus diastereomers, as must the final dialkyl phosphate."
+        },
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Expected proton-decoupled 31P NMR: only singlets; the dialkylphosphorochloridate intermediate and the final dialkyl phosphate each give two singlets because phosphorus is a stereocenter bearing two different enantiopure alkoxy groups (two diastereomers resolved in achiral NMR)."
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "All chemical-shift claims in the delivered answer must be factually correct and internally consistent (e.g., POCl3 near +3–5 ppm, not +35–48 ppm; no contradictory 'high-field'/'downfield' descriptions of the same values)."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 4,
+        "evidence_refs": [
+          "event_004",
+          "event_003",
+          "event_002"
+        ],
+        "reason": "CONTENT TEST: event_004 asserts 'POCl3 typically appears as a sharp singlet near +35 to +48 ppm in 31P NMR (values vary with solvent, but often near +38 ppm in CDCl3 or DMSO)' — a citation-precision value supported by no observation: the searches in event_002/event_003 returned only generic snippets (e.g., 'Peaks in the chemical shift range 10 to −10 ppm' and the Springer table listing O=PMe3 36.2 / O=P(OMe)3 2.1 ppm), never a POCl3 shift; the true POCl3 resonance is ~+3 to +5 ppm vs 85% H3PO4, so the value is both ungrounded and wrong, and the same answer contradicts itself by calling +35–48 ppm 'the high-field POCl3 peak' and saying intermediates 'shift downfield' while its own table decreases from +35–48 to 0 to −5 ppm. Second deviation is also in event_004: step 3 delivers the dialkylphosphorochloridate 'RO–P(O)(Cl)(OR')' as one signal ('This intermediate generally resonates ~0 to +10 ppm', single row in the table), but with two different enantiopure alkoxy groups phosphorus is a stereocenter, so this intermediate — the starting material of the very final reaction the user is monitoring — must show two diastereomeric singlets, replaced by two diastereomeric singlets of the product; the answer only hedged splitting for the final product and even called the two peaks a possible 'doublet' despite proton decoupling. RELEVANCE TEST: step 4 is itself the final-answer deliverable with no later events; correcting its fabricated shifts and its single-signal description of the stereogenic intermediate would make the only deliverable correct, so the error is causally connected to what the trajectory delivers and is not repaired anywhere."
+      }
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The ratio of silicon atoms in the photosphere of Star_1 to Star_2 is 3.98.",
+        "correct_result": "nSi_1/nSi_2 = 10^0.6 ≈ 3.98",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Calculate the ratio of silicon atoms in the photospheres of Star_1 and Star_2 (nSi_1/nSi_2) using the given abundances [Si/Fe]_1=0.3, [Mg/Si]_2=0.3, [Fe/H]_1=0, [Mg/H]_2=0 and solar Fe (7.5) and Mg (7) abundances."
+          }
+        ]
+      },
+      "defense": {}
+    }
+  ],
+  "missing_cases": []
+}

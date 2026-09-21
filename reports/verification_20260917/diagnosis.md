@@ -106,12 +106,12 @@ IV-1-002 在 S+G 只真正触发了一例 OpenDeepSearch/002，而该例原本�
 
 `diagnostic_recheck.py` 只读取当前仓库保存的原始运行，输出 `diagnostic_recheck.json`。复算包含三个候选的上下文对照、联合臂去重后的逐例翻转、实际 deployment 事件、定位分母核对。上下文恢复仅为诊断反事实，不构成新准入结果。
 
-主要证据路径：
+主要证据路径（2026-09-21 起从运行目录归档到本报告目录，见 [reports 归档说明](../README.md)）：
 
-* `artifacts/evolution_real/cycles/cycle001.json`、`cycle002.json`
-* `artifacts/evolution_real/checkpoints/cycle001/arms/`、`cycle002/arms/`
-* `artifacts/detector_dev40/dev40/evaluation.json` 及 `cases/*/result.json`
-* `artifacts/evolution/memory/episodic.jsonl`
+* `evolution_run/cycles/cycle001.json`、`cycle002.json`
+* `evolution_run/checkpoints/cycle001/arms/`、`cycle002/arms/`
+* `detector_dev40/evaluation.json` 及 `cases/*/result.json`
+* `harness_memory/episodic.jsonl`
 * `evolution/gates.py:190,437`；`evolution/engine.py:193,934,1597`
 * `detector/predicate_dsl.py:611`；`detector/interventions.py:1040`；`detector/defense.py:351`；`detector/semantics.py:34`
-* `docs/review.md:399`；`reports/evolution_real/analysis.md`
+* `docs/history/review.md:399`；`reports/evolution_real/analysis.md`

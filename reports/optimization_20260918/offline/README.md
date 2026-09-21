@@ -20,7 +20,7 @@
 
 这些结果包括本地 HTTP 命令链回归与 mock 机制验证，不是真实模型准确率或独立泛化结论。
 
-另行执行的真实服务检查见 [../live/README.md](../live/README.md)（两例合成联调）与 [../real/README.md](../real/README.md)（真实数据集小规模路径与重复运行）；两者都有独立时间与源码记录，本命令不会重新调用模型服务。
+另行执行的真实服务检查见 [../../live/README.md](../../live/README.md)（两例合成联调）与 [../../real/README.md](../../real/README.md)（真实数据集小规模路径与重复运行）；两者都有独立时间与源码记录，本命令不会重新调用模型服务。
 
 源码 SHA-256：`69281d2c03702da1185ef93f031e767c8744506b4d91cd929d7a1ccdf6098a7c`。逐文件摘要见 [source_manifest.json](source_manifest.json)。
 

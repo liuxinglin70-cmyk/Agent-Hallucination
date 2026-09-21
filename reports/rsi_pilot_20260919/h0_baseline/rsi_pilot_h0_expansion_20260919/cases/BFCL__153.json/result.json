@@ -1,0 +1,163 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/153.json",
+  "state": "verified_clean",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00 (matches observation); booking 3426812 made with token secure_access_token_987654321 and card_4526 (booking_status true); invoice retrieved and relayed accurately (cost 1050.0, transaction 45451592); customer support contacted for booking 3426812; booking cancelled (cancel_status true); tweet posted as 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' from account john after successful authentication.",
+        "correct_result": "All deliverables required by the six turns: correct first-class cost ($1050.00), successful booking with the given card and token, retrieved invoice, support contact, successful cancellation, and a published tweet containing 'Postponing my plans.' with #Travel, #PlansChanged and @AirlineSupport — all of which the trajectory delivered."
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "Flight cost RMS->JFK first class on 2024-12-15 reported as $1050.00 (matches observation); booking 3426812 made with token secure_access_token_987654321 and card_4526 (booking_status true); invoice retrieved and relayed accurately (cost 1050.0, transaction 45451592); customer support contacted for booking 3426812; booking cancelled (cancel_status true); tweet posted as 'Postponing my plans. #Travel #PlansChanged @AirlineSupport' from account john after successful authentication.",
+      "correct_result": "All deliverables required by the six turns: correct first-class cost ($1050.00), successful booking with the given card and token, retrieved invoice, support contact, successful cancellation, and a published tweet containing 'Postponing my plans.' with #Travel, #PlansChanged and @AirlineSupport — all of which the trajectory delivered.",
+      "basis": "observation",
+      "confidence": "high",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "required_action",
+          "requirement": "Determine first-class cost from nearest airport to Rivermist (RMS) to JFK for 2024-12-15"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Book the flight using access token secure_access_token_987654321 charged to card_id card_4526 with matching details (RMS->JFK, first, 2024-12-15)"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Retrieve the invoice for the booking just made"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Contact customer support on the user's behalf about the unresolved booking issue"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Cancel the flight booking"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Authenticate as john/john1234 and publish tweet 'Postponing my plans.' incorporating #Travel, #PlansChanged and mention @AirlineSupport"
+        }
+      ]
+    },
+    "recall_candidates": [],
+    "causal_upgrade": null,
+    "causal_upgrades": [],
+    "causal_upgrade_rows": [],
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": null,
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    },
+    "external_evidence": null
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    },
+    "causal_upgrade": {
+      "stage": "causal_upgrade",
+      "state": "not_needed",
+      "attempts": 0,
+      "view": "not_rendered",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 3002,
+        "completion_tokens": 1485,
+        "total_tokens": 4487,
+        "prompt_tokens_details": {
+          "cached_tokens": 1472
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1038
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1038
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1472
+        },
+        "input_tokens": 3002,
+        "output_tokens": 1485
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Flight cost $1050.00 (RMS→JFK, first class, 2024-12-15), booking 3426812 confirmed with transaction 45451592 charged to card_4526, invoice retrieved and accurately reported, customer support contacted",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 0,
+        "winner": false,
+        "tie": false
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "not_rendered",
+    "upgrade_view": "not_rendered",
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "packet_hash": "20f77efebb4f266cbb5e23ad7f77dd5a061b0e9afa1df0fa68036149b330aa8d"
+  },
+  "_packet_event_count": 15
+}

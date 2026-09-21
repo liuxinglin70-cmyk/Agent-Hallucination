@@ -1,0 +1,543 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/082.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_011",
+  "responsible_step": 11,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_011",
+    "responsible_step": 11,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 11,
+        "traced_step": 11,
+        "defense": "substantiated",
+        "confirmed_step": 11,
+        "delivered_result": "Message sent to USR008 (Emma): 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+        "correct_result": "Message to Emma in the fixed format with X = 980 (the integer value returned by estimate_distance): 'The estimated distance from Rivermist to San Francisco is 980 miles.'",
+        "judge_basis": "task_requirement",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 11,
+      "hallucination_reason": "The assistant sent Emma the message 'The estimated distance from Rivermist to San Francisco is 609 miles.', substituting a unit-converted value (980 km ≈ 609 mi) for X instead of the actual integer value computed earlier (980), breaching the user's explicitly fixed message format.",
+      "delivered_result": "Message sent to USR008 (Emma): 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+      "correct_result": "Message to Emma in the fixed format with X = 980 (the integer value returned by estimate_distance): 'The estimated distance from Rivermist to San Francisco is 980 miles.'",
+      "basis": "task_requirement",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_008",
+        "event_011",
+        "event_012"
+      ],
+      "root_cause": {
+        "step": 11,
+        "quote": "'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+        "referent": "'The estimated distance from Rivermist to San Francisco is 980 miles.' — X must be the actual integer value computed earlier (980.0 from estimate_distance), per the user's fixed format"
+      },
+      "contracts": [
+        {
+          "kind": "required_action",
+          "requirement": "Start the engine with ignition mode START (pressing brake pedal as the environment requires)."
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Postal code for Rivermist as returned by the zipcode tool (83214)."
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Distance from Rivermist to San Francisco as computed by estimate_distance (980.0)."
+        },
+        {
+          "kind": "verbatim_content",
+          "requirement": "Message to Emma must be exactly 'The estimated distance from Rivermist to San Francisco is X miles.' with X replaced by the actual integer value computed earlier (980)."
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Send that message to colleague Emma (receiver_id USR008)."
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Display all messages that have been sent."
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 11,
+      "quote": "'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+      "referent": "'message': 'The estimated distance from Rivermist to San Francisco is 980 miles.' — X must be the actual integer value 980 returned by estimate_distance in event_008, per the user's fixed format in turn 4.",
+      "evidence_refs": [
+        "event_008",
+        "event_011",
+        "event_012"
+      ],
+      "reason": "The wrong value 609 first appears in the send_message arguments at event_011, where the assistant substituted a unit-converted figure (980 km ≈ 609 mi) for the integer 980 that estimate_distance returned, and no earlier step contains this erroneous content; event_012 and event_013 merely repeat the already-sent message."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 11,
+      "evidence_refs": [
+        "event_008",
+        "event_011",
+        "event_012",
+        "event_013"
+      ],
+      "evidence_citations": [],
+      "conflict_note": "",
+      "reason": "CONTENT TEST: At event_011 the assistant called send_message with message='The estimated distance from Rivermist to San Francisco is 609 miles.' Turn 4 explicitly fixed the deliverable: format 'The estimated distance from Rivermist to San Francisco is X miles.', where X is replaced by the actual integer value computed earlier. The only computed value is event_008's estimate_distance observation {\"distance\": 980.0}, so X=980 and the required message was '...is 980 miles.' The assistant's prose at event_009 ('980 kilometers') is an assertion, not an environment fact (grounding rule 3), and cannot override the task-fixed value; substituting a self-derived unit conversion (980 km ≈ 609 mi) for the fixed integer is a DELIVERABLE BREACH of an explicit contract, material by definition. RELEVANCE TEST: The wrong value was actually committed and never corrected — event_011's observation confirms the send, event_013's view_messages_sent shows the stored message 'The estimated distance from Rivermist to San Francisco is 609 miles.', and event_012 merely repeats the error as delivery evidence, not a separate root cause. Correcting event_011 to send X=980 would make the message, its confirmation, and the sent-messages record all correct, so the step is causally connected to every deliverable."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 11,
+          "reason": "The assistant sent Emma the message 'The estimated distance from Rivermist to San Francisco is 609 miles.', substituting a unit-converted value (980 km ≈ 609 mi) for X instead of the actual integer value computed earlier (980), breaching the user's explicitly fixed message format.",
+          "evidence_refs": [
+            "event_008",
+            "event_011",
+            "event_012"
+          ],
+          "quote": "'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+          "delivered_result": "Message sent to USR008 (Emma): 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+          "correct_result": "Message to Emma in the fixed format with X = 980 (the integer value returned by estimate_distance): 'The estimated distance from Rivermist to San Francisco is 980 miles.'"
+        },
+        "evidence_citations": [],
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 11,
+            "quote": "'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+            "referent": "'message': 'The estimated distance from Rivermist to San Francisco is 980 miles.' — X must be the actual integer value 980 returned by estimate_distance in event_008, per the user's fixed format in turn 4.",
+            "evidence_refs": [
+              "event_008",
+              "event_011",
+              "event_012"
+            ],
+            "reason": "The wrong value 609 first appears in the send_message arguments at event_011, where the assistant substituted a unit-converted figure (980 km ≈ 609 mi) for the integer 980 that estimate_distance returned, and no earlier step contains this erroneous content; event_012 and event_013 merely repeat the already-sent message."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1807,
+              "completion_tokens": 898,
+              "total_tokens": 2705,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 698
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 698
+              },
+              "input_tokens": 1807,
+              "output_tokens": 898
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "\n{\n  \"step\": 11,\n  \"quote\": \"'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'\",\n  \"referent\": \"'message': 'The estimated distance from Rivermist to San Francisco is 980 miles.' — X must be the actual integer value 980 returned by estimate_distance in event_008, per t"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 11,
+            "reason": "The assistant sent Emma the message 'The estimated distance from Rivermist to San Francisco is 609 miles.', substituting a unit-converted value (980 km ≈ 609 mi) for X instead of the actual integer value computed earlier (980), breaching the user's explicitly fixed message format.",
+            "delivered_result": "Message sent to USR008 (Emma): 'The estimated distance from Rivermist to San Francisco is 609 miles.'",
+            "correct_result": "Message to Emma in the fixed format with X = 980 (the integer value returned by estimate_distance): 'The estimated distance from Rivermist to San Francisco is 980 miles.'",
+            "evidence_refs": [
+              "event_008",
+              "event_011",
+              "event_012"
+            ],
+            "contracts": [
+              {
+                "kind": "required_action",
+                "requirement": "Start the engine with ignition mode START (pressing brake pedal as the environment requires)."
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Postal code for Rivermist as returned by the zipcode tool (83214)."
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Distance from Rivermist to San Francisco as computed by estimate_distance (980.0)."
+              },
+              {
+                "kind": "verbatim_content",
+                "requirement": "Message to Emma must be exactly 'The estimated distance from Rivermist to San Francisco is X miles.' with X replaced by the actual integer value computed earlier (980)."
+              },
+              {
+                "kind": "required_action",
+                "requirement": "Send that message to colleague Emma (receiver_id USR008)."
+              },
+              {
+                "kind": "required_action",
+                "requirement": "Display all messages that have been sent."
+              }
+            ],
+            "confidence": "high",
+            "quote": "'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010",
+              "event_011",
+              "event_012",
+              "event_013",
+              "event_014"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 11,
+            "evidence_refs": [
+              "event_008",
+              "event_011",
+              "event_012",
+              "event_013"
+            ],
+            "evidence_citations": [],
+            "conflict_note": "",
+            "reason": "CONTENT TEST: At event_011 the assistant called send_message with message='The estimated distance from Rivermist to San Francisco is 609 miles.' Turn 4 explicitly fixed the deliverable: format 'The estimated distance from Rivermist to San Francisco is X miles.', where X is replaced by the actual integer value computed earlier. The only computed value is event_008's estimate_distance observation {\"distance\": 980.0}, so X=980 and the required message was '...is 980 miles.' The assistant's prose at event_009 ('980 kilometers') is an assertion, not an environment fact (grounding rule 3), and cannot override the task-fixed value; substituting a self-derived unit conversion (980 km ≈ 609 mi) for the fixed integer is a DELIVERABLE BREACH of an explicit contract, material by definition. RELEVANCE TEST: The wrong value was actually committed and never corrected — event_011's observation confirms the send, event_013's view_messages_sent shows the stored message 'The estimated distance from Rivermist to San Francisco is 609 miles.', and event_012 merely repeats the error as delivery evidence, not a separate root cause. Correcting event_011 to send X=980 would make the message, its confirmation, and the sent-messages record all correct, so the step is causally connected to every deliverable."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 11,
+              "evidence_refs": [
+                "event_008",
+                "event_011",
+                "event_012",
+                "event_013"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: At event_011 the assistant called send_message with message='The estimated distance from Rivermist to San Francisco is 609 miles.' Turn 4 explicitly fixed the deliverable: format 'The estimated distance from Rivermist to San Francisco is X miles.', where X is replaced by the actual integer value computed earlier. The only computed value is event_008's estimate_distance observation {\"distance\": 980.0}, so X=980 and the required message was '...is 980 miles.' The assistant's prose at event_009 ('980 kilometers') is an assertion, not an environment fact (grounding rule 3), and cannot override the task-fixed value; substituting a self-derived unit conversion (980 km ≈ 609 mi) for the fixed integer is a DELIVERABLE BREACH of an explicit contract, material by definition. RELEVANCE TEST: The wrong value was actually committed and never corrected — event_011's observation confirms the send, event_013's view_messages_sent shows the stored message 'The estimated distance from Rivermist to San Francisco is 609 miles.', and event_012 merely repeats the error as delivery evidence, not a separate root cause. Correcting event_011 to send X=980 would make the message, its confirmation, and the sent-messages record all correct, so the step is causally connected to every deliverable."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 11,
+              "evidence_refs": [
+                "event_011",
+                "event_008"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: At event_011 the assistant called send_message with message='The estimated distance from Rivermist to San Francisco is 609 miles.' The task contract (turn 4) explicitly fixes the message format: 'The estimated distance from Rivermist to San Francisco is X miles.', where X is replaced by 'the actual integer value you computed earlier'. The value computed earlier is shown at event_008: estimate_distance returned {\"distance\": 980.0}, i.e., integer 980. The sent message substitutes 609 (a unit conversion of 980) for X, deviating from the explicitly fixed value; per grounding rule 2, the task-fixed format and value cannot be overridden by the assistant's own unit interpretation at event_009 ('980 kilometers' is an assertion, not an environment fact). This is a DELIVERABLE BREACH of an explicit verbatim-content contract, material by definition. RELEVANCE TEST: event_011 is the earliest assistant-authored introduction of the wrong message content; event_012 merely repeats it in prose and event_013's view_messages_sent observation reflects the state created by event_011's action. Correcting event_011 to send '980 miles' would make the sent message, the confirmation, and the displayed messages all correct, so the step is causally connected to the delivered breach."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 11,
+              "evidence_refs": [
+                "event_008",
+                "event_011",
+                "event_012",
+                "event_013"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "",
+              "reason": "CONTENT TEST: event_008 shows the computed value was 980.0 (estimate_distance -> {\"distance\": 980.0}), and the user's turn 4 explicitly fixed the deliverable: message format 'The estimated distance from Rivermist to San Francisco is X miles.' with X replaced by 'the actual integer value you computed earlier' — i.e., X=980. At event_011 the assistant instead called send_message with 'The estimated distance from Rivermist to San Francisco is 609 miles.', substituting its own unit conversion (980 km ≈ 609 mi) for the contract-fixed value. This is a real deviation from an explicitly fixed format/value, material by definition (DELIVERABLE BREACH), and the sent message is a required deliverable, not just final-answer text. RELEVANCE TEST: the error was never corrected — event_012 repeats the 609-mile content as a success claim and event_013's view_messages_sent shows the wrong message persisted as the delivered state (which turn 5 explicitly asked to display). Correcting event_011 to send X=980 would make the sent message, the confirmation, and the displayed message log all correct, so the step is causally connected to every affected deliverable."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 2332,
+              "completion_tokens": 1698,
+              "total_tokens": 4030,
+              "prompt_tokens_details": {
+                "cached_tokens": 2304
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1359
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1359
+              },
+              "input_tokens_details": {
+                "cached_tokens": 2304
+              },
+              "input_tokens": 2332,
+              "output_tokens": 1698
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 11,\n  \"evidence_refs\": [\"event_008\", \"event_011\", \"event_012\", \"event_013\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_008 shows the computed value was 980.0 (estimate_distance -> {\\\"distance\\\": 980.0}), an",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_008",
+              "event_009",
+              "event_010",
+              "event_011",
+              "event_012",
+              "event_013"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_014"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    },
+    "external_evidence": null
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2608,
+        "completion_tokens": 2847,
+        "total_tokens": 5455,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2308
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2308
+        },
+        "input_tokens": 2608,
+        "output_tokens": 2847
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 11,\n  \"hallucination_reason\": \"The assistant sent Emma the message with X=609 (a self-converted km-to-miles figure) instead of the actual integer value 980 that it computed earlier and that the user explicitly required in the fixed message forma",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1807,
+        "completion_tokens": 898,
+        "total_tokens": 2705,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 698
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 698
+        },
+        "input_tokens": 1807,
+        "output_tokens": 898
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "\n{\n  \"step\": 11,\n  \"quote\": \"'message': 'The estimated distance from Rivermist to San Francisco is 609 miles.'\",\n  \"referent\": \"'message': 'The estimated distance from Rivermist to San Francisco is 980 miles.' — X must be the actual integer value 980 returned by estimate_distance in event_008, per t"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2332,
+        "completion_tokens": 1698,
+        "total_tokens": 4030,
+        "prompt_tokens_details": {
+          "cached_tokens": 2304
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1359
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1359
+        },
+        "input_tokens_details": {
+          "cached_tokens": 2304
+        },
+        "input_tokens": 2332,
+        "output_tokens": 1698
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 11,\n  \"evidence_refs\": [\"event_008\", \"event_011\", \"event_012\", \"event_013\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_008 shows the computed value was 980.0 (estimate_distance -> {\\\"distance\\\": 980.0}), an",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "175d70894d88549103e35d85369507cf279432e41d09ad0b3647c04a88a7649c"
+  },
+  "_packet_event_count": 14
+}

@@ -1,0 +1,1055 @@
+{
+  "arm": "58fbdde643c6",
+  "row": {
+    "case": "Magentic_One/050.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Magentic_One/050.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "recall_upgrade",
+            "judge_step": null,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 5,
+            "delivered_result": "",
+            "correct_result": "",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c3",
+                "verdict": "substantiated"
+              },
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c1",
+                "verdict": "substantiated"
+              },
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c4",
+                "verdict": "refuted"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "The actual enrollment count of the H. pylori in acne vulgaris clinical trial (NCT03411733, Sohag University, 2018) is 90 participants.",
+          "correct_result": "The actual enrollment count of the matching H. pylori in acne vulgaris trial as recorded in its registry record (NCT03411733) is 90 participants, per the observed 'Enrollment (Actual) 90' field.",
+          "basis": "observation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Report the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients (enrollment period Jan-May 2018) as listed on the NIH website (ClinicalTrials.gov)."
+            }
+          ]
+        },
+        "recall_candidates": [
+          {
+            "candidate_id": "c1",
+            "claim": "the agent reported the enrollment count of 90 as 'listed on the NIH website (ClinicalTrials.gov NCT03411733)' instead of the value actually read from the third-party ICH GCP registry page (ichgcp.net); no ClinicalTrials.gov/NIH page was ever opened to confirm the NIH-listed value",
+            "locus_event_id": "event_008",
+            "evidence_refs": [
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants."
+          },
+          {
+            "candidate_id": "c2",
+            "claim": "the agent asserted the trial was 'conducted from January to May 2018' instead of a verified enrollment period; the observations only establish record dates (published Jan 20, 2018; updated April 30, 2018), not a Jan-May 2018 enrollment window",
+            "locus_event_id": "event_008",
+            "evidence_refs": [
+              "event_005",
+              "event_008"
+            ],
+            "quote": "conducted from January to May 2018"
+          },
+          {
+            "candidate_id": "c3",
+            "claim": "the agent navigated to and relied on the third-party ICHGCP registry mirror instead of opening the ClinicalTrials.gov (NIH) study record as its own plan and the task contract required ('as listed on the NIH website')",
+            "locus_event_id": "event_005",
+            "evidence_refs": [
+              "event_001",
+              "event_004",
+              "event_005"
+            ],
+            "quote": "Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial"
+          },
+          {
+            "candidate_id": "c4",
+            "claim": "the agent presented the enrollment count as established without performing its own planned verification step ('follow it to confirm the enrollment count from the official NIH record'), leaving the NIH attribution unverified by any observation",
+            "locus_event_id": "event_008",
+            "evidence_refs": [
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "quote": "check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record"
+          }
+        ],
+        "causal_upgrade": {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 8,
+          "reason": "The only observation of the value 90 came from the third-party ichgcp.net mirror, yet the deliverable asserts it is 'listed on the NIH website (ClinicalTrials.gov NCT03411733)', an unconsulted-source attribution that is false as delivered; verifying the value on the ClinicalTrials.gov record before answering would make every deliverable correct.",
+          "coverage": "answered",
+          "locus_event_id": "event_008",
+          "evidence_refs": [
+            "event_005",
+            "event_006",
+            "event_007",
+            "event_008"
+          ],
+          "claim": "the agent reported the enrollment count of 90 as 'listed on the NIH website (ClinicalTrials.gov NCT03411733)' instead of the value actually read from the third-party ICH GCP registry page (ichgcp.net); no ClinicalTrials.gov/NIH page was ever opened to confirm the NIH-listed value",
+          "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants."
+        },
+        "causal_upgrades": [
+          {
+            "candidate_id": "c3",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 5,
+            "reason": "The task fixes the NIH website as the source of the requested value, but the agent navigated to and relied on the third-party ichgcp.net mirror and never opened the ClinicalTrials.gov study record, a wrong-target breach of the fixed source; opening the NCT03411733 NIH record at that point would ground the enrollment value and the attribution, making all deliverables correct.",
+            "coverage": "answered",
+            "locus_event_id": "event_005",
+            "evidence_refs": [
+              "event_001",
+              "event_004",
+              "event_005"
+            ],
+            "claim": "the agent navigated to and relied on the third-party ICHGCP registry mirror instead of opening the ClinicalTrials.gov (NIH) study record as its own plan and the task contract required ('as listed on the NIH website')",
+            "quote": "Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial"
+          },
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 8,
+            "reason": "The only observation of the value 90 came from the third-party ichgcp.net mirror, yet the deliverable asserts it is 'listed on the NIH website (ClinicalTrials.gov NCT03411733)', an unconsulted-source attribution that is false as delivered; verifying the value on the ClinicalTrials.gov record before answering would make every deliverable correct.",
+            "coverage": "answered",
+            "locus_event_id": "event_008",
+            "evidence_refs": [
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "claim": "the agent reported the enrollment count of 90 as 'listed on the NIH website (ClinicalTrials.gov NCT03411733)' instead of the value actually read from the third-party ICH GCP registry page (ichgcp.net); no ClinicalTrials.gov/NIH page was ever opened to confirm the NIH-listed value",
+            "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants."
+          },
+          {
+            "candidate_id": "c4",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 8,
+            "reason": "The agent's own planned verification step (follow the ClinicalTrials.gov link to confirm the count from the official NIH record) was never executed, so the delivered NIH attribution is unverified by any observation; performing that verification before finalizing the answer would make the trajectory clean.",
+            "coverage": "answered",
+            "locus_event_id": "event_008",
+            "evidence_refs": [
+              "event_006",
+              "event_007",
+              "event_008"
+            ],
+            "claim": "the agent presented the enrollment count as established without performing its own planned verification step ('follow it to confirm the enrollment count from the official NIH record'), leaving the NIH attribution unverified by any observation",
+            "quote": "check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record"
+          }
+        ],
+        "causal_upgrade_rows": [
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 8,
+            "reason": "The only observation of the value 90 came from the third-party ichgcp.net mirror, yet the deliverable asserts it is 'listed on the NIH website (ClinicalTrials.gov NCT03411733)', an unconsulted-source attribution that is false as delivered; verifying the value on the ClinicalTrials.gov record before answering would make every deliverable correct.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c2",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "reason": "The 'January to May 2018' phrase merely echoes the question's own trial-identifying premise and is not a separately fixed deliverable, so it is presentational wording that touches no deliverable even if the record dates only span Jan-Apr 2018.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c3",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 5,
+            "reason": "The task fixes the NIH website as the source of the requested value, but the agent navigated to and relied on the third-party ichgcp.net mirror and never opened the ClinicalTrials.gov study record, a wrong-target breach of the fixed source; opening the NCT03411733 NIH record at that point would ground the enrollment value and the attribution, making all deliverables correct.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c4",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 8,
+            "reason": "The agent's own planned verification step (follow the ClinicalTrials.gov link to confirm the count from the official NIH record) was never executed, so the delivered NIH attribution is unverified by any observation; performing that verification before finalizing the answer would make the trajectory clean.",
+            "coverage": "answered"
+          }
+        ],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c3",
+            "positive": {
+              "source": "recall_upgrade",
+              "step": 5,
+              "reason": "the agent navigated to and relied on the third-party ICHGCP registry mirror instead of opening the ClinicalTrials.gov (NIH) study record as its own plan and the task contract required ('as listed on the NIH website')",
+              "evidence_refs": [
+                "event_001",
+                "event_004",
+                "event_005"
+              ],
+              "quote": "Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial",
+              "delivered_result": "",
+              "correct_result": ""
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial, and locate the actual enrollment count listed.",
+                "referent": "Instruct WebSurfer to open the official ClinicalTrials.gov (NIH) study record for NCT03411733 (the classic.clinicaltrials.gov result already shown in the Bing results) and read the actual enrollment count from that NIH page, as the plan in event_001 and the task's 'as listed on the NIH website' requirement demand.",
+                "evidence_refs": [
+                  "event_001",
+                  "event_004",
+                  "event_005"
+                ],
+                "reason": "The deviation from the NIH-source contract first appears at event_004, where the orchestrator chooses the third-party ichgcp.net mirror over the ClinicalTrials.gov record, so every later data point (the enrollment value of 90 and the final claim it came from the NIH website) rests on the non-NIH source introduced by this instruction."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 4092,
+                  "completion_tokens": 2653,
+                  "total_tokens": 6745,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2402
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2402
+                  },
+                  "input_tokens": 4092,
+                  "output_tokens": 2653
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":4,\"quote\":\"Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial, and locate the actual enrollment count listed.\",\"referent\":\"Instruct WebSurfer to open the official ClinicalTrials.gov (NIH) study "
+              },
+              "hearing_target": {
+                "source": "recall_upgrade",
+                "step": 5,
+                "reason": "the agent navigated to and relied on the third-party ICHGCP registry mirror instead of opening the ClinicalTrials.gov (NIH) study record as its own plan and the task contract required ('as listed on the NIH website')",
+                "delivered_result": "",
+                "correct_result": "",
+                "evidence_refs": [
+                  "event_001",
+                  "event_004",
+                  "event_005"
+                ],
+                "quote": "Click on the ICHGCP link titled 'Prevalence of H.Pylori in Patients With Acne Vulgaris Acne Vulgaris' to try to access details of the clinical trial",
+                "confidence": "",
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Report the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients (enrollment period Jan-May 2018) as listed on the NIH website (ClinicalTrials.gov)."
+                  }
+                ],
+                "candidate_id": "c3"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_001",
+                  "event_004",
+                  "event_005",
+                  "event_007"
+                ],
+                "reason": "CONTENT TEST: The task fixes the data source explicitly — the question demands the enrollment count 'as listed on the NIH website' — and the agent's own plan (event_001) required WebSurfer to 'locate the most relevant clinical trial(s) and open the detailed study page(s)' on ClinicalTrials.gov. Instead, event_004 directed 'Click on the ICHGCP link' and event_005 executed a click landing on 'https://ichgcp.net/clinical-trials-registry/NCT03411733' — a third-party mirror — even though a classic.clinicaltrials.gov result was visible in the search viewport at event_003. The delivered figure was then read from that mirror page (event_007: 'Enrollment (Actual) 90' on ichgcp.net), never from the NIH record. Under the grounding rules the source/channel is fixed by the task text, so this is a DELIVERABLE BREACH, material even though the number looks plausible (mirror data can diverge from the NIH listing; the ICHGCP page itself contains injected sponsor spam, showing it is not the authoritative record). RELEVANCE TEST: the step is causally connected to the deliverable — the only enrollment value in the trajectory is the one read off the ICHGCP page at event_007, which exists solely because of the navigation at event_005. Had the agent opened the NIH ClinicalTrials.gov record instead, the count would be sourced exactly as the contract requires. No later correction is shown: the trajectory's shown events end with the value obtained from the mirror, and no evidence demonstrates a subsequent verification against the NIH website. Both tests pass on the shown evidence."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_001",
+                    "event_004",
+                    "event_005",
+                    "event_007"
+                  ],
+                  "reason": "CONTENT TEST: The task fixes the data source explicitly — the question demands the enrollment count 'as listed on the NIH website' — and the agent's own plan (event_001) required WebSurfer to 'locate the most relevant clinical trial(s) and open the detailed study page(s)' on ClinicalTrials.gov. Instead, event_004 directed 'Click on the ICHGCP link' and event_005 executed a click landing on 'https://ichgcp.net/clinical-trials-registry/NCT03411733' — a third-party mirror — even though a classic.clinicaltrials.gov result was visible in the search viewport at event_003. The delivered figure was then read from that mirror page (event_007: 'Enrollment (Actual) 90' on ichgcp.net), never from the NIH record. Under the grounding rules the source/channel is fixed by the task text, so this is a DELIVERABLE BREACH, material even though the number looks plausible (mirror data can diverge from the NIH listing; the ICHGCP page itself contains injected sponsor spam, showing it is not the authoritative record). RELEVANCE TEST: the step is causally connected to the deliverable — the only enrollment value in the trajectory is the one read off the ICHGCP page at event_007, which exists solely because of the navigation at event_005. Had the agent opened the NIH ClinicalTrials.gov record instead, the count would be sourced exactly as the contract requires. No later correction is shown: the trajectory's shown events end with the value obtained from the mirror, and no evidence demonstrates a subsequent verification against the NIH website. Both tests pass on the shown evidence."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_001",
+                    "event_005",
+                    "event_007"
+                  ],
+                  "reason": "CONTENT TEST: The task contract (quoted in event_001) requires the enrollment count 'as listed on the NIH website', and the agent's own plan (event_001) required opening the ClinicalTrials.gov detailed study page. At event_005 the agent instead clicked the third-party ICHGCP link and the browser opened 'https://ichgcp.net/clinical-trials-registry/NCT03411733' (ICH GCP mirror, not NIH). At event_007 the delivered value 'Enrollment (Actual) 90' was read from that ichgcp.net page — an environment fact about the mirror, not about the NIH website. The source/channel deviation from the explicit task contract is therefore factually real. RELEVANCE TEST: The value the trajectory delivers is causally sourced from the ICHGCP page reached by the event_005 click; event_006's instruction to follow the ClinicalTrials.gov link was conditional ('If not found'), and the value was found on the mirror, so no shown later step corrects the source to the NIH record. Correcting event_005 to open the ClinicalTrials.gov NCT03411733 record would ground the deliverable in the NIH website as the contract requires. Violation of an explicit verbatim task constraint ('as listed on the NIH website') is material by definition and is not repaired by a plausible-looking number from a third-party mirror."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_001",
+                    "event_004",
+                    "event_005",
+                    "event_007"
+                  ],
+                  "reason": "CONTENT TEST: event_005 shows the click navigating to 'https://ichgcp.net/clinical-trials-registry/NCT03411733' (third-party ICHGCP mirror), whereas the task fixes the source as 'as listed on the NIH website' and the agent's own plan (event_001) required searching ClinicalTrials.gov and opening 'the detailed study page(s)'. The enrollment figure the trajectory relies on — 'Enrollment (Actual) 90' in event_007 — is read from the mirror page, and no ClinicalTrials.gov record is ever opened in the shown trajectory. The deviation is factually real under grounding rule 1 (wrong target/channel fixed by the task contract). RELEVANCE TEST: the orchestrator's only path to the official record (event_006) was conditional — 'If not found... check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record' — and since 90 was found on the mirror, the NIH record was never consulted; no later correction exists. The step is causally connected to the delivered result (the 90 originates from this navigation), and correcting it (opening the NIH study record) would make the deliverable correct. Per the MATERIALITY LAW this is a DELIVERABLE BREACH — a wrong target fixed by the task — material even if the final answer text reads plausible."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 4414,
+                  "completion_tokens": 6070,
+                  "total_tokens": 10484,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 768
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 5716
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 768
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 5716
+                  },
+                  "input_tokens": 4414,
+                  "output_tokens": 6070
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_001\", \"event_004\", \"event_005\", \"event_007\"],\n  \"reason\": \"CONTENT TEST: event_005 shows the click navigating to 'https://ichgcp.net/clinical-trials-registry/NCT03411733' (third-party ICHGCP mirror), whereas the task f",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 2,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_002",
+                  "event_008"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 5,
+              "view": "complete",
+              "warnings": []
+            }
+          },
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "positive": {
+              "source": "recall_upgrade",
+              "step": 8,
+              "reason": "the agent reported the enrollment count of 90 as 'listed on the NIH website (ClinicalTrials.gov NCT03411733)' instead of the value actually read from the third-party ICH GCP registry page (ichgcp.net); no ClinicalTrials.gov/NIH page was ever opened to confirm the NIH-listed value",
+              "evidence_refs": [
+                "event_005",
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.",
+              "delivered_result": "",
+              "correct_result": ""
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 8,
+                "quote": "as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants",
+                "referent": "The enrollment count of 90 was actually read from the third-party ICH GCP registry page (https://ichgcp.net/clinical-trials-registry/NCT03411733, 'Enrollment (Actual) 90'); no NIH/ClinicalTrials.gov page was ever opened, so the answer must attribute the value to the ichgcp.net page (or first confirm it on ClinicalTrials.gov).",
+                "evidence_refs": [
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "The misattribution of the enrollment figure to the NIH website first appears in the final answer at step 8; step 7 shows the value 90 was read from the ichgcp.net ICH GCP page, so no earlier step contains the false NIH-source claim."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 4127,
+                  "completion_tokens": 2467,
+                  "total_tokens": 6594,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2253
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2253
+                  },
+                  "input_tokens": 4127,
+                  "output_tokens": 2467
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":8,\"quote\":\"as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants\",\"referent\":\"The enrollment count of 90 was actually read from the third-party ICH GCP registry page (https://ichgcp.net/clinical-trials-registry/NCT03411733, 'Enrollment (Actual) 90'); no NIH/Clini"
+              },
+              "hearing_target": {
+                "source": "recall_upgrade",
+                "step": 8,
+                "reason": "the agent reported the enrollment count of 90 as 'listed on the NIH website (ClinicalTrials.gov NCT03411733)' instead of the value actually read from the third-party ICH GCP registry page (ichgcp.net); no ClinicalTrials.gov/NIH page was ever opened to confirm the NIH-listed value",
+                "delivered_result": "",
+                "correct_result": "",
+                "evidence_refs": [
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.",
+                "confidence": "",
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Report the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients (enrollment period Jan-May 2018) as listed on the NIH website (ClinicalTrials.gov)."
+                  }
+                ],
+                "candidate_id": "c1"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 8,
+                "evidence_refs": [
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "CONTENT TEST: event_008 delivers 'The actual enrollment count ... as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.' But the shown trajectory proves the value 90 was read only from the third-party ICH GCP mirror: event_005 clicked through to https://ichgcp.net/clinical-trials-registry/NCT03411733 and event_007 shows 'Enrollment (Actual) 90' on that ichgcp.net page. No NIH/ClinicalTrials.gov page was ever opened — indeed event_006's own instruction treated following the ClinicalTrials.gov link as an unexecuted fallback ('If not found ... check for a link to ClinicalTrials.gov ... and follow it to confirm the enrollment count from the official NIH record'). Since the task fixes the source ('as listed on the NIH website'), the delivered answer asserts a provenance claim never verified by any tool observation, which under grounding rule 3 is an unverified assertion, not an established fact; this is a false completion embedded in the deliverable itself, not a formatting/process-only issue. RELEVANCE TEST: the question's contract requires the NIH-listed value; the deliverable's NIH attribution is exactly what event_008 asserts and exactly what the trajectory failed to establish (the mirror's value could differ from the NIH record, so the delivered result is not thereby correct). Had step 8 been corrected — consulting the official NIH record or accurately attributing the source — the deliverable would be grounded; the error is causally connected to the final answer and was never corrected afterward (event_008 is the last prose event). Both tests pass."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 8,
+                  "evidence_refs": [
+                    "event_005",
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "CONTENT TEST: event_008 delivers 'The actual enrollment count ... as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.' But the shown trajectory proves the value 90 was read only from the third-party ICH GCP mirror: event_005 clicked through to https://ichgcp.net/clinical-trials-registry/NCT03411733 and event_007 shows 'Enrollment (Actual) 90' on that ichgcp.net page. No NIH/ClinicalTrials.gov page was ever opened — indeed event_006's own instruction treated following the ClinicalTrials.gov link as an unexecuted fallback ('If not found ... check for a link to ClinicalTrials.gov ... and follow it to confirm the enrollment count from the official NIH record'). Since the task fixes the source ('as listed on the NIH website'), the delivered answer asserts a provenance claim never verified by any tool observation, which under grounding rule 3 is an unverified assertion, not an established fact; this is a false completion embedded in the deliverable itself, not a formatting/process-only issue. RELEVANCE TEST: the question's contract requires the NIH-listed value; the deliverable's NIH attribution is exactly what event_008 asserts and exactly what the trajectory failed to establish (the mirror's value could differ from the NIH record, so the delivered result is not thereby correct). Had step 8 been corrected — consulting the official NIH record or accurately attributing the source — the deliverable would be grounded; the error is causally connected to the final answer and was never corrected afterward (event_008 is the last prose event). Both tests pass."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 8,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "CONTENT TEST: event_008 delivers 'The actual enrollment count ... as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.' The only observed source of the value 90 is event_007's observation from the third-party mirror https://ichgcp.net/clinical-trials-registry/NCT03411733 ('Enrollment (Actual) 90'). No shown event opens clinicaltrials.gov/NIH; the observation record contains no NIH page content, so the attribution 'as listed on the NIH website' asserts a fact never grounded in any tool observation — the deviation alleged is factually real. It also contradicts the trajectory's own plan: event_006 instructed to 'check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record', an action that was never performed before the answer claimed NIH provenance. RELEVANCE TEST: event_008 is the delivered final answer (last_prose_event_id=event_008), and the task question fixes the source of the correct value ('as listed on the NIH website'), so the unverified NIH-listing claim is part of the deliverable itself, not formatting or process detail. Under the MATERIALITY LAW a delivered result asserting an unverified source fact is not thereby correct, and correcting this step (verifying on the official NIH record before claiming NIH provenance) is causally necessary for the answer to be correct. Both tests pass."
+                },
+                {
+                  "verdict": "refuted",
+                  "confirmed_step": null,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "CONTENT TEST: The factual core of the allegation is real — event_008 states the count 'as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants,' while the only observation of that value is event_007's environment fact from https://ichgcp.net/clinical-trials-registry/NCT03411733 showing 'Enrollment (Actual): 90'; no NIH/ClinicalTrials.gov page appears in the shown trajectory. RELEVANCE TEST: the deviation is immaterial under the MATERIALITY LAW. (a) No RESULT ERROR: the delivered value (90) is exactly the value observed in event_007 for the very record the question names (NCT03411733); nothing in the shown evidence indicates the NIH-listed value differs, and the ICH GCP page self-identifies as a mirror of the 'US Clinical Trials Registry' entry. (b) No DELIVERABLE BREACH: the task fixes no navigation target, tool argument, order, or format — 'as listed on the NIH website' is the question's own framing, which the answer restates; and the orchestrator's own plan (event_006) made following the ClinicalTrials.gov link conditional: 'If not found... check for a link to ClinicalTrials.gov... and follow it to confirm' — the value WAS found, so that conditional action was never triggered or required. (c) No FALSE COMPLETION: event_008 claims where the value is listed (echoing the task text), not that the agent performed an NIH verification it skipped. Correcting the step (confirming on NIH or rephrasing the source) would not change any delivered value: the numeric deliverable is already correct and grounded in a tool observation, so the conviction fails the materiality requirement."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2849,
+                  "completion_tokens": 8105,
+                  "total_tokens": 10954,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 768
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 7673
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 7673
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 768
+                  },
+                  "input_tokens": 2849,
+                  "output_tokens": 8105
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "```json\n{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_006\", \"event_007\", \"event_008\"],\n  \"reason\": \"CONTENT TEST: The factual core of the allegation is real — event_008 states the count 'as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participan",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "refuted"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 1,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 4,
+              "view": "complete",
+              "warnings": []
+            }
+          },
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c4",
+            "positive": {
+              "source": "recall_upgrade",
+              "step": 8,
+              "reason": "the agent presented the enrollment count as established without performing its own planned verification step ('follow it to confirm the enrollment count from the official NIH record'), leaving the NIH attribution unverified by any observation",
+              "evidence_refs": [
+                "event_006",
+                "event_007",
+                "event_008"
+              ],
+              "quote": "check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record",
+              "delivered_result": "",
+              "correct_result": ""
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 8,
+                "quote": "The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.",
+                "referent": "The count of 90 was only observed on the third-party ICHGCP page (ichgcp.net/clinical-trials-registry/NCT03411733, event_007); per the agent's own plan in event_006, it needed to follow the ClinicalTrials.gov link to confirm the enrollment count from the official NIH record (or attribute the figure to ICHGCP) before presenting it as NIH-listed.",
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "Step 8 is the first point where the enrollment count is asserted as 'listed on the NIH website' although the only observation (event_007) came from the third-party ICHGCP registry and the planned verification of the official NIH record was never performed."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 4071,
+                  "completion_tokens": 2282,
+                  "total_tokens": 6353,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2035
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2035
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "input_tokens": 4071,
+                  "output_tokens": 2282
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":8,\"quote\":\"The actual enrollment count for the clinical trial on H. pylori in acne vulgaris patients conducted from January to May 2018, as listed on the NIH website (ClinicalTrials.gov NCT03411733), was 90 participants.\",\"referent\":\"The count of 90 was only observed on the third-party ICHGC"
+              },
+              "hearing_target": {
+                "source": "recall_upgrade",
+                "step": 8,
+                "reason": "the agent presented the enrollment count as established without performing its own planned verification step ('follow it to confirm the enrollment count from the official NIH record'), leaving the NIH attribution unverified by any observation",
+                "delivered_result": "",
+                "correct_result": "",
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "quote": "check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record",
+                "confidence": "",
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "Report the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients (enrollment period Jan-May 2018) as listed on the NIH website (ClinicalTrials.gov)."
+                  }
+                ],
+                "candidate_id": "c4"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "refuted",
+                "confirmed_step": null,
+                "evidence_refs": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "reason": "The conviction mischaracterizes the plan and ignores the grounding. event_006 made the NIH-record verification a conditional fallback, not a required step: 'look for the Enrollment section... and report that value. If not found, ...check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm.' The condition never triggered because event_007's observation directly shows 'Enrollment (Actual) 90' on the registry page for NCT03411733 (the ClinicalTrials.gov record identifier). The delivered answer at event_008 ('was 90 participants') is therefore grounded in an environment observation, not an unverified claim; the only unverified element is the provenance phrasing 'as listed on the NIH website,' which mirrors the question's own framing and does not change the delivered value. The complaint is process-only (skipping an agent-internal conditional check whose precondition was false), the answer's substance is correct, and correcting the step would not alter any deliverable — immaterial under the MATERIALITY LAW."
+              },
+              "raw": [
+                {
+                  "verdict": "refuted",
+                  "confirmed_step": null,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "The conviction mischaracterizes the plan and ignores the grounding. event_006 made the NIH-record verification a conditional fallback, not a required step: 'look for the Enrollment section... and report that value. If not found, ...check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm.' The condition never triggered because event_007's observation directly shows 'Enrollment (Actual) 90' on the registry page for NCT03411733 (the ClinicalTrials.gov record identifier). The delivered answer at event_008 ('was 90 participants') is therefore grounded in an environment observation, not an unverified claim; the only unverified element is the provenance phrasing 'as listed on the NIH website,' which mirrors the question's own framing and does not change the delivered value. The complaint is process-only (skipping an agent-internal conditional check whose precondition was false), the answer's substance is correct, and correcting the step would not alter any deliverable — immaterial under the MATERIALITY LAW."
+                },
+                {
+                  "verdict": "refuted",
+                  "confirmed_step": null,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "CONTENT TEST: the alleged skipped verification was conditional, not mandatory — event_006 instructs 'If not found, ... check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm the enrollment count from the official NIH record.' The info WAS found: event_007's observation shows the registry page for NCT03411733 displaying 'Enrollment (Actual) 90'. So no planned step was skipped, and the delivered figure in event_008 ('was 90 participants') is directly grounded in an environment observation, not invented. RELEVANCE TEST: the only residual defect is the attribution phrase 'as listed on the NIH website' being sourced from the ICH GCP mirror of the same NCT03411733 record rather than from an observed NIH page; correcting that step would not change any deliverable, since the answer's content (90) already matches the trial's registry record shown in event_007. No result error, no breached fixed action/argument, and no claim of a performed action that did not occur — the deviation is a process/sourcing nuance and immaterial under the MATERIALITY LAW."
+                },
+                {
+                  "verdict": "refuted",
+                  "confirmed_step": null,
+                  "evidence_refs": [
+                    "event_006",
+                    "event_007",
+                    "event_008"
+                  ],
+                  "reason": "The alleged skipped verification was explicitly conditional in the agent's own plan: event_006 instructs 'look for the Enrollment section... and report that value. If not found, ...check for a link to ClinicalTrials.gov (NCT03411733) and follow it to confirm.' The condition was never triggered: the event_007 observation shows the value was found directly on the registry page ('Enrollment (Actual) 90' for NCT03411733). So no planned step was omitted — the deviation as described is not factually real. On the content side, the delivered answer at event_008 ('was 90 participants') is grounded in an environment observation (event_007), not an unverified user claim, and is the correct count for the exact record the question names (NCT03411733); the 'NIH website' attribution is the question's own framing of that same record. Relevance test: correcting the step (visiting ClinicalTrials.gov) would not change any deliverable — the count is already correct and observed — so the alleged deviation is immaterial under the MATERIALITY LAW."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1610,
+                  "completion_tokens": 2582,
+                  "total_tokens": 4192,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2301
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2301
+                  },
+                  "input_tokens": 1610,
+                  "output_tokens": 2582
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"refuted\",\n  \"confirmed_step\": null,\n  \"evidence_refs\": [\"event_006\", \"event_007\", \"event_008\"],\n  \"reason\": \"The alleged skipped verification was explicitly conditional in the agent's own plan: event_006 instructs 'look for the Enrollment section... and report that value. If not foun",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "refuted",
+                    "refuted",
+                    "refuted"
+                  ],
+                  "collapsed": "refuted",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evo_self_refuting_conviction",
+            "verdict": "not_applicable",
+            "detail": "no rule matched; default verdict not_applicable",
+            "runner": "typed_dsl",
+            "definition_hash": "0a16039c03da7099",
+            "intervention_id": "IV-2-001",
+            "hook": "defense.pre",
+            "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+          },
+          {
+            "predicate": "evo_self_refuting_conviction",
+            "verdict": "not_applicable",
+            "detail": "no rule matched; default verdict not_applicable",
+            "runner": "typed_dsl",
+            "definition_hash": "0a16039c03da7099",
+            "intervention_id": "IV-2-001",
+            "hook": "defense.pre",
+            "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+          },
+          {
+            "predicate": "evo_self_refuting_conviction",
+            "verdict": "not_applicable",
+            "detail": "no rule matched; default verdict not_applicable",
+            "runner": "typed_dsl",
+            "definition_hash": "0a16039c03da7099",
+            "intervention_id": "IV-2-001",
+            "hook": "defense.pre",
+            "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+          "active_interventions": [
+            "IV-2-001",
+            "IV-2-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evo_self_refuting_conviction verdict=not_applicable"
+            },
+            {
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evo_self_refuting_conviction verdict=not_applicable"
+            },
+            {
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evo_self_refuting_conviction verdict=not_applicable"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evo_self_refuting_conviction",
+              "verdict": "not_applicable",
+              "detail": "no rule matched; default verdict not_applicable",
+              "runner": "typed_dsl",
+              "definition_hash": "0a16039c03da7099",
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+            },
+            {
+              "predicate": "evo_self_refuting_conviction",
+              "verdict": "not_applicable",
+              "detail": "no rule matched; default verdict not_applicable",
+              "runner": "typed_dsl",
+              "definition_hash": "0a16039c03da7099",
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+            },
+            {
+              "predicate": "evo_self_refuting_conviction",
+              "verdict": "not_applicable",
+              "detail": "no rule matched; default verdict not_applicable",
+              "runner": "typed_dsl",
+              "definition_hash": "0a16039c03da7099",
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+            }
+          ],
+          "facts": {
+            "evo_self_refuting_conviction": "not_applicable"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [
+            {
+              "name": "evo_self_refuting_conviction",
+              "definition_hash": "0a16039c03da7099",
+              "rules": 1
+            }
+          ],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 1,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": "complete",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "6a2349b0a5ecb288cf555396edc4eb2b841393daca7ac26502788c3629ab1ea8",
+        "interventions_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result",
+          "recall_result",
+          "upgrade_result"
+        ]
+      },
+      "_packet_event_count": 8
+    },
+    "backend": "detector"
+  },
+  "row_hash": "72ea57a40788"
+}

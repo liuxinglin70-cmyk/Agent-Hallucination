@@ -1,0 +1,480 @@
+{
+  "arm": "58fbdde643c6",
+  "row": {
+    "case": "SmolAgents/019.json",
+    "gold": false,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "SmolAgents/019.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "A spectral evolution in which the dialkylphosphorochloridate intermediate shows one signal (~0 to +10 ppm), POCl3 appears at +35 to +48 ppm, and the final dialkyl phosphate gives one peak or 'two closely spaced singlets' (0 to –5 ppm), with a 'possible doublet for diastereomers'.",
+            "correct_result": "Over the course of the final hydrolysis, both the starting phosphorochloridate RO–P(O)(Cl)(OR') and the product RO–P(O)(OR')(OH) are chiral at phosphorus; with two different enantiopure alcohols each is formed as two diastereomers, so the proton-decoupled 31P NMR shows two starting chloridate singlets decreasing and two new phosphate singlets growing (two pairs of peaks during the reaction, ending with two peaks for the product).",
+            "judge_basis": "derivation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The final answer asserts that the dialkylphosphorochloridate RO–P(O)(Cl)(OR') gives a single 31P signal (and places POCl3 at +35 to +48 ppm), but phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols it exists as two diastereomers giving two 31P signals, which during the hydrolysis being followed convert into two diastereomeric signals of the final phosphate.",
+          "delivered_result": "A spectral evolution in which the dialkylphosphorochloridate intermediate shows one signal (~0 to +10 ppm), POCl3 appears at +35 to +48 ppm, and the final dialkyl phosphate gives one peak or 'two closely spaced singlets' (0 to –5 ppm), with a 'possible doublet for diastereomers'.",
+          "correct_result": "Over the course of the final hydrolysis, both the starting phosphorochloridate RO–P(O)(Cl)(OR') and the product RO–P(O)(OR')(OH) are chiral at phosphorus; with two different enantiopure alcohols each is formed as two diastereomers, so the proton-decoupled 31P NMR shows two starting chloridate singlets decreasing and two new phosphate singlets growing (two pairs of peaks during the reaction, ending with two peaks for the product).",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm",
+            "referent": "RO–P(O)(Cl)(OR') is stereogenic at phosphorus and, from two different enantiopure alcohols, appears as two diastereomeric 31P signals; over the hydrolysis these two starting peaks are replaced by two diastereomeric product peaks (POCl3, absent from this step, actually resonates near +3 to +5 ppm, not +35 to +48 ppm)."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The expected proton-decoupled 31P NMR over the final (hydrolysis) reaction: two diastereomeric signals for the phosphorochloridate starting material converting to two diastereomeric signals for the dialkyl phosphate product, since phosphorus is a stereocenter in both RO–P(O)(Cl)(OR') and RO–P(O)(OR')(OH)."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm",
+          "referent": "Phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols this intermediate exists as two diastereomers giving two 31P singlets, which during the hydrolysis convert into two diastereomeric singlets of the final phosphate",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "The claim that the dialkylphosphorochloridate gives a single 31P signal first appears in the final answer at event_004 — the plan (event_001) only leaves the signal count open ('Signal(s)') and the searches (event_002/003) contain no such assertion — so correcting event_004 alone is causally sufficient to make the delivered result correct."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004",
+            "event_002"
+          ],
+          "reason": "CONTENT TEST: The final answer (event_004) states 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' and 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)', i.e., a single 31P signal for the dialkylphosphorochloridate. The task fixes that both alcohols are enantiopure and different, so P in RO–P(O)(Cl)(OR') carries four different substituents (=O, Cl, OR, OR') and is stereogenic: the intermediate exists as two diastereomers, which in achiral medium give two distinct proton-decoupled 31P singlets; the product RO–P(O)(OR')(OH) is likewise P-stereogenic and gives two singlets. The correct spectral evolution during the followed hydrolysis is two starting chloridate singlets decreasing while two product phosphate singlets grow. The trajectory's own search evidence (event_002, results on 'Differentiation of chiral phosphorus enantiomers by 31P NMR' and diastereomeric 31P shift dispersion for alcohol derivatives) corroborates that diastereomeric P species give separate 31P signals. The delivered single-signal claim (and the 'possible doublet for diastereomers') is a real factual error, not formatting. RELEVANCE TEST: Step 4 is the final_answer deliverable itself; correcting it to two diastereomeric singlets for both chloridate and phosphate would make the delivered answer correct, and no later event corrects the error. The wrong spectral evolution is the committed result, so the deviation is material (RESULT ERROR)."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The final answer asserts that the dialkylphosphorochloridate RO–P(O)(Cl)(OR') gives a single 31P signal (and places POCl3 at +35 to +48 ppm), but phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols it exists as two diastereomers giving two 31P signals, which during the hydrolysis being followed convert into two diastereomeric signals of the final phosphate.",
+              "evidence_refs": [
+                "event_004"
+              ],
+              "quote": "Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm",
+              "delivered_result": "A spectral evolution in which the dialkylphosphorochloridate intermediate shows one signal (~0 to +10 ppm), POCl3 appears at +35 to +48 ppm, and the final dialkyl phosphate gives one peak or 'two closely spaced singlets' (0 to –5 ppm), with a 'possible doublet for diastereomers'.",
+              "correct_result": "Over the course of the final hydrolysis, both the starting phosphorochloridate RO–P(O)(Cl)(OR') and the product RO–P(O)(OR')(OH) are chiral at phosphorus; with two different enantiopure alcohols each is formed as two diastereomers, so the proton-decoupled 31P NMR shows two starting chloridate singlets decreasing and two new phosphate singlets growing (two pairs of peaks during the reaction, ending with two peaks for the product)."
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm",
+                "referent": "Phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols this intermediate exists as two diastereomers giving two 31P singlets, which during the hydrolysis convert into two diastereomeric singlets of the final phosphate",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "The claim that the dialkylphosphorochloridate gives a single 31P signal first appears in the final answer at event_004 — the plan (event_001) only leaves the signal count open ('Signal(s)') and the searches (event_002/003) contain no such assertion — so correcting event_004 alone is causally sufficient to make the delivered result correct."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 7820,
+                  "completion_tokens": 3133,
+                  "total_tokens": 10953,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2901
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2901
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "input_tokens": 7820,
+                  "output_tokens": 3133
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":4,\"quote\":\"Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm\",\"referent\":\"Phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols this intermediate exists as two diastereomers giving two"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The final answer asserts that the dialkylphosphorochloridate RO–P(O)(Cl)(OR') gives a single 31P signal (and places POCl3 at +35 to +48 ppm), but phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols it exists as two diastereomers giving two 31P signals, which during the hydrolysis being followed convert into two diastereomeric signals of the final phosphate.",
+                "delivered_result": "A spectral evolution in which the dialkylphosphorochloridate intermediate shows one signal (~0 to +10 ppm), POCl3 appears at +35 to +48 ppm, and the final dialkyl phosphate gives one peak or 'two closely spaced singlets' (0 to –5 ppm), with a 'possible doublet for diastereomers'.",
+                "correct_result": "Over the course of the final hydrolysis, both the starting phosphorochloridate RO–P(O)(Cl)(OR') and the product RO–P(O)(OR')(OH) are chiral at phosphorus; with two different enantiopure alcohols each is formed as two diastereomers, so the proton-decoupled 31P NMR shows two starting chloridate singlets decreasing and two new phosphate singlets growing (two pairs of peaks during the reaction, ending with two peaks for the product).",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The expected proton-decoupled 31P NMR over the final (hydrolysis) reaction: two diastereomeric signals for the phosphorochloridate starting material converting to two diastereomeric signals for the dialkyl phosphate product, since phosphorus is a stereocenter in both RO–P(O)(Cl)(OR') and RO–P(O)(OR')(OH)."
+                  }
+                ],
+                "confidence": "high",
+                "quote": "Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004",
+                  "event_002"
+                ],
+                "reason": "CONTENT TEST: The final answer (event_004) states 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' and 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)', i.e., a single 31P signal for the dialkylphosphorochloridate. The task fixes that both alcohols are enantiopure and different, so P in RO–P(O)(Cl)(OR') carries four different substituents (=O, Cl, OR, OR') and is stereogenic: the intermediate exists as two diastereomers, which in achiral medium give two distinct proton-decoupled 31P singlets; the product RO–P(O)(OR')(OH) is likewise P-stereogenic and gives two singlets. The correct spectral evolution during the followed hydrolysis is two starting chloridate singlets decreasing while two product phosphate singlets grow. The trajectory's own search evidence (event_002, results on 'Differentiation of chiral phosphorus enantiomers by 31P NMR' and diastereomeric 31P shift dispersion for alcohol derivatives) corroborates that diastereomeric P species give separate 31P signals. The delivered single-signal claim (and the 'possible doublet for diastereomers') is a real factual error, not formatting. RELEVANCE TEST: Step 4 is the final_answer deliverable itself; correcting it to two diastereomeric singlets for both chloridate and phosphate would make the delivered answer correct, and no later event corrects the error. The wrong spectral evolution is the committed result, so the deviation is material (RESULT ERROR)."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_002"
+                  ],
+                  "reason": "CONTENT TEST: The final answer (event_004) states 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' and 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)', i.e., a single 31P signal for the dialkylphosphorochloridate. The task fixes that both alcohols are enantiopure and different, so P in RO–P(O)(Cl)(OR') carries four different substituents (=O, Cl, OR, OR') and is stereogenic: the intermediate exists as two diastereomers, which in achiral medium give two distinct proton-decoupled 31P singlets; the product RO–P(O)(OR')(OH) is likewise P-stereogenic and gives two singlets. The correct spectral evolution during the followed hydrolysis is two starting chloridate singlets decreasing while two product phosphate singlets grow. The trajectory's own search evidence (event_002, results on 'Differentiation of chiral phosphorus enantiomers by 31P NMR' and diastereomeric 31P shift dispersion for alcohol derivatives) corroborates that diastereomeric P species give separate 31P signals. The delivered single-signal claim (and the 'possible doublet for diastereomers') is a real factual error, not formatting. RELEVANCE TEST: Step 4 is the final_answer deliverable itself; correcting it to two diastereomeric singlets for both chloridate and phosphate would make the delivered answer correct, and no later event corrects the error. The wrong spectral evolution is the committed result, so the deviation is material (RESULT ERROR)."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: The final answer (event_004) states 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' (a single signal) and 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)'. The correct referent, grounded in the task's own setup (two DIFFERENT enantiopure chiral alcohols), is that P in RO–P(O)(Cl)(OR') bears four different substituents (=O, Cl, OR, OR') and is therefore stereogenic; with enantiopure R and R' the two configurations at P are diastereomers, which are distinguishable in an achiral 31P NMR experiment and give two singlets (the same holds for the product RO–P(O)(OR')(OH), which should end as two peaks). The trajectory's own search results (event_002_tool_03, results on 'Determination of Enantiomeric Excess via 31P-NMR' and 'diastereomeric' 31P shift dispersion for chiral alcohol phosphorus derivatives) corroborate that such P centers give separated diastereomeric 31P signals. The claim that proton decoupling prevents multiple peaks is also factually wrong: decoupling removes P–H coupling, not diastereomeric chemical-shift nonequivalence. The answer only concedes 'two closely spaced singlets may appear' for the final product as a conditional possibility while asserting a single signal for the chloridate starting material of the followed hydrolysis. RELEVANCE TEST: The deliverable is the final answer's spectral prediction, and the error sits in the delivered result itself (RESULT ERROR); event_004 is the last event with no later correction, so correcting this step is exactly what would make the deliverable correct — the number of signals for the starting chloridate and final phosphate is the central observable the question asks about."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: The final answer (event_004) states for the chloridate stage: 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' — a single signal — and asserts 'The spectrum is expected to show clean single peaks for each major species (no splitting, as proton decoupling is used)', treating two product peaks only as a conditional ('two closely spaced singlets may appear... otherwise a single peak'). The correct referent: phosphorus in RO–P(O)(Cl)(OR') carries four different substituents (=O, Cl, OR, OR') and is stereogenic; with two different enantiopure alcohols both P configurations are diastereomers, so the proton-decoupled 31P spectrum must show two chloridate singlets decreasing and two phosphate singlets (RO–P(O)(OR')(OH), likewise stereogenic: =O, OH, OR, OR') growing during the hydrolysis being followed. Proton decoupling removes P–H coupling but does not collapse diastereomeric resonances, so the 'clean single peaks for each major species' claim is a real factual error, not formatting. The trajectory's own search results (event_002_tool_03: 'Differentiation of chiral phosphorus enantiomers by 31P... the two diastereomers moved about 0.65 ppm') corroborate that diastereomeric phosphorus esters give separate 31P signals. RELEVANCE TEST: The final answer is the sole deliverable of this Q&A task; correcting step 4 to report two diastereomeric signals for both the starting chloridate and the product would make the deliverable correct, and no later event corrects the error. The step is the delivered result itself, so the deviation is material (RESULT ERROR)."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 9161,
+                  "completion_tokens": 4251,
+                  "total_tokens": 13412,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 9152
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 3815
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 3815
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 9152
+                  },
+                  "input_tokens": 9161,
+                  "output_tokens": 4251
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"reason\": \"CONTENT TEST: The final answer (event_004) states for the chloridate stage: 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' — a single signal — and asser",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evo_self_refuting_conviction",
+            "verdict": "not_applicable",
+            "detail": "no rule matched; default verdict not_applicable",
+            "runner": "typed_dsl",
+            "definition_hash": "0a16039c03da7099",
+            "intervention_id": "IV-2-001",
+            "hook": "defense.pre",
+            "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+          "active_interventions": [
+            "IV-2-001",
+            "IV-2-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evo_self_refuting_conviction verdict=not_applicable"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evo_self_refuting_conviction",
+              "verdict": "not_applicable",
+              "detail": "no rule matched; default verdict not_applicable",
+              "runner": "typed_dsl",
+              "definition_hash": "0a16039c03da7099",
+              "intervention_id": "IV-2-001",
+              "hook": "defense.pre",
+              "failure_family": "FAM-fp-judge_conviction-117fce1c070d"
+            }
+          ],
+          "facts": {
+            "evo_self_refuting_conviction": "not_applicable"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [
+            {
+              "name": "evo_self_refuting_conviction",
+              "definition_hash": "0a16039c03da7099",
+              "rules": 1
+            }
+          ],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 7820,
+            "completion_tokens": 3133,
+            "total_tokens": 10953,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2901
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2901
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "input_tokens": 7820,
+            "output_tokens": 3133
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":4,\"quote\":\"Signal: Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm\",\"referent\":\"Phosphorus in RO–P(O)(Cl)(OR') is stereogenic (substituents =O, Cl, OR, OR'), so with two different enantiopure alcohols this intermediate exists as two diastereomers giving two"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 9161,
+            "completion_tokens": 4251,
+            "total_tokens": 13412,
+            "prompt_tokens_details": {
+              "cached_tokens": 9152
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3815
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3815
+            },
+            "input_tokens_details": {
+              "cached_tokens": 9152
+            },
+            "input_tokens": 9161,
+            "output_tokens": 4251
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\"],\n  \"reason\": \"CONTENT TEST: The final answer (event_004) states for the chloridate stage: 'Formation of RO–P(O)(Cl)(OR'). This intermediate generally resonates ~0 to +10 ppm' — a single signal — and asser",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "ba1b1ea12623e6e748c862332e3b28ac0301a82462f4249c79d00bfb55510869",
+        "interventions_hash": "3718c96b0b4fcec8c36856fb29f3870b0d99c72a7075b4472effe6921d273b0e",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "aeea244c01e0"
+}

@@ -1,0 +1,492 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "Octotools/023.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Octotools/023.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 4,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "Inter Milan committed 21 fouls in the Champions League final against Bayern Munich (attributed to FBref and WhoScored, with Bayern committing 11).",
+            "correct_result": "No retrieved source in the trajectory contains Inter's foul count for the final; the correct deliverable is the statistic verified from an actual observation, or a report that it could not be found from retrieved sources, not the unsourced number 21.",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The trajectory's final answer asserts a foul count 'according to FBref and WhoScored', but no tool call in the trajectory ever accessed FBref, WhoScored, or any page containing the statistic, making the delivered value 21 a fabricated, ungrounded result and the source attribution a false completion claim.",
+          "delivered_result": "Inter Milan committed 21 fouls in the Champions League final against Bayern Munich (attributed to FBref and WhoScored, with Bayern committing 11).",
+          "correct_result": "No retrieved source in the trajectory contains Inter's foul count for the final; the correct deliverable is the statistic verified from an actual observation, or a report that it could not be found from retrieved sources, not the unsourced number 21.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_003",
+            "event_002"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.",
+            "referent": "The only page actually extracted (Football Wiki Fandom, event_003) contained no statistics section data, and the Google search results (event_002) contain no foul counts; no observation supports any foul figure, so the 21-foul claim and its FBref/WhoScored attribution are unverified fabrications."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The answer must be the verified number of fouls committed by Inter Milan in the 2010 UEFA Champions League final against Bayern Munich."
+            },
+            {
+              "kind": "required_action",
+              "requirement": "The statistic must be established by actually retrieving it from a reliable source (search/extract of match statistics pages) before delivering it."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed **21 fouls**. Bayern Munich committed **11 fouls**.",
+          "referent": "Report that Inter's foul count could not be verified from any retrieved source (no tool call ever accessed FBref, WhoScored, or any page containing the statistic), or actually retrieve and verify the statistic from such a source before citing it.",
+          "evidence_refs": [
+            "event_004"
+          ],
+          "reason": "The fabricated value 21 and the false attribution to FBref/WhoScored first appear at step 4; the earlier search results (event_002) and the extracted Fandom text (event_003) contain no foul statistic, so correcting this step to an honest 'not found from retrieved sources' report is sufficient to fix the delivered result."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_004",
+            "event_002",
+            "event_003"
+          ],
+          "reason": "CONTENT TEST: At event_004 the trajectory delivers 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.' No observation in the trajectory grounds this. event_002's Google results contain only titles/snippets with no foul counts, and event_003's extraction of the Football Wiki Fandom page is truncated before any Statistics section and contains no foul statistic. No tool call in the shown trajectory ever accessed FBref, WhoScored, or any page yielding a foul count, so the value 21 and its source attribution are fabricated — a RESULT ERROR and FALSE COMPLETION under the grounding rules (a delivered result repeating an unverified claim is not thereby correct, even if 21 happened to be true). RELEVANCE TEST: The final answer is the sole deliverable; correcting step 4 to a verified figure or an honest 'not found in retrieved sources' would make every deliverable correct, and there are no later corrections. The error is real and material."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The trajectory's final answer asserts a foul count 'according to FBref and WhoScored', but no tool call in the trajectory ever accessed FBref, WhoScored, or any page containing the statistic, making the delivered value 21 a fabricated, ungrounded result and the source attribution a false completion claim.",
+              "evidence_refs": [
+                "event_004",
+                "event_003",
+                "event_002"
+              ],
+              "quote": "According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.",
+              "delivered_result": "Inter Milan committed 21 fouls in the Champions League final against Bayern Munich (attributed to FBref and WhoScored, with Bayern committing 11).",
+              "correct_result": "No retrieved source in the trajectory contains Inter's foul count for the final; the correct deliverable is the statistic verified from an actual observation, or a report that it could not be found from retrieved sources, not the unsourced number 21."
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed **21 fouls**. Bayern Munich committed **11 fouls**.",
+                "referent": "Report that Inter's foul count could not be verified from any retrieved source (no tool call ever accessed FBref, WhoScored, or any page containing the statistic), or actually retrieve and verify the statistic from such a source before citing it.",
+                "evidence_refs": [
+                  "event_004"
+                ],
+                "reason": "The fabricated value 21 and the false attribution to FBref/WhoScored first appear at step 4; the earlier search results (event_002) and the extracted Fandom text (event_003) contain no foul statistic, so correcting this step to an honest 'not found from retrieved sources' report is sufficient to fix the delivered result."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 5295,
+                  "completion_tokens": 1138,
+                  "total_tokens": 6433,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 937
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 937
+                  },
+                  "input_tokens": 5295,
+                  "output_tokens": 1138
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":4,\"quote\":\"According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed **21 fouls**. Bayern Munich committed **11 fouls**.\",\"referent\":\"Report that Inter's foul count could not be verified from any retrieved source (no tool call ever accessed FBref, WhoSc"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The trajectory's final answer asserts a foul count 'according to FBref and WhoScored', but no tool call in the trajectory ever accessed FBref, WhoScored, or any page containing the statistic, making the delivered value 21 a fabricated, ungrounded result and the source attribution a false completion claim.",
+                "delivered_result": "Inter Milan committed 21 fouls in the Champions League final against Bayern Munich (attributed to FBref and WhoScored, with Bayern committing 11).",
+                "correct_result": "No retrieved source in the trajectory contains Inter's foul count for the final; the correct deliverable is the statistic verified from an actual observation, or a report that it could not be found from retrieved sources, not the unsourced number 21.",
+                "evidence_refs": [
+                  "event_004",
+                  "event_003",
+                  "event_002"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The answer must be the verified number of fouls committed by Inter Milan in the 2010 UEFA Champions League final against Bayern Munich."
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "The statistic must be established by actually retrieving it from a reliable source (search/extract of match statistics pages) before delivering it."
+                  }
+                ],
+                "confidence": "high",
+                "quote": "According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_004",
+                  "event_002",
+                  "event_003"
+                ],
+                "reason": "CONTENT TEST: At event_004 the trajectory delivers 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.' No observation in the trajectory grounds this. event_002's Google results contain only titles/snippets with no foul counts, and event_003's extraction of the Football Wiki Fandom page is truncated before any Statistics section and contains no foul statistic. No tool call in the shown trajectory ever accessed FBref, WhoScored, or any page yielding a foul count, so the value 21 and its source attribution are fabricated — a RESULT ERROR and FALSE COMPLETION under the grounding rules (a delivered result repeating an unverified claim is not thereby correct, even if 21 happened to be true). RELEVANCE TEST: The final answer is the sole deliverable; correcting step 4 to a verified figure or an honest 'not found in retrieved sources' would make every deliverable correct, and there are no later corrections. The error is real and material."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_002",
+                    "event_003"
+                  ],
+                  "reason": "CONTENT TEST: At event_004 the trajectory delivers 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.' No observation in the trajectory grounds this. event_002's Google results contain only titles/snippets with no foul counts, and event_003's extraction of the Football Wiki Fandom page is truncated before any Statistics section and contains no foul statistic. No tool call in the shown trajectory ever accessed FBref, WhoScored, or any page yielding a foul count, so the value 21 and its source attribution are fabricated — a RESULT ERROR and FALSE COMPLETION under the grounding rules (a delivered result repeating an unverified claim is not thereby correct, even if 21 happened to be true). RELEVANCE TEST: The final answer is the sole deliverable; correcting step 4 to a verified figure or an honest 'not found in retrieved sources' would make every deliverable correct, and there are no later corrections. The error is real and material."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_002",
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: event_004 states 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls' and delivers 'Inter Milan committed 21 fouls...'. The only environment facts shown are event_002 (Google results whose snippets contain no foul count for the final) and event_003 (Fandom page extraction that is truncated before the Statistics section and contains no foul figures). No tool call in the shown trajectory accesses FBref, WhoScored, or any page containing the statistic, and event_004's own process summary lists only the Google search and the Fandom/UEFA extraction attempts. Under grounding rule 3, the '21' and the FBref/WhoScored attribution are unverified assertions, not observations; presenting them as 'Verification' is a false completion claim and the delivered number is an ungrounded result error. RELEVANCE TEST: event_004 is the final deliverable itself (the answer to the question); no later event corrects it. Replacing the fabricated figure with a statistic grounded in an actual observation, or a report that no retrieved source contains it, would make the sole deliverable correct, so the error is material and causally connected to what is delivered."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_002",
+                    "event_003"
+                  ],
+                  "reason": "CONTENT TEST: event_004 states 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 11 fouls.' Yet the only tool calls shown are event_002 (Google search whose snippets contain no foul counts) and event_003 (URL extraction of the Fandom page, whose text is truncated before any Statistics section and contains no foul count). No observation in the shown trajectory contains the number 21, 11, or any foul statistic, and no call to FBref or WhoScored appears. The agent's own narrative in event_004 concedes it only 'Attempted to extract data from the official UEFA match report and Football Wiki Fandom page' and 'Faced technical issues and incomplete data extraction' — it then asserts FBref/WhoScored content it never retrieved. Under grounding rule 3, the 'According to FBref and WhoScored' attribution is an unverified assertion, not an environment fact, so the delivered value 21 is a fabricated result and the verification claim is a false completion. RELEVANCE TEST: event_004 is the final deliverable with no later correction; replacing the ungrounded figure with an actually observed statistic (or a report that no retrieved source contains it) would make every deliverable correct, so the error is causally identical to the delivered result and material as a RESULT ERROR / FALSE COMPLETION."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 5346,
+                  "completion_tokens": 1980,
+                  "total_tokens": 7326,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 5312
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 1624
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 5312
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 1624
+                  },
+                  "input_tokens": 5346,
+                  "output_tokens": 1980
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_002\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: event_004 states 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 1",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "unresolved",
+            "detail": "refs exist but the cited quote cannot be located",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=unresolved"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "unresolved",
+              "detail": "refs exist but the cited quote cannot be located",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "unresolved"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 5295,
+            "completion_tokens": 1138,
+            "total_tokens": 6433,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 937
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 937
+            },
+            "input_tokens": 5295,
+            "output_tokens": 1138
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":4,\"quote\":\"According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed **21 fouls**. Bayern Munich committed **11 fouls**.\",\"referent\":\"Report that Inter's foul count could not be verified from any retrieved source (no tool call ever accessed FBref, WhoSc"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 5346,
+            "completion_tokens": 1980,
+            "total_tokens": 7326,
+            "prompt_tokens_details": {
+              "cached_tokens": 5312
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1624
+            },
+            "input_tokens_details": {
+              "cached_tokens": 5312
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 1624
+            },
+            "input_tokens": 5346,
+            "output_tokens": 1980
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "```json\n{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_002\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: event_004 states 'According to FBref and WhoScored, in the 2010 UEFA Champions League final: Inter Milan committed 21 fouls. Bayern Munich committed 1",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "397f78e814c74fcc1c22041b00bbf5c85e0ff513a0e3ee53de89a8301c20410c",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "db8ab875961b"
+}

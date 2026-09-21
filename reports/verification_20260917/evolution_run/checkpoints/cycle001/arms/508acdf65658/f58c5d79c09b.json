@@ -1,0 +1,471 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/095.json",
+    "gold": true,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/095.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_003",
+        "responsible_step": 3,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 4,
+            "traced_step": 3,
+            "defense": "substantiated",
+            "confirmed_step": 4,
+            "delivered_result": "111111111",
+            "correct_result": "11111111100",
+            "judge_basis": "derivation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The delivered answer 111111111 is not a multiple of 450 since it does not end in 00 (not divisible by 50), so the completion claim is false.",
+          "delivered_result": "111111111",
+          "correct_result": "11111111100",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_003"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.",
+            "referent": "The smallest positive multiple of 450 whose digits are all zeroes and ones is 11111111100."
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "the smallest positive multiple of 450 with only digits 0 and 1"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 3,
+          "quote": "TOOL python_interpreter ... Output: 111111111 (code checks `sum(int(d) for d in number_str) % 9 == 0 and number != 0` and returns `number`)",
+          "referent": "The interpreter must return 11111111100 — the smallest positive multiple of 450 with only 0s and 1s, i.e., nine 1s followed by \"00\" (digit sum 9 divisible by 9, and ending in \"00\" for divisibility by 50). The returned value 111111111 fails the code's own `endswith(\"00\")` filter and is not a multiple of 450.",
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "reason": "The wrong value 111111111 first appears as event_003's interpreter output (event_002 produced 0, which event_003 corrected), while event_004 merely repeats it, so fixing event_003's result to 11111111100 is sufficient to make the final answer correct."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 4,
+          "evidence_refs": [
+            "event_003",
+            "event_004"
+          ],
+          "reason": "The code at event_003 returned 111111111 and event_004 delivered 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 is odd and does not end in 0, so it is not divisible by 2 or 5, hence not a multiple of 450 = 2·3²·5². The correct smallest such multiple is 11111111100 (trailing 00 for divisibility by 100, nine 1s for divisibility by 9), which is a multiple of 450. The completion claim is a result error and is not corrected later."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The delivered answer 111111111 is not a multiple of 450 since it does not end in 00 (not divisible by 50), so the completion claim is false.",
+              "evidence_refs": [
+                "event_004",
+                "event_003"
+              ],
+              "quote": "The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.",
+              "delivered_result": "111111111",
+              "correct_result": "11111111100"
+            },
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 3,
+                "quote": "TOOL python_interpreter ... Output: 111111111 (code checks `sum(int(d) for d in number_str) % 9 == 0 and number != 0` and returns `number`)",
+                "referent": "The interpreter must return 11111111100 — the smallest positive multiple of 450 with only 0s and 1s, i.e., nine 1s followed by \"00\" (digit sum 9 divisible by 9, and ending in \"00\" for divisibility by 50). The returned value 111111111 fails the code's own `endswith(\"00\")` filter and is not a multiple of 450.",
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "reason": "The wrong value 111111111 first appears as event_003's interpreter output (event_002 produced 0, which event_003 corrected), while event_004 merely repeats it, so fixing event_003's result to 11111111100 is sufficient to make the final answer correct."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1623,
+                  "completion_tokens": 3200,
+                  "total_tokens": 4823,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2956
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2956
+                  },
+                  "input_tokens": 1623,
+                  "output_tokens": 3200
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\"step\":3,\"quote\":\"TOOL python_interpreter ... Output: 111111111 (code checks `sum(int(d) for d in number_str) % 9 == 0 and number != 0` and returns `number`)\",\"referent\":\"The interpreter must return 11111111100 — the smallest positive multiple of 450 with only 0s and 1s, i.e., nine 1s followed by \\"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The delivered answer 111111111 is not a multiple of 450 since it does not end in 00 (not divisible by 50), so the completion claim is false.",
+                "delivered_result": "111111111",
+                "correct_result": "11111111100",
+                "evidence_refs": [
+                  "event_004",
+                  "event_003"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "the smallest positive multiple of 450 with only digits 0 and 1"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 4,
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "reason": "The code at event_003 returned 111111111 and event_004 delivered 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 is odd and does not end in 0, so it is not divisible by 2 or 5, hence not a multiple of 450 = 2·3²·5². The correct smallest such multiple is 11111111100 (trailing 00 for divisibility by 100, nine 1s for divisibility by 9), which is a multiple of 450. The completion claim is a result error and is not corrected later."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "The code at event_003 returned 111111111 and event_004 delivered 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 is odd and does not end in 0, so it is not divisible by 2 or 5, hence not a multiple of 450 = 2·3²·5². The correct smallest such multiple is 11111111100 (trailing 00 for divisibility by 100, nine 1s for divisibility by 9), which is a multiple of 450. The completion claim is a result error and is not corrected later."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: event_004 delivers the final answer 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' This is factually wrong: 111111111 ends in 1, so it is divisible by neither 2 nor 5 and cannot be a multiple of 450 = 2·3^2·5^2. The correct referent follows from the trajectory's own logic (event_002/event_003 code require the number to end in '00' for divisibility by 50 and have a digit sum divisible by 9): the smallest candidate is nine 1s followed by '00' = 11111111100, and indeed 450 × 24691358 = 11111111100. The delivered result 111111111 is a RESULT ERROR (and thus a false completion claim) regardless of the event_003 tool observation, since the error is verifiable by pure arithmetic. RELEVANCE TEST: the final_answer call at event_004 is the deliverable itself and the last event; correcting it to 11111111100 makes every required deliverable correct, with no later corrections to consider and full causal connection to the delivered answer. Both tests pass."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "reason": "CONTENT TEST: event_004 delivers the final answer 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 ends in digit 1, so it is odd and not divisible by 2 or 5, hence not divisible by 450 = 2·3^2·5^2 (450 × 246914 = 111111300 ≠ 111111111). This wrong value traces to event_003, whose code requires candidates to end in '00' and skips 0, so the smallest hit would be the 11-digit 11111111100 (digit sum 9, ends in 00, and 450 × 24691358 = 11111111100); the observation '111111111' is inconsistent with the code's own endswith('00') filter and is mathematically impossible. The correct result is 11111111100, exactly as the verdict states. RELEVANCE TEST: the sole deliverable of this QA task is the final answer; correcting event_004 to state 11111111100 (which the trajectory's own search procedure yields) makes every deliverable correct — the erroneous value at event_003 is causally connected only through this uncorrected final answer, so the RESULT ERROR / false completion at step 4 is real and material."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1647,
+                  "completion_tokens": 2982,
+                  "total_tokens": 4629,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 1600
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2650
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 1600
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2650
+                  },
+                  "input_tokens": 1647,
+                  "output_tokens": 2982
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: event_004 delivers the final answer 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 ends in digit 1, so it is odd ",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        }
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2235,
+            "completion_tokens": 4383,
+            "total_tokens": 6618,
+            "prompt_tokens_details": {
+              "cached_tokens": 1088
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4051
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 4051
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1088
+            },
+            "input_tokens": 2235,
+            "output_tokens": 4383
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":3,\"hallucination_reason\":\"The computation delivered 111111111 as the smallest 0/1-digit multiple of 450, but 111111111 is odd and therefore not divisible by 450 (450 = 9 × 50 requires the number to end in '00'); the correct smallest such multiple is 1111",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1623,
+            "completion_tokens": 3200,
+            "total_tokens": 4823,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2956
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2956
+            },
+            "input_tokens": 1623,
+            "output_tokens": 3200
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"step\":3,\"quote\":\"TOOL python_interpreter ... Output: 111111111 (code checks `sum(int(d) for d in number_str) % 9 == 0 and number != 0` and returns `number`)\",\"referent\":\"The interpreter must return 11111111100 — the smallest positive multiple of 450 with only 0s and 1s, i.e., nine 1s followed by \\"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1647,
+            "completion_tokens": 2982,
+            "total_tokens": 4629,
+            "prompt_tokens_details": {
+              "cached_tokens": 1600
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2650
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1600
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2650
+            },
+            "input_tokens": 1647,
+            "output_tokens": 2982
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: event_004 delivers the final answer 'The smallest positive multiple of 450 whose digits are all zeroes and ones is 111111111.' But 111111111 ends in digit 1, so it is odd ",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "d626fcb38d7aa1ef6dd9c8dbe86d8248f38c89d890281a7c40f89e85f059c658",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "8cb46f6ce2ac"
+}

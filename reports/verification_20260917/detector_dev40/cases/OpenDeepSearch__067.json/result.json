@@ -1,0 +1,474 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "OpenDeepSearch/067.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_006",
+  "responsible_step": 6,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_006",
+    "responsible_step": 6,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 6,
+        "traced_step": 6,
+        "defense": "substantiated",
+        "confirmed_step": 6,
+        "delivered_result": "Sergey Brin",
+        "correct_result": "Peter Norvig, who was Director of Search Quality at Google from 2002 to 2005 and was responsible for the core web search algorithms",
+        "judge_basis": "world_knowledge",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 6,
+      "hallucination_reason": "The trajectory delivered 'Sergey Brin' as the final answer based solely on an explicit assumption ('it is reasonable to assume') that his President of Technology role made him responsible for core web search algorithms, even though its own observations never established this, and the verified director responsible for Google's core web search algorithms in 2002-2005 was Peter Norvig (Director of Search Quality).",
+      "delivered_result": "Sergey Brin",
+      "correct_result": "Peter Norvig, who was Director of Search Quality at Google from 2002 to 2005 and was responsible for the core web search algorithms",
+      "basis": "world_knowledge",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_006",
+        "event_004",
+        "event_005"
+      ],
+      "root_cause": {
+        "step": 6,
+        "quote": "it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms",
+        "referent": "No observation establishes Brin as the director responsible for core web search algorithms; the verified answer is Peter Norvig, Director of Search Quality 2002-2005"
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "The final answer must identify the actual director responsible for Google's core web search algorithms from 2002 to 2005."
+        },
+        {
+          "kind": "required_action",
+          "requirement": "The identified person must be grounded in gathered evidence from research, not an unsupported assumption, before delivering the final answer."
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 6,
+      "quote": "it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms",
+      "referent": "Instead of assuming Sergey Brin's President of Technology role covered core web search algorithms, the agent should have verified the actual director responsible — Peter Norvig, Director of Search Quality at Google from 2002 to 2005 — via search before delivering the final answer",
+      "evidence_refs": [
+        "event_006"
+      ],
+      "reason": "Step 6 is the first step where the wrong content is committed: the agent converts an unverified assumption ('it is reasonable to assume') into the final answer 'Sergey Brin', whereas earlier steps (event_004, event_005) only selected search targets or hedged ('it is likely') while explicitly acknowledging no evidence linked Brin to the core web search algorithms and continuing to search."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 6,
+      "evidence_refs": [
+        "event_004",
+        "event_005",
+        "event_006"
+      ],
+      "reason": "CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and commits final_answer(\"Sergey Brin\"). The only environment fact (event_004 observation) establishes Brin as 'president of technology... overseeing the company's growth and technological advancements, including its initial public offering' — it never establishes responsibility for core web search algorithms. The trajectory itself concedes at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms.' Under grounding rule 3, the delivered result rests on the agent's own assumption, not on any environment fact, and the correct referent (Peter Norvig, Director of Search Quality 2002-2005, responsible for core web search algorithms) is a well-established fact the trajectory never obtained. The delivered answer is therefore a RESULT ERROR grounded in fabrication. RELEVANCE TEST: event_006 is the terminal deliverable — the final_answer call is exactly what the trajectory delivers, with no later correction. Correcting this step to deliver the verified answer would make the sole deliverable correct, so the error is causally connected to and material for the delivered result."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 6,
+          "reason": "The trajectory delivered 'Sergey Brin' as the final answer based solely on an explicit assumption ('it is reasonable to assume') that his President of Technology role made him responsible for core web search algorithms, even though its own observations never established this, and the verified director responsible for Google's core web search algorithms in 2002-2005 was Peter Norvig (Director of Search Quality).",
+          "evidence_refs": [
+            "event_006",
+            "event_004",
+            "event_005"
+          ],
+          "quote": "it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms",
+          "delivered_result": "Sergey Brin",
+          "correct_result": "Peter Norvig, who was Director of Search Quality at Google from 2002 to 2005 and was responsible for the core web search algorithms"
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 6,
+            "quote": "it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms",
+            "referent": "Instead of assuming Sergey Brin's President of Technology role covered core web search algorithms, the agent should have verified the actual director responsible — Peter Norvig, Director of Search Quality at Google from 2002 to 2005 — via search before delivering the final answer",
+            "evidence_refs": [
+              "event_006"
+            ],
+            "reason": "Step 6 is the first step where the wrong content is committed: the agent converts an unverified assumption ('it is reasonable to assume') into the final answer 'Sergey Brin', whereas earlier steps (event_004, event_005) only selected search targets or hedged ('it is likely') while explicitly acknowledging no evidence linked Brin to the core web search algorithms and continuing to search."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 2023,
+              "completion_tokens": 1309,
+              "total_tokens": 3332,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1113
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1113
+              },
+              "input_tokens": 2023,
+              "output_tokens": 1309
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":6,\"quote\":\"it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms\",\"referent\":\"Instead of assuming Sergey Brin's President of Technology role covered core web search algorithms, the agent should have verified the actual director respons"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 6,
+            "reason": "The trajectory delivered 'Sergey Brin' as the final answer based solely on an explicit assumption ('it is reasonable to assume') that his President of Technology role made him responsible for core web search algorithms, even though its own observations never established this, and the verified director responsible for Google's core web search algorithms in 2002-2005 was Peter Norvig (Director of Search Quality).",
+            "delivered_result": "Sergey Brin",
+            "correct_result": "Peter Norvig, who was Director of Search Quality at Google from 2002 to 2005 and was responsible for the core web search algorithms",
+            "evidence_refs": [
+              "event_006",
+              "event_004",
+              "event_005"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "The final answer must identify the actual director responsible for Google's core web search algorithms from 2002 to 2005."
+              },
+              {
+                "kind": "required_action",
+                "requirement": "The identified person must be grounded in gathered evidence from research, not an unsupported assumption, before delivering the final answer."
+              }
+            ],
+            "confidence": "high",
+            "quote": "it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 6,
+            "evidence_refs": [
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "reason": "CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and commits final_answer(\"Sergey Brin\"). The only environment fact (event_004 observation) establishes Brin as 'president of technology... overseeing the company's growth and technological advancements, including its initial public offering' — it never establishes responsibility for core web search algorithms. The trajectory itself concedes at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms.' Under grounding rule 3, the delivered result rests on the agent's own assumption, not on any environment fact, and the correct referent (Peter Norvig, Director of Search Quality 2002-2005, responsible for core web search algorithms) is a well-established fact the trajectory never obtained. The delivered answer is therefore a RESULT ERROR grounded in fabrication. RELEVANCE TEST: event_006 is the terminal deliverable — the final_answer call is exactly what the trajectory delivers, with no later correction. Correcting this step to deliver the verified answer would make the sole deliverable correct, so the error is causally connected to and material for the delivered result."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_004",
+                "event_005",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and commits final_answer(\"Sergey Brin\"). The only environment fact (event_004 observation) establishes Brin as 'president of technology... overseeing the company's growth and technological advancements, including its initial public offering' — it never establishes responsibility for core web search algorithms. The trajectory itself concedes at event_005 that the observation 'does not explicitly mention him being the director responsible for the core web search algorithms.' Under grounding rule 3, the delivered result rests on the agent's own assumption, not on any environment fact, and the correct referent (Peter Norvig, Director of Search Quality 2002-2005, responsible for core web search algorithms) is a well-established fact the trajectory never obtained. The delivered answer is therefore a RESULT ERROR grounded in fabrication. RELEVANCE TEST: event_006 is the terminal deliverable — the final_answer call is exactly what the trajectory delivers, with no later correction. Correcting this step to deliver the verified answer would make the sole deliverable correct, so the error is causally connected to and material for the delivered result."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006"
+              ],
+              "reason": "At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and calls final_answer(\"Sergey Brin\"). Its own observations (event_004) only established Brin was President of Technology, and event_005's thought admits the observation 'does not explicitly mention him being the director responsible for the core web search algorithms.' The delivered result rests on an unverified assumption, so the final answer is a RESULT ERROR; correcting step 6 to the verified director would make the deliverable correct."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006",
+                "event_005",
+                "event_004"
+              ],
+              "reason": "CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and then commits final_answer(\"Sergey Brin\"). Its own evidence refutes this grounding: the event_004 observation establishes only that 'Sergey Brin served as the president of technology at Google Inc.' overseeing general 'growth and technological advancements', and the event_005 thought explicitly concedes the observation 'does not explicitly mention him being the director responsible for the core web search algorithms.' The delivered result therefore rests on an explicit assumption contradicting no observation yet supported by none — a RESULT ERROR: the delivered answer 'Sergey Brin' is wrong; the verified director responsible for Google's core web search algorithms in 2002-2005 was Peter Norvig, Director of Search Quality. RELEVANCE TEST: event_006 is the terminal, causally decisive step — it is the explicit final_answer delivery with no later correction in the trajectory. Correcting it to the verified referent (Peter Norvig) would make the sole deliverable (the final answer) correct; as delivered, the completion claim is false."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1744,
+              "completion_tokens": 1518,
+              "total_tokens": 3262,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1222
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1222
+              },
+              "input_tokens": 1744,
+              "output_tokens": 1518
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_005\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and then c",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 4,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2562,
+        "completion_tokens": 3215,
+        "total_tokens": 5777,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2769
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2769
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "input_tokens": 2562,
+        "output_tokens": 3215
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":6,\"hallucination_reason\":\"The agent explicitly acknowledged that no observation identifies Sergey Brin as the director responsible for core web search algorithms, yet concluded 'it is reasonable to assume' he was responsible and committed final_answer('S",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2023,
+        "completion_tokens": 1309,
+        "total_tokens": 3332,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1113
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1113
+        },
+        "input_tokens": 2023,
+        "output_tokens": 1309
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":6,\"quote\":\"it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms\",\"referent\":\"Instead of assuming Sergey Brin's President of Technology role covered core web search algorithms, the agent should have verified the actual director respons"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1744,
+        "completion_tokens": 1518,
+        "total_tokens": 3262,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1222
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1222
+        },
+        "input_tokens": 1744,
+        "output_tokens": 1518
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_005\", \"event_004\"],\n  \"reason\": \"CONTENT TEST: At event_006 the trajectory states 'it is reasonable to assume that he was responsible for overseeing the development of the web search algorithms' and then c",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "4e4fb458bcec9327f56a6005a063fb0529d6530998d2e848c9b61fcb067ffa3d"
+  },
+  "_packet_event_count": 6
+}

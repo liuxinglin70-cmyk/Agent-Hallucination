@@ -1,6 +1,6 @@
 # 证据覆盖优化与固定划分预检
 
-本轮沿用 `feat/evidence-retrieval`，原始数据、种子、划分和门限不变。运行协议先于真实请求冻结于 [protocol.json](protocol.json)，独立工作目录为 `artifacts/evolution_evidence_20260918`，不会复用历史失败实验或旧基线。
+本轮沿用 `feat/evidence-retrieval`，原始数据、种子、划分和门限不变。运行协议先于真实请求冻结于 [protocol.json](protocol.json)，独立工作目录为 `artifacts/evolution_evidence_20260918`（运行时目录，已回收；结果归档在 [run/](run/)），不会复用历史失败实验或旧基线。
 
 ## 已验证改动
 

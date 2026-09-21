@@ -1,0 +1,479 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "Octotools/005.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_002",
+  "responsible_step": 2,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_002",
+    "responsible_step": 2,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 2,
+        "traced_step": 2,
+        "defense": "substantiated",
+        "confirmed_step": 2,
+        "delivered_result": "Approximately 12,763,731,089,750 gamma-rays (≈1.28×10¹³), obtained from total decays 1.276×10¹⁴ (computed with a 30.17-day half-life) multiplied by an assumed 0.1 detection efficiency.",
+        "correct_result": "Approximately 1.0×10⁶ gamma-rays: with T½ = 30.17 years, λ ≈ 7.29×10⁻¹⁰ s⁻¹, A ≈ 7.29×10⁷ Bq, decays in 4800 s ≈ 3.50×10¹¹; a perfect detector intercepts the fraction 6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶, giving ≈1.04×10⁶ detected gamma-rays (≈8.9×10⁵ if the ~85% 662-keV branching ratio is included).",
+        "judge_basis": "derivation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 2,
+      "hallucination_reason": "The trajectory converted the Cs-137 half-life as 30.17 days instead of 30.17 years (inflating activity and total decays by ~365x) and then replaced the required geometric solid-angle fraction for the stated 'perfect' 2x3 cm detector at 4 m (6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶) with a fabricated 10% efficiency, delivering ~1.28×10¹³ detected gamma-rays instead of the correct ~10⁶.",
+      "delivered_result": "Approximately 12,763,731,089,750 gamma-rays (≈1.28×10¹³), obtained from total decays 1.276×10¹⁴ (computed with a 30.17-day half-life) multiplied by an assumed 0.1 detection efficiency.",
+      "correct_result": "Approximately 1.0×10⁶ gamma-rays: with T½ = 30.17 years, λ ≈ 7.29×10⁻¹⁰ s⁻¹, A ≈ 7.29×10⁷ Bq, decays in 4800 s ≈ 3.50×10¹¹; a perfect detector intercepts the fraction 6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶, giving ≈1.04×10⁶ detected gamma-rays (≈8.9×10⁵ if the ~85% 662-keV branching ratio is included).",
+      "basis": "derivation",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_002",
+        "event_003",
+        "event_006"
+      ],
+      "root_cause": {
+        "step": 2,
+        "quote": "T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600",
+        "referent": "Cs-137 half-life is 30.17 YEARS, so T_half_seconds = 30.17 × 365 × 24 × 3600 ≈ 9.51×10⁸ s (not 2,606,688 s); additionally the detector geometry (2×3 cm at 4 m, perfect efficiency) must supply the detection fraction instead of the fabricated 0.1 efficiency introduced at event_003."
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Number of gamma-rays detected in 80 minutes by a perfect 2x3 cm detector at 4 m from 10^17 Cs-137 atoms (T½ = 30.17 years): ≈10^6 (≈1.0×10^6, or ≈8.9×10^5 with the ~85% gamma branching ratio)."
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Use the given detector geometry (2x3 cm = 6 cm² area at 4 m distance) to compute the isotropic solid-angle fraction; 'perfect detector' fixes efficiency at 100% for incident gamma-rays, so no assumed 10% efficiency may be substituted."
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 2,
+      "quote": "T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600",
+      "referent": "T_half_years = 30.17; T_half_seconds = T_half_years * 365 * 24 * 3600 (Cs-137 half-life is 30.17 years, not 30.17 days)",
+      "evidence_refs": [
+        "event_002"
+      ],
+      "reason": "The half-life unit error (days instead of years) was introduced at event_002, inflating the decay constant, activity, and total decays by ~365x, and all later steps merely propagated this wrong value."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 2,
+      "evidence_refs": [
+        "event_002",
+        "event_003",
+        "event_004",
+        "event_006"
+      ],
+      "reason": "CONTENT TEST: event_002's tool call literally sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600', treating Cs-137's 30.17-YEAR half-life as days; the observation confirms lambda_=2.659e-07 s^-1 and total_decays=127637310897496.66 (~365x inflated vs the correct ~3.5e11 decays from lambda≈7.29e-10 s^-1). The compounding efficiency error is also real: event_003 says 'Assume a detection efficiency of 0.1 (10%)' although the task specifies a 'perfect' detector with a fixed 2x3 cm area at 4 m, whose required geometric fraction 6/(4π·400²)≈2.98e-6 is never computed — the detector dimensions and distance appear in no tool call. RELEVANCE TEST: the inflated total_decays flows uncorrected into event_004 ('detected_gamma_rays = 127637310897496.66 * 0.1' → 1.276e13) and into the final answer event_006, which concludes 'approximately 12,763,731,089,750 gamma-rays' — event_006 even writes '30.17 years × 365 × 24 × 3600 ≈ 2,607,000 seconds', an internally inconsistent figure that is actually 30.17 days, proving the day-based error was carried through. The delivered ~1.28e13 vs the correct ~1.0e6 is a RESULT ERROR causally connected to step 2, with no later correction."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 2,
+          "reason": "The trajectory converted the Cs-137 half-life as 30.17 days instead of 30.17 years (inflating activity and total decays by ~365x) and then replaced the required geometric solid-angle fraction for the stated 'perfect' 2x3 cm detector at 4 m (6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶) with a fabricated 10% efficiency, delivering ~1.28×10¹³ detected gamma-rays instead of the correct ~10⁶.",
+          "evidence_refs": [
+            "event_002",
+            "event_003",
+            "event_006"
+          ],
+          "quote": "T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600",
+          "delivered_result": "Approximately 12,763,731,089,750 gamma-rays (≈1.28×10¹³), obtained from total decays 1.276×10¹⁴ (computed with a 30.17-day half-life) multiplied by an assumed 0.1 detection efficiency.",
+          "correct_result": "Approximately 1.0×10⁶ gamma-rays: with T½ = 30.17 years, λ ≈ 7.29×10⁻¹⁰ s⁻¹, A ≈ 7.29×10⁷ Bq, decays in 4800 s ≈ 3.50×10¹¹; a perfect detector intercepts the fraction 6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶, giving ≈1.04×10⁶ detected gamma-rays (≈8.9×10⁵ if the ~85% 662-keV branching ratio is included)."
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 2,
+            "quote": "T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600",
+            "referent": "T_half_years = 30.17; T_half_seconds = T_half_years * 365 * 24 * 3600 (Cs-137 half-life is 30.17 years, not 30.17 days)",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "reason": "The half-life unit error (days instead of years) was introduced at event_002, inflating the decay constant, activity, and total decays by ~365x, and all later steps merely propagated this wrong value."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 2304,
+              "completion_tokens": 166,
+              "total_tokens": 2470,
+              "prompt_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 13
+              },
+              "input_tokens_details": {
+                "cached_tokens": 1920
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 13
+              },
+              "input_tokens": 2304,
+              "output_tokens": 166
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"step\": 2,\n  \"quote\": \"T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600\",\n  \"referent\": \"T_half_years = 30.17; T_half_seconds = T_half_years * 365 * 24 * 3600 (Cs-137 half-life is 30.17 years, not 30.17 days)\",\n  \"evidence_refs\": [\"event_002\"],\n  \"reason\": \"The half-life unit error "
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 2,
+            "reason": "The trajectory converted the Cs-137 half-life as 30.17 days instead of 30.17 years (inflating activity and total decays by ~365x) and then replaced the required geometric solid-angle fraction for the stated 'perfect' 2x3 cm detector at 4 m (6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶) with a fabricated 10% efficiency, delivering ~1.28×10¹³ detected gamma-rays instead of the correct ~10⁶.",
+            "delivered_result": "Approximately 12,763,731,089,750 gamma-rays (≈1.28×10¹³), obtained from total decays 1.276×10¹⁴ (computed with a 30.17-day half-life) multiplied by an assumed 0.1 detection efficiency.",
+            "correct_result": "Approximately 1.0×10⁶ gamma-rays: with T½ = 30.17 years, λ ≈ 7.29×10⁻¹⁰ s⁻¹, A ≈ 7.29×10⁷ Bq, decays in 4800 s ≈ 3.50×10¹¹; a perfect detector intercepts the fraction 6 cm² / (4π·(400 cm)²) ≈ 2.98×10⁻⁶, giving ≈1.04×10⁶ detected gamma-rays (≈8.9×10⁵ if the ~85% 662-keV branching ratio is included).",
+            "evidence_refs": [
+              "event_002",
+              "event_003",
+              "event_006"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Number of gamma-rays detected in 80 minutes by a perfect 2x3 cm detector at 4 m from 10^17 Cs-137 atoms (T½ = 30.17 years): ≈10^6 (≈1.0×10^6, or ≈8.9×10^5 with the ~85% gamma branching ratio)."
+              },
+              {
+                "kind": "required_action",
+                "requirement": "Use the given detector geometry (2x3 cm = 6 cm² area at 4 m distance) to compute the isotropic solid-angle fraction; 'perfect detector' fixes efficiency at 100% for incident gamma-rays, so no assumed 10% efficiency may be substituted."
+              }
+            ],
+            "confidence": "high",
+            "quote": "T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 2,
+            "evidence_refs": [
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_006"
+            ],
+            "reason": "CONTENT TEST: event_002's tool call literally sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600', treating Cs-137's 30.17-YEAR half-life as days; the observation confirms lambda_=2.659e-07 s^-1 and total_decays=127637310897496.66 (~365x inflated vs the correct ~3.5e11 decays from lambda≈7.29e-10 s^-1). The compounding efficiency error is also real: event_003 says 'Assume a detection efficiency of 0.1 (10%)' although the task specifies a 'perfect' detector with a fixed 2x3 cm area at 4 m, whose required geometric fraction 6/(4π·400²)≈2.98e-6 is never computed — the detector dimensions and distance appear in no tool call. RELEVANCE TEST: the inflated total_decays flows uncorrected into event_004 ('detected_gamma_rays = 127637310897496.66 * 0.1' → 1.276e13) and into the final answer event_006, which concludes 'approximately 12,763,731,089,750 gamma-rays' — event_006 even writes '30.17 years × 365 × 24 × 3600 ≈ 2,607,000 seconds', an internally inconsistent figure that is actually 30.17 days, proving the day-based error was carried through. The delivered ~1.28e13 vs the correct ~1.0e6 is a RESULT ERROR causally connected to step 2, with no later correction."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 2,
+              "evidence_refs": [
+                "event_002",
+                "event_003",
+                "event_004",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_002's tool call literally sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600', treating Cs-137's 30.17-YEAR half-life as days; the observation confirms lambda_=2.659e-07 s^-1 and total_decays=127637310897496.66 (~365x inflated vs the correct ~3.5e11 decays from lambda≈7.29e-10 s^-1). The compounding efficiency error is also real: event_003 says 'Assume a detection efficiency of 0.1 (10%)' although the task specifies a 'perfect' detector with a fixed 2x3 cm area at 4 m, whose required geometric fraction 6/(4π·400²)≈2.98e-6 is never computed — the detector dimensions and distance appear in no tool call. RELEVANCE TEST: the inflated total_decays flows uncorrected into event_004 ('detected_gamma_rays = 127637310897496.66 * 0.1' → 1.276e13) and into the final answer event_006, which concludes 'approximately 12,763,731,089,750 gamma-rays' — event_006 even writes '30.17 years × 365 × 24 × 3600 ≈ 2,607,000 seconds', an internally inconsistent figure that is actually 30.17 days, proving the day-based error was carried through. The delivered ~1.28e13 vs the correct ~1.0e6 is a RESULT ERROR causally connected to step 2, with no later correction."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 2,
+              "evidence_refs": [
+                "event_002",
+                "event_004",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_002's tool call explicitly codes 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600', yielding T_half_seconds = 2,606,688 s (i.e., 30.17 DAYS), lambda_ = 2.659e-07 s^-1 and total_decays = 1.276e14. The correct referent is the Cs-137 half-life of 30.17 YEARS (~9.52e8 s, lambda ~7.29e-10 s^-1, decays in 4800 s ~3.50e11) — an inflation of ~365x; the trajectory's own final text (event_006) even states 'half-life of approximately 30.17 years' while computing with the days-based value of ~2,607,000 seconds, an internal contradiction confirming the deviation is real. Additionally, event_004 computes 'detected_gamma_rays = 127637310897496.66 * 0.1' using a fabricated 10% efficiency with no basis in the task, which specifies a 'perfect detector' whose detected count must be total decays times the geometric solid-angle fraction 6 cm² / (4π·(400 cm)²) ≈ 2.98e-6. RELEVANCE TEST: both errors propagate causally into the delivered result at event_006 ('approximately 12,763,731,089,750 gamma-rays', ~1.28e13), which is wrong by ~7 orders of magnitude versus the correct ~1.04e6 (3.50e11 decays × 2.98e-6). The final answer is a RESULT ERROR; correcting the half-life and replacing the fabricated efficiency with the geometric fraction yields the correct value, so the step is material and uncorrected."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 2,
+              "evidence_refs": [
+                "event_002",
+                "event_004",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_002's tool call sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600' yielding T_half_seconds=2606688.0, lambda_=2.659e-07 and total_decays=127637310897496.66 — i.e., Cs-137's 30.17-YEAR half-life was converted as 30.17 DAYS (2.6×10^6 s instead of ~9.5×10^8 s), inflating λ, activity and total decays by ~365x (correct: λ≈7.29×10⁻¹⁰ s⁻¹, decays in 4800 s ≈3.50×10¹¹). The deviation is factually real and visible in the environment observation itself. Additionally, event_003/event_004 multiply by an assumed 'efficiency of 0.1', fabricating a 10% efficiency while never using the task-fixed geometry; a 'perfect' 2×3 cm detector at 4 m intercepts 6/(4π·400²)≈2.98×10⁻⁶ of emissions. RELEVANCE TEST: the error propagates uncorrected to the delivered result — event_006 concludes 'approximately 12,763,731,089,750 gamma-rays' using the day-based total_decays 127,637,310,897,496.66 × 0.1, and even mislabels the day-conversion as '30.17 years ... ≈ 2,607,000 seconds'. The correct deliverable is ~1.0×10⁶ detected gamma-rays. The step is causally connected to the wrong final answer (RESULT ERROR plus fabricated efficiency replacing the required geometric fraction), so the conviction stands."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 2653,
+              "completion_tokens": 4042,
+              "total_tokens": 6695,
+              "prompt_tokens_details": {
+                "cached_tokens": 2624
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 3597
+              },
+              "input_tokens_details": {
+                "cached_tokens": 2624
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 3597
+              },
+              "input_tokens": 2653,
+              "output_tokens": 4042
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 2,\n  \"evidence_refs\": [\"event_002\", \"event_004\", \"event_006\"],\n  \"reason\": \"CONTENT TEST: event_002's tool call sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600' yielding T_half_seconds=2606688.0, lambda_=2.659e-07 and total_deca",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_005"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2679,
+        "completion_tokens": 5624,
+        "total_tokens": 8303,
+        "prompt_tokens_details": {
+          "cached_tokens": 1088
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4974
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1088
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 4974
+        },
+        "input_tokens": 2679,
+        "output_tokens": 5624
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":2,\"hallucination_reason\":\"The calculation treated the Cs-137 half-life as 30.17 days instead of 30.17 years, and the entire computation ignored the given geometry (2x3 cm detector face at 4 m), instead multiplying by a fabricated 10% efficiency, so the d",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2304,
+        "completion_tokens": 166,
+        "total_tokens": 2470,
+        "prompt_tokens_details": {
+          "cached_tokens": 1920
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 13
+        },
+        "input_tokens_details": {
+          "cached_tokens": 1920
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 13
+        },
+        "input_tokens": 2304,
+        "output_tokens": 166
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"step\": 2,\n  \"quote\": \"T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600\",\n  \"referent\": \"T_half_years = 30.17; T_half_seconds = T_half_years * 365 * 24 * 3600 (Cs-137 half-life is 30.17 years, not 30.17 days)\",\n  \"evidence_refs\": [\"event_002\"],\n  \"reason\": \"The half-life unit error "
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2653,
+        "completion_tokens": 4042,
+        "total_tokens": 6695,
+        "prompt_tokens_details": {
+          "cached_tokens": 2624
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3597
+        },
+        "input_tokens_details": {
+          "cached_tokens": 2624
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 3597
+        },
+        "input_tokens": 2653,
+        "output_tokens": 4042
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 2,\n  \"evidence_refs\": [\"event_002\", \"event_004\", \"event_006\"],\n  \"reason\": \"CONTENT TEST: event_002's tool call sets 'T_half_days = 30.17; T_half_seconds = T_half_days * 24 * 3600' yielding T_half_seconds=2606688.0, lambda_=2.659e-07 and total_deca",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "52976c279f45a373de244e4ae456f92261cbc2f460560db87353dcf22976efe0"
+  },
+  "_packet_event_count": 6
+}

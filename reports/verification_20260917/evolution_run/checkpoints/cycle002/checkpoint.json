@@ -1,0 +1,626 @@
+{
+  "contract": {
+    "cycle": 2,
+    "config": "dc6823a133e1",
+    "source": "00b049063521f76b",
+    "detector_config": "cc1e128e93c64111",
+    "split": {
+      "name": "mini",
+      "mini": true,
+      "seed": 20260824,
+      "pool_size": 30,
+      "sentinel": [
+        "BFCL/041.json",
+        "Magentic_One/036.json",
+        "Octotools/023.json",
+        "OpenDeepSearch/077.json",
+        "OpenDeepSearch/088.json",
+        "SmolAgents/019.json"
+      ],
+      "sentinel_size": 6,
+      "sentinel_polarity": {
+        "error": 3,
+        "clean": 3
+      },
+      "gain": [
+        "OpenDeepSearch/080.json",
+        "Octotools/005.json",
+        "Magentic_One/050.json",
+        "OpenDeepSearch/002.json"
+      ],
+      "gain_size": 4,
+      "gain_polarity": {
+        "error": 2,
+        "clean": 2
+      },
+      "patrol_pool_size": 20,
+      "validation": [
+        "BFCL/012.json",
+        "BFCL/068.json",
+        "BFCL/106.json",
+        "Camel/028.json",
+        "Magentic_One/067.json",
+        "Magentic_One/074.json",
+        "OpenDeepSearch/076.json",
+        "OpenDeepSearch/078.json",
+        "SmolAgents/022.json",
+        "SmolAgents/036.json"
+      ],
+      "validation_size": 10,
+      "final_size": 0,
+      "final_reads": 0
+    },
+    "data": {
+      "BFCL/017.json": "1f87b9b729981699",
+      "BFCL/041.json": "2e31d397fec79037",
+      "BFCL/062.json": "8c938b8cfa2dbc55",
+      "BFCL/107.json": "ff270a43033931d5",
+      "Camel/018.json": "805a0c50132f4e47",
+      "Camel/048.json": "191ad88d678e9ac3",
+      "Camel/054.json": "629d33e73665b661",
+      "Magentic_One/036.json": "845734ed932b45d8",
+      "Magentic_One/049.json": "f8fcebca7f4f241f",
+      "Magentic_One/050.json": "1a00961447267a0c",
+      "Magentic_One/085.json": "4df65f6eb4b9af03",
+      "Magentic_One/093.json": "7365ffdbaa7fdef3",
+      "Octotools/005.json": "6396d64b9db30b17",
+      "Octotools/023.json": "3936acd203bdd418",
+      "Octotools/030.json": "c17eaea9b4719611",
+      "Octotools/040.json": "8645f077c37fda21",
+      "OpenDeepSearch/002.json": "00f7c1d90ba49d24",
+      "OpenDeepSearch/035.json": "4cae7a9e011c0344",
+      "OpenDeepSearch/063.json": "9e3b5ab3c6718c9a",
+      "OpenDeepSearch/067.json": "fb48002721320d14",
+      "OpenDeepSearch/077.json": "27df43a4fef2b517",
+      "OpenDeepSearch/080.json": "d6b3d8b2545b993b",
+      "OpenDeepSearch/084.json": "2d38baa0939a177e",
+      "OpenDeepSearch/086.json": "f703304fa2465f74",
+      "OpenDeepSearch/088.json": "a730efb05568199c",
+      "OpenDeepSearch/095.json": "dda5d7168527cfda",
+      "OpenManus/064.json": "b48ed317967fdf94",
+      "OpenManus/073.json": "4f7edd6b5db3b030",
+      "SmolAgents/019.json": "4ef9f079bf8ce401",
+      "SmolAgents/037.json": "7487eb708703c91d"
+    }
+  },
+  "status": "completed",
+  "used_seconds": 2206.6334527,
+  "registry_before": {
+    "schema_version": "detector.intervention_registry.v1",
+    "interventions": [],
+    "content_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+  },
+  "audit": {
+    "enabled": true,
+    "passed": true,
+    "frozen": false,
+    "reports": [
+      {
+        "intervention_id": "IV-DEFECT-001",
+        "structural": {
+          "passed": false,
+          "reason": "case id leak in directive/body/claim: BFCL/001.json"
+        },
+        "harmlessness": null,
+        "behavior": null,
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      },
+      {
+        "intervention_id": "IV-DEFECT-002",
+        "structural": {
+          "passed": true,
+          "reason": "",
+          "jaccard_base": 0.0118
+        },
+        "harmlessness": {
+          "passed": false,
+          "reason": "sentinel has insufficient baseline-correct coverage: protected_tp=2 < 2, protected_tn=1 < 2",
+          "delta": null,
+          "reroll_control": null,
+          "sentinel_manifest": {
+            "nominated": 6,
+            "protected": 3,
+            "protected_tp": 2,
+            "protected_tn": 1,
+            "excluded": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "prediction": false,
+                "authority": "authoritative",
+                "reason": "baseline_incorrect"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": true,
+                "authority": "authoritative",
+                "reason": "baseline_incorrect"
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "prediction": true,
+                "authority": "authoritative",
+                "reason": "baseline_incorrect"
+              }
+            ],
+            "baseline_rows": [
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "prediction": true
+              }
+            ],
+            "candidate_rows": [
+              {
+                "case": "Magentic_One/036.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/023.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "prediction": true
+              }
+            ]
+          }
+        },
+        "behavior": null,
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      }
+    ],
+    "cache": "hit"
+  },
+  "proposing": false,
+  "proposal": {
+    "candidates": [
+      {
+        "type": "evidence_check",
+        "hook": "defense.pre",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": []
+        },
+        "body": {
+          "predicate": "evo_self_refuting_conviction",
+          "runner": "typed_dsl",
+          "output_verdicts": [
+            "satisfied",
+            "violated",
+            "not_applicable"
+          ],
+          "predicate_definition": {
+            "schema_version": "detector.predicate_program.v1",
+            "name": "evo_self_refuting_conviction",
+            "description": "Detects packets where the judge convicted positive while the same packet records a non-empty hallucination reason, i.e. a self-refuting conviction.",
+            "verdicts": [
+              "satisfied",
+              "violated",
+              "not_applicable"
+            ],
+            "conviction_verdicts": [
+              "violated"
+            ],
+            "default_verdict": "not_applicable",
+            "rules": [
+              {
+                "conditions": [
+                  {
+                    "field": "context_judge_positive",
+                    "operator": "equals",
+                    "value": "true"
+                  },
+                  {
+                    "field": "context_judge_hallucination_reason",
+                    "operator": "exists"
+                  }
+                ],
+                "verdict": "violated",
+                "detail": "judge_positive=true while context_judge_hallucination_reason is non-empty: the judge's own recorded failure reason contradicts its positive conviction"
+              }
+            ]
+          }
+        },
+        "claim": {
+          "expected_behavior": "At defense.pre, every judge-positive packet whose own context records a hallucination reason produces the mechanical row evo_self_refuting_conviction=violated, giving adjudication a same-packet mechanical ground to withhold the conviction.",
+          "target_polarity": "precision"
+        },
+        "provenance": {
+          "cycle": 2,
+          "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+          "failure_cases": [
+            "BFCL/107.json",
+            "Camel/048.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-2-001"
+      },
+      {
+        "type": "decision_guard",
+        "hook": "adjudicate.guard",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": [
+            "judge_positive=true",
+            "positive_source=judge",
+            "evo_self_refuting_conviction=violated"
+          ]
+        },
+        "body": {
+          "action": "withhold_conviction",
+          "action_not_when": "Never withhold when the positive originated from a recall upgrade rather than the judge itself, and never withhold on judge-sourced positives whose packet records no hallucination reason; this guard only targets judge-sourced convictions that the judge's own recorded hallucination reason contradicts.",
+          "action_not_when_facts": [
+            "positive_source=recall_upgrade"
+          ]
+        },
+        "claim": {
+          "expected_behavior": "Adjudication withholds conviction on packets where a judge-sourced positive is contradicted by the judge's own non-empty hallucination reason, converting self-refuting false convictions into withheld outcomes while leaving reasoned positives and recall-upgraded positives untouched.",
+          "target_polarity": "precision"
+        },
+        "provenance": {
+          "cycle": 2,
+          "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+          "failure_cases": [
+            "BFCL/107.json",
+            "Camel/048.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-2-002"
+      },
+      {
+        "type": "recall_trigger",
+        "hook": "recall.trigger",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": [
+            "judge_positive=false"
+          ]
+        },
+        "body": {
+          "predicate": "evo_final_answer_unreasoned_negative",
+          "runner": "typed_dsl",
+          "output_verdicts": [
+            "satisfied",
+            "violated",
+            "not_applicable"
+          ],
+          "trigger_verdicts": [
+            "violated"
+          ],
+          "require_judge_negative": true,
+          "predicate_definition": {
+            "schema_version": "detector.predicate_program.v1",
+            "name": "evo_final_answer_unreasoned_negative",
+            "description": "Flags judge-negative packets that nevertheless delivered a final answer through the answer tool with a reported delivered result and no recorded hallucination reason, so the recall net hears the case.",
+            "verdicts": [
+              "satisfied",
+              "violated",
+              "not_applicable"
+            ],
+            "conviction_verdicts": [
+              "violated"
+            ],
+            "default_verdict": "not_applicable",
+            "rules": [
+              {
+                "conditions": [
+                  {
+                    "field": "context_judge_positive",
+                    "operator": "equals",
+                    "value": "false"
+                  },
+                  {
+                    "field": "last_answer_tool_name",
+                    "operator": "equals",
+                    "value": "final_answer"
+                  },
+                  {
+                    "field": "context_judge_hallucination_reason",
+                    "operator": "missing"
+                  },
+                  {
+                    "field": "context_judge_delivered_result",
+                    "operator": "exists"
+                  }
+                ],
+                "verdict": "violated",
+                "detail": "final answer was delivered via final_answer and a delivered result is reported, yet the negative verdict carries no hallucination reason"
+              },
+              {
+                "conditions": [
+                  {
+                    "field": "context_judge_positive",
+                    "operator": "equals",
+                    "value": "false"
+                  },
+                  {
+                    "field": "last_answer_tool_name",
+                    "operator": "equals",
+                    "value": "final_answer"
+                  },
+                  {
+                    "field": "packet_features",
+                    "operator": "any_equals",
+                    "value": "has_answer_tool"
+                  },
+                  {
+                    "field": "context_judge_delivered_result",
+                    "operator": "exists"
+                  }
+                ],
+                "verdict": "violated",
+                "detail": "final answer delivered via final_answer on an answer-tool packet with a reported delivered result despite the negative verdict"
+              }
+            ]
+          }
+        },
+        "claim": {
+          "expected_behavior": "When the judge returns negative on a packet whose answer was delivered through final_answer with a reported delivered result and no recorded hallucination reason, the recall net is opened for that case so a later defense-substantiated upgrade can restore the positive.",
+          "target_polarity": "recall"
+        },
+        "provenance": {
+          "cycle": 2,
+          "failure_family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93-Pf96f7bc87dcb",
+          "failure_cases": [
+            "OpenDeepSearch/035.json",
+            "OpenDeepSearch/063.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-2-003"
+      },
+      {
+        "type": "recall_trigger",
+        "hook": "recall.trigger",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": [
+            "judge_positive=false"
+          ]
+        },
+        "body": {
+          "predicate": "evo_confident_unreasoned_negative",
+          "runner": "typed_dsl",
+          "output_verdicts": [
+            "satisfied",
+            "violated",
+            "not_applicable"
+          ],
+          "trigger_verdicts": [
+            "violated"
+          ],
+          "require_judge_negative": true,
+          "predicate_definition": {
+            "schema_version": "detector.predicate_program.v1",
+            "name": "evo_confident_unreasoned_negative",
+            "description": "Flags high-confidence judge-negative packets that report a delivered result and carry explicit contract requirements yet record no hallucination reason, so the recall net hears the case.",
+            "verdicts": [
+              "satisfied",
+              "violated",
+              "not_applicable"
+            ],
+            "conviction_verdicts": [
+              "violated"
+            ],
+            "default_verdict": "not_applicable",
+            "rules": [
+              {
+                "conditions": [
+                  {
+                    "field": "context_judge_positive",
+                    "operator": "equals",
+                    "value": "false"
+                  },
+                  {
+                    "field": "context_judge_hallucination_reason",
+                    "operator": "missing"
+                  },
+                  {
+                    "field": "context_judge_confidence",
+                    "operator": "equals",
+                    "value": "high"
+                  },
+                  {
+                    "field": "context_judge_delivered_result",
+                    "operator": "exists"
+                  }
+                ],
+                "verdict": "violated",
+                "detail": "high-confidence negative with a reported delivered result but no hallucination reason explaining the rejection"
+              },
+              {
+                "conditions": [
+                  {
+                    "field": "context_judge_positive",
+                    "operator": "equals",
+                    "value": "false"
+                  },
+                  {
+                    "field": "context_judge_confidence",
+                    "operator": "equals",
+                    "value": "high"
+                  },
+                  {
+                    "field": "context_contract_requirements",
+                    "operator": "exists"
+                  },
+                  {
+                    "field": "context_judge_delivered_result",
+                    "operator": "exists"
+                  }
+                ],
+                "verdict": "violated",
+                "detail": "high-confidence negative over a packet with explicit contract requirements and a reported delivered result"
+              }
+            ]
+          }
+        },
+        "claim": {
+          "expected_behavior": "When the judge issues a high-confidence negative without any hallucination reason even though the packet reports a delivered result and explicit contract requirements, the recall net hears the case so a later defense-substantiated upgrade can restore the positive.",
+          "target_polarity": "recall"
+        },
+        "provenance": {
+          "cycle": 2,
+          "failure_family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93-P70fe7f80fd90",
+          "failure_cases": [
+            "BFCL/017.json",
+            "OpenDeepSearch/086.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-2-004"
+      }
+    ],
+    "joint_groups": [
+      [
+        "IV-2-001",
+        "IV-2-002"
+      ]
+    ],
+    "notes": [
+      {
+        "generator": "llm",
+        "provider_called": true,
+        "provider_ok": true,
+        "purpose": "evolution_proposer",
+        "model": "glm-5.3-flash",
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 12615,
+          "completion_tokens": 18176,
+          "total_tokens": 30791,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 16490
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 16490
+          },
+          "input_tokens": 12615,
+          "output_tokens": 18176
+        }
+      },
+      {
+        "generator": "llm",
+        "rejected": "invalid_contract",
+        "reason": "batch capability contract: predicate program field rules[0].conditions[2].value must be non-empty text"
+      },
+      {
+        "intervention_id": "IV-2-001",
+        "generator": "llm",
+        "rejected": "invalid_contract",
+        "reason": "predicate program field rules[0].conditions[1].value must be non-empty text"
+      },
+      {
+        "intervention_id": "IV-2-002",
+        "generator": "llm",
+        "rejected": "invalid_contract",
+        "reason": "predicate program field rules[0].conditions[3].value must be non-empty text"
+      },
+      {
+        "intervention_id": "IV-2-003",
+        "generator": "llm",
+        "rejected": "invalid_contract",
+        "reason": "predicate program field rules[0].conditions[2].value must be non-empty text"
+      },
+      {
+        "intervention_id": "IV-2-004",
+        "generator": "llm",
+        "rejected": "invalid_contract",
+        "reason": "IV-2-004: unknown trigger fact 'evo_self_refuting_conviction'"
+      },
+      {
+        "generator": "llm",
+        "provider_called": true,
+        "provider_ok": true,
+        "purpose": "evolution_proposer",
+        "model": "glm-5.3-flash",
+        "attempts": 2,
+        "usage": {
+          "prompt_tokens": 13080,
+          "completion_tokens": 17812,
+          "total_tokens": 30892,
+          "prompt_tokens_details": {
+            "cached_tokens": 13056
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 15945
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 15945
+          },
+          "input_tokens_details": {
+            "cached_tokens": 13056
+          },
+          "input_tokens": 13080,
+          "output_tokens": 17812
+        },
+        "repair": true
+      },
+      {
+        "intervention_id": "IV-2-001",
+        "family": "FAM-fp-judge_conviction-117fce1c070d",
+        "generator": "llm",
+        "frozen_judge_replay_compatible": true
+      },
+      {
+        "intervention_id": "IV-2-002",
+        "family": "FAM-fp-judge_conviction-117fce1c070d",
+        "generator": "llm",
+        "frozen_judge_replay_compatible": true
+      },
+      {
+        "intervention_id": "IV-2-003",
+        "family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93-Pf96f7bc87dcb",
+        "generator": "llm",
+        "frozen_judge_replay_compatible": true
+      },
+      {
+        "intervention_id": "IV-2-004",
+        "family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93-P70fe7f80fd90",
+        "generator": "llm",
+        "frozen_judge_replay_compatible": true
+      }
+    ]
+  },
+  "harness_parent_digest": "a6b59863a98f"
+}

@@ -14,7 +14,7 @@
 | 数据划分 | 开发 30+10（sentinel 6、gain 4、patrol 20；validation 10） |
 | 轮数 | 2（`--cycles 2 --mini`） |
 | 模型 | `GLM-5.3-flash`，proposer 输出预算 32768 |
-| 工作目录 | `artifacts/evolution_real`（独立 work_root/registry/ledger，起始 registry 为空） |
+| 工作目录 | `artifacts/evolution_real`（运行时目录，已回收）；归档产物见 [run_20260916/](run_20260916/) 与 [verification_20260917/evolution_run/](../verification_20260917/evolution_run/) |
 | 初始 registry | 空（`content_hash=1a4fe1d7…`，未加载任何历史干预） |
 
 ## 时间线
@@ -110,4 +110,4 @@ python -m evolution experiment --mini --cycles 2 \
   --config evolution/configs/development_real_run.json
 ```
 
-注意：`artifacts/evolution_real` 中第 2 轮已写 `cycle_started`，直接重跑会因防重用保护而 `raise`。复现需另建配置指向新的工作目录，或清理该目录后重跑。`python scripts/verify.py` 不执行真实进化。
+注意：原始 `artifacts/evolution_real` 运行时目录已回收；要复现需另建配置指向新的工作目录（该目录第 2 轮已写 `cycle_started`，直接复用会因防重用保护而 `raise`）。归档产物见 [verification_20260917/evolution_run/](../verification_20260917/evolution_run/)。`python scripts/verify.py` 不执行真实进化。

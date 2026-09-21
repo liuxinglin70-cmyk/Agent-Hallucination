@@ -1,0 +1,523 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "BFCL/042.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_008",
+  "responsible_step": 8,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_008",
+    "responsible_step": 8,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 8,
+        "traced_step": 8,
+        "defense": "substantiated",
+        "confirmed_step": 8,
+        "delivered_result": "A tweet with content 'healthy' (tag #CarMaintenance, mention @VehicleGuru) was posted as tweet ID 10 and then successfully retweeted.",
+        "correct_result": "A tweet with content 'not healthy' (rear tires at 30 psi are outside the inclusive 32-35 healthy range) with tag #CarMaintenance and mention @VehicleGuru, followed by retweeting that post.",
+        "judge_basis": "task_requirement",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 8,
+      "hallucination_reason": "The assistant posted the tire pressure status as 'healthy' even though the observed rear tire pressures (30 psi) fall below the user-defined healthy range of 32-35 inclusive, so the required content was 'not healthy'; this wrong post was never corrected and was subsequently retweeted as the requested tire-maintenance post.",
+      "delivered_result": "A tweet with content 'healthy' (tag #CarMaintenance, mention @VehicleGuru) was posted as tweet ID 10 and then successfully retweeted.",
+      "correct_result": "A tweet with content 'not healthy' (rear tires at 30 psi are outside the inclusive 32-35 healthy range) with tag #CarMaintenance and mention @VehicleGuru, followed by retweeting that post.",
+      "basis": "task_requirement",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_007",
+        "event_008",
+        "event_009"
+      ],
+      "root_cause": {
+        "step": 8,
+        "quote": "post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}",
+        "referent": "post_tweet with content 'not healthy' (rearLeftTirePressure and rearRightTirePressure are 30.0, below the inclusive 32-35 healthy threshold fixed by the task)"
+      },
+      "contracts": [
+        {
+          "kind": "verbatim_content",
+          "requirement": "The tweet message content must be exactly 'healthy' or 'not healthy', nothing else"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Status is 'healthy' only if all tire pressures are between 32 and 35 inclusive; observed readings 32/32/30/30 require the content 'not healthy'"
+        },
+        {
+          "kind": "required_action",
+          "requirement": "Check tire pressure, post the status tweet with tag '#CarMaintenance' and mention '@VehicleGuru', then retweet the tire maintenance post (plus convert 20 liters to gallons and start the engine)"
+        },
+        {
+          "kind": "required_channel",
+          "requirement": "The status must be shared via a Twitter post carrying #CarMaintenance and @VehicleGuru"
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 8,
+      "quote": "post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}",
+      "referent": "post_tweet with content 'not healthy' (rear tires at 30.0 psi fall below the user-defined inclusive 32-35 healthy range), keeping tags ['#CarMaintenance'] and mentions ['@VehicleGuru']",
+      "evidence_refs": [
+        "event_007",
+        "event_008",
+        "event_009"
+      ],
+      "reason": "Event_008 is the first assistant-authored step introducing the wrong content: despite event_007 showing rear tire pressures of 30.0 psi (outside the inclusive 32-35 range), the assistant posted 'healthy' instead of 'not healthy', and although event_009 acknowledged the discrepancy, the tweet was never corrected before being retweeted at event_010."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 8,
+      "evidence_refs": [
+        "event_007",
+        "event_008",
+        "event_009",
+        "event_010"
+      ],
+      "evidence_citations": [],
+      "conflict_note": "The observation at event_007 contains an internal discrepancy: 'healthy_tire_pressure': true alongside rear pressures of 30.0 psi. This is resolved by the task contract: the user explicitly fixed the definition of healthy as all tires between 32 and 35 inclusive, and task-fixed constants cannot be overridden by an observation. Applying that definition to the observed 30 psi rear pressures yields 'not healthy', so the conflict does not unsettle the finding.",
+      "reason": "CONTENT TEST: At event_008 the assistant called post_tweet with {'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}. The task text fixes the content criterion: 'Healthy is defined as all tire pressure between 32 and 35, inclusive.' The observation at event_007 shows rearLeftTirePressure 30.0 and rearRightTirePressure 30.0, outside that inclusive range, so the required content was 'not healthy'. The delivered 'healthy' is a real deviation from an explicitly fixed deliverable value (the tool's 'healthy_tire_pressure': true flag cannot override the task's definition). RELEVANCE TEST: The wrong tweet (id 10) was never corrected — event_009 only acknowledges the error in prose ('the rear tires (30 psi) indicate not healthy... Would you like me to clarify this discrepancy?') without deleting or reposting, and event_010 then retweets tweet_id 10, delivering the wrong content as the requested tire-maintenance post. Correcting step 8 to post 'not healthy' would make the tweet and the subsequent retweet correct, so the step is causally connected to the material deliverables. Step 8 is the earliest assistant-authored introduction of the wrong content; event_007 is an observation, not an assistant error."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 8,
+          "reason": "The assistant posted the tire pressure status as 'healthy' even though the observed rear tire pressures (30 psi) fall below the user-defined healthy range of 32-35 inclusive, so the required content was 'not healthy'; this wrong post was never corrected and was subsequently retweeted as the requested tire-maintenance post.",
+          "evidence_refs": [
+            "event_007",
+            "event_008",
+            "event_009"
+          ],
+          "quote": "post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}",
+          "delivered_result": "A tweet with content 'healthy' (tag #CarMaintenance, mention @VehicleGuru) was posted as tweet ID 10 and then successfully retweeted.",
+          "correct_result": "A tweet with content 'not healthy' (rear tires at 30 psi are outside the inclusive 32-35 healthy range) with tag #CarMaintenance and mention @VehicleGuru, followed by retweeting that post."
+        },
+        "evidence_citations": [],
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 8,
+            "quote": "post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}",
+            "referent": "post_tweet with content 'not healthy' (rear tires at 30.0 psi fall below the user-defined inclusive 32-35 healthy range), keeping tags ['#CarMaintenance'] and mentions ['@VehicleGuru']",
+            "evidence_refs": [
+              "event_007",
+              "event_008",
+              "event_009"
+            ],
+            "reason": "Event_008 is the first assistant-authored step introducing the wrong content: despite event_007 showing rear tire pressures of 30.0 psi (outside the inclusive 32-35 range), the assistant posted 'healthy' instead of 'not healthy', and although event_009 acknowledged the discrepancy, the tweet was never corrected before being retweeted at event_010."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 1667,
+              "completion_tokens": 945,
+              "total_tokens": 2612,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 745
+              },
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 745
+              },
+              "input_tokens": 1667,
+              "output_tokens": 945
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "\n{\n  \"step\": 8,\n  \"quote\": \"post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}\",\n  \"referent\": \"post_tweet with content 'not healthy' (rear tires at 30.0 psi fall below the user-defined inclusive 32-35 healthy range), keeping tags ['#CarMaintenance"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 8,
+            "reason": "The assistant posted the tire pressure status as 'healthy' even though the observed rear tire pressures (30 psi) fall below the user-defined healthy range of 32-35 inclusive, so the required content was 'not healthy'; this wrong post was never corrected and was subsequently retweeted as the requested tire-maintenance post.",
+            "delivered_result": "A tweet with content 'healthy' (tag #CarMaintenance, mention @VehicleGuru) was posted as tweet ID 10 and then successfully retweeted.",
+            "correct_result": "A tweet with content 'not healthy' (rear tires at 30 psi are outside the inclusive 32-35 healthy range) with tag #CarMaintenance and mention @VehicleGuru, followed by retweeting that post.",
+            "evidence_refs": [
+              "event_007",
+              "event_008",
+              "event_009"
+            ],
+            "contracts": [
+              {
+                "kind": "verbatim_content",
+                "requirement": "The tweet message content must be exactly 'healthy' or 'not healthy', nothing else"
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Status is 'healthy' only if all tire pressures are between 32 and 35 inclusive; observed readings 32/32/30/30 require the content 'not healthy'"
+              },
+              {
+                "kind": "required_action",
+                "requirement": "Check tire pressure, post the status tweet with tag '#CarMaintenance' and mention '@VehicleGuru', then retweet the tire maintenance post (plus convert 20 liters to gallons and start the engine)"
+              },
+              {
+                "kind": "required_channel",
+                "requirement": "The status must be shared via a Twitter post carrying #CarMaintenance and @VehicleGuru"
+              }
+            ],
+            "confidence": "high",
+            "quote": "post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006",
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010",
+              "event_011"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 8,
+            "evidence_refs": [
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010"
+            ],
+            "evidence_citations": [],
+            "conflict_note": "The observation at event_007 contains an internal discrepancy: 'healthy_tire_pressure': true alongside rear pressures of 30.0 psi. This is resolved by the task contract: the user explicitly fixed the definition of healthy as all tires between 32 and 35 inclusive, and task-fixed constants cannot be overridden by an observation. Applying that definition to the observed 30 psi rear pressures yields 'not healthy', so the conflict does not unsettle the finding.",
+            "reason": "CONTENT TEST: At event_008 the assistant called post_tweet with {'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}. The task text fixes the content criterion: 'Healthy is defined as all tire pressure between 32 and 35, inclusive.' The observation at event_007 shows rearLeftTirePressure 30.0 and rearRightTirePressure 30.0, outside that inclusive range, so the required content was 'not healthy'. The delivered 'healthy' is a real deviation from an explicitly fixed deliverable value (the tool's 'healthy_tire_pressure': true flag cannot override the task's definition). RELEVANCE TEST: The wrong tweet (id 10) was never corrected — event_009 only acknowledges the error in prose ('the rear tires (30 psi) indicate not healthy... Would you like me to clarify this discrepancy?') without deleting or reposting, and event_010 then retweets tweet_id 10, delivering the wrong content as the requested tire-maintenance post. Correcting step 8 to post 'not healthy' would make the tweet and the subsequent retweet correct, so the step is causally connected to the material deliverables. Step 8 is the earliest assistant-authored introduction of the wrong content; event_007 is an observation, not an assistant error."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 8,
+              "evidence_refs": [
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "The observation at event_007 contains an internal discrepancy: 'healthy_tire_pressure': true alongside rear pressures of 30.0 psi. This is resolved by the task contract: the user explicitly fixed the definition of healthy as all tires between 32 and 35 inclusive, and task-fixed constants cannot be overridden by an observation. Applying that definition to the observed 30 psi rear pressures yields 'not healthy', so the conflict does not unsettle the finding.",
+              "reason": "CONTENT TEST: At event_008 the assistant called post_tweet with {'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}. The task text fixes the content criterion: 'Healthy is defined as all tire pressure between 32 and 35, inclusive.' The observation at event_007 shows rearLeftTirePressure 30.0 and rearRightTirePressure 30.0, outside that inclusive range, so the required content was 'not healthy'. The delivered 'healthy' is a real deviation from an explicitly fixed deliverable value (the tool's 'healthy_tire_pressure': true flag cannot override the task's definition). RELEVANCE TEST: The wrong tweet (id 10) was never corrected — event_009 only acknowledges the error in prose ('the rear tires (30 psi) indicate not healthy... Would you like me to clarify this discrepancy?') without deleting or reposting, and event_010 then retweets tweet_id 10, delivering the wrong content as the requested tire-maintenance post. Correcting step 8 to post 'not healthy' would make the tweet and the subsequent retweet correct, so the step is causally connected to the material deliverables. Step 8 is the earliest assistant-authored introduction of the wrong content; event_007 is an observation, not an assistant error."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 8,
+              "evidence_refs": [
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "The tool observation includes healthy_tire_pressure: true, but the task text explicitly fixes the criterion ('all tire pressure between 32 and 35, inclusive'); task-fixed constants govern the deliverable and cannot be overridden by an observation, so the flag does not legitimize the 'healthy' post.",
+              "reason": "CONTENT TEST: event_007 observed rearLeftTirePressure 30.0 and rearRightTirePressure 30.0, outside the user's task-fixed healthy range of 32-35 inclusive, so the required message content was 'not healthy'. At event_008 the assistant posted {'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']} — a deliverable breach of the task-fixed content. RELEVANCE TEST: the error was never corrected — event_009 merely acknowledged the discrepancy in prose ('the rear tires (30 psi) indicate not healthy... Would you like me to clarify?') without deleting or reposting, and event_010 retweeted tweet ID 10, the wrong post, making the wrong content the delivered final state. Correcting step 8 to post 'not healthy' would make the subsequent retweet propagate the correct post and every deliverable correct, so the step is causally connected and material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 8,
+              "evidence_refs": [
+                "event_007",
+                "event_008",
+                "event_009",
+                "event_010"
+              ],
+              "evidence_citations": [],
+              "conflict_note": "The tool observation's flag healthy_tire_pressure:true conflicts with the user-fixed definition, but grounding rule 2 gives the task text precedence: 'Healthy is defined as all tire pressure between 32 and 35, inclusive', and the observed rear pressures (30.0 psi) fall outside that range, so the required content is 'not healthy'. The assistant's own event_009 prose concedes this.",
+              "reason": "CONTENT TEST: turn 2 fixes the contract — content must be 'healthy' or 'not healthy' with 'Healthy is deinfed as all tire pressure between 32 and 35, inclusive'. event_007 observes rearLeftTirePressure 30.0 and rearRightTirePressure 30.0, outside the inclusive 32-35 range, so the required content was 'not healthy'. At event_008 the assistant posted {'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']} (tweet ID 10) — a real content deviation; the environment flag healthy_tire_pressure:true cannot override the task-fixed definition, and event_009 shows the assistant itself conceding 'the rear tires (30 psi) indicate **not healthy**'. RELEVANCE TEST: the error was never corrected — event_009 only acknowledges the discrepancy in prose while the wrong tweet remains live, and event_010 retweets tweet_id 10, delivering the wrong 'healthy' content as the requested tire-maintenance post (the retweet is delivery of the uncorrected error, not a separate root cause). Correcting event_008 to post 'not healthy' would make both the tweet and the subsequent retweet correct, so the step is causally connected to every affected deliverable."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 2297,
+              "completion_tokens": 2120,
+              "total_tokens": 4417,
+              "prompt_tokens_details": {
+                "cached_tokens": 2240
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1693
+              },
+              "input_tokens_details": {
+                "cached_tokens": 2240
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1693
+              },
+              "input_tokens": 2297,
+              "output_tokens": 2120
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 8,\n  \"evidence_refs\": [\"event_007\", \"event_008\", \"event_009\", \"event_010\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"The tool observation's flag healthy_tire_pressure:true conflicts with the user-fixed definition, but grounding rule 2 gives ",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_006",
+              "event_007",
+              "event_008",
+              "event_009",
+              "event_010"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_011"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    },
+    "external_evidence": null
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2448,
+        "completion_tokens": 14747,
+        "total_tokens": 17195,
+        "prompt_tokens_details": {
+          "cached_tokens": 2432
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 14248
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 14248
+        },
+        "input_tokens_details": {
+          "cached_tokens": 2432
+        },
+        "input_tokens": 2448,
+        "output_tokens": 14747
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 8,\n  \"hallucination_reason\": \"The assistant posted the tweet with content 'healthy' even though the observed tire pressures (rear left and rear right at 30 psi) fail the user's explicit definition of healthy (all tires between 32 and 35 inclusiv",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 1667,
+        "completion_tokens": 945,
+        "total_tokens": 2612,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 745
+        },
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 745
+        },
+        "input_tokens": 1667,
+        "output_tokens": 945
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "\n{\n  \"step\": 8,\n  \"quote\": \"post_tweet arguments={'content': 'healthy', 'tags': ['#CarMaintenance'], 'mentions': ['@VehicleGuru']}\",\n  \"referent\": \"post_tweet with content 'not healthy' (rear tires at 30.0 psi fall below the user-defined inclusive 32-35 healthy range), keeping tags ['#CarMaintenance"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 2297,
+        "completion_tokens": 2120,
+        "total_tokens": 4417,
+        "prompt_tokens_details": {
+          "cached_tokens": 2240
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1693
+        },
+        "input_tokens_details": {
+          "cached_tokens": 2240
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1693
+        },
+        "input_tokens": 2297,
+        "output_tokens": 2120
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 8,\n  \"evidence_refs\": [\"event_007\", \"event_008\", \"event_009\", \"event_010\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"The tool observation's flag healthy_tire_pressure:true conflicts with the user-fixed definition, but grounding rule 2 gives ",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "c2e54ee4ce611117158aae1642a11b95ed729231c5b085d383bb265748babc9b"
+  },
+  "_packet_event_count": 11
+}

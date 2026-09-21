@@ -1,10 +1,10 @@
 {
-  "started_at_utc": "2026-09-20T14:25:39.723993+00:00",
-  "finished_at_utc": "2026-09-20T14:26:18.510759+00:00",
+  "started_at_utc": "2026-09-21T05:36:58.002191+00:00",
+  "finished_at_utc": "2026-09-21T05:37:40.840367+00:00",
   "python": "3.13.7",
   "platform": "Windows-10-10.0.19045-SP0",
   "scope": "Offline regression and mock mechanism validation; no live provider accuracy measurement.",
-  "source_sha256": "25370d6f80b56c6bad057e3501c1bd08e9c48594932a2ce1590c4eac45abcb56",
+  "source_sha256": "20ad0d938bfc8884eda4b447d99d3302653e75e995eac1b677f8208cf3e76a55",
   "passed": true,
   "tests": {
     "tests": 425,
@@ -29,7 +29,7 @@
         "--junitxml=reports/latest/pytest.xml"
       ],
       "exit_code": 0,
-      "seconds": 30.698
+      "seconds": 35.843
     },
     {
       "name": "detector_cli",
@@ -39,7 +39,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.212
+      "seconds": 0.24
     },
     {
       "name": "evolution_cli",
@@ -49,7 +49,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.235
+      "seconds": 0.266
     },
     {
       "name": "capability_audit",
@@ -59,7 +59,7 @@
         "capability-audit"
       ],
       "exit_code": 0,
-      "seconds": 0.256
+      "seconds": 0.27
     },
     {
       "name": "smoke",
@@ -68,10 +68,10 @@
         "evolution",
         "smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_87v8fx8m\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_j482opxd\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 3.78
+      "seconds": 3.854
     },
     {
       "name": "smoke_admission_and_audit",
@@ -84,10 +84,10 @@
         "evolution",
         "capability-smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_87v8fx8m\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_j482opxd\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 1.857
+      "seconds": 2.007
     },
     {
       "name": "source_unchanged_during_checks",

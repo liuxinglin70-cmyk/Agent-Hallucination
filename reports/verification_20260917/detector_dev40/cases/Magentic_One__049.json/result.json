@@ -1,0 +1,170 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "Magentic_One/049.json",
+  "state": "verified_clean",
+  "decision_authority": "degraded_judge_only",
+  "runtime_valid": true,
+  "responsible_event_id": null,
+  "responsible_step": null,
+  "incident_occurred": false,
+  "occurrence_state": "verified_clean",
+  "proof": {
+    "state": "verified_clean",
+    "decision_authority": "degraded_judge_only",
+    "runtime_valid": true,
+    "responsible_event_id": null,
+    "responsible_step": null,
+    "incident_occurred": false,
+    "terminal_basis": {
+      "state": "verified_clean",
+      "decisive_facts": {
+        "judge": "false",
+        "recall_upgrade": "none",
+        "delivered_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the compound whose oxidation to its aromatic form is least favorable.",
+        "correct_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the least favorable to oxidize: in the aromatic product 1,10-dimethylbenzo[c]cinnoline the methyl groups flank the N=N azo unit in the bay/peri region, introducing severe steric strain that destabilizes the oxidized form, whereas the parent (1) and the 3,8-dimethyl isomer (4) lack this strain and the naphtho-fused system (3) gains extra aromatic stabilization upon oxidation."
+      },
+      "blocking_facts": [
+        {
+          "component": "recall",
+          "code": "recall_unavailable",
+          "error_type": "case_deadline_exceeded",
+          "error": "case deadline exceeded"
+        }
+      ]
+    },
+    "authority_failure_reasons": [
+      {
+        "component": "recall",
+        "code": "recall_unavailable",
+        "error_type": "case_deadline_exceeded",
+        "error": "case deadline exceeded"
+      }
+    ],
+    "judge": {
+      "is_hallucination": false,
+      "hallucination_step": null,
+      "hallucination_reason": null,
+      "delivered_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the compound whose oxidation to its aromatic form is least favorable.",
+      "correct_result": "Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the least favorable to oxidize: in the aromatic product 1,10-dimethylbenzo[c]cinnoline the methyl groups flank the N=N azo unit in the bay/peri region, introducing severe steric strain that destabilizes the oxidized form, whereas the parent (1) and the 3,8-dimethyl isomer (4) lack this strain and the naphtho-fused system (3) gains extra aromatic stabilization upon oxidation.",
+      "basis": "world_knowledge",
+      "confidence": "medium",
+      "evidence_refs": [],
+      "root_cause": null,
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Identify which one of the four listed compounds undergoes the least favorable oxidation by oxygen to its aromatic counterpart (a single compound choice among 1-4)."
+        }
+      ]
+    },
+    "recall_candidates": [],
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": null,
+    "defense": null,
+    "causal_upgrade_coverage": null,
+    "hearings": [],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 4,
+      "view": "complete",
+      "warnings": [
+        {
+          "attempt": "vote",
+          "error": "total timeout exceeded"
+        },
+        {
+          "attempt": "vote",
+          "error": "case deadline exceeded"
+        },
+        {
+          "attempt": "vote",
+          "error": "case deadline exceeded"
+        }
+      ]
+    },
+    "recall_scanner": {
+      "stage": "recall_scanner",
+      "state": "provider_error",
+      "attempts": 0,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 2,
+      "usage": {
+        "prompt_tokens": 7076,
+        "completion_tokens": 4296,
+        "total_tokens": 11372,
+        "prompt_tokens_details": {
+          "cached_tokens": 7040
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3947
+        },
+        "input_tokens_details": {
+          "cached_tokens": 7040
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 3947
+        },
+        "input_tokens": 7076,
+        "output_tokens": 4296
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Compound 2 (1,10-dimethyl-5,6-dihydrobenzo[c]cinnoline) is the least favorable to oxidize, because methyl groups at the 1,10 positions disrupt planarity/aromatic stabilization of the product and raise",
+      "vote": {
+        "votes": 3,
+        "cast": 2,
+        "positives": 0,
+        "winner": false,
+        "tie": false,
+        "topups": 2
+      }
+    }
+  },
+  "authority_failure_reasons": [
+    {
+      "component": "recall",
+      "code": "recall_unavailable",
+      "error_type": "case_deadline_exceeded",
+      "error": "case deadline exceeded"
+    }
+  ],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": "complete",
+    "upgrade_view": null,
+    "tracer_view": null,
+    "defense_view": null
+  },
+  "provenance": {
+    "packet_hash": "11e5a5b2dbff7b99b88f1b699dfcdeb7940bb374acb0bfd7173e5a9711061aff"
+  },
+  "_packet_event_count": 10
+}

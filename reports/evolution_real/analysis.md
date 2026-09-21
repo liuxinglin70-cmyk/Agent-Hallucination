@@ -10,7 +10,7 @@
 
 ## 1. 重新计算的结果
 
-证据：`recheck.json`，来源为原 `artifacts/evolution_real/cycles/cycle001.json` 和 30 例空库缓存。`recheck.py` 可重复执行确定性检查；不调用模型、不改变原账本。
+证据：`recheck.json`，来源为原 `artifacts/evolution_real/cycles/cycle001.json` 和 30 例空库缓存（运行目录已回收，归档副本见 [../verification_20260917/evolution_run/cycles/](../verification_20260917/evolution_run/cycles/)）。`recheck.py` 可重复执行确定性检查；不调用模型、不改变原账本。
 
 ### 1.1 Patrol 混入了运行失败
 
@@ -193,8 +193,8 @@ BFCL/041的正向补测最终responsible_step=3，与gold步号一致；但trace
 
 ## 证据入口
 
-- 原始轮次：`artifacts/evolution_real/cycles/cycle001.json`
-- 原始账本：`artifacts/evolution_real/ledger.jsonl`
+- 原始轮次：[../verification_20260917/evolution_run/cycles/cycle001.json](../verification_20260917/evolution_run/cycles/cycle001.json)
+- 原始账本：[../verification_20260917/evolution_run/ledger.jsonl](../verification_20260917/evolution_run/ledger.jsonl)
 - 确定性复核：`reports/evolution_real/recheck.py`、`recheck.json`
 - 独立诊断：`reports/evolution_real/recheck_live/protocol.json`及逐例结果
 - 计分/门限：`evolution/metrics.py`、`evolution/gates.py`、`evolution/worksheet.py`

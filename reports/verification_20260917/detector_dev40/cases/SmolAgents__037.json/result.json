@@ -1,0 +1,478 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "SmolAgents/037.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_003",
+  "responsible_step": 3,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 6,
+        "traced_step": 3,
+        "defense": "substantiated",
+        "confirmed_step": 6,
+        "delivered_result": "Season 1, Episode 5, 'The King of Omashu'",
+        "correct_result": "Season 2, Episode 2, 'The Cave of Two Lovers'",
+        "judge_basis": "world_knowledge",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 6,
+      "hallucination_reason": "The final answer claims Season 1, Episode 5 'The King of Omashu' is the episode in which the history of Omashu is explained, but that episode only introduces the city and recounts Aang's personal past there; the history of the city Omashu itself (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers'.",
+      "delivered_result": "Season 1, Episode 5, 'The King of Omashu'",
+      "correct_result": "Season 2, Episode 2, 'The Cave of Two Lovers'",
+      "basis": "world_knowledge",
+      "confidence": "medium",
+      "evidence_refs": [
+        "event_006",
+        "event_003"
+      ],
+      "root_cause": {
+        "step": 6,
+        "quote": "The episode of \"Avatar: The Last Airbender\" in which the history of the city Omashu is explained is:\n- Season: 1\n- Episode: 5\n- Title: \"The King of Omashu\"",
+        "referent": "Season 2, Episode 2, 'The Cave of Two Lovers' — the episode in which the legend of the two lovers Oma and Shu explains the founding and history of the city Omashu"
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "The season number of the Avatar: The Last Airbender episode in which the history of the city Omashu is explained (Season 2)"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "The episode number of that episode (Episode 2)"
+        },
+        {
+          "kind": "verbatim_content",
+          "requirement": "The title of that episode ('The Cave of Two Lovers')"
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 3,
+      "quote": "arguments={'url': 'https://avatar.fandom.com/wiki/The_King_of_Omashu'}",
+      "referent": "The page for 'The Cave of Two Lovers' (Book Two: Earth, Chapter 2; Season 2, Episode 2), the episode that recounts the founding legend of Omashu (the lovers Oma and Shu), as documented on the Omashu city page (first search result in event_002)",
+      "evidence_refs": [
+        "event_003",
+        "event_002"
+      ],
+      "reason": "This is the earliest step where the agent committed to 'The King of Omashu' as the episode explaining Omashu's history; the synopsis it read covers only Aang's reunion with King Bumi and Aang's personal past, not the city's founding history, which is actually told in 'The Cave of Two Lovers' (Season 2, Episode 2), so investigating this page instead of the Omashu city history introduced the wrong episode identification that was later confirmed in event_005 and delivered in event_006."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 6,
+      "evidence_refs": [
+        "event_006",
+        "event_003"
+      ],
+      "reason": "CONTENT TEST: event_006 delivers 'The episode ... in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: The King of Omashu'. The trajectory's own evidence contradicts this: the event_003 observation (the episode's wiki page) shows the episode's plot is Aang visiting Omashu, meeting King Bumi, and the three challenges — it introduces the city and recounts Aang's personal past there ('focusing on developing Aang's past'), and nowhere explains the history of the city itself. The history of Omashu (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers', so the delivered answer names the wrong episode — a RESULT ERROR. RELEVANCE TEST: the final answer is the sole deliverable of this QA task and event_006 is the last event with no later correction; replacing the delivered episode with the correct one would make the deliverable correct, so the error is causally material."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 6,
+          "reason": "The final answer claims Season 1, Episode 5 'The King of Omashu' is the episode in which the history of Omashu is explained, but that episode only introduces the city and recounts Aang's personal past there; the history of the city Omashu itself (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers'.",
+          "evidence_refs": [
+            "event_006",
+            "event_003"
+          ],
+          "quote": "The episode of \"Avatar: The Last Airbender\" in which the history of the city Omashu is explained is:\n- Season: 1\n- Episode: 5\n- Title: \"The King of Omashu\"",
+          "delivered_result": "Season 1, Episode 5, 'The King of Omashu'",
+          "correct_result": "Season 2, Episode 2, 'The Cave of Two Lovers'"
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 3,
+            "quote": "arguments={'url': 'https://avatar.fandom.com/wiki/The_King_of_Omashu'}",
+            "referent": "The page for 'The Cave of Two Lovers' (Book Two: Earth, Chapter 2; Season 2, Episode 2), the episode that recounts the founding legend of Omashu (the lovers Oma and Shu), as documented on the Omashu city page (first search result in event_002)",
+            "evidence_refs": [
+              "event_003",
+              "event_002"
+            ],
+            "reason": "This is the earliest step where the agent committed to 'The King of Omashu' as the episode explaining Omashu's history; the synopsis it read covers only Aang's reunion with King Bumi and Aang's personal past, not the city's founding history, which is actually told in 'The Cave of Two Lovers' (Season 2, Episode 2), so investigating this page instead of the Omashu city history introduced the wrong episode identification that was later confirmed in event_005 and delivered in event_006."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 25820,
+              "completion_tokens": 4865,
+              "total_tokens": 30685,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 4616
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 4616
+              },
+              "input_tokens": 25820,
+              "output_tokens": 4865
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":3,\"quote\":\"arguments={'url': 'https://avatar.fandom.com/wiki/The_King_of_Omashu'}\",\"referent\":\"The page for 'The Cave of Two Lovers' (Book Two: Earth, Chapter 2; Season 2, Episode 2), the episode that recounts the founding legend of Omashu (the lovers Oma and Shu), as documented on the Omash"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 6,
+            "reason": "The final answer claims Season 1, Episode 5 'The King of Omashu' is the episode in which the history of Omashu is explained, but that episode only introduces the city and recounts Aang's personal past there; the history of the city Omashu itself (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers'.",
+            "delivered_result": "Season 1, Episode 5, 'The King of Omashu'",
+            "correct_result": "Season 2, Episode 2, 'The Cave of Two Lovers'",
+            "evidence_refs": [
+              "event_006",
+              "event_003"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "The season number of the Avatar: The Last Airbender episode in which the history of the city Omashu is explained (Season 2)"
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "The episode number of that episode (Episode 2)"
+              },
+              {
+                "kind": "verbatim_content",
+                "requirement": "The title of that episode ('The Cave of Two Lovers')"
+              }
+            ],
+            "confidence": "medium",
+            "quote": "The episode of \"Avatar: The Last Airbender\" in which the history of the city Omashu is explained is:\n- Season: 1\n- Episode: 5\n- Title: \"The King of Omashu\""
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 6,
+            "evidence_refs": [
+              "event_006",
+              "event_003"
+            ],
+            "reason": "CONTENT TEST: event_006 delivers 'The episode ... in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: The King of Omashu'. The trajectory's own evidence contradicts this: the event_003 observation (the episode's wiki page) shows the episode's plot is Aang visiting Omashu, meeting King Bumi, and the three challenges — it introduces the city and recounts Aang's personal past there ('focusing on developing Aang's past'), and nowhere explains the history of the city itself. The history of Omashu (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers', so the delivered answer names the wrong episode — a RESULT ERROR. RELEVANCE TEST: the final answer is the sole deliverable of this QA task and event_006 is the last event with no later correction; replacing the delivered episode with the correct one would make the deliverable correct, so the error is causally material."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers 'The episode ... in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: The King of Omashu'. The trajectory's own evidence contradicts this: the event_003 observation (the episode's wiki page) shows the episode's plot is Aang visiting Omashu, meeting King Bumi, and the three challenges — it introduces the city and recounts Aang's personal past there ('focusing on developing Aang's past'), and nowhere explains the history of the city itself. The history of Omashu (the founding legend of the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers', so the delivered answer names the wrong episode — a RESULT ERROR. RELEVANCE TEST: the final answer is the sole deliverable of this QA task and event_006 is the last event with no later correction; replacing the delivered episode with the correct one would make the deliverable correct, so the error is causally material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_003",
+                "event_006"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers 'The episode of \"Avatar: The Last Airbender\" in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: \"The King of Omashu\"'. The trajectory's own environment fact, event_003, contains the full plot of 'The King of Omashu' (Aang visits Omashu, delivery chutes, meeting King Bumi, three challenges) and no explanation of the city's history — it only recounts Aang's personal past there ('friends one hundred years prior'), and even the answer's own justification concedes the episode merely 'introduces Omashu, its delivery system, and King Bumi'. The city's actual history (the founding legend of the lovers Oma and Shu and the origin of the city's name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers', so the delivered result is factually wrong — a RESULT ERROR. RELEVANCE TEST: the final answer is the only required deliverable, and correcting event_006 to Season 2, Episode 2 'The Cave of Two Lovers' makes it fully correct; there is no later correction and the step is the delivered result itself, so the error is material."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 6,
+              "evidence_refs": [
+                "event_006",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: event_006 delivers 'The episode of \"Avatar: The Last Airbender\" in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: \"The King of Omashu\"'. The shown environment fact in event_003 (the full Avatar Wiki plot summary of 'The King of Omashu') proves this episode contains no explanation of the city's own history: it only shows Aang introducing Katara and Sokka to the city, its delivery system, and King Bumi, recounting Aang's personal past there ('he and his eccentric childhood friend, Bumi... would slide down the Omashu delivery system for fun'; the trivia even notes the episode focuses 'on developing Aang's past'). The founding history of Omashu itself (the lovers Oma and Shu, origin of the city and its name) is explained in Season 2, Episode 2, 'The Cave of Two Lovers', so the delivered season/episode/title is a wrong result. The trajectory never consulted any source on Omashu's history — event_005's search presupposes the wrong episode ('The King of Omashu season and episode number') — and the final answer's own hedge ('introduces Omashu... who shares historical background with Aang and the city') concedes it does not explain the city's history. RELEVANCE TEST: the alleged step IS the delivered final answer (the only deliverable); correcting it to 'The Cave of Two Lovers' (S2E2) makes the deliverable correct, and no later event repairs it. Real and material RESULT ERROR."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 25175,
+              "completion_tokens": 3737,
+              "total_tokens": 28912,
+              "prompt_tokens_details": {
+                "cached_tokens": 25152
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 3343
+              },
+              "input_tokens_details": {
+                "cached_tokens": 25152
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 3343
+              },
+              "input_tokens": 25175,
+              "output_tokens": 3737
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: event_006 delivers 'The episode of \\\"Avatar: The Last Airbender\\\" in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: \\\"The King of Omas",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_003",
+              "event_004",
+              "event_005",
+              "event_006"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001",
+              "event_002"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 26318,
+        "completion_tokens": 2957,
+        "total_tokens": 29275,
+        "prompt_tokens_details": {
+          "cached_tokens": 26304
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2721
+        },
+        "input_tokens_details": {
+          "cached_tokens": 26304
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2721
+        },
+        "input_tokens": 26318,
+        "output_tokens": 2957
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"Season 1, Episode 5, titled 'The King of Omashu' — the episode in which Omashu and its history (the delivery system and Aang's past in the city with Bumi) are explained.\",\"correct_result\":\"Season 1, E",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 2,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 25820,
+        "completion_tokens": 4865,
+        "total_tokens": 30685,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4616
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 4616
+        },
+        "input_tokens": 25820,
+        "output_tokens": 4865
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":3,\"quote\":\"arguments={'url': 'https://avatar.fandom.com/wiki/The_King_of_Omashu'}\",\"referent\":\"The page for 'The Cave of Two Lovers' (Book Two: Earth, Chapter 2; Season 2, Episode 2), the episode that recounts the founding legend of Omashu (the lovers Oma and Shu), as documented on the Omash"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 25175,
+        "completion_tokens": 3737,
+        "total_tokens": 28912,
+        "prompt_tokens_details": {
+          "cached_tokens": 25152
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 3343
+        },
+        "input_tokens_details": {
+          "cached_tokens": 25152
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 3343
+        },
+        "input_tokens": 25175,
+        "output_tokens": 3737
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 6,\n  \"evidence_refs\": [\"event_006\", \"event_003\"],\n  \"reason\": \"CONTENT TEST: event_006 delivers 'The episode of \\\"Avatar: The Last Airbender\\\" in which the history of the city Omashu is explained is: Season: 1, Episode: 5, Title: \\\"The King of Omas",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "e405f919b9043c8d7a057ccf95289f664ffbf3330811ebd89e7ef7760a761961"
+  },
+  "_packet_event_count": 6
+}

@@ -1,0 +1,473 @@
+{
+  "schema_version": "detector.detection_result.v1",
+  "case_id": "SmolAgents/036.json",
+  "state": "verified_error",
+  "decision_authority": "authoritative",
+  "runtime_valid": true,
+  "responsible_event_id": "event_003",
+  "responsible_step": 3,
+  "incident_occurred": true,
+  "occurrence_state": "verified_error",
+  "proof": {
+    "state": "verified_error",
+    "decision_authority": "authoritative",
+    "runtime_valid": true,
+    "responsible_event_id": "event_003",
+    "responsible_step": 3,
+    "incident_occurred": true,
+    "terminal_basis": {
+      "state": "verified_error",
+      "decisive_facts": {
+        "positive_source": "judge",
+        "judge_step": 4,
+        "traced_step": 3,
+        "defense": "substantiated",
+        "confirmed_step": 4,
+        "delivered_result": "Energy of the third excited state E = (9/2)ħω = 4.5ħω, with 30 linearly independent eigenfunctions (degeneracy 30).",
+        "correct_result": "Energy of the third excited state E = (3 + 3/2)ħω = (9/2)ħω, with (n+1)(n+2)/2 = (4·5)/2 = 10 linearly independent eigenfunctions (degeneracy 10).",
+        "judge_basis": "derivation",
+        "authority": "authoritative",
+        "guard_actions": [],
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "verdict": "substantiated"
+          }
+        ]
+      },
+      "blocking_facts": []
+    },
+    "authority_failure_reasons": [],
+    "judge": {
+      "is_hallucination": true,
+      "hallucination_step": 4,
+      "hallucination_reason": "The trajectory computed the degeneracy with the erroneous formula g(n) = n(n+1)(n+2)/2, yielding 30, whereas the correct degeneracy of the n=3 level of the 3D isotropic harmonic oscillator is g(n) = (n+1)(n+2)/2 = 10.",
+      "delivered_result": "Energy of the third excited state E = (9/2)ħω = 4.5ħω, with 30 linearly independent eigenfunctions (degeneracy 30).",
+      "correct_result": "Energy of the third excited state E = (3 + 3/2)ħω = (9/2)ħω, with (n+1)(n+2)/2 = (4·5)/2 = 10 linearly independent eigenfunctions (degeneracy 10).",
+      "basis": "derivation",
+      "confidence": "high",
+      "evidence_refs": [
+        "event_004",
+        "event_005"
+      ],
+      "root_cause": {
+        "step": 4,
+        "quote": "g = int(0.5 * n * (n + 1) * (n + 2))",
+        "referent": "g = (n+1)(n+2)/2; for n=3 the number of non-negative integer solutions of n_x+n_y+n_z=3 is C(5,2)=10, not 30"
+      },
+      "contracts": [
+        {
+          "kind": "exact_value",
+          "requirement": "Energy of the third excited state (n=3) of the 3D isotropic harmonic oscillator: E = (3 + 3/2)ħω = (9/2)ħω"
+        },
+        {
+          "kind": "exact_value",
+          "requirement": "Number of linearly independent eigenfunctions at that energy (degeneracy for n=3): (n+1)(n+2)/2 = 10"
+        }
+      ]
+    },
+    "recall_candidates": null,
+    "causal_upgrade": null,
+    "causal_upgrades": null,
+    "causal_upgrade_rows": null,
+    "step_tracer": {
+      "step": 3,
+      "quote": "= (n + 1)(n + 1) - ½n(n + 1) = ½n(n + 1)(n + 2)",
+      "referent": "g_n = (n + 1)(n + 2)/2 — the sum ∑_{n1=0}^{n}(n - n1 + 1) simplifies to (n+1)(n+2)/2, giving g(3) = 10, not 30",
+      "evidence_refs": [
+        "event_003"
+      ],
+      "reason": "The erroneous degeneracy formula n(n+1)(n+2)/2 (yielding 30 for n=3) first enters the trajectory in the event_003 webpage observation — even though its own intermediate algebra (n+1)² − ½n(n+1) equals (n+1)(n+2)/2 — and the event_004 code merely transcribes this wrong formula, so step 3 is the earliest introduction of the degeneracy error."
+    },
+    "defense": {
+      "verdict": "substantiated",
+      "confirmed_step": 4,
+      "evidence_refs": [
+        "event_004",
+        "event_005",
+        "event_002",
+        "event_003"
+      ],
+      "reason": "CONTENT TEST: At event_004 the code explicitly applies the formula '# (2) Degeneracy formula: g(n) = 1/2 * n * (n + 1) * (n + 2)' with n=3, and the observation returns '(4.5, 30)'. The correct degeneracy of the n=3 level is g(n) = (n+1)(n+2)/2 = (4·5)/2 = 10, which is confirmed within the trajectory's own evidence: the search result in event_002 gives g(n,p) = (n+p−1)!/(n!(p−1)!) = C(n+2,2) = 10 for n=3, p=3, and the visited page in event_003 derives g_n = ∑_{n1=0}^{n}(n−n1+1), which for n=3 sums to 4+3+2+1 = 10 (its closed form (n+1)(n+2)/2; the page's trailing '½n(n+1)(n+2)' is an internal algebra slip the trajectory copied uncritically). The Weizmann source in event_002 also states the n=3 level is 'the 10-dimensional irrep'. So the deviation (30 vs 10) is factually real. RELEVANCE TEST: The erroneous value propagates uncorrected into the required deliverable — event_005's final_answer states 'The number of linearly independent eigenfunctions (degeneracy) at this energy is 30.' The energy (9/2)ħω is correct, but the degeneracy deliverable is a RESULT ERROR with no later correction, so the step is causally connected to the wrong delivered answer."
+    },
+    "causal_upgrade_coverage": null,
+    "hearings": [
+      {
+        "source": "judge",
+        "candidate_id": null,
+        "positive": {
+          "source": "judge",
+          "step": 4,
+          "reason": "The trajectory computed the degeneracy with the erroneous formula g(n) = n(n+1)(n+2)/2, yielding 30, whereas the correct degeneracy of the n=3 level of the 3D isotropic harmonic oscillator is g(n) = (n+1)(n+2)/2 = 10.",
+          "evidence_refs": [
+            "event_004",
+            "event_005"
+          ],
+          "quote": "g = int(0.5 * n * (n + 1) * (n + 2))",
+          "delivered_result": "Energy of the third excited state E = (9/2)ħω = 4.5ħω, with 30 linearly independent eigenfunctions (degeneracy 30).",
+          "correct_result": "Energy of the third excited state E = (3 + 3/2)ħω = (9/2)ħω, with (n+1)(n+2)/2 = (4·5)/2 = 10 linearly independent eigenfunctions (degeneracy 10)."
+        },
+        "tracer_result": {
+          "ok": true,
+          "parsed": {
+            "step": 3,
+            "quote": "= (n + 1)(n + 1) - ½n(n + 1) = ½n(n + 1)(n + 2)",
+            "referent": "g_n = (n + 1)(n + 2)/2 — the sum ∑_{n1=0}^{n}(n - n1 + 1) simplifies to (n+1)(n+2)/2, giving g(3) = 10, not 30",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "reason": "The erroneous degeneracy formula n(n+1)(n+2)/2 (yielding 30 for n=3) first enters the trajectory in the event_003 webpage observation — even though its own intermediate algebra (n+1)² − ½n(n+1) equals (n+1)(n+2)/2 — and the event_004 code merely transcribes this wrong formula, so step 3 is the earliest introduction of the degeneracy error."
+          },
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 3548,
+              "completion_tokens": 6067,
+              "total_tokens": 9615,
+              "prompt_tokens_details": {
+                "cached_tokens": 64
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 5830
+              },
+              "input_tokens_details": {
+                "cached_tokens": 64
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 5830
+              },
+              "input_tokens": 3548,
+              "output_tokens": 6067
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "step_tracer",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\"step\":3,\"quote\":\"= (n + 1)(n + 1) - ½n(n + 1) = ½n(n + 1)(n + 2)\",\"referent\":\"g_n = (n + 1)(n + 2)/2 — the sum ∑_{n1=0}^{n}(n - n1 + 1) simplifies to (n+1)(n+2)/2, giving g(3) = 10, not 30\",\"evidence_refs\":[\"event_003\"],\"reason\":\"The erroneous degeneracy formula n(n+1)(n+2)/2 (yielding 30 for n=3)"
+          },
+          "hearing_target": {
+            "source": "judge",
+            "step": 4,
+            "reason": "The trajectory computed the degeneracy with the erroneous formula g(n) = n(n+1)(n+2)/2, yielding 30, whereas the correct degeneracy of the n=3 level of the 3D isotropic harmonic oscillator is g(n) = (n+1)(n+2)/2 = 10.",
+            "delivered_result": "Energy of the third excited state E = (9/2)ħω = 4.5ħω, with 30 linearly independent eigenfunctions (degeneracy 30).",
+            "correct_result": "Energy of the third excited state E = (3 + 3/2)ħω = (9/2)ħω, with (n+1)(n+2)/2 = (4·5)/2 = 10 linearly independent eigenfunctions (degeneracy 10).",
+            "evidence_refs": [
+              "event_004",
+              "event_005"
+            ],
+            "contracts": [
+              {
+                "kind": "exact_value",
+                "requirement": "Energy of the third excited state (n=3) of the 3D isotropic harmonic oscillator: E = (3 + 3/2)ħω = (9/2)ħω"
+              },
+              {
+                "kind": "exact_value",
+                "requirement": "Number of linearly independent eigenfunctions at that energy (degeneracy for n=3): (n+1)(n+2)/2 = 10"
+              }
+            ],
+            "confidence": "high",
+            "quote": "g = int(0.5 * n * (n + 1) * (n + 2))"
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_001",
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "degraded": false
+          }
+        },
+        "tracer_status": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense_result": {
+          "ok": true,
+          "parsed": {
+            "verdict": "substantiated",
+            "confirmed_step": 4,
+            "evidence_refs": [
+              "event_004",
+              "event_005",
+              "event_002",
+              "event_003"
+            ],
+            "reason": "CONTENT TEST: At event_004 the code explicitly applies the formula '# (2) Degeneracy formula: g(n) = 1/2 * n * (n + 1) * (n + 2)' with n=3, and the observation returns '(4.5, 30)'. The correct degeneracy of the n=3 level is g(n) = (n+1)(n+2)/2 = (4·5)/2 = 10, which is confirmed within the trajectory's own evidence: the search result in event_002 gives g(n,p) = (n+p−1)!/(n!(p−1)!) = C(n+2,2) = 10 for n=3, p=3, and the visited page in event_003 derives g_n = ∑_{n1=0}^{n}(n−n1+1), which for n=3 sums to 4+3+2+1 = 10 (its closed form (n+1)(n+2)/2; the page's trailing '½n(n+1)(n+2)' is an internal algebra slip the trajectory copied uncritically). The Weizmann source in event_002 also states the n=3 level is 'the 10-dimensional irrep'. So the deviation (30 vs 10) is factually real. RELEVANCE TEST: The erroneous value propagates uncorrected into the required deliverable — event_005's final_answer states 'The number of linearly independent eigenfunctions (degeneracy) at this energy is 30.' The energy (9/2)ħω is correct, but the degeneracy deliverable is a RESULT ERROR with no later correction, so the step is causally connected to the wrong delivered answer."
+          },
+          "raw": [
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005",
+                "event_002",
+                "event_003"
+              ],
+              "reason": "CONTENT TEST: At event_004 the code explicitly applies the formula '# (2) Degeneracy formula: g(n) = 1/2 * n * (n + 1) * (n + 2)' with n=3, and the observation returns '(4.5, 30)'. The correct degeneracy of the n=3 level is g(n) = (n+1)(n+2)/2 = (4·5)/2 = 10, which is confirmed within the trajectory's own evidence: the search result in event_002 gives g(n,p) = (n+p−1)!/(n!(p−1)!) = C(n+2,2) = 10 for n=3, p=3, and the visited page in event_003 derives g_n = ∑_{n1=0}^{n}(n−n1+1), which for n=3 sums to 4+3+2+1 = 10 (its closed form (n+1)(n+2)/2; the page's trailing '½n(n+1)(n+2)' is an internal algebra slip the trajectory copied uncritically). The Weizmann source in event_002 also states the n=3 level is 'the 10-dimensional irrep'. So the deviation (30 vs 10) is factually real. RELEVANCE TEST: The erroneous value propagates uncorrected into the required deliverable — event_005's final_answer states 'The number of linearly independent eigenfunctions (degeneracy) at this energy is 30.' The energy (9/2)ħω is correct, but the degeneracy deliverable is a RESULT ERROR with no later correction, so the step is causally connected to the wrong delivered answer."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005",
+                "event_002"
+              ],
+              "reason": "CONTENT TEST: At event_004 the trajectory encodes '# (2) Degeneracy formula: g(n) = 1/2 * n * (n + 1) * (n + 2)' with n=3, and the tool returns '(4.5, 30)'; this wrong value is carried verbatim into the delivered final answer at event_005: 'The number of linearly independent eigenfunctions (degeneracy) at this energy is 30.' The correct degeneracy of the n=3 level is g(n) = (n+1)(n+2)/2 = 10, established within the shown evidence itself: the source page's own derivation at event_003 sums g_n = Σ_{n1=0}^{n}(n - n1 + 1) = (n+1)(n+2)/2 (its trailing '½n(n+1)(n+2)' contradicts its own preceding algebra and is a typo), and the search result at event_002 states 'The 3-quantum states belong to the 10-dimensional irrep (3,0) and are degenerate, at energy E3 = 9/2 ħω.' So the delivered degeneracy 30 is a factually wrong result (RESULT ERROR); the energy part 9/2 ħω is correct. RELEVANCE TEST: event_004's output is the direct and sole input to the final answer's degeneracy claim at event_005, and no later event corrects it; fixing the formula to (n+1)(n+2)/2 would make every deliverable (energy 9/2 ħω, degeneracy 10) correct. Both tests pass, so the conviction stands."
+            },
+            {
+              "verdict": "substantiated",
+              "confirmed_step": 4,
+              "evidence_refs": [
+                "event_004",
+                "event_005"
+              ],
+              "reason": "CONTENT TEST: At event_004 the code explicitly implements g = int(0.5 * n * (n + 1) * (n + 2)) with n = 3, yielding output '(4.5, 30)'. The correct degeneracy of the n=3 level is (n+1)(n+2)/2 = 10, as confirmed within the trajectory's own evidence: event_002 result 3 gives g(n,p) = (n+p-1)!/(n!(p-1)!) = (n+1)(n+2)/2, and result 6 states 'The 3-quantum states belong to the 10-dimensional irrep (3,0) and are degenerate, at energy E3 = 9/2 ħω'. The scraped source formula '½n(n+1)(n+2)' in event_003 is internally inconsistent with its own derivation ((n+1)(n+1) - ½n(n+1) = (n+1)(n+2)/2) and with its own statement that E0 is non-degenerate (degeneracy 1, not 0), so it cannot ground the value 30. The wrong value propagates verbatim into the final deliverable at event_005: 'The number of linearly independent eigenfunctions (degeneracy) at this energy is 30.' RELEVANCE TEST: The degeneracy count is an explicit deliverable of the task ('how many linearly independent eigenfunctions are possible for the same energy eigenvalue?'). Correcting event_004 to g = (n+1)(n+2)/2 = 10 would make the final answer fully correct (energy 9/2 ħω is already right); no later event corrects the error, so the RESULT ERROR is material and causally connected to the delivered answer."
+            }
+          ],
+          "provider": {
+            "attempts": 1,
+            "usage": {
+              "prompt_tokens": 3504,
+              "completion_tokens": 1932,
+              "total_tokens": 5436,
+              "prompt_tokens_details": {
+                "cached_tokens": 3456
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 1490
+              },
+              "input_tokens_details": {
+                "cached_tokens": 3456
+              },
+              "output_tokens_details": {
+                "reasoning_tokens": 1490
+              },
+              "input_tokens": 3504,
+              "output_tokens": 1932
+            },
+            "cache_hit": false,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 0,
+            "prompt_cache_read_tokens": 0,
+            "prompt_cache_write_tokens": 0,
+            "purpose": "defense",
+            "model": "glm-5.3-flash",
+            "finish_reason": "stop",
+            "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: At event_004 the code explicitly implements g = int(0.5 * n * (n + 1) * (n + 2)) with n = 3, yielding output '(4.5, 30)'. The correct degeneracy of the n=3 level is (n+1)(",
+            "vote": {
+              "votes": 3,
+              "cast": 3,
+              "verdicts": [
+                "substantiated",
+                "substantiated",
+                "substantiated"
+              ],
+              "collapsed": "substantiated",
+              "tie": false,
+              "topups": 0,
+              "quorum": 2,
+              "quorum_met": true
+            }
+          },
+          "view_meta": {
+            "rendered_event_ids": [
+              "event_002",
+              "event_003",
+              "event_004",
+              "event_005"
+            ],
+            "truncated_event_ids": [],
+            "packet_truncated": false,
+            "omitted_event_ids": [
+              "event_001"
+            ]
+          }
+        },
+        "defense_status": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      }
+    ],
+    "evidence": [],
+    "deployment": {
+      "intervention_registry_hash": "",
+      "active_interventions": [],
+      "fired": [],
+      "evidence": [],
+      "facts": {},
+      "guard_actions": [],
+      "mechanical_guard_evidence": [],
+      "typed_predicate_programs": [],
+      "policy_conflict": false
+    }
+  },
+  "stage_status": {
+    "judge": {
+      "stage": "judge",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    },
+    "step_tracer": {
+      "stage": "step_tracer",
+      "state": "ok",
+      "attempts": 1,
+      "view": "complete",
+      "warnings": []
+    },
+    "defense": {
+      "stage": "defense",
+      "state": "ok",
+      "attempts": 3,
+      "view": "complete",
+      "warnings": []
+    }
+  },
+  "providers": {
+    "judge": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 4035,
+        "completion_tokens": 2804,
+        "total_tokens": 6839,
+        "prompt_tokens_details": {
+          "cached_tokens": 4032
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2291
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 2291
+        },
+        "input_tokens_details": {
+          "cached_tokens": 4032
+        },
+        "input_tokens": 4035,
+        "output_tokens": 2804
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "judge",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"is_hallucination\":true,\"hallucination_step\":4,\"hallucination_reason\":\"The trajectory computed the degeneracy of the third excited state (n=3) using the erroneous formula g(n) = n(n+1)(n+2)/2, yielding 30, whereas the correct degeneracy formula g(n) = (n+1)(n+2)/2 (confirmed by the combinatorial co",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "positives": 3,
+        "winner": true,
+        "tie": false
+      }
+    },
+    "step_tracer": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 3548,
+        "completion_tokens": 6067,
+        "total_tokens": 9615,
+        "prompt_tokens_details": {
+          "cached_tokens": 64
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5830
+        },
+        "input_tokens_details": {
+          "cached_tokens": 64
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 5830
+        },
+        "input_tokens": 3548,
+        "output_tokens": 6067
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "step_tracer",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\"step\":3,\"quote\":\"= (n + 1)(n + 1) - ½n(n + 1) = ½n(n + 1)(n + 2)\",\"referent\":\"g_n = (n + 1)(n + 2)/2 — the sum ∑_{n1=0}^{n}(n - n1 + 1) simplifies to (n+1)(n+2)/2, giving g(3) = 10, not 30\",\"evidence_refs\":[\"event_003\"],\"reason\":\"The erroneous degeneracy formula n(n+1)(n+2)/2 (yielding 30 for n=3)"
+    },
+    "defense": {
+      "attempts": 1,
+      "usage": {
+        "prompt_tokens": 3504,
+        "completion_tokens": 1932,
+        "total_tokens": 5436,
+        "prompt_tokens_details": {
+          "cached_tokens": 3456
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1490
+        },
+        "input_tokens_details": {
+          "cached_tokens": 3456
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 1490
+        },
+        "input_tokens": 3504,
+        "output_tokens": 1932
+      },
+      "cache_hit": false,
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 0,
+      "prompt_cache_read_tokens": 0,
+      "prompt_cache_write_tokens": 0,
+      "purpose": "defense",
+      "model": "glm-5.3-flash",
+      "finish_reason": "stop",
+      "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_005\"],\n  \"reason\": \"CONTENT TEST: At event_004 the code explicitly implements g = int(0.5 * n * (n + 1) * (n + 2)) with n = 3, yielding output '(4.5, 30)'. The correct degeneracy of the n=3 level is (n+1)(",
+      "vote": {
+        "votes": 3,
+        "cast": 3,
+        "verdicts": [
+          "substantiated",
+          "substantiated",
+          "substantiated"
+        ],
+        "collapsed": "substantiated",
+        "tie": false,
+        "topups": 0,
+        "quorum": 2,
+        "quorum_met": true
+      }
+    }
+  },
+  "authority_failure_reasons": [],
+  "evidence_health": {
+    "judge_view": "complete",
+    "recall_view": null,
+    "upgrade_view": null,
+    "tracer_view": "complete",
+    "defense_view": "complete"
+  },
+  "provenance": {
+    "packet_hash": "c9e856675cc7d7a139fea01557b01d1854efef0ef24168797109d01f179cc002"
+  },
+  "_packet_event_count": 5
+}

@@ -18,7 +18,7 @@
 | 协议 SHA-256 | `c9f0e1d0a3dfd70de5380af0b3894f55e7a51e351790e1b06844eb25015747bd` |
 | 源码 SHA-256 | `452cd7ef94fa22a8c9ce8f8de51060086b1ed8421b500370d6a7379928661f8f` |
 
-运行目录：`artifacts/real/real_path_20260916T083519896451Z`。冻结在首次运行前完成，运行后重新校验所有源码摘要，`source_unchanged` 为 `true`。
+运行目录：`artifacts/real/real_path_20260916T083519896451Z`（运行时目录，已回收；逐例读数保存在本目录的 `rep1_evaluation.json`、`rep2_evaluation.json` 与 `recall_evaluation.json`）。冻结在首次运行前完成，运行后重新校验所有源码摘要，`source_unchanged` 为 `true`。
 
 ## 主检查结果
 

@@ -1,0 +1,61 @@
+[
+  {
+    "case": "BFCL/012.json",
+    "gold": "false",
+    "state": "unresolved",
+    "authority": "invalid",
+    "step": null,
+    "elapsed": 6.8,
+    "stages": {
+      "judge": "provider_error"
+    },
+    "stage_detail": {
+      "judge": {
+        "stage": "judge",
+        "state": "provider_error",
+        "attempts": 0,
+        "view": "complete",
+        "warnings": [
+          {
+            "attempt": "vote",
+            "error": "OSError: isolated transport failed: Traceback (most recent call last):\r\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\r\n  File \"<frozen runpy>\", line 88, in _run_code\r\n  File \"E:\\agent hallucination\\agent hallucination\\detect"
+          }
+        ]
+      }
+    },
+    "recall_candidates": 0,
+    "upgrade_state": null
+  },
+  {
+    "case": "Camel/028.json",
+    "gold": "false",
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "step": null,
+    "elapsed": 50.7,
+    "stages": {
+      "judge": "ok",
+      "recall_scanner": "ok",
+      "causal_upgrade": "not_needed"
+    },
+    "stage_detail": {},
+    "recall_candidates": 0,
+    "upgrade_state": "not_needed"
+  },
+  {
+    "case": "Magentic_One/067.json",
+    "gold": "false",
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "step": null,
+    "elapsed": 97.4,
+    "stages": {
+      "judge": "ok",
+      "recall_scanner": "ok",
+      "causal_upgrade": "ok"
+    },
+    "stage_detail": {},
+    "recall_candidates": 1,
+    "upgrade_state": "ok"
+  }
+]

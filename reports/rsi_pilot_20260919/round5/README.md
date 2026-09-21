@@ -1,6 +1,6 @@
 # RSI 试点第 5 轮（终局轮）：种子确认未过零容忍门 + 跨轮初步验证汇总
 
-日期：2026-09-20；协议：[research-manifest-round5.json](../../output/rsi-planning/research-manifest-round5.json)（运行前冻结，提交 `dc7bfa6`）；代码基线：`dc7bfa6`（424 passed）。
+日期：2026-09-20；协议：[research-manifest-round5.json](../../../output/rsi-planning/research-manifest-round5.json)（运行前冻结，提交 `dc7bfa6`）；代码基线：`dc7bfa6`（424 passed）。
 
 ## 结论摘要
 
