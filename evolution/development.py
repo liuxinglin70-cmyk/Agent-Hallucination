@@ -41,6 +41,7 @@ from evolution.contracts import (
 )
 from evolution.metrics import paired_delta
 from evolution.mechanisms import repair_requirements
+from evolution.metamorphic import admission_error
 
 DEVELOPMENT_SCHEMA = "evolution.candidate_development.v1"
 
@@ -150,6 +151,17 @@ def check_l0(
         leaked is None,
         f"case id {leaked!r} appears in directive/body/claim" if leaked else "",
     )
+
+    # 2b. The named runner must have passed §15.2's metamorphic admission gate.
+    #     Checked here as well as in STRUCTURAL because L0 is where a candidate
+    #     is *developed*: a version drafted against an inadmissible executor
+    #     should fail its development round instead of consuming an L1 replay
+    #     first. The gate admits runners, not candidates -- it is not a
+    #     competitor to the four gates and does not score anything.
+    runner_error = admission_error(
+        str((candidate.get("body") or {}).get("runner") or "")
+    )
+    record("metamorphic_runner", not runner_error, runner_error)
 
     # 3. Structured identity: the candidate must *have* an executable identity
     #    before it can be compared, and it must not be the same executable

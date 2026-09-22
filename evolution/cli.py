@@ -709,6 +709,26 @@ def cmd_capability_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_metamorphic_gate(args: argparse.Namespace) -> int:
+    """Report the §15.2 admission verdict for the registered runners.
+
+    Offline and provider-free by construction: every class runs against the
+    reference subjects, so this command can be run before any executor exists
+    and its verdict is about the runner space rather than about a run. The exit
+    code is the verdict, so it is usable as a check in a script.
+    """
+    from evolution.metamorphic import metamorphic_report, run_gate
+
+    runner = getattr(args, "runner", None)
+    if runner:
+        report = run_gate(str(runner))
+        _print_json(report)
+        return 0 if report["passed"] else 1
+    report = metamorphic_report()
+    _print_json(report)
+    return 0 if report["all_admitted"] else 1
+
+
 def _mock_backend(config: dict[str, Any]):
     from evolution.backends import make_backend
 
@@ -1154,6 +1174,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--config")
     p.set_defaults(func=cmd_capability_smoke)
+
+    p = sub.add_parser(
+        "metamorphic-gate",
+        help=(
+            "run the six §15.2 metamorphic relations against the registered "
+            "runners and report each admission verdict"
+        ),
+    )
+    p.add_argument(
+        "--runner",
+        help="check one runner instead of every registered runner",
+    )
+    p.set_defaults(func=cmd_metamorphic_gate)
     return parser
 
 

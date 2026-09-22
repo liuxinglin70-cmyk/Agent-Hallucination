@@ -1,0 +1,49 @@
+=== the six §15.2 classes, in order ===
+  1. case_id_rename
+  2. source_rename
+  3. irrelevant_tool_call
+  4. neighbor_surface_token
+  5. semantic_equivalence
+  6. localization_event_move
+  (declared by the registry: 6 names)
+
+=== registration and admission ===
+  deterministic    declares 5 classes  admission_error=''
+  typed_dsl        declares 5 classes  admission_error=''
+  typed_semantic   declares 6 classes  admission_error=''
+  admitted runners: ['deterministic', 'typed_dsl', 'typed_semantic']
+
+=== executed gate per runner ===
+  deterministic    admitted=True classes=5 failed=[]
+  typed_dsl        admitted=True classes=5 failed=[]
+  typed_semantic   admitted=True classes=6 failed=[]
+  all_admitted=True authority=admission-only
+
+=== per-class evidence for the deterministic runner ===
+  case_id_rename             passed=True mutation_effective=True
+      {"before": [{"group": ["verbatim_content", "mismatch", "recall_scanner", "not_reached", "route_recall"], "mechanism_id": "M-614490524b56", "status": "confirmed", "member_count": 2}], "after": [{"group": ["verbatim_conten
+  source_rename              passed=True mutation_effective=True
+      {"sources_before": ["SourceA", "SourceB"], "sources_after": ["SourceY", "SourceZ"], "mechanisms": [{"group": ["verbatim_content", "mismatch", "recall_scanner", "not_reached", "route_recall"], "mechanism_id": "M-614490524
+  irrelevant_tool_call       passed=True mutation_effective=True
+      [{"packet": 0, "before": "not_applicable", "after": "not_applicable"}, {"packet": 1, "before": "not_applicable", "after": "not_applicable"}]
+  neighbor_surface_token     passed=True mutation_effective=True
+      [{"packet": 0, "tokens": ["Flag", "delivery", "that", "omits", "phrase", "task", "required", "verbatim", "never", "apply", "when", "delivered"], "before": "not_applicable", "after": "not_applicable"}, {"packet": 1, "tokens": ["Flag", "delivery", "that", "omits", "phrase", "task", "required", "verbatim", "never", "apply", "when", "delivered"], "before": "not_applicable", "after": "not_applicable"}]
+  localization_event_move    passed=True mutation_effective=True
+      {"position_map": {"2": 1, "1": 2}, "responsible_step": 3, "localization_state": "mislocated", "relabelled_state": "mislocated"}
+
+=== negative controls (must all be refused) ===
+  keyword matcher (fires on its own words): admitted=False
+      neighbor_surface_token: packet 0: adding the rule's own surface tokens made it fire ('violated') on a normal neighbour
+  surface-sensitive judge (exact string equality): admitted=False
+      case_id_rename: the subject does not implement this class
+      source_rename: the subject does not implement this class
+      irrelevant_tool_call: the subject does not implement this class
+      neighbor_surface_token: the subject does not implement this class
+      semantic_equivalence: pair 0: rewriting expected to 'Hello there' changed the judgment from 'supported' to 'contradicted'
+      localization_event_move: the subject does not implement this class
+  mechanism keyed on the case id: admitted=False
+      case_id_rename: mechanism identity changed under case rename: [{'group': ['case'], 'mechanism_id': 'M-case_001.json', 'status': 'confirmed', 'member_c
+      irrelevant_tool_call: the subject does not implement this class
+      neighbor_surface_token: the subject does not implement this class
+
+verdict: PASS

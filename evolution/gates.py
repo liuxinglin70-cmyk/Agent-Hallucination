@@ -39,6 +39,7 @@ from evolution.metrics import (
     paired_delta,
     paired_localization_delta,
 )
+from evolution.metamorphic import admission_error
 
 SEMANTICS_KEYS = (
     "JUDGE_SYSTEM", "RECALL_SYSTEM", "UPGRADE_SYSTEM", "TRACER_SYSTEM",
@@ -255,6 +256,16 @@ def structural_gate(
     case_id_hit = candidate_contains_case_id(candidate)
     if case_id_hit:
         return _policy_fail(f"case id leak in directive/body/claim: {case_id_hit}")
+
+    # §15.2 / P2.3: the runner a candidate names must have passed the
+    # metamorphic admission gate. The check sits immediately after the schema
+    # check for the same reason the schema check is first: a candidate whose
+    # executor has no invariance contract is refused on the executor, not
+    # measured and then compared with others. Its verdict is admission-only and
+    # replaces nothing -- every later gate still runs.
+    runner_error = admission_error(str((candidate.get("body") or {}).get("runner") or ""))
+    if runner_error:
+        return _policy_fail(f"metamorphic admission: {runner_error}")
 
     # §23.2: a learned artifact must have a digest. An entry whose runner reads
     # an artifact it does not pin cannot be told apart from a different model

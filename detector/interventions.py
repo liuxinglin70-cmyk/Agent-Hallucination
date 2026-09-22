@@ -141,16 +141,42 @@ _EVIDENCE_HOOK_BY_TYPE: dict[str, frozenset[str]] = {
 #   learned               reads an artifact whose content must be pinned
 #   requires_artifact     the entry must carry artifact{id,digest}
 #   terminal_authority    whether its verdicts may ever authorize a conviction
+#   metamorphic_classes   which §15.2 invariances the runner must survive
 #
 # ``terminal_authority`` is the safety-relevant one. A learned executor is
 # registered ``evidence_only``: it may report, and it may never be the thing
 # that convicts. That is plan §12.3's rule ("learned executor only outputs
 # evidence, no independent terminal conviction") expressed where it can be
 # enforced rather than in prose.
+#
+# ``metamorphic_classes`` is the other half of the same idea: declaring what a
+# runner *is* only means something if something also requires what it must not
+# do. The vocabulary lives here, next to the declaration that uses it, and is
+# executed by ``evolution.metamorphic`` (which imports these names rather than
+# keeping a second copy). The class names are §15.2's transformations.
 
 TERMINAL_NONE = "none"
 TERMINAL_EVIDENCE_ONLY = "evidence_only"
 TERMINAL_CONVICTION = "conviction"
+
+#: The §15.2 metamorphic transformations. A runner declares the subset that
+#: applies to it, and ``evolution.metamorphic`` enforces exactly that subset.
+METAMORPHIC_CLASSES = frozenset({
+    "case_id_rename",
+    "source_rename",
+    "irrelevant_tool_call",
+    "neighbor_surface_token",
+    "semantic_equivalence",
+    "localization_event_move",
+})
+
+#: Every runner reads a packet, so every runner owes the three packet-level
+#: invariances; the two renaming classes belong to the mechanism layer that
+#: every candidate inherits. A learned runner adds semantic equivalence.
+_PACKET_CLASSES = frozenset({
+    "irrelevant_tool_call", "neighbor_surface_token", "localization_event_move",
+})
+_IDENTITY_CLASSES = frozenset({"case_id_rename", "source_rename"})
 
 
 class RunnerSpec:
@@ -159,7 +185,7 @@ class RunnerSpec:
     __slots__ = (
         "name", "supported_hooks", "intervention_types", "input_schema",
         "deterministic", "learned", "requires_artifact", "terminal_authority",
-        "description",
+        "metamorphic_classes", "description",
     )
 
     def __init__(
@@ -173,6 +199,7 @@ class RunnerSpec:
         learned: bool,
         requires_artifact: bool,
         terminal_authority: str,
+        metamorphic_classes: frozenset[str] | None = None,
         description: str = "",
     ) -> None:
         if terminal_authority not in {
@@ -191,6 +218,25 @@ class RunnerSpec:
                 f"runner {name!r}: a learned runner may not hold terminal "
                 "conviction authority"
             )
+        declared = (
+            set(_PACKET_CLASSES)
+            if metamorphic_classes is None
+            else {str(item) for item in metamorphic_classes}
+        )
+        unknown = declared - METAMORPHIC_CLASSES
+        if unknown:
+            raise ValueError(
+                f"runner {name!r}: unknown metamorphic class(es) "
+                f"{sorted(unknown)}; known classes are "
+                f"{sorted(METAMORPHIC_CLASSES)}"
+            )
+        # A runner that reads a learned artifact is exactly the one whose
+        # answer can depend on how a sentence is written, so it cannot opt out
+        # of the semantic-equivalence class. The requirement is added rather
+        # than checked-and-rejected, so a declaration cannot silently omit it.
+        if learned:
+            declared = declared | {"semantic_equivalence"}
+        self.metamorphic_classes = frozenset(declared)
         self.name = name
         self.supported_hooks = frozenset(supported_hooks)
         self.intervention_types = frozenset(intervention_types)
@@ -211,6 +257,7 @@ class RunnerSpec:
             "learned": self.learned,
             "requires_artifact": self.requires_artifact,
             "terminal_authority": self.terminal_authority,
+            "metamorphic_classes": sorted(self.metamorphic_classes),
             "description": self.description,
         }
 
@@ -233,6 +280,10 @@ RUNNER_REGISTRY: dict[str, RunnerSpec] = {
         learned=False,
         requires_artifact=False,
         terminal_authority=TERMINAL_CONVICTION,
+        # A built-in predicate reads the packet and is not allowed to notice
+        # how the case was identified, so it owes the identity classes as well
+        # as the packet ones.
+        metamorphic_classes=_PACKET_CLASSES | _IDENTITY_CLASSES,
         description=(
             "A built-in mechanical predicate. Its verdicts are computed from "
             "the packet by fixed code, so a conviction verdict proves a task-"
@@ -252,6 +303,7 @@ RUNNER_REGISTRY: dict[str, RunnerSpec] = {
         learned=False,
         requires_artifact=False,
         terminal_authority=TERMINAL_CONVICTION,
+        metamorphic_classes=_PACKET_CLASSES | _IDENTITY_CLASSES,
         description=(
             "An inline typed-DSL program. Non-Turing-complete and interpreted "
             "by fixed operators, so it is deterministic and may hold "
@@ -274,6 +326,12 @@ RUNNER_REGISTRY: dict[str, RunnerSpec] = {
         learned=True,
         requires_artifact=True,
         terminal_authority=TERMINAL_EVIDENCE_ONLY,
+        # ``semantic_equivalence`` is added by the constructor for every
+        # learned runner; it is listed here to be read, not because the gate
+        # depends on the listing.
+        metamorphic_classes=_PACKET_CLASSES | _IDENTITY_CLASSES | {
+            "semantic_equivalence",
+        },
         description=(
             "A typed semantic judgment produced by an injected executor. "
             "Evidence only: it can never authorize a terminal conviction, and "

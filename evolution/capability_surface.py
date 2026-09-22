@@ -22,6 +22,7 @@ from detector.predicates import (
     PREDICATE_CONVICTION_VERDICTS,
     PREDICATE_VERDICTS,
 )
+from evolution.metamorphic import metamorphic_report
 
 
 def capability_surface_report() -> dict[str, Any]:
@@ -64,6 +65,12 @@ def capability_surface_report() -> dict[str, Any]:
             # is exactly the question this report exists to answer, and the
             # runner space used to be invisible to it.
             "runners": runner_declarations(),
+            # The admission criterion, executed rather than declared: each
+            # registered runner's §15.2 invariances are actually run here, so
+            # this section reports a verdict instead of a promise. It is the
+            # other half of ``runners`` -- that one says what a runner may do,
+            # this one says what it must not notice.
+            "runner_admission": metamorphic_report(),
             "system_prompt_hooks": sorted(SYSTEM_HOOKS),
             "packet_features": sorted(PACKET_FEATURE_NAMES),
             "nonempty_packet_feature_conjunctions": (
@@ -114,6 +121,9 @@ def capability_surface_report() -> dict[str, Any]:
             "execution_graph_rewrite": False,
             "sandboxed_code_generation": False,
             "model_weight_update": False,
+            # P2.3. Distinct from ``new_executor``: the framework can refuse an
+            # executor, which is a different power from being able to run one.
+            "new_executor_admission_criterion": True,
         },
         "causal_limits": {
             "evidence_check_changes_terminal_alone": False,

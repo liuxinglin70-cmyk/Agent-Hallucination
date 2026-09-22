@@ -38,7 +38,7 @@ def main() -> int:
     save("summary.json", {"passed": False, "status": "running", "started_at_utc": started})
     (OUT / "README.md").write_text("# 最新代码验证结果\n\n验证正在运行，结果尚未完成。\n", encoding="utf-8")
     (OUT / "pytest.xml").write_text("<testsuites />\n", encoding="utf-8")
-    for pending in ("capability_audit.json", "smoke.json", "capability_smoke.json"):
+    for pending in ("capability_audit.json", "metamorphic_gate.json", "smoke.json", "capability_smoke.json"):
         save(pending, {"status": "not_run"})
     checks = []
     environment = {**os.environ, "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1"}
@@ -77,6 +77,8 @@ def main() -> int:
     run("evolution_cli", ["-m", "evolution", "--help"])
     if run("capability_audit", ["-m", "evolution", "capability-audit"]):
         save("capability_audit.json", json.loads((OUT / "capability_audit.log").read_text(encoding="utf-8")))
+    if run("metamorphic_gate", ["-m", "evolution", "metamorphic-gate"]):
+        save("metamorphic_gate.json", json.loads((OUT / "metamorphic_gate.log").read_text(encoding="utf-8")))
 
     # Both smoke commands use mock backends. Their writable roots are verified
     # descendants of a fresh temporary directory, never a live registry or raw data.
