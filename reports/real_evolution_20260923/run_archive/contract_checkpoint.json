@@ -1,0 +1,539 @@
+{
+  "contract": {
+    "cycle": 1,
+    "config": "7d9ff8b47ed2",
+    "source": "6b382bd0ac13c675",
+    "detector_config": "da3131e671c5d981",
+    "split": {
+      "name": "mini",
+      "mini": true,
+      "seed": 20260923,
+      "pool_size": 30,
+      "sentinel": [
+        "BFCL/041.json",
+        "Magentic_One/085.json",
+        "Octotools/005.json",
+        "OpenDeepSearch/067.json",
+        "OpenDeepSearch/077.json",
+        "SmolAgents/019.json"
+      ],
+      "sentinel_size": 6,
+      "sentinel_polarity": {
+        "error": 3,
+        "clean": 3
+      },
+      "gain": [
+        "OpenDeepSearch/088.json",
+        "Magentic_One/049.json",
+        "OpenManus/064.json",
+        "Octotools/030.json",
+        "OpenDeepSearch/002.json",
+        "OpenDeepSearch/063.json"
+      ],
+      "gain_size": 6,
+      "gain_polarity": {
+        "error": 4,
+        "clean": 2
+      },
+      "patrol_pool_size": 18,
+      "validation": [
+        "BFCL/012.json",
+        "BFCL/068.json",
+        "BFCL/106.json",
+        "Camel/028.json",
+        "Magentic_One/067.json",
+        "Magentic_One/074.json",
+        "OpenDeepSearch/076.json",
+        "OpenDeepSearch/078.json",
+        "SmolAgents/022.json",
+        "SmolAgents/036.json"
+      ],
+      "validation_size": 10,
+      "final_size": 0,
+      "final_reads": 0
+    },
+    "data": {
+      "BFCL/017.json": "1f87b9b729981699",
+      "BFCL/041.json": "2e31d397fec79037",
+      "BFCL/062.json": "8c938b8cfa2dbc55",
+      "BFCL/107.json": "ff270a43033931d5",
+      "Camel/018.json": "805a0c50132f4e47",
+      "Camel/048.json": "191ad88d678e9ac3",
+      "Camel/054.json": "629d33e73665b661",
+      "Magentic_One/036.json": "845734ed932b45d8",
+      "Magentic_One/049.json": "f8fcebca7f4f241f",
+      "Magentic_One/050.json": "1a00961447267a0c",
+      "Magentic_One/085.json": "4df65f6eb4b9af03",
+      "Magentic_One/093.json": "7365ffdbaa7fdef3",
+      "Octotools/005.json": "6396d64b9db30b17",
+      "Octotools/023.json": "3936acd203bdd418",
+      "Octotools/030.json": "c17eaea9b4719611",
+      "Octotools/040.json": "8645f077c37fda21",
+      "OpenDeepSearch/002.json": "00f7c1d90ba49d24",
+      "OpenDeepSearch/035.json": "4cae7a9e011c0344",
+      "OpenDeepSearch/063.json": "9e3b5ab3c6718c9a",
+      "OpenDeepSearch/067.json": "fb48002721320d14",
+      "OpenDeepSearch/077.json": "27df43a4fef2b517",
+      "OpenDeepSearch/080.json": "d6b3d8b2545b993b",
+      "OpenDeepSearch/084.json": "2d38baa0939a177e",
+      "OpenDeepSearch/086.json": "f703304fa2465f74",
+      "OpenDeepSearch/088.json": "a730efb05568199c",
+      "OpenDeepSearch/095.json": "dda5d7168527cfda",
+      "OpenManus/064.json": "b48ed317967fdf94",
+      "OpenManus/073.json": "4f7edd6b5db3b030",
+      "SmolAgents/019.json": "4ef9f079bf8ce401",
+      "SmolAgents/037.json": "7487eb708703c91d"
+    }
+  },
+  "status": "completed",
+  "used_seconds": 7328.403287400004,
+  "registry_before": {
+    "schema_version": "detector.intervention_registry.v1",
+    "interventions": [],
+    "content_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+  },
+  "audit": {
+    "enabled": true,
+    "passed": true,
+    "frozen": false,
+    "reports": [
+      {
+        "intervention_id": "IV-DEFECT-001",
+        "structural": {
+          "passed": false,
+          "reason": "case id leak in directive/body/claim: BFCL/001.json"
+        },
+        "harmlessness": null,
+        "behavior": null,
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      },
+      {
+        "intervention_id": "IV-DEFECT-002",
+        "structural": {
+          "passed": true,
+          "reason": "",
+          "jaccard_base": 0.0092
+        },
+        "harmlessness": {
+          "passed": true,
+          "reason": "",
+          "delta": {
+            "paired_n": 4,
+            "base_all_case_correct": 4,
+            "active_all_case_correct": 4,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "F->F": 2,
+              "T->T": 2
+            },
+            "transitions_by_gold": {
+              "error": {
+                "T->T": 2
+              },
+              "clean": {
+                "F->F": 2
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 4,
+              "decisive": 4,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 2,
+              "fp": 0,
+              "fn": 0,
+              "tn": 2,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "active_metrics": {
+              "n": 4,
+              "decisive": 4,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 2,
+              "fp": 0,
+              "fn": 0,
+              "tn": 2,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "rows": [
+              {
+                "case": "Magentic_One/085.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/005.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/067.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              }
+            ]
+          },
+          "reroll_control": null,
+          "sentinel_manifest": {
+            "nominated": 6,
+            "protected": 4,
+            "protected_tp": 2,
+            "protected_tn": 2,
+            "excluded": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "prediction": false,
+                "authority": "authoritative",
+                "reason": "baseline_incorrect"
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "prediction": true,
+                "authority": "authoritative",
+                "reason": "baseline_incorrect"
+              }
+            ],
+            "baseline_rows": [
+              {
+                "case": "Magentic_One/085.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/005.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/067.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              }
+            ],
+            "candidate_rows": [
+              {
+                "case": "Magentic_One/085.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Octotools/005.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/067.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              }
+            ]
+          }
+        },
+        "behavior": {
+          "passed": false,
+          "reason": "target polarity mismatch: boundary claim corrected no decisive decision (decisive_fixed=0, decisive_broken=0)",
+          "delta": {
+            "paired_n": 12,
+            "base_all_case_correct": 9,
+            "active_all_case_correct": 9,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "F->F": 6,
+              "T->T": 6
+            },
+            "transitions_by_gold": {
+              "error": {
+                "F->F": 2,
+                "T->T": 5
+              },
+              "clean": {
+                "F->F": 4,
+                "T->T": 1
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 12,
+              "decisive": 12,
+              "unresolved": 0,
+              "decisive_accuracy": 0.75,
+              "all_case_accuracy": 0.75,
+              "tp": 5,
+              "fp": 1,
+              "fn": 2,
+              "tn": 4,
+              "positive_precision": 0.8333333333333334,
+              "positive_recall": 0.7142857142857143,
+              "positive_f1": 0.7692307692307692,
+              "macro_precision": 0.75,
+              "macro_recall": 0.7571428571428571,
+              "macro_f1": 0.7482517482517481
+            },
+            "active_metrics": {
+              "n": 12,
+              "decisive": 12,
+              "unresolved": 0,
+              "decisive_accuracy": 0.75,
+              "all_case_accuracy": 0.75,
+              "tp": 5,
+              "fp": 1,
+              "fn": 2,
+              "tn": 4,
+              "positive_precision": 0.8333333333333334,
+              "positive_recall": 0.7142857142857143,
+              "positive_f1": 0.7692307692307692,
+              "macro_precision": 0.75,
+              "macro_recall": 0.7571428571428571,
+              "macro_f1": 0.7482517482517481
+            },
+            "rows": [
+              {
+                "case": "BFCL/041.json",
+                "gold": true,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/085.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/005.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/067.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "SmolAgents/019.json",
+                "gold": false,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/088.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Magentic_One/049.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenManus/064.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/030.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/002.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/063.json",
+                "gold": true,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              }
+            ]
+          },
+          "fired_rate": 1.0,
+          "behavior_events": 12,
+          "behavior_event_kind": "evidence_increment"
+        },
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      }
+    ],
+    "cache": "miss"
+  },
+  "proposing": false,
+  "proposal": {
+    "candidates": [
+      {
+        "type": "text_boundary",
+        "hook": "tracer.system",
+        "trigger": {
+          "packet_features": [
+            "has_tool_calls"
+          ],
+          "facts": []
+        },
+        "body": {
+          "directive": "Localize the convicted error to a step that can actually host it: scan the packet's event texts, tool arguments, tool observations, and prose texts for the earliest interaction whose own recorded content first exhibits the defect the judge convicted (a fabricated or unsupported value or claim asserted in a tool exchange, or a wrong delivered result), and name that interaction's step as the responsible step. Before naming or keeping a step, verify that the step's own arguments, observations, or prose contain that defective content; if the currently named step's recorded content does not contain the defect but an earlier or different interaction first introduces it, relocate the localization to the step that first introduced the defect and cite the recorded content that hosts it.",
+          "not_when": "Do not relocate the named step when the currently named step's own arguments, observations, or prose already contain the defective claim, since that step can host the error and its localization stands; never derive or revise the responsible step from a case identifier, gold label, gold step name, or dataset annotation; and do not relocate when no interaction in the packet contains the defective content."
+        },
+        "claim": {
+          "expected_behavior": "The step tracer names the step whose recorded packet content first contains the convicted defect (for example, the search or note interaction asserting fabricated relative-density conformity data, or the computation and final-answer interaction producing the wrong delivered multiple), so the named responsible step can host the error instead of a step whose transcript cannot.",
+          "target_polarity": "boundary",
+          "target_kind": "localization"
+        },
+        "provenance": {
+          "cycle": 1,
+          "failure_family": "FAM-loc-mislocated-117fce1c070d",
+          "failure_cases": [
+            "Camel/018.json",
+            "OpenDeepSearch/095.json"
+          ]
+        },
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-1-001"
+      }
+    ],
+    "joint_groups": [],
+    "notes": [
+      {
+        "generator": "llm",
+        "provider_called": true,
+        "provider_ok": true,
+        "purpose": "evolution_proposer",
+        "model": "glm-5.3-flash",
+        "attempts": 1,
+        "usage": {
+          "prompt_tokens": 7012,
+          "completion_tokens": 20139,
+          "total_tokens": 27151,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 19720
+          },
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 19720
+          },
+          "input_tokens": 7012,
+          "output_tokens": 20139
+        }
+      },
+      {
+        "intervention_id": "IV-1-001",
+        "family": "FAM-loc-mislocated-117fce1c070d",
+        "generator": "llm",
+        "frozen_judge_replay_compatible": true
+      }
+    ]
+  },
+  "harness_parent_digest": null
+}

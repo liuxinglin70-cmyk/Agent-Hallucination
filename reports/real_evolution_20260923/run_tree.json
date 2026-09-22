@@ -1,0 +1,346 @@
+{
+ "run_root": "artifacts/selfevo-real-20260923",
+ "files": [
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/BFCL__041.json.436981817edc.json",
+   "bytes": 5817
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/Magentic_One__049.json.2e0c2e81550e.json",
+   "bytes": 5831
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/Magentic_One__085.json.a0ddeb3c11d8.json",
+   "bytes": 4890
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/Octotools__005.json.34933c991f6d.json",
+   "bytes": 28802
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/Octotools__030.json.a14788d54d6d.json",
+   "bytes": 24442
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenDeepSearch__002.json.572a807a19c6.json",
+   "bytes": 4471
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenDeepSearch__063.json.70a755355c30.json",
+   "bytes": 4788
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenDeepSearch__067.json.fd4008163c14.json",
+   "bytes": 28979
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenDeepSearch__077.json.28f451af6401.json",
+   "bytes": 7854
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenDeepSearch__088.json.bfc8bc6f9a21.json",
+   "bytes": 28198
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/OpenManus__064.json.eb78a123e1cf.json",
+   "bytes": 28633
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9/SmolAgents__019.json.7d3f7db99225.json",
+   "bytes": 31132
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/BFCL__041.json.436981817edc.json",
+   "bytes": 6373
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/BFCL__107.json.e9975305b056.json",
+   "bytes": 26922
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Camel__018.json.1f5b3493a4cd.json",
+   "bytes": 35060
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Camel__048.json.2a50c029a851.json",
+   "bytes": 32356
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Magentic_One__036.json.db890cd3edde.json",
+   "bytes": 5309
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Magentic_One__049.json.2e0c2e81550e.json",
+   "bytes": 6420
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Magentic_One__050.json.f4860b883e30.json",
+   "bytes": 50232
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Magentic_One__085.json.a0ddeb3c11d8.json",
+   "bytes": 5457
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Octotools__005.json.34933c991f6d.json",
+   "bytes": 29361
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Octotools__023.json.74d269d926a4.json",
+   "bytes": 26926
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/Octotools__030.json.a14788d54d6d.json",
+   "bytes": 24978
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__002.json.572a807a19c6.json",
+   "bytes": 5067
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__035.json.1da2f489f8d7.json",
+   "bytes": 5344
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__063.json.70a755355c30.json",
+   "bytes": 5363
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__067.json.fd4008163c14.json",
+   "bytes": 29516
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__077.json.28f451af6401.json",
+   "bytes": 11168
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__088.json.bfc8bc6f9a21.json",
+   "bytes": 28751
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenDeepSearch__095.json.85ae73e76c51.json",
+   "bytes": 26079
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/OpenManus__064.json.eb78a123e1cf.json",
+   "bytes": 29183
+  },
+  {
+   "path": "cache/detector-stage-replay-bound-hearings-bfbc7f40e34b/1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37/SmolAgents__019.json.7d3f7db99225.json",
+   "bytes": 31688
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/00bfd8430fc7.json",
+   "bytes": 894
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/078a43f81b05.json",
+   "bytes": 894
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/25b86ebcdc32.json",
+   "bytes": 897
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/28649dd5e405.json",
+   "bytes": 898
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/2ba6f44854e5.json",
+   "bytes": 897
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/2f0d1f4ff7f1.json",
+   "bytes": 890
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/403836705db1.json",
+   "bytes": 898
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/49683a275045.json",
+   "bytes": 887
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/9ec0e72cf3c8.json",
+   "bytes": 887
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/b201f1303c69.json",
+   "bytes": 897
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/bd198e0c90b3.json",
+   "bytes": 887
+  },
+  {
+   "path": "checkpoints/cycle001/arms/3a5774f75379/f5f761b6fbf5.json",
+   "bytes": 877
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/00bfd8430fc7.json",
+   "bytes": 6466
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json",
+   "bytes": 7455
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/1af4be2615ea.json",
+   "bytes": 37711
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/25b86ebcdc32.json",
+   "bytes": 32003
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/28649dd5e405.json",
+   "bytes": 6099
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/2ba6f44854e5.json",
+   "bytes": 31182
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/2f0d1f4ff7f1.json",
+   "bytes": 34140
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/3d27b3053166.json",
+   "bytes": 29460
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/403836705db1.json",
+   "bytes": 12677
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/49683a275045.json",
+   "bytes": 31705
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/583f58aada2d.json",
+   "bytes": 29392
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/7f232f63ee61.json",
+   "bytes": 35084
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/9ec0e72cf3c8.json",
+   "bytes": 31855
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/b201f1303c69.json",
+   "bytes": 6374
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/bd198e0c90b3.json",
+   "bytes": 27433
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/d4f582d882f7.json",
+   "bytes": 6322
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/effe5d2a4bcd.json",
+   "bytes": 6338
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/f58c5d79c09b.json",
+   "bytes": 28530
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/f5f761b6fbf5.json",
+   "bytes": 7421
+  },
+  {
+   "path": "checkpoints/cycle001/arms/508acdf65658/f7245d82173f.json",
+   "bytes": 54195
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/00bfd8430fc7.json",
+   "bytes": 5850
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/078a43f81b05.json",
+   "bytes": 6815
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/25b86ebcdc32.json",
+   "bytes": 31416
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/28649dd5e405.json",
+   "bytes": 5453
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/2ba6f44854e5.json",
+   "bytes": 30579
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/2f0d1f4ff7f1.json",
+   "bytes": 33534
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/403836705db1.json",
+   "bytes": 8984
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/49683a275045.json",
+   "bytes": 31105
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/9ec0e72cf3c8.json",
+   "bytes": 31246
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/b201f1303c69.json",
+   "bytes": 5749
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/bd198e0c90b3.json",
+   "bytes": 26846
+  },
+  {
+   "path": "checkpoints/cycle001/arms/6581f456f6e8/f5f761b6fbf5.json",
+   "bytes": 6816
+  },
+  {
+   "path": "checkpoints/cycle001/checkpoint.json",
+   "bytes": 18529
+  },
+  {
+   "path": "cycles/cycle001.json",
+   "bytes": 117414
+  },
+  {
+   "path": "harness/gaps_summary.json",
+   "bytes": 168
+  },
+  {
+   "path": "harness/harness.json",
+   "bytes": 4650
+  },
+  {
+   "path": "harness/harness_history.jsonl",
+   "bytes": 317
+  },
+  {
+   "path": "ledger.jsonl",
+   "bytes": 70836
+  },
+  {
+   "path": "memory/episodic.jsonl",
+   "bytes": 442
+  },
+  {
+   "path": "registry/active.json",
+   "bytes": 169
+  },
+  {
+   "path": "reports/defect_audit_verdict.json",
+   "bytes": 11281
+  }
+ ],
+ "count": 85
+}

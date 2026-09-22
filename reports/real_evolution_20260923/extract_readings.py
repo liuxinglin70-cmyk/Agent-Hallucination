@@ -94,10 +94,38 @@ def ledger_section(root: pathlib.Path) -> dict[str, Any]:
         "records": len(records),
         "events": dict(sorted(events.items())),
         "rejections": rejections,
-        "hash_chain_valid": all(
-            str(record.get("hash") or "")
-            for record in records
-        ),
+        # The chain is verified by the ledger's own verifier, not by checking
+        # that a hash field exists: "every record has some hash" is satisfied by
+        # a chain that has been rewritten, which is the thing the chain exists
+        # to detect. ``python -m evolution verify-ledger`` is the authority.
+        "hash_chain_valid": _verify_chain(root),
+    }
+
+
+def _verify_chain(root: pathlib.Path) -> bool:
+    """Recompute the ledger's hash chain with the framework's own verifier."""
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+    from evolution.ledger import load_ledger
+
+    return bool(
+        load_ledger({"ledger_path": str(root / "ledger.jsonl")})
+        .verify()
+        .get("valid")
+    )
+
+
+def _gate_verdict(value: Any) -> Any:
+    """One gate's verdict, or None when the gate did not run.
+
+    ``None`` and ``False`` are different readings: a gate that never ran has
+    said nothing about the candidate, and reporting it as a failure would
+    attribute a verdict to it that it did not give.
+    """
+    if not isinstance(value, Mapping):
+        return None
+    return {
+        "passed": bool(value.get("passed")),
+        "reason": str(value.get("reason") or ""),
     }
 
 
@@ -170,15 +198,22 @@ def cycle_section(root: pathlib.Path) -> dict[str, Any]:
         "gates": [
             {
                 "intervention_id": item.get("intervention_id"),
-                "gates": {
-                    str(key): (
-                        bool((value or {}).get("passed"))
-                        if isinstance(value, Mapping) else bool(value)
-                    )
-                    for key, value in (item.get("gates") or {}).items()
-                } if isinstance(item.get("gates"), Mapping) else item.get("gates"),
-                "reason": item.get("reason"),
-                "marginal": item.get("marginal"),
+                # Each gate's verdict and its machine-readable reason. The
+                # reason is what a rejection has to produce (§19.10), and it is
+                # reported alongside the verdict so a reader does not have to
+                # open the candidate to learn why it failed.
+                "structural": _gate_verdict(item.get("structural")),
+                "harmlessness": _gate_verdict(item.get("harmlessness")),
+                "behavior": _gate_verdict(item.get("behavior")),
+                "m": _gate_verdict(item.get("m")),
+                "harmlessness_delta": (
+                    (item.get("harmlessness") or {}).get("delta")
+                    if isinstance(item.get("harmlessness"), Mapping) else None
+                ),
+                "target_kind": (
+                    (item.get("candidate") or {}).get("claim") or {}
+                ).get("target_kind"),
+                "hook": (item.get("candidate") or {}).get("hook"),
             }
             for item in gates
         ],

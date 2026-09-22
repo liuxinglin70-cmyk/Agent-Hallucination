@@ -1,0 +1,870 @@
+{
+  "run_root": "artifacts\\selfevo-real-20260923",
+  "contract": {
+    "config_hash": "7d9ff8b47ed2",
+    "source_hash": "6b382bd0ac13c675",
+    "detector_config_hash": "da3131e671c5d981",
+    "split": {
+      "name": "mini",
+      "seed": 20260923,
+      "pool_size": 30,
+      "sentinel_size": 6,
+      "gain_size": 6,
+      "gain_polarity": {
+        "error": 4,
+        "clean": 2
+      },
+      "patrol_pool_size": 18,
+      "validation_size": 10,
+      "final_size": 0,
+      "final_reads": 0
+    },
+    "sentinel": [
+      "BFCL/041.json",
+      "Magentic_One/085.json",
+      "Octotools/005.json",
+      "OpenDeepSearch/067.json",
+      "OpenDeepSearch/077.json",
+      "SmolAgents/019.json"
+    ],
+    "gain": [
+      "OpenDeepSearch/088.json",
+      "Magentic_One/049.json",
+      "OpenManus/064.json",
+      "Octotools/030.json",
+      "OpenDeepSearch/002.json",
+      "OpenDeepSearch/063.json"
+    ],
+    "validation": [
+      "BFCL/012.json",
+      "BFCL/068.json",
+      "BFCL/106.json",
+      "Camel/028.json",
+      "Magentic_One/067.json",
+      "Magentic_One/074.json",
+      "OpenDeepSearch/076.json",
+      "OpenDeepSearch/078.json",
+      "SmolAgents/022.json",
+      "SmolAgents/036.json"
+    ],
+    "data_fingerprints": 30
+  },
+  "ledger": {
+    "records": 11,
+    "events": {
+      "audit": 1,
+      "capability_gaps": 1,
+      "cycle_completed": 1,
+      "cycle_started": 1,
+      "evaluation_preflight": 1,
+      "harness": 1,
+      "patrol": 1,
+      "proposal_memory": 1,
+      "proposal_memory_used": 1,
+      "proposed": 1,
+      "rejected": 1
+    },
+    "rejections": [
+      {
+        "intervention_id": "IV-1-001",
+        "gate": "HARMLESSNESS",
+        "reason": "sentinel harmlessness violation: new_fn=2, new_unresolved=4, health_regressed=4"
+      }
+    ],
+    "hash_chain_valid": true
+  },
+  "cycle": {
+    "source_file": "cycle001.json",
+    "state": "completed",
+    "patrol": {
+      "tp": 3,
+      "tn": 1,
+      "fn": 1,
+      "fp": 3,
+      "unresolved": 0
+    },
+    "families": [],
+    "capability_plan": {
+      "schema_version": "evolution.capability_requirement.v1",
+      "requirements": [
+        {
+          "schema_version": "evolution.capability_requirement.v1",
+          "mechanism_id": "M-5a89ab46e81f",
+          "classification": "actionable",
+          "required_capability": "",
+          "repair_operation": "withhold_conviction",
+          "required_inputs": [
+            "context_judge_positive",
+            "context_judge_confidence",
+            "last_answer_tool_observation"
+          ],
+          "current_routes": [
+            "withhold_guard"
+          ],
+          "sufficient_routes": [
+            "withhold_guard"
+          ],
+          "insufficient_routes": [],
+          "route_statuses": [
+            {
+              "route": "withhold_guard",
+              "capability": "guard",
+              "hooks": [
+                "adjudicate.guard"
+              ],
+              "capability_fits": true,
+              "readable_fields": [],
+              "unreadable_fields": [
+                "context_judge_confidence",
+                "context_judge_positive",
+                "last_answer_tool_observation"
+              ],
+              "semantic_fields": [],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": true,
+              "reasons": []
+            }
+          ],
+          "evidence": []
+        },
+        {
+          "schema_version": "evolution.capability_requirement.v1",
+          "mechanism_id": "M-c393f57ff12f",
+          "classification": "actionable",
+          "required_capability": "prompt_only",
+          "repair_operation": "constrain_localization",
+          "required_inputs": [
+            "event_texts",
+            "tool_arguments",
+            "prose_texts"
+          ],
+          "current_routes": [
+            "tracer_directive"
+          ],
+          "sufficient_routes": [
+            "tracer_directive"
+          ],
+          "insufficient_routes": [],
+          "route_statuses": [
+            {
+              "route": "tracer_directive",
+              "capability": "prompt",
+              "hooks": [
+                "tracer.system"
+              ],
+              "capability_fits": true,
+              "readable_fields": [],
+              "unreadable_fields": [
+                "event_texts",
+                "prose_texts",
+                "tool_arguments"
+              ],
+              "semantic_fields": [
+                "event_texts",
+                "prose_texts"
+              ],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": true,
+              "reasons": []
+            }
+          ],
+          "evidence": []
+        }
+      ],
+      "actionable_mechanisms": [
+        "M-5a89ab46e81f",
+        "M-c393f57ff12f"
+      ],
+      "gaps": [],
+      "capability_surface": {
+        "schema_version": "evolution.capability_requirement.v1",
+        "capabilities": {
+          "observation": "evidence_check + inline typed-DSL program: a deterministic comparison over typed fields, conjoined to at most 4 conditions",
+          "guard": "decision_guard: one of the closed guard actions ['convict_mechanical_violation', 'require_full_view_defense', 'restore_judge_conviction', 'withhold_conviction']",
+          "control_flow": "recall_trigger: forces the existing recall net for a case",
+          "prompt": "text_boundary: a prose directive injected into an LLM stage"
+        },
+        "hooks": [
+          "adjudicate.guard",
+          "defense.pre",
+          "defense.system",
+          "judge.post",
+          "judge.system",
+          "recall.trigger",
+          "scanner.system",
+          "tracer.system",
+          "upgrade.pre",
+          "upgrade.system"
+        ],
+        "intervention_types": [
+          "decision_guard",
+          "evidence_check",
+          "recall_trigger",
+          "text_boundary"
+        ],
+        "guard_actions": [
+          "convict_mechanical_violation",
+          "require_full_view_defense",
+          "restore_judge_conviction",
+          "withhold_conviction"
+        ],
+        "treatment_routes": [
+          "defense_directive",
+          "defense_requirement",
+          "evolved_predicate",
+          "judge_directive",
+          "mechanical_conviction",
+          "recall_directive",
+          "recall_trigger",
+          "restore_guard",
+          "tracer_directive",
+          "upgrade_directive",
+          "withhold_guard"
+        ],
+        "typed_field_count": 27,
+        "max_conditions_per_rule": 4,
+        "hook_reads_context_fields": {
+          "defense.pre": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_quote"
+          ],
+          "judge.post": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_judge_confidence",
+            "context_judge_delivered_result",
+            "context_judge_hallucination_reason",
+            "context_judge_positive",
+            "context_quote"
+          ],
+          "recall.trigger": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_judge_confidence",
+            "context_judge_delivered_result",
+            "context_judge_hallucination_reason",
+            "context_judge_positive",
+            "context_quote"
+          ],
+          "upgrade.pre": []
+        }
+      }
+    },
+    "proposals": [
+      {
+        "intervention_id": "IV-1-001",
+        "type": "text_boundary",
+        "hook": "tracer.system",
+        "failure_family": "FAM-loc-mislocated-117fce1c070d",
+        "target_polarity": "boundary",
+        "runner": null
+      }
+    ],
+    "proposal_summary": {
+      "stable_families": [
+        "FAM-fp-judge_conviction-117fce1c070d",
+        "FAM-loc-mislocated-117fce1c070d"
+      ],
+      "capability_gaps": [],
+      "candidate_count": 1,
+      "joint_groups": [],
+      "empty_proposal_reason": ""
+    },
+    "preflight": {
+      "sentinel": {
+        "protected_tp": 2,
+        "protected_tn": 2,
+        "minimum": {
+          "protected_tp": 2,
+          "protected_tn": 2
+        },
+        "evaluable": true,
+        "reason": ""
+      },
+      "blocked_families": [
+        {
+          "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+          "polarity": "precision",
+          "status": "not_evaluated",
+          "reason": "no repair opportunities in gain"
+        }
+      ],
+      "gain_opportunity": {
+        "recall": 1,
+        "precision": 0
+      }
+    },
+    "gates": [
+      {
+        "intervention_id": "IV-1-001",
+        "structural": {
+          "passed": true,
+          "reason": ""
+        },
+        "harmlessness": {
+          "passed": false,
+          "reason": "sentinel harmlessness violation: new_fn=2, new_unresolved=4, health_regressed=4"
+        },
+        "behavior": null,
+        "m": null,
+        "harmlessness_delta": {
+          "paired_n": 4,
+          "base_all_case_correct": 4,
+          "active_all_case_correct": 0,
+          "marginal_cases": -4,
+          "tp_lost": 2,
+          "fp_added": 0,
+          "new_fn": 2,
+          "new_fp": 0,
+          "new_errors": 2,
+          "unresolved_added": 4,
+          "unresolved_removed": 0,
+          "health_regressed": 4,
+          "health_improved": 0,
+          "flips": {
+            "F->U": 2,
+            "T->U": 2
+          },
+          "transitions_by_gold": {
+            "error": {
+              "T->U": 2
+            },
+            "clean": {
+              "F->U": 2
+            }
+          },
+          "correctness_improved": 0,
+          "correctness_worsened": 4,
+          "baseline_metrics": {
+            "n": 4,
+            "decisive": 4,
+            "unresolved": 0,
+            "decisive_accuracy": 1.0,
+            "all_case_accuracy": 1.0,
+            "tp": 2,
+            "fp": 0,
+            "fn": 0,
+            "tn": 2,
+            "positive_precision": 1.0,
+            "positive_recall": 1.0,
+            "positive_f1": 1.0,
+            "macro_precision": 1.0,
+            "macro_recall": 1.0,
+            "macro_f1": 1.0
+          },
+          "active_metrics": {
+            "n": 4,
+            "decisive": 0,
+            "unresolved": 4,
+            "decisive_accuracy": null,
+            "all_case_accuracy": null,
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "positive_precision": null,
+            "positive_recall": null,
+            "positive_f1": null,
+            "macro_f1": null
+          },
+          "rows": [
+            {
+              "case": "Magentic_One/085.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": null,
+              "baseline_state": "verified_clean",
+              "active_state": "unresolved"
+            },
+            {
+              "case": "Octotools/005.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": null,
+              "baseline_state": "verified_error",
+              "active_state": "unresolved"
+            },
+            {
+              "case": "OpenDeepSearch/067.json",
+              "gold": true,
+              "baseline_prediction": true,
+              "active_prediction": null,
+              "baseline_state": "verified_error",
+              "active_state": "unresolved"
+            },
+            {
+              "case": "OpenDeepSearch/077.json",
+              "gold": false,
+              "baseline_prediction": false,
+              "active_prediction": null,
+              "baseline_state": "verified_clean",
+              "active_state": "unresolved"
+            }
+          ]
+        },
+        "target_kind": "localization",
+        "hook": "tracer.system"
+      }
+    ],
+    "admitted": [],
+    "active_after_cycle": [],
+    "effect_on_gain_set": {
+      "paired_n": 6,
+      "base_all_case_correct": 5,
+      "active_all_case_correct": 5,
+      "marginal_cases": 0,
+      "new_fn": 0,
+      "new_fp": 0,
+      "new_errors": 0,
+      "unresolved_added": 0,
+      "unresolved_removed": 0,
+      "health_regressed": 0,
+      "flips": {
+        "T->T": 3,
+        "F->F": 3
+      }
+    },
+    "route_failures": {
+      "observed": 0,
+      "appended": 0,
+      "state": {
+        "records": 0,
+        "pairs": 0,
+        "insufficient": [],
+        "observed_only": []
+      }
+    },
+    "capability_backlog": {
+      "open": [],
+      "summary": {
+        "schema_version": "evolution.capability_gap.v1",
+        "recorded": 0,
+        "open": 0,
+        "resolved": 0,
+        "by_classification": {},
+        "by_reason": {},
+        "observations": 0
+      }
+    },
+    "audit": {
+      "enabled": true,
+      "passed": true,
+      "frozen": false,
+      "reports": [
+        {
+          "intervention_id": "IV-DEFECT-001",
+          "structural": {
+            "passed": false,
+            "reason": "case id leak in directive/body/claim: BFCL/001.json"
+          },
+          "harmlessness": null,
+          "behavior": null,
+          "m": null,
+          "audit_expected_reject": true,
+          "audit_rejected": true,
+          "audit_passed": false,
+          "audit_inconclusive": false
+        },
+        {
+          "intervention_id": "IV-DEFECT-002",
+          "structural": {
+            "passed": true,
+            "reason": "",
+            "jaccard_base": 0.0092
+          },
+          "harmlessness": {
+            "passed": true,
+            "reason": "",
+            "delta": {
+              "paired_n": 4,
+              "base_all_case_correct": 4,
+              "active_all_case_correct": 4,
+              "marginal_cases": 0,
+              "tp_lost": 0,
+              "fp_added": 0,
+              "new_fn": 0,
+              "new_fp": 0,
+              "new_errors": 0,
+              "unresolved_added": 0,
+              "unresolved_removed": 0,
+              "health_regressed": 0,
+              "health_improved": 0,
+              "flips": {
+                "F->F": 2,
+                "T->T": 2
+              },
+              "transitions_by_gold": {
+                "error": {
+                  "T->T": 2
+                },
+                "clean": {
+                  "F->F": 2
+                }
+              },
+              "correctness_improved": 0,
+              "correctness_worsened": 0,
+              "baseline_metrics": {
+                "n": 4,
+                "decisive": 4,
+                "unresolved": 0,
+                "decisive_accuracy": 1.0,
+                "all_case_accuracy": 1.0,
+                "tp": 2,
+                "fp": 0,
+                "fn": 0,
+                "tn": 2,
+                "positive_precision": 1.0,
+                "positive_recall": 1.0,
+                "positive_f1": 1.0,
+                "macro_precision": 1.0,
+                "macro_recall": 1.0,
+                "macro_f1": 1.0
+              },
+              "active_metrics": {
+                "n": 4,
+                "decisive": 4,
+                "unresolved": 0,
+                "decisive_accuracy": 1.0,
+                "all_case_accuracy": 1.0,
+                "tp": 2,
+                "fp": 0,
+                "fn": 0,
+                "tn": 2,
+                "positive_precision": 1.0,
+                "positive_recall": 1.0,
+                "positive_f1": 1.0,
+                "macro_precision": 1.0,
+                "macro_recall": 1.0,
+                "macro_f1": 1.0
+              },
+              "rows": [
+                {
+                  "case": "Magentic_One/085.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "Octotools/005.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/067.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/077.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                }
+              ]
+            },
+            "reroll_control": null,
+            "sentinel_manifest": {
+              "nominated": 6,
+              "protected": 4,
+              "protected_tp": 2,
+              "protected_tn": 2,
+              "excluded": [
+                {
+                  "case": "BFCL/041.json",
+                  "gold": true,
+                  "prediction": false,
+                  "authority": "authoritative",
+                  "reason": "baseline_incorrect"
+                },
+                {
+                  "case": "SmolAgents/019.json",
+                  "gold": false,
+                  "prediction": true,
+                  "authority": "authoritative",
+                  "reason": "baseline_incorrect"
+                }
+              ],
+              "baseline_rows": [
+                {
+                  "case": "Magentic_One/085.json",
+                  "gold": false,
+                  "prediction": false
+                },
+                {
+                  "case": "Octotools/005.json",
+                  "gold": true,
+                  "prediction": true
+                },
+                {
+                  "case": "OpenDeepSearch/067.json",
+                  "gold": true,
+                  "prediction": true
+                },
+                {
+                  "case": "OpenDeepSearch/077.json",
+                  "gold": false,
+                  "prediction": false
+                }
+              ],
+              "candidate_rows": [
+                {
+                  "case": "Magentic_One/085.json",
+                  "gold": false,
+                  "prediction": false
+                },
+                {
+                  "case": "Octotools/005.json",
+                  "gold": true,
+                  "prediction": true
+                },
+                {
+                  "case": "OpenDeepSearch/067.json",
+                  "gold": true,
+                  "prediction": true
+                },
+                {
+                  "case": "OpenDeepSearch/077.json",
+                  "gold": false,
+                  "prediction": false
+                }
+              ]
+            }
+          },
+          "behavior": {
+            "passed": false,
+            "reason": "target polarity mismatch: boundary claim corrected no decisive decision (decisive_fixed=0, decisive_broken=0)",
+            "delta": {
+              "paired_n": 12,
+              "base_all_case_correct": 9,
+              "active_all_case_correct": 9,
+              "marginal_cases": 0,
+              "tp_lost": 0,
+              "fp_added": 0,
+              "new_fn": 0,
+              "new_fp": 0,
+              "new_errors": 0,
+              "unresolved_added": 0,
+              "unresolved_removed": 0,
+              "health_regressed": 0,
+              "health_improved": 0,
+              "flips": {
+                "F->F": 6,
+                "T->T": 6
+              },
+              "transitions_by_gold": {
+                "error": {
+                  "F->F": 2,
+                  "T->T": 5
+                },
+                "clean": {
+                  "F->F": 4,
+                  "T->T": 1
+                }
+              },
+              "correctness_improved": 0,
+              "correctness_worsened": 0,
+              "baseline_metrics": {
+                "n": 12,
+                "decisive": 12,
+                "unresolved": 0,
+                "decisive_accuracy": 0.75,
+                "all_case_accuracy": 0.75,
+                "tp": 5,
+                "fp": 1,
+                "fn": 2,
+                "tn": 4,
+                "positive_precision": 0.8333333333333334,
+                "positive_recall": 0.7142857142857143,
+                "positive_f1": 0.7692307692307692,
+                "macro_precision": 0.75,
+                "macro_recall": 0.7571428571428571,
+                "macro_f1": 0.7482517482517481
+              },
+              "active_metrics": {
+                "n": 12,
+                "decisive": 12,
+                "unresolved": 0,
+                "decisive_accuracy": 0.75,
+                "all_case_accuracy": 0.75,
+                "tp": 5,
+                "fp": 1,
+                "fn": 2,
+                "tn": 4,
+                "positive_precision": 0.8333333333333334,
+                "positive_recall": 0.7142857142857143,
+                "positive_f1": 0.7692307692307692,
+                "macro_precision": 0.75,
+                "macro_recall": 0.7571428571428571,
+                "macro_f1": 0.7482517482517481
+              },
+              "rows": [
+                {
+                  "case": "BFCL/041.json",
+                  "gold": true,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "Magentic_One/085.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "Octotools/005.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/067.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/077.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "SmolAgents/019.json",
+                  "gold": false,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/088.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "Magentic_One/049.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "OpenManus/064.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "Octotools/030.json",
+                  "gold": true,
+                  "baseline_prediction": true,
+                  "active_prediction": true,
+                  "baseline_state": "verified_error",
+                  "active_state": "verified_error"
+                },
+                {
+                  "case": "OpenDeepSearch/002.json",
+                  "gold": false,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                },
+                {
+                  "case": "OpenDeepSearch/063.json",
+                  "gold": true,
+                  "baseline_prediction": false,
+                  "active_prediction": false,
+                  "baseline_state": "verified_clean",
+                  "active_state": "verified_clean"
+                }
+              ]
+            },
+            "fired_rate": 1.0,
+            "behavior_events": 12,
+            "behavior_event_kind": "evidence_increment"
+          },
+          "m": null,
+          "audit_expected_reject": true,
+          "audit_rejected": true,
+          "audit_passed": false,
+          "audit_inconclusive": false
+        }
+      ],
+      "cache": "miss"
+    },
+    "ledger_integrity": {
+      "valid": true,
+      "records": 8,
+      "broken_at": null,
+      "reason": ""
+    },
+    "instrument": {
+      "gain_opportunity": {
+        "recall": 1,
+        "precision": 0
+      },
+      "gain_measured": true,
+      "blocked_families": [
+        {
+          "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+          "polarity": "precision",
+          "status": "not_evaluated",
+          "reason": "no repair opportunities in gain"
+        }
+      ],
+      "unmeasurable_polarities": [
+        "precision"
+      ],
+      "replacement_gain_cases": 0,
+      "coverage_responses": {},
+      "coverage_response_counts": {},
+      "terminal_classification": {
+        "IV-1-001": "rejected"
+      },
+      "terminal_counts": {
+        "rejected": 1
+      },
+      "instrument_limited": true
+    }
+  },
+  "stores": {
+    "route_failures": 0,
+    "gaps": 0,
+    "candidates": 0,
+    "components": 0,
+    "memory_episodes": 0
+  }
+}
