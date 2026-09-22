@@ -1,0 +1,382 @@
+{
+  "schema_version": "evolution.validation.v1",
+  "evidence_grade": "engineering-closure only: mock backend and offline proposer throughout, so every reading is about framework mechanics and none is about detection quality. No provider was called.",
+  "packages_measured": [
+    "P2.3",
+    "P2.2",
+    "§28.6"
+  ],
+  "offline_cycle": {
+    "seconds": 0.39,
+    "state": "completed",
+    "patrol_families": 0,
+    "proposed": 1,
+    "admitted": [
+      "IV-VALID-001"
+    ],
+    "gates": {
+      "IV-VALID-001": {
+        "structural": true,
+        "harmlessness": true,
+        "behavior": true,
+        "m": true,
+        "partner_ids": false,
+        "fresh": false,
+        "candidate_rows": true,
+        "gain_opportunities": true,
+        "measurement_gain_cases": true,
+        "coverage_response": false
+      }
+    },
+    "gate_reason": {
+      "IV-VALID-001": ""
+    },
+    "active_after_cycle": [
+      "IV-VALID-001"
+    ],
+    "effect_on_gain_set": {
+      "paired_n": 8,
+      "base_all_case_correct": 6,
+      "active_all_case_correct": 8,
+      "marginal_cases": 2,
+      "new_fn": 0,
+      "new_fp": 0,
+      "new_errors": 0,
+      "unresolved_added": 0,
+      "health_regressed": 0
+    },
+    "audit_passed": true,
+    "ledger_valid": true,
+    "registry_entries_after": 1,
+    "registry_ids_after": [
+      "IV-VALID-001"
+    ]
+  },
+  "offline_experiment": {
+    "seconds": 0.58,
+    "cycles": 2,
+    "per_cycle": [
+      {
+        "cycle": 1,
+        "state": "completed",
+        "admitted": [
+          "IV-VALID-001"
+        ],
+        "registry_after": [
+          "IV-VALID-001"
+        ],
+        "marginal_cases": 2,
+        "new_errors": 0
+      },
+      {
+        "cycle": 2,
+        "state": "blocked_evaluation_preflight",
+        "admitted": [],
+        "registry_after": [
+          "IV-VALID-001"
+        ],
+        "marginal_cases": null,
+        "new_errors": null
+      }
+    ],
+    "active_entries": 1,
+    "active_ids": [
+      "IV-VALID-001"
+    ],
+    "ledger_records": 16,
+    "inheritance_reading": "each cycle's admitted set and the registry it left behind; an entry present in a later cycle's starting registry is an entry the next round ran with"
+  },
+  "development": {
+    "mechanism_id": "M-17aad6d46f7a",
+    "repair_operation": "route_recall",
+    "capability": "control_flow",
+    "versions": 1,
+    "version_status": [
+      "ready_for_freeze"
+    ],
+    "l0_passed": [
+      false
+    ],
+    "l1_delta": null,
+    "frozen_version": "v001",
+    "archived_candidates": 1,
+    "archived_statuses": [
+      "frozen"
+    ],
+    "archived_components": 1,
+    "component_names": [
+      "evo_delivery_probe"
+    ],
+    "archive_report": {
+      "schema_version": "evolution.candidate_archive.v1",
+      "metric_role": "diagnostic-only",
+      "candidates": {
+        "total": 1,
+        "by_status": {
+          "frozen": 1
+        },
+        "mechanisms": [
+          "M-17aad6d46f7a"
+        ]
+      },
+      "components": {
+        "total": 1,
+        "by_kind": {
+          "parser": 1
+        },
+        "kinds_available": [
+          "extractor",
+          "evidence_formatter",
+          "parser",
+          "semantic_executor",
+          "localization_helper"
+        ]
+      },
+      "note": "Candidate history and reusable parts. Neither store can admit a version: only the promotion protocol writes the Active Registry, and a component records local usefulness, not correctness."
+    }
+  },
+  "runner_admission": {
+    "runners": [
+      {
+        "runner": "deterministic",
+        "admitted": true,
+        "classes": 5,
+        "failed": []
+      },
+      {
+        "runner": "sandboxed_component",
+        "admitted": true,
+        "classes": 5,
+        "failed": []
+      },
+      {
+        "runner": "typed_dsl",
+        "admitted": true,
+        "classes": 5,
+        "failed": []
+      },
+      {
+        "runner": "typed_semantic",
+        "admitted": true,
+        "classes": 6,
+        "failed": []
+      }
+    ],
+    "all_admitted": true,
+    "report": {
+      "schema_version": "evolution.metamorphic_gate.v1",
+      "classes": [
+        "case_id_rename",
+        "source_rename",
+        "irrelevant_tool_call",
+        "neighbor_surface_token",
+        "semantic_equivalence",
+        "localization_event_move"
+      ],
+      "runners": [
+        {
+          "runner": "deterministic",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "sandboxed_component",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "typed_dsl",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "typed_semantic",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "semantic_equivalence",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        }
+      ],
+      "all_admitted": true,
+      "authority": "admission-only"
+    }
+  },
+  "sandbox": {
+    "admission_blockers": [],
+    "capabilities_declared": {
+      "wall_seconds": true,
+      "cpu_seconds": true,
+      "memory_bytes": true
+    },
+    "mechanism": "windows_job_object",
+    "escape_routes": 27,
+    "escape_routes_refused": 27,
+    "runner_contract": {
+      "name": "sandboxed_component",
+      "supported_hooks": [
+        "defense.pre",
+        "judge.post",
+        "upgrade.pre"
+      ],
+      "intervention_types": [
+        "evidence_check"
+      ],
+      "input_schema": "body.component carries a validated evolution.sandboxed_component.v1 component whose name equals body.predicate, and body.component_inputs maps each declared parameter to one fixed packet view",
+      "deterministic": true,
+      "learned": false,
+      "requires_artifact": true,
+      "terminal_authority": "evidence_only",
+      "metamorphic_classes": [
+        "case_id_rename",
+        "irrelevant_tool_call",
+        "localization_event_move",
+        "neighbor_surface_token",
+        "source_rename"
+      ],
+      "description": "A small pure function generated as source and executed under the Level B sandbox (fixed parameter schema, import whitelist, no filesystem or network, OS-enforced CPU/time/memory limits). Evidence only: it reports, and it can never convict."
+    }
+  },
+  "component_execution": {
+    "executors_built": [
+      "evo_sentence_match"
+    ],
+    "evidence_rows": [
+      {
+        "predicate": "evo_sentence_match",
+        "verdict": "contradicted",
+        "detail": "component evo_sentence_match returned contradicted",
+        "runner": "sandboxed_component",
+        "intervention_id": "IV-1-001",
+        "hook": "judge.post",
+        "failure_family": "FAM-fn-x"
+      }
+    ],
+    "evidence_verdict": "contradicted",
+    "tampered_digest_refused": true,
+    "tampered_digest_reason": "IV-1-001: the executor loaded artifact '90bbf86f008957d09fd9ba531b6f6fb6c086ed93518fdb8ea59176be90a40bad' but the entry pins '0000000000000000000000000000000000",
+    "runaway_verdict": "abstained"
+  },
+  "metamorphic_negative_controls": {
+    "keyword_matcher_admitted": false,
+    "keyword_matcher_failed_on": [
+      "neighbor_surface_token"
+    ],
+    "surface_sensitive_judge_admitted": false,
+    "surface_sensitive_failed_on": [
+      "case_id_rename",
+      "source_rename",
+      "irrelevant_tool_call",
+      "neighbor_surface_token",
+      "semantic_equivalence",
+      "localization_event_move"
+    ],
+    "case_id_reading_admitted": false,
+    "case_id_reading_failed_on": [
+      "case_id_rename",
+      "irrelevant_tool_call",
+      "neighbor_surface_token"
+    ]
+  },
+  "l0_admission": {
+    "checks": [
+      {
+        "check": "schema",
+        "passed": true
+      },
+      {
+        "check": "no_case_id",
+        "passed": true
+      },
+      {
+        "check": "metamorphic_runner",
+        "passed": true
+      },
+      {
+        "check": "structured_identity",
+        "passed": true
+      },
+      {
+        "check": "targets_mechanism",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "capability_surface": {
+    "open_ended_self_evolution": false,
+    "runner_count": 4,
+    "runner_admission_all": true,
+    "sandboxed_code_generation": true,
+    "sandbox_scope": "pure function, fixed parameter schema, import whitelist, no filesystem or network access, OS-enforced cpu/time/memory limits, evidence-only (may never convict)",
+    "unmet_for_open_ended": [
+      {
+        "requirement": "typed declarative predicate programs",
+        "satisfied": true,
+        "closed_by": "inline detector.predicate_program.v1 (typed_dsl)"
+      },
+      {
+        "requirement": "typed control-flow policy artifacts",
+        "satisfied": true,
+        "closed_by": "recall_trigger carrying an inline typed-DSL program"
+      },
+      {
+        "requirement": "sandboxed new executors with property and metamorphic tests",
+        "satisfied": true,
+        "closed_by": "P2.2 evolution.sandbox (Level B) + P2.3 evolution.metamorphic admission gate"
+      },
+      {
+        "requirement": "typed execution-graph artifacts",
+        "satisfied": false,
+        "closed_by": ""
+      },
+      {
+        "requirement": "immutable capability artifact store",
+        "satisfied": false,
+        "closed_by": ""
+      }
+    ]
+  },
+  "capability_smoke": {
+    "exit_code": 0,
+    "seconds": 0.9,
+    "state": "completed",
+    "admitted": [
+      "IV-1-001",
+      "IV-1-002"
+    ],
+    "new_predicate": null,
+    "gain_opportunity": null,
+    "audit_passed": true
+  }
+}

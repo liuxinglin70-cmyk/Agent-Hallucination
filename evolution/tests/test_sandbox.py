@@ -975,3 +975,77 @@ def test_the_detector_builds_component_executors_when_given_a_factory():
     # closed, rather than silently running a different executor.
     bare = Detector(require_credentials=False)
     assert bare._component_executors({"interventions": [entry]}) == {}
+
+
+# --------------------------------------------------------------------------
+# Every unbounded construct the AST allowlist permits must be bounded
+# --------------------------------------------------------------------------
+
+#: Constructs the validator *allows* (loops, recursion, repetition) that can
+#: nevertheless run forever or allocate without limit. The AST layer cannot
+#: refuse them -- a pure function may legitimately loop -- so the only thing
+#: bounding them is the resource contract. Each is checked to be stopped, and
+#: the check fails if one of them returns a verdict instead.
+UNBOUNDED_CONSTRUCTS = {
+    "while_true": (
+        "def judge(expected, actual):\n"
+        "    n = 0\n"
+        "    while True:\n"
+        "        n += 1\n"
+    ),
+    "nested_loops": (
+        "def judge(expected, actual):\n"
+        "    total = 0\n"
+        "    for i in range(100000000):\n"
+        "        for j in range(100000000):\n"
+        "            total += 1\n"
+        "    return \"supported\"\n"
+    ),
+    "huge_allocation": (
+        "def judge(expected, actual):\n"
+        "    block = expected * (1000000 * 1000)\n"
+        "    return \"supported\"\n"
+    ),
+    "unbounded_recursion": (
+        "def judge(expected, actual):\n"
+        "    return probe(expected, 0)\n"
+        "\n"
+        "\n"
+        "def probe(text, n):\n"
+        "    return probe(text, n + 1)\n"
+    ),
+}
+
+
+@pytest.mark.slow
+def test_every_allowed_unbounded_construct_is_stopped_by_a_limit():
+    """A construct the validator allows must still be bounded at run time.
+
+    This is the property that makes the AST allowlist safe. The validator
+    permits loops and recursion because a pure function may legitimately use
+    them; what it cannot do is bound them. So the claim under test is not "the
+    validator refuses these" -- it is "the resource contract stops them", and
+    the test fails if any one of them produces a verdict instead.
+    """
+    outcomes = {}
+    for label, source in UNBOUNDED_CONSTRUCTS.items():
+        component = reference_component(
+            name=f"evo_{label}",
+            source=source,
+            limits={
+                "wall_seconds": 3.0,
+                "cpu_seconds": 2.0,
+                "memory_bytes": 192 * 1024 * 1024,
+            },
+        )
+        result = execute_component(component, {"expected": "a", "actual": "b"})
+        outcomes[label] = (result["ok"], result["status"], result.get("wall_seconds"))
+        assert result["ok"] is False, (label, result)
+        # Stopped by a limit, and specifically not by a fabricated verdict.
+        assert result["status"] in {
+            "timeout", "component_error", "no_result", "refused",
+        }, (label, result["status"])
+        assert result.get("wall_seconds", 0) < 20.0, (label, result)
+    # Every one of them ran to a bound rather than escaping: the shapes are
+    # distinct enough that they must not all fail for the same reason.
+    assert len({status for _ok, status, _w in outcomes.values()}) >= 2, outcomes

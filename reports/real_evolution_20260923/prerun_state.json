@@ -1,0 +1,147 @@
+{
+  "recorded_at_utc": "2026-09-22T18:11:10.604347+00:00",
+  "source_sha256": "6cea011e44bc83fd1d3250e33a7df7ed8dcf4c8b1a8e30101d11831a6ebc395e",
+  "source_files": 142,
+  "run_config": "evolution\\configs\\selfevo_real_20260923.json",
+  "run_config_sha256": "10176951e60017eed1ce4ea02c01b164a394d816e546f5d6d34774f3c2f82dcc",
+  "detector_config": "detector\\configs\\autodl.json",
+  "detector_config_sha256": "da3131e671c5d9816eff50bad1c54f91e4214eaeecbafee3333f7946dbc28df0",
+  "detector_config_body": {
+    "schema_version": "detector.config.v1",
+    "case_timeout_seconds": 10800,
+    "provider": {
+      "endpoint": "https://www.autodl.art/api/v1",
+      "model": "GLM-5.3-flash",
+      "api_key_env": "AUTODL_API_KEY",
+      "temperature": 0.0,
+      "timeout_seconds": 900,
+      "total_timeout_seconds": 2400,
+      "transport_retries": 2,
+      "timeout_growth_factor": 1.5,
+      "context_cache": {
+        "enabled": true,
+        "mode": "automatic"
+      }
+    },
+    "judge_route": {
+      "model": "GLM-5.3-flash",
+      "json_mode": true,
+      "votes": 3,
+      "vote_topup": 2
+    },
+    "defense_route": {
+      "model": "GLM-5.3-flash",
+      "max_tokens": 32768,
+      "votes": 3,
+      "vote_topup": 2
+    },
+    "recall_route": {
+      "model": "GLM-5.3-flash",
+      "max_tokens": 32768
+    }
+  },
+  "run_config_body": {
+    "schema_version": "evolution.framework.v1",
+    "detector_config": "detector/configs/autodl.json",
+    "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+    "mini_split_manifest": "datasets/protocols/development.json",
+    "split_manifest": null,
+    "work_root": "artifacts/selfevo-real-20260923",
+    "registry_dir": "artifacts/selfevo-real-20260923/registry",
+    "ledger_path": "artifacts/selfevo-real-20260923/ledger.jsonl",
+    "harness_dir": "artifacts/selfevo-real-20260923/harness",
+    "memory_root": "artifacts/selfevo-real-20260923/memory",
+    "historical_development_manifests": [
+      "datasets/protocols/development_exposure.json"
+    ],
+    "patrol_registry": "active",
+    "coverage_response": {
+      "mode": "strict",
+      "policies": {}
+    },
+    "split": {
+      "seed": 20260923,
+      "sentinel_positives": 3,
+      "sentinel_negatives": 3,
+      "mini_pool_size": 30,
+      "mini_gain_size": 6,
+      "mini_gain_min_positives": 2,
+      "mini_gain_min_negatives": 2
+    },
+    "budget": {
+      "patrol_cases": 8,
+      "stable_failure_rerun_cases": 8,
+      "llm_calls": 2,
+      "max_proposals": 3,
+      "max_admits": 2,
+      "cycle_timeout_seconds": 7200
+    },
+    "gates": {
+      "structural_jaccard_threshold": 0.72,
+      "harmlessness_new_fn_allowed": 0,
+      "harmlessness_new_fp_allowed": 0,
+      "harmlessness_new_unresolved_allowed": 0,
+      "harmlessness_min_protected_tp": 2,
+      "harmlessness_min_protected_tn": 2,
+      "behavior_require_fired": true,
+      "m_min_marginal_cases": 1,
+      "m_new_errors_allowed": 0,
+      "localization_min_joint_cases": 1,
+      "localization_joint_broken_allowed": 0
+    },
+    "mini_effect": {
+      "min_marginal_cases": 1,
+      "max_new_errors": 0,
+      "max_unresolved_added": 0
+    },
+    "library": {
+      "max_width": 6,
+      "max_text_boundary_per_hook": 1,
+      "max_decision_guards": 4,
+      "retire_after_cycles_marginal_le0": 2,
+      "rollback_after_cycles_net_negative": 2
+    },
+    "audit": {
+      "enabled": true
+    },
+    "backend": {
+      "name": "detector",
+      "workers": 8,
+      "cache": true
+    },
+    "proposer": {
+      "mode": "llm",
+      "max_output_tokens": 32768,
+      "thinking_level": "",
+      "max_repair_calls": 1
+    },
+    "archive": {
+      "on": "cycle_end",
+      "root": "artifacts/selfevo-real-20260923/candidates"
+    }
+  },
+  "git_head": "95e0d01facf097401f579a77c0c8870b28c7ffe1",
+  "git_status_porcelain": [
+    "M reports/latest/README.md",
+    " M reports/latest/capability_audit.json",
+    " M reports/latest/capability_audit.log",
+    " M reports/latest/capability_smoke.json",
+    " M reports/latest/capability_smoke.log",
+    " M reports/latest/evolution_cli.log",
+    " M reports/latest/pytest.log",
+    " M reports/latest/pytest.xml",
+    " M reports/latest/smoke.json",
+    " M reports/latest/smoke.log",
+    " M reports/latest/source_manifest.json",
+    " M reports/latest/summary.json",
+    "?? NEXT_TASK.md",
+    "?? agent_hallucination_self_evolution_optimization_plan.md",
+    "?? evolution/configs/selfevo_real_20260923.json",
+    "?? reports/latest/metamorphic_gate.json",
+    "?? reports/latest/metamorphic_gate.log",
+    "?? reports/latest/sandbox_check.json",
+    "?? reports/latest/sandbox_check.log",
+    "?? reports/real_evolution_20260923/",
+    "?? reports/validation_20260923/"
+  ]
+}

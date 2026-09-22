@@ -170,12 +170,44 @@ def capability_surface_report() -> dict[str, Any]:
             "capability_gap_can_expand_observation": True,
             "capability_gap_can_expand_terminal_effects": True,
         },
+        # §23.7's checklist, with each item's status and where it was closed.
+        # A bare list of strings could not distinguish "outstanding" from
+        # "satisfied", and this report is quoted by an audit: three of these
+        # were closed by P2.1/P2.2 and the flat form made them read as open.
         "required_for_open_ended_evolution": [
-            "typed declarative predicate programs",  # now implemented inline
-            "typed control-flow policy artifacts",  # now implemented inline
+            {
+                "requirement": "typed declarative predicate programs",
+                "satisfied": True,
+                "closed_by": "inline detector.predicate_program.v1 (typed_dsl)",
+            },
+            {
+                "requirement": "typed control-flow policy artifacts",
+                "satisfied": True,
+                "closed_by": "recall_trigger carrying an inline typed-DSL program",
+            },
+            {
+                "requirement": "sandboxed new executors with property and "
+                               "metamorphic tests",
+                "satisfied": True,
+                "closed_by": (
+                    "P2.2 evolution.sandbox (Level B) + P2.3 "
+                    "evolution.metamorphic admission gate"
+                ),
+            },
+            {
+                "requirement": "typed execution-graph artifacts",
+                "satisfied": False,
+                "closed_by": "",
+            },
+            {
+                "requirement": "immutable capability artifact store",
+                "satisfied": False,
+                "closed_by": "",
+            },
+        ],
+        "open_ended_evolution_blockers": [
             "typed execution-graph artifacts",
             "immutable capability artifact store",
-            "sandboxed new executors with property and metamorphic tests",
         ],
     }
 
