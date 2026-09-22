@@ -36,11 +36,15 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from detector.interventions import (
-    build_intervention_registry,
     validate_intervention,
+    validate_intervention_batch,
 )
 
+from evolution import promotion_alignment as alignment
+from evolution.candidate_versions import canonical_hash
 from evolution.backends import (
+    artifact_digest,
+    artifact_manifest,
     fingerprint,
     make_backend,
     source_digest,
@@ -63,7 +67,7 @@ from evolution.gates import (
     sentinel_coverage,
     structural_gate,
 )
-from evolution.ledger import load_ledger
+from evolution.ledger import Ledger, load_ledger
 from evolution.metrics import (
     gain_opportunity,
     localization_metrics,
@@ -71,7 +75,6 @@ from evolution.metrics import (
     paired_delta,
     paired_localization_delta,
     protection_repair,
-    row_responsible_step,
 )
 from evolution.registry import load_active_registry
 from evolution.splits import bool_gold, load_gold, load_gold_step
@@ -111,6 +114,8 @@ def build_candidate(
     artifact_refs: Sequence[str] = (),
     dependencies: Sequence[str] = (),
     notes: Sequence[Any] = (),
+    mechanism: Mapping[str, Any] | None = None,
+    development_cases: Sequence[str] = (),
 ) -> dict[str, Any]:
     """The unified candidate object (plan §4.1).
 
@@ -122,8 +127,7 @@ def build_candidate(
     entries = [dict(entry) for entry in artifacts]
     if not entries:
         raise ValueError("a candidate needs at least one artifact")
-    for entry in entries:
-        validate_intervention(entry, require_executable_bounds=True)
+    validate_intervention_batch(entries, require_executable_bounds=True)
     payload: dict[str, Any] = {
         "schema_version": CANDIDATE_SCHEMA,
         "candidate_id": str(candidate_id),
@@ -138,6 +142,24 @@ def build_candidate(
         "status": "frozen",
         "notes": [item for item in notes],
     }
+    if mechanism is not None:
+        try:
+            descriptor = alignment.mechanism_descriptor(mechanism)
+            if target_kind != descriptor["objective"]:
+                raise ValueError("candidate target_kind differs from mechanism objective")
+            artifact_kinds = {candidate_target_kind(entry) for entry in entries}
+            if target_kind != "joint" and artifact_kinds != {target_kind}:
+                raise ValueError("candidate artifacts disagree with the declared objective")
+            payload.update(
+                schema_version=alignment.ALIGNED_CANDIDATE_SCHEMA,
+                target_mechanism_id=descriptor["mechanism_id"],
+                mechanism=descriptor,
+                development_cases=alignment.case_ids(list(development_cases), name="development cases"),
+            )
+            payload["development_cases"] = alignment.development_cases(payload)
+            payload["development_evidence_hash"] = alignment.digest(payload["development_results"])
+        except ValueError as exc:
+            raise PromotionProtocolError(str(exc)) from exc
     payload["content_hash"] = candidate_content_hash(payload)
     return payload
 
@@ -159,6 +181,96 @@ def candidate_content_hash(candidate: Mapping[str, Any]) -> str:
         payload, ensure_ascii=False, sort_keys=True, default=str,
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
+
+
+def _validate_candidate_identity(candidate: Mapping[str, Any]) -> None:
+    if not isinstance(candidate, Mapping):
+        raise PromotionProtocolError("candidate must be an object")
+    if candidate.get("content_hash") != candidate_content_hash(candidate):
+        raise PromotionProtocolError("candidate content hash mismatch")
+    if candidate.get("schema_version") == alignment.ALIGNED_CANDIDATE_SCHEMA:
+        if candidate.get("development_evidence_hash") != alignment.digest(candidate.get("development_results") or {}):
+            raise PromotionProtocolError("candidate development evidence changed")
+        descriptor = alignment.mechanism_descriptor(candidate.get("mechanism") or {})
+        if candidate.get("target_mechanism_id") != descriptor["mechanism_id"]:
+            raise PromotionProtocolError("candidate mechanism binding mismatch")
+        if candidate.get("development_cases") != alignment.development_cases(candidate):
+            raise PromotionProtocolError("candidate development exposure is incomplete")
+
+
+def bind_candidate(
+    candidate: Mapping[str, Any], mechanism: Mapping[str, Any],
+    *, extra_development_cases: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Migrate an unbound artifact before freeze, never during evaluation."""
+    _validate_candidate_identity(candidate)
+    if candidate.get("target_mechanism_id") and candidate["target_mechanism_id"] != mechanism.get("mechanism_id"):
+        raise PromotionProtocolError("cannot rebind a candidate to a different mechanism")
+    return build_candidate(
+        candidate_id=str(candidate["candidate_id"]),
+        change_kind=str(candidate["change_kind"]), base_revision=str(candidate["base_revision"]),
+        artifacts=candidate["artifacts"], development=candidate.get("development_results"),
+        target_kind=str(candidate["target_kind"]), parent_id=candidate.get("parent_id"),
+        artifact_refs=candidate.get("artifact_refs") or (), dependencies=candidate.get("dependencies") or (),
+        notes=candidate.get("notes") or (), mechanism=mechanism,
+        development_cases=sorted(set(alignment.development_cases(candidate)) | set(extra_development_cases)),
+    )
+
+
+def candidate_from_development(
+    run_dir: str | Path, *, version_id: str, mechanism: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Read an explicitly frozen development version and all observed cases."""
+    if not version_id.startswith("v") or not version_id[1:].isdigit():
+        raise PromotionProtocolError("invalid development version id")
+    root = Path(run_dir).resolve()
+    selected_path = root / version_id / "candidate.json"
+    sidecar_path = root / version_id / "development.json"
+    try:
+        record = json.loads(selected_path.read_text(encoding="utf-8-sig"))
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8-sig"))
+        descriptor = alignment.mechanism_descriptor(mechanism)
+    except (OSError, ValueError) as exc:
+        raise PromotionProtocolError(str(exc)) from exc
+    if sidecar.get("status") != "frozen":
+        raise PromotionProtocolError("development version must be frozen, not merely ready")
+    if sidecar.get("mechanism_id") != descriptor["mechanism_id"]:
+        raise PromotionProtocolError("development version targets another mechanism")
+    artifacts = record.get("candidate")
+    if not artifacts or record.get("candidate_hash") != canonical_hash(artifacts):
+        raise PromotionProtocolError("development artifact hash mismatch")
+    for level in ("l0", "l1"):
+        if (sidecar.get(level) or {}).get("passed") is not True:
+            raise PromotionProtocolError(f"development {level.upper()} did not pass")
+        if (record.get("verdict") or {}).get(level) != sidecar.get(level):
+            raise PromotionProtocolError("development verdict and sidecar disagree")
+    exposed: set[str] = set()
+    for path in sorted(root.glob("v*/development.json")):
+        item = json.loads(path.read_text(encoding="utf-8-sig"))
+        evidence = item.get("development_evidence") or {}
+        for field in ("target_cases", "neighbor_cases"):
+            exposed.update(alignment.case_ids(evidence.get(field, []), name=field))
+        sibling = json.loads((path.parent / "candidate.json").read_text(encoding="utf-8-sig"))
+        content = sibling.get("candidate") or []
+        for entry in [content] if isinstance(content, Mapping) else content:
+            exposed.update(alignment.case_ids((entry.get("provenance") or {}).get(
+                "failure_cases", []), name="version provenance"))
+    parent_id = sidecar.get("parent_version_id") or None
+    evidence = {
+        "source": "development", "run_dir": str(root), "version_id": version_id,
+        "l0": sidecar["l0"], "l1": sidecar["l1"],
+        "development_cases": sorted(exposed),
+        "candidate_record_hash": alignment.digest(record),
+        "development_sidecar_hash": alignment.digest(sidecar),
+    }
+    return build_candidate(
+        candidate_id=f"development:{root.name}:{version_id}", change_kind=str(record.get("kind") or "draft"),
+        base_revision=str((record.get("evaluation") or {}).get("identity", {}).get("code_baseline") or "development-unpinned"),
+        artifacts=[artifacts] if isinstance(artifacts, Mapping) else artifacts,
+        development=evidence, target_kind=descriptor["objective"], parent_id=parent_id,
+        mechanism=descriptor, development_cases=sorted(exposed),
+        artifact_refs=[str(selected_path), str(sidecar_path)],
+    )
 
 
 def _transition(candidate: dict[str, Any], state: str) -> dict[str, Any]:
@@ -317,6 +429,14 @@ def freeze_protocol(
     expected_authority: Mapping[str, Any] | None = None,
     baseline_roll: Mapping[str, Any] | None = None,
     require_fresh: bool = False,
+    mechanism: Mapping[str, Any] | None = None,
+    mechanism_membership: Mapping[str, Any] | None = None,
+    candidate: Mapping[str, Any] | None = None,
+    dataset_root: str | Path | None = None,
+    framework_config: Mapping[str, Any] | None = None,
+    baseline_registry_hash: str | None = None,
+    artifact_paths: Sequence[str | Path] = (),
+    ledger: "Ledger | None" = None,
 ) -> dict[str, Any]:
     """Freeze a promotion batch once, before any model call.
 
@@ -347,6 +467,15 @@ def freeze_protocol(
     necessary-not-sufficient; here it is additionally enforced early because the
     batch is frozen and expensive.
     """
+    aligned = any(value is not None for value in (mechanism, mechanism_membership, candidate))
+    if aligned and any(value is None for value in (
+        mechanism, mechanism_membership, candidate, dataset_root, baseline_registry_hash,
+    )):
+        raise PromotionProtocolError(
+            "v2 freeze needs candidate, mechanism, membership, dataset_root and baseline_registry_hash"
+        )
+    if aligned:
+        _validate_candidate_identity(candidate)
     if baseline_roll is not None and require_fresh:
         raise PromotionProtocolError(
             "baseline_roll and require_fresh are mutually exclusive: a pinned "
@@ -362,7 +491,8 @@ def freeze_protocol(
         raise PromotionProtocolError(
             "promotion batch must be a non-empty list of unique case ids"
         )
-    unknown_roles = sorted(set(roles.values()) - {"benefit", "protection"})
+    allowed_roles = {"benefit", "protection", "challenge"} if aligned else {"benefit", "protection"}
+    unknown_roles = sorted(set(roles.values()) - allowed_roles)
     if unknown_roles:
         raise PromotionProtocolError(
             f"unknown role(s) {unknown_roles}; use 'benefit' or 'protection'"
@@ -452,6 +582,12 @@ def freeze_protocol(
         "detector_config": str(resolved_detector),
         "detector_config_hash": fingerprint(config_payload),
         "code_baseline": source_digest(),
+        # Learned artifacts (weights, tokenizer, calibration output) are not
+        # covered by the code digest: replacing a weight file changes no source
+        # byte while changing every decision the runner makes. Frozen empty
+        # when the registry declares none, which is a statement ("no external
+        # artifact") rather than a missing value.
+        "artifact_manifest": artifact_manifest(*artifact_paths),
         "workers": int(workers),
         "timeout_seconds": (
             float(timeout_seconds) if timeout_seconds else None
@@ -466,8 +602,97 @@ def freeze_protocol(
         ),
         "require_fresh": bool(require_fresh),
     }
+    if aligned:
+        try:
+            protocol = alignment.build_alignment(
+                protocol, candidate=candidate, mechanism=mechanism,
+                membership=mechanism_membership, dataset_root=dataset_root,
+                config=framework_config or {}, baseline_registry_hash=baseline_registry_hash,
+            )
+        except (ValueError, OSError) as exc:
+            raise PromotionProtocolError(str(exc)) from exc
+    _refuse_refrozen_batch(protocol, ledger=ledger)
     save_json(path, protocol)
+    if ledger is not None:
+        ledger.append("protocol_frozen", {
+            "protocol_hash": protocol.get("protocol_hash"),
+            "batch_hash": protocol.get("batch_hash"),
+            "candidate_content_hash": protocol.get("candidate_content_hash"),
+            "mechanism_id": protocol.get("mechanism_id"),
+            "cases": len(protocol.get("cases") or ()),
+            "path": str(path),
+        })
     return protocol
+
+
+def _refuse_refrozen_batch(
+    protocol: Mapping[str, Any],
+    *,
+    ledger: "Ledger | None" = None,
+) -> None:
+    """Refuse to freeze the same batch and candidate a second time.
+
+    §7.5: a failed L2 may not be retried by calling another candidate on the
+    same frozen protocol, and a candidate may not be re-scored by re-freezing
+    the batch it already ran on. The per-path claim file guards one path, which
+    a second freeze at a new path (a new ``frozen_at``, hence a new
+    ``protocol_hash``) defeats. The ledger is the cross-path record, so the
+    guard is anchored there whenever a ledger is supplied.
+    """
+    if ledger is None:
+        return
+    identity = {
+        "batch_hash": protocol.get("batch_hash"),
+        "candidate_content_hash": protocol.get("candidate_content_hash"),
+        "mechanism_id": protocol.get("mechanism_id"),
+    }
+    if not identity["batch_hash"]:
+        return
+    for record in ledger.read():
+        if str(record.get("event")) != "protocol_frozen":
+            continue
+        payload = record.get("payload") or {}
+        if all(payload.get(key) == value for key, value in identity.items()):
+            raise PromotionProtocolError(
+                "this batch and candidate were already frozen as a protocol "
+                f"(recorded {record.get('timestamp')!r}); a rejected promotion "
+                "may not be re-scored on the same frozen evidence. Change the "
+                "candidate or freeze a different batch."
+            )
+
+
+def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
+    """Re-check every learned artifact the frozen protocol names.
+
+    A protocol that declares no artifact has nothing to re-derive and passes.
+    A protocol that declares one is checked byte for byte: replacing a weights
+    file changes no source line and no detector config, so without this the
+    frozen protocol would happily evaluate a different model than the one it
+    was frozen against.
+    """
+    manifest = protocol.get("artifact_manifest")
+    if not isinstance(manifest, Mapping):
+        raise PromotionProtocolError(
+            "frozen protocol carries no artifact manifest; refusing to "
+            "evaluate a protocol whose learned artifacts are unpinned"
+        )
+    declared = manifest.get("artifacts") or {}
+    if not declared:
+        return
+    for path, digest in sorted(declared.items()):
+        try:
+            actual = artifact_digest(path)
+        except ValueError as exc:
+            raise PromotionProtocolError(
+                f"learned artifact is missing after the protocol was frozen: "
+                f"{exc}"
+            ) from exc
+        if actual != digest:
+            raise PromotionProtocolError(
+                "learned artifact changed after the protocol was frozen: "
+                f"{path}. The frozen protocol is evaluated on the artifacts "
+                "it froze; re-freeze before measuring this version."
+            )
 
 
 def _freeze_baseline_roll(
@@ -560,10 +785,18 @@ def load_protocol(
             "needs a protocol frozen before any model call"
         )
     protocol = json.loads(path.read_text(encoding="utf-8-sig"))
-    if str(protocol.get("schema_version")) != PROMOTION_PROTOCOL_SCHEMA:
-        raise PromotionProtocolError(
-            f"promotion protocol schema must be {PROMOTION_PROTOCOL_SCHEMA}"
-        )
+    schema = str(protocol.get("schema_version"))
+    if schema not in {PROMOTION_PROTOCOL_SCHEMA, alignment.ALIGNED_PROTOCOL_SCHEMA}:
+        raise PromotionProtocolError("unsupported promotion protocol schema")
+    if schema == alignment.ALIGNED_PROTOCOL_SCHEMA:
+        try:
+            alignment.verify_alignment(protocol)
+            if protocol["case_digests"] != alignment.data_digests(dataset_root, protocol["cases"]):
+                raise ValueError("promotion trajectory content changed after freeze")
+            if set(stages) != set(alignment.FORMAL_STAGES):
+                raise ValueError("v2 formal promotion must execute all four gates")
+        except (ValueError, KeyError, OSError) as exc:
+            raise PromotionProtocolError(str(exc)) from exc
     batch_path = Path(str(protocol.get("batch_path") or ""))
     if not batch_path.is_file():
         raise PromotionProtocolError(f"promotion batch is missing: {batch_path}")
@@ -578,6 +811,7 @@ def load_protocol(
             "detector/evolution source changed after the promotion protocol was "
             "frozen; a frozen protocol is evaluated on the machinery it froze"
         )
+    _verify_artifact_manifest(protocol)
     detector_config = Path(str(protocol.get("detector_config") or ""))
     if not detector_config.is_file():
         raise PromotionProtocolError(
@@ -637,8 +871,9 @@ def load_protocol(
             "declared gold steps disagree with the dataset annotations: "
             f"{mismatch}"
         )
-    protocol["gold"] = derived_gold
-    protocol["gold_steps"] = derived_steps
+    if schema != alignment.ALIGNED_PROTOCOL_SCHEMA:
+        protocol["gold"] = derived_gold
+        protocol["gold_steps"] = derived_steps
     unknown = sorted(set(stages) - {"structural", "harmlessness", "behavior", "m"})
     if unknown:
         raise PromotionProtocolError(f"unknown promotion stage(s): {unknown}")
@@ -790,6 +1025,8 @@ class PromotionRun:
             # A stored arm is only reusable under the same pinned control roll;
             # otherwise a resume would pair rows measured against a different
             # baseline than the one the protocol froze.
+            "protocol_hash": self.protocol.get("protocol_hash"),
+            "mechanism_id": self.protocol.get("mechanism_id"),
             "baseline_roll_hash": (
                 (self.protocol.get("baseline_roll") or {}).get("roll_hash")
             ),
@@ -942,6 +1179,19 @@ class PromotionRun:
         }
 
     def run(self) -> dict[str, Any]:
+        if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
+            return self._run_aligned()
+        if self.candidate.get("target_mechanism_id"):
+            report = {
+                "schema_version": PROMOTION_STATE_SCHEMA,
+                "state": "promotion_blocked_preflight", "admitted": False,
+                "candidate_id": self.candidate.get("candidate_id"),
+                "candidate_content_hash": self.candidate.get("content_hash"),
+                "terminal_reason": "mechanism-bound candidates require a v2 protocol",
+                "promotion_diagnosis": alignment.diagnosis("mechanism_alignment_missing"),
+            }
+            self._write(report)
+            return report
         import time as _time
 
         started = _time.monotonic()
@@ -1276,6 +1526,218 @@ class PromotionRun:
         self._write(report)
         return report
 
+    def _run_aligned(self) -> dict[str, Any]:
+        started = time.monotonic()
+        if self.timeout_seconds is not None:
+            self.deadline = started + self.timeout_seconds
+        protocol = self.protocol
+        candidate = self.candidate
+        mechanism_id = str(protocol.get("mechanism_id") or "")
+        report: dict[str, Any] = {
+            "schema_version": PROMOTION_STATE_SCHEMA,
+            "candidate_id": candidate.get("candidate_id"),
+            "candidate_content_hash": candidate.get("content_hash"),
+            "target_kind": candidate.get("target_kind"),
+            "mechanism_id": mechanism_id,
+            "protocol_hash": protocol.get("protocol_hash"),
+            "evidence_scope": "candidate_unused_development_data",
+            "admitted": False, "gates": {},
+            "protocol": {
+                "benefit": benefit_cases(protocol),
+                "protection": protection_cases(protocol),
+                "challenge": list(protocol.get("challenge_cases") or ()),
+                "workers": self.workers,
+            },
+        }
+
+        def finish(state: str, code: str, reason: str = "") -> dict[str, Any]:
+            report.update(
+                state=state, terminal_reason=reason, admitted=state == "promoted",
+                elapsed_seconds=round(time.monotonic() - started, 3),
+                promotion_diagnosis=alignment.diagnosis(
+                    code, mechanism_id=mechanism_id, reason=reason,
+                ),
+            )
+            self._write(report)
+            return report
+
+        # An unbound candidate is a missing alignment, not a broken protocol: it
+        # has to be reported as its own diagnosis so the next step (bind the
+        # candidate at freeze time) is readable from the terminal state.
+        if (
+            candidate.get("schema_version") != alignment.ALIGNED_CANDIDATE_SCHEMA
+            or not candidate.get("target_mechanism_id")
+        ):
+            return finish(
+                "promotion_blocked_preflight", "mechanism_alignment_missing",
+                "mechanism-bound promotion needs a v2 candidate bound to a "
+                "mechanism; bind it before freezing the protocol",
+            )
+        try:
+            alignment.verify_alignment(protocol)
+            _validate_candidate_identity(candidate)
+            if set(self.stages) != set(alignment.FORMAL_STAGES):
+                raise ValueError(
+                    "all four formal gates are mandatory in a v2 promotion"
+                )
+            if candidate["content_hash"] != protocol["candidate_content_hash"]:
+                raise ValueError("candidate changed after the protocol was frozen")
+            if candidate["target_mechanism_id"] != mechanism_id:
+                raise ValueError("candidate and protocol target different mechanisms")
+            if alignment.digest(candidate["mechanism"]) != alignment.digest(protocol["mechanism"]):
+                raise ValueError("candidate and protocol mechanism evidence differ")
+            if set(alignment.development_cases(candidate)) - set(protocol["development_cases"]):
+                raise ValueError("protocol omits candidate development exposure")
+            if alignment.frozen_policy(self.config) != protocol["policy"]:
+                raise ValueError("gate or library policy changed after freeze")
+            if source_digest() != protocol["code_baseline"]:
+                raise ValueError("source changed after protocol freeze")
+            if fingerprint(json.loads(Path(protocol["detector_config"]).read_text(encoding="utf-8-sig"))) != protocol["detector_config_hash"]:
+                raise ValueError("detector configuration changed after freeze")
+            if protocol["case_digests"] != alignment.data_digests(self.dataset_root, protocol["cases"]):
+                raise ValueError("promotion trajectory content changed after freeze")
+            if self._registry_for(self.registry.entries)["content_hash"] != protocol["baseline_registry_hash"]:
+                raise ValueError("active baseline changed after protocol freeze")
+            if not self.ledger.verify()["valid"]:
+                raise ValueError("ledger integrity check failed")
+            self._claim_aligned_protocol()
+        except (ValueError, KeyError, TypeError, OSError) as exc:
+            return finish("promotion_blocked_preflight", "protocol_invalid", str(exc))
+
+        artifacts = [dict(entry) for entry in candidate["artifacts"]]
+        entries = list(self.registry.entries)
+        exposed = set(alignment.development_cases(candidate))
+        if exposed & set(protocol["cases"]):
+            return finish("promotion_rejected", "candidate_invalid", "candidate-unused rule violated")
+        try:
+            validate_intervention_batch([*entries, *artifacts], require_executable_bounds=True)
+            if any(candidate_contains_case_id(entry) for entry in artifacts):
+                raise ValueError("case id leak in candidate executable prose")
+            # Development results never substitute for formal gates. Failed or
+            # missing L0/L1 on this source cannot be imported as a frozen success.
+            development = candidate.get("development_results") or {}
+            if development.get("source") == "development":
+                if any((development.get(level) or {}).get("passed") is not True for level in ("l0", "l1")):
+                    raise ValueError("development candidate lacks passing L0/L1 evidence")
+            elif development.get("screening_passed") is False:
+                raise ValueError("research screening verdict did not pass")
+            for entry in artifacts:
+                verdict = structural_gate(
+                    entry, active_entries=entries, config=self.config,
+                    dataset_root=self.dataset_root, batch_candidates=artifacts,
+                )
+                if not verdict["passed"]:
+                    raise ValueError(verdict["reason"])
+        except ValueError as exc:
+            report["gates"]["structural"] = {"passed": False, "reason": str(exc)}
+            return finish("promotion_rejected", "candidate_invalid", str(exc))
+        report["gates"]["structural"] = {"passed": True, "reason": ""}
+        all_cases = list(protocol["cases"])
+        fresh = self.require_fresh or requires_fresh_evaluation([*entries, *artifacts])
+        try:
+            control = alignment.checked_rows(
+                self._run_arm(entries, all_cases, fresh=fresh, label="control"), protocol,
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            return finish("promotion_unresolved", "runtime_unresolved", str(exc))
+        measured = alignment.opportunity(protocol, control)
+        report["opportunity"] = {"mechanism": measured, "detection": gain_opportunity(control)}
+        if not measured["evaluable"]:
+            state = "promotion_unresolved" if measured["unresolved"] else "promotion_unmeasurable"
+            return finish(state, measured["reason_code"], "the frozen gain set has no measurable repair opportunity for this mechanism")
+        protection_ids = set(protection_cases(protocol))
+        challenge_ids = set(protocol["challenge_cases"])
+        gain_ids = set(protocol["mechanism_gain_cases"])
+        control_protection = [row for row in control if row["case"] in protection_ids]
+        coverage = sentinel_coverage(control_protection, self.config)
+        report["protection_coverage"] = coverage
+        if not coverage["evaluable"]:
+            return finish("promotion_unmeasurable", "protection_coverage_missing", coverage["reason"])
+        objective = str(candidate["target_kind"])
+        if objective in {"localization", "joint"}:
+            preserved = paired_localization_delta(control_protection, control_protection, gold_steps=protocol["gold_steps"])
+            if preserved["base_joint"] < 1:
+                return finish("promotion_unmeasurable", "localization_protection_missing", "protection set has no baseline-correct localization")
+        try:
+            active = alignment.checked_rows(
+                self._run_arm([*entries, *artifacts], all_cases, fresh=fresh, label="candidate"), protocol,
+            )
+        except (ValueError, OSError, RuntimeError) as exc:
+            return finish("promotion_unresolved", "runtime_unresolved", str(exc))
+        control_gain = [row for row in control if row["case"] in gain_ids]
+        active_gain = [row for row in active if row["case"] in gain_ids]
+        active_protection = [row for row in active if row["case"] in protection_ids]
+        control_challenge = [row for row in control if row["case"] in challenge_ids]
+        active_challenge = [row for row in active if row["case"] in challenge_ids]
+        detection = paired_delta(control_gain, active_gain)
+        localization = paired_localization_delta(control_gain, active_gain, gold_steps=protocol["gold_steps"])
+        all_detection = paired_delta(control, active)
+        all_localization = paired_localization_delta(control, active, gold_steps=protocol["gold_steps"])
+        challenge_delta = paired_delta(control_challenge, active_challenge)
+        report["benefit"] = {"detection": _delta_summary(detection), "localization": _localization_summary(localization)}
+        report["challenge"] = {"metric_role": "promotion-authoritative", "delta": _delta_summary(challenge_delta)}
+        report["localization_protection"] = _localization_summary(all_localization)
+        harmlessness = harmlessness_gate(baseline_rows=control_protection, candidate_rows=active_protection, config=self.config)
+        report["gates"]["harmlessness"] = harmlessness
+        if not harmlessness["passed"]:
+            return finish("promotion_rejected", "protection_regression", harmlessness["reason"])
+        if challenge_delta["new_errors"] or challenge_delta["unresolved_added"]:
+            report["gates"]["challenge"] = {"passed": False, "reason": "mechanism-external challenge regression"}
+            return finish("promotion_rejected", "challenge_regression", "mechanism-external challenge regression")
+        report["gates"]["challenge"] = {"passed": True, "reason": ""}
+        if all_localization["joint_broken"]:
+            return finish("promotion_rejected", "localization_regression", "a baseline-correct localization regressed")
+        if all_detection["new_errors"] or all_detection["unresolved_added"]:
+            return finish("promotion_rejected", "protection_regression", "a previously correct decision regressed")
+        member_behavior = {}
+        for entry in artifacts:
+            kind = candidate_target_kind(entry)
+            detection_behavior = behavior_gate(entry, baseline_rows=control_gain, candidate_rows=active_gain, config=self.config)
+            local_behavior = localization_behavior_gate(entry, baseline_rows=control_gain, candidate_rows=active_gain, config=self.config, gold_steps=protocol["gold_steps"])
+            if kind == "joint":
+                verdict = {"passed": detection_behavior["passed"] or local_behavior["passed"],
+                           "reason": "; ".join(v["reason"] for v in (detection_behavior, local_behavior) if not v["passed"]),
+                           "detection": detection_behavior, "localization": local_behavior}
+            else:
+                verdict = local_behavior if kind == "localization" else detection_behavior
+            member_behavior[str(entry["intervention_id"])] = verdict
+        passed = all(item["passed"] for item in member_behavior.values())
+        report["gates"]["behavior"] = {"passed": passed, "members": member_behavior}
+        if not passed:
+            return finish("promotion_rejected", "candidate_no_effect", "candidate did not improve its declared objective on mechanism gain cases")
+        if objective == "detection":
+            passed, reasons = meets_m(detection, config=self.config)
+        else:
+            passed, reasons = meets_localization(localization, config=self.config, detection_delta=detection, target_kind=objective)
+        report["gates"]["m"] = {"passed": passed, "reason": "; ".join(reasons), "delta": detection, "localization_delta": localization}
+        if not passed:
+            return finish("promotion_rejected", "candidate_no_effect", "; ".join(reasons))
+        problems = self.registry.check_limits([*entries, *artifacts], library_cfg=self.config.get("library") or {})
+        if problems:
+            return finish("promotion_blocked_preflight", "library_limit", "; ".join(problems))
+        report["version"] = self._publish()
+        return finish("promoted", "promoted")
+
+    def _claim_aligned_protocol(self) -> None:
+        path = Path(str(self.protocol.get("loaded_from") or ""))
+        if not path.is_file():
+            raise ValueError("v2 protocol must have a persisted source path")
+        claim_path = path.with_name(path.name + ".attempt.json")
+        identity = {"protocol_hash": self.protocol["protocol_hash"],
+                    "candidate_content_hash": self.candidate["content_hash"],
+                    "output_dir": str(self.output_dir.resolve())}
+        if claim_path.exists():
+            if json.loads(claim_path.read_text(encoding="utf-8")) != identity:
+                raise ValueError("protocol already consumed by another promotion attempt")
+            return
+        claim_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with claim_path.open("x", encoding="utf-8") as handle:
+                json.dump(identity, handle, ensure_ascii=False, sort_keys=True)
+        except FileExistsError:
+            if json.loads(claim_path.read_text(encoding="utf-8")) != identity:
+                raise ValueError("protocol already consumed by another promotion attempt")
+
     # -- publication ------------------------------------------------------
     def _publish(self) -> dict[str, Any]:
         """Commit the admitted version and record it in registry and ledger.
@@ -1307,6 +1769,13 @@ class PromotionRun:
             "promoted_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "protocol": self.protocol.get("loaded_from"),
         }
+        if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
+            version.update(
+                mechanism_id=self.protocol["mechanism_id"],
+                protocol_hash=self.protocol["protocol_hash"],
+                parent_registry_hash=self.protocol["baseline_registry_hash"],
+                development_cases=list(self.candidate["development_cases"]),
+            )
         save_json(self.output_dir / "version.json", version)
         self.ledger.append("candidate_promoted", {
             "candidate_id": self.candidate.get("candidate_id"),
@@ -1321,6 +1790,11 @@ class PromotionRun:
         return version
 
     def _write(self, report: Mapping[str, Any]) -> None:
+        if "promotion_diagnosis" not in report and isinstance(report, dict):
+            state = str(report.get("state") or "")
+            code = alignment.LEGACY_STATE_REASONS.get(state, "runtime_unresolved")
+            report["promotion_diagnosis"] = alignment.diagnosis(code, reason=str(report.get("terminal_reason") or ""))
+            report["evidence_scope"] = "legacy_polarity_evaluation"
         save_json(self.output_dir / "promotion.json", report)
         self.ledger.append("promotion_attempt", {
             "candidate_id": report.get("candidate_id"),
@@ -1329,6 +1803,9 @@ class PromotionRun:
             "target_kind": report.get("target_kind"),
             "reason": report.get("terminal_reason"),
             "protocol": self.protocol.get("loaded_from"),
+            "protocol_hash": self.protocol.get("protocol_hash"),
+            "mechanism_id": report.get("mechanism_id"),
+            "promotion_diagnosis": report.get("promotion_diagnosis"),
         })
 
 

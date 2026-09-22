@@ -1,0 +1,86 @@
+{
+  "artifacts": {
+    "artifacts": [
+      "C:\\Users\\NUAA\\AppData\\Local\\Temp\\tmp5tp2xcid\\weights.bin"
+    ],
+    "empty_manifest_digest": "240d65f018d28d56",
+    "manifest_digest": "a21cb66fdcd8bcd9",
+    "manifest_schema": "evolution.artifact_manifest.v1",
+    "replaced_weights": "refused: learned artifact changed after the protocol was frozen: C:\\Users\\NUAA\\AppData\\Local\\Temp\\tmp5tp2xcid\\weights.bin. The frozen protocol is evaluated on the artifacts it froze; re-freeze before measuring this version.",
+    "source_digest": "45dc5d724e24a066",
+    "unchanged_weights": "loaded",
+    "weight_digest_after": "98c4e96569e84d33"
+  },
+  "boundary": {
+    "adjudicate_guard": {
+      "boundary_key": "a8a94b34",
+      "fresh_required": false,
+      "hooks": [
+        "adjudicate.guard"
+      ],
+      "rerun_stages": [
+        "adjudication"
+      ],
+      "reusable_stages": [
+        "causal_upgrade",
+        "defense",
+        "judge",
+        "recall_scanner",
+        "step_tracer"
+      ],
+      "stage_of_hook": {
+        "adjudicate.guard": "adjudication"
+      },
+      "unknown_hooks": []
+    },
+    "stages": [
+      "judge",
+      "recall_scanner",
+      "causal_upgrade",
+      "step_tracer",
+      "defense",
+      "adjudication"
+    ],
+    "tracer_system": {
+      "boundary_key": "bdbfde95",
+      "fresh_required": false,
+      "hooks": [
+        "tracer.system"
+      ],
+      "rerun_stages": [
+        "adjudication",
+        "step_tracer"
+      ],
+      "reusable_stages": [
+        "causal_upgrade",
+        "defense",
+        "judge",
+        "recall_scanner"
+      ],
+      "stage_of_hook": {
+        "tracer.system": "step_tracer"
+      },
+      "unknown_hooks": []
+    },
+    "unknown_hook": {
+      "boundary_key": "423381b5",
+      "hooks": [
+        "no.such.hook"
+      ],
+      "rerun_stages": [
+        "adjudication",
+        "causal_upgrade",
+        "defense",
+        "judge",
+        "recall_scanner",
+        "step_tracer"
+      ],
+      "unknown_hooks": [
+        "no.such.hook"
+      ]
+    }
+  },
+  "evidence_grade": "diagnostic-only",
+  "note": "Offline and scripted: no provider call, no admission, and no statement about detector quality. Demonstrates the replay boundary and the artifact identity rules only.",
+  "schema_version": "evolution.p1_replay_artifacts_dryrun.v1"
+}

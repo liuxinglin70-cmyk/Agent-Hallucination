@@ -1,0 +1,167 @@
+{
+  "schema_version": "evolution.promotion_alignment_dryrun.v1",
+  "evidence_grade": "diagnostic-only",
+  "note": "Scripted offline arms: no provider call, no admission beyond the offline registry stub. Demonstrates the promotion rules, not detector quality. Real promotion still requires a real service run and an independently frozen protocol.",
+  "mechanism_id": "M-17084a0707a4",
+  "case_roles": {
+    "gain": [
+      "A/001.json",
+      "A/002.json"
+    ],
+    "protection": [
+      "C/001.json",
+      "C/002.json",
+      "E/001.json",
+      "E/002.json"
+    ],
+    "challenge": [
+      "X/001.json",
+      "X/002.json"
+    ]
+  },
+  "promoted": {
+    "state": "promoted",
+    "admitted": true,
+    "reason_code": "promoted",
+    "category": "promoted",
+    "arms_measured": [
+      "control",
+      "candidate"
+    ],
+    "mechanism_opportunity": {
+      "schema_version": "evolution.mechanism_opportunity.v1",
+      "metric_role": "promotion-authoritative",
+      "mechanism_id": "M-17084a0707a4",
+      "target_kind": "detection",
+      "target_cases": 2,
+      "repairable_errors": 2,
+      "already_correct": 0,
+      "unresolved": 0,
+      "unconfirmed": 0,
+      "ineligible": 0,
+      "detection_repairable_errors": 2,
+      "localization_repairable_errors": 0,
+      "opportunity_cases": [
+        "A/001.json",
+        "A/002.json"
+      ],
+      "already_correct_cases": [],
+      "unresolved_cases": [],
+      "unconfirmed_cases": [],
+      "ineligible_cases": [],
+      "evaluable": true,
+      "reason_code": "measurable"
+    },
+    "marginal_cases": 2
+  },
+  "no_mechanism_opportunity": {
+    "state": "promotion_unmeasurable",
+    "admitted": false,
+    "reason_code": "no_mechanism_opportunity",
+    "category": "formal_gain_no_opportunity",
+    "arms_measured": [
+      "control"
+    ],
+    "mechanism_opportunity": {
+      "schema_version": "evolution.mechanism_opportunity.v1",
+      "metric_role": "promotion-authoritative",
+      "mechanism_id": "M-17084a0707a4",
+      "target_kind": "detection",
+      "target_cases": 2,
+      "repairable_errors": 0,
+      "already_correct": 2,
+      "unresolved": 0,
+      "unconfirmed": 0,
+      "ineligible": 0,
+      "detection_repairable_errors": 0,
+      "localization_repairable_errors": 0,
+      "opportunity_cases": [],
+      "already_correct_cases": [
+        "A/001.json",
+        "A/002.json"
+      ],
+      "unresolved_cases": [],
+      "unconfirmed_cases": [],
+      "ineligible_cases": [],
+      "evaluable": false,
+      "reason_code": "no_mechanism_opportunity"
+    },
+    "marginal_cases": null
+  },
+  "protection_regression": {
+    "state": "promotion_rejected",
+    "admitted": false,
+    "reason_code": "protection_regression",
+    "category": "harmlessness_failed",
+    "arms_measured": [
+      "control",
+      "candidate"
+    ],
+    "mechanism_opportunity": {
+      "schema_version": "evolution.mechanism_opportunity.v1",
+      "metric_role": "promotion-authoritative",
+      "mechanism_id": "M-17084a0707a4",
+      "target_kind": "detection",
+      "target_cases": 2,
+      "repairable_errors": 2,
+      "already_correct": 0,
+      "unresolved": 0,
+      "unconfirmed": 0,
+      "ineligible": 0,
+      "detection_repairable_errors": 2,
+      "localization_repairable_errors": 0,
+      "opportunity_cases": [
+        "A/001.json",
+        "A/002.json"
+      ],
+      "already_correct_cases": [],
+      "unresolved_cases": [],
+      "unconfirmed_cases": [],
+      "ineligible_cases": [],
+      "evaluable": true,
+      "reason_code": "measurable"
+    },
+    "marginal_cases": 2
+  },
+  "challenge_regression": {
+    "state": "promotion_rejected",
+    "admitted": false,
+    "reason_code": "challenge_regression",
+    "category": "mechanism_external_regression",
+    "arms_measured": [
+      "control",
+      "candidate"
+    ],
+    "mechanism_opportunity": {
+      "schema_version": "evolution.mechanism_opportunity.v1",
+      "metric_role": "promotion-authoritative",
+      "mechanism_id": "M-17084a0707a4",
+      "target_kind": "detection",
+      "target_cases": 2,
+      "repairable_errors": 2,
+      "already_correct": 0,
+      "unresolved": 0,
+      "unconfirmed": 0,
+      "ineligible": 0,
+      "detection_repairable_errors": 2,
+      "localization_repairable_errors": 0,
+      "opportunity_cases": [
+        "A/001.json",
+        "A/002.json"
+      ],
+      "already_correct_cases": [],
+      "unresolved_cases": [],
+      "unconfirmed_cases": [],
+      "ineligible_cases": [],
+      "evaluable": true,
+      "reason_code": "measurable"
+    },
+    "marginal_cases": 2
+  },
+  "second_attempt_on_frozen_evidence": {
+    "state": "promotion_blocked_preflight",
+    "reason_code": "protocol_invalid",
+    "terminal_reason": "protocol already consumed by another promotion attempt",
+    "admitted": false
+  }
+}

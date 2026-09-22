@@ -1,0 +1,216 @@
+{
+  "schema_version": "evolution.mechanism_dryrun.v1",
+  "evidence_grade": "diagnostic-only",
+  "note": "Mechanism reconstruction over archived evaluated rows; no detector call and no detector behaviour change. Gold is carried for human review only and never enters a mechanism key.",
+  "source_archive": "reports/error_scope_20260918/attempts",
+  "coarse_failure_cases": 6,
+  "proposable_cases": 4,
+  "unrepresented_cases": 0,
+  "excluded_cases": 2,
+  "accounting_closed": true,
+  "coarse_families": [
+    {
+      "failure_family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93",
+      "count": 4,
+      "failure_cases": [
+        "BFCL/041.json",
+        "BFCL/062.json",
+        "BFCL/017.json",
+        "OpenDeepSearch/035.json"
+      ],
+      "sources": [
+        "BFCL",
+        "OpenDeepSearch"
+      ]
+    },
+    {
+      "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+      "count": 2,
+      "failure_cases": [
+        "SmolAgents/019.json",
+        "BFCL/107.json"
+      ],
+      "sources": [
+        "BFCL",
+        "SmolAgents"
+      ]
+    }
+  ],
+  "mechanisms": [
+    {
+      "mechanism_id": "M-17084a0707a4",
+      "schema_version": "evolution.failure_mechanism.v1",
+      "objective": "detection",
+      "status": "confirmed",
+      "confidence_basis": "multi_case",
+      "task_obligation": {
+        "kind": "required_action",
+        "subject": "tool_action",
+        "expected_relation": "the_required_action_was_performed"
+      },
+      "observed_deviation": {
+        "kind": "omission",
+        "actual": "required_action_absent",
+        "expected": "required_action_present"
+      },
+      "detector_failure": {
+        "stage": "recall_scanner",
+        "failure_mode": "not_reached",
+        "path_signature": {
+          "judge_positive": false,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_needed",
+            "causal_upgrade": "not_needed",
+            "step_tracer": "not_run",
+            "defense": "not_run"
+          },
+          "recall_path": "not_needed",
+          "upgrade_positive": false,
+          "defense_verdict": "none",
+          "positive_source": "none"
+        }
+      },
+      "repair_hypothesis": {
+        "operation": "route_recall",
+        "required_inputs": [
+          "question_text",
+          "tool_names",
+          "packet_features"
+        ],
+        "required_capabilities": [
+          "control_flow"
+        ],
+        "forbidden_shortcuts": [
+          "case_id",
+          "gold_label",
+          "gold_step",
+          "dataset_annotation"
+        ]
+      },
+      "families": [
+        "FAM-fn-judge_false_no_recall_candidates-a4f141369d93-Pa34f489e3099"
+      ],
+      "case_count": 2,
+      "proposable": true
+    },
+    {
+      "mechanism_id": "M-5a89ab46e81f",
+      "schema_version": "evolution.failure_mechanism.v1",
+      "objective": "detection",
+      "status": "confirmed",
+      "confidence_basis": "multi_case",
+      "task_obligation": {
+        "kind": "exact_value",
+        "subject": "delivered_value",
+        "expected_relation": "the_delivered_value_equals_the_required_one"
+      },
+      "observed_deviation": {
+        "kind": "none",
+        "actual": "no_task_level_deviation",
+        "expected": "no_task_level_deviation"
+      },
+      "detector_failure": {
+        "stage": "adjudication",
+        "failure_mode": "false_conviction",
+        "path_signature": {
+          "judge_positive": true,
+          "stages": {
+            "judge": "ok",
+            "recall_scanner": "not_run",
+            "causal_upgrade": "not_run",
+            "step_tracer": "ok",
+            "defense": "ok"
+          },
+          "recall_path": "not_run",
+          "upgrade_positive": false,
+          "defense_verdict": "substantiated",
+          "positive_source": "judge"
+        }
+      },
+      "repair_hypothesis": {
+        "operation": "withhold_conviction",
+        "required_inputs": [
+          "context_judge_positive",
+          "context_judge_confidence",
+          "last_answer_tool_observation"
+        ],
+        "required_capabilities": [
+          "guard"
+        ],
+        "forbidden_shortcuts": [
+          "case_id",
+          "gold_label",
+          "gold_step",
+          "dataset_annotation"
+        ]
+      },
+      "families": [
+        "FAM-fp-judge_conviction-117fce1c070d"
+      ],
+      "case_count": 2,
+      "proposable": true
+    }
+  ],
+  "unrepresented": [],
+  "excluded": [
+    {
+      "failure_family": "FAM-fn-judge_false_no_recall_candidates-a4f141369d93",
+      "parent_count": 4,
+      "excluded_count": 2,
+      "excluded_cases": [
+        "BFCL/017.json",
+        "OpenDeepSearch/035.json"
+      ],
+      "reason": "mechanical profile group smaller than the two-case minimum; kept out of the proposable set rather than mixed into a subgroup whose repair operation would be wrong for it"
+    }
+  ],
+  "mechanism_cases": {
+    "M-17084a0707a4": {
+      "status": "confirmed",
+      "task_obligation": "required_action",
+      "observed_deviation": "omission",
+      "repair_operation": "route_recall",
+      "detector_failure": "recall_scanner/not_reached",
+      "members": [
+        {
+          "case": "BFCL/041.json",
+          "source": "BFCL",
+          "gold": true,
+          "prediction": false,
+          "archived_row": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/f5f761b6fbf5.json"
+        },
+        {
+          "case": "BFCL/062.json",
+          "source": "BFCL",
+          "gold": true,
+          "prediction": false,
+          "archived_row": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/e2cf882fc0eb.json"
+        }
+      ]
+    },
+    "M-5a89ab46e81f": {
+      "status": "confirmed",
+      "task_obligation": "exact_value",
+      "observed_deviation": "none",
+      "repair_operation": "withhold_conviction",
+      "detector_failure": "adjudication/false_conviction",
+      "members": [
+        {
+          "case": "SmolAgents/019.json",
+          "source": "SmolAgents",
+          "gold": false,
+          "prediction": true,
+          "archived_row": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/2f0d1f4ff7f1.json"
+        },
+        {
+          "case": "BFCL/107.json",
+          "source": "BFCL",
+          "gold": false,
+          "prediction": true,
+          "archived_row": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/3d27b3053166.json"
+        }
+      ]
+    }
+  }
+}

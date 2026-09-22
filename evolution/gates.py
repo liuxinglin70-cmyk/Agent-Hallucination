@@ -28,6 +28,7 @@ from detector.predicate_dsl import run_predicate_program
 from evolution.contracts import (
     candidate_contains_case_id,
     candidate_prose_text,
+    identity_incompleteness,
     jaccard,
     make_intervention,
     structured_key,
@@ -255,6 +256,15 @@ def structural_gate(
     if case_id_hit:
         return _policy_fail(f"case id leak in directive/body/claim: {case_id_hit}")
 
+    # §23.2: a learned artifact must have a digest. An entry whose runner reads
+    # an artifact it does not pin cannot be told apart from a different model
+    # wearing the same declared fields, and the STRUCTURAL redundancy check
+    # below -- and every later reading -- would be comparing on an identity
+    # that does not determine behaviour.
+    incomplete = identity_incompleteness(candidate)
+    if incomplete:
+        return _policy_fail(f"incomplete executable identity: {incomplete}")
+
     provenance = candidate.get("provenance") or {}
     failure_cases = provenance.get("failure_cases") or []
     if len(failure_cases) < 2:
@@ -442,7 +452,15 @@ def structural_gate(
     candidate_key = structured_key(candidate)
     for existing in active_entries:
         existing_key = structured_key(existing)
-        if candidate_key is not None and existing_key is not None:
+        # The structural comparison is authoritative only when both keys
+        # describe what actually executes. An entry whose runner reads an
+        # unpinned artifact has an incomplete key, so the comparison falls
+        # through to prose instead of claiming the two are different executors.
+        if (
+            candidate_key is not None
+            and existing_key is not None
+            and not identity_incompleteness(existing)
+        ):
             if candidate_key == existing_key:
                 return _policy_fail(
                     "redundant with active intervention "
@@ -635,11 +653,23 @@ def behavior_gate(
 
     behavior_ok = False
     behavior_note = ""
+    # Machine-readable counterpart of ``behavior_note``. The note is prose for
+    # a report; route-insufficiency evidence (``evolution.route_failures``)
+    # needs the count itself, because "the hook fired and moved nothing" is a
+    # claim about numbers, not about a sentence.
+    behavior_events = 0
+    behavior_event_kind = {
+        "evidence_check": "evidence_increment",
+        "text_boundary": "text_injected",
+        "recall_trigger": "recall_triggered",
+        "decision_guard": "guard_fired",
+    }.get(intervention_type, "")
     if intervention_type == "evidence_check":
         increment = evidence_increment_rows(
             baseline_rows, candidate_rows, intervention_id,
         )
         behavior_ok = increment > 0
+        behavior_events = increment
         behavior_note = f"evidence_increment_rows={increment}"
     elif intervention_type == "text_boundary":
         injected = 0
@@ -653,6 +683,7 @@ def behavior_gate(
                 and item.get("event") == "text_injected"
             )
         behavior_ok = injected > 0
+        behavior_events = injected
         behavior_note = f"text_injected_cases={injected}"
     elif intervention_type == "recall_trigger":
         forced = 0
@@ -672,6 +703,7 @@ def behavior_gate(
             state = (((base.get("result") or {}).get("stage_status") or {}).get("recall_scanner") or {}).get("state")
             newly_opened += int(matched and state in {"not_needed", "not_run"})
         behavior_ok = forced > 0
+        behavior_events = forced
         behavior_note = f"recall_triggered_cases={forced}; newly_opened_recall_cases={newly_opened}"
     elif intervention_type == "decision_guard":
         guard_fired = 0
@@ -685,12 +717,15 @@ def behavior_gate(
                 and item.get("event") == "guard_fired"
             )
         behavior_ok = guard_fired > 0
+        behavior_events = guard_fired
         behavior_note = f"guard_fired_cases={guard_fired}"
 
     if not behavior_ok:
         return _policy_fail(
             f"claim behavior mismatch: {behavior_note}",
             fired_rate=rate,
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
         )
 
     delta = paired_delta(list(baseline_rows), candidate_rows)
@@ -699,13 +734,23 @@ def behavior_gate(
             f"runtime health regressed on {delta['health_regressed']} case(s)",
             delta=delta,
             fired_rate=rate,
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
         )
+    # Every branch below reports the firing readings as well as the delta: this
+    # is where "the intervention fired, moved what it promised, and the outcome
+    # did not move" lands, and that reading is exactly what route-insufficiency
+    # evidence is made of. Reporting only the delta made the case
+    # indistinguishable from an intervention that never ran.
     if polarity == "recall":
         if not (_new_tp(delta) > 0 and delta["tp_lost"] == 0 and delta["fp_added"] == 0):
             return _policy_fail(
                 "target polarity mismatch: recall claim but no TP gain or "
                 "precision was harmed",
                 delta=delta,
+                fired_rate=rate,
+                behavior_events=behavior_events,
+                behavior_event_kind=behavior_event_kind,
             )
     elif polarity == "precision":
         if not (_removed_fp(delta) > 0 and delta["tp_lost"] == 0):
@@ -713,6 +758,9 @@ def behavior_gate(
                 "target polarity mismatch: precision claim but no FP removal "
                 "or TP was lost",
                 delta=delta,
+                fired_rate=rate,
+                behavior_events=behavior_events,
+                behavior_event_kind=behavior_event_kind,
             )
     elif polarity == "boundary":
         # A boundary claim must correct a real decision, not merely fire or
@@ -724,6 +772,9 @@ def behavior_gate(
                 "target polarity mismatch: boundary claim corrected no decisive "
                 f"decision (decisive_fixed={fixed}, decisive_broken={broken})",
                 delta=delta,
+                fired_rate=rate,
+                behavior_events=behavior_events,
+                behavior_event_kind=behavior_event_kind,
             )
     else:
         return _policy_fail(f"unknown target polarity {polarity!r}")
@@ -732,6 +783,8 @@ def behavior_gate(
         delta=delta,
         fired_rate=rate,
         behavior_note=behavior_note,
+        behavior_events=behavior_events,
+        behavior_event_kind=behavior_event_kind,
     )
 
 

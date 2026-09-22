@@ -57,6 +57,7 @@ from evolution.metrics import (
     fired_rate,
     gain_opportunity,
     localization_opportunity,
+    mechanism_opportunity,
     paired_delta,
     paired_localization_delta,
     source_deltas,
@@ -82,10 +83,19 @@ from evolution.harness import (
 from evolution.memory import (
     load_episodes,
     record_episode,
-    record_improvement,
     record_procedure,
     recall as recall_experience,
     write_recall,
+)
+from evolution.capability_planning import plan_capabilities
+from evolution.mechanisms import mechanism_prompt_view, repair_requirements
+from evolution.archive import retrieve_components
+from evolution.route_failures import (
+    ROUTE_FAILURE_NAME,
+    insufficiency_evidence,
+    load_route_failures,
+    record_route_failures,
+    route_failure_summary,
 )
 from evolution.splits import (
     EvolutionSplit,
@@ -97,8 +107,12 @@ from evolution.splits import (
     split_manifest_report,
 )
 from evolution.worksheet import (
+    attach_normal_neighbors,
     classify_family_actionability,
     diagnose_failure_families,
+    excluded_failure_cases,
+    mechanism_report,
+    mechanism_subgroups,
     refine_failure_families,
     stable_failure_families,
     stable_localization_families,
@@ -182,11 +196,6 @@ def _failure_contrast(
             "count": len(resolved_cases), "cases": sorted(resolved_cases),
         },
     }
-
-
-def gain_opportunity_for(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """Alias kept for callers inside this module."""
-    return gain_opportunity(rows)
 
 
 def gate_rejection_is_unevaluable(
@@ -511,11 +520,54 @@ class EvolutionEngine:
                     feedback.update(reason=episode["reason"], not_evaluable=episode["unevaluable"],
                                     correction_evidence=episode["correction_evidence"])
         self.gap_store = self.harness_dir / GAP_STORE_NAME
+        self.route_failure_store = self.harness_dir / ROUTE_FAILURE_NAME
+        # Optional mechanism-level scoring binding. Absent by default, which is
+        # what keeps every existing cycle's semantics unchanged.
+        self.mechanism_binding: dict[str, Any] = {}
+        self.mechanism_membership: dict[str, Any] = {}
+        self._mechanism_binding_error = ""
+        self._load_mechanism_binding()
         # Optional, explicitly installed replacement evaluation set.
         self._replacement_gain_cases: list[str] = []
         self._previous_manifest = self._load_previous_manifest()
+        # Layer 2 of §9.1: reusable parts. Separate from the registry by
+        # construction -- nothing this store holds has passed a promotion gate.
+        self.component_store = Path(
+            (self.config.get("component_root") or "").strip()
+            or str(Path(self.config["work_root"]) / "components")
+        )
+        self.component_prompt_limit = int(
+            (self.config.get("proposer") or {}).get("max_components", 4)
+        )
 
     # ------------------------------------------------------------------
+    def _load_mechanism_binding(self) -> None:
+        """Read the optional mechanism binding declared by configuration.
+
+        Both files or neither: a mechanism without membership cannot be scored
+        (membership is the evidence a case belongs to the mechanism), and
+        membership without a mechanism names no target.
+        """
+        mechanism_path = self.config.get("mechanism")
+        membership_path = self.config.get("mechanism_membership")
+        if not mechanism_path and not membership_path:
+            return
+        if not (mechanism_path and membership_path):
+            self._mechanism_binding_error = (
+                "a mechanism binding needs both 'mechanism' and "
+                "'mechanism_membership'"
+            )
+            return
+        try:
+            self.mechanism_binding = dict(json.loads(
+                resolve_path(str(mechanism_path)).read_text(encoding="utf-8-sig")
+            ))
+            self.mechanism_membership = dict(json.loads(
+                resolve_path(str(membership_path)).read_text(encoding="utf-8-sig")
+            ))
+        except (OSError, ValueError) as exc:
+            self._mechanism_binding_error = f"{type(exc).__name__}: {exc}"
+
     def _cycle_seconds(self) -> float | None:
         raw = (self.config.get("budget") or {}).get("cycle_timeout_seconds")
         return float(raw) if raw else None
@@ -540,6 +592,55 @@ class EvolutionEngine:
         if not path.is_file():
             return None
         return load_manifest(path)
+
+    def _reusable_components(
+        self, diagnosed_families: Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Bounded reusable parts for the mechanisms under proposal this round.
+
+        One retrieval per mechanism, then a global cap, so a store that grows
+        over a long run cannot grow the drafting prompt with it. A component is
+        offered by mechanism first and by capability second: a part that reads
+        a typed field is reusable by any mechanism whose repair needs that
+        observation, not only the one that first needed it.
+        """
+        if not self.component_store.is_dir() and not (
+            self.component_store / "components.jsonl"
+        ).exists():
+            return []
+        selected: dict[str, dict[str, Any]] = {}
+        for family in diagnosed_families:
+            mechanism = family.get("mechanism") or {}
+            if not isinstance(mechanism, Mapping):
+                continue
+            # The capability a component is matched on is the one the *repair*
+            # needs (``control_flow`` / ``guard`` / ``observation`` /
+            # ``prompt``), not the actionability verdict. The two are different
+            # vocabularies that happen to share a word: ``actionable`` says
+            # whether this framework can act, while the repair requirement says
+            # what kind of action is needed. Matching on the former would find
+            # nothing, because no component is registered under it.
+            required = []
+            try:
+                required = list(
+                    repair_requirements(mechanism).get("required_capabilities")
+                    or ()
+                )
+            except (ValueError, KeyError):
+                required = []
+            for capability in required or [""]:
+                retrieved = retrieve_components(
+                    self.component_store,
+                    mechanism_id=str(mechanism.get("mechanism_id") or ""),
+                    capability=str(capability),
+                    limit=3,
+                )
+                for record in retrieved.get("components") or ():
+                    digest = str(record.get("digest") or "")
+                    kind = str(record.get("kind") or "")
+                    if digest:
+                        selected.setdefault(f"{kind}:{digest}", record)
+        return list(selected.values())[: self.component_prompt_limit]
 
     def _proposal_memory_context(
         self,
@@ -816,6 +917,54 @@ class EvolutionEngine:
         self.cycle_reports.append(report)
         return report
 
+    def _mechanism_opportunity(
+        self, gain_rows: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any] | None:
+        """The mechanism-level opportunity reading, or None when unbound.
+
+        Returns None unless this run was given an evaluator binding (a
+        mechanism file plus a membership file). An unbound run must keep the
+        historical polarity semantics: there is no evaluator-confirmed
+        membership for the gain set, and deriving one from identifiers,
+        sources or a shared polarity is exactly the inference the mechanism
+        work exists to forbid.
+        """
+        mechanism = getattr(self, "mechanism_binding", None)
+        membership = getattr(self, "mechanism_membership", None)
+        # A declared binding that cannot be read is not "no binding": the run
+        # asked to be scored against a mechanism, so it is reported as not
+        # evaluable rather than silently falling back. Checked before the
+        # unbound case, because an unreadable file leaves both dicts empty and
+        # would otherwise read as a run that never asked to be bound.
+        if self._mechanism_binding_error:
+            return {
+                "schema_version": "evolution.mechanism_opportunity.v1",
+                "metric_role": "promotion-authoritative",
+                "mechanism_id": str((mechanism or {}).get("mechanism_id") or ""),
+                "evaluable": False,
+                "reason_code": "mechanism_membership_invalid",
+                "reason": self._mechanism_binding_error,
+                "repairable_errors": 0,
+            }
+        if not mechanism or not membership:
+            return None
+        try:
+            reading = mechanism_opportunity(
+                list(gain_rows), mechanism, membership,
+                gold_steps=self.gold_step_map,
+            )
+        except ValueError as exc:
+            return {
+                "schema_version": "evolution.mechanism_opportunity.v1",
+                "metric_role": "promotion-authoritative",
+                "mechanism_id": str(mechanism.get("mechanism_id") or ""),
+                "evaluable": False,
+                "reason_code": "mechanism_measurement_unresolved",
+                "reason": str(exc),
+                "repairable_errors": 0,
+            }
+        return reading
+
     def _measurable_families(
         self, families: Sequence[Mapping[str, Any]],
         baseline_gain: Sequence[Mapping[str, Any]], arms: _ArmRunner,
@@ -957,6 +1106,161 @@ class EvolutionEngine:
             "open": len(backlog),
         })
         return {"open": backlog, "summary": summary}
+
+    def route_failure_records(self) -> list[dict[str, Any]]:
+        """The route-falsification memory as stored, for a planner or a report."""
+        if not self.route_failure_store.exists():
+            return []
+        return load_route_failures(self.route_failure_store)
+
+    def develop_rows(
+        self,
+        cases: Sequence[str],
+        *,
+        candidate: Mapping[str, Any],
+        split: EvolutionSplit | None = None,
+    ) -> list[dict[str, Any]]:
+        """Paired rows for one development check: baseline and candidate arms.
+
+        L1 measures the same case set twice -- once with the deployed version
+        and once with the candidate added -- and hands both back tagged, so the
+        development loop scores the pair without touching the gates. The
+        candidate arm's registry is the active one plus this candidate, which is
+        what makes the reading a statement about *this* change.
+
+        ``split`` is the data-separation check, not a source of cases: the
+        development loop may measure a candidate on patrol findings, never on
+        the sentinel or gain sets. Spending a formal evaluation case during
+        development turns it into development exposure, and the promotion
+        protocol's candidate-unused rule would then be guarding a number that
+        was measured on data the candidate had already seen.
+        """
+        if split is not None:
+            formal = {str(case) for case in [*split.sentinel, *split.gain]}
+            spent = sorted(formal & {str(case) for case in cases})
+            if spent:
+                raise ValueError(
+                    "development must not measure a candidate on formal "
+                    f"evaluation cases: {spent[:5]}"
+                )
+        arms = _ArmRunner(self, None)
+        active = self.registry.registry
+        active_entries = list(self.registry.entries)
+        unit_entries = [dict(candidate)]
+        candidate_registry = make_registry([*active_entries, *unit_entries])
+        fresh = requires_fresh_evaluation([*active_entries, *unit_entries])
+        baseline_rows = arms.run(
+            list(cases), registry=active, fresh=(
+                requires_fresh_evaluation(active_entries)
+            ),
+        )
+        candidate_rows = arms.run(
+            list(cases), registry=candidate_registry, fresh=fresh,
+        )
+        self.development_provider_calls = getattr(
+            self, "development_provider_calls", 0,
+        ) + (len(cases) if fresh else 0)
+        return [
+            {**dict(row), "arm": "baseline"} for row in baseline_rows
+        ] + [
+            {**dict(row), "arm": "candidate"} for row in candidate_rows
+        ]
+
+    def record_route_failures(
+        self,
+        *,
+        cycle: int,
+        diagnosed_families: Sequence[Mapping[str, Any]],
+        gate_reports: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Remember routes that fired on a mechanism and changed nothing.
+
+        This is the negative half of capability planning. ``record_capability_gaps``
+        records that nothing could be tried; this records that something was
+        tried, reached the runtime, moved what it promised to move, and still
+        left the target outcome alone. Without it the next round re-proposes
+        the same route against the same mechanism, which is what the pilot's
+        tracer directive did ten times.
+
+        Nothing here scores, admits or rejects: it only writes down what the
+        gates already measured.
+        """
+        family_by_name = {
+            str(item.get("failure_family") or ""): item
+            for item in diagnosed_families
+        }
+        observations: list[dict[str, Any]] = []
+        for report in gate_reports:
+            candidate = dict(report.get("candidate") or {})
+            provenance = candidate.get("provenance") or {}
+            family_id = str(provenance.get("failure_family") or "")
+            family = family_by_name.get(family_id)
+            mechanism_id = str((family or {}).get("mechanism", {}).get(
+                "mechanism_id") or "")
+            if not mechanism_id:
+                continue
+            behavior = report.get("behavior") or {}
+            if behavior.get("passed"):
+                continue
+            opportunity = int(
+                (report.get("gain_opportunities") or {}).get(
+                    str((candidate.get("claim") or {}).get(
+                        "target_polarity") or ""),
+                    0,
+                ) or 0
+            )
+            # The gain delta is the measured outcome on the benefit set, which
+            # is why ``insufficiency_evidence`` reads a "benefit_set" basis:
+            # an unchanged outcome there is the moment the route failed to
+            # repair anything, not merely a gate that stayed closed.
+            gain_delta = ((report.get("m") or {}).get("delta")) or (
+                (report.get("behavior") or {}).get("delta")
+            )
+            observation = insufficiency_evidence(
+                candidate=candidate,
+                behavior=behavior,
+                gain_delta=gain_delta,
+                opportunity=opportunity,
+                substantive_rejection=not bool(
+                    gate_rejection_is_unevaluable(
+                        gate="behavior",
+                        verdict=behavior,
+                        report=report,
+                        candidate=candidate,
+                    )
+                ),
+            )
+            if observation is None:
+                continue
+            observations.append({
+                "mechanism_id": mechanism_id,
+                "family_id": family_id,
+                "observation": observation,
+            })
+        appended = record_route_failures(
+            self.route_failure_store, cycle=cycle, observations=observations,
+        )
+        if observations:
+            self._ledger("route_insufficiency", {
+                "cycle": cycle,
+                "recorded": [
+                    {
+                        "mechanism_id": item["mechanism_id"],
+                        "route": item["observation"]["route"],
+                        "evidence": item["observation"]["evidence"],
+                    }
+                    for item in observations
+                ],
+                "appended": len(appended),
+                "duplicates_skipped": len(observations) - len(appended),
+            })
+        return {
+            "observed": len(observations),
+            "appended": len(appended),
+            "state": route_failure_summary(
+                load_route_failures(self.route_failure_store),
+            ),
+        }
 
     def recall_experience(
         self,
@@ -1285,6 +1589,12 @@ class EvolutionEngine:
         )
         control_g = _subset_rows(control, self.split.gain)
         opportunity = gain_opportunity(control_g)
+        # Mechanism-level opportunity applies only when an evaluator binding was
+        # supplied for this run. Cycles that carry no binding keep the polarity
+        # reading exactly as before: the framework has no evaluator-confirmed
+        # membership for the gain set, and inventing one from case ids or from a
+        # shared polarity is what the mechanism work exists to prevent.
+        mechanism_reading = self._mechanism_opportunity(control_g)
 
         # Decide coverage before spending a candidate arm, including candidates
         # supplied explicitly or partners with a different declared polarity.
@@ -1324,12 +1634,26 @@ class EvolutionEngine:
                 sum(measured_opportunities.values()),
             ) == 0
         ]
-        if not coverage["evaluable"] or (unavailable and not audit):
-            reason = (
-                "insufficient baseline-correct sentinel coverage: " + coverage["reason"]
-                if not coverage["evaluable"] else
-                f"no repair opportunities in gain for {sorted(set(unavailable))}"
-            )
+        if not coverage["evaluable"] or (unavailable and not audit) or (
+            mechanism_reading is not None
+            and not mechanism_reading["evaluable"]
+            and not audit
+        ):
+            if mechanism_reading is not None and not mechanism_reading["evaluable"]:
+                reason = (
+                    "mechanism-aligned gain set cannot score this mechanism: "
+                    + str(mechanism_reading.get("reason_code") or "")
+                )
+            elif not coverage["evaluable"]:
+                reason = (
+                    "insufficient baseline-correct sentinel coverage: "
+                    + coverage["reason"]
+                )
+            else:
+                reason = (
+                    f"no repair opportunities in gain for "
+                    f"{sorted(set(unavailable))}"
+                )
             blocked = {"passed": False, "reason": reason, "delta": None,
                        "evaluable": False, "status": "not_evaluated"}
             if response is not None and response["kind"] == "skip":
@@ -1342,6 +1666,7 @@ class EvolutionEngine:
                 "partners": [dict(entry) for entry in partners],
                 "fresh": fresh,
                 "gain_opportunities": opportunity,
+                "mechanism_opportunity": mechanism_reading,
                 "measurement_gain_cases": measurement_gain,
                 "coverage_response": response,
                 "candidate_rows": [],
@@ -1445,6 +1770,7 @@ class EvolutionEngine:
             "partners": [dict(entry) for entry in partners],
             "fresh": fresh,
             "gain_opportunities": opportunity,
+            "mechanism_opportunity": mechanism_reading,
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
@@ -1642,7 +1968,7 @@ class EvolutionEngine:
                 patrol_rows, bare_patrol_rows, patrol_contrast = (
                     self._extend_patrol(
                         arms,
-                        patrol_cases=patrol_rows,
+                        patrol_rows=patrol_rows,
                         bare_rows=bare_patrol_rows,
                         bootstrap_cases=bootstrap_cases,
                     )
@@ -1654,7 +1980,21 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
         )
         diagnosed = refine_failure_families(diagnosed)
+        # Cases the profile split left behind, plus the mechanism reading of
+        # each surviving family. Both are reported by the preview for the same
+        # reason the cycle reports them: a preview that shows only family ids
+        # cannot answer what a cycle would aim a candidate at.
+        mechanism_excluded = excluded_failure_cases(families, diagnosed)
+        diagnosed, mechanism_unrepresented = mechanism_subgroups(diagnosed)
+        # The healthy half of the patrol becomes each mechanism's neighbour
+        # set, so the development loop's "did the neighbours hold" check has
+        # cases to run on instead of passing over an empty list.
+        diagnosed = attach_normal_neighbors(diagnosed, patrol_rows)
         diagnosed, capability_gaps = split_actionable_families(diagnosed)
+        route_failure_records = self.route_failure_records()
+        capability_plan = plan_capabilities(
+            diagnosed, route_failure_records=route_failure_records,
+        )
         proposal_batch = self.proposer.propose(
             diagnosed,
             cycle=cycle,
@@ -1688,11 +2028,30 @@ class EvolutionEngine:
             "families": [
                 {
                     "failure_family": item.get("failure_family"),
+                    "coarse_failure_family": item.get("coarse_failure_family"),
+                    "target_kind": item.get("target_kind") or "detection",
                     "count": item.get("count"),
+                    "failure_cases": list(item.get("failure_cases") or ()),
+                    "sources": list(item.get("sources") or ()),
+                    # The prompt view deliberately strips case identifiers;
+                    # the preview is a runtime record for the researcher and
+                    # the development loop, both of which need the case list.
+                    "mechanism": mechanism_prompt_view(item.get("mechanism")),
+                    "mechanism_detail": item.get("mechanism"),
+                    "actionability": item.get("actionability"),
                     "diagnostics": item.get("diagnostics"),
                 }
                 for item in diagnosed
             ],
+            "mechanisms": mechanism_report(
+                diagnosed, mechanism_unrepresented, mechanism_excluded,
+            ),
+            # The capability planner's reading travels with the preview: a
+            # researcher deciding whether to spend development budget needs to
+            # see which routes can act on each mechanism, not only which routes
+            # were enumerated.
+            "capability_plan": capability_plan,
+            "route_failures": route_failure_summary(route_failure_records),
             "capability_gaps": capability_gaps,
             "candidates": proposal_batch.candidates,
             "joint_groups": proposal_batch.joint_groups,
@@ -1933,10 +2292,36 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
         )
         diagnosed_families = refine_failure_families(diagnosed_families)
+        # Cases the profile split left behind, reported with the mechanisms so
+        # the patrol's failure count stays reconstructible.
+        mechanism_excluded = excluded_failure_cases(
+            families, diagnosed_families,
+        )
+        diagnosed_families, mechanism_unrepresented = mechanism_subgroups(
+            diagnosed_families,
+        )
+        diagnosed_families = attach_normal_neighbors(
+            diagnosed_families, patrol_rows,
+        )
         (
             diagnosed_families, capability_gaps,
         ) = split_actionable_families(diagnosed_families)
-        worksheet = worksheet_report(patrol_rows, diagnosed_families)
+        # Route falsification memory, read before planning: a route that already
+        # fired on this mechanism without moving the outcome is not evidence
+        # that the mechanism is repairable, and the planner must not offer it
+        # as if it were. This is the read side; the write side runs after the
+        # gates, where the behaviour and delta readings exist.
+        route_failure_records = load_route_failures(self.route_failure_store)
+        capability_plan = plan_capabilities(
+            diagnosed_families,
+            route_failure_records=route_failure_records,
+        )
+        worksheet = worksheet_report(
+            patrol_rows,
+            diagnosed_families,
+            unrepresented=mechanism_unrepresented,
+            excluded=mechanism_excluded,
+        )
         worksheet["patrol_registry"] = self._patrol_registry_mode()
         worksheet["failure_contrast"] = patrol_contrast
         worksheet["bootstrap"] = {
@@ -1946,6 +2331,10 @@ class EvolutionEngine:
             "family_found": bool(diagnosed_families),
         }
         worksheet["capability_gaps"] = capability_gaps
+        worksheet["capability_plan"] = capability_plan
+        worksheet["route_failures"] = route_failure_summary(
+            route_failure_records,
+        )
         self._ledger("patrol", {
             "cycle": cycle,
             "cases": patrol_cases,
@@ -2004,11 +2393,19 @@ class EvolutionEngine:
             )
             if hasattr(self.proposer, "set_memory_context"):
                 self.proposer.set_memory_context(memory_context)
+            # Reusable parts from the component store (§9.1 layer 2), retrieved
+            # for the mechanisms this round can act on. Retrieval is bounded
+            # for the same reason memory retrieval is: the drafting prompt must
+            # not grow with the store.
+            components = self._reusable_components(diagnosed_families)
+            if hasattr(self.proposer, "set_components"):
+                self.proposer.set_components(components)
             self._ledger("proposal_memory", {
                 "cycle": cycle,
                 "procedures": len(memory_context["procedures"]),
                 "open_gaps": len(memory_context["open_capability_gaps"]),
                 "recurring_gaps": len(memory_context["recurring_capability_gaps"]),
+                "components": len(components),
             })
             proposal_batch = self.proposer.propose(
                 proposal_families,
@@ -2438,6 +2835,22 @@ class EvolutionEngine:
         ]
         report["capability_backlog"] = self.record_capability_gaps(
             cycle, capability_gaps,
+        )
+        # The planner's reading of why each family was or was not treatable,
+        # recorded as backlog items so "a route exists but the harness cannot
+        # use it" becomes a standing, countable gap instead of a quiet round.
+        report["capability_plan"] = capability_plan
+        if capability_plan.get("gaps"):
+            record_gaps(
+                self.gap_store, cycle=cycle, gaps=capability_plan["gaps"],
+            )
+        # Route falsification: a route that fired, changed observable
+        # behaviour, and moved no target outcome on a set where it could have
+        # been rewarded. The write side of the memory the planner reads above.
+        report["route_failures"] = self.record_route_failures(
+            cycle=cycle,
+            diagnosed_families=diagnosed_families,
+            gate_reports=gate_reports,
         )
         self._record_cycle_experience(
             cycle=cycle,

@@ -6,7 +6,7 @@ external gold labels joined to the two detection arms.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 
 def _bool_prediction(value: bool | None) -> bool | None:
@@ -275,6 +275,142 @@ def localization_opportunity(
         "preserved": preserved,
         "unannotated_positive": unannotated,
     }
+
+
+def mechanism_opportunity(
+    baseline_rows: Sequence[Mapping[str, Any]],
+    mechanism: Mapping[str, Any],
+    mechanism_membership: Mapping[str, Any],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Count opportunities only in evaluator-confirmed mechanism members.
+
+    Membership is evidence supplied before candidate evaluation, not something
+    inferred from an identifier, a source, a prediction or a shared path.
+    """
+    mechanism_id = str(mechanism.get("mechanism_id") or "")
+    objective = str(mechanism.get("objective") or "")
+    polarity = str(mechanism.get("target_polarity") or "boundary")
+    cases = [row.get("case") for row in baseline_rows]
+    if any(not isinstance(case, str) or not case for case in cases):
+        raise ValueError("mechanism opportunity needs non-empty case ids")
+    if len(set(cases)) != len(cases):
+        raise ValueError("mechanism opportunity received duplicate cases")
+    opportunity_cases: list[str] = []
+    correct_cases: list[str] = []
+    unresolved_cases: list[str] = []
+    unconfirmed_cases: list[str] = []
+    ineligible_cases: list[str] = []
+    target_cases: list[str] = []
+    detection_errors = localization_errors = 0
+    for row in baseline_rows:
+        case = row["case"]
+        membership = mechanism_membership.get(case)
+        if not isinstance(membership, Mapping):
+            unconfirmed_cases.append(case)
+            continue
+        if membership.get("mechanism_id") != mechanism_id:
+            continue
+        evidence = membership.get("evidence")
+        if (
+            membership.get("status") != "confirmed"
+            or not isinstance(evidence, list)
+            or not evidence
+            or any(not isinstance(item, str) or not item.strip() for item in evidence)
+        ):
+            unconfirmed_cases.append(case)
+            continue
+        target_cases.append(case)
+        gold, prediction = row.get("gold"), row.get("prediction")
+        if type(gold) is not bool or type(prediction) is not bool or not mechanism_row_healthy(row):
+            unresolved_cases.append(case)
+            continue
+        gold_step = (gold_steps or {}).get(case, row.get("gold_step"))
+        annotated = type(gold_step) is int and gold_step > 0
+        step = row.get("responsible_step", (row.get("result") or {}).get("responsible_step"))
+        step_hit = annotated and type(step) is int and step == gold_step
+        detection_correct = prediction is gold
+        if objective in {"localization", "joint"} and gold and not annotated:
+            unresolved_cases.append(case)
+            continue
+        correct = detection_correct if objective == "detection" else (
+            prediction is True and step_hit if gold else prediction is False
+        )
+        if correct:
+            correct_cases.append(case)
+            continue
+        detection_error = (
+            not detection_correct
+            and objective in {"detection", "joint"}
+            and (polarity == "boundary" or (polarity == "recall" and gold)
+                 or (polarity == "precision" and not gold))
+        )
+        localization_error = (
+            objective in {"localization", "joint"}
+            and gold and prediction and annotated and not step_hit
+            and membership.get("localization_viable") is True
+        )
+        if membership.get("repairable") is True and (detection_error or localization_error):
+            opportunity_cases.append(case)
+            detection_errors += int(detection_error)
+            localization_errors += int(localization_error)
+        else:
+            ineligible_cases.append(case)
+    valid = bool(mechanism_id) and objective in {"detection", "localization", "joint"}
+    if not valid or polarity not in {"recall", "precision", "boundary"}:
+        reason = "mechanism_invalid"
+    elif mechanism.get("status") != "confirmed":
+        reason = "mechanism_unconfirmed"
+    elif unresolved_cases:
+        reason = "mechanism_measurement_unresolved"
+    elif not opportunity_cases:
+        reason = "no_mechanism_opportunity"
+    else:
+        reason = "measurable"
+    return {
+        "schema_version": "evolution.mechanism_opportunity.v1",
+        "metric_role": "promotion-authoritative",
+        "mechanism_id": mechanism_id,
+        "target_kind": objective,
+        "target_cases": len(target_cases),
+        "repairable_errors": len(opportunity_cases),
+        "already_correct": len(correct_cases),
+        "unresolved": len(unresolved_cases),
+        "unconfirmed": len(unconfirmed_cases),
+        "ineligible": len(ineligible_cases),
+        "detection_repairable_errors": detection_errors,
+        "localization_repairable_errors": localization_errors,
+        "opportunity_cases": sorted(opportunity_cases),
+        "already_correct_cases": sorted(correct_cases),
+        "unresolved_cases": sorted(unresolved_cases),
+        "unconfirmed_cases": sorted(unconfirmed_cases),
+        "ineligible_cases": sorted(ineligible_cases),
+        "evaluable": reason == "measurable",
+        "reason_code": reason,
+    }
+
+
+def mechanism_row_healthy(row: Mapping[str, Any]) -> bool:
+    """Strict health check for a new mechanism-bound measurement."""
+    if row.get("authority") != "authoritative":
+        return False
+    if type(row.get("gold")) is not bool or type(row.get("prediction")) is not bool:
+        return False
+    result = row.get("result") or {}
+    if result and result.get("runtime_valid") is not True:
+        return False
+    if result.get("decision_authority", "authoritative") != "authoritative":
+        return False
+    statuses = list((result.get("stage_status") or {}).values())
+    for hearing in (result.get("proof") or {}).get("hearings") or ():
+        statuses.extend(hearing.get(name) or {} for name in ("tracer_status", "defense_status"))
+    return not any(
+        str((status or {}).get("state") or "").startswith(
+            ("provider_error", "invalid", "contract_error", "degraded", "no_quorum", "timeout")
+        )
+        for status in statuses
+    )
 
 
 def protection_repair(

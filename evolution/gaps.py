@@ -28,16 +28,63 @@ GAP_SCHEMA = "evolution.capability_gap.v1"
 GAP_STORE_NAME = "gaps.jsonl"
 GAP_SUMMARY_NAME = "gaps_summary.json"
 
+# Why a family is not treatable. The first entry is the original reading: the
+# action space has no route for this mechanism. The rest come from
+# ``evolution.capability_planning`` and separate "no route exists" from "a
+# route exists but the harness cannot use it" -- a distinction that was
+# invisible while the store carried only the first kind, which is why the
+# backlog stayed nearly empty.
+#
+# Identity is ``(failure_family, classification)``, so a gap that sharpens from
+# ``capability_gap`` to ``semantic_judgment_missing`` becomes a second entry.
+# That is intended: the later entry is a better name for the same standing gap,
+# and the store keeps both so the refinement stays visible instead of
+# overwriting the earlier reading.
+GAP_REASONS = (
+    "capability_gap",
+    "route_exists_but_insufficient",
+    "missing_information",
+    "missing_representation",
+    "semantic_judgment_missing",
+    "control_flow_missing",
+    "executor_missing",
+    "missing_localization_operator",
+    "localization_attribution_missing",
+    "prompt_only",
+)
+
 # ``worksheet`` appends ``-P<hash>`` when it splits a family by predicate
-# profile. The backlog tracks the underlying family, so that suffix is removed
-# before an identity is computed.
+# profile, and ``-M<hash>`` when it splits one by mechanism reading. The backlog
+# tracks the underlying family, so those suffixes are removed before an identity
+# is computed.
 _PROFILE_SUFFIX = re.compile(r"-P[0-9a-f]{6,}$")
+_MECHANISM_SUFFIX = re.compile(r"-M[0-9a-f]{6,}$")
+
+
+def _profile_free_family(failure_family: str) -> str:
+    """Family id without the per-split hash suffixes.
+
+    Two suffixes can follow a coarse family: ``-P<hash>`` from the
+    predicate-profile split and ``-M<hash>`` from the mechanism subgroup split.
+    The backlog tracks the underlying family, so both are stripped -- a gap must
+    not reopen every time a split sharpens its name for the same family.
+    """
+    family = str(failure_family or "").strip()
+    # The mechanism split runs after the profile split, so a family carrying
+    # both reads ``...-P<profile>-M<mechanism>``. Strip until stable rather than
+    # in a fixed order, so either suffix order is handled instead of silently
+    # leaving one behind and minting a second identity for one family.
+    while True:
+        stripped = _MECHANISM_SUFFIX.sub("", _PROFILE_SUFFIX.sub("", family))
+        if stripped == family:
+            break
+        family = stripped
+    return family.strip()
 
 
 def gap_identity(failure_family: str, classification: str) -> str:
-    """Stable backlog id for a gap, independent of cycle and profile split."""
-    family = _PROFILE_SUFFIX.sub("", str(failure_family or "")).strip()
-    return f"{family}|{str(classification or '').strip()}"
+    """Stable backlog id for a gap, independent of cycle and family splits."""
+    return f"{_profile_free_family(failure_family)}|{str(classification or '').strip()}"
 
 
 def gap_record(

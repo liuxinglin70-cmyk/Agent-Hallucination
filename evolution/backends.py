@@ -16,7 +16,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from detector.api import Detector
 from detector.config import load_config as load_detector_config
@@ -29,8 +29,7 @@ from detector.result import prediction_state
 
 from evolution.config import resolve_path
 from evolution.contracts import save_json
-from evolution.metrics import source_of
-from evolution.splits import bool_gold, load_record
+from evolution.splits import load_record
 
 
 def prediction_from_state(state: Any) -> bool | None:
@@ -49,6 +48,8 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 # Bump whenever the detector-side execution or paired-replay semantics change;
 # this invalidates stale result caches instead of silently reusing them.
 CACHE_FORMAT = "stage-replay-bound-hearings"
+
+ARTIFACT_MANIFEST_SCHEMA = "evolution.artifact_manifest.v1"
 
 
 def _valid_stage_entry(
@@ -75,14 +76,80 @@ def source_digest() -> str:
 
     Execution-semantics fingerprint: any change to how arms are replayed or
     gated must invalidate derived caches (audit verdicts, row caches).
+
+    Recursive, so a subpackage or a module moved into one is covered. The
+    non-recursive form missed every file below a package root, which meant a
+    new runner implementation dropped into a subdirectory could change results
+    without changing any fingerprint that was supposed to pin them.
+
+    Test trees are excluded. They are the only subdirectory that exists today,
+    and they are not execution semantics: a test never runs during a detection,
+    so letting its edits invalidate every cache and refuse every frozen
+    protocol would spend the digest's authority on something it is not
+    describing. Runtime code, including anything future subpackaged, stays
+    covered.
     """
     root = Path(__file__).resolve().parent.parent
     digest = hashlib.sha256()
     for package in (root / "detector", root / "evolution"):
-        for path in sorted(package.glob("*.py")):
+        for path in sorted(package.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            if "tests" in path.relative_to(package).parts:
+                continue
             digest.update(str(path.relative_to(root)).encode("utf-8"))
             digest.update(path.read_bytes())
     return digest.hexdigest()[:16]
+
+
+def artifact_digest(path: str | Path) -> str:
+    """Content digest of one learned artifact (weights, tokenizer, config).
+
+    Deliberately a different function from ``file_digest``: this one refuses a
+    missing path instead of returning the ``"missing"`` sentinel, because a
+    declared artifact that cannot be read is a broken freeze rather than a
+    legitimate "no artifact here". A sentinel that hashes like a value is how
+    "the weights were replaced by nothing" would pass a digest check.
+    """
+    target = Path(path)
+    if target.is_dir():
+        digest = hashlib.sha256()
+        for item in sorted(
+            p for p in target.rglob("*") if p.is_file()
+            and "__pycache__" not in p.parts
+        ):
+            digest.update(str(item.relative_to(target)).encode("utf-8"))
+            digest.update(item.read_bytes())
+        return digest.hexdigest()
+    if not target.is_file():
+        raise ValueError(f"artifact not found or not a file: {target}")
+    return hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def artifact_manifest(*paths: str | Path) -> dict[str, Any]:
+    """A freeze-ready manifest of the artifacts a runner depends on.
+
+    Shape: ``{"schema_version", "artifacts": {label: digest}, "digest"}``. The
+    manifest digest covers the labels and the per-artifact digests together, so
+    swapping two artifacts' contents cannot leave the manifest digest intact.
+    An empty manifest is legal and means "this runner declares no external
+    artifact" -- which is what a deterministic runner must declare, and is a
+    different statement from declaring one and failing to read it.
+    """
+    artifacts: dict[str, str] = {}
+    for path in paths:
+        target = Path(path)
+        artifacts[str(target)] = artifact_digest(target)
+    payload = {
+        "schema_version": ARTIFACT_MANIFEST_SCHEMA,
+        "artifacts": artifacts,
+    }
+    return {
+        **payload,
+        "digest": hashlib.sha256(json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")).hexdigest(),
+    }
 
 
 def fingerprint(value: Any) -> str:
@@ -94,6 +161,27 @@ def registry_key(registry: Mapping[str, Any] | None) -> str:
     if not registry:
         return "empty"
     return str(registry.get("content_hash") or "unsigned")
+
+
+def _hooks_of(registry: Mapping[str, Any] | None) -> list[str]:
+    """The hooks a registry's entries target, for the replay boundary."""
+    return sorted({
+        str(entry.get("hook") or "")
+        for entry in ((registry or {}).get("interventions") or [])
+        if str(entry.get("hook") or "")
+    })
+
+
+def _content_derived_key(registry: Mapping[str, Any] | None) -> bool:
+    """Whether ``registry_key`` was computed from the entries themselves.
+
+    ``make_registry`` stamps ``content_hash``; ``registry_key`` falls back to
+    the literal ``"unsigned"`` when it is absent. Only the fallback leaves the
+    hook set unrecorded, so only then does the cache name need to carry it.
+    """
+    return bool(registry) and bool(
+        str(registry.get("content_hash") or "").strip()
+    ) and str(registry.get("content_hash")) != "unsigned"
 
 
 def _unresolved_backend_result(
@@ -922,6 +1010,15 @@ class CachedRunBackend(DetectionBackend):
 _CACHE_PATH_MAX = 250
 _CACHE_TEMP_NAME = ".tmp-XXXXXXXX.json"
 _DIGEST_NAME_WIDTH = 16
+# Cache names carry the replay boundary, and every character spent there is one
+# the descriptive name cannot use before it degrades to a bare digest. Eight
+# hex characters are enough because of what the key can discriminate: a result
+# is filed under the registry that produced it, and the boundary is a pure
+# function of that registry's hooks, so two entries can only differ in boundary
+# if they differ in registry -- and then the registry key already separates
+# them. A shorter key costs a longer key's safety only for an input that cannot
+# occur, and buys readable cache filenames for every real case.
+_BOUNDARY_KEY_WIDTH = 8
 
 
 class CachingBackend(DetectionBackend):
@@ -954,8 +1051,20 @@ class CachingBackend(DetectionBackend):
         tag = ""
         if self._extra_key is not None:
             tag = "." + str(self._extra_key(case_id))
+        # The registry key pins which entries ran. A content-derived key
+        # already implies the replay boundary, because the boundary is a pure
+        # function of those entries' hooks -- so the boundary is named
+        # explicitly only when the key is *not* content-derived, which is the
+        # one case where two different hook sets would otherwise share a
+        # directory. Adding it unconditionally would shorten the descriptive
+        # filename budget for every case to re-state something already pinned.
         directory = self.cache_dir / registry_key(registry)
-        name = f"{safe_case}.{record_hash}{tag}.json"
+        boundary = ""
+        if not _content_derived_key(registry):
+            boundary = ".b" + str(
+                replay_boundary(_hooks_of(registry))["boundary_key"]
+            )
+        name = f"{safe_case}.{record_hash}{boundary}{tag}.json"
         # The name carries case id, record hash and evidence tag, so a
         # snapshot-tagged case under a nested work root can cross the ceiling
         # while its neighbours fit. Past the budget the name becomes a digest
@@ -1162,11 +1271,176 @@ def make_backend(
     return backend
 
 
+# Canonical stage order of the detector flow. One spelling, used by the
+# dependency graph below, by ``replay_boundary`` and by every report that names
+# a boundary, so a stage cannot be called ``tracer`` in one place and
+# ``step_tracer`` in another.
+REPLAY_STAGES: tuple[str, ...] = (
+    "judge", "recall_scanner", "causal_upgrade", "step_tracer", "defense",
+    "adjudication",
+)
+
+# Which stages a change to one hook can affect, and therefore which stages a
+# targeted development replay must re-run. ``judge.system`` rewrites the judge
+# prompt, so every stage downstream of the judge is downstream of it;
+# ``adjudicate.guard`` only decides, so nothing else needs re-measuring.
+#
+# This is the minimal rerun boundary the development loop (plan P0.3, §7.3)
+# needs before it can evaluate a candidate cheaply. Without it a development
+# check degenerates into a full arm run and the L0/L1 split buys nothing:
+# ``gates.requires_fresh_evaluation`` treats only ``judge.system`` and
+# ``require_full_view_defense`` as fresh, and every other hook replays a frozen
+# judge, so "which stages must move" is a question that has to be answered
+# explicitly rather than inferred from the hook name.
+#
+# This table declares *reach*: what a hook can affect. The envelope
+# ``LiveDetectorBackend._frozen_stages`` builds decides what a replay actually
+# reuses, and it reuses at least the reach (it may freeze more, never less).
+# ``test_backends.py`` pins that containment, so a hook whose live behaviour
+# drifts outside its declaration fails rather than silently widening or
+# narrowing the measurement.
+HOOK_DEPENDENCY_GRAPH: dict[str, tuple[str, ...]] = {
+    "judge.system": (
+        "judge", "recall_scanner", "causal_upgrade", "step_tracer", "defense",
+        "adjudication",
+    ),
+    "judge.post": (
+        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
+        "adjudication",
+    ),
+    "recall.trigger": (
+        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
+        "adjudication",
+    ),
+    "scanner.system": (
+        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
+        "adjudication",
+    ),
+    "upgrade.pre": ("causal_upgrade", "step_tracer", "defense", "adjudication"),
+    "upgrade.system": (
+        "causal_upgrade", "step_tracer", "defense", "adjudication",
+    ),
+    "tracer.system": ("step_tracer", "adjudication"),
+    "defense.pre": ("defense", "adjudication"),
+    "defense.system": ("defense", "adjudication"),
+    "adjudicate.guard": ("adjudication",),
+}
+
+# The stage each hook belongs to, for downstream reporting.
+_HOOK_STAGE = {
+    "judge.system": "judge",
+    "judge.post": "judge",
+    "recall.trigger": "recall_scanner",
+    "scanner.system": "recall_scanner",
+    "upgrade.pre": "causal_upgrade",
+    "upgrade.system": "causal_upgrade",
+    "tracer.system": "step_tracer",
+    "defense.pre": "defense",
+    "defense.system": "defense",
+    "adjudicate.guard": "adjudication",
+}
+
+
+def replay_boundary(hooks: Iterable[str]) -> dict[str, Any]:
+    """The rerun reach of a hook set, and the identity of that boundary.
+
+    One implementation for the whole framework: the development loop uses it to
+    say how much of the flow a candidate forces to re-run, and the result cache
+    keys on ``boundary_key`` so a cached measurement can never be served under a
+    boundary it was not produced under. That second use is why the boundary is
+    a *digest* and not just a report field: the boundary logic is expected to
+    change (P1 is where it gets extended), and a cache written before such a
+    change must not answer for one made after it.
+
+    ``unknown`` hooks are the conservative case. A hook the graph does not
+    declare cannot be shown to reach anything, and assuming it reaches nothing
+    would silently freeze stages the change can actually affect -- so an
+    unknown hook widens the boundary to the whole flow, which is the same
+    envelope ``fresh`` produces.
+    """
+    hook_set = sorted({str(hook) for hook in hooks if str(hook)})
+    reach: set[str] = set()
+    unknown: list[str] = []
+    for hook in hook_set:
+        declared = HOOK_DEPENDENCY_GRAPH.get(hook)
+        if declared is None:
+            unknown.append(hook)
+            continue
+        reach.update(declared)
+    if unknown:
+        reach = set(REPLAY_STAGES)
+    identity = {
+        "rerun_stages": sorted(reach),
+        "hooks": hook_set,
+        "unknown_hooks": sorted(unknown),
+    }
+    payload = dict(identity)
+    payload["boundary_key"] = hashlib.sha256(
+        json.dumps(identity, ensure_ascii=False, sort_keys=True,
+                   separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:_BOUNDARY_KEY_WIDTH]
+    return payload
+
+
+def partial_replay_plan(
+    entries: Sequence[Mapping[str, Any]],
+    *,
+    active_entries: Sequence[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    """Which stages a candidate set forces to re-run, and which may be reused.
+
+    Returns the union of the dependency sets of every hook the candidate set
+    targets -- candidate and active entries together, because the deployed
+    version participates in the same measurement.
+
+    ``fresh`` is reported alongside, because the two are not the same question:
+    ``fresh`` says the *whole* provider flow must be re-run (a judge-system
+    change, or a defence that demands the full view), while a partial plan says
+    which stages the change can reach. The second is what makes a development
+    check cheap; the first is a correctness constraint that a development check
+    must respect rather than relax.
+    """
+    entries = [*active_entries, *entries]
+    hooks = sorted({
+        str(entry.get("hook") or "")
+        for entry in entries
+        if str(entry.get("hook") or "")
+    })
+    from evolution.gates import requires_fresh_evaluation
+
+    fresh = requires_fresh_evaluation(entries)
+    boundary = replay_boundary(hooks)
+    stages = set(boundary["rerun_stages"])
+    if fresh:
+        # A whole-flow rerun reaches everything, so the boundary is the full
+        # stage list rather than the union of the hooks it happens to name.
+        stages = set(REPLAY_STAGES)
+    return {
+        "hooks": hooks,
+        "rerun_stages": sorted(stages),
+        "reusable_stages": sorted(set(REPLAY_STAGES) - stages),
+        "stage_of_hook": {
+            hook: _HOOK_STAGE.get(hook, "") for hook in hooks
+        },
+        "fresh_required": fresh,
+        "unknown_hooks": list(boundary["unknown_hooks"]),
+        # The cache identity of the boundary this plan was derived from, so a
+        # stored plan can be matched against the measurement it describes.
+        "boundary_key": boundary["boundary_key"],
+    }
+
+
 __all__ = [
+    "ARTIFACT_MANIFEST_SCHEMA",
     "CACHE_FORMAT",
+    "REPLAY_STAGES",
+    "artifact_digest",
+    "artifact_manifest",
+    "replay_boundary",
     "CachedRunBackend",
     "CachingBackend",
     "DetectionBackend",
+    "HOOK_DEPENDENCY_GRAPH",
     "LiveDetectorBackend",
     "MockDetectorBackend",
     "file_digest",

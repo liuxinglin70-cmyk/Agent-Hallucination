@@ -16,6 +16,11 @@ from detector.dataset import load_case
 from detector.predicate_context import judge_predicate_context
 
 from evolution.metrics import source_of, binary_metrics
+from evolution.mechanisms import (
+    infer_mechanism,
+    member_reading,
+    reading_signature,
+)
 
 
 def _sha(value: str) -> str:
@@ -637,6 +642,9 @@ def _mechanism_summary(
 def worksheet_report(
     patrol_rows: Sequence[Mapping[str, Any]],
     families: Sequence[Mapping[str, Any]],
+    *,
+    unrepresented: Sequence[Mapping[str, Any]] = (),
+    excluded: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """One patrol's readable summary.
 
@@ -645,6 +653,10 @@ def worksheet_report(
     satisfied by different evidence; keeping them in one list under the
     detection name made a localization family look like a detection family in
     every downstream report.
+
+    ``unrepresented`` carries mechanism readings too rare to propose on (see
+    ``mechanism_subgroups``); they appear under ``mechanisms`` so an excluded
+    reading is reported rather than silently missing.
     """
     errors = [row for row in patrol_rows if row.get("prediction") != row.get("gold")]
     metrics = binary_metrics(patrol_rows)
@@ -670,6 +682,7 @@ def worksheet_report(
         "stable_failure_families": detection,
         "detection_families": detection,
         "localization_families": localization,
+        "mechanisms": mechanism_report(families, unrepresented, excluded),
     }
 
 
@@ -1002,6 +1015,343 @@ def refine_failure_families(
     return refined
 
 
+def excluded_failure_cases(
+    families: Sequence[Mapping[str, Any]],
+    covered: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Cases that entered family formation but no surviving family carries.
+
+    ``refine_failure_families`` splits a coarse family by mechanical profile
+    and keeps only groups of at least ``min_cases``, so a four-case family can
+    leave two cases behind. That rule is right -- a one-case group cannot carry
+    the two provenance cases STRUCTURAL demands -- but the loss must be
+    reported, or the patrol looks like it found fewer failures than it did and
+    the mechanism grouping is judged on a set nobody can reconstruct.
+
+    Reported, not repaired: the cases are evidence about the action space, and
+    the same reasoning as ``localization_annotation_choices`` applies.
+    """
+    kept: dict[str, set[str]] = {}
+    for family in covered:
+        kept.setdefault(str(family.get("failure_family") or ""), set()).update(
+            str(case) for case in family.get("failure_cases") or ()
+        )
+    covered_cases = {case for cases in kept.values() for case in cases}
+    out: list[dict[str, Any]] = []
+    for family in families:
+        family_id = str(family.get("failure_family") or "")
+        cases = [str(case) for case in family.get("failure_cases") or ()]
+        dropped = [case for case in cases if case not in covered_cases]
+        if not dropped:
+            continue
+        out.append({
+            "failure_family": family_id,
+            "parent_count": len(cases),
+            "excluded_count": len(dropped),
+            "excluded_cases": dropped,
+            "reason": (
+                "mechanical profile group smaller than the two-case minimum; "
+                "kept out of the proposable set rather than mixed into a "
+                "subgroup whose repair operation would be wrong for it"
+            ),
+        })
+    out.sort(key=lambda entry: str(entry.get("failure_family") or ""))
+    return out
+
+
+def mechanism_subgroups(
+    families: Sequence[Mapping[str, Any]],
+    *,
+    min_cases: int = 2,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split coarse families by task-level mechanism, not by execution path.
+
+    A coarse family is a group of cases whose verdicts went wrong in the same
+    place. That is not the same as a group of cases that need the same repair:
+    a family can mix an omitted tool action with a misquoted span, and a
+    proposer handed both drafts a rule too wide for either.
+
+    The split is by ``evolution.mechanisms`` reading -- obligation, deviation,
+    failing stage, repair operation -- so it is decided by what would repair
+    the case. A family whose members agree, or whose members carry no readings
+    at all, passes through whole with a mechanism attached.
+
+    Returns ``(families, unrepresented)``. Members whose reading is shared by
+    fewer than ``min_cases`` cases cannot be proposed on: STRUCTURAL demands at
+    least two provenance cases per candidate, so a one-case subgroup could only
+    ever produce drafts the validator must reject. They are returned separately
+    as evidence -- with their mechanism id -- instead of being dropped or
+    merged into a neighbouring mechanism.
+
+    Detector identity is preserved: every subgroup keeps the coarse
+    ``failure_family`` id and its signature, so gates that route on the family
+    prefix (polarity, target kind, provenance membership) keep working.
+    """
+    out: list[dict[str, Any]] = []
+    unrepresented: list[dict[str, Any]] = []
+    for family in families:
+        item = dict(family)
+        family_id = str(item.get("failure_family") or "")
+        objective = (
+            "localization"
+            if str(item.get("target_kind") or "") == "localization"
+            or family_id.startswith("FAM-loc-")
+            else "detection"
+        )
+        members = list((item.get("diagnostics") or {}).get(
+            "member_summaries") or ())
+        case_ids = [str(case) for case in item.get("failure_cases") or ()]
+        local_states = list(item.get("localization_states") or ())
+        signature = item.get("mechanism_signature") or {}
+        if not members or len(members) != len(case_ids):
+            # Without one summary per case there is nothing to split on, and
+            # the coarse family is still a mechanism -- reported as a
+            # path-only hypothesis rather than silently dropped.
+            mechanism = infer_mechanism(
+                family_id,
+                target_kind=objective,
+                members=(),
+                path_signature=signature,
+                member_cases=case_ids,
+                count=int(item.get("count") or len(case_ids)),
+            )
+            item["mechanism"] = mechanism
+            item["mechanism_subgroup"] = False
+            out.append(item)
+            continue
+        readings = [
+            member_reading(
+                member,
+                family_id=family_id,
+                objective=objective,
+                local_state=(
+                    local_states[index]
+                    if index < len(local_states) else "mislocated"
+                ),
+            )
+            for index, member in enumerate(members)
+        ]
+        groups: dict[tuple[str, ...], list[int]] = {}
+        for index, reading in enumerate(readings):
+            groups.setdefault(reading_signature(reading), []).append(index)
+        split = any(len(indices) >= min_cases for indices in groups.values())
+        if len(groups) <= 1 or not split:
+            # Either every member agrees, or no single reading is shared by
+            # two cases. A split that produces no proposable subgroup would
+            # empty the family -- a two-case family becomes two one-case
+            # readings and the proposer loses the family it used to have. The
+            # split only happens when it yields at least one homogeneous
+            # subgroup of proposable size; otherwise the coarse family stays
+            # whole and its mechanism is reported as mixed.
+            mechanism = infer_mechanism(
+                family_id,
+                target_kind=objective,
+                members=members,
+                path_signature=signature,
+                local_states=local_states,
+                member_cases=case_ids,
+                count=int(item.get("count") or len(case_ids)),
+            )
+            item["mechanism"] = mechanism
+            item["mechanism_subgroup"] = False
+            out.append(item)
+            continue
+        for signature_key, indices in sorted(groups.items()):
+            group = [members[index] for index in indices]
+            cases = [case_ids[index] for index in indices]
+            mechanism = infer_mechanism(
+                family_id,
+                target_kind=objective,
+                members=group,
+                path_signature=signature,
+                local_states=[
+                    local_states[index]
+                    if index < len(local_states) else "mislocated"
+                    for index in indices
+                ],
+                member_cases=cases,
+                count=len(cases),
+            )
+            mechanism["reading"] = list(signature_key)
+            if len(group) < min_cases:
+                unrepresented.append({
+                    **{
+                        key: mechanism.get(key)
+                        for key in (
+                            "mechanism_id", "schema_version", "objective",
+                            "status", "confidence_basis", "task_obligation",
+                            "observed_deviation", "detector_failure",
+                            "repair_hypothesis", "member_cases",
+                        )
+                    },
+                    "family_id": family_id,
+                    "case_count": len(cases),
+                    "reason": (
+                        "fewer than two cases share this reading; STRUCTURAL "
+                        "requires two provenance cases, so this reading is "
+                        "reported as evidence and not proposed on"
+                    ),
+                })
+                continue
+            sub = dict(item)
+            # A subgroup needs its own family id: gates and the proposal
+            # validator key the diagnosed families by ``failure_family``, so
+            # two subgroups sharing the coarse id would overwrite each other
+            # and one of them would look undiagnosed. The coarse prefix is
+            # kept verbatim so the polarity and target-kind routing that reads
+            # ``FAM-fn-`` / ``FAM-fp-`` / ``FAM-loc-`` keeps working.
+            subgroup_id = (
+                f"{family_id}-M{str(mechanism['mechanism_id'])[2:]}"
+            )
+            mechanism["family_id"] = subgroup_id
+            mechanism["coarse_family_id"] = family_id
+            sub["failure_family"] = subgroup_id
+            sub["coarse_failure_family"] = family_id
+            sub["failure_cases"] = cases
+            sub["count"] = len(cases)
+            sub["sources"] = sorted({source_of(case) for case in cases})
+            sub["diagnostics"] = {
+                **(item.get("diagnostics") or {}),
+                "n": len(group),
+                "member_summaries": [dict(member) for member in group],
+                "predicate_signals": _predicate_signal_counts(group),
+                "shared_literals": _shared_literals([
+                    (member.get("typed_samples") or {}) for member in group
+                ]),
+            }
+            sub["mechanism_subgroup"] = True
+            sub["mechanism"] = mechanism
+            out.append(sub)
+    out.sort(key=lambda entry: (
+        -int(entry.get("count") or 0),
+        str(entry.get("failure_family") or ""),
+    ))
+    unrepresented.sort(key=lambda entry: str(entry.get("mechanism_id") or ""))
+    return out, unrepresented
+
+
+def attach_normal_neighbors(
+    families: Sequence[Mapping[str, Any]],
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Give each mechanism the cases the bare base already handles.
+
+    ``normal_neighbors`` is the other half of a mechanism: the cases where the
+    failure direction is *not* present and the base detector is already right.
+    Both development checks need them -- the deterministic predicate must not
+    fire on a normal neighbour (§7.1), and L1 must show the neighbours held
+    (§7.4). Left empty, those two checks silently pass over nothing.
+
+    They are taken from the same rows the mechanism was diagnosed on, so a
+    neighbour is a case from the same patrol rather than a case invented for
+    the check. They count as development exposure: a case used to check a
+    candidate may not also decide its promotion.
+    """
+    healthy = []
+    for row in rows:
+        gold = row.get("gold")
+        if gold is not True and gold is not False:
+            continue
+        if str(row.get("authority") or "") != "authoritative":
+            continue
+        if row.get("prediction") != gold:
+            continue
+        result = row.get("result") or {}
+        if result and not bool(result.get("runtime_valid", True)):
+            continue
+        case = str(row.get("case") or "")
+        if case:
+            healthy.append(case)
+    healthy = sorted(dict.fromkeys(healthy))[:max(0, int(limit))]
+    out: list[dict[str, Any]] = []
+    for family in families:
+        item = dict(family)
+        mechanism = item.get("mechanism")
+        if isinstance(mechanism, Mapping):
+            mechanism = dict(mechanism)
+            members = {str(case) for case in mechanism.get("member_cases") or ()}
+            mechanism["normal_neighbors"] = [
+                case for case in healthy if case not in members
+            ]
+            item["mechanism"] = mechanism
+        out.append(item)
+    return out
+
+
+def mechanism_report(
+    families: Sequence[Mapping[str, Any]],
+    unrepresented: Sequence[Mapping[str, Any]] = (),
+    excluded: Sequence[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    """The deduplicated mechanism view of one patrol, for any report.
+
+    Public because both the cycle worksheet and the cheaper preview need it:
+    the preview exists to show what a cycle would propose, and since a
+    proposal is aimed at a mechanism, a preview that shows only family ids
+    cannot answer that.
+    """
+    mechanisms: dict[str, dict[str, Any]] = {}
+    for family in families:
+        mechanism = family.get("mechanism")
+        if not isinstance(mechanism, Mapping):
+            continue
+        mechanism_id = str(mechanism.get("mechanism_id") or "")
+        if not mechanism_id:
+            continue
+        entry = mechanisms.get(mechanism_id)
+        if entry is None:
+            mechanisms[mechanism_id] = {
+                **{
+                    key: mechanism.get(key)
+                    for key in (
+                        "mechanism_id", "schema_version", "objective",
+                        "status", "confidence_basis", "task_obligation",
+                        "observed_deviation", "detector_failure",
+                        "repair_hypothesis",
+                    )
+                },
+                "families": [str(family.get("failure_family") or "")],
+                "case_count": int(family.get("count") or 0),
+                "proposable": True,
+            }
+            continue
+        family_id = str(family.get("failure_family") or "")
+        if family_id not in entry["families"]:
+            entry["families"].append(family_id)
+        entry["case_count"] += int(family.get("count") or 0)
+        if mechanism.get("status") == "confirmed":
+            entry["status"] = "confirmed"
+    return {
+        "count": len(mechanisms),
+        "mechanisms": [mechanisms[key] for key in sorted(mechanisms)],
+        # Readings too rare to propose on (fewer than two cases) stay visible
+        # here: a mechanism with one case is evidence, not a silent gap.
+        "unrepresented": [
+            {
+                **{
+                    key: item.get(key)
+                    for key in (
+                        "mechanism_id", "schema_version", "objective",
+                        "status", "confidence_basis", "task_obligation",
+                        "observed_deviation", "detector_failure",
+                        "repair_hypothesis",
+                    )
+                },
+                "families": [str(item.get("family_id") or "")],
+                "case_count": int(item.get("case_count") or 0),
+                "proposable": False,
+                "reason": item.get("reason"),
+            }
+            for item in unrepresented
+        ],
+        # Cases dropped by the profile split upstream: reported so the patrol's
+        # true failure count stays reconstructible from the report alone.
+        "excluded": [dict(item) for item in excluded],
+    }
+
+
 def _predicate_signal_counts(
     members: Sequence[Mapping[str, Any]],
 ) -> dict[str, dict[str, int]]:
@@ -1028,10 +1378,14 @@ def _predicate_signal_counts(
 
 
 __all__ = [
+    "attach_normal_neighbors",
     "diagnose_failure_families",
+    "excluded_failure_cases",
     "failure_family",
     "localization_family",
     "localization_state",
+    "mechanism_report",
+    "mechanism_subgroups",
     "refine_failure_families",
     "stable_failure_families",
     "stable_localization_families",

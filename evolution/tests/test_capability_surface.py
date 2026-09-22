@@ -70,3 +70,31 @@ def test_case_id_hidden_in_evolved_program_literal_is_leak():
         },
     }
     assert candidate_contains_case_id(candidate) == "A/001.json"
+
+
+def test_the_surface_reports_the_runners_and_does_not_overstate_them():
+    """The runner space is part of "what can be executed", so it is reported.
+
+    And the distinction between *naming* a learned executor and *generating*
+    one is kept explicit: the framework binds an injected executor, it does
+    not contain one. Reporting the second as true would claim a capability
+    that does not exist.
+    """
+    report = capability_surface_report()
+    runners = {
+        entry["name"]: entry
+        for entry in report["executable_inventory"]["runners"]
+    }
+    assert set(runners) == {"deterministic", "typed_dsl", "typed_semantic"}
+    assert runners["typed_semantic"]["learned"] is True
+    assert runners["typed_semantic"]["terminal_authority"] == "evidence_only"
+    assert runners["typed_semantic"]["requires_artifact"] is True
+    assert runners["deterministic"]["terminal_authority"] == "conviction"
+
+    freedom = report["generative_freedom"]
+    assert freedom["name_a_learned_executor"] is True
+    assert freedom["generate_a_learned_executor"] is False
+    # Still closed, and the change to the runner space does not open them.
+    assert freedom["new_hook"] is False
+    assert freedom["sandboxed_code_generation"] is False
+    assert freedom["model_weight_update"] is False

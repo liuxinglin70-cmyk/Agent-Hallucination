@@ -30,6 +30,7 @@ from evolution.promotion import (
     promote,
 )
 from evolution.contracts import make_intervention
+from evolution.ledger import Ledger
 
 
 def _candidate(
@@ -784,3 +785,124 @@ def test_target_kind_defaults_to_detection_on_old_entries():
     entry = _candidate()["artifacts"][0]
     assert "target_kind" not in entry["claim"]
     assert candidate_target_kind(entry) == "detection"
+
+
+def test_refreezing_the_same_batch_at_a_new_path_is_refused(tmp_path):
+    """§7.5: a spent batch must not be re-opened by freezing it elsewhere.
+
+    The per-path claim file already stops a second attempt at one path, but a
+    fresh path (and so a fresh ``frozen_at`` and ``protocol_hash``) used to be
+    accepted, which let a rejected candidate be re-scored on the same data
+    until it passed. The ledger is the record that spans paths.
+    """
+    roles = {
+        "A/001.json": "benefit", "A/002.json": "benefit",
+        "C/001.json": "protection", "C/002.json": "protection",
+        "E/001.json": "protection", "E/002.json": "protection",
+    }
+    batch = tmp_path / "batch.json"
+    batch.write_text(json.dumps(sorted(roles)), encoding="utf-8")
+    detector_config = tmp_path / "detector.json"
+    detector_config.write_text(
+        json.dumps({"schema_version": "detector.config.v1"}), encoding="utf-8",
+    )
+    # A protection set needs both polarities to satisfy the coverage floor.
+    gold = {"A/001.json": True, "A/002.json": False, "C/001.json": True,
+            "C/002.json": True, "E/001.json": False, "E/002.json": False}
+    ledger = Ledger(tmp_path / "ledger.jsonl")
+    for name in ("protocol.json",):
+        freeze_protocol(
+            tmp_path / name, batch_path=batch, roles=roles, gold=gold,
+            detector_config=detector_config, workers=2, reason="first",
+            ledger=ledger,
+        )
+    with pytest.raises(PromotionProtocolError) as exc:
+        freeze_protocol(
+            tmp_path / "protocol_again.json", batch_path=batch, roles=roles,
+            gold=gold, detector_config=detector_config, workers=2,
+            reason="retry", ledger=ledger,
+        )
+    assert "already frozen" in str(exc.value)
+    # The refusal is recorded, not silently absorbed: the ledger still verifies.
+    assert ledger.verify()["valid"] is True
+
+
+def _artifact_fixture(tmp_path: Path) -> tuple[dict, dict, Path, Path]:
+    """A six-case v1 batch with the dataset files ``load_protocol`` re-derives.
+
+    ``load_protocol`` re-reads gold from the dataset every load, so these tests
+    need real case files: a protocol whose batch cannot be resolved is rejected
+    before the artifact manifest is ever consulted.
+    """
+    roles = {"A/001.json": "benefit", "A/002.json": "benefit",
+             "C/001.json": "protection", "C/002.json": "protection",
+             "E/001.json": "protection", "E/002.json": "protection"}
+    gold = {"A/001.json": True, "A/002.json": False, "C/001.json": True,
+            "C/002.json": True, "E/001.json": False, "E/002.json": False}
+    data = tmp_path / "data"
+    for case in roles:
+        path = data / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "question": "q", "history": [],
+            "is_hallucination": gold[case],
+        }), encoding="utf-8")
+    batch = tmp_path / "batch.json"
+    batch.write_text(json.dumps(sorted(roles)), encoding="utf-8")
+    detector_config = tmp_path / "detector.json"
+    detector_config.write_text(
+        json.dumps({"schema_version": "detector.config.v1"}), encoding="utf-8",
+    )
+    return roles, gold, batch, detector_config
+
+
+def test_replacing_a_learned_artifact_refuses_the_frozen_protocol(tmp_path):
+    """§12.1: a replaced weight file must invalidate the frozen protocol.
+
+    Replacing weights changes no source byte and no detector config, so neither
+    of the digests that already existed can notice it. Without the artifact
+    manifest the protocol would evaluate a different model than the one it was
+    frozen against and report the reading as that model's.
+    """
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    weights = tmp_path / "weights.bin"
+    weights.write_bytes(b"model-version-1")
+    protocol_path = tmp_path / "protocol.json"
+    freeze_protocol(
+        protocol_path, batch_path=batch, roles=roles, gold=gold,
+        detector_config=detector_config, workers=2,
+        artifact_paths=[weights],
+    )
+    frozen = json.loads(protocol_path.read_text(encoding="utf-8"))
+    assert frozen["artifact_manifest"]["artifacts"][str(weights)]
+
+    # Unchanged: the protocol loads.
+    load_protocol(protocol_path, dataset_root=tmp_path / "data",
+                  stages=("structural",))
+
+    # Replaced weights: the same protocol must refuse to load.
+    weights.write_bytes(b"model-version-2")
+    with pytest.raises(PromotionProtocolError) as exc:
+        load_protocol(protocol_path, dataset_root=tmp_path / "data",
+                      stages=("structural",))
+    assert "learned artifact changed" in str(exc.value)
+
+    # Deleted weights: also refused, and for the right reason.
+    weights.unlink()
+    with pytest.raises(PromotionProtocolError) as exc:
+        load_protocol(protocol_path, dataset_root=tmp_path / "data",
+                      stages=("structural",))
+    assert "missing" in str(exc.value)
+
+
+def test_a_protocol_without_learned_artifacts_records_that_explicitly(tmp_path):
+    """"No artifact" is a recorded statement, not an absent key."""
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    protocol = freeze_protocol(
+        tmp_path / "protocol.json", batch_path=batch, roles=roles, gold=gold,
+        detector_config=detector_config, workers=2,
+    )
+    manifest = protocol["artifact_manifest"]
+    assert manifest["artifacts"] == {}
+    assert manifest["schema_version"] == "evolution.artifact_manifest.v1"
+    assert manifest["digest"]

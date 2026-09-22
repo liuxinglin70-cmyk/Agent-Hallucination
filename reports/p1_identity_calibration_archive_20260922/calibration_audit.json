@@ -1,0 +1,272 @@
+{
+  "confidence_levels": [
+    "high",
+    "low",
+    "medium"
+  ],
+  "continuous_metrics_unavailable": "Brier, log loss, AUROC, calibration curve, accuracy-at-coverage and bootstrap CI need a numeric score per case. judge.confidence is an ordinal level (high/medium/low) with no numeric scale, so computing them would require inventing the mapping. They stay unimplemented until a runner emits real probabilities.",
+  "metric_role": "calibration-only",
+  "monotonicity": {
+    "levels_compared": 2,
+    "monotone": true,
+    "violations": []
+  },
+  "note": "Discrete reliability table over the judge's stated confidence. Calibration-only: this report scores nothing and admits nothing. A well-calibrated level is not evidence that a candidate repaired a mechanism.",
+  "overall": {
+    "decided_rows": 27,
+    "levels": [
+      {
+        "abstained": 0,
+        "abstention_rate": 0.0,
+        "accuracy": 0.8,
+        "correct": 20,
+        "coverage": 0.925926,
+        "decided": 25,
+        "error_rate": 0.2,
+        "level": "high",
+        "n": 25,
+        "unlabelled": 0,
+        "wrong": 5
+      },
+      {
+        "abstained": 2,
+        "abstention_rate": 0.5,
+        "accuracy": 0.5,
+        "correct": 1,
+        "coverage": 0.074074,
+        "decided": 2,
+        "error_rate": 0.5,
+        "level": "medium",
+        "n": 4,
+        "unlabelled": 0,
+        "wrong": 1
+      }
+    ],
+    "unstated_level_rows": 1
+  },
+  "per_source": {
+    "source_count": 7,
+    "sources": {
+      "BFCL": {
+        "decided_rows": 4,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 0.0,
+            "correct": 0,
+            "coverage": 0.75,
+            "decided": 3,
+            "error_rate": 1.0,
+            "level": "high",
+            "n": 3,
+            "unlabelled": 0,
+            "wrong": 3
+          },
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 0.0,
+            "correct": 0,
+            "coverage": 0.25,
+            "decided": 1,
+            "error_rate": 1.0,
+            "level": "medium",
+            "n": 1,
+            "unlabelled": 0,
+            "wrong": 1
+          }
+        ],
+        "unstated_level_rows": 0
+      },
+      "Camel": {
+        "decided_rows": 2,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 1.0,
+            "correct": 2,
+            "coverage": 1.0,
+            "decided": 2,
+            "error_rate": 0.0,
+            "level": "high",
+            "n": 2,
+            "unlabelled": 0,
+            "wrong": 0
+          },
+          {
+            "abstained": 1,
+            "abstention_rate": 1.0,
+            "accuracy": null,
+            "correct": 0,
+            "coverage": 0.0,
+            "decided": 0,
+            "error_rate": null,
+            "level": "medium",
+            "n": 1,
+            "unlabelled": 0,
+            "wrong": 0
+          }
+        ],
+        "unstated_level_rows": 0
+      },
+      "Magentic_One": {
+        "decided_rows": 5,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 1.0,
+            "correct": 5,
+            "coverage": 1.0,
+            "decided": 5,
+            "error_rate": 0.0,
+            "level": "high",
+            "n": 5,
+            "unlabelled": 0,
+            "wrong": 0
+          }
+        ],
+        "unstated_level_rows": 0
+      },
+      "Octotools": {
+        "decided_rows": 4,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 1.0,
+            "correct": 4,
+            "coverage": 1.0,
+            "decided": 4,
+            "error_rate": 0.0,
+            "level": "high",
+            "n": 4,
+            "unlabelled": 0,
+            "wrong": 0
+          }
+        ],
+        "unstated_level_rows": 0
+      },
+      "OpenDeepSearch": {
+        "decided_rows": 8,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 0.875,
+            "correct": 7,
+            "coverage": 1.0,
+            "decided": 8,
+            "error_rate": 0.125,
+            "level": "high",
+            "n": 8,
+            "unlabelled": 0,
+            "wrong": 1
+          },
+          {
+            "abstained": 1,
+            "abstention_rate": 1.0,
+            "accuracy": null,
+            "correct": 0,
+            "coverage": 0.0,
+            "decided": 0,
+            "error_rate": null,
+            "level": "medium",
+            "n": 1,
+            "unlabelled": 0,
+            "wrong": 0
+          }
+        ],
+        "unstated_level_rows": 1
+      },
+      "OpenManus": {
+        "decided_rows": 2,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 1.0,
+            "correct": 1,
+            "coverage": 0.5,
+            "decided": 1,
+            "error_rate": 0.0,
+            "level": "high",
+            "n": 1,
+            "unlabelled": 0,
+            "wrong": 0
+          },
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 1.0,
+            "correct": 1,
+            "coverage": 0.5,
+            "decided": 1,
+            "error_rate": 0.0,
+            "level": "medium",
+            "n": 1,
+            "unlabelled": 0,
+            "wrong": 0
+          }
+        ],
+        "unstated_level_rows": 0
+      },
+      "SmolAgents": {
+        "decided_rows": 2,
+        "levels": [
+          {
+            "abstained": 0,
+            "abstention_rate": 0.0,
+            "accuracy": 0.5,
+            "correct": 1,
+            "coverage": 1.0,
+            "decided": 2,
+            "error_rate": 0.5,
+            "level": "high",
+            "n": 2,
+            "unlabelled": 0,
+            "wrong": 1
+          }
+        ],
+        "unstated_level_rows": 0
+      }
+    }
+  },
+  "row_source": "reports\\error_scope_20260918\\attempts",
+  "rows": 30,
+  "schema_version": "evolution.calibration_report.v1",
+  "source_files": {
+    "BFCL/017.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/ecbdc8778dd3.json",
+    "BFCL/041.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/f5f761b6fbf5.json",
+    "BFCL/062.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/e2cf882fc0eb.json",
+    "BFCL/107.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/3d27b3053166.json",
+    "Camel/018.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/1af4be2615ea.json",
+    "Camel/048.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/7f232f63ee61.json",
+    "Camel/054.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/2cc51d9a66e4.json",
+    "Magentic_One/036.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/d4f582d882f7.json",
+    "Magentic_One/049.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json",
+    "Magentic_One/050.json": "reports/error_scope_20260918/attempts/attempt2_recall_budget_fix/run/checkpoints/cycle001/arms/508acdf65658/f7245d82173f.json",
+    "Magentic_One/085.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/00bfd8430fc7.json",
+    "Magentic_One/093.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/e76e80e70384.json",
+    "Octotools/005.json": "reports/error_scope_20260918/attempts/attempt2_recall_budget_fix/run/checkpoints/cycle001/arms/508acdf65658/9ec0e72cf3c8.json",
+    "Octotools/023.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/583f58aada2d.json",
+    "Octotools/030.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/bd198e0c90b3.json",
+    "Octotools/040.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/b86cb6c76211.json",
+    "OpenDeepSearch/002.json": "reports/error_scope_20260918/attempts/attempt2_recall_budget_fix/run/checkpoints/cycle001/arms/508acdf65658/28649dd5e405.json",
+    "OpenDeepSearch/035.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/effe5d2a4bcd.json",
+    "OpenDeepSearch/063.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/b201f1303c69.json",
+    "OpenDeepSearch/067.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/25b86ebcdc32.json",
+    "OpenDeepSearch/077.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/403836705db1.json",
+    "OpenDeepSearch/080.json": "reports/error_scope_20260918/attempts/attempt2_recall_budget_fix/run/checkpoints/cycle001/arms/508acdf65658/ffa46a922c27.json",
+    "OpenDeepSearch/084.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/3fa2b03fd4cb.json",
+    "OpenDeepSearch/086.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/b12a82572954.json",
+    "OpenDeepSearch/088.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/2ba6f44854e5.json",
+    "OpenDeepSearch/095.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/f58c5d79c09b.json",
+    "OpenManus/064.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/49683a275045.json",
+    "OpenManus/073.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/614f3077f894.json",
+    "SmolAgents/019.json": "reports/error_scope_20260918/attempts/attempt1_semantics_fix/run/checkpoints/cycle001/arms/508acdf65658/2f0d1f4ff7f1.json",
+    "SmolAgents/037.json": "reports/error_scope_20260918/attempts/attempt4_runtime_envelope_fix/run/checkpoints/cycle001/arms/508acdf65658/1b3d8e0e04e8.json"
+  }
+}

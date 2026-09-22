@@ -20,7 +20,7 @@ from typing import Any, Mapping
 
 from evolution.config import load_config, resolve_path
 from evolution.capability_surface import capability_surface_report
-from evolution.contracts import empty_registry, save_json
+from evolution.contracts import save_json
 from evolution.engine import EvolutionEngine, run_full_self_evolution
 from evolution.ledger import Ledger, load_ledger
 from evolution.meta_eval import write_meta_report
@@ -46,8 +46,33 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _apply_mechanism_binding(config: dict[str, Any], args: Any) -> dict[str, Any]:
+    """Install the evaluator-supplied mechanism binding declared on the CLI.
+
+    The binding is *evidence*, not configuration the framework may derive: a
+    mechanism file names the mechanism and the membership file is the
+    evaluator's per-case confirmation that a case belongs to it. Neither is
+    inferred from case ids, sources or shared polarity, so both are required
+    together and a half-declared binding is refused here rather than silently
+    degrading to the unbound polarity reading.
+    """
+    mechanism = getattr(args, "mechanism_binding", None)
+    membership = getattr(args, "membership_binding", None)
+    if not mechanism and not membership:
+        return config
+    if not (mechanism and membership):
+        raise SystemExit(
+            "a mechanism binding needs both --mechanism-binding and "
+            "--membership-binding: membership is the evidence a case belongs "
+            "to the mechanism, and neither can stand alone"
+        )
+    config["mechanism"] = str(mechanism)
+    config["mechanism_membership"] = str(membership)
+    return config
+
+
 def cmd_cycle(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = _apply_mechanism_binding(load_config(args.config), args)
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
@@ -62,7 +87,7 @@ def cmd_cycle(args: argparse.Namespace) -> int:
 
 
 def cmd_experiment(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = _apply_mechanism_binding(load_config(args.config), args)
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
@@ -77,7 +102,7 @@ def cmd_experiment(args: argparse.Namespace) -> int:
 
 
 def cmd_governance(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = _apply_mechanism_binding(load_config(args.config), args)
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
@@ -104,8 +129,17 @@ def cmd_full_self_evolution(args: argparse.Namespace) -> int:
 
 def cmd_meta(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    # The mini and formal protocols measure different splits, so a
+    # meta-evaluation drawn from both would compare readings that were never
+    # comparable. Each cycle report already records which protocol produced it.
+    reports = _load_cycle_reports(config)
+    if args.mini:
+        reports = [
+            item for item in reports
+            if bool((item.get("split") or {}).get("mini")) is True
+        ]
     report = write_meta_report(
-        _load_cycle_reports(config),
+        reports,
         load_ledger(config),
         resolve_path(config["work_root"]) / "reports" / "meta_eval.json",
     )
@@ -130,7 +164,7 @@ def cmd_verify_ledger(args: argparse.Namespace) -> int:
 
 
 def cmd_preview(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    config = _apply_mechanism_binding(load_config(args.config), args)
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
@@ -150,6 +184,51 @@ def cmd_registry(args: argparse.Namespace) -> int:
     return 0
 
 
+def _candidate_from_args(args: argparse.Namespace) -> dict[str, Any] | None:
+    """Derive the candidate object from the shared source flags.
+
+    ``freeze-protocol`` and ``promote`` must derive the *same* object from the
+    same flags: a v2 protocol binds a candidate content hash, and a promotion
+    run is refused when its candidate's hash differs from the frozen one. Two
+    independent derivations would make that refusal fire on identical inputs.
+    """
+    from evolution.promotion import (
+        PromotionProtocolError,
+        bind_candidate,
+        candidate_from_development,
+        candidate_from_registry_patch,
+        candidate_from_research,
+    )
+
+    mechanism = None
+    if getattr(args, "mechanism", None):
+        mechanism = json.loads(
+            Path(args.mechanism).read_text(encoding="utf-8-sig")
+        )
+    if getattr(args, "from_development", None):
+        if not mechanism:
+            raise PromotionProtocolError(
+                "--from-development needs --mechanism: a development run is "
+                "bound to the mechanism it repaired"
+            )
+        if not getattr(args, "version", None):
+            raise PromotionProtocolError(
+                "--from-development needs --version (e.g. --version v001)"
+            )
+        return candidate_from_development(
+            args.from_development,
+            version_id=str(args.version),
+            mechanism=mechanism,
+        )
+    if getattr(args, "from_patch", None):
+        candidate = candidate_from_registry_patch(args.from_patch)
+        return bind_candidate(candidate, mechanism) if mechanism else candidate
+    if getattr(args, "from_research", None):
+        candidate = candidate_from_research(args.from_research)
+        return bind_candidate(candidate, mechanism) if mechanism else candidate
+    return None
+
+
 def cmd_promote(args: argparse.Namespace) -> int:
     """Carry a frozen candidate through the deployment gates.
 
@@ -159,24 +238,19 @@ def cmd_promote(args: argparse.Namespace) -> int:
     localization objective when claimed), publish only on success, and record
     every attempt in the version ledger.
     """
-    from evolution.promotion import (
-        PromotionProtocolError,
-        candidate_from_registry_patch,
-        candidate_from_research,
-        promote,
-    )
+    from evolution.promotion import PromotionProtocolError, promote
 
     config = load_config(args.config)
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
     try:
-        if args.from_research:
-            candidate = candidate_from_research(args.from_research)
-        elif args.from_patch:
-            candidate = candidate_from_registry_patch(args.from_patch)
-        else:
-            raise SystemExit("promote needs --from-research or --from-patch")
+        candidate = _candidate_from_args(args)
+        if candidate is None:
+            raise SystemExit(
+                "promote needs --from-research, --from-patch or "
+                "--from-development"
+            )
         stages = [item for item in str(args.stages).split(",") if item]
         report = promote(
             candidate=candidate,
@@ -198,7 +272,19 @@ def cmd_promote(args: argparse.Namespace) -> int:
 
 
 def cmd_freeze_protocol(args: argparse.Namespace) -> int:
-    """Freeze a candidate-unused promotion batch before any model call."""
+    """Freeze a candidate-unused promotion batch before any model call.
+
+    Two shapes are supported:
+
+    * v1 (no ``--mechanism``): the historical polarity batch, benefit plus
+      protection;
+    * v2 (``--mechanism`` + ``--membership`` + a candidate source): the frozen
+      mechanism, its evaluator-confirmed membership, and three disjoint sets --
+      mechanism gain, protection and mechanism-external challenge. A v2 freeze
+      also pins the candidate content hash and the active baseline registry, so
+      a promotion run cannot be scored against a candidate or a baseline that
+      changed after the freeze.
+    """
     from evolution.promotion import PromotionProtocolError, freeze_protocol
     from evolution.splits import load_gold, load_gold_step
 
@@ -214,19 +300,42 @@ def cmd_freeze_protocol(args: argparse.Namespace) -> int:
         batch_cases = [str(item) for item in batch]
         roles = {}
     if not roles:
-        if not args.benefit and not args.protection:
+        if not (args.benefit or args.protection or getattr(args, "challenge", None)):
             raise SystemExit(
-                "the batch file declares no roles and no --benefit/--protection "
-                "was given; every case needs a role"
+                "the batch file declares no roles and no --benefit/--protection/"
+                "--challenge was given; every case needs a role"
             )
         benefit = [item for item in str(args.benefit or "").split(",") if item]
         protection = [
             item for item in str(args.protection or "").split(",") if item
         ]
-        roles = {
-            **{case: "benefit" for case in benefit},
-            **{case: "protection" for case in protection},
-        }
+        challenge = [
+            item for item in str(getattr(args, "challenge", "") or "").split(",")
+            if item
+        ]
+        # §8.2 defines three mutually exclusive sets, so a case listed under two
+        # of them is a contradiction about what it is, not a precedence
+        # question. Merging the flag lists as a dict would silently let the
+        # last flag win and freeze a batch with a different meaning than the
+        # one the researcher declared.
+        declared = [
+            ("benefit", benefit), ("protection", protection),
+            ("challenge", challenge),
+        ]
+        seen: dict[str, str] = {}
+        clashes: list[str] = []
+        for role_name, items in declared:
+            for case in items:
+                previous = seen.get(case)
+                if previous is not None and previous != role_name:
+                    clashes.append(f"{case} ({previous} and {role_name})")
+                seen[case] = role_name
+        if clashes:
+            raise SystemExit(
+                "a case may have exactly one role; declared twice: "
+                + ", ".join(sorted(clashes)[:5])
+            )
+        roles = seen
         missing = sorted(set(batch_cases) - set(roles))
         if missing:
             raise SystemExit(f"cases without a role: {missing}")
@@ -248,6 +357,39 @@ def cmd_freeze_protocol(args: argparse.Namespace) -> int:
             "path": str(args.baseline_roll),
             "declared_path": getattr(args, "baseline_roll_declared_path", None),
             "source_run": getattr(args, "baseline_roll_source_run", None),
+        }
+    mechanism = None
+    alignment_kwargs: dict[str, Any] = {}
+    if getattr(args, "mechanism", None):
+        if not getattr(args, "membership", None):
+            raise SystemExit(
+                "a mechanism-aligned (v2) freeze needs --membership: gain cases "
+                "must be evaluator-confirmed members of the target mechanism"
+            )
+        try:
+            candidate = _candidate_from_args(args)
+        except PromotionProtocolError as exc:
+            _print_json({"state": "freeze_rejected", "reason": str(exc)})
+            return 3
+        if candidate is None:
+            raise SystemExit(
+                "a mechanism-aligned freeze needs a candidate source "
+                "(--from-development/--from-patch/--from-research)"
+            )
+        mechanism = json.loads(
+            Path(args.mechanism).read_text(encoding="utf-8-sig")
+        )
+        membership = json.loads(
+            Path(args.membership).read_text(encoding="utf-8-sig")
+        )
+        registry = load_active_registry(config)
+        alignment_kwargs = {
+            "mechanism": mechanism,
+            "mechanism_membership": membership,
+            "candidate": candidate,
+            "dataset_root": dataset_root,
+            "framework_config": config,
+            "baseline_registry_hash": registry.registry_hash,
         }
     try:
         protocol = freeze_protocol(
@@ -271,6 +413,14 @@ def cmd_freeze_protocol(args: argparse.Namespace) -> int:
             reason=str(args.reason or ""),
             baseline_roll=baseline_roll,
             require_fresh=bool(getattr(args, "require_fresh", False)),
+            artifact_paths=[
+                resolve_path(item) for item in (getattr(args, "artifact", []) or [])
+            ],
+            # The ledger is the cross-path record of what was already frozen:
+            # without it, re-freezing the same batch at a new path mints a new
+            # protocol hash and re-opens a batch that was already spent.
+            ledger=load_ledger(config),
+            **alignment_kwargs,
         )
     except PromotionProtocolError as exc:
         _print_json({"state": "freeze_rejected", "reason": str(exc)})
@@ -290,13 +440,268 @@ def cmd_freeze_protocol(args: argparse.Namespace) -> int:
         "protection_negatives": sum(
             1 for case, r in roles.items() if r == "protection" and gold[case] is False
         ),
+        "challenge": sum(1 for r in roles.values() if r == "challenge"),
         "gold_positive": sum(1 for value in gold.values() if value is True),
         "annotated_gold_steps": annotated,
         "workers": protocol["workers"],
         "timeout_seconds": protocol["timeout_seconds"],
+        "mechanism_id": protocol.get("mechanism_id"),
+        "candidate_content_hash": protocol.get("candidate_content_hash"),
+        "protocol_hash": protocol.get("protocol_hash"),
         "path": resolve_path(args.protocol_out).as_posix(),
     })
     return 0
+
+
+def cmd_develop(args: argparse.Namespace) -> int:
+    """Develop one candidate for one mechanism, then stop at freeze.
+
+    This is the deployment-side development loop (plan P0.3) as a command: it
+    patrols to find mechanisms, picks the target, runs draft -> L0 -> L1 ->
+    revise, and freezes a version. It never runs the formal gates: a frozen
+    candidate is carried into ``freeze-protocol`` / ``promote`` separately, so
+    the development/promotion budget and data separation stays visible in the
+    commands a researcher types.
+    """
+    from evolution.development import (
+        CandidateDeveloper,
+        DevelopmentBudget,
+        development_report,
+    )
+    from evolution.engine import EvolutionEngine
+    from evolution.splits import build_split
+
+    config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
+    if getattr(args, "workers", None):
+        config.setdefault("backend", {})["workers"] = int(args.workers)
+    # --dry-run promises no provider call, so it cannot patrol the real
+    # backend: the offline mock is used instead, and the report names where the
+    # mechanism it shows came from.
+    dry_run = bool(args.dry_run)
+    backend = _mock_backend(config) if (args.backend == "mock" or dry_run) else None
+    # ``mini`` follows the configuration, not the config file's name: whether a
+    # formal split is configured is a property of the manifest key, and a
+    # filename heuristic silently forced the mini protocol for every config
+    # whose name did not contain "development.json".
+    mini = not bool(config.get("split_manifest"))
+    split = build_split(
+        config=config, dataset_root=config["dataset_root"], mini=mini,
+    )
+    engine = EvolutionEngine(config, backend=backend, split=split, mini=mini)
+    preview, preview_source = _development_preview(engine, int(args.cycle), dry_run=dry_run)
+    families = list(preview.get("families") or [])
+    if not families:
+        _print_json({
+            "state": "no_family",
+            "reason": preview.get("empty_proposal_reason"),
+        })
+        return 2
+    target = _select_development_family(families, args.mechanism)
+    if target is None:
+        _print_json({
+            "state": "no_target",
+            "reason": (
+                f"no family for mechanism {args.mechanism!r}; "
+                f"available: {[f.get('mechanism', {}).get('mechanism_id') for f in families]}"
+            ),
+        })
+        return 2
+    mechanism = dict(target.get("mechanism") or {})
+    plan = dict(target.get("actionability") or {})
+    requirement = next(
+        (
+            item for item in (
+                (preview.get("capability_plan") or {}).get("requirements") or ()
+            )
+            if str(item.get("mechanism_id")) == str(mechanism.get("mechanism_id"))
+        ),
+        {},
+    )
+    development_cfg = dict(config.get("development") or {})
+    budget = DevelopmentBudget(
+        max_versions_per_mechanism=int(
+            development_cfg.get("max_versions_per_mechanism", 4),
+        ),
+        max_provider_calls=int(development_cfg.get("max_provider_calls", 6)),
+        max_l1_cases=int(development_cfg.get("max_l1_cases", 12)),
+        require_normal_neighbors=int(
+            development_cfg.get("require_normal_neighbors", 2),
+        ),
+        allow_action_class_change=bool(
+            development_cfg.get("allow_action_class_change", True),
+        ),
+    )
+    output_dir = resolve_path(
+        args.output_dir or str(
+            Path(config["work_root"]) / "development"
+            / str(mechanism.get("mechanism_id") or "unknown")
+        )
+    )
+    cases = [str(case) for case in target.get("failure_cases") or ()]
+    if getattr(args, "case_id", None):
+        # Narrowing the target set is how a researcher works one case at a
+        # time; the case has to be a member, or the reading would be about a
+        # case the mechanism was never diagnosed from.
+        wanted = str(args.case_id)
+        if wanted not in cases:
+            _print_json({
+                "state": "no_target",
+                "reason": (
+                    f"case {wanted!r} is not a member of mechanism "
+                    f"{mechanism.get('mechanism_id')!r}; members: {cases}"
+                ),
+            })
+            return 2
+        cases = [wanted]
+    # Neighbours come from the mechanism itself: the cases the bare base
+    # already handles on the same failure direction, which the candidate must
+    # not break. Passing an empty list made the neighbour half of L1 vacuous,
+    # so an empty list here is reported rather than silently accepted.
+    neighbor_cases = [
+        str(case) for case in mechanism.get("normal_neighbors") or ()
+        if str(case) not in set(cases)
+    ]
+    if dry_run:
+        _print_json({
+            "state": "dry_run",
+            "provider_calls": 0,
+            # The mechanism shown comes from a saved preview report when one
+            # exists, and from the offline mock otherwise: a dry run cannot
+            # discover a real mechanism without patrol, so it must not be
+            # mistaken for a real one.
+            "preview_source": preview_source,
+            "mechanism": mechanism,
+            "capability_requirement": requirement,
+            "routes": plan.get("routes"),
+            "target_cases": cases,
+            "neighbor_cases": neighbor_cases,
+            "output_dir": str(output_dir),
+            "budget": budget.as_dict(),
+        })
+        return 0
+    if not args.from_patch:
+        _print_json({
+            "state": "no_seed",
+            "reason": (
+                "the deployment-side development loop needs a seed candidate "
+                "(--from-patch) or a proposer that satisfies the development "
+                "contract; neither was supplied"
+            ),
+            "mechanism": mechanism,
+            "capability_requirement": requirement,
+        })
+        return 2
+    seed = json.loads(Path(args.from_patch).read_text(encoding="utf-8-sig"))
+    if isinstance(seed, Mapping) and "candidates" in seed:
+        seed = (seed.get("candidates") or [{}])[0]
+    seed = dict(seed)
+    seed.setdefault("provenance", {})
+    seed["provenance"].update({
+        "cycle": int(args.cycle),
+        "failure_family": str(target.get("failure_family") or ""),
+        "failure_cases": cases,
+    })
+    seed.pop("content_hash", None)
+
+    def l1_runner(cases_to_run, *, candidate, plan):
+        rows = engine.develop_rows(
+            cases_to_run,
+            candidate=candidate,
+            split=split,
+        )
+        return rows
+
+    def propose(mechanism_, plan_, parent, diagnosis, cycle):
+        # One seed, then no new drafts: the seed is version v001 and the loop's
+        # job is to revise it. A caller that wants fresh drafts passes a
+        # proposer instead of a patch (development contract).
+        return [seed] if parent is None else []
+
+    developer = CandidateDeveloper(
+        output_dir=output_dir,
+        budget=budget,
+        mechanism=mechanism,
+        capability_plan=requirement,
+        route_failure_records=engine.route_failure_records(),
+        target_cases=cases,
+        neighbor_cases=neighbor_cases,
+        active_entries=engine.registry.entries,
+        target_kind=str(target.get("target_kind") or "detection"),
+        gold_steps=engine.gold_step_map,
+        l1_runner=l1_runner,
+    )
+    result = developer.develop(
+        propose, cycle=int(args.cycle),
+        max_versions=int(development_cfg.get("max_versions_per_mechanism", 4)),
+    )
+    report = development_report(result)
+    report["capability_requirement"] = requirement
+    report["output_dir"] = str(output_dir)
+    # Hand the passing version to the promotion path here, in the same command
+    # that produced it. Only ``CandidateDeveloper.freeze`` writes the status
+    # ``candidate_from_development`` accepts, so a run that stopped at
+    # ``ready_for_freeze`` could not reach ``freeze-protocol`` at all.
+    if result.get("selected_version_id"):
+        frozen = developer.freeze(str(result["selected_version_id"]))
+        report["frozen"] = {
+            "version_id": frozen["version_id"],
+            "candidate_hash": frozen["candidate_hash"],
+            "lineage": frozen["lineage"],
+            "development_evidence": frozen["development_evidence"],
+        }
+    _print_json(report)
+    out = output_dir / "development_report.json"
+    save_json(out, report)
+    print(f"\ndevelopment report -> {out}")
+    return 0 if result.get("selected_version_id") else 2
+
+
+def _development_preview(
+    engine: Any, cycle: int, *, dry_run: bool,
+) -> tuple[dict[str, Any], str]:
+    """The preview a development run works from, and where it came from.
+
+    A dry run must not spend a provider call, and patrol is the most expensive
+    call in the framework, so a previously saved preview report is read from
+    disk instead. The returned source string travels into the report so a
+    mechanism enumerated offline is never presented as a measured one.
+    """
+    if dry_run:
+        saved = engine.paths["reports"] / f"proposal_preview_cycle{int(cycle):03d}.json"
+        if saved.is_file():
+            try:
+                payload = json.loads(saved.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError):
+                payload = None
+            if isinstance(payload, dict) and payload.get("families"):
+                return payload, f"archive:{saved}"
+        return engine.preview_cycle(int(cycle)), "offline_mock"
+    return engine.preview_cycle(int(cycle)), "measured"
+
+
+def _select_development_family(
+    families: list[dict[str, Any]], mechanism_id: str | None,
+) -> dict[str, Any] | None:
+    """Pick the family to develop: the named one, or the largest actionable one."""
+    actionable = [
+        family for family in families
+        if bool((family.get("mechanism") or {}).get("mechanism_id"))
+    ]
+    if not actionable:
+        return None
+    if mechanism_id:
+        for family in actionable:
+            if str((family.get("mechanism") or {}).get("mechanism_id")) == (
+                str(mechanism_id)
+            ):
+                return family
+        return None
+    return max(
+        actionable,
+        key=lambda family: int(family.get("count") or 0),
+    )
 
 
 def cmd_capability_audit(args: argparse.Namespace) -> int:
@@ -496,6 +901,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("cycle", help="run one evolution cycle")
+    p.add_argument(
+        "--mechanism-binding",
+        help="mechanism JSON; with --membership-binding, scores the gain set "
+             "against evaluator-confirmed mechanism members",
+    )
+    p.add_argument(
+        "--membership-binding",
+        help="JSON of case_id -> evaluator membership evidence for the mechanism",
+    )
     p.add_argument("--resume", action="store_true", help="resume a fingerprint-matched checkpoint without redrawing completed arms")
     p.add_argument("--cycle", type=int, required=True)
     p.add_argument("--backend", choices=["detector", "mock"], default=None)
@@ -504,6 +918,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_cycle)
 
     p = sub.add_parser("experiment", help="run multiple evolution cycles")
+    p.add_argument(
+        "--mechanism-binding",
+        help="mechanism JSON; with --membership-binding, scores the gain set "
+             "against evaluator-confirmed mechanism members",
+    )
+    p.add_argument(
+        "--membership-binding",
+        help="JSON of case_id -> evaluator membership evidence for the mechanism",
+    )
     p.add_argument("--resume", action="store_true", help="reuse completed cycles and resume checkpointed gates")
     p.add_argument("--cycles", type=int, default=None)
     p.add_argument("--backend", choices=["detector", "mock"], default=None)
@@ -514,6 +937,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "governance",
         help="post-cycle attribution, retirement and rollback accounting",
+    )
+    p.add_argument(
+        "--mechanism-binding",
+        help="mechanism JSON; with --membership-binding, scores the gain set "
+             "against evaluator-confirmed mechanism members",
+    )
+    p.add_argument(
+        "--membership-binding",
+        help="JSON of case_id -> evaluator membership evidence for the mechanism",
     )
     p.add_argument("--cycle", type=int, default=None)
     p.add_argument("--backend", choices=["detector", "mock"], default=None)
@@ -546,6 +978,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser(
         "preview",
         help="patrol and draft proposals without spending gate budget",
+    )
+    p.add_argument(
+        "--mechanism-binding",
+        help="mechanism JSON; with --membership-binding, scores the gain set "
+             "against evaluator-confirmed mechanism members",
+    )
+    p.add_argument(
+        "--membership-binding",
+        help="JSON of case_id -> evaluator membership evidence for the mechanism",
     )
     p.add_argument("--cycle", type=int, required=True)
     p.add_argument("--backend", choices=["detector", "mock"], default=None)
@@ -596,9 +1037,87 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="re-run every stage on both arms instead of replaying any stage",
     )
+    p.add_argument(
+        "--artifact",
+        action="append",
+        default=[],
+        help=(
+            "learned artifact the runner depends on (weights, tokenizer, "
+            "calibration output); repeatable. Frozen by digest, so replacing "
+            "one refuses the protocol at load time"
+        ),
+    )
+    p.add_argument(
+        "--challenge",
+        help=(
+            "comma-separated mechanism-external challenge cases (v2 only): "
+            "similar surface features, different mechanism"
+        ),
+    )
+    p.add_argument(
+        "--mechanism",
+        help=(
+            "mechanism JSON; switching this on freezes a mechanism-aligned "
+            "(v2) protocol"
+        ),
+    )
+    p.add_argument(
+        "--membership",
+        help="JSON of case_id -> evaluator membership evidence (required for v2)",
+    )
+    p.add_argument(
+        "--from-development",
+        help="development run directory (candidate source for v2)",
+    )
+    p.add_argument(
+        "--from-research",
+        help="research run directory (candidate source for v2)",
+    )
+    p.add_argument(
+        "--from-patch",
+        help="intervention JSON (candidate source for v2)",
+    )
+    p.add_argument("--version", help="development version id to bind, e.g. v001")
     p.add_argument("--reason")
     p.add_argument("--config")
     p.set_defaults(func=cmd_freeze_protocol)
+
+    p = sub.add_parser(
+        "develop",
+        help=(
+            "develop a candidate for one mechanism: draft, L0, targeted L1 "
+            "replay, revise, freeze"
+        ),
+    )
+    p.add_argument(
+        "--mechanism",
+        help="mechanism id to develop against (default: the largest actionable one)",
+    )
+    p.add_argument(
+        "--case-id",
+        help=(
+            "restrict the development target set to this one case id (must "
+            "belong to the selected mechanism); provenance is always the "
+            "family's case list"
+        ),
+    )
+    p.add_argument("--cycle", type=int, default=1)
+    p.add_argument(
+        "--from-patch",
+        help="intervention JSON to seed version v001 instead of asking the proposer",
+    )
+    p.add_argument(
+        "--output-dir",
+        help="development directory (default: <work_root>/development/<mechanism>)",
+    )
+    p.add_argument("--backend", choices=["detector", "mock"], default=None)
+    p.add_argument(
+        "--workers", type=int, default=None,
+        help="concurrency for the L1 replay (default: the configured backend workers)",
+    )
+    p.add_argument("--dry-run", action="store_true", help="do not call any provider")
+    p.add_argument("--config")
+    p.set_defaults(func=cmd_develop)
 
     p = sub.add_parser(
         "promote",
@@ -607,6 +1126,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--protocol", required=True, help="frozen promotion protocol")
     p.add_argument("--from-research", help="research run directory; the selected version becomes the candidate")
     p.add_argument("--from-patch", help="intervention/registry JSON to promote directly")
+    p.add_argument(
+        "--from-development",
+        help="development run directory; --version names the frozen version",
+    )
+    p.add_argument("--version", help="development version id to promote, e.g. v001")
+    p.add_argument(
+        "--mechanism",
+        help=(
+            "mechanism JSON to bind an unbound candidate to; required with "
+            "--from-development and for mechanism-aligned promotion"
+        ),
+    )
     p.add_argument("--stages", default="structural,harmlessness,behavior,m")
     p.add_argument("--output-dir", required=True, help="where the promotion report and version record go")
     p.add_argument("--backend", choices=["detector", "mock"], default=None)

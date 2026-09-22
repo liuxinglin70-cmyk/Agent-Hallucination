@@ -38,6 +38,7 @@ from detector.provider import ProviderError, provider_call
 
 from evolution.config import resolve_path
 from evolution.contracts import redact_case_ids, structured_key
+from evolution.mechanisms import mechanism_prompt_view
 
 
 @dataclass
@@ -80,6 +81,10 @@ error; its existence is not self-refutation. High confidence alone is not
 a failure mechanism. Distinguish these schema conventions from actual
 packet evidence of a violated task requirement. Shared fields across failure
 members do not establish that the same fields distinguish clean controls.
+
+Semantic-evidence schema (asks an injected learned executor for one typed judgment):
+{"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"<a task schema name, not a built-in predicate>","runner":"typed_semantic","output_verdicts":["supported","contradicted","abstained"]},"artifact":{"id":"<executor id>","digest":"<executor artifact digest>"},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
+Use this ONLY when the judgement needs a semantic comparison the typed operator set cannot express (whether two values mean the same thing) and an executor is available. Three hard boundaries: the artifact{id,digest} is mandatory and must match the executor that actually runs, so never invent a digest; the verdict vocabulary is exactly supported/contradicted/abstained, where abstained means the executor could not tell; and this runner is evidence-only -- it can never convict, and it may not drive recall.trigger. A deterministic route that can express the same comparison is always preferable.
 
 Guard schema (emits one closed adjudication action):
 {"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","evidence_predicate":"<required only for convict_mechanical_violation>","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
@@ -309,6 +314,12 @@ class LLMProposer:
         # human-reviewed target-error description. Absent for every caller
         # but the research entry, in which case drafting is unchanged.
         self.research_packet: dict[str, Any] = {}
+        # Reusable parts from the component store (§9.1 layer 2). Bounded and
+        # retrieved by mechanism/capability/kind. A component is a validated
+        # typed-DSL program that was useful somewhere, not a correct answer
+        # anywhere: it is offered so a draft can reuse a working observation
+        # instead of re-deriving it, and it changes no gate.
+        self.components: list[dict[str, Any]] = []
 
     def set_memory_context(
         self, context: Mapping[str, Any] | None,
@@ -321,6 +332,27 @@ class LLMProposer:
         scored, and supplying them changes no gate.
         """
         self.memory_context = dict(context or {})
+
+    def set_components(
+        self, components: Sequence[Mapping[str, Any]] | None,
+    ) -> None:
+        """Attach reusable parts as drafting input.
+
+        Same discipline as ``set_memory_context``: context, not constraint.
+        Only the prompt view is kept -- a component's provenance (which
+        mechanism first needed it, which candidate produced it) is not drafting
+        material and is deliberately not carried into the prompt.
+        """
+        from evolution.archive import component_prompt_view
+
+        # A malformed entry is dropped rather than crashing the draft: this is
+        # an optional drafting aid, and losing one part must not cost the whole
+        # proposal round.
+        self.components = [
+            component_prompt_view(record)
+            for record in (components or ())
+            if isinstance(record, Mapping)
+        ]
 
     def set_research_packet(
         self, packet: Mapping[str, Any] | None,
@@ -467,6 +499,11 @@ class LLMProposer:
                     "sources": f.get("sources"),
                     "mechanism_summary": f.get("mechanism_summary"),
                     "mechanism_signature": f.get("mechanism_signature"),
+                    # The task-level reading of the family: obligation,
+                    # deviation, failing stage and the repair operation it
+                    # implies. Present when the cycle derived mechanisms; the
+                    # path signature above stays as the fallback reading.
+                    "mechanism": mechanism_prompt_view(f.get("mechanism")),
                     "treatment_routes": (f.get("actionability") or {}).get(
                         "routes", []
                     ),
@@ -487,6 +524,7 @@ class LLMProposer:
         )
         active_block = json.dumps(self._registry_digest(), ensure_ascii=False)
         memory_block = json.dumps(self.memory_context, ensure_ascii=False)
+        components_block = json.dumps(self.components, ensure_ascii=False)
         research_block = json.dumps(
             self.research_packet, ensure_ascii=False,
         ) if self.research_packet else ""
@@ -532,6 +570,18 @@ class LLMProposer:
             f"explain families no current route can treat. Reuse a procedure "
             f"when the mechanism matches; do not re-derive it from scratch:\n"
             f"{memory_block}\n\n"
+            + (
+                f"Reusable validated components (already registered, not "
+                f"deployed): each entry is a complete typed-DSL program that "
+                f"was useful on some mechanism. A component may already fit "
+                f"this family -- check before writing a new program, and reuse "
+                f"its predicate_definition verbatim when it does. To use one, "
+                f"carry it as the body.predicate_definition of an evidence_check "
+                f"or recall_trigger, keeping its name and rules exactly as "
+                f"given; a modified program is a new component, not a reuse:\n"
+                f"{components_block}\n\n"
+                if self.components else ""
+            )
             + (
                 f"Research packet (bounded, read-only): complete training-case "
                 f"trajectories after label projection, per-stage baseline "

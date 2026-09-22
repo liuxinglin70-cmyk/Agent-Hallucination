@@ -1,0 +1,134 @@
+{
+  "schema_version": "evolution.development_dryrun.v1",
+  "evidence_grade": "diagnostic-only",
+  "note": "Deployment-side development loop over a synthetic workspace with a mock backend. No provider call, no admission, no promotion. The mock oracle is what makes the target reachable, so this run demonstrates the loop's mechanics, not detector quality.",
+  "not_repairing": {
+    "repairing_mock": false,
+    "mechanism_id": "M-17aad6d46f7a",
+    "failure_stage": "recall_scanner",
+    "repair_operation": "route_recall",
+    "capability": {
+      "classification": "actionable",
+      "sufficient_routes": [
+        "recall_trigger"
+      ]
+    },
+    "partial_replay": {
+      "hooks": [
+        "recall.trigger"
+      ],
+      "rerun_stages": [
+        "adjudication",
+        "causal_upgrade",
+        "defense",
+        "recall_scanner",
+        "step_tracer"
+      ],
+      "fresh_required": false
+    },
+    "development": {
+      "schema_version": "evolution.candidate_development.v1",
+      "mechanism_id": "M-17aad6d46f7a",
+      "route": "recall_trigger",
+      "cycle": 1,
+      "status": "discarded",
+      "stopped": "no_candidates",
+      "versions": [
+        {
+          "version_id": "v001",
+          "parent_version_id": "",
+          "status": "failed_l1",
+          "l0_passed": true,
+          "l1_passed": false,
+          "l1_reasons": [
+            "no target case improved on the development replay"
+          ]
+        }
+      ],
+      "selected_version_id": "",
+      "lineage": [],
+      "budget": {
+        "caps": {
+          "max_versions_per_mechanism": 3,
+          "max_provider_calls": 6,
+          "max_l1_cases": 12,
+          "require_normal_neighbors": 2,
+          "allow_action_class_change": true
+        },
+        "used": {
+          "provider_calls": 0,
+          "l1_cases": 4
+        }
+      }
+    },
+    "frozen": null
+  },
+  "repairing": {
+    "repairing_mock": true,
+    "mechanism_id": "M-17aad6d46f7a",
+    "failure_stage": "recall_scanner",
+    "repair_operation": "route_recall",
+    "capability": {
+      "classification": "actionable",
+      "sufficient_routes": [
+        "recall_trigger"
+      ]
+    },
+    "partial_replay": {
+      "hooks": [
+        "recall.trigger"
+      ],
+      "rerun_stages": [
+        "adjudication",
+        "causal_upgrade",
+        "defense",
+        "recall_scanner",
+        "step_tracer"
+      ],
+      "fresh_required": false
+    },
+    "development": {
+      "schema_version": "evolution.candidate_development.v1",
+      "mechanism_id": "M-17aad6d46f7a",
+      "route": "recall_trigger",
+      "cycle": 1,
+      "status": "ready_for_freeze",
+      "stopped": "",
+      "versions": [
+        {
+          "version_id": "v001",
+          "parent_version_id": "",
+          "status": "ready_for_freeze",
+          "l0_passed": true,
+          "l1_passed": true,
+          "l1_reasons": []
+        }
+      ],
+      "selected_version_id": "v001",
+      "lineage": [
+        "v001"
+      ],
+      "budget": {
+        "caps": {
+          "max_versions_per_mechanism": 3,
+          "max_provider_calls": 6,
+          "max_l1_cases": 12,
+          "require_normal_neighbors": 2,
+          "allow_action_class_change": true
+        },
+        "used": {
+          "provider_calls": 0,
+          "l1_cases": 4
+        }
+      }
+    },
+    "frozen": {
+      "version_id": "v001",
+      "mechanism_id": "M-17aad6d46f7a",
+      "route": "recall_trigger",
+      "lineage": [
+        "v001"
+      ]
+    }
+  }
+}

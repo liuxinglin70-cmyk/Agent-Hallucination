@@ -1,0 +1,445 @@
+"""Route falsification memory: a route that fired and changed nothing.
+
+The framework already records *why* a candidate was rejected, and it already
+counts how often an intervention fired. Neither answers the question a
+capability planner has to answer: for this mechanism, does this treatment route
+actually repair anything?
+
+Attempt 5 of the pilot answered it the hard way. A tracer directive was
+generated, the hook fired, the reasoning demonstrably changed, and the
+responsible step was still wrong. "Can be triggered" did not imply "can
+repair", and nothing in the repository remembered that.
+
+This store remembers it. An entry means: on this mechanism, through this route,
+the candidate reached the runtime and moved observable behaviour, and the target
+outcome did not improve and was not harmed. That is a negative capability
+observation -- not a rejection reason, not a gate verdict, and never a score.
+
+Two disciplines keep it from over-claiming:
+
+* every recorded condition is checked against the same readings the BEHAVIOR
+  gate used (fired rate, type-specific behaviour event, paired delta), so an
+  infrastructure outage, an unmeasured claim, or a harmful candidate cannot be
+  filed as insufficiency;
+* one observation is not a falsification. The plan's condition includes "at
+  least one targeted revision", and revision lineage arrives with the
+  development loop (P0.3). Until then the store records what happened and
+  ``route_failure_state`` admits a falsification only after two independent
+  observations on the same mechanism and route -- or immediately when a caller
+  can attest a revision, which is the condition the plan actually asks for.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+from evolution.contracts import append_jsonl, read_jsonl
+
+ROUTE_FAILURE_SCHEMA = "evolution.route_failure.v1"
+ROUTE_FAILURE_NAME = "route_failures.jsonl"
+
+# Two independent observations on the same (mechanism, route) are admitted as a
+# falsification when no revision evidence is available. See the module docstring.
+REPEAT_OBSERVATION_THRESHOLD = 2
+
+# Treatment routes, in the vocabulary ``worksheet.TREATMENT_ROUTES`` already
+# uses. The trailing entries are reachable hooks the worksheet does not route
+# to yet; they are named here so a record never has to invent a label.
+TREATMENT_ROUTES = (
+    "recall_directive",
+    "upgrade_directive",
+    "restore_guard",
+    "withhold_guard",
+    "mechanical_conviction",
+    "evolved_predicate",
+    "tracer_directive",
+    "recall_trigger",
+    "judge_directive",
+    "defense_directive",
+    "defense_requirement",
+)
+
+_HOOK_ROUTES = {
+    "scanner.system": "recall_directive",
+    "recall.trigger": "recall_trigger",
+    "judge.system": "judge_directive",
+    "tracer.system": "tracer_directive",
+    "upgrade.system": "upgrade_directive",
+    "defense.system": "defense_directive",
+    "defense.pre": "defense_directive",
+    "upgrade.pre": "upgrade_directive",
+}
+
+_GUARD_ROUTES = {
+    "withhold_conviction": "withhold_guard",
+    "restore_judge_conviction": "restore_guard",
+    "convict_mechanical_violation": "mechanical_conviction",
+    "require_full_view_defense": "defense_requirement",
+}
+
+# Which guard action a route implies. A conviction route is served by either a
+# built-in predicate or an inline typed-DSL program, and those are different
+# capabilities: only the second one creates a new observation.
+_PROGRAM_RUNNER = "typed_dsl"
+
+
+def route_of(candidate: Mapping[str, Any]) -> str | None:
+    """The treatment route one intervention implements, or None.
+
+    A candidate's shape decides the route; the family's route list only says
+    which routes were *available*. Recording the available list instead would
+    attribute a failure to routes the candidate never used.
+    """
+    entry_type = str(candidate.get("type") or "")
+    hook = str(candidate.get("hook") or "")
+    body = candidate.get("body") or {}
+    if entry_type == "decision_guard":
+        action = str(body.get("action") or "")
+        return _GUARD_ROUTES.get(action)
+    if entry_type == "text_boundary":
+        return _HOOK_ROUTES.get(hook)
+    if entry_type == "recall_trigger":
+        return "recall_trigger" if hook == "recall.trigger" else None
+    if entry_type == "evidence_check":
+        if hook != "judge.post":
+            return None
+        # An evidence check alone only reports; it is the guard partner that
+        # acts on it, so its route is named by the program it carries.
+        return (
+            "evolved_predicate"
+            if str(body.get("runner") or "") == _PROGRAM_RUNNER
+            else "mechanical_conviction"
+        )
+    return None
+
+
+def unit_route(members: Sequence[Mapping[str, Any]]) -> str | None:
+    """The route of one admission unit.
+
+    A conviction is served by a pair: an ``evidence_check`` observes and a
+    ``decision_guard`` acts on the observation. The pair is one route, and
+    which one depends on where the observation came from -- a built-in
+    predicate rides the closed mechanical route, an inline typed-DSL program is
+    capability creation. That difference is the whole reason the two routes are
+    listed separately, so it must survive the pairing.
+
+    Members that disagree about which *acting* route was used yield None:
+    attributing the outcome to one of two routes would be a guess.
+    """
+    routes = [
+        route for route in (route_of(member) for member in members)
+        if route is not None
+    ]
+    acting = [route for route in routes if route != "evolved_predicate"]
+    if "evolved_predicate" in routes and (
+        not acting or set(acting) == {"mechanical_conviction"}
+    ):
+        # The same guard, a newly created observation: capability creation.
+        return "evolved_predicate"
+    if len(set(acting)) != 1:
+        return None
+    return acting[0]
+
+
+def _int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _target_unchanged(delta: Mapping[str, Any], polarity: str) -> bool:
+    """Whether the measured outcome failed to improve, without any harm.
+
+    Read as "nothing got better and nothing got worse": a candidate that
+    improved some other case is not a clean insufficiency observation, and a
+    candidate that broke a case is a regression rather than a route that cannot
+    repair the mechanism.
+    """
+    flips = delta.get("flips") or {}
+    if polarity == "recall":
+        gain = _int(flips.get("F->T"))
+    elif polarity == "precision":
+        gain = _int(flips.get("T->F"))
+    else:
+        # A boundary claim is scorable only by a decisive correction, and
+        # ``correctness_improved`` is zero whenever no case became correct.
+        gain = _int(delta.get("correctness_improved"))
+    harm = any(
+        _int(delta.get(key))
+        for key in (
+            "tp_lost", "fp_added", "new_errors", "unresolved_added",
+            "health_regressed",
+        )
+    )
+    return (
+        gain == 0
+        and _int(delta.get("correctness_improved")) == 0
+        and _int(delta.get("marginal_cases")) <= 0
+        and not harm
+    )
+
+
+def insufficiency_evidence(
+    *,
+    candidate: Mapping[str, Any],
+    behavior: Mapping[str, Any] | None,
+    gain_delta: Mapping[str, Any] | None,
+    opportunity: int,
+    substantive_rejection: bool,
+) -> dict[str, Any] | None:
+    """One unit's route-insufficiency reading, or None.
+
+    Returns a record body when every condition holds: the hook fired, the
+    intervention moved the behaviour it promised, the outcome was measured on a
+    set where it could have been rewarded, and it did not move. Anything else --
+    an outage, an unmeasured claim, a harmful candidate, a candidate that never
+    fired -- is not evidence about the route's repair capability and returns
+    None.
+    """
+    route = route_of(candidate)
+    if route is None or not substantive_rejection or opportunity <= 0:
+        return None
+    if not isinstance(behavior, Mapping) or behavior.get("passed"):
+        return None
+    fired_rate = float(behavior.get("fired_rate") or 0.0)
+    events = _int(behavior.get("behavior_events"))
+    if fired_rate <= 0.0 or events <= 0:
+        return None
+    if not isinstance(gain_delta, Mapping):
+        return None
+    polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
+    if polarity not in {"recall", "precision", "boundary"}:
+        return None
+    if not _target_unchanged(gain_delta, polarity):
+        return None
+    return {
+        "route": route,
+        "status": "insufficient_for_mechanism",
+        "evidence": {
+            "hook_fired": round(fired_rate, 6),
+            "output_changed": events,
+            "behavior_event": str(behavior.get("behavior_event_kind") or ""),
+            "target_outcome_changed": 0,
+            "target_polarity": polarity,
+            "gain_opportunities": int(opportunity),
+            "delta_basis": "benefit_set",
+        },
+    }
+
+
+def route_failure_record(
+    *,
+    cycle: int,
+    mechanism_id: str,
+    family_id: str,
+    observation: Mapping[str, Any],
+    revisions_observed: int | None = None,
+) -> dict[str, Any]:
+    """Build one stored record from an observation."""
+    return {
+        "schema_version": ROUTE_FAILURE_SCHEMA,
+        "kind": "observation",
+        "mechanism_id": str(mechanism_id or ""),
+        "family_id": str(family_id or ""),
+        "route": str(observation.get("route") or ""),
+        "status": str(observation.get("status") or ""),
+        "evidence": dict(observation.get("evidence") or {}),
+        "revisions_observed": (
+            None if revisions_observed is None else int(revisions_observed)
+        ),
+        "cycle": int(cycle),
+    }
+
+
+def load_route_failures(path: str | Path) -> list[dict[str, Any]]:
+    records = read_jsonl(path)
+    for number, record in enumerate(records, start=1):
+        if not isinstance(record, Mapping):
+            raise ValueError(f"route-failure record {number} is not an object")
+        schema = record.get("schema_version")
+        if schema != ROUTE_FAILURE_SCHEMA:
+            raise ValueError(
+                f"route-failure record {number} has unsupported schema {schema!r}"
+            )
+    return [dict(record) for record in records]
+
+
+def record_route_failures(
+    path: str | Path,
+    *,
+    cycle: int,
+    observations: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Append this cycle's route-insufficiency records.
+
+    A resumed cycle replays its writes, so an observation already stored for
+    this ``(cycle, mechanism, route)`` is skipped rather than duplicated: a
+    duplicate would silently count as a second independent observation and
+    falsify a route on one cycle's evidence.
+    """
+    seen = {
+        (
+            int(record.get("cycle") or -1),
+            str(record.get("mechanism_id") or ""),
+            str(record.get("route") or ""),
+        )
+        for record in load_route_failures(path)
+        if record.get("kind") != "resolution"
+    }
+    appended: list[dict[str, Any]] = []
+    for observation in observations:
+        mechanism_id = str(observation.get("mechanism_id") or "")
+        route = str((observation.get("observation") or observation).get(
+            "route") or "")
+        if not mechanism_id or not route:
+            continue
+        key = (int(cycle), mechanism_id, route)
+        if key in seen:
+            continue
+        record = route_failure_record(
+            cycle=cycle,
+            mechanism_id=mechanism_id,
+            family_id=str(observation.get("family_id") or ""),
+            observation=observation.get("observation") or observation,
+            revisions_observed=observation.get("revisions_observed"),
+        )
+        append_jsonl(path, record)
+        seen.add(key)
+        appended.append(record)
+    return appended
+
+
+def route_failure_state(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """Collapse records into one entry per (mechanism, route).
+
+    ``insufficient`` is the admitted verdict; ``observations`` counts every
+    record, including any that have not yet accumulated enough evidence. A
+    record carrying revision evidence admits on its own, which is the
+    condition the plan states.
+    """
+    state: dict[tuple[str, str], dict[str, Any]] = {}
+    for record in records:
+        if record.get("kind") == "resolution":
+            continue
+        status = str(record.get("status") or "")
+        if status != "insufficient_for_mechanism":
+            continue
+        key = (
+            str(record.get("mechanism_id") or ""),
+            str(record.get("route") or ""),
+        )
+        if not all(key):
+            continue
+        entry = state.setdefault(key, {
+            "mechanism_id": key[0],
+            "route": key[1],
+            "observations": 0,
+            "insufficient": False,
+            "basis": "",
+            "cycles": [],
+            "evidence": {},
+        })
+        entry["observations"] = int(entry["observations"]) + 1
+        entry["cycles"] = [*entry["cycles"], int(record.get("cycle") or 0)]
+        entry["evidence"] = dict(record.get("evidence") or {})
+        revisions = record.get("revisions_observed")
+        if revisions is not None and int(revisions) > 0:
+            entry["insufficient"] = True
+            entry["basis"] = "revision"
+    for entry in state.values():
+        if entry["insufficient"]:
+            continue
+        if int(entry["observations"]) >= REPEAT_OBSERVATION_THRESHOLD:
+            entry["insufficient"] = True
+            entry["basis"] = "repeat_observation"
+    return state
+
+
+def falsified_routes(
+    records: Sequence[Mapping[str, Any]],
+    mechanism_id: str,
+) -> dict[str, dict[str, Any]]:
+    """Routes admitted as insufficient for one mechanism."""
+    state = route_failure_state(records)
+    return {
+        route: entry for (mid, route), entry in state.items()
+        if mid == str(mechanism_id or "") and entry.get("insufficient")
+    }
+
+
+def route_failure_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """A report-shaped view: what has been tried, what is admitted."""
+    state = route_failure_state(records)
+    admitted = {key: entry for key, entry in state.items() if entry["insufficient"]}
+    return {
+        "records": len([
+            record for record in records if record.get("kind") != "resolution"
+        ]),
+        "pairs": len(state),
+        "insufficient": [
+            {
+                "mechanism_id": entry["mechanism_id"],
+                "route": entry["route"],
+                "observations": entry["observations"],
+                "basis": entry["basis"],
+                "evidence": entry["evidence"],
+            }
+            for _key, entry in sorted(admitted.items())
+        ],
+        "observed_only": [
+            {
+                "mechanism_id": entry["mechanism_id"],
+                "route": entry["route"],
+                "observations": entry["observations"],
+            }
+            for _key, entry in sorted(state.items())
+            if not entry["insufficient"]
+        ],
+    }
+
+
+def resolve_route_failure(
+    path: str | Path,
+    *,
+    mechanism_id: str,
+    route: str,
+    cycle: int,
+    note: str,
+) -> dict[str, Any]:
+    """Clear a falsification: the route now repairs this mechanism.
+
+    Recorded as history rather than by deleting the observations, so a route
+    that was once falsified stays explainable after it is repaired.
+    """
+    record = {
+        "schema_version": ROUTE_FAILURE_SCHEMA,
+        "kind": "resolution",
+        "mechanism_id": str(mechanism_id or ""),
+        "route": str(route or ""),
+        "cycle": int(cycle),
+        "note": str(note or ""),
+    }
+    append_jsonl(path, record)
+    return record
+
+
+__all__ = [
+    "REPEAT_OBSERVATION_THRESHOLD",
+    "ROUTE_FAILURE_NAME",
+    "ROUTE_FAILURE_SCHEMA",
+    "TREATMENT_ROUTES",
+    "falsified_routes",
+    "insufficiency_evidence",
+    "load_route_failures",
+    "record_route_failures",
+    "resolve_route_failure",
+    "route_failure_record",
+    "route_failure_state",
+    "route_failure_summary",
+    "route_of",
+    "unit_route",
+]

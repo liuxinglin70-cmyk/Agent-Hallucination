@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from evolution.backends import fingerprint
 from evolution.contracts import load_json, save_json

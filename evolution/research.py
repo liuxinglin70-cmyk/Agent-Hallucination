@@ -47,6 +47,11 @@ from detector.interventions import (
     validate_intervention,
 )
 
+from evolution.candidate_versions import (
+    CandidateVersionGraph,
+    canonical_hash,
+    case_file_name,
+)
 from evolution.contracts import candidate_contains_case_id, save_json
 from evolution.splits import load_record
 
@@ -70,7 +75,6 @@ def case_file_name(case_id: str) -> str:
     """File-system-safe artifact name for one case id."""
     safe = str(case_id).replace("/", "__").replace("\\", "__")
     return safe if safe.endswith(".json") else f"{safe}.json"
-
 
 @dataclass
 class ResearchBudget:
@@ -181,6 +185,10 @@ class ResearchRun:
         self.routes: dict[str, dict[str, Any]] = {}
         self.versions: list[dict[str, Any]] = []
         self.stopped: str | None = None
+        # The shared version store (also used by the deployment-side development
+        # loop). ``self.versions`` / ``self.routes`` below stay as the
+        # research-side views the rest of this class reads.
+        self.version_graph = CandidateVersionGraph(self.output_dir)
 
     # ------------------------------------------------------------------
     # stage 0: freeze the run manifest
@@ -525,14 +533,14 @@ class ResearchRun:
     def _version_identity(
         self, candidate: Mapping[str, Any], registry: Mapping[str, Any],
     ) -> dict[str, Any]:
-        return {
-            "candidate_hash": canonical_hash(candidate),
-            "registry_hash": str(registry.get("content_hash") or ""),
-            "case_set": list(self.case_ids),
-            "config_hash": self.frozen_manifest["detector_config_hash"],
-            "code_baseline": self.frozen_manifest["code_baseline"],
-            "evaluation_mode": "fresh_full_detection_no_judge_cache",
-        }
+        return self.version_graph.identity(
+            candidate,
+            case_ids=self.case_ids,
+            registry_hash=str(registry.get("content_hash") or ""),
+            config_hash=self.frozen_manifest["detector_config_hash"],
+            code_baseline=self.frozen_manifest["code_baseline"],
+            evaluation_mode="fresh_full_detection_no_judge_cache",
+        )
 
     def _find_reusable_results(
         self, identity: Mapping[str, Any],
@@ -543,19 +551,9 @@ class ResearchRun:
         envelope all match (doc §8.3); the identity bundle encodes exactly
         that. Incomplete stored sets are ignored.
         """
-        for path in sorted(self.output_dir.glob("v*/identity.json")):
-            try:
-                stored = json.loads(path.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                continue
-            if stored != dict(identity):
-                continue
-            cases, results = self._load_stored_results(path.parent / "results")
-            if set(self.case_ids) <= cases:
-                return path.parent.name, {
-                    case_id: results[case_id] for case_id in self.case_ids
-                }
-        return None, None
+        return self.version_graph.find_reusable_results(
+            identity, required_cases=self.case_ids,
+        )
 
     def _evaluate_version(self, route: str, version_id: str, candidate: Mapping[str, Any]) -> dict[str, Any]:
         version_dir = self.output_dir / version_id
@@ -631,11 +629,7 @@ class ResearchRun:
         }
 
     def _load_stored_results(self, results_dir: Path) -> tuple[set[str], dict[str, dict[str, Any]]]:
-        results: dict[str, dict[str, Any]] = {}
-        for path in results_dir.glob("*.json"):
-            entry = json.loads(path.read_text(encoding="utf-8-sig"))
-            results[str(entry.get("case_id"))] = entry
-        return set(results), results
+        return self.version_graph.load_results(results_dir)
 
     def _role_of(self, case_id: str) -> str:
         for item in self.cases:
@@ -704,38 +698,27 @@ class ResearchRun:
         }
 
     # ------------------------------------------------------------------
+    # Version bookkeeping is delegated to ``evolution.candidate_versions``, the
+    # store the deployment-side development loop also uses. The disk format and
+    # the numbering rule are that component's contract; these wrappers keep the
+    # research-side names and the ``self.versions`` / ``self.routes`` views the
+    # rest of this class and its tests read.
     def _new_version_id(self) -> str:
-        # Version numbering is continuous across resumed runs: existing
-        # version directories on disk are never overwritten.
-        numbers = [self.budget.versions_created]
-        for path in self.output_dir.glob("v*"):
-            name = path.name
-            if name.startswith("v") and name[1:].isdigit():
-                numbers.append(int(name[1:]))
-        self.budget.versions_created = max(numbers) + 1
-        return f"v{self.budget.versions_created:03d}"
+        version_id = self.version_graph.new_version_id()
+        self.budget.versions_created = self.version_graph.versions_created
+        return version_id
 
     def _load_existing_versions(self) -> None:
-        for path in sorted(self.output_dir.glob("v*/candidate.json")):
-            try:
-                record = json.loads(path.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                continue
-            if not isinstance(record, Mapping) or not record.get("version_id"):
-                continue
+        self.version_graph.versions_created = self.budget.versions_created
+        self.version_graph.load_existing()
+        self.budget.versions_created = self.version_graph.versions_created
+        for record in self.version_graph.versions:
             self.versions.append(dict(record))
             route = str(record.get("route") or "?")
             self.routes.setdefault(route, {"versions": [], "notes": []})
             version_id = str(record.get("version_id"))
             if version_id not in self.routes[route]["versions"]:
                 self.routes[route]["versions"].append(version_id)
-            if record.get("version_id", "").startswith("v") and record[
-                "version_id"
-            ][1:].isdigit():
-                self.budget.versions_created = max(
-                    self.budget.versions_created,
-                    int(record["version_id"][1:]),
-                )
 
     def _record_version(
         self,
@@ -749,50 +732,17 @@ class ResearchRun:
         evaluation: Mapping[str, Any] | None,
         verdict: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
-        version_dir = self.output_dir / version_id
-        stored_candidate: Any = None
-        if candidate is not None:
-            stored_candidate = (
-                [dict(entry) for entry in candidate]
-                if not isinstance(candidate, Mapping) else dict(candidate)
-            )
-        record = {
-            "version_id": version_id,
-            "route": route,
-            "kind": "draft" if diagnosis is None else "revision",
-            "candidate": stored_candidate,
-            "candidate_hash": (
-                canonical_hash(candidate) if candidate else None
-            ),
-            "parent_hash": (
-                canonical_hash(parent)
-                if parent is not None and diagnosis is not None
-                else None
-            ),
-            "notes": list(draft_notes),
-            "evaluation": (
-                {
-                    "identity": evaluation["identity"],
-                    "reused": evaluation["reused"],
-                    "source_version": evaluation.get("source_version"),
-                }
-                if evaluation else None
-            ),
-            "verdict": verdict,
-        }
-        save_json(version_dir / "candidate.json", record)
-        if parent is not None and diagnosis is not None:
-            save_json(version_dir / "parent.json", {
-                "parent_hash": canonical_hash(parent),
-                "parent_candidate": (
-                    [dict(entry) for entry in parent]
-                    if not isinstance(parent, Mapping) else dict(parent)
-                ),
-            })
-            save_json(version_dir / "diagnosis.json", diagnosis)
+        record = self.version_graph.record(
+            route, version_id, candidate,
+            parent=parent, diagnosis=diagnosis, draft_notes=draft_notes,
+            evaluation=evaluation, verdict=verdict,
+        )
         self.versions.append(record)
         self.routes.setdefault(route, {"versions": [], "notes": []})
         self.routes[route]["versions"].append(version_id)
+        self.budget.versions_created = max(
+            self.budget.versions_created, self.version_graph.versions_created,
+        )
         return record
 
     def _no_change_version(

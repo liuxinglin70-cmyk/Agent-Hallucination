@@ -111,6 +111,26 @@ DEFAULTS: dict[str, Any] = {
         "max_new_errors": 0,
         "max_unresolved_added": 0,
     },
+    # The development loop's own budget, deliberately separate from
+    # ``budget``: development is meant to be repeated and cheap, promotion is
+    # frozen and expensive, and one counter would let a long development run
+    # consume what the formal protocol needs. ``enabled`` is false by default so
+    # an existing cycle keeps its single-shot behaviour until the loop is turned
+    # on deliberately.
+    # ``max_l1_cases`` counts case *evaluations*: one L1 replay measures the
+    # target and neighbour cases twice (a baseline arm and a candidate arm), so
+    # a replay over 6 cases costs 12. It is 24 rather than the plan's 12
+    # because the plan's number was written before the development loop charged
+    # both arms; at the honest rate, 12 would stop the loop before a single
+    # replay whenever a mechanism carries its neighbour set.
+    "development": {
+        "enabled": False,
+        "max_versions_per_mechanism": 4,
+        "max_provider_calls": 6,
+        "max_l1_cases": 24,
+        "require_normal_neighbors": 2,
+        "allow_action_class_change": True,
+    },
 }
 
 

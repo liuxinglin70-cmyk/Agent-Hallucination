@@ -27,6 +27,22 @@ _CASE_ID_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Runners whose executable identity is fully described by the entry itself: the
+# declared predicate program *is* the behaviour. Any other runner reads
+# something the entry does not contain -- a model, a tokenizer, a calibration
+# file -- so its identity has to carry that artifact.
+#
+# This list is hand-maintained only until P2.1's ``RUNNER_REGISTRY`` lands, at
+# which point each runner will declare its own identity requirement and this
+# constant is replaced by a lookup.
+DETERMINISTIC_RUNNERS = ("deterministic", PROGRAM_RUNNER)
+
+# Where an entry declares the artifact its runner depends on. ``id`` names the
+# artifact, ``digest`` pins its content. The *path* is deliberately not part of
+# the identity: the same weights at a different path are the same intervention,
+# and the digest is what says so.
+ARTIFACT_FIELDS = ("id", "digest")
+
 
 def empty_registry() -> dict[str, Any]:
     return build_intervention_registry([])
@@ -51,6 +67,7 @@ def make_intervention(
     failure_family: str,
     failure_cases: Sequence[str],
     facts: Sequence[str] | None = None,
+    artifact: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "schema_version": "detector.intervention.v1",
@@ -72,6 +89,13 @@ def make_intervention(
             "failure_cases": [str(x) for x in failure_cases],
         },
     }
+    # A learned runner's entry must pin the artifact it reads, and the
+    # validator enforces that: building the payload without it would fail on
+    # construction, which is the right place to learn about it.
+    if artifact is not None:
+        payload["artifact"] = {
+            field: str(artifact.get(field) or "") for field in ARTIFACT_FIELDS
+        }
     if intervention_type == "decision_guard":
         if "action_not_when_facts" not in payload["body"]:
             payload["body"]["action_not_when_facts"] = [
@@ -139,6 +163,82 @@ def redact_case_ids(value: Any) -> str:
     return _CASE_ID_RE.sub("[case]", str(value or ""))
 
 
+def declared_artifact(entry: Mapping[str, Any]) -> dict[str, str]:
+    """The artifact binding an entry declares, as ``{id, digest}``.
+
+    Returns empty strings for the fields it does not declare, so a caller can
+    tell "no artifact" from "an artifact whose id I forgot".
+    """
+    raw = entry.get("artifact")
+    if not isinstance(raw, Mapping):
+        return {"id": "", "digest": ""}
+    return {
+        field: str(raw.get(field) or "").strip()
+        for field in ARTIFACT_FIELDS
+    }
+
+
+def learned_runner_of(entry: Mapping[str, Any]) -> str:
+    """The entry's runner when it needs an external artifact, else ``""``."""
+    body = entry.get("body") or {}
+    if not isinstance(body, Mapping):
+        return ""
+    runner = str(body.get("runner") or "")
+    if not runner or runner in DETERMINISTIC_RUNNERS:
+        return ""
+    return runner
+
+
+def identity_incompleteness(entry: Mapping[str, Any]) -> str:
+    """Why this entry has no trustworthy executable identity, or ``""``.
+
+    Two interventions are the same only if they execute the same thing. A
+    runner that reads an artifact the entry does not pin can be swapped for a
+    different one without changing a single declared field, so an entry in that
+    state must not be treated as identical to anything -- nor as *different*
+    from a twin, since the framework cannot tell which it is.
+
+    This is the §23.2 red line ("learned artifacts must have a digest") in the
+    one place that can enforce it before a measurement.
+    """
+    runner = learned_runner_of(entry)
+    if not runner:
+        return ""
+    artifact = declared_artifact(entry)
+    if not artifact["id"]:
+        return (
+            f"runner {runner!r} reads an external artifact but the entry "
+            "declares no artifact.id"
+        )
+    if not artifact["digest"]:
+        return (
+            f"runner {runner!r} declares artifact {artifact['id']!r} without a "
+            "digest, so its behaviour is not pinned to any content"
+        )
+    return ""
+
+
+def _artifact_identity(entry: Mapping[str, Any]) -> tuple[str, str, str]:
+    """The runner/artifact component of a structured key.
+
+    Empty for a deterministic runner, which is every entry deployed today. The
+    key therefore grew a trailing element rather than changing any existing
+    one: deterministic entries all receive the same empty suffix, so the
+    *equivalence relation* the redundancy check relies on is exactly what it
+    was -- two entries compare equal iff they did before. Nothing persists a
+    key, so the changed tuple shape is not a compatibility break.
+
+    A learned runner contributes its name plus the id and digest of the
+    artifact it binds. The path is excluded on purpose: the same weights at a
+    different path are the same behaviour.
+    """
+    runner = learned_runner_of(entry)
+    if not runner:
+        return ("", "", "")
+    artifact = declared_artifact(entry)
+    return (runner, artifact["id"], artifact["digest"])
+
+
 def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
     """Executable identity for deterministic intervention types.
 
@@ -147,6 +247,14 @@ def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
     different predicates are distinct and must not be rejected just because
     their natural-language claims overlap. ``text_boundary`` remains prose
     compared because its body is natural language by definition.
+
+    The key carries the runner *and* the artifact it binds, because a runner
+    that reads a model is not identified by its predicate name: two entries
+    that agree on every declared field but name different weights execute
+    different things. Returns ``None`` when no structural identity can be
+    formed, which is the caller's signal to fall back to prose comparison; an
+    entry whose identity is merely *incomplete* is reported by
+    ``identity_incompleteness`` and refused before it is compared.
     """
     entry_type = str(entry.get("type") or "")
     hook = str(entry.get("hook") or "")
@@ -175,6 +283,7 @@ def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
             str(body.get("predicate") or ""),
             str(body.get("runner") or ""),
             program_hash,
+            _artifact_identity(entry),
         )
     if entry_type == "decision_guard":
         facts = [str(item) for item in (trigger.get("facts") or ())]
@@ -188,6 +297,7 @@ def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
             tuple(sorted(
                 str(item) for item in body.get("action_not_when_facts") or ()
             )),
+            _artifact_identity(entry),
         )
     if entry_type == "recall_trigger":
         program_hash = ""
@@ -215,6 +325,7 @@ def structured_key(entry: Mapping[str, Any]) -> tuple[Any, ...] | None:
             tuple(sorted(
                 str(item) for item in body.get("trigger_verdicts") or ()
             )),
+            _artifact_identity(entry),
         )
     return None
 
@@ -297,11 +408,16 @@ def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "ARTIFACT_FIELDS",
+    "DETERMINISTIC_RUNNERS",
     "append_jsonl",
     "candidate_contains_case_id",
     "candidate_prose_text",
+    "declared_artifact",
     "empty_registry",
+    "identity_incompleteness",
     "jaccard",
+    "learned_runner_of",
     "load_json",
     "load_registry",
     "make_intervention",

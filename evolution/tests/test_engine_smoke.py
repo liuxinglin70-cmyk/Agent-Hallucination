@@ -232,6 +232,15 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
 
     assert report["audit"]["passed"] is True
     assert report["patrol"]["stable_failure_families"], report["patrol"]
+    # The cycle derives a task-level mechanism for every family it reports, so
+    # a rejection can say which mechanism was proposed against rather than
+    # only which execution path failed.
+    mechanisms = report["patrol"]["mechanisms"]
+    assert mechanisms["count"] >= 1
+    for mechanism in mechanisms["mechanisms"]:
+        assert mechanism["mechanism_id"].startswith("M-")
+        assert mechanism["schema_version"] == "evolution.failure_mechanism.v1"
+        assert mechanism["repair_hypothesis"]["operation"]
     assert [p["intervention_id"] for p in report["proposals"]][0] == "IV-1-001"
     assert len(report["proposals"]) >= 1
     assert report["marginal_selection"]["selected"] == ["IV-1-001"]
@@ -240,6 +249,42 @@ def test_one_full_cycle_admits_only_marginal_candidate(tmp_path):
     assert report["active_effect_on_g"]["marginal_cases"] >= 1
     assert engine.registry.entries[0]["type"] == "text_boundary"
     assert engine.registry.entries[0]["hook"] == "scanner.system"
+
+
+def test_preview_reports_mechanisms_and_family_actionability(tmp_path):
+    """The preview exists to show what a cycle would aim a candidate at.
+
+    It reports families through an explicit field list, so a mechanism that is
+    only attached to the family dict would silently disappear from the preview
+    a researcher uses to decide whether to spend gate budget.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    backend = MockDetectorBackend(
+        base_predictions={case: False for case in patrol_true},
+    )
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    report = engine.preview_cycle(1)
+    assert report["families"], report
+    for item in report["families"]:
+        assert item["mechanism"]["mechanism_id"].startswith("M-")
+        assert item["mechanism"]["repair_hypothesis"]["operation"]
+        assert item["actionability"]["classification"] == "actionable"
+    block = report["mechanisms"]
+    assert block["count"] >= 1
+    assert block["mechanisms"][0]["proposable"] is True
 
 
 def test_engine_restores_rejection_feedback_before_next_cycle(tmp_path):
@@ -1958,3 +2003,196 @@ def test_cycle_report_declares_whether_evidence_was_active(tmp_path):
         proposer=_scripted_proposer(_scanner_candidate()),
     )
     assert inactive._evidence_report() == {"active": False}
+
+
+def test_cycle_records_route_insufficiency_end_to_end(tmp_path):
+    """A candidate that fires and repairs nothing becomes route evidence.
+
+    This is the pilot's Attempt-5 shape reproduced through a real cycle: the
+    intervention reaches the runtime, injects its directive on every case, and
+    the target outcome does not move. Before route falsification memory the next
+    round re-proposed the same route against the same mechanism, because
+    nothing recorded that it had already been tried.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    # Plant FNs on the gain and patrol pools only: the sentinel keeps its
+    # baseline-correct TPs, so the coverage floor is satisfiable and the gain
+    # set holds a real recall opportunity. The mock never repairs them.
+    targets = [
+        case for case in [*split.gain, *split.patrol_pool]
+        if int(case.split("/")[1][:3]) % 2 == 0
+    ]
+    backend = MockDetectorBackend(
+        base_predictions={case: False for case in targets},
+    )
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_scripted_proposer(_scanner_candidate()),
+    )
+    report = engine.run_cycle(1)
+    assert report["state"] == "completed"
+    assert report["marginal_selection"]["selected"] == []
+    behavior = report["gates"][0]["behavior"]
+    assert behavior["passed"] is False
+    assert behavior["fired_rate"] > 0
+    assert behavior["behavior_events"] > 0
+    assert behavior["behavior_event_kind"] == "text_injected"
+
+    recorded = report["route_failures"]
+    assert recorded["observed"] == 1
+    assert recorded["appended"] == 1
+    entry = recorded["state"]["observed_only"][0]
+    assert entry["route"] == "recall_directive"
+    assert entry["observations"] == 1
+    # One round is not a falsification.
+    assert recorded["state"]["insufficient"] == []
+
+    # The store is on disk, schema-checked, and carries the readings.
+    from evolution.route_failures import load_route_failures
+    store = engine.route_failure_store
+    records = load_route_failures(store)
+    assert len(records) == 1
+    assert records[0]["mechanism_id"] == entry["mechanism_id"]
+    assert records[0]["evidence"]["target_outcome_changed"] == 0
+    assert records[0]["evidence"]["output_changed"] > 0
+    assert records[0]["evidence"]["gain_opportunities"] > 0
+
+
+def test_cycle_does_not_record_insufficiency_for_a_never_fired_candidate(tmp_path):
+    """A hook that never fired says nothing about the route's repair capability."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    # A hook whose trigger cannot match: no packet feature is ever present.
+    candidate = make_intervention(
+        intervention_id="IV-1-NOFIRE",
+        intervention_type="text_boundary",
+        hook="scanner.system",
+        packet_features=["multi_turn_question"],
+        body={"directive": "name the missing action",
+              "not_when": "never when every action is present"},
+        expected_behavior="recall gains candidates",
+        target_polarity="recall",
+        cycle=1,
+        failure_family="FAM-smoke",
+        failure_cases=["A/012.json", "A/014.json"],
+    )
+    backend = MockDetectorBackend(base_predictions={})
+    # A proposer that drafts nothing: this test is about what the engine must
+    # *not* record, so the family never needs to survive to a gate report.
+    class _Silent:
+        name = "silent"
+
+        def propose(self, families, *, cycle, max_proposals=3):
+            return ProposalBatch(candidates=[], joint_groups=[], notes=[])
+
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=_Silent(),
+    )
+    engine.run_cycle(1)
+    # No insufficiency evidence may be filed: nothing reached the runtime.
+    from evolution.route_failures import load_route_failures
+    store = engine.route_failure_store
+    records = load_route_failures(store) if store.exists() else []
+    assert all(
+        record["evidence"]["hook_fired"] > 0 for record in records
+    )
+
+
+def test_preview_bootstrap_path_runs_when_the_patrol_finds_no_family(tmp_path):
+    """A preview with no family must still report, not raise.
+
+    The bootstrap branch is the only path a researcher uses to see whether a
+    bare base has any family left on a bigger sample, and it is the one path
+    that calls ``_extend_patrol``. It passed the rows under a keyword the
+    method does not take, so every such preview raised TypeError instead of
+    reporting.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    # A patrol smaller than the pool is what leaves cases for the bootstrap
+    # rerun to spend; with the whole pool patrolled there is nothing to extend.
+    config["budget"]["patrol_cases"] = 4
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    # The oracle mock predicts gold everywhere: the bare base has no failure
+    # family at all, which is exactly when the bootstrap rerun runs.
+    backend = MockDetectorBackend(base_predictions={})
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    report = engine.preview_cycle(1)
+    assert report["mode"] == "preview"
+    assert report["families"] == []
+    # The bootstrap rerun is what this path exists for: the report has to say
+    # the bigger sample was actually re-patrolled before "no family" was said.
+    assert report["bootstrap_count"] > 0
+
+
+def test_mechanisms_carry_normal_neighbours_from_the_patrol(tmp_path):
+    """Every mechanism ships the healthy cases L0 and L1 check against.
+
+    Both the deterministic-neighbour check and the L1 preservation half read
+    ``normal_neighbors``; left empty they pass over nothing and report a clean
+    result for a check that never ran.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    patrol_true = [c for c in cases if c.endswith(("012.json", "014.json"))]
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    backend = MockDetectorBackend(
+        base_predictions={case: False for case in patrol_true},
+    )
+    engine = EvolutionEngine(
+        config, backend=backend, split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    report = engine.preview_cycle(1)
+    assert report["families"]
+    families = report["families"]
+    neighbours = [
+        case
+        for item in families
+        for case in (item["mechanism_detail"] or {}).get("normal_neighbors") or ()
+    ]
+    assert neighbours, "no mechanism carries a normal neighbour"
+    members = {
+        case for item in families
+        for case in (item["mechanism_detail"] or {}).get("member_cases") or ()
+    }
+    # A neighbour is the healthy counterpart of a member, never the same case.
+    assert not (set(neighbours) & members)

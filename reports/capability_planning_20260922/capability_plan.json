@@ -1,0 +1,360 @@
+{
+  "schema_version": "evolution.capability_plan_dryrun.v1",
+  "evidence_grade": "diagnostic-only",
+  "note": "Capability planning over the mechanisms P0.1 reconstructed from archived rows. No detector call, no provider call, no admission.",
+  "source_archive": "reports/error_scope_20260918/attempts",
+  "capability_surface": {
+    "schema_version": "evolution.capability_requirement.v1",
+    "capabilities": {
+      "observation": "evidence_check + inline typed-DSL program: a deterministic comparison over typed fields, conjoined to at most 4 conditions",
+      "guard": "decision_guard: one of the closed guard actions ['convict_mechanical_violation', 'require_full_view_defense', 'restore_judge_conviction', 'withhold_conviction']",
+      "control_flow": "recall_trigger: forces the existing recall net for a case",
+      "prompt": "text_boundary: a prose directive injected into an LLM stage"
+    },
+    "hooks": [
+      "adjudicate.guard",
+      "defense.pre",
+      "defense.system",
+      "judge.post",
+      "judge.system",
+      "recall.trigger",
+      "scanner.system",
+      "tracer.system",
+      "upgrade.pre",
+      "upgrade.system"
+    ],
+    "intervention_types": [
+      "decision_guard",
+      "evidence_check",
+      "recall_trigger",
+      "text_boundary"
+    ],
+    "guard_actions": [
+      "convict_mechanical_violation",
+      "require_full_view_defense",
+      "restore_judge_conviction",
+      "withhold_conviction"
+    ],
+    "treatment_routes": [
+      "defense_directive",
+      "defense_requirement",
+      "evolved_predicate",
+      "judge_directive",
+      "mechanical_conviction",
+      "recall_directive",
+      "recall_trigger",
+      "restore_guard",
+      "tracer_directive",
+      "upgrade_directive",
+      "withhold_guard"
+    ],
+    "typed_field_count": 27,
+    "max_conditions_per_rule": 4,
+    "hook_reads_context_fields": {
+      "defense.pre": [
+        "context_contract_kinds",
+        "context_contract_requirements",
+        "context_evidence_refs",
+        "context_quote"
+      ],
+      "judge.post": [
+        "context_contract_kinds",
+        "context_contract_requirements",
+        "context_evidence_refs",
+        "context_judge_confidence",
+        "context_judge_delivered_result",
+        "context_judge_hallucination_reason",
+        "context_judge_positive",
+        "context_quote"
+      ],
+      "recall.trigger": [
+        "context_contract_kinds",
+        "context_contract_requirements",
+        "context_evidence_refs",
+        "context_judge_confidence",
+        "context_judge_delivered_result",
+        "context_judge_hallucination_reason",
+        "context_judge_positive",
+        "context_quote"
+      ],
+      "upgrade.pre": []
+    }
+  },
+  "families": {
+    "coarse": 2,
+    "subgroups": 2,
+    "unrepresented": 0,
+    "excluded_cases": 2,
+    "actionable": 2,
+    "worksheet_gap_families": 0
+  },
+  "requirements": [
+    {
+      "schema_version": "evolution.capability_requirement.v1",
+      "mechanism_id": "M-17084a0707a4",
+      "classification": "actionable",
+      "required_capability": "",
+      "repair_operation": "route_recall",
+      "required_inputs": [
+        "question_text",
+        "tool_names",
+        "packet_features"
+      ],
+      "current_routes": [
+        "mechanical_conviction",
+        "recall_directive",
+        "recall_trigger",
+        "upgrade_directive"
+      ],
+      "sufficient_routes": [
+        "recall_trigger"
+      ],
+      "insufficient_routes": [
+        {
+          "route": "mechanical_conviction",
+          "capability": "guard",
+          "capability_fits": false,
+          "reasons": [
+            "route 'mechanical_conviction' provides 'guard', but the repair needs ['control_flow']; guard cannot act on this failure"
+          ],
+          "falsification": {}
+        },
+        {
+          "route": "recall_directive",
+          "capability": "prompt",
+          "capability_fits": false,
+          "reasons": [
+            "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+          ],
+          "falsification": {}
+        },
+        {
+          "route": "upgrade_directive",
+          "capability": "prompt",
+          "capability_fits": false,
+          "reasons": [
+            "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+          ],
+          "falsification": {}
+        }
+      ],
+      "route_statuses": [
+        {
+          "route": "mechanical_conviction",
+          "capability": "guard",
+          "hooks": [
+            "judge.post",
+            "adjudicate.guard"
+          ],
+          "capability_fits": false,
+          "readable_fields": [],
+          "unreadable_fields": [
+            "packet_features",
+            "question_text",
+            "tool_names"
+          ],
+          "semantic_fields": [
+            "question_text"
+          ],
+          "semantic_relation": false,
+          "falsification": {},
+          "sufficient": false,
+          "reasons": [
+            "route 'mechanical_conviction' provides 'guard', but the repair needs ['control_flow']; guard cannot act on this failure"
+          ]
+        },
+        {
+          "route": "recall_directive",
+          "capability": "prompt",
+          "hooks": [
+            "scanner.system"
+          ],
+          "capability_fits": false,
+          "readable_fields": [],
+          "unreadable_fields": [
+            "packet_features",
+            "question_text",
+            "tool_names"
+          ],
+          "semantic_fields": [
+            "question_text"
+          ],
+          "semantic_relation": false,
+          "falsification": {},
+          "sufficient": false,
+          "reasons": [
+            "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+          ]
+        },
+        {
+          "route": "recall_trigger",
+          "capability": "control_flow",
+          "hooks": [
+            "recall.trigger"
+          ],
+          "capability_fits": true,
+          "readable_fields": [],
+          "unreadable_fields": [
+            "packet_features",
+            "question_text",
+            "tool_names"
+          ],
+          "semantic_fields": [
+            "question_text"
+          ],
+          "semantic_relation": false,
+          "falsification": {},
+          "sufficient": true,
+          "reasons": []
+        },
+        {
+          "route": "upgrade_directive",
+          "capability": "prompt",
+          "hooks": [
+            "upgrade.system"
+          ],
+          "capability_fits": false,
+          "readable_fields": [],
+          "unreadable_fields": [
+            "packet_features",
+            "question_text",
+            "tool_names"
+          ],
+          "semantic_fields": [
+            "question_text"
+          ],
+          "semantic_relation": false,
+          "falsification": {},
+          "sufficient": false,
+          "reasons": [
+            "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+          ]
+        }
+      ],
+      "evidence": [
+        "mechanical_conviction: route 'mechanical_conviction' provides 'guard', but the repair needs ['control_flow']; guard cannot act on this failure",
+        "recall_directive: route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure",
+        "upgrade_directive: route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+      ]
+    },
+    {
+      "schema_version": "evolution.capability_requirement.v1",
+      "mechanism_id": "M-5a89ab46e81f",
+      "classification": "actionable",
+      "required_capability": "",
+      "repair_operation": "withhold_conviction",
+      "required_inputs": [
+        "context_judge_positive",
+        "context_judge_confidence",
+        "last_answer_tool_observation"
+      ],
+      "current_routes": [
+        "withhold_guard"
+      ],
+      "sufficient_routes": [
+        "withhold_guard"
+      ],
+      "insufficient_routes": [],
+      "route_statuses": [
+        {
+          "route": "withhold_guard",
+          "capability": "guard",
+          "hooks": [
+            "adjudicate.guard"
+          ],
+          "capability_fits": true,
+          "readable_fields": [],
+          "unreadable_fields": [
+            "context_judge_confidence",
+            "context_judge_positive",
+            "last_answer_tool_observation"
+          ],
+          "semantic_fields": [],
+          "semantic_relation": false,
+          "falsification": {},
+          "sufficient": true,
+          "reasons": []
+        }
+      ],
+      "evidence": []
+    }
+  ],
+  "planner_gaps": [],
+  "gap_identities": [],
+  "falsification_simulation": [
+    {
+      "mechanism_id": "M-17084a0707a4",
+      "falsified_route": "recall_trigger",
+      "before": {
+        "classification": "actionable",
+        "sufficient_routes": [
+          "recall_trigger"
+        ]
+      },
+      "after": {
+        "classification": "research_only",
+        "required_capability": "already_supported_but_insufficient",
+        "sufficient_routes": [],
+        "insufficient_routes": [
+          {
+            "route": "mechanical_conviction",
+            "capability": "guard",
+            "capability_fits": false,
+            "reasons": [
+              "route 'mechanical_conviction' provides 'guard', but the repair needs ['control_flow']; guard cannot act on this failure"
+            ],
+            "falsification": {}
+          },
+          {
+            "route": "recall_directive",
+            "capability": "prompt",
+            "capability_fits": false,
+            "reasons": [
+              "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ],
+            "falsification": {}
+          },
+          {
+            "route": "recall_trigger",
+            "capability": "control_flow",
+            "capability_fits": true,
+            "reasons": [
+              "route previously fired and changed nothing on this mechanism (repeat_observation, 2 observation(s))"
+            ],
+            "falsification": {
+              "mechanism_id": "M-17084a0707a4",
+              "route": "recall_trigger",
+              "observations": 2,
+              "insufficient": true,
+              "basis": "repeat_observation",
+              "cycles": [
+                1,
+                2
+              ],
+              "evidence": {
+                "hook_fired": 1.0,
+                "output_changed": 21,
+                "target_outcome_changed": 0
+              }
+            }
+          },
+          {
+            "route": "upgrade_directive",
+            "capability": "prompt",
+            "capability_fits": false,
+            "reasons": [
+              "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ],
+            "falsification": {}
+          }
+        ]
+      }
+    }
+  ],
+  "route_failure_summary": {
+    "records": 0,
+    "pairs": 0,
+    "insufficient": [],
+    "observed_only": []
+  }
+}

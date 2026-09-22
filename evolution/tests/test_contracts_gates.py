@@ -792,3 +792,204 @@ def test_boundary_polarity_requires_a_decisive_correction():
         _delta_row("b", False, False, True),  # regressed (TN -> FP)
     ]}
     assert _decisive_correction(mixed) == (1, 1)
+
+
+# --------------------------------------------------------------------------
+# P1.4: executable identity must determine behaviour
+# --------------------------------------------------------------------------
+def _learned_entry(*, artifact=None, runner="typed_semantic", predicate="semantic_match"):
+    """An evidence_check whose runner reads an external artifact.
+
+    The verdict vocabulary matches the registered semantic runner, so a test
+    that omits the artifact fails on *that* and not on an unrelated vocabulary
+    mismatch.
+    """
+    entry = {
+        "schema_version": "detector.intervention.v1",
+        "intervention_id": "IV-1-001",
+        "type": "evidence_check",
+        "hook": "judge.post",
+        "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+        "body": {
+            "predicate": predicate,
+            "runner": runner,
+            "output_verdicts": ["supported", "contradicted", "abstained"],
+        },
+        "claim": {
+            "expected_behavior": "evidence about the claim",
+            "target_polarity": "recall",
+            "target_kind": "detection",
+        },
+        "provenance": {
+            "cycle": 1,
+            "failure_family": "FAM-fn-x",
+            "failure_cases": ["A/001.json", "A/002.json"],
+        },
+    }
+    if artifact is not None:
+        entry["artifact"] = dict(artifact)
+    return entry
+
+
+def test_two_different_artifacts_are_not_the_same_intervention():
+    """§23.6: two models must never be judged the same intervention.
+
+    Before this, the structured key stopped at the predicate name and the
+    runner name, so two entries backed by different weights produced byte-equal
+    keys -- the redundancy check would have called the second model a duplicate
+    of the first.
+    """
+    from evolution.contracts import structured_key
+
+    model_a = _learned_entry(artifact={"id": "classifier-a", "digest": "a" * 64})
+    model_b = _learned_entry(artifact={"id": "classifier-b", "digest": "b" * 64})
+    assert structured_key(model_a) != structured_key(model_b)
+
+    # Same artifact under a different path is the same behaviour: the digest is
+    # the identity, not the path.
+    relocated = _learned_entry(
+        artifact={"id": "classifier-a", "digest": "a" * 64,
+                  "path": "/somewhere/else/model.bin"},
+    )
+    assert structured_key(relocated) == structured_key(model_a)
+
+
+def test_a_learned_runner_without_a_pinned_artifact_has_no_identity():
+    """An unpinned learned entry is refused, not silently compared.
+
+    "Cannot tell whether these are the same" must not pass as "different":
+    the redundancy check and every later reading would be scoring an identity
+    that does not determine behaviour.
+    """
+    from evolution.contracts import identity_incompleteness, structured_key
+
+    assert identity_incompleteness(_learned_entry()) != ""
+    assert "no artifact.id" in identity_incompleteness(_learned_entry())
+    assert "without a digest" in identity_incompleteness(
+        _learned_entry(artifact={"id": "classifier-a"}),
+    )
+    assert identity_incompleteness(
+        _learned_entry(artifact={"id": "classifier-a", "digest": "a" * 64}),
+    ) == ""
+    # A deterministic runner needs no artifact and is complete by construction.
+    deterministic = _learned_entry(
+        runner="deterministic", predicate="required_action_present",
+        artifact=None,
+    )
+    deterministic["body"]["output_verdicts"] = [
+        "satisfied", "violated", "not_applicable",
+    ]
+    assert identity_incompleteness(deterministic) == ""
+    assert structured_key(deterministic) is not None
+
+
+def test_deterministic_keys_carry_no_artifact_component():
+    """A deterministic entry's identity does not depend on any artifact.
+
+    The key grew a trailing element in P1.4, so it is not byte-identical to
+    the old form -- but every deterministic entry gets the same empty suffix,
+    so entries still compare equal to exactly the ones they matched before.
+    That equivalence, not the tuple's shape, is what the redundancy check
+    consumes.
+    """
+    from evolution.contracts import structured_key
+
+    entry = _learned_entry(runner="deterministic", predicate="required_action_present")
+    entry["body"]["output_verdicts"] = ["satisfied", "violated", "not_applicable"]
+    key = structured_key(entry)
+    assert key == (
+        "evidence_check", "judge.post", ("has_tool_calls",),
+        "required_action_present", "deterministic", "", ("", "", ""),
+    )
+    # And two entries that differ only in an unspecified artifact still match:
+    # a deterministic runner has no artifact to differ on.
+    twin = dict(entry)
+    twin["artifact"] = {"id": "noise", "digest": "zzz"}
+    assert structured_key(twin) == key
+
+
+def test_a_learned_runner_is_refused_without_an_artifact_binding():
+    """Now that ``typed_semantic`` is registered, validation reaches further.
+
+    The identity check is no longer defense-in-depth: a learned entry with no
+    pinned artifact is refused by the schema/executor stage itself, because the
+    runner's declaration says an artifact is required.
+    """
+    config = load_config()
+    verdict = structural_gate(
+        _learned_entry(),
+        active_entries=[],
+        config=config,
+        allowed_failure_cases=["A/001.json", "A/002.json"],
+        diagnosed_families=[{
+            "failure_family": "FAM-fn-x",
+            "failure_cases": ["A/001.json", "A/002.json"],
+        }],
+    )
+    assert verdict["passed"] is False
+    assert "artifact" in verdict["reason"]
+
+
+def _family_arguments():
+    return {
+        "allowed_failure_cases": ["A/001.json", "A/002.json"],
+        "diagnosed_families": [{
+            "failure_family": "FAM-fn-x",
+            "failure_cases": ["A/001.json", "A/002.json"],
+        }],
+    }
+
+
+def test_structural_gate_refuses_an_unpinned_runner_once_it_is_registered(
+    monkeypatch,
+):
+    """The identity check fires the moment the runner becomes executable.
+
+    P2.1's ``RUNNER_REGISTRY`` is what makes ``typed_semantic`` valid; this
+    simulates exactly that one fact so the wiring added by P1.4 is exercised
+    rather than merely present.
+    """
+    import evolution.gates as gates
+
+    monkeypatch.setattr(gates, "validate_intervention", lambda *a, **k: None)
+    verdict = structural_gate(
+        _learned_entry(), active_entries=[], config=load_config(),
+        **_family_arguments(),
+    )
+    assert verdict["passed"] is False
+    assert "incomplete executable identity" in verdict["reason"]
+
+
+def test_structural_gate_does_not_call_two_models_redundant(monkeypatch):
+    """A second model must not be rejected as a duplicate of the first."""
+    import evolution.gates as gates
+
+    monkeypatch.setattr(gates, "validate_intervention", lambda *a, **k: None)
+    deployed = _learned_entry(artifact={"id": "classifier-a", "digest": "a" * 64})
+    candidate = _learned_entry(artifact={"id": "classifier-b", "digest": "b" * 64})
+    candidate["intervention_id"] = "IV-1-002"
+    verdict = structural_gate(
+        candidate, active_entries=[deployed], config=load_config(),
+        **_family_arguments(),
+    )
+    assert verdict["passed"] is True, verdict.get("reason")
+
+
+def test_l0_refuses_a_learned_runner_without_an_artifact(monkeypatch):
+    """The development loop rejects it before spending a measurement."""
+    import evolution.development as development
+
+    monkeypatch.setattr(
+        development, "validate_intervention", lambda *a, **k: None,
+    )
+    from evolution.development import check_l0
+    from evolution.mechanisms import infer_mechanism
+
+    mechanism = infer_mechanism(
+        "FAM-fn-x", member_cases=["A/001.json", "A/002.json"], count=2,
+    )
+    verdict = check_l0(_learned_entry(), mechanism=mechanism)
+    assert verdict["passed"] is False
+    failed = {item["check"]: item for item in verdict["failed"]}
+    assert "structured_identity" in failed
+    assert "artifact" in failed["structured_identity"]["detail"]

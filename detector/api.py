@@ -15,7 +15,11 @@ from detector.evidence import (
     touches_packet,
     validate_snapshot,
 )
-from detector.interventions import compile_runtime_plan, load_intervention_registry
+from detector.interventions import (
+    SemanticExecutor,
+    compile_runtime_plan,
+    load_intervention_registry,
+)
 from detector.judge import _parse_judge, run_judge
 from detector.packet import build_packet, validate_record
 from detector.predicate_context import judge_predicate_context
@@ -261,6 +265,7 @@ class Detector:
         config: Mapping[str, Any] | None = None,
         *,
         require_credentials: bool = True,
+        semantic_executor: "SemanticExecutor | None" = None,
     ) -> None:
         self.config = (
             config if config is not None
@@ -270,6 +275,11 @@ class Detector:
         self.default_interventions_path = (
             Path(str(registry_path)) if registry_path else None
         )
+        # The executor behind any ``typed_semantic`` entry in a registry. It is
+        # injected rather than constructed here: the framework does not own a
+        # model, and an executor that cannot be supplied must make a learned
+        # entry fail closed rather than silently judge as something else.
+        self.semantic_executor = semantic_executor
 
     def detect(
         self,
@@ -355,7 +365,9 @@ class Detector:
                 "configured intervention registry does not exist: "
                 f"{self.default_interventions_path}"
             )
-        plan = compile_runtime_plan(effective_interventions)
+        plan = compile_runtime_plan(
+            effective_interventions, semantic_executor=self.semantic_executor,
+        )
         targeted_hooks = {
             str(entry.get("hook") or "") for entry in plan.entries
         }

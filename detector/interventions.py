@@ -123,6 +123,213 @@ _EVIDENCE_HOOK_BY_TYPE: dict[str, frozenset[str]] = {
     "recall_trigger": frozenset({RECALL_TRIGGER_HOOK}),
 }
 
+# ---------------------------------------------------------------------------
+# Runner registry
+# ---------------------------------------------------------------------------
+# Every executor an intervention may name declares what it is and what it may
+# do. Before this the runner space was an implicit if/else: anything that was
+# not ``typed_dsl`` fell to the built-in predicate table, and a new executor
+# could only be added by editing two dispatch sites -- a shape where the
+# *absence* of a declaration was the same as "use the default".
+#
+# Each spec answers the questions a gate or a reviewer actually needs:
+#
+#   supported_hooks       which hooks this runner may be bound to
+#   intervention_types    which intervention kinds may carry it
+#   input_schema          what the body must declare
+#   deterministic         same input -> same output, no external state
+#   learned               reads an artifact whose content must be pinned
+#   requires_artifact     the entry must carry artifact{id,digest}
+#   terminal_authority    whether its verdicts may ever authorize a conviction
+#
+# ``terminal_authority`` is the safety-relevant one. A learned executor is
+# registered ``evidence_only``: it may report, and it may never be the thing
+# that convicts. That is plan §12.3's rule ("learned executor only outputs
+# evidence, no independent terminal conviction") expressed where it can be
+# enforced rather than in prose.
+
+TERMINAL_NONE = "none"
+TERMINAL_EVIDENCE_ONLY = "evidence_only"
+TERMINAL_CONVICTION = "conviction"
+
+
+class RunnerSpec:
+    """What one executor is and what it may do."""
+
+    __slots__ = (
+        "name", "supported_hooks", "intervention_types", "input_schema",
+        "deterministic", "learned", "requires_artifact", "terminal_authority",
+        "description",
+    )
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        supported_hooks: frozenset[str],
+        intervention_types: frozenset[str],
+        input_schema: str,
+        deterministic: bool,
+        learned: bool,
+        requires_artifact: bool,
+        terminal_authority: str,
+        description: str = "",
+    ) -> None:
+        if terminal_authority not in {
+            TERMINAL_NONE, TERMINAL_EVIDENCE_ONLY, TERMINAL_CONVICTION,
+        }:
+            raise ValueError(
+                f"runner {name!r}: unknown terminal_authority "
+                f"{terminal_authority!r}"
+            )
+        if learned and terminal_authority == TERMINAL_CONVICTION:
+            # A learned runner's decisions come from an artifact that can be
+            # swapped. Allowing it to convict terminally would make the
+            # detector's verdict a function of whatever weights happen to be
+            # loaded, with no calibration gate in between.
+            raise ValueError(
+                f"runner {name!r}: a learned runner may not hold terminal "
+                "conviction authority"
+            )
+        self.name = name
+        self.supported_hooks = frozenset(supported_hooks)
+        self.intervention_types = frozenset(intervention_types)
+        self.input_schema = input_schema
+        self.deterministic = bool(deterministic)
+        self.learned = bool(learned)
+        self.requires_artifact = bool(requires_artifact)
+        self.terminal_authority = terminal_authority
+        self.description = description
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "supported_hooks": sorted(self.supported_hooks),
+            "intervention_types": sorted(self.intervention_types),
+            "input_schema": self.input_schema,
+            "deterministic": self.deterministic,
+            "learned": self.learned,
+            "requires_artifact": self.requires_artifact,
+            "terminal_authority": self.terminal_authority,
+            "description": self.description,
+        }
+
+
+# The semantic executor's verdict vocabulary. ``abstained`` is a first-class
+# outcome: a semantic runner that cannot decide must say so, and the vocabulary
+# makes "I could not tell" distinguishable from "I checked and it holds".
+SEMANTIC_VERDICTS = frozenset({"supported", "contradicted", "abstained"})
+
+RUNNER_REGISTRY: dict[str, RunnerSpec] = {
+    "deterministic": RunnerSpec(
+        name="deterministic",
+        supported_hooks=EVIDENCE_HOOKS | frozenset({RECALL_TRIGGER_HOOK}),
+        intervention_types=frozenset({"evidence_check", "recall_trigger"}),
+        input_schema=(
+            "body.predicate names a built-in predicate; body.output_verdicts "
+            "must equal that predicate's full verdict vocabulary"
+        ),
+        deterministic=True,
+        learned=False,
+        requires_artifact=False,
+        terminal_authority=TERMINAL_CONVICTION,
+        description=(
+            "A built-in mechanical predicate. Its verdicts are computed from "
+            "the packet by fixed code, so a conviction verdict proves a task-"
+            "level mechanical violation."
+        ),
+    ),
+    PROGRAM_RUNNER: RunnerSpec(
+        name=PROGRAM_RUNNER,
+        supported_hooks=EVIDENCE_HOOKS | frozenset({RECALL_TRIGGER_HOOK}),
+        intervention_types=frozenset({"evidence_check", "recall_trigger"}),
+        input_schema=(
+            "body.predicate_definition carries a validated "
+            "detector.predicate_program.v1 program whose name equals "
+            "body.predicate"
+        ),
+        deterministic=True,
+        learned=False,
+        requires_artifact=False,
+        terminal_authority=TERMINAL_CONVICTION,
+        description=(
+            "An inline typed-DSL program. Non-Turing-complete and interpreted "
+            "by fixed operators, so it is deterministic and may hold "
+            "conviction verdicts."
+        ),
+    ),
+    "typed_semantic": RunnerSpec(
+        name="typed_semantic",
+        # Evidence only, and initially evidence_check only: a semantic
+        # judgment routed into recall control flow would let a learned model
+        # decide *when* to run the recall net, which is a stronger power than
+        # reporting an observation.
+        supported_hooks=EVIDENCE_HOOKS,
+        intervention_types=frozenset({"evidence_check"}),
+        input_schema=(
+            "body.predicate names the task schema the executor judges; "
+            "body.output_verdicts must equal the semantic verdict vocabulary"
+        ),
+        deterministic=False,
+        learned=True,
+        requires_artifact=True,
+        terminal_authority=TERMINAL_EVIDENCE_ONLY,
+        description=(
+            "A typed semantic judgment produced by an injected executor. "
+            "Evidence only: it can never authorize a terminal conviction, and "
+            "its artifact must be digest-pinned."
+        ),
+    ),
+}
+
+
+def runner_spec(runner: str) -> RunnerSpec | None:
+    """The declaration for a runner name, or None when it is unregistered."""
+    return RUNNER_REGISTRY.get(str(runner or ""))
+
+
+class SemanticExecutor:
+    """Base class for the injected executor behind ``typed_semantic``.
+
+    A concrete executor owns a model artifact and answers typed judgments. Two
+    properties are load-bearing:
+
+    * ``artifact_id`` / ``artifact_digest`` say *which* artifact this executor
+      actually loaded, so an entry's declared digest can be checked against it
+      rather than trusted. Pinning a digest in an entry is only meaningful if
+      something compares it with reality at run time.
+    * ``judge`` returns a declared verdict and may return ``abstained``. It
+      never returns a conviction; the runner's ``terminal_authority`` is
+      ``evidence_only``, so its output cannot reach a terminal decision.
+
+    ``learned = True`` is what the registry reads to require an artifact; a
+    subclass must set both identity fields or be refused when it is used.
+    """
+
+    name = ""
+
+    def __init__(self, *, artifact_id: str, artifact_digest: str) -> None:
+        self.artifact_id = str(artifact_id or "")
+        self.artifact_digest = str(artifact_digest or "")
+
+    def judge(
+        self,
+        predicate: str,
+        packet: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def identity(self) -> dict[str, str]:
+        return {"id": self.artifact_id, "digest": self.artifact_digest}
+
+
+def runner_declarations() -> list[dict[str, Any]]:
+    """Every registered runner, for a report or an audit."""
+    return [
+        RUNNER_REGISTRY[name].as_dict() for name in sorted(RUNNER_REGISTRY)
+    ]
+
 
 def _require_text(value: Any, field: str) -> str:
     text = str(value or "").strip()
@@ -422,6 +629,75 @@ def validate_intervention_batch(
         )
 
 
+def _validate_runner_binding(
+    entry: Mapping[str, Any],
+    intervention_type: str,
+    hook: str,
+) -> None:
+    """Check the entry against its runner's declared capability contract.
+
+    The declaration only means something if something enforces it. These are
+    the two reachable parts of the contract at validation time: which hooks a
+    runner may bind to, and which intervention kinds may carry it. Both matter
+    for ``typed_semantic``, whose declaration deliberately excludes
+    ``recall.trigger`` -- a learned judgment must not decide *when* the recall
+    net runs, only report what it observes.
+    """
+    body = entry.get("body")
+    body = body if isinstance(body, Mapping) else {}
+    runner = str(body.get("runner") or "")
+    if not runner:
+        return
+    intervention_id = str(entry.get("intervention_id") or "?")
+    spec = runner_spec(runner)
+    if spec is None:
+        raise ValueError(
+            f"{intervention_id}: runner {runner!r} is not registered; known "
+            f"runners are {sorted(RUNNER_REGISTRY)}"
+        )
+    if hook not in spec.supported_hooks:
+        raise ValueError(
+            f"{intervention_id}: runner {runner!r} does not support hook "
+            f"{hook!r}; it declares {sorted(spec.supported_hooks)}"
+        )
+    if intervention_type not in spec.intervention_types:
+        raise ValueError(
+            f"{intervention_id}: runner {runner!r} cannot be carried by a "
+            f"{intervention_type!r} intervention; it declares "
+            f"{sorted(spec.intervention_types)}"
+        )
+
+
+def _validate_artifact_binding(
+    entry: Mapping[str, Any],
+    intervention_id: str,
+) -> dict[str, str]:
+    """Check the artifact a learned runner's entry declares.
+
+    The runner declaration already says an artifact is required; this is the
+    entry-level half. Both fields must be present and non-empty, because an
+    entry cannot be identified by a runner name alone when the behaviour comes
+    from what the runner loaded (plan §23.2: learned artifacts must have a
+    digest).
+    """
+    raw = entry.get("artifact")
+    if not isinstance(raw, Mapping):
+        raise ValueError(
+            f"{intervention_id}: this runner reads a learned artifact, so the "
+            "entry must declare artifact{id, digest}"
+        )
+    binding: dict[str, str] = {}
+    for field in ("id", "digest"):
+        value = str(raw.get(field) or "").strip()
+        if not value:
+            raise ValueError(
+                f"{intervention_id}: artifact.{field} is required and must be "
+                "non-empty"
+            )
+        binding[field] = value
+    return binding
+
+
 def _validate_body(
     entry: Mapping[str, Any],
     intervention_type: str,
@@ -462,11 +738,23 @@ def _validate_body(
                     f"{program.get('name')!r} must equal body.predicate {predicate!r}"
                 )
             expected = set(program.get("verdicts") or ())
+        elif runner in RUNNER_REGISTRY:
+            # A registered runner whose predicate the entry did not define.
+            # The runner is known, so the fix is about the entry, and saying
+            # "unregistered" here would send the caller after the wrong thing.
+            expected = set(SEMANTIC_VERDICTS)
         else:
+            registered = runner_spec(runner)
+            if registered is None:
+                raise ValueError(
+                    f"{intervention_id}: runner {runner!r} is not registered; "
+                    f"known runners are {sorted(RUNNER_REGISTRY)}"
+                )
             raise ValueError(
                 f"{intervention_id}: predicate {predicate!r} has no registered "
-                "executor; use a built-in predicate or carry a validated "
-                f"{PROGRAM_RUNNER} predicate_definition"
+                "executor; use a built-in predicate, carry a validated "
+                f"{PROGRAM_RUNNER} predicate_definition, or name a registered "
+                "semantic runner"
             )
         verdicts = set(body.get("output_verdicts") or ())
         if verdicts != expected:
@@ -474,6 +762,9 @@ def _validate_body(
                 f"{intervention_id}: output_verdicts must declare the full "
                 f"executor vocabulary {sorted(expected)}"
             )
+        spec = runner_spec(runner)
+        if spec is not None and spec.requires_artifact:
+            _validate_artifact_binding(entry, intervention_id)
         return {
             "predicate": predicate,
             "runner": runner,
@@ -510,6 +801,19 @@ def _validate_body(
                 )
             expected = set(program.get("verdicts") or ())
         else:
+            # Name the runner's own restriction when that is the reason. A
+            # proposer reads this text in its repair loop, and "no registered
+            # executor" for a runner that *is* registered but may not drive
+            # recall control flow sends it looking for the wrong problem.
+            spec = runner_spec(runner)
+            if spec is not None and "recall_trigger" not in spec.intervention_types:
+                raise ValueError(
+                    f"{intervention_id}: runner {runner!r} cannot be carried by "
+                    f"a recall_trigger; it declares "
+                    f"{sorted(spec.intervention_types)}. A runner whose "
+                    "verdicts cannot convict is not allowed to decide when the "
+                    "recall net runs."
+                )
             raise ValueError(
                 f"{intervention_id}: predicate {predicate!r} has no registered "
                 "executor; use a built-in predicate or carry a validated "
@@ -521,6 +825,9 @@ def _validate_body(
                 f"{intervention_id}: output_verdicts must declare the full "
                 f"executor vocabulary {sorted(expected)}"
             )
+        spec = runner_spec(runner)
+        if spec is not None and spec.requires_artifact:
+            _validate_artifact_binding(entry, intervention_id)
         trigger_verdicts = set(body.get("trigger_verdicts") or ())
         if not trigger_verdicts or not trigger_verdicts <= verdicts:
             raise ValueError(
@@ -661,6 +968,7 @@ def validate_intervention(
         custom_predicate_verdicts=custom_predicate_verdicts,
         custom_conviction_verdicts=custom_conviction_verdicts,
     )
+    _validate_runner_binding(entry, intervention_type, hook)
     program = (entry.get("body") or {}).get("predicate_definition")
     if program:
         validate_program_hook(program, hook)
@@ -791,7 +1099,12 @@ class InterventionPlan:
     a faithful append-only trace.
     """
 
-    def __init__(self, entries: Sequence[Mapping[str, Any]]) -> None:
+    def __init__(
+        self,
+        entries: Sequence[Mapping[str, Any]],
+        *,
+        semantic_executor: "SemanticExecutor | None" = None,
+    ) -> None:
         self.entries = [dict(entry) for entry in entries]
         self.fired: list[dict[str, Any]] = []
         self.evidence: list[dict[str, Any]] = []
@@ -806,13 +1119,76 @@ class InterventionPlan:
             **PREDICATE_CONVICTION_VERDICTS,
             **custom_conviction_verdicts_for(self.predicate_programs),
         }
+        self.semantic_executor = semantic_executor
+
+    def _semantic_result(
+        self,
+        entry: Mapping[str, Any],
+        packet: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Run one ``typed_semantic`` judgment, or fail closed.
+
+        The executor's own identity is compared with the entry's declared
+        artifact before it is used. Without that comparison the pinned digest
+        would be decoration: a loader could hand over model B while the entry
+        names model A, and every downstream check would still pass because it
+        only ever saw the declared value.
+        """
+        intervention_id = str(entry.get("intervention_id") or "?")
+        executor = self.semantic_executor
+        if executor is None:
+            raise ValueError(
+                f"{intervention_id}: typed_semantic needs an executor; none was "
+                "supplied to this detection call. A learned judgment cannot be "
+                "simulated by the deterministic default."
+            )
+        declared = entry.get("artifact") or {}
+        actual = executor.identity()
+        for field in ("id", "digest"):
+            if not str(declared.get(field) or ""):
+                raise ValueError(
+                    f"{intervention_id}: typed_semantic entry declares no "
+                    f"artifact.{field}"
+                )
+            if str(declared.get(field)) != str(actual.get(field) or ""):
+                raise ValueError(
+                    f"{intervention_id}: the executor loaded artifact "
+                    f"{actual.get(field)!r} but the entry pins "
+                    f"{declared.get(field)!r}; refusing to attribute results to "
+                    "an artifact that did not produce them"
+                )
+        body = entry.get("body") or {}
+        predicate = str(body.get("predicate") or "")
+        result = executor.judge(predicate, packet, dict(context))
+        if not isinstance(result, Mapping):
+            raise ValueError(
+                f"{intervention_id}: the semantic executor must return a mapping"
+            )
+        verdict = str(result.get("verdict") or "")
+        if verdict not in SEMANTIC_VERDICTS:
+            raise ValueError(
+                f"{intervention_id}: semantic verdict {verdict!r} is outside the "
+                f"declared vocabulary {sorted(SEMANTIC_VERDICTS)}"
+            )
+        return {
+            "predicate": predicate,
+            "verdict": verdict,
+            "detail": str(result.get("detail") or ""),
+            "runner": "typed_semantic",
+        }
 
     @classmethod
-    def from_registry(cls, payload: Mapping[str, Any] | None) -> "InterventionPlan":
+    def from_registry(
+        cls,
+        payload: Mapping[str, Any] | None,
+        *,
+        semantic_executor: "SemanticExecutor | None" = None,
+    ) -> "InterventionPlan":
         if payload is None:
-            return cls([])
+            return cls([], semantic_executor=semantic_executor)
         entries = validate_registry(payload, require_executable_bounds=True)
-        plan = cls(entries)
+        plan = cls(entries, semantic_executor=semantic_executor)
         plan.registry_hash = str(payload.get("content_hash") or "")
         return plan
 
@@ -881,6 +1257,45 @@ class InterventionPlan:
             self._record(entry, "text_injected", f"hook={hook}")
         return "\n" + "\n".join(lines)
 
+    def _run_predicate(
+        self,
+        entry: Mapping[str, Any],
+        runner: str,
+        predicate: str,
+        packet: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Dispatch one predicate to its declared executor.
+
+        A lookup, not a fallthrough: before this, anything that was not
+        ``typed_dsl`` ran the built-in table, so an unregistered runner name
+        silently executed a *different* executor than the one it named. An
+        unregistered runner is now an error, which is what makes
+        ``RUNNER_REGISTRY`` the authority on what can run.
+        """
+        spec = runner_spec(runner)
+        if spec is None:
+            raise ValueError(
+                f"{entry.get('intervention_id')}: runner {runner!r} is not "
+                f"registered; known runners are {sorted(RUNNER_REGISTRY)}"
+            )
+        if runner == PROGRAM_RUNNER:
+            return run_predicate_program(
+                (entry.get("body") or {}).get("predicate_definition") or {},
+                packet,
+                context,
+            )
+        if runner == "deterministic":
+            return run_predicate(predicate, packet, context)
+        if runner == "typed_semantic":
+            return self._semantic_result(entry, packet, context)
+        # A runner registered without an executor is a registry bug, not a
+        # caller error: fail loudly rather than falling back to another runner.
+        raise ValueError(
+            f"{entry.get('intervention_id')}: runner {runner!r} is declared but "
+            "has no executor wired into InterventionPlan"
+        )
+
     def evidence_for(
         self,
         hook: str,
@@ -900,12 +1315,9 @@ class InterventionPlan:
             body = entry.get("body") or {}
             predicate = str(body.get("predicate") or "")
             runner = str(body.get("runner") or "")
-            if runner == PROGRAM_RUNNER:
-                result = run_predicate_program(
-                    body.get("predicate_definition") or {}, packet, context,
-                )
-            else:
-                result = run_predicate(predicate, packet, context)
+            result = self._run_predicate(
+                entry, runner, predicate, packet, context,
+            )
             allowed_verdicts = set(body.get("output_verdicts") or ())
             if str(result.get("verdict") or "") not in allowed_verdicts:
                 raise ValueError(
@@ -1074,14 +1486,9 @@ class InterventionPlan:
                 continue
             predicate = str(body.get("predicate") or "")
             runner = str(body.get("runner") or "")
-            if runner == PROGRAM_RUNNER:
-                result = run_predicate_program(
-                    body.get("predicate_definition") or {},
-                    packet,
-                    context,
-                )
-            else:
-                result = run_predicate(predicate, packet, context)
+            result = self._run_predicate(
+                entry, runner, predicate, packet, context,
+            )
             verdict = str(result.get("verdict") or "")
             if verdict in set(body.get("trigger_verdicts") or ()):
                 self._record(
@@ -1123,8 +1530,12 @@ class InterventionPlan:
 
 def compile_runtime_plan(
     intervention_registry: Mapping[str, Any] | None = None,
+    *,
+    semantic_executor: "SemanticExecutor | None" = None,
 ) -> InterventionPlan:
-    return InterventionPlan.from_registry(intervention_registry)
+    return InterventionPlan.from_registry(
+        intervention_registry, semantic_executor=semantic_executor,
+    )
 
 
 def empty_plan() -> InterventionPlan:

@@ -10,6 +10,7 @@ from detector.interventions import (
     HOOKS,
     INTERVENTION_TYPES,
     SYSTEM_HOOKS,
+    runner_declarations,
 )
 from detector.packet import PACKET_FEATURE_NAMES
 from detector.predicate_dsl import (
@@ -48,13 +49,21 @@ def capability_surface_report() -> dict[str, Any]:
         "reason": (
             "the runtime can register new typed-DSL predicate programs (with "
             "AND-conjoined conditions) as evidence observations and as "
-            "recall.trigger control-flow policies at admission time; it still "
-            "cannot create LLM stage hooks, arbitrary sandboxed code, "
-            "execution-graph rewrites, or weight updates"
+            "recall.trigger control-flow policies at admission time, and it "
+            "can bind a caller-injected learned executor (typed_semantic) "
+            "under an enforced evidence-only contract; it still cannot create "
+            "LLM stage hooks, arbitrary sandboxed code, execution-graph "
+            "rewrites, or weight updates, and it cannot itself produce a "
+            "learned executor"
         ),
         "executable_inventory": {
             "intervention_types": sorted(INTERVENTION_TYPES),
             "hooks": sorted(HOOKS),
+            # Every executor an intervention may name, with its declared
+            # powers. Reported here because "what can the framework execute"
+            # is exactly the question this report exists to answer, and the
+            # runner space used to be invisible to it.
+            "runners": runner_declarations(),
             "system_prompt_hooks": sorted(SYSTEM_HOOKS),
             "packet_features": sorted(PACKET_FEATURE_NAMES),
             "nonempty_packet_feature_conjunctions": (
@@ -91,6 +100,12 @@ def capability_surface_report() -> dict[str, Any]:
             "prompt_not_when_text": True,
             "new_predicate_program": True,
             "new_executor": True,
+            # Distinct from ``new_executor``: the framework can now *name* a
+            # learned executor (typed_semantic) and enforce its constraints,
+            # but it does not contain one. An executor is injected by the
+            # caller, so this is a capability to bind, not one to generate.
+            "name_a_learned_executor": True,
+            "generate_a_learned_executor": False,
             "new_fact_type": True,
             "new_hook": False,
             "new_guard_action": False,

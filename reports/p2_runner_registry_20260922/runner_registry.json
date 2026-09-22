@@ -1,0 +1,67 @@
+{
+  "conviction_on_semantic_evidence": "IV-1-002: unknown trigger fact 'claim_supported'",
+  "declarations": [
+    {
+      "description": "A built-in mechanical predicate. Its verdicts are computed from the packet by fixed code, so a conviction verdict proves a task-level mechanical violation.",
+      "deterministic": true,
+      "input_schema": "body.predicate names a built-in predicate; body.output_verdicts must equal that predicate's full verdict vocabulary",
+      "intervention_types": [
+        "evidence_check",
+        "recall_trigger"
+      ],
+      "learned": false,
+      "name": "deterministic",
+      "requires_artifact": false,
+      "supported_hooks": [
+        "defense.pre",
+        "judge.post",
+        "recall.trigger",
+        "upgrade.pre"
+      ],
+      "terminal_authority": "conviction"
+    },
+    {
+      "description": "An inline typed-DSL program. Non-Turing-complete and interpreted by fixed operators, so it is deterministic and may hold conviction verdicts.",
+      "deterministic": true,
+      "input_schema": "body.predicate_definition carries a validated detector.predicate_program.v1 program whose name equals body.predicate",
+      "intervention_types": [
+        "evidence_check",
+        "recall_trigger"
+      ],
+      "learned": false,
+      "name": "typed_dsl",
+      "requires_artifact": false,
+      "supported_hooks": [
+        "defense.pre",
+        "judge.post",
+        "recall.trigger",
+        "upgrade.pre"
+      ],
+      "terminal_authority": "conviction"
+    },
+    {
+      "description": "A typed semantic judgment produced by an injected executor. Evidence only: it can never authorize a terminal conviction, and its artifact must be digest-pinned.",
+      "deterministic": false,
+      "input_schema": "body.predicate names the task schema the executor judges; body.output_verdicts must equal the semantic verdict vocabulary",
+      "intervention_types": [
+        "evidence_check"
+      ],
+      "learned": true,
+      "name": "typed_semantic",
+      "requires_artifact": true,
+      "supported_hooks": [
+        "defense.pre",
+        "judge.post",
+        "upgrade.pre"
+      ],
+      "terminal_authority": "evidence_only"
+    }
+  ],
+  "evidence_grade": "diagnostic-only",
+  "identity_mismatch": "IV-1-001: the executor loaded artifact 'classifier-B' but the entry pins 'classifier-a'; refusing to attribute results to an artifact that did not produce them",
+  "no_executor": "IV-1-001: typed_semantic needs an executor; none was supplied to this detection call. A learned judgment cannot be simulated by the deterministic default.",
+  "note": "Offline: no provider call and no admission. Demonstrates the runner contract's enforcement, not detector quality.",
+  "schema_version": "evolution.p2_runner_registry_dryrun.v1",
+  "unregistered_runner": "IV-1-001: runner 'no_such_runner' is not registered; known runners are ['deterministic', 'typed_dsl', 'typed_semantic']",
+  "verdict_beyond_vocabulary": "IV-1-001: semantic verdict 'convicted' is outside the declared vocabulary ['abstained', 'contradicted', 'supported']"
+}
