@@ -1,0 +1,43 @@
+=== 1. resource limits: declared, then probed ===
+  mechanism: windows_job_object  platform: win32
+  declared: {"wall_seconds": true, "cpu_seconds": true, "memory_bytes": true}
+  admission blockers: none
+  soft defaults: {"wall_seconds": 5.0, "cpu_seconds": 2.0, "memory_bytes": 268435456, "max_input_bytes": 262144, "max_output_bytes": 65536}
+  hard ceiling:  {"wall_seconds": 10.0, "cpu_seconds": 5.0, "memory_bytes": 536870912, "max_input_bytes": 1048576, "max_output_bytes": 262144}
+  probing (each probe makes a real child violate one limit)...
+    wall     enforced=True  child stopped after 2.02s wall (wall budget 2.0s)
+    memory   enforced=True  allocation refused by the memory cap
+    cpu      enforced=True  child stopped after 5.66s wall (cpu budget 1.0s)
+
+=== 2. escape routes ===
+  catalogue: 27 routes; refused: 27; leaked: 0
+  sample refusals:
+    async_function         component refused: line 4: AsyncFunctionDef is not allowed at module level; line 4: Asyn
+    attribute_system       component refused: line 1: entrypoint 'f' takes [] but the schema declares ['a']; line 2
+    await_expression       component refused: line 1: entrypoint 'f' takes [] but the schema declares ['a']; line 2
+    class_definition       component refused: line 1: ClassDef is not allowed at module level; line 1: ClassDef is 
+    computed_module_level  component refused: line 1: module-level assignment must be a literal constant; line 4: e
+  import whitelist (16): re, json, math, statistics, decimal, fractions, itertools, functools, collections, string, unicodedata, difflib, textwrap, datetime, operator, typing
+
+=== 3. the runner's declared contract ===
+  supported_hooks        ['defense.pre', 'judge.post', 'upgrade.pre']
+  intervention_types     ['evidence_check']
+  deterministic          True
+  learned                False
+  requires_artifact      True
+  terminal_authority     evidence_only
+  metamorphic_classes    ['case_id_rename', 'irrelevant_tool_call', 'localization_event_move', 'neighbor_surface_token', 'source_rename']
+
+=== 4. metamorphic admission ===
+  deterministic          admitted=True classes=5 failed=[]
+  sandboxed_component    admitted=True classes=5 failed=[]
+  typed_dsl              admitted=True classes=5 failed=[]
+  typed_semantic         admitted=True classes=6 failed=[]
+  admission_error('sandboxed_component') = ''
+
+=== 5. reachability through the evolution backend ===
+  executors built from the registry: ['evo_sentence_match']
+  evidence rows: [{"predicate": "evo_sentence_match", "verdict": "contradicted", "detail": "component evo_sentence_match returned contradicted", "runner": "sandboxed_component", "intervention_id": "IV-1-001", "hook": "judge.post", "failure_family": "FAM-fn-x"}]
+  tampered digest refused: IV-1-001: the executor loaded artifact '90bbf86f008957d09fd9ba531b6f6fb6c086ed93518fdb8ea59176be
+
+verdict: PASS

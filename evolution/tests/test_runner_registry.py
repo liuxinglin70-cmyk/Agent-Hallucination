@@ -269,7 +269,13 @@ def test_the_registry_declares_the_runners_that_existed_before_it():
         assert spec.requires_artifact is False
         assert spec.terminal_authority == "conviction"
         assert spec.deterministic is True
-    assert set(RUNNER_REGISTRY) == {"deterministic", "typed_dsl", "typed_semantic"}
+    # Exactly the registered set, with the Level B component runner added by
+    # P2.2. Pinned as an equality rather than a superset on purpose: a runner
+    # that appears in the registry without a test noticing it is a runner whose
+    # powers nobody declared.
+    assert set(RUNNER_REGISTRY) == {
+        "deterministic", "typed_dsl", "typed_semantic", "sandboxed_component",
+    }
 
 
 def test_a_drafted_semantic_entry_builds_validates_and_runs():

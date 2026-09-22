@@ -23,6 +23,13 @@ from detector.predicates import (
     PREDICATE_VERDICTS,
 )
 from evolution.metamorphic import metamorphic_report
+from evolution.sandbox import (
+    DEFAULT_LIMITS,
+    HARD_LIMITS,
+    IMPORT_WHITELIST,
+    admission_blockers,
+    sandbox_capabilities,
+)
 
 
 def capability_surface_report() -> dict[str, Any]:
@@ -71,6 +78,23 @@ def capability_surface_report() -> dict[str, Any]:
             # other half of ``runners`` -- that one says what a runner may do,
             # this one says what it must not notice.
             "runner_admission": metamorphic_report(),
+            # What the Level B sandbox can actually enforce on this platform,
+            # declared. The *probed* reading (which makes a child violate each
+            # limit) belongs in a report, not in a per-call audit: it launches
+            # processes. ``admission_blockers`` is reported because an empty
+            # list is the difference between "components may run" and "they
+            # must be refused".
+            "sandbox": {
+                "capabilities": sandbox_capabilities(verify=False),
+                "admission_blockers": admission_blockers(),
+                "soft_defaults": dict(DEFAULT_LIMITS),
+                "hard_ceiling": dict(HARD_LIMITS),
+                "import_whitelist": list(IMPORT_WHITELIST),
+                "component_kinds_served": [
+                    "field parsing", "argument binding comparison",
+                    "structured contract checking", "event dependency extraction",
+                ],
+            },
             "system_prompt_hooks": sorted(SYSTEM_HOOKS),
             "packet_features": sorted(PACKET_FEATURE_NAMES),
             "nonempty_packet_feature_conjunctions": (
@@ -119,7 +143,19 @@ def capability_surface_report() -> dict[str, Any]:
             "new_control_flow_policy": True,
             "typed_dsl_template_proposer": True,
             "execution_graph_rewrite": False,
-            "sandboxed_code_generation": False,
+            # P2.2: bounded, not open. A component is a pure function with a
+            # fixed parameter schema, a whitelisted import set, no filesystem
+            # or network, and OS-enforced CPU/time/memory limits -- and it is
+            # evidence-only. Reporting this as ``True`` alongside those limits
+            # is the honest reading; reporting it as ``False`` would understate
+            # what can now run, and reporting it without them would overstate
+            # what it can do.
+            "sandboxed_code_generation": True,
+            "sandboxed_code_generation_scope": (
+                "pure function, fixed parameter schema, import whitelist, no "
+                "filesystem or network access, OS-enforced cpu/time/memory "
+                "limits, evidence-only (may never convict)"
+            ),
             "model_weight_update": False,
             # P2.3. Distinct from ``new_executor``: the framework can refuse an
             # executor, which is a different power from being able to run one.

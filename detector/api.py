@@ -266,6 +266,7 @@ class Detector:
         *,
         require_credentials: bool = True,
         semantic_executor: "SemanticExecutor | None" = None,
+        component_executor_factory: Any | None = None,
     ) -> None:
         self.config = (
             config if config is not None
@@ -280,6 +281,36 @@ class Detector:
         # model, and an executor that cannot be supplied must make a learned
         # entry fail closed rather than silently judge as something else.
         self.semantic_executor = semantic_executor
+        # The executors behind any ``sandboxed_component`` entries. Unlike the
+        # semantic executor these are derived from the registry itself: a
+        # component carries its own source, so there is nothing for a caller to
+        # supply and nothing for the detector layer to import. Left as None the
+        # detector builds them per call, which keeps the Level B path reachable
+        # from every caller rather than only from the one that remembered.
+        self.component_executor_factory = component_executor_factory
+
+    def _component_executors(
+        self, registry: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        """The sandbox executors a registry's component entries need.
+
+        Empty when the registry names none, which is every registry that
+        predates the runner -- so passing the result unconditionally cannot
+        change an existing path. A factory is accepted so an embedder can
+        supply its own builder; without one, an explicitly supplied factory
+        that returns nothing still leaves the entry to fail closed rather than
+        run some other executor.
+        """
+        entries: list[Mapping[str, Any]] = []
+        if isinstance(registry, Mapping):
+            raw = registry.get("interventions")
+            if isinstance(raw, list):
+                entries = [entry for entry in raw if isinstance(entry, Mapping)]
+        if not entries:
+            return {}
+        if self.component_executor_factory is not None:
+            return dict(self.component_executor_factory(entries) or {})
+        return {}
 
     def detect(
         self,
@@ -366,7 +397,9 @@ class Detector:
                 f"{self.default_interventions_path}"
             )
         plan = compile_runtime_plan(
-            effective_interventions, semantic_executor=self.semantic_executor,
+            effective_interventions,
+            semantic_executor=self.semantic_executor,
+            component_executors=self._component_executors(effective_interventions),
         )
         targeted_hooks = {
             str(entry.get("hook") or "") for entry in plan.entries

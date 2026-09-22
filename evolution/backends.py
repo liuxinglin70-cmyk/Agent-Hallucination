@@ -32,6 +32,44 @@ from evolution.contracts import save_json
 from evolution.splits import load_record
 
 
+def _registry_component_executors(
+    entries: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """The sandbox executor for each component predicate, built on demand.
+
+    A module-level function rather than a lambda so the detector can be handed
+    something inspectable, and so the sandbox import stays inside the
+    evolution layer where it belongs.
+    """
+    from evolution.sandbox import component_executor_for_registry
+
+    return component_executor_for_registry(entries)
+
+
+def _compile_with_component_executors(
+    registry: Mapping[str, Any] | None,
+) -> Any:
+    """Compile a registry with the sandbox executors its component entries need.
+
+    ``sandboxed_component`` entries carry their own source, so the executor is
+    derived from the registry rather than injected by a caller. Doing it here
+    means every evolution-side execution path -- mock backend, real backend,
+    deployment summary -- reaches a component entry the same way, instead of
+    each site remembering to build the executors.
+    """
+    from evolution.sandbox import component_executor_for_registry
+
+    entries: list[Mapping[str, Any]] = []
+    if isinstance(registry, Mapping):
+        raw = registry.get("interventions")
+        if isinstance(raw, list):
+            entries = [entry for entry in raw if isinstance(entry, Mapping)]
+    return compile_runtime_plan(
+        registry,
+        component_executors=component_executor_for_registry(entries),
+    )
+
+
 def prediction_from_state(state: Any) -> bool | None:
     if state == "verified_error":
         return True
@@ -390,7 +428,10 @@ class LiveDetectorBackend(DetectionBackend):
     ) -> None:
         detector_config_path = resolve_path(config.get("detector_config"))
         detector_config = load_detector_config(detector_config_path)
-        self.detector = Detector(detector_config)
+        self.detector = Detector(
+            detector_config,
+            component_executor_factory=_registry_component_executors,
+        )
         self._base_results: dict[str, dict[str, Any]] = {
             str(key).replace("__", "/"): dict(value)
             for key, value in (baseline_results or {}).items()
@@ -759,7 +800,7 @@ class MockDetectorBackend(DetectionBackend):
         return validate_registry(registry, require_executable_bounds=True)
 
     def _deployment(self, registry: Mapping[str, Any] | None) -> dict[str, Any]:
-        plan = compile_runtime_plan(registry)
+        plan = _compile_with_component_executors(registry)
         entries = self._active_ids(registry)
         for entry in entries:
             intervention_id = str(entry.get("intervention_id") or "")
@@ -802,7 +843,7 @@ class MockDetectorBackend(DetectionBackend):
         ``overrides`` are applied afterwards by ``run_case`` and therefore stay
         the explicit oracle override used by protocol tests.
         """
-        plan = compile_runtime_plan(registry)
+        plan = _compile_with_component_executors(registry)
         packet = None
         try:
             packet = build_packet(record)

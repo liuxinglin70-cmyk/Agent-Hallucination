@@ -709,6 +709,44 @@ def cmd_capability_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sandbox_check(args: argparse.Namespace) -> int:
+    """Report the Level B sandbox: limits (probed on request) and refusals.
+
+    Offline and provider-free. ``--probe`` makes a real child violate each
+    limit, which is the difference between a claimed cap and a demonstrated
+    one; it is opt-in because it launches processes and costs a few seconds.
+    The escape-route catalogue is always run, because a validator that has
+    stopped refusing something is the thing a reader most needs to see.
+    """
+    from evolution.sandbox import (
+        DEFAULT_LIMITS,
+        HARD_LIMITS,
+        IMPORT_WHITELIST,
+        admission_blockers,
+        run_forbidden_sources,
+        sandbox_capabilities,
+    )
+
+    routes = run_forbidden_sources()
+    leaked = [row["route"] for row in routes if not row["refused"]]
+    report = {
+        "capabilities": sandbox_capabilities(verify=bool(args.probe)),
+        "admission_blockers": admission_blockers(),
+        "soft_defaults": dict(DEFAULT_LIMITS),
+        "hard_ceiling": dict(HARD_LIMITS),
+        "import_whitelist": list(IMPORT_WHITELIST),
+        "escape_routes": {
+            "catalogue": len(routes),
+            "refused": len(routes) - len(leaked),
+            "leaked": leaked,
+        },
+        "authority": "admission-only",
+    }
+    _print_json(report)
+    ok = not leaked and not report["admission_blockers"]
+    return 0 if ok else 1
+
+
 def cmd_metamorphic_gate(args: argparse.Namespace) -> int:
     """Report the §15.2 admission verdict for the registered runners.
 
@@ -1174,6 +1212,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--config")
     p.set_defaults(func=cmd_capability_smoke)
+
+    p = sub.add_parser(
+        "sandbox-check",
+        help=(
+            "report the Level B sandbox limits and escape-route refusals "
+            "(--probe makes a real child violate each limit)"
+        ),
+    )
+    p.add_argument(
+        "--probe",
+        action="store_true",
+        help="demonstrate each resource limit by making a child violate it",
+    )
+    p.set_defaults(func=cmd_sandbox_check)
 
     p = sub.add_parser(
         "metamorphic-gate",

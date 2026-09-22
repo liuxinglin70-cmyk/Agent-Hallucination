@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from detector.interventions import (
+    RUNNER_REGISTRY,
     build_intervention_registry,
     intervention_content_hash,
     load_intervention_registry,
@@ -32,10 +33,18 @@ _CASE_ID_RE = re.compile(
 # something the entry does not contain -- a model, a tokenizer, a calibration
 # file -- so its identity has to carry that artifact.
 #
-# This list is hand-maintained only until P2.1's ``RUNNER_REGISTRY`` lands, at
-# which point each runner will declare its own identity requirement and this
-# constant is replaced by a lookup.
-DETERMINISTIC_RUNNERS = ("deterministic", PROGRAM_RUNNER)
+# Derived from ``RUNNER_REGISTRY`` rather than hand-listed. The list used to be
+# a literal here with a comment saying it would be replaced by a lookup once
+# P2.1 landed; leaving it would mean a runner could be registered with
+# ``requires_artifact=False`` and still be treated as artifact-reading here, or
+# the reverse -- two authorities on one question, which is how the two silently
+# disagree.
+DETERMINISTIC_RUNNERS = tuple(
+    sorted(
+        name for name, spec in RUNNER_REGISTRY.items()
+        if not spec.requires_artifact and not spec.learned
+    )
+)
 
 # Where an entry declares the artifact its runner depends on. ``id`` names the
 # artifact, ``digest`` pins its content. The *path* is deliberately not part of

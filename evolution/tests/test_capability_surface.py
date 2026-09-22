@@ -85,16 +85,40 @@ def test_the_surface_reports_the_runners_and_does_not_overstate_them():
         entry["name"]: entry
         for entry in report["executable_inventory"]["runners"]
     }
-    assert set(runners) == {"deterministic", "typed_dsl", "typed_semantic"}
+    assert set(runners) == {
+        "deterministic", "typed_dsl", "typed_semantic", "sandboxed_component",
+    }
     assert runners["typed_semantic"]["learned"] is True
     assert runners["typed_semantic"]["terminal_authority"] == "evidence_only"
     assert runners["typed_semantic"]["requires_artifact"] is True
     assert runners["deterministic"]["terminal_authority"] == "conviction"
+    # The Level B component runner: evidence only, artifact-pinned, and not a
+    # conviction authority -- the three properties that make generated code
+    # admissible without letting it decide the outcome.
+    component = runners["sandboxed_component"]
+    assert component["terminal_authority"] == "evidence_only"
+    assert component["requires_artifact"] is True
+    assert component["learned"] is False
+
+    # The admission criterion is reported by *running* it, so the section is a
+    # verdict rather than a promise.
+    admission = report["executable_inventory"]["runner_admission"]
+    assert admission["all_admitted"] is True
+    assert admission["authority"] == "admission-only"
+    assert {row["runner"] for row in admission["runners"]} == set(runners)
 
     freedom = report["generative_freedom"]
     assert freedom["name_a_learned_executor"] is True
     assert freedom["generate_a_learned_executor"] is False
     # Still closed, and the change to the runner space does not open them.
     assert freedom["new_hook"] is False
-    assert freedom["sandboxed_code_generation"] is False
     assert freedom["model_weight_update"] is False
+    # P2.2 opens a *bounded* code channel. The claim and its bound are checked
+    # together on purpose: reporting the capability without the limits would
+    # overstate it, and reporting it as absent would understate what runs.
+    assert freedom["sandboxed_code_generation"] is True
+    assert "evidence-only" in freedom["sandboxed_code_generation_scope"]
+    sandbox = report["executable_inventory"]["sandbox"]
+    assert sandbox["admission_blockers"] == []
+    assert sandbox["capabilities"]["declared"]["memory_bytes"] is True
+    assert sandbox["hard_ceiling"]["wall_seconds"] > 0

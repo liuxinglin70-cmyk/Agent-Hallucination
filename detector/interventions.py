@@ -178,6 +178,9 @@ _PACKET_CLASSES = frozenset({
 })
 _IDENTITY_CLASSES = frozenset({"case_id_rename", "source_rename"})
 
+#: The runner name for a Level B sandboxed code component (§10.2).
+COMPONENT_RUNNER = "sandboxed_component"
+
 
 class RunnerSpec:
     """What one executor is and what it may do."""
@@ -338,6 +341,40 @@ RUNNER_REGISTRY: dict[str, RunnerSpec] = {
             "its artifact must be digest-pinned."
         ),
     ),
+    COMPONENT_RUNNER: RunnerSpec(
+        name=COMPONENT_RUNNER,
+        # Evidence only, and evidence_check only, for the same reason as
+        # ``typed_semantic`` but more so: a generated component that could
+        # bind ``recall.trigger`` would decide *when* the recall net runs, and
+        # one that could hold conviction authority would let generated code
+        # convict on its own. Neither is granted here.
+        supported_hooks=EVIDENCE_HOOKS,
+        intervention_types=frozenset({"evidence_check"}),
+        input_schema=(
+            "body.component carries a validated "
+            "evolution.sandboxed_component.v1 component whose name equals "
+            "body.predicate, and body.component_inputs maps each declared "
+            "parameter to one fixed packet view"
+        ),
+        deterministic=True,
+        # Not ``learned``: the artifact is source code, not weights, and an
+        # exact-match component is a legitimate component -- so the
+        # semantic-equivalence class is not added by the constructor the way it
+        # is for a model artifact. ``requires_artifact`` is set anyway, because
+        # behaviour is still determined by pinned content rather than by the
+        # declared fields, and an entry that pins no digest is exactly the
+        # unfalsifiable identity §23.2 refuses.
+        learned=False,
+        requires_artifact=True,
+        terminal_authority=TERMINAL_EVIDENCE_ONLY,
+        metamorphic_classes=_PACKET_CLASSES | _IDENTITY_CLASSES,
+        description=(
+            "A small pure function generated as source and executed under the "
+            "Level B sandbox (fixed parameter schema, import whitelist, no "
+            "filesystem or network, OS-enforced CPU/time/memory limits). "
+            "Evidence only: it reports, and it can never convict."
+        ),
+    ),
 }
 
 
@@ -362,6 +399,40 @@ class SemanticExecutor:
 
     ``learned = True`` is what the registry reads to require an artifact; a
     subclass must set both identity fields or be refused when it is used.
+    """
+
+    name = ""
+
+    def __init__(self, *, artifact_id: str, artifact_digest: str) -> None:
+        self.artifact_id = str(artifact_id or "")
+        self.artifact_digest = str(artifact_digest or "")
+
+    def judge(
+        self,
+        predicate: str,
+        packet: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def identity(self) -> dict[str, str]:
+        return {"id": self.artifact_id, "digest": self.artifact_digest}
+
+
+class ComponentExecutor:
+    """Base class for the injected executor behind ``sandboxed_component``.
+
+    Structurally the same bargain as :class:`SemanticExecutor`, and for the same
+    reason: the framework can *name* an executor, enforce its contract, and
+    refuse to attribute results to an artifact that did not produce them --
+    without the detector layer importing the sandbox that runs it.
+
+    It differs in one way that matters. A ``typed_semantic`` entry names an
+    artifact the caller supplies; a ``sandboxed_component`` entry *carries* its
+    own source, so any caller can reconstruct the executor and re-derive the
+    digest. The injection is therefore a layering decision, not a privilege
+    boundary, and a concrete executor must compare ``identity()`` against the
+    entry's declared digest rather than trust either one.
     """
 
     name = ""
@@ -726,6 +797,23 @@ def _validate_runner_binding(
         )
 
 
+def _resolve_component_input(
+    field: str,
+    packet: Mapping[str, Any],
+    context: Mapping[str, Any],
+) -> Any:
+    """One declared parameter's value, read from the entry's bound packet view.
+
+    Delegates to the typed-DSL view extractor so a component and a
+    ``typed_dsl`` program read the packet the same way. Re-implementing the
+    extraction here would mean two definitions of "event_texts", and the two
+    executors would disagree the first time one of them changed.
+    """
+    from detector.predicate_dsl import _extract_view
+
+    return _extract_view(field, packet, context)
+
+
 def _validate_artifact_binding(
     entry: Mapping[str, Any],
     intervention_id: str,
@@ -741,8 +829,8 @@ def _validate_artifact_binding(
     raw = entry.get("artifact")
     if not isinstance(raw, Mapping):
         raise ValueError(
-            f"{intervention_id}: this runner reads a learned artifact, so the "
-            "entry must declare artifact{id, digest}"
+            f"{intervention_id}: this runner's behaviour is determined by an "
+            "artifact, so the entry must declare artifact{id, digest}"
         )
     binding: dict[str, str] = {}
     for field in ("id", "digest"):
@@ -796,6 +884,81 @@ def _validate_body(
                     f"{program.get('name')!r} must equal body.predicate {predicate!r}"
                 )
             expected = set(program.get("verdicts") or ())
+        elif runner == COMPONENT_RUNNER:
+            # A Level B component travels *inside* the entry, so validation
+            # here is a structural check only: the source is validated by the
+            # sandbox module, which the detector layer does not import (see
+            # ``ComponentExecutor``). What is checked here is what the entry
+            # has to say for the runtime to bind the component at all: a
+            # component object named by the predicate, and a fixed mapping from
+            # each declared parameter to a packet view.
+            component = body.get("component")
+            if not isinstance(component, Mapping):
+                raise ValueError(
+                    f"{intervention_id}: runner {COMPONENT_RUNNER!r} requires "
+                    "body.component to be a sandboxed component object"
+                )
+            name = str(component.get("name") or "")
+            if not name:
+                raise ValueError(
+                    f"{intervention_id}: body.component.name must be non-empty"
+                )
+            if name != predicate:
+                raise ValueError(
+                    f"{intervention_id}: body.component.name {name!r} must "
+                    f"equal body.predicate {predicate!r}"
+                )
+            declared_parameters = component.get("parameters")
+            if not isinstance(declared_parameters, list) or not declared_parameters:
+                raise ValueError(
+                    f"{intervention_id}: body.component.parameters must be a "
+                    "non-empty list"
+                )
+            parameter_names = []
+            for index, item in enumerate(declared_parameters):
+                if not isinstance(item, Mapping):
+                    raise ValueError(
+                        f"{intervention_id}: body.component.parameters[{index}] "
+                        "must be an object"
+                    )
+                field = str(item.get("name") or "")
+                if not field:
+                    raise ValueError(
+                        f"{intervention_id}: body.component.parameters[{index}] "
+                        "needs a non-empty name"
+                    )
+                parameter_names.append(field)
+            inputs = body.get("component_inputs")
+            if not isinstance(inputs, Mapping):
+                raise ValueError(
+                    f"{intervention_id}: runner {COMPONENT_RUNNER!r} requires "
+                    "body.component_inputs mapping each parameter to a packet view"
+                )
+            missing = sorted(set(parameter_names) - set(map(str, inputs)))
+            unknown = sorted(set(map(str, inputs)) - set(parameter_names))
+            if missing or unknown:
+                raise ValueError(
+                    f"{intervention_id}: component_inputs must cover exactly the "
+                    f"declared parameters; missing {missing}, unknown {unknown}"
+                )
+            from detector.predicate_dsl import FIELD_TYPES
+
+            illegal = sorted(
+                str(field) for field in inputs.values()
+                if str(field) not in FIELD_TYPES
+            )
+            if illegal:
+                raise ValueError(
+                    f"{intervention_id}: component_inputs names {illegal}, which "
+                    f"is outside the typed packet vocabulary "
+                    f"{sorted(FIELD_TYPES)}"
+                )
+            declared_verdicts = component.get("returns") or {}
+            expected = set(
+                declared_verdicts.get("verdicts") or ()
+            ) if str(declared_verdicts.get("type") or "") == "verdict" else set(
+                SEMANTIC_VERDICTS
+            )
         elif runner in RUNNER_REGISTRY:
             # A registered runner whose predicate the entry did not define.
             # The runner is known, so the fix is about the entry, and saying
@@ -832,6 +995,16 @@ def _validate_body(
                     body.get("predicate_definition")
                 )}
                 if runner == PROGRAM_RUNNER else {}
+            ),
+            **(
+                {
+                    "component": dict(body.get("component") or {}),
+                    "component_inputs": {
+                        str(key): str(value)
+                        for key, value in (body.get("component_inputs") or {}).items()
+                    },
+                }
+                if runner == COMPONENT_RUNNER else {}
             ),
         }
     if intervention_type == "recall_trigger":
@@ -1162,6 +1335,7 @@ class InterventionPlan:
         entries: Sequence[Mapping[str, Any]],
         *,
         semantic_executor: "SemanticExecutor | None" = None,
+        component_executors: Mapping[str, "ComponentExecutor"] | None = None,
     ) -> None:
         self.entries = [dict(entry) for entry in entries]
         self.fired: list[dict[str, Any]] = []
@@ -1178,6 +1352,10 @@ class InterventionPlan:
             **custom_conviction_verdicts_for(self.predicate_programs),
         }
         self.semantic_executor = semantic_executor
+        # Keyed by predicate, not a single executor: each component entry
+        # carries its own component, so each has its own artifact identity and
+        # the per-entry digest check has to compare against the right one.
+        self.component_executors = dict(component_executors or {})
 
     def _semantic_result(
         self,
@@ -1242,11 +1420,20 @@ class InterventionPlan:
         payload: Mapping[str, Any] | None,
         *,
         semantic_executor: "SemanticExecutor | None" = None,
+        component_executors: Mapping[str, "ComponentExecutor"] | None = None,
     ) -> "InterventionPlan":
         if payload is None:
-            return cls([], semantic_executor=semantic_executor)
+            return cls(
+                [],
+                semantic_executor=semantic_executor,
+                component_executors=component_executors,
+            )
         entries = validate_registry(payload, require_executable_bounds=True)
-        plan = cls(entries, semantic_executor=semantic_executor)
+        plan = cls(
+            entries,
+            semantic_executor=semantic_executor,
+            component_executors=component_executors,
+        )
         plan.registry_hash = str(payload.get("content_hash") or "")
         return plan
 
@@ -1347,12 +1534,84 @@ class InterventionPlan:
             return run_predicate(predicate, packet, context)
         if runner == "typed_semantic":
             return self._semantic_result(entry, packet, context)
+        if runner == COMPONENT_RUNNER:
+            return self._component_result(entry, packet, context)
         # A runner registered without an executor is a registry bug, not a
         # caller error: fail loudly rather than falling back to another runner.
         raise ValueError(
             f"{entry.get('intervention_id')}: runner {runner!r} is declared but "
             "has no executor wired into InterventionPlan"
         )
+
+    def _component_result(
+        self,
+        entry: Mapping[str, Any],
+        packet: Mapping[str, Any],
+        context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Run one sandboxed component, or fail closed.
+
+        The executor's identity is compared with the entry's declared artifact
+        before it is used, for the same reason as with ``typed_semantic``: a
+        pinned digest that nothing compares is decoration.
+
+        The parameter values come from the declared packet views -- not from
+        the component's own reading of the packet -- so the entry fixes what the
+        component can see. A component cannot reach a field the entry did not
+        bind, which is what makes "fixed input schema" true of the *entry* and
+        not merely of the function signature.
+        """
+        intervention_id = str(entry.get("intervention_id") or "?")
+        body = entry.get("body") or {}
+        predicate = str(body.get("predicate") or "")
+        executor = self.component_executors.get(predicate)
+        if executor is None:
+            raise ValueError(
+                f"{intervention_id}: sandboxed_component needs an executor for "
+                f"predicate {predicate!r}; none was supplied to this detection "
+                "call. The sandbox that runs a generated component is built by "
+                "the evolution layer and injected, so a missing one means the "
+                "caller did not build it -- not that the component is absent."
+            )
+        declared = entry.get("artifact") or {}
+        actual = executor.identity()
+        for field in ("id", "digest"):
+            if not str(declared.get(field) or ""):
+                raise ValueError(
+                    f"{intervention_id}: sandboxed_component entry declares no "
+                    f"artifact.{field}"
+                )
+            if str(declared.get(field)) != str(actual.get(field) or ""):
+                raise ValueError(
+                    f"{intervention_id}: the executor loaded artifact "
+                    f"{actual.get(field)!r} but the entry pins "
+                    f"{declared.get(field)!r}; refusing to attribute results to "
+                    "an artifact that did not produce them"
+                )
+        component = body.get("component") or {}
+        inputs = body.get("component_inputs") or {}
+        arguments: dict[str, Any] = {}
+        for name, field in inputs.items():
+            arguments[str(name)] = _resolve_component_input(
+                str(field), packet, context,
+            )
+        result = executor.judge(predicate, packet, {"arguments": arguments})
+        if not isinstance(result, Mapping):
+            raise ValueError(
+                f"{intervention_id}: the component executor must return a mapping"
+            )
+        verdict = str(result.get("verdict") or "")
+        if verdict not in SEMANTIC_VERDICTS:
+            raise ValueError(
+                f"{intervention_id}: component verdict {verdict!r} is outside "
+                f"the declared vocabulary {sorted(SEMANTIC_VERDICTS)}"
+            )
+        return {
+            "predicate": predicate,
+            "verdict": verdict,
+            "detail": str(result.get("detail") or ""),
+            "runner": COMPONENT_RUNNER,
+        }
 
     def evidence_for(
         self,
@@ -1590,9 +1849,12 @@ def compile_runtime_plan(
     intervention_registry: Mapping[str, Any] | None = None,
     *,
     semantic_executor: "SemanticExecutor | None" = None,
+    component_executors: Mapping[str, "ComponentExecutor"] | None = None,
 ) -> InterventionPlan:
     return InterventionPlan.from_registry(
-        intervention_registry, semantic_executor=semantic_executor,
+        intervention_registry,
+        semantic_executor=semantic_executor,
+        component_executors=component_executors,
     )
 
 
@@ -1601,6 +1863,8 @@ def empty_plan() -> InterventionPlan:
 
 
 __all__ = [
+    "COMPONENT_RUNNER",
+    "ComponentExecutor",
     "EVIDENCE_HOOKS",
     "FACT_NAMES",
     "GUARD_ACTIONS",
@@ -1610,7 +1874,10 @@ __all__ = [
     "INTERVENTION_SCHEMA",
     "INTERVENTION_TYPES",
     "InterventionPlan",
+    "METAMORPHIC_CLASSES",
     "RECALL_TRIGGER_HOOK",
+    "RunnerSpec",
+    "SEMANTIC_VERDICTS",
     "SYSTEM_HOOKS",
     "TARGET_KINDS",
     "TARGET_POLARITIES",

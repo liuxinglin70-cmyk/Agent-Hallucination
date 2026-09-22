@@ -51,6 +51,7 @@ import unicodedata
 from typing import Any, Mapping, Sequence
 
 from detector.interventions import (
+    COMPONENT_RUNNER,
     METAMORPHIC_CLASSES,
     PROGRAM_RUNNER,
     RUNNER_REGISTRY,
@@ -1421,6 +1422,43 @@ def _reference_packet_rule(*, name: str, run: Any, prose: str) -> PacketRuleSubj
     )
 
 
+def _reference_component_rule(*, name: str, prose: str) -> PacketRuleSubject:
+    """A packet rule whose verdicts come out of the Level B sandbox.
+
+    The point of admitting ``sandboxed_component`` through the *sandbox* rather
+    than a stand-in is that the class results then describe the path a real
+    component takes: the packet views are resolved by the entry, coerced to the
+    declared parameter types, run in a child under the limits, and mapped back
+    onto the evidence vocabulary.
+    """
+    from evolution.sandbox import execute_component, reference_component
+
+    component = reference_component(name=name)
+
+    def run(packet: Mapping[str, Any], context: Mapping[str, Any]) -> str:
+        from detector.interventions import _resolve_component_input
+
+        arguments = {
+            "expected": _resolve_component_input("last_prose_text", packet, context),
+            "actual": _resolve_component_input("question_text", packet, context),
+        }
+        outcome = execute_component(component, arguments)
+        if not outcome.get("ok"):
+            return "abstained"
+        return str(outcome.get("result") or "abstained")
+
+    return PacketRuleSubject(
+        name=name,
+        run=run,
+        prose=prose,
+        packets=[
+            build_packet(normal_record()),
+            build_packet(tool_call_record()),
+        ],
+        localization=_localization_case(),
+    )
+
+
 #: The subject each registered runner is admitted on. Its presence *is* the
 #: admission: a runner added to ``RUNNER_REGISTRY`` without an entry here is
 #: refused by the gate, and the test suite fails, rather than passing by
@@ -1476,6 +1514,17 @@ REFERENCE_SUBJECTS: dict[str, Any] = {
                     "The sensor reading is 10 degrees.",
                 ),
             ],
+        ),
+    ),
+    COMPONENT_RUNNER: lambda: CompositeSubject(
+        name="reference_sandboxed_component",
+        mechanism=MechanismSubject(),
+        packet_rule=_reference_component_rule(
+            name="evo_reference_component",
+            prose=(
+                "Compare the delivered sentence with the required one and "
+                "report whether the trajectory delivered it."
+            ),
         ),
     ),
 }
